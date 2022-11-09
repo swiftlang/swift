@@ -357,7 +357,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
       return std::make_unique<toolchains::Android>(*this, target);
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::FreeBSD:
-    return std::make_unique<toolchains::GenericUnix>(*this, target);
+    return std::make_unique<toolchains::FreeBSD>(*this, target);
   case llvm::Triple::OpenBSD:
     return std::make_unique<toolchains::OpenBSD>(*this, target);
   case llvm::Triple::Win32:
@@ -2391,7 +2391,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
     std::string executable = getSwiftProgramPath();
 
-    // FIXME: This bypasses mechanisms like -v and -###. (SR-12119)
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses mechanisms like -v and -###.
     sys::TaskQueue queue;
     queue.addTask(executable.c_str(), commandLine);
     queue.execute(nullptr,

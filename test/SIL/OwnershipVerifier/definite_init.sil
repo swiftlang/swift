@@ -72,8 +72,8 @@ bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = mark_uninitialized [var] %3 : $<τ_0_0> { var τ_0_0 } <T>
   %4 = project_box %3a : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr [take] %1 to [initialization] %4 : $*T
-  copy_addr %4 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %4 : $*T
+  copy_addr %4 to [init] %0 : $*T
   destroy_value %3a : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
@@ -128,7 +128,7 @@ bb0(%0 : $*T, %1 : $*T):
   %2 = project_box %ba : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %1 to %2 : $*T
   copy_addr [take] %1 to %2 : $*T
-  copy_addr %2 to [initialization] %0 : $*T
+  copy_addr %2 to [init] %0 : $*T
   destroy_value %ba : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
@@ -246,7 +246,7 @@ entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p : $*P
   %q = init_existential_addr %b : $*P, $C
-  copy_addr %a to [initialization] %q : $*C
+  copy_addr %a to [init] %q : $*C
   %u = function_ref @use : $@convention(thin) (@in P) -> ()
   %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
   dealloc_stack %p : $*P
@@ -400,7 +400,7 @@ bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   apply %7(%8, %6) : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
   copy_addr [take] %8 to %3 : $*MyStruct2
   dealloc_stack %8 : $*MyStruct2
-  copy_addr [take] %3 to [initialization] %0 : $*MyStruct2
+  copy_addr [take] %3 to [init] %0 : $*MyStruct2
   dealloc_stack %2 : $*MyStruct2
   %13 = tuple ()
   return %13 : $()

@@ -574,6 +574,20 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
+#if SWIFT_OBJC_INTEROP
+#if __arm64__
+// Marking this as noinline allows swift_bridgeObjectRetain to avoid emitting
+// a stack frame for the swift_retain path on ARM64. It makes for worse codegen
+// on x86-64, though, so limit it to ARM64.
+SWIFT_NOINLINE
+#endif
+static void *objcRetainAndReturn(void *object) {
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+  objc_retain(static_cast<id>(objectRef));
+  return object;
+}
+#endif
+
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
@@ -584,14 +598,18 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
-    swift_retain(static_cast<HeapObject *>(objectRef));
-    return object;
+    return swift_retain(static_cast<HeapObject *>(objectRef));
   }
-  objc_retain(static_cast<id>(objectRef));
-  return object;
+
+  // Put the call to objc_retain in a separate function, tail-called here. This
+  // allows the fast path of swift_bridgeObjectRetain to avoid creating a stack
+  // frame on ARM64. We can't directly tail-call objc_retain, because
+  // swift_bridgeObjectRetain returns the pointer with objectPointerIsObjCBit
+  // set, so we have to make a non-tail call and then return the value with the
+  // bit set.
+  SWIFT_MUSTTAIL return objcRetainAndReturn(object);
 #else
-  swift_retain(static_cast<HeapObject *>(objectRef));
-  return object;
+  return swift_retain(static_cast<HeapObject *>(objectRef));
 #endif
 }
 

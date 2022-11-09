@@ -345,7 +345,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
 
         /// Invalidate analysis results of Callee.
         PM->invalidateAnalysis(Callee,
-                               SILAnalysis::InvalidationKind::Everything);
+                               SILAnalysis::InvalidationKind::FunctionBody);
       }
     }
   }

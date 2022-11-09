@@ -1669,6 +1669,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::HasSymbolQuery:
         mangleInReverseOrder = true;
         break;
       default:
@@ -2239,6 +2240,18 @@ ManglingError Remangler::mangleNonObjCAttribute(Node *node, unsigned depth) {
 ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
   Buffer << 't';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePack(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
+  Buffer << "QP";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "Qp";
   return ManglingError::Success;
 }
 
@@ -3500,6 +3513,11 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   else
     Buffer << "Xg";
 
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
+  Buffer << "TwS";
   return ManglingError::Success;
 }
 

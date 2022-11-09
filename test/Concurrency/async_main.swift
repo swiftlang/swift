@@ -20,10 +20,10 @@ func asyncFunc() async {
 
 @main struct MyProgram {
   static func main() async throws {
-    print(foo)
+    print("\(foo)")
     foo += 1
     await asyncFunc()
-    print(foo)
+    print("\(foo)")
   }
 }
 
@@ -40,7 +40,7 @@ func asyncFunc() async {
 
 
 // async_Main
-// CHECK-SIL_LABEL: sil hidden @async_Main : $@convention(thin) @async () -> () {
+// CHECK-SIL-LABEL: sil hidden @async_Main : $@convention(thin) @async () -> () {
 // call main
 // CHECK-SIL:  %0 = metatype $@thin MyProgram.Type             // user: %2
 // CHECK-SIL-NEXT:  // function_ref static MyProgram.$main()

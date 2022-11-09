@@ -30,6 +30,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -570,10 +571,21 @@ public:
                                              SILValue value, bool wasPlusOne) {
     // If we have none...
     if (value->getOwnershipKind() == OwnershipKind::None) {
-      // ... and we don't have a no implicit copy trivial type, just return
-      // value.
-      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) ||
-          !vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
+      // If we don't have move only features enabled, just return, we are done.
+      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
+        return value;
+
+      // Then check if we have a pure move only type. In that case, we need to
+      // insert a no implicit copy
+      if (value->getType().isPureMoveOnly()) {
+        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        return SGF.B.createMarkMustCheckInst(
+            PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      }
+
+      // Otherwise, if we don't have a no implicit copy trivial type, just
+      // return value.
+      if (!vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
         return value;
 
       // Otherwise, we have a no implicit copy trivial type, so wrap it in the
@@ -1335,29 +1347,96 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
-  if (auto *Init = PBD->getExecutableInit(idx)) {
+  auto emitInitializer = [&](Expr *initExpr, VarDecl *var, bool forLocalContext,
+                             InitializationPtr &initialization) {
     // If an initial value expression was specified by the decl, emit it into
     // the initialization.
-    FullExpr Scope(Cleanups, CleanupLocation(Init));
+    FullExpr Scope(Cleanups, CleanupLocation(initExpr));
 
-    auto *var = PBD->getSingleVar();
-    if (var && var->getDeclContext()->isLocalContext()) {
+    if (forLocalContext) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
         auto initInfo = orig->getPropertyWrapperInitializerInfo();
         if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
-          Init = placeholder->getOriginalWrappedValue();
+          initExpr = placeholder->getOriginalWrappedValue();
 
-          auto value = emitRValue(Init);
-          emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
-                                                       getForwardingSubstitutionMap(),
-                                                       std::move(value))
-            .forwardInto(*this, SILLocation(PBD), initialization.get());
+          auto value = emitRValue(initExpr);
+          emitApplyOfPropertyWrapperBackingInitializer(
+              PBD, orig, getForwardingSubstitutionMap(), std::move(value))
+              .forwardInto(*this, SILLocation(PBD), initialization.get());
           return;
         }
       }
     }
 
-    emitExprInto(Init, initialization.get(), SILLocation(PBD));
+    emitExprInto(initExpr, initialization.get(), SILLocation(PBD));
+  };
+
+  auto *singleVar = PBD->getSingleVar();
+  if (auto *Init = PBD->getExecutableInit(idx)) {
+    // If an initial value expression was specified by the decl, emit it into
+    // the initialization.
+    bool isLocalVar =
+        singleVar && singleVar->getDeclContext()->isLocalContext();
+    emitInitializer(Init, singleVar, isLocalVar, initialization);
+  } else if (singleVar &&
+             singleVar->isTypeWrapperLocalStorageForInitializer()) {
+    // If any of the type wrapper managed properties had default initializers
+    // we need to emit them as assignments to `_storage` elements as part
+    // of its initialization.
+
+    auto storageVarType = singleVar->getType()->castTo<TupleType>();
+    auto *wrappedDecl = cast<NominalTypeDecl>(
+        singleVar->getDeclContext()->getInnermostTypeContext());
+
+    SmallVector<std::pair<VarDecl *, Expr *>, 2> fieldsToInitialize;
+    fieldsToInitialize.resize_for_overwrite(storageVarType->getNumElements());
+
+    unsigned numInitializable = 0;
+    for (auto member : wrappedDecl->getMembers()) {
+      auto *PBD = dyn_cast<PatternBindingDecl>(member);
+      // Check every member that is managed by the type wrapper.
+      if (!(PBD && PBD->getSingleVar() &&
+            PBD->getSingleVar()->isAccessedViaTypeWrapper()))
+        continue;
+
+      auto *field = PBD->getSingleVar();
+      auto fieldNo = storageVarType->getNamedElementId(field->getName());
+
+      if (auto *initExpr = PBD->getInit(/*index=*/0)) {
+        fieldsToInitialize[fieldNo] = {PBD->getSingleVar(), initExpr};
+        ++numInitializable;
+      }
+    }
+
+    if (numInitializable == 0) {
+      initialization->finishUninitialized(*this);
+      return;
+    }
+
+    // If there are any initializable fields, let's split _storage into
+    // element initializers and emit initializations for individual fields.
+
+    assert(initialization->canSplitIntoTupleElements());
+
+    SmallVector<InitializationPtr, 4> scratch;
+    auto fieldInits = initialization->splitIntoTupleElements(
+        *this, PBD, storageVarType->getCanonicalType(), scratch);
+
+    for (unsigned i : range(fieldInits.size())) {
+      VarDecl *field;
+      Expr *initExpr;
+
+      std::tie(field, initExpr) = fieldsToInitialize[i];
+
+      auto &fieldInit = fieldInits[i];
+      if (initExpr) {
+        emitInitializer(initExpr, field, /*forLocalContext=*/true, fieldInit);
+      } else {
+        fieldInit->finishUninitialized(*this);
+      }
+    }
+
+    initialization->finishInitialization(*this);
   } else {
     // Otherwise, mark it uninitialized for DI to resolve.
     initialization->finishUninitialized(*this);
@@ -1522,7 +1601,58 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     }
 
     case StmtConditionElement::CK_HasSymbol: {
-      llvm::report_fatal_error("Can't SILGen #_hasSymbol yet!");
+      auto info = elt.getHasSymbolInfo();
+      if (info->isInvalid()) {
+        // This condition may have referenced a decl that isn't valid in some
+        // way but for developer convenience wasn't treated as an error. Just
+        // emit a 'true' condition value.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, 1);
+        break;
+      }
+
+      auto expr = info->getSymbolExpr();
+      auto declRef = info->getReferencedDecl();
+      assert(declRef);
+
+      auto decl = declRef.getDecl();
+      getModule().addHasSymbolDecl(decl);
+
+      SILFunction *silFn = SGM.getFunction(
+          SILDeclRef(decl->getHasSymbolQueryDecl(), SILDeclRef::Kind::Func),
+          NotForDefinition);
+      SILValue fnRef = B.createFunctionRefFor(loc, silFn);
+      booleanTestValue = B.createApply(loc, fnRef, {}, {});
+      booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
+      booleanTestLoc = expr;
+
+      // Ensure that function declarations for each function associated with
+      // the decl are emitted so that they can be referenced during IRGen.
+      class SymbolVisitor : public SILSymbolVisitor {
+        SILGenModule &SGM;
+
+      public:
+        SymbolVisitor(SILGenModule &SGM) : SGM{SGM} {};
+
+        void addFunction(SILDeclRef declRef) override {
+          (void)SGM.getFunction(declRef, NotForDefinition);
+        }
+
+        virtual void addFunction(StringRef name, SILDeclRef declRef) override {
+          // The kinds of functions which go through this callback (e.g.
+          // differentiability witnesses) can't be forward declared with a
+          // SILDeclRef alone. For now, just ignore them.
+          //
+          // Ideally, this callback will be removed entirely in favor of
+          // SILDeclRef being able to represent all function variants.
+        }
+      };
+
+      SILSymbolVisitorOptions opts;
+      opts.VisitMembers = false;
+      auto visitorCtx =
+          SILSymbolVisitorContext(getModule().getSwiftModule(), opts);
+      SymbolVisitor(SGM).visitDecl(decl, visitorCtx);
       break;
     }
     }

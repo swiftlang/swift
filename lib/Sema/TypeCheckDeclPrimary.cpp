@@ -33,6 +33,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -180,7 +181,8 @@ static void checkInheritanceClause(
     // For generic parameters and associated types, the GSB checks constraints;
     // however, we still want to fire off the requests to produce diagnostics
     // in some circular validation cases.
-    if (isa<AbstractTypeParamDecl>(decl))
+    if (isa<GenericTypeParamDecl>(decl) ||
+        isa<AssociatedTypeDecl>(decl))
       continue;
 
     // Check whether we inherited from 'AnyObject' twice.
@@ -192,7 +194,7 @@ static void checkInheritanceClause(
       // for Swift >= 5.
       auto sourceRange = inherited.getSourceRange();
       bool isWrittenAsClass =
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
       if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
@@ -210,7 +212,7 @@ static void checkInheritanceClause(
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
         if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
-            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
           SourceLoc classLoc = knownRange.Start;
@@ -1167,7 +1169,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       TypeResolutionStage::Interface,
       [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
-        case RequirementKind::SameCount:
+        case RequirementKind::SameShape:
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -1211,6 +1213,46 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
     assert(isa<SubscriptDecl>(decl));
     decl->diagnose(diag::dynamic_self_invalid_subscript);
   }
+}
+
+/// Check that, if this declaration is a member of an `@_objcImplementation`
+/// extension, it is either `final` or `@objc` (which may have been inferred by
+/// checking whether it shadows an imported declaration).
+static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
+  // We check the properties instead of their accessors.
+  if (isa<AccessorDecl>(VD))
+    return;
+
+  // Are we in an @_objcImplementation extension?
+  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ED || !ED->isObjCImplementation())
+    return;
+
+  assert(ED->getSelfClassDecl() &&
+         !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
+         "@_objcImplementation on non-class or Swift class?");
+
+  if (!VD->isObjCMemberImplementation())
+    return;
+
+  if (VD->isObjC()) {
+    assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
+           "@objc decls in @_objcImplementations should be dynamic!");
+    return;
+  }
+
+  auto &diags = VD->getASTContext().Diags;
+  diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
+                 VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
+
+  if (canBeRepresentedInObjC(VD))
+    diags.diagnose(VD, diag::fixit_add_objc_for_objc_implementation,
+                   VD->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+  diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
+                 VD->getDescriptiveKind())
+      .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
 }
 
 /// Build a default initializer string for the given pattern.
@@ -1499,6 +1541,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
       break;
     }
   }
@@ -1836,6 +1879,10 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
+      // If this is in an `@_objcImplementation` extension, check whether it's
+      // valid there.
+      checkObjCImplementationMemberAvoidsVTable(VD);
+
       // Check for actor isolation of top-level and local declarations.
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
@@ -1929,6 +1976,10 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
     llvm_unreachable("should always be type-checked already");
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    llvm_unreachable("FIXME: macro expansion decl not handled in DeclChecker");
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -2137,6 +2188,7 @@ public:
             return;
           case SourceFileKind::Main:
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2157,6 +2209,7 @@ public:
           case SourceFileKind::SIL:
             return;
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2439,6 +2492,9 @@ public:
       }
     }
 
+    diagnoseCopyableTypeContainingMoveOnlyType(ED);
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(ED);
+
     checkExplicitAvailability(ED);
 
     TypeChecker::checkDeclCircularity(ED);
@@ -2461,8 +2517,9 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    for (Decl *Member : SD->getMembers())
+    for (Decl *Member : SD->getMembers()) {
       visit(Member);
+    }
 
     TypeChecker::checkPatternBindingCaptures(SD);
 
@@ -2476,6 +2533,12 @@ public:
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
+
+    // If this struct is not move only, check that all vardecls of nominal type
+    // are not move only.
+    diagnoseCopyableTypeContainingMoveOnlyType(SD);
+
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2577,6 +2640,17 @@ public:
     }
   }
 
+  void diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(
+      NominalTypeDecl *nomDecl) {
+    if (!nomDecl->isMoveOnly())
+      return;
+
+    for (auto *prot : nomDecl->getAllProtocols()) {
+      nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
+                        nomDecl->getDescriptiveKind(),
+                        nomDecl->getBaseName(), prot->getBaseName());
+    }
+  }
 
   void visitClassDecl(ClassDecl *CD) {
     checkUnsupportedNestedType(CD);
@@ -2740,6 +2814,8 @@ public:
     TypeChecker::checkConformancesInContext(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
+
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -2846,6 +2922,7 @@ public:
         return false;
       case SourceFileKind::Library:
       case SourceFileKind::Main:
+      case SourceFileKind::MacroExpansion:
         break;
       }
     }
@@ -3168,6 +3245,18 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
+    // If this is an @_objcImplementation of a class, set up some aspects of the
+    // class.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+      // Force lowering of stored properties.
+      (void) CD->getStoredProperties();
+
+      // Force creation of an implicit destructor, if any.
+      (void) CD->getDestructor();
+      
+      // FIXME: Should we duplicate any other logic from visitClassDecl()?
+    }
+
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -3181,6 +3270,12 @@ public:
 
     if (nominal->isDistributedActor())
       TypeChecker::checkDistributedActor(SF, nominal);
+
+    // If we have a move only type and allow it to extend any protocol, error.
+    if (nominal->isMoveOnly() && ED->getInherited().size()) {
+      ED->diagnose(diag::moveonly_cannot_conform_to_protocol,
+                   nominal->getDescriptiveKind(), nominal->getBaseName());
+    }
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

@@ -21,7 +21,6 @@ namespace swift {
 class NominalTypeDecl;
 class VarDecl;
 class Type;
-} // namespace swift
 
 /// Representation of a compile-time-known value, for example
 /// in a type property initializer expression
@@ -43,7 +42,7 @@ private:
 class RawLiteralValue : public CompileTimeValue {
 public:
   RawLiteralValue(std::string Value)
-      : CompileTimeValue(ValueKind::RawLiteral), Value(Value) {}
+  : CompileTimeValue(ValueKind::RawLiteral), Value(Value) {}
 
   std::string getValue() const { return Value; }
 
@@ -70,8 +69,8 @@ private:
 class InitCallValue : public CompileTimeValue {
 public:
   InitCallValue(std::string Name, std::vector<FunctionParameter> Parameters)
-      : CompileTimeValue(ValueKind::InitCall), Name(Name),
-        Parameters(Parameters) {}
+  : CompileTimeValue(ValueKind::InitCall), Name(Name),
+  Parameters(Parameters) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::InitCall;
@@ -127,5 +126,5 @@ struct ConstValueTypeInfo {
   swift::NominalTypeDecl *TypeDecl;
   std::vector<ConstValueTypePropertyInfo> Properties;
 };
-
+} // namespace swift
 #endif

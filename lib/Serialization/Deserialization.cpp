@@ -16,6 +16,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -24,18 +25,18 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -1162,9 +1163,10 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto paramDecl = GenericTypeParamDecl::create(
-            getAssociatedModule(), name, SourceLoc(), paramTy->isTypeSequence(),
-            paramTy->getDepth(), paramTy->getIndex(), false, nullptr);
+        auto *paramDecl = GenericTypeParamDecl::createDeserialized(
+            getAssociatedModule(), name, paramTy->getDepth(),
+            paramTy->getIndex(), paramTy->isParameterPack(),
+            /*isOpaqueType*/ false);
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -1219,9 +1221,10 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   if (recordID != GENERIC_ENVIRONMENT)
     fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
+  unsigned kind;
   GenericSignatureID parentSigID;
   TypeID existentialID;
-  GenericEnvironmentLayout::readRecord(scratch, existentialID, parentSigID);
+  GenericEnvironmentLayout::readRecord(scratch, kind, existentialID, parentSigID);
 
   auto existentialTypeOrError = getTypeChecked(existentialID);
   if (!existentialTypeOrError)
@@ -1231,8 +1234,18 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   if (!parentSigOrError)
     return parentSigOrError.takeError();
 
-  auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+  GenericEnvironment *genericEnv = nullptr;
+  switch (GenericEnvironmentKind(kind)) {
+  case GenericEnvironmentKind::OpenedExistential:
+    genericEnv = GenericEnvironment::forOpenedExistential(
+        existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+    break;
+
+  case GenericEnvironmentKind::OpenedElement:
+    genericEnv = GenericEnvironment::forOpenedElement(
+        parentSigOrError.get(), UUID::fromTime());
+  }
+
   envOffset = genericEnv;
 
   return genericEnv;
@@ -2823,21 +2836,21 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
-    bool isTypeSequence;
+    bool isParameterPack;
     unsigned depth;
     unsigned index;
     bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isTypeSequence, depth, index,
+        scratch, nameID, isImplicit, isParameterPack, depth, index,
         isOpaqueType);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
-    auto genericParam = GenericTypeParamDecl::create(
-        DC, MF.getIdentifier(nameID), SourceLoc(), isTypeSequence, depth,
-        index, isOpaqueType, /*opaqueTypeRepr=*/nullptr);
+    auto *genericParam = GenericTypeParamDecl::createDeserialized(
+        DC, MF.getIdentifier(nameID), depth, index, isParameterPack,
+        isOpaqueType);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -3516,8 +3529,8 @@ public:
                                         resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
-          ctx, accessorKind, storage, staticSpelling.getValue(),
-          async, throws, genericParams, resultType, DC);
+          ctx, accessorKind, storage, staticSpelling.getValue(), async, throws,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -5090,6 +5103,20 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::ObjCImplementation_DECL_ATTR: {
+        bool isImplicit;
+        bool isCategoryNameInvalid;
+        uint64_t categoryNameID;
+        serialization::decls_block::ObjCImplementationDeclAttrLayout::
+            readRecord(scratch, isImplicit, isCategoryNameInvalid,
+                       categoryNameID);
+        Identifier categoryName = MF.getIdentifier(categoryNameID);
+        Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
+                                                SourceRange(), isImplicit,
+                                                isCategoryNameInvalid);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
@@ -5103,6 +5130,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       default:
         // We don't know how to deserialize this kind of attribute.
         MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+      }
+
+      // Do a quick check to see if this attribute is a move only attribute. If
+      // so, emit a nice error if we don't have experimental move only enabled.
+      if (Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
+          !MF.getContext().LangOpts.Features.contains(Feature::MoveOnly)) {
+        MF.getContext().Diags.diagnose(
+            SourceLoc(),
+            diag::
+                experimental_moveonly_feature_can_only_be_imported_when_enabled,
+            MF.getAssociatedModule()->getName());
       }
 
       if (!skipAttr) {
@@ -5877,13 +5915,13 @@ Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(
                                       subsOrError.get());
 }
 
-Expected<Type> DESERIALIZE_TYPE(SEQUENCE_ARCHETYPE_TYPE)(
+Expected<Type> DESERIALIZE_TYPE(PACK_ARCHETYPE_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   GenericSignatureID sigID;
   TypeID interfaceTypeID;
 
-  decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID,
-                                                       interfaceTypeID);
+  decls_block::PackArchetypeTypeLayout::readRecord(scratch, sigID,
+                                                   interfaceTypeID);
 
   auto sig = MF.getGenericSignature(sigID);
   if (!sig)
@@ -5899,15 +5937,35 @@ Expected<Type> DESERIALIZE_TYPE(SEQUENCE_ARCHETYPE_TYPE)(
   return contextType;
 }
 
+Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID interfaceID;
+  GenericEnvironmentID genericEnvID;
+
+  decls_block::ElementArchetypeTypeLayout::readRecord(scratch,
+                                                      interfaceID,
+                                                      genericEnvID);
+
+  auto interfaceTypeOrError = MF.getTypeChecked(interfaceID);
+  if (!interfaceTypeOrError)
+    return interfaceTypeOrError.takeError();
+
+  auto envOrError = MF.getGenericEnvironmentChecked(genericEnvID);
+  if (!envOrError)
+    return envOrError.takeError();
+
+  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
+}
+
 Expected<Type>
 DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool typeSequence;
+  bool parameterPack;
   DeclID declIDOrDepth;
   unsigned indexPlusOne;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, typeSequence, declIDOrDepth, indexPlusOne);
+      scratch, parameterPack, declIDOrDepth, indexPlusOne);
 
   if (indexPlusOne == 0) {
     auto genericParam =
@@ -5919,7 +5977,7 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     return genericParam->getDeclaredInterfaceType();
   }
 
-  return GenericTypeParamType::get(typeSequence, declIDOrDepth,
+  return GenericTypeParamType::get(parameterPack, declIDOrDepth,
                                    indexPlusOne - 1, MF.getContext());
 }
 

@@ -441,6 +441,10 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
                                    DeclContext *dc);
 
+/// Returns the unique decl ref identified by the expr according to the
+/// requirements of the \c #_hasSymbol() condition type.
+ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
+
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
@@ -924,7 +928,8 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
 isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                              bool hasUnboundOpener);
+                              bool hasUnboundOpener,
+                              bool isExtensionBinding = false);
 
 /// @}
 
@@ -1493,6 +1498,22 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
 
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
+
+/// Look for closure discriminators within an AST.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
+  unsigned NextDiscriminator = 0;
+
+public:
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator();
+
+  unsigned getFirstDiscriminator() const {
+    return FirstDiscriminator;
+  }
+};
 
 } // end namespace swift
 

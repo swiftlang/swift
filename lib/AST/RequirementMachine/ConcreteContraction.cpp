@@ -371,8 +371,12 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape: {
+    auto substFirstType = substType(firstType);
+    auto substSecondType = substType(req.getSecondType());
+
+    return Requirement(req.getKind(), substFirstType, substSecondType);
+  }
 
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
@@ -553,8 +557,9 @@ bool ConcreteContraction::performConcreteContraction(
 
     auto kind = req.req.getKind();
     switch (kind) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      assert(req.req.getSecondType()->isTypeParameter());
+      continue;
 
     case RequirementKind::SameType: {
       auto constraintType = req.req.getSecondType();

@@ -376,25 +376,25 @@ func archetypeDowncasts<S,
   // CHECK: ([[ARG0:%.*]] : $*S, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $any Derived & R, [[ARG9:%.*]] : @guaranteed $any Base<T> & P, [[ARG10:%.*]] : @guaranteed $any Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr %0 to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<T> & P
   // CHECK-NEXT: checked_cast_addr_br take_always S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
   let _ = s as? (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<T> & P
   // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to any Base<T> & P in [[RESULT]] : $*any Base<T> & P
   let _ = s as! (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<Int> & P
   // CHECK-NEXT: checked_cast_addr_br take_always S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
   let _ = s as? (Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [init] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $any Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to any Base<Int> & P in [[RESULT]] : $*any Base<Int> & P
   let _ = s as! (Base<Int> & P)

@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module > %t/out.ir
+// RUN: %FileCheck --input-file=%t/out.ir %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
@@ -28,9 +29,9 @@ class Foo : NSRuncing, NSFunging, Ansible {
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@.str.[0-9]+]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC3fooyyFTo{{(\.ptrauth)?}}" to i8*)
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC3fooyyFTo{{(\.ptrauth)?}}" to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
@@ -53,9 +54,9 @@ extension Bar : NSRuncing, NSFunging {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
@@ -69,7 +70,7 @@ extension Bas : NSRuncing {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = internal constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas0C0C0a1_B0E3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas0C0C0a1_B0E3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
@@ -89,9 +90,9 @@ class Zim : Frungible {
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
@@ -109,8 +110,8 @@ extension Zang : Frungible {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = internal constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas4ZangC0a1_B0E3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas4ZangC0a1_B0E3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
@@ -120,7 +121,8 @@ protocol InheritingProtocol : BaseProtocol { }
 // CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
 class ImplementingClass : InheritingProtocol { }
 
-// CHECK: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = weak hidden constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+// CHECK-linux: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = weak hidden constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+// CHECK-macosx: @"_OBJC_$_PROTOCOL_REFS_NSDoubleInheritedFunging" = internal global{{.*}}i64 2{{.*}} @"_OBJC_PROTOCOL_$_NSFungingAndRuncing"{{.*}} @"_OBJC_PROTOCOL_$_NSFunging"
 
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @"$s14objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F"
@@ -215,4 +217,14 @@ func gallop<T : Vanner>(_ t: Stirrup<T>) {
 // https://github.com/apple/swift/issues/49678
 func triggerDoubleInheritedFunging() -> AnyObject {
   return NSDoubleInheritedFunging.self as AnyObject
+}
+
+class TestNonRuntimeProto : RuntimeP { }
+
+class TestNonRuntime2Proto : Runtime2P {}
+
+public class SomeImpl : DeclarationOnlyUser {
+    public func printIt() {
+        print("hello")
+    }
 }

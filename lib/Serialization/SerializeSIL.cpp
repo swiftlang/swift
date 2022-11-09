@@ -488,9 +488,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
+  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
+                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
       numAttrs++;
     });
@@ -520,7 +523,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
 
       llvm::SmallString<64> buffer;
@@ -529,10 +532,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
       IdentifierID effectsStrID = S.addUniquedStringRef(OS.str());
       unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
+      bool isGlobalSideEffects = (argumentIndex < 0);
+      unsigned argIdx = (isGlobalSideEffects ? 0 : (unsigned)argumentIndex);
 
       SILArgEffectsAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode,
-          effectsStrID, (unsigned)argumentIndex, (unsigned)isDerived);
+          Out, ScratchRecord, abbrCode, effectsStrID,
+          argIdx, (unsigned)isGlobalSideEffects, (unsigned)isDerived);
     });
 
   if (NoBody)
@@ -911,6 +916,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Currently we don't serialize debug variable infos, so it doesn't make
     // sense to write the instruction at all.
     // TODO: decide if we want to serialize those instructions.
+    return;
+  case SILInstructionKind::TestSpecificationInst:
+    // Instruction exists only for tests.  Ignore it.
     return;
 
   case SILInstructionKind::UnwindInst:

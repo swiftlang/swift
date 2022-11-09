@@ -31,7 +31,7 @@ class MyClass {
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'clone_switch_enum_exit'
+// CHECK-LABEL: } // end sil function 'clone_switch_enum_exit'
 
 /// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
 /// after cloning.
@@ -124,7 +124,7 @@ sil @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
+// CHECK-LABEL: } // end sil function 'clone_try_apply_exit'
 sil @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error any Error) {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load %0 : $*MyArray<MyClass>
@@ -162,7 +162,7 @@ bb6(%9 : $Error):
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
+// CHECK-LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
 sil @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load %0 : $*MyArray<MyClass>
@@ -214,7 +214,7 @@ bb10:
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
+// CHECK-LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
 sil @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load %0 : $*MyArray<MyClass>
@@ -257,45 +257,4 @@ bb10: // Exit dominated by bb3
 
 bb11: // Non-exit dominated by bb1
   return %4 : $Builtin.Int1
-}
-
-class Klass {
-}
-
-struct WrapperStruct {
-  var val: Klass
-}
-
-sil @use_klass : $@convention(thin) (@in_guaranteed Klass) -> ()
-
-sil @test_sink_address_proj : $@convention(thin) (@inout MyArray<MyClass>, @in_guaranteed WrapperStruct) -> () {
-bb0(%0 : $*MyArray<MyClass>, %1 : $*WrapperStruct):
-  %3 = load %0 : $*MyArray<MyClass>
-  br bb1
-
-bb1:
-  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  retain_value %3 : $MyArray<MyClass>
-  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  %ele = struct_element_addr %1 : $*WrapperStruct, #WrapperStruct.val
-  cond_br undef, bb5, bb2
-
-bb2:
- %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb3, bb4
-
-bb3:
-  br bb1
-
-bb4:
- br bb6
-
-bb5:
- %f = function_ref @use_klass : $@convention(thin) (@in_guaranteed Klass) -> ()
- %a = apply %f(%ele) : $@convention(thin) (@in_guaranteed Klass) -> ()
- br bb6
-
-bb6:
- %t = tuple ()
- return %t : $()
 }

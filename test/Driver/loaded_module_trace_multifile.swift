@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -module-name Module %S/Inputs/loaded_module_trace_empty.swift -o %t/Module.swiftmodule
-// RUN: %target-build-swift -emit-module -module-name Module2 %S/Inputs/loaded_module_trace_empty.swift -o %t/Module2.swiftmodule
-// RUN: %target-build-swift %s %S/Inputs/loaded_module_trace_imports_module.swift -emit-loaded-module-trace-path %t/multifile.trace.json -emit-library -o %t/loaded_module_trace_multifile -I %t
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-build-swift -emit-module -module-name Module %S/Inputs/loaded_module_trace_empty.swift -o %t/Module.swiftmodule -module-cache-path %t/cache
+// RUN: %target-build-swift -emit-module -module-name Module2 %S/Inputs/loaded_module_trace_empty.swift -o %t/Module2.swiftmodule -module-cache-path %t/cache
+// RUN: %target-build-swift %s %S/Inputs/loaded_module_trace_imports_module.swift -emit-loaded-module-trace-path %t/multifile.trace.json -emit-library -o %t/loaded_module_trace_multifile -I %t -module-cache-path %t/cache
 // RUN: %FileCheck %s < %t/multifile.trace.json
 
 // This file only imports Module2, but the other file imports Module: hopefully they both appear!

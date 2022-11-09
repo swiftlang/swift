@@ -131,7 +131,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs) {
+                                                   bool printSPIs,
+                                                   bool aliasModuleNames) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -152,6 +153,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
+  result.AliasModuleNames = aliasModuleNames;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -240,7 +242,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (!isPublicOrUsableFromInline(req.getSecondType()))
               return false;
             break;
-          case RequirementKind::SameCount:
+          case RequirementKind::SameShape:
           case RequirementKind::Layout:
             break;
           }
@@ -365,7 +367,11 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
   printName(Name, Context);
 }
 
-void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
+                                const PrintOptions &Options) {
+  if (Options.AliasModuleNames)
+    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
+
   printName(Name);
 }
 
@@ -960,10 +966,6 @@ public:
   }
 
   bool visit(Decl *D) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return false; // not needed for the parser library.
-    #endif
-
     bool Synthesize =
         Options.TransformContext &&
         Options.TransformContext->isPrintingSynthesizedExtension() &&
@@ -1415,8 +1417,8 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirements not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
   case RequirementKind::Superclass: {
@@ -1510,7 +1512,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
-  case RequirementKind::SameCount: {
+  case RequirementKind::SameShape: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1684,9 +1686,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
-          if (param->isTypeSequence())
-            Printer.printAttrName("@_typeSequence ");
-
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
@@ -1699,6 +1698,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
           } else {
             printType(param);
           }
+          if (param->isParameterPack())
+            Printer << "...";
         },
         [&] { Printer << ", "; });
   }
@@ -1757,8 +1758,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
         // We only print the second part of a requirement in the "inherited"
         // clause.
         switch (req.getKind()) {
-        case RequirementKind::SameCount:
-          llvm_unreachable("Same-count requirement not supported here");
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
 
         case RequirementKind::Layout:
           req.getLayoutConstraint()->print(Printer, Options);
@@ -1788,10 +1789,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   printTransformedType(req.getFirstType());
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    Printer << ".count == ";
+  case RequirementKind::SameShape:
+    Printer << ".shape == ";
     printTransformedType(req.getSecondType());
-    Printer << ".count";
+    Printer << ".shape";
     return;
   case RequirementKind::Layout:
     Printer << " : ";
@@ -1848,11 +1849,7 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return false; // not needed for the parser library.
-  #endif
-
-  if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
@@ -2293,8 +2290,6 @@ static void addNamespaceMembers(Decl *decl,
       if (!name)
         continue;
 
-      // If we're building libSyntaxParser, #if out the clang importer request
-      // because libSyntaxParser doesn't know about the clang importer.
       CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
       for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
         if (addedMembers.insert(found).second)
@@ -2504,7 +2499,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                              Name = Declaring->getRealName();
                          }
                        }
-                       Printer.printModuleRef(Mods.front(), Name);
+                       Printer.printModuleRef(Mods.front(), Name, Options);
                        Mods = Mods.slice(1);
                      } else {
                        Printer << Elem.Item.str();
@@ -2734,11 +2729,11 @@ static bool usesFeatureActors(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureConcurrentFunctions(Decl *decl) {
-  return false;
+static bool usesFeatureMacros(Decl *decl) {
+  return isa<MacroExpansionDecl>(decl);
 }
 
-static bool usesFeatureActors2(Decl *decl) {
+static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
@@ -2844,17 +2839,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
 }
 
 static bool usesFeatureGlobalActors(Decl *decl) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto nominal = ext->getExtendedNominal())
-      if (usesFeatureGlobalActors(nominal))
-        return true;
-  }
-
   return false;
 }
 
@@ -3103,6 +3087,14 @@ static bool usesFeatureForwardModeDifferentiation(Decl *decl) {
 }
 
 static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureParserASTGen(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }
 
@@ -3513,9 +3505,9 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
-    if (decl->isTypeSequence())
-      Printer.printAttrName("@_typeSequence ");
     Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
+    if (decl->isParameterPack())
+      Printer << "...";
   });
 
   printInherited(decl);
@@ -4441,6 +4433,24 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << " */";
 }
 
+void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
+  Printer << '#' << decl->getMacro();
+  if (decl->getArgs()) {
+    Printer << '(';
+    auto args = decl->getArgs()->getOriginalArgs();
+    bool isFirst = true;
+    // FIXME: handle trailing closures.
+    for (auto arg : *args) {
+      if (!isFirst) {
+        Printer << ", ";
+      }
+      printArgument(arg);
+      isFirst = false;
+    }
+    Printer << ')';
+  }
+}
+
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
   Printer << expr->getDigitsText();
 }
@@ -4593,12 +4603,6 @@ void PrintAST::visitTupleExpr(TupleExpr *expr) {
     isFirst = false;
   }
   Printer << ")";
-}
-
-void PrintAST::visitPackExpr(PackExpr *expr) {
-}
-
-void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
 }
 
 void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
@@ -4765,6 +4769,10 @@ void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
+  visit(expr->getPatternExpr());
+}
+
 void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {
 }
 
@@ -4923,6 +4931,9 @@ void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperVa
 }
 
 void PrintAST::visitDifferentiableFunctionExtractOriginalExpr(swift::DifferentiableFunctionExtractOriginalExpr *expr) {
+}
+
+void PrintAST::visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
@@ -5376,7 +5387,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    Printer.printModuleRef(Mod, Name);
+    Printer.printModuleRef(Mod, Name, Options);
     Printer << ".";
   }
 
@@ -5461,10 +5472,6 @@ public:
   }
 
   void visit(Type T) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return; // not needed for the parser library.
-    #endif
-
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
@@ -5559,7 +5566,7 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    Printer << "(";
+    Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -5568,7 +5575,7 @@ public:
       Type EltType = Fields[i];
       visit(EltType);
     }
-    Printer << ")";
+    Printer << "}";
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
@@ -5727,7 +5734,8 @@ public:
     Printer << "module<";
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
-    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName(),
+                           Options);
     Printer << ">";
   }
 
@@ -6384,6 +6392,19 @@ public:
     }
   }
 
+  void visitElementArchetypeType(ElementArchetypeType *T) {
+    if (Options.PrintForSIL) {
+      Printer << "@element(\"" << T->getOpenedElementID() << ") ";
+      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      Printer << ") ";
+
+      auto interfaceTy = T->getInterfaceType();
+      visit(interfaceTy);
+    } else {
+      visit(T->getInterfaceType());
+    }
+  }
+
   void printDependentMember(DependentMemberType *T) {
     if (auto *const Assoc = T->getAssocType()) {
       if (Options.ProtocolQualifiedDependentMemberTypes) {
@@ -6452,6 +6473,13 @@ public:
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
 
+      // Opaque archetype substitutions are always canonical, so re-sugar the
+      // constraint type using the owning declaration's generic parameter names.
+      auto genericSig = T->getDecl()->getNamingDecl()->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+      if (genericSig)
+        constraint = genericSig->getSugaredType(constraint);
+
       visit(constraint);
       return;
     }
@@ -6497,7 +6525,7 @@ public:
     }
   }
 
-  void visitSequenceArchetypeType(SequenceArchetypeType *T) {
+  void visitPackArchetypeType(PackArchetypeType *T) {
     printArchetypeCommon(T);
   }
 
@@ -6531,16 +6559,13 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (!decl->getConformingProtocols().empty()) {
-        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
-          if (auto printType = proto->getDeclaredType())
-            printType->print(Printer, Options);
-          else
-            Printer << proto->getNameStr();
-        }, " & ");
-      } else {
-        Printer << "Any";
-      }
+      auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
+          decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
+      auto constraintType = archetypeType->getExistentialType();
+      if (auto *existentialType = constraintType->getAs<ExistentialType>())
+        constraintType = existentialType->getConstraintType();
+
+      constraintType->print(Printer, Options);
       return;
     }
 

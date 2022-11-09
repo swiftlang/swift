@@ -171,3 +171,16 @@ class NonObjC {}
   @IBOutlet weak var something: OX
   init() { }
 }
+
+@propertyWrapper
+struct MyWrapper {
+  var wrappedValue: AnyObject {
+    get { fatalError() }
+    set { }
+  }
+}
+
+@objc class WrappedIBOutlet {
+  // Non-optional types are okay with property wrappers.
+  @IBOutlet @MyWrapper var value: AnyObject
+}

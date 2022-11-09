@@ -317,10 +317,6 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
-
-def enable_experimental_layout_prespecialization :
-  Flag<["-"], "enable-experimental-layout-prespecialization">,
-  HelpText<"Enable experimental support for layout based pre-specializations">;
 }
 
 // HIDDEN FLAGS
@@ -907,6 +903,15 @@ def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
+
+def alias_module_names_in_module_interface :
+  Flag<["-"], "alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disambiguate modules using "
+           "distinct alias names">;
+def disable_alias_module_names_in_module_interface :
+  Flag<["-"], "disable-alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disable disambiguating modules "
+           "using distinct alias names">;
 
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,

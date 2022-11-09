@@ -435,6 +435,41 @@ protected:
   }
 };
 
+/// Diagnose failures related to same-shape generic requirements, e.g.
+/// ```swift
+/// func foo<T..., U...>(t: T..., u: U...) -> (T, U)... {}
+/// func bar<T..., U...>(t: T..., u: U...) {
+///   foo(t: t..., u: u...)
+/// }
+/// ```
+///
+/// The generic parameter packs `T` and `U` are not known to have the same
+/// shape, which is required by `foo()`.
+class SameShapeRequirementFailure final : public RequirementFailure {
+public:
+  SameShapeRequirementFailure(const Solution &solution, Type lhs, Type rhs,
+                              ConstraintLocator *locator)
+      : RequirementFailure(solution, lhs, rhs, locator) {
+#ifndef NDEBUG
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::SameShape);
+#endif
+  }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_same_shape_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_same_shape_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_same_shape_requirement;
+  }
+};
+
 /// Diagnose failures related to superclass generic requirements, e.g.
 /// ```swift
 /// class A {

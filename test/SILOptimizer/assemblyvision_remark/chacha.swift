@@ -1,5 +1,6 @@
 // RUN: %target-swiftc_driver -Osize -emit-sil %s -o /dev/null -Xfrontend -verify
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 // An extraction from the benchmark ChaCha20 that we were not ignoring
 // dealloc_stack and other end scope instructions.

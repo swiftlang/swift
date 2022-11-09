@@ -65,6 +65,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
 
 #endif
 
+VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
+         "Enable dispatch cooperative queues in the global executor.")
+
 #ifndef NDEBUG
 
 VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,

@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -compute-side-effects -unit-test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil [ossa] @unknown : $@convention(thin) () -> ()
+
+sil [ossa] @unknown_caller : $@convention(thin) () -> () {
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @empty_fn : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @empty_fn_caller : $@convention(thin) () -> () {
+  %empty_fn = function_ref @empty_fn : $@convention(thin) () -> ()
+  apply %empty_fn() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @empty_fn_caller_caller : $@convention(thin) () -> () {
+  %empty_fn_caller = function_ref @empty_fn_caller : $@convention(thin) () -> ()
+  apply %empty_fn_caller() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on call_functions: dump-function
+// CHECK:       [[EMPTY_FN:%[^,]+]] = function_ref @empty_fn
+// CHECK:       [[EMPTY_FN_CALLER:%[^,]+]] = function_ref @empty_fn_caller
+// CHECK:       [[EMPTY_FN_CALLER_CALLER:%[^,]+]] = function_ref @empty_fn_caller_caller
+// CHECK:       [[UNKNOWN:%[^,]+]] = function_ref @unknown
+// CHECK:       [[UNKNOWN_CALLER:%[^,]+]] = function_ref @unknown_caller
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on call_functions: dump-function
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK:   apply [[EMPTY_FN]]
+// CHECK:   false
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: begin running test 3 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK:   apply [[EMPTY_FN_CALLER]]
+// CHECK:   false
+// CHECK-LABEL: end running test 3 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: begin running test 4 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK:   apply [[EMPTY_FN_CALLER_CALLER]]
+// CHECK:   false
+// CHECK-LABEL: end running test 4 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: begin running test 5 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK:   apply [[UNKNOWN]]
+// CHECK:   true
+// CHECK-LABEL: end running test 5 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: begin running test 6 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK:   apply [[UNKNOWN_CALLER]]
+// CHECK:   true
+// CHECK-LABEL: end running test 6 of {{[0-9]+}} on call_functions: is-deinit-barrier
+sil [ossa] @call_functions : $@convention(thin) () -> () {
+entry:
+  test_specification "dump-function"
+  test_specification "is-deinit-barrier @instruction[1]"
+  %empty_fn = function_ref @empty_fn : $@convention(thin) () -> ()
+  apply %empty_fn() : $@convention(thin) () -> ()
+
+  test_specification "is-deinit-barrier @instruction[3]"
+  %empty_fn_caller = function_ref @empty_fn_caller : $@convention(thin) () -> ()
+  apply %empty_fn_caller() : $@convention(thin) () -> ()
+
+  test_specification "is-deinit-barrier @instruction[5]"
+  %empty_fn_caller_caller = function_ref @empty_fn_caller_caller : $@convention(thin) () -> ()
+  apply %empty_fn_caller_caller() : $@convention(thin) () -> ()
+
+  test_specification "is-deinit-barrier @instruction[7]"
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+
+  test_specification "is-deinit-barrier @instruction[9]"
+  %unknown_caller = function_ref @unknown_caller : $@convention(thin) () -> ()
+  apply %unknown_caller() : $@convention(thin) () -> ()
+
+  %retval = tuple ()
+  return %retval : $()
+}
+

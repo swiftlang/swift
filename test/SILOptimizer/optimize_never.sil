@@ -183,7 +183,7 @@ sil [Onone] @$s14optimize_never4foo1ys5Int32Vx_AA1CCtlF : $@convention(thin) <T>
 bb0(%0 : $*T, %1 : $C):
   %4 = function_ref @$s14optimize_never10transform1ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
-  copy_addr %0 to [initialization] %5 : $*T
+  copy_addr %0 to [init] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %8 = class_method %1 : $C, #C.foo : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32
@@ -299,7 +299,7 @@ sil @$s14optimize_never4foo3ys5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T,
 bb0(%0 : $*T, %1 : $C):
   %4 = function_ref @$s14optimize_never10transform3ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
-  copy_addr %0 to [initialization] %5 : $*T
+  copy_addr %0 to [init] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %8 = class_method %1 : $C, #C.foo : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32

@@ -287,6 +287,26 @@ namespace {
 
 #undef IMPL
 
+    RetTy visitPackType(CanPackType type,
+                        AbstractionPattern origType,
+                        IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
+    RetTy visitPackExpansionType(CanPackExpansionType type,
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
                                      AbstractionPattern orig,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -669,16 +689,6 @@ namespace {
                                       IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyStructType(type, origType, type->getDecl(),
                                          isSensitive);
-    }
-
-    RetTy visitPackType(CanPackType type, AbstractionPattern origType,
-                        IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
-    }
-
-    RetTy visitPackExpansionType(CanPackExpansionType type, AbstractionPattern origType,
-                                 IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
     }
 
     RetTy visitBuiltinTupleType(CanBuiltinTupleType type, AbstractionPattern origType,
@@ -1459,6 +1469,110 @@ namespace {
     }
   };
 
+  /// A lowering for loadable but non-trivial struct types.
+  class MoveOnlyLoadableStructTypeLowering final
+      : public LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering,
+                                       VarDecl *> {
+    using Super =
+        LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering, VarDecl *>;
+
+  public:
+    MoveOnlyLoadableStructTypeLowering(CanType type,
+                                       RecursiveProperties properties,
+                                       TypeExpansionContext forExpansion)
+        : LoadableAggTypeLowering(type, properties, forExpansion) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue structValue, VarDecl *field,
+                               const TypeLowering &fieldLowering) const {
+      return B.createStructExtract(loc, structValue, field,
+                                   fieldLowering.getLoweredType());
+    }
+
+    void destructureAggregate(
+        SILBuilder &B, SILLocation loc, SILValue aggValue, bool skipTrivial,
+        function_ref<void(unsigned childIndex, SILValue childValue,
+                          const TypeLowering &childLowering)>
+            visitor) const {
+      if (!B.hasOwnership())
+        return Super::destructureAggregate(B, loc, aggValue, skipTrivial,
+                                           visitor);
+
+      auto *dsi = B.createDestructureStruct(loc, aggValue);
+      for (auto pair : llvm::enumerate(dsi->getResults())) {
+        SILValue childValue = pair.value();
+        auto &childLowering =
+            B.getFunction().getTypeLowering(childValue->getType());
+        if (skipTrivial && childLowering.isTrivial())
+          continue;
+        visitor(pair.index(), childValue, childLowering);
+      }
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      return B.createStruct(loc, getLoweredType(), values);
+    }
+
+  private:
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto silTy = getLoweredType();
+      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      assert(structDecl);
+
+      for (auto prop : structDecl->getStoredProperties()) {
+        SILType propTy = silTy.getFieldType(prop, TC, getExpansionContext());
+        auto &propTL = TC.getTypeLowering(propTy, getExpansionContext());
+        children.push_back(Child{prop, propTL});
+      }
+    }
+  };
+
+  /// A lowering for loadable but non-trivial enum types.
+  class MoveOnlyLoadableEnumTypeLowering final
+      : public NonTrivialLoadableTypeLowering {
+  public:
+    MoveOnlyLoadableEnumTypeLowering(CanType type,
+                                     RecursiveProperties properties,
+                                     TypeExpansionContext forExpansion)
+        : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                         properties, IsNotReferenceCounted,
+                                         forExpansion) {}
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 TypeExpansionKind style) const override {
+      // Enums, we never want to expand.
+      return emitDestroyValue(B, loc, value);
+    }
+  };
+
   /// A type lowering for `@differentiable(_linear)` function types.
   class LinearDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
@@ -2022,13 +2136,21 @@ namespace {
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
+      RecursiveProperties properties;
+      properties.setAddressOnly();
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      return handleAddressOnly(packType, properties);
     }
 
-    TypeLowering *visitPackExpansionType(CanPackExpansionType packType,
+    TypeLowering *visitPackExpansionType(CanPackExpansionType packExpansionType,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
+      RecursiveProperties properties;
+      properties.setAddressOnly();
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      return handleAddressOnly(packExpansionType, properties);
     }
 
     TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
@@ -2146,7 +2268,8 @@ namespace {
         properties.setNonTrivial();
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(structType, properties);
-        return handleMoveOnlyReference(structType, properties);
+        return new (TC) MoveOnlyLoadableStructTypeLowering(
+            structType, properties, Expansion);
       }
 
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2223,7 +2346,8 @@ namespace {
         properties.setNonTrivial();
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(enumType, properties);
-        return handleMoveOnlyReference(enumType, properties);
+        return new (TC)
+            MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
@@ -2341,9 +2465,37 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
 
   if (!changed) return substType;
 
-  // The cast should succeed, because if we end up with a one-element
-  // tuple type here, it must have a label.
-  return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
+  return CanTupleType(TupleType::get(loweredElts, tc.Context));
+}
+
+/// Lower each of the elements of the substituted type according to
+/// the abstraction pattern of the given original type.
+static CanPackType computeLoweredPackType(TypeConverter &tc,
+                                          TypeExpansionContext context,
+                                          AbstractionPattern origType,
+                                          CanPackType substType) {
+  assert(origType.matchesPack(substType));
+
+  // Does the lowered tuple type differ from the substituted type in
+  // any interesting way?
+  bool changed = false;
+  SmallVector<Type, 4> loweredElts;
+  loweredElts.reserve(substType->getNumElements());
+
+  for (auto i : indices(substType->getElementTypes())) {
+    auto origEltType = origType.getPackElementType(i);
+    auto substEltType = substType.getElementType(i);
+
+    CanType loweredTy =
+        tc.getLoweredRValueType(context, origEltType, substEltType);
+    changed = (changed || substEltType != loweredTy);
+
+    loweredElts.push_back(loweredTy);
+  }
+
+  if (!changed) return substType;
+
+  return CanPackType(PackType::get(tc.Context, loweredElts));
 }
 
 static CanType computeLoweredOptionalType(TypeConverter &tc,
@@ -2760,54 +2912,34 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                                              MetatypeRepresentation::Thick);
     }
 
-    CanType visitExistentialType(CanExistentialType substExistType) {
-      // Try to avoid walking into the constraint type if we can help it
-      if (!substExistType->hasTypeParameter() &&
-          !substExistType->hasArchetype() &&
-          !substExistType->hasOpaqueArchetype()) {
-        return substExistType;
-      }
-
-      return CanExistentialType::get(visit(substExistType.getConstraintType()));
+    // Lower pack element types.
+    CanType visitPackType(CanPackType substPackType) {
+      return computeLoweredPackType(TC, forExpansion, origType,
+                                    substPackType);
     }
 
-    CanType
-    visitParameterizedProtocolType(CanParameterizedProtocolType substPPT) {
+    CanType visitPackExpansionType(CanPackExpansionType substPackExpansionType) {
       bool changed = false;
-      SmallVector<Type, 4> loweredSubstArgs;
-      loweredSubstArgs.reserve(substPPT.getArgs().size());
 
-      auto origConstraint = origType.getExistentialConstraintType();
-      auto origPPT = origConstraint.getAs<ParameterizedProtocolType>();
-      if (!origPPT)
-        return substPPT;
-      
-      for (auto i : indices(substPPT.getArgs())) {
-        auto origArgTy = AbstractionPattern(
-            origConstraint.getGenericSignatureOrNull(), origPPT.getArgs()[i]);
-        auto substArgType = substPPT.getArgs()[i];
+      CanType substPatternType = substPackExpansionType.getPatternType();
+      CanType loweredSubstPatternType = TC.getLoweredRValueType(
+          forExpansion,
+          origType.getPackExpansionPatternType(),
+          substPatternType);
+      changed |= (loweredSubstPatternType != substPatternType);
 
-        CanType loweredSubstEltType =
-            TC.getLoweredRValueType(forExpansion, origArgTy, substArgType);
-        changed = changed || substArgType != loweredSubstEltType;
-
-        loweredSubstArgs.push_back(loweredSubstEltType);
-      }
+      CanType substCountType = substPackExpansionType.getCountType();
+      CanType loweredSubstCountType = TC.getLoweredRValueType(
+          forExpansion,
+          origType.getPackExpansionCountType(),
+          substCountType);
+      changed |= (loweredSubstCountType != substCountType);
 
       if (!changed)
-        return substPPT;
+        return substPackExpansionType;
 
-      return CanParameterizedProtocolType::get(
-          TC.Context, substPPT->getBaseType(), loweredSubstArgs);
-    }
-
-    CanType visitPackType(CanPackType substPackType) {
-      llvm_unreachable("");
-    }
-
-
-    CanType visitPackExpansionType(CanPackExpansionType substPackType) {
-      llvm_unreachable("");
+      return CanType(PackExpansionType::get(loweredSubstPatternType,
+                                            loweredSubstCountType));
     }
 
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {

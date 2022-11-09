@@ -205,7 +205,7 @@ sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, 
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   strong_release %2 : $B
   strong_retain %2 : $B
-  copy_addr [take] %1 to [initialization] %0 : $*T // id: %3
+  copy_addr [take] %1 to [init] %0 : $*T // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 }
@@ -819,6 +819,28 @@ bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.W
   release_value %0 : $_ContiguousArrayBuffer<AnyObject>
   return %newptr : $Builtin.RawPointer
 }
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @testMemcpy
+// CHECK-RELEASE-HOISTING:       bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
+// CHECK-RELEASE-HOISTING:         builtin "int_memcpy_RawPointer_RawPointer_Word"
+// CHECK-RELEASE-HOISTING:         release_value %0 : $_ContiguousArrayBuffer<UInt64>
+// CHECK-RELEASE-HOISTING:       } // end sil function 'testMemcpy'
+sil @testMemcpy : $@convention(thin) (_ContiguousArrayBuffer<UInt64>, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
+  %newptr = builtin "allocRaw"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer
+  %token = bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*UInt64
+  %storage = struct_extract %0 : $_ContiguousArrayBuffer<UInt64>, #_ContiguousArrayBuffer._storage
+  %elements = ref_tail_addr %storage : $__ContiguousArrayStorageBase, $UInt64
+  %eltptr = address_to_pointer %elements : $*UInt64 to $Builtin.RawPointer
+  %objptr = struct $UnsafePointer<UInt64> (%eltptr : $Builtin.RawPointer)
+  %ptrdep = mark_dependence %objptr : $UnsafePointer<UInt64> on %storage : $__ContiguousArrayStorageBase
+  %rawptr = struct_extract %ptrdep : $UnsafePointer<UInt64>, #UnsafePointer._rawValue
+  %f = integer_literal $Builtin.Int1, 0
+  %move = builtin "int_memcpy_RawPointer_RawPointer_Word"(%newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word, %f : $Builtin.Int1) : $()
+  release_value %0 : $_ContiguousArrayBuffer<UInt64>
+  return %newptr : $Builtin.RawPointer
+}
+
 
 // CHECK-LABEL: sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz>
 // CHECK:    strong_retain %0

@@ -21,6 +21,8 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBridging.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
@@ -30,7 +32,9 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -636,22 +640,6 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *noneBB = builder->getFunction().createBasicBlockAfter(someBB);
 
     auto *phi = contBB->createPhiArgument(destTy, value->getOwnershipKind());
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      auto createEndBorrow = [&](SILBasicBlock::iterator insertPt) {
-        builder->setInsertionPoint(insertPt);
-        builder->createEndBorrow(loc, phi);
-      };
-      for (SILInstruction *user : usePoints) {
-        if (isa<TermInst>(user)) {
-          assert(!isa<BranchInst>(user) && "no branch as guaranteed use point");
-          for (auto *succBB : user->getParent()->getSuccessorBlocks()) {
-            createEndBorrow(succBB->begin());
-          }
-          continue;
-        }
-        createEndBorrow(std::next(user->getIterator()));
-      }
-    }
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));
@@ -677,17 +665,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // rewrapped Optional.
     SILValue someValue =
         builder->createOptionalSome(loc, castedUnwrappedValue, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       someValue = builder->createBeginBorrow(loc, someValue);
-    }
     builder->createBranch(loc, contBB, {someValue});
 
     // Handle the None case.
     builder->setInsertionPoint(noneBB);
     SILValue noneValue = builder->createOptionalNone(loc, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       noneValue = builder->createBeginBorrow(loc, noneValue);
-    }
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
@@ -1067,7 +1049,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return true;
   }
 
-  // Collect all destroys of the closure (transitively including destorys of
+  // Collect all destroys of the closure (transitively including destroys of
   // copies) and check if those are the only uses of the closure.
   SmallVector<Operand *, 16> closureDestroys;
   if (!collectDestroys(closure, closureDestroys))
@@ -1084,7 +1066,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                        callbacks))
         return false;
     } else {
-      // A preceeding partial_apply -> apply conversion (done in
+      // A preceding partial_apply -> apply conversion (done in
       // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
       // kept alive until the end of the partial_apply's lifetime.
       SmallVector<Operand *, 8> argsToHandle;
@@ -1635,7 +1617,7 @@ swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
 }
 
 /// Given that we are going to replace use's underlying value, if the use is a
-/// lifetime ending use, insert an end scope scope use for the underlying value
+/// lifetime ending use, insert an end scope use for the underlying value
 /// before we RAUW.
 static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
                                          SILLocation loc,
@@ -1843,7 +1825,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       if (VarInfo->DIExpr.hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
-        // existing op_fragment in DIExpresison.
+        // existing op_fragment in DIExpression.
         // TODO: Try to merge two op_fragment expressions here.
         continue;
       for (VarDecl *FD : FieldDecls) {

@@ -275,23 +275,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
-    for (const auto &Inherit: TPD->getInherited()) {
+  bool visitGenericTypeParamDecl(GenericTypeParamDecl *GTPD) {
+    for (const auto &Inherit: GTPD->getInherited()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
     }
+    return false;
+  }
 
-    if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
-      if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
-        if (doIt(DefaultTy))
+  bool visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
+    for (const auto &Inherit: ATD->getInherited()) {
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(TyR))
           return true;
+    }
+    if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
+      if (doIt(DefaultTy))
+        return true;
 
-      if (auto *WhereClause = ATD->getTrailingWhereClause()) {
-        for (auto &Req: WhereClause->getRequirements()) {
-          if (doIt(Req))
-            return true;
-        }
+    if (auto *WhereClause = ATD->getTrailingWhereClause()) {
+      for (auto &Req: WhereClause->getRequirements()) {
+        if (doIt(Req))
+          return true;
       }
     }
     return false;
@@ -398,6 +404,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    return false;
+  }
+
+  bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    if (MED->getArgs() && doIt(MED->getArgs()))
+      return true;
+    if (MED->getRewritten() && doIt(MED->getRewritten()))
+      return true;
     return false;
   }
 
@@ -625,16 +639,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     return E;
   }
-  Expr *visitPackExpr(PackExpr *E) {
-    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
-      if (E->getElement(i)) {
-        if (Expr *Elt = doIt(E->getElement(i)))
-          E->setElement(i, Elt);
-        else
-          return nullptr;
-      }
-    return E;
-  }
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -824,6 +828,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
+  Expr *visitPackExpansionExpr(PackExpansionExpr *E) {
+    if (Expr *pattern = doIt(E->getPatternExpr())) {
+      E->setPatternExpr(pattern);
       return E;
     }
     return nullptr;
@@ -1240,6 +1252,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    Expr *rewritten = nullptr;
+    if (E->getRewritten()) {
+      rewritten = doIt(E->getRewritten());
+      if (!rewritten) return nullptr;
+    }
+    ArgumentList *args = nullptr;
+    if (E->getArgs()) {
+      args = doIt(E->getArgs());
+      if (!args) return nullptr;
+    }
+    E->setRewritten(rewritten);
+    E->setArgs(args);
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//
@@ -1394,8 +1422,17 @@ public:
     for (auto &elt : C) {
       switch (elt.getKind()) {
       case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_HasSymbol:
         break;
+      case StmtConditionElement::CK_HasSymbol: {
+        auto E = elt.getHasSymbolInfo()->getSymbolExpr();
+        if (!E)
+          return true;
+        E = doIt(E);
+        if (!E)
+          return true;
+        elt.getHasSymbolInfo()->setSymbolExpr(E);
+        break;
+      }
       case StmtConditionElement::CK_Boolean: {
         auto E = elt.getBoolean();
         // Walk an expression condition normally.

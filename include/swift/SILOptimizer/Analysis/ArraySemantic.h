@@ -196,7 +196,7 @@ public:
   bool canInlineEarly() const;
 
   /// If this is a call to  ArrayUninitialized (or
-  /// ArrayUninitializedInstrinsic), identify the instructions that store
+  /// ArrayUninitializedIntrinsic), identify the instructions that store
   /// elements into the array indices. For every index, add the store
   /// instruction that stores to that index to \p ElementStoreMap.
   ///

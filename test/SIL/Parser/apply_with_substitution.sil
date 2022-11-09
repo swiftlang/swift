@@ -15,7 +15,7 @@ bb0(%0 : $Optional<@callee_guaranteed @substituted <A> () -> @out A for <()>>):
   %3 = alloc_stack $Optional<()>                  // users: %22, %28, %30, %31
   %4 = alloc_stack $()                            // users: %12, %22, %25
   %5 = alloc_stack $Optional<@callee_guaranteed @substituted <A> () -> @out A for <()>>            // users: %6, %8, %10, %11, %16, %24
-  copy_addr %1a to [initialization] %5 : $*Optional<@callee_guaranteed @substituted <A> () -> @out A for <()>> // id: %6
+  copy_addr %1a to [init] %5 : $*Optional<@callee_guaranteed @substituted <A> () -> @out A for <()>> // id: %6
   %7 = function_ref @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %8
   %8 = apply %7<() -> ()>(%5) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %9
   br bb2                                          // id: %13

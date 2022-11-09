@@ -540,13 +540,28 @@ std::string LinkEntity::mangleAsString() const {
   llvm_unreachable("bad entity kind!");
 }
 
-SILDeclRef LinkEntity::getSILDeclRef() const {
-  assert(getKind() == Kind::DistributedThunkAsyncFunctionPointer ||
-         getKind() == Kind::AsyncFunctionPointerAST);
+SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
+  switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::MethodDescriptor:
+    return SILDeclRef::Kind::Func;
+  case Kind::DispatchThunkInitializer:
+  case Kind::MethodDescriptorInitializer:
+    return SILDeclRef::Kind::Initializer;
+  case Kind::MethodDescriptorAllocator:
+  case Kind::DispatchThunkAllocator:
+    return SILDeclRef::Kind::Allocator;
+  case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
+    return static_cast<SILDeclRef::Kind>(
+        reinterpret_cast<uintptr_t>(SecondaryPointer));
+  default:
+    llvm_unreachable("unhandled kind");
+  }
+}
 
-  return SILDeclRef(const_cast<ValueDecl *>(getDecl()),
-             static_cast<SILDeclRef::Kind>(
-                 reinterpret_cast<uintptr_t>(SecondaryPointer)));
+SILDeclRef LinkEntity::getSILDeclRef() const {
+  return SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -703,7 +718,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto linkage = getDeclLinkage(varDecl);
 
     // Classes with resilient storage don't expose field offset symbols.
-    if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
+    auto implContext = varDecl->getDeclContext()->getImplementedObjCContext();
+    if (cast<ClassDecl>(implContext)->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
@@ -1021,13 +1037,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.Int8Ty;
     
   case Kind::ClassMetadataBaseOffset:
-    // TODO: put a cache variable on IGM
-    return llvm::StructType::get(IGM.getLLVMContext(), {
-      IGM.SizeTy,  // Immediate members offset
-      IGM.Int32Ty, // Negative size in words
-      IGM.Int32Ty  // Positive size in words
-    });
-    
+    return IGM.ClassMetadataBaseOffsetTy;
+
   case Kind::TypeMetadataInstantiationCache:
     // TODO: put a cache variable on IGM
     return llvm::ArrayType::get(IGM.Int8PtrTy,
@@ -1129,6 +1140,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
   case Kind::TypeMetadataLazyCacheVariable:

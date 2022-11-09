@@ -27,7 +27,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -97,13 +97,13 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
     auto operOwnership = forwardedOper->getOperandOwnership();
     if (operOwnership == OperandOwnership::TrivialUse)
       return false;
-    // Don't mess with unowned conversions. They need to be copied immeidately.
-    if (operOwnership != OperandOwnership::ForwardingBorrow
-        && operOwnership != OperandOwnership::ForwardingConsume) {
+    // Don't mess with unowned conversions. They need to be copied immediately.
+    if (operOwnership != OperandOwnership::GuaranteedForwarding &&
+        operOwnership != OperandOwnership::ForwardingConsume) {
       return false;
     }
-    assert(operOwnership == OperandOwnership::ForwardingBorrow
-           || operOwnership == OperandOwnership::ForwardingConsume);
+    assert(operOwnership == OperandOwnership::GuaranteedForwarding ||
+           operOwnership == OperandOwnership::ForwardingConsume);
 
     // Filter instructions that belong to a Forwarding*ValueInst mixin but
     // cannot be converted to forward owned value (struct_extract).
@@ -274,7 +274,8 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
         }
         break;
 
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
           if (!visitor.visitForwardingUse(use)) {
@@ -542,7 +543,7 @@ public:
     }
     // If this use begins a borrow scope, check if any of the scope ending
     // instructions are outside the current scope (this can happen if any copy
-    // has occured on the def-use chain within the current scope).
+    // has occurred on the def-use chain within the current scope).
     if (auto borrowingOper = BorrowingOperand(use)) {
       if (!borrowingOper.visitExtendedScopeEndingUses(
             [&](Operand *endBorrow) {

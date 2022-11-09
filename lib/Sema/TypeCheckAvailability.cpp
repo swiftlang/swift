@@ -3254,13 +3254,24 @@ public:
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
-    if (auto *RLE = dyn_cast<RegexLiteralExpr>(E)) {
-      // Regex literals require both the Regex<Output> type to be available, as
-      // well as the initializer that is implicitly called.
-      auto Range = RLE->getSourceRange();
-      diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
-      diagnoseDeclRefAvailability(RLE->getInitializer(), Range);
+
+    if (auto *LE = dyn_cast<LiteralExpr>(E)) {
+      if (auto literalType = LE->getType()) {
+        // Check availability of the type produced by implicit literal
+        // initializer.
+        if (auto *nominalDecl = literalType->getAnyNominal()) {
+          diagnoseDeclAvailability(nominalDecl, LE->getSourceRange(),
+                                   /*call=*/nullptr, Where);
+        }
+      }
+      diagnoseDeclRefAvailability(LE->getInitializer(), LE->getSourceRange());
     }
+
+    if (auto *CE = dyn_cast<CollectionExpr>(E)) {
+      // Diagnose availability of implicit collection literal initializers.
+      diagnoseDeclRefAvailability(CE->getInitializer(), CE->getSourceRange());
+    }
+
     if (auto *EE = dyn_cast<ErasureExpr>(E)) {
       maybeDiagParameterizedExistentialErasure(EE, Where);
     }
@@ -3611,8 +3622,8 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
 
   if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
     if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
-      assert(call && "No call calling async alternative function");
-      ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+      SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+      ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
         SmallString<32> name;

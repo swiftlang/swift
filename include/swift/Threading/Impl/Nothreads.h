@@ -19,7 +19,7 @@
 
 #include "llvm/ADT/Optional.h"
 
-#include <chrono>
+#include "chrono_utils.h"
 
 namespace swift {
 namespace threading_impl {

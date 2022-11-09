@@ -34,6 +34,7 @@ enum class ModuleSearchPathKind {
   Framework,
   DarwinImplicitFramework,
   RuntimeLibrary,
+  CompilerPlugin,
 };
 
 /// A single module search path that can come from different sources, e.g.
@@ -230,6 +231,9 @@ private:
   /// \c ModuleSearchPath.
   std::vector<std::string> DarwinImplicitFrameworkSearchPaths;
 
+  /// Compiler plugin library search paths.
+  std::vector<std::string> CompilerPluginLibraryPaths;
+
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
   void addImportSearchPath(StringRef Path, llvm::vfs::FileSystem *FS) {
@@ -237,6 +241,14 @@ private:
     Lookup.searchPathAdded(FS, ImportSearchPaths.back(),
                            ModuleSearchPathKind::Import, /*isSystem=*/false,
                            ImportSearchPaths.size() - 1);
+  }
+
+  void addCompilerPluginLibraryPath(StringRef Path, llvm::vfs::FileSystem *FS) {
+    CompilerPluginLibraryPaths.push_back(Path.str());
+    Lookup.searchPathAdded(FS, CompilerPluginLibraryPaths.back(),
+                           ModuleSearchPathKind::CompilerPlugin,
+                           /*isSystem=*/false,
+                           CompilerPluginLibraryPaths.size() - 1);
   }
 
   /// Add a single framework search path. Must only be called from
@@ -300,6 +312,16 @@ public:
       std::vector<std::string> NewRuntimeLibraryImportPaths) {
     RuntimeLibraryImportPaths = NewRuntimeLibraryImportPaths;
     Lookup.searchPathsDidChange();
+  }
+
+  void setCompilerPluginLibraryPaths(
+      std::vector<std::string> NewCompilerPluginLibraryPaths) {
+    CompilerPluginLibraryPaths = NewCompilerPluginLibraryPaths;
+    Lookup.searchPathsDidChange();
+  }
+
+  ArrayRef<std::string> getCompilerPluginLibraryPaths() const {
+    return CompilerPluginLibraryPaths;
   }
 
   /// Path(s) to virtual filesystem overlay YAML files.

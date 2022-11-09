@@ -9,9 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-/// After ShrinkBorrowScope and CanonicalOSSALifetime both run, when a final use
-/// of the extended simple lifetime of a begin_borrow [lexical] is as an owned
-/// argument, we will have the following pattern:
+/// After ShrinkBorrowScope and CanonicalizeOSSALifetime both run, when a final
+/// use of the extended simple lifetime of a begin_borrow [lexical] is as an
+/// owned argument, we will have the following pattern:
 ///
 /// %result = apply %fn(..., %copy, ...) : $... (..., @owned Ty, ...)
 /// end_borrow %lifetime : $Ty
@@ -86,8 +86,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallVector.h"
@@ -531,7 +531,7 @@ void Rewriter::fold(Match candidate, ArrayRef<int> rewritableArgumentIndices) {
   //   apply %fn(%move)
   //   end_borrow %lifetime
   //
-  // This isn't valid, though, because the apply consumes the the %move but
+  // This isn't valid, though, because the apply consumes the %move but
   // the borrow scope guarantees it until the subsequent end_borrow.
   //
   // Fix this by hoisting the end_borrow above the apply.
@@ -626,16 +626,22 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
     auto *user = use->getUser();
     if (user == context.introducer)
       continue;
-    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::PointerEscape:
+      return false;
+    case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
-            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-              return false;
-            }
-            recordUse(end);
-            return true;
-          })) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        recordUse(end);
+        return true;
+      })) {
         return false;
       }
+      break;
+    default:
+      break;
     }
     recordUse(use);
   }
@@ -644,8 +650,8 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
 
 bool borroweeHasUsesWithinBorrowScope(Context const &context,
                                       BorroweeUsage const &usage) {
-  PrunedLiveness liveness;
-  context.borrowedValue.computeLiveness(liveness);
+  MultiDefPrunedLiveness liveness(context.function);
+  context.borrowedValue.computeTransitiveLiveness(liveness);
   DeadEndBlocks deadEndBlocks(context.function);
   return !liveness.areUsesOutsideBoundary(usage.uses, &deadEndBlocks);
 }
@@ -679,9 +685,9 @@ DestroyValueInst *
 FindCandidates::findNextBorroweeDestroy(SILInstruction *from) const {
   for (auto *inst = from; inst; inst = inst->getNextInstruction()) {
     if (!CanonicalizeOSSALifetime::ignoredByDestroyHoisting(inst->getKind())) {
-      // This is not an instruction that CanonicalOSSALifetime would not hoist a
-      // destroy above.  In other words, CanonicalOSSALifetime would have
-      // hoisted
+      // This is not an instruction that CanonicalizeOSSALifetime would not
+      // hoist a destroy above.  In other words, CanonicalizeOSSALifetime would
+      // have hoisted
       //     destroy_value %borrowee
       // over this instruction if it could have.  Stop looking.
       return nullptr;

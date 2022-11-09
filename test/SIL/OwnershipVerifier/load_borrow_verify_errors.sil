@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
+import Builtin
 
 class Klass {}
 
@@ -69,5 +70,33 @@ bb6(%ld : @guaranteed $Klass):
   dealloc_stack %stk : $*Klass
   %6 = tuple ()
   return %6 : $()
+}
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+struct MyStruct {
+}
+
+// CHECK: Write:   %4 = is_unique %1 : $*ArrayIntBuffer
+// CHECK: Begin Error in function test_is_unique
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: End Error in function test_is_unique
+sil [ossa] @test_is_unique : $@convention(thin) (@in MyArray<MyStruct>) -> () {
+bb0(%0 : $*MyArray<MyStruct>):
+  %1 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
+  %2 = load_borrow %1 : $*ArrayIntBuffer
+  %3 = struct $MyArray<MyStruct>(%2 : $ArrayIntBuffer)
+  %6 = is_unique %1 : $*ArrayIntBuffer
+  %7 = struct $MyArray<MyStruct>(%2 : $ArrayIntBuffer)
+  end_borrow %2 : $ArrayIntBuffer
+  destroy_addr %0 : $*MyArray<MyStruct>
+  %t = tuple ()
+  return %t : $()
 }
 

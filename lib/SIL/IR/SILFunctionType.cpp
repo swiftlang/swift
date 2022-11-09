@@ -263,35 +263,6 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 
-CanSILFunctionType SILFunctionType::getDifferentiableComponentType(
-    NormalDifferentiableFunctionTypeComponent component, SILModule &module) {
-  assert(getDifferentiabilityKind() == DifferentiabilityKind::Reverse &&
-         "Must be a `@differentiable(reverse)` function");
-  auto originalFnTy = getWithoutDifferentiability();
-  if (auto derivativeKind = component.getAsDerivativeFunctionKind()) {
-    return originalFnTy->getAutoDiffDerivativeFunctionType(
-        getDifferentiabilityParameterIndices(),
-        getDifferentiabilityResultIndices(), *derivativeKind, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
-  }
-  return originalFnTy;
-}
-
-CanSILFunctionType SILFunctionType::getLinearComponentType(
-    LinearDifferentiableFunctionTypeComponent component, SILModule &module) {
-  assert(getDifferentiabilityKind() == DifferentiabilityKind::Linear &&
-         "Must be a `@differentiable(linear)` function");
-  auto originalFnTy = getWithoutDifferentiability();
-  switch (component) {
-  case LinearDifferentiableFunctionTypeComponent::Original:
-    return originalFnTy;
-  case LinearDifferentiableFunctionTypeComponent::Transpose:
-    return originalFnTy->getAutoDiffTransposeFunctionType(
-        getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
-  }
-}
-
 CanSILFunctionType
 SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
                                           IndexSubset *parameterIndices,
@@ -492,7 +463,7 @@ static CanType getAutoDiffTangentTypeForLinearMap(
   // Otherwise, the tangent type is a new generic parameter substituted for the
   // tangent type.
   auto gpIndex = substGenericParams.size();
-  auto gpType = CanGenericTypeParamType::get(/*type sequence*/ false,
+  auto gpType = CanGenericTypeParamType::get(/*isParameterPack*/ false,
                                              0, gpIndex, context);
   substGenericParams.push_back(gpType);
   substReplacements.push_back(tanType);
@@ -1526,7 +1497,10 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial()) {
+    } else if (substTL.isTrivial() ||
+               // Foreign reference types are passed trivially.
+               (substType->getClassOrBoundGenericClass() &&
+                substType->isForeignReferenceType())) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
@@ -2478,7 +2452,7 @@ buildThunkSignature(SILFunction *fn,
 
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
-      GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+      GenericTypeParamType::get(/*isParameterPack*/ false, depth, 0, ctx);
 
   assert(openedExistential->isRoot());
   auto constraint = openedExistential->getExistentialType();
@@ -4154,7 +4128,10 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType origType) {
-    llvm_unreachable("Unimplemented!");
+    CanType patternType = visit(origType.getPatternType());
+    CanType countType = visit(origType.getCountType());
+
+    return CanType(PackExpansionType::get(patternType, countType));
   }
 
   /// Tuples need to have their component types substituted by these

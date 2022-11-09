@@ -255,7 +255,7 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 /// resigning the identity requires a call into the \p actorSystem.
 /// Since deinitialization consistently happens in-order, according to the
 /// listing returned by \p NominalTypeDecl::getStoredProperties
-/// it is important the the VarDecl for the \p id is synthesized before
+/// it is important the VarDecl for the \p id is synthesized before
 /// the \p actorSystem so that we get the right ordering in DI and deinits.
 ///
 /// \param nomDecl a distributed actor decl
@@ -413,7 +413,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
                                            std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
-  if (isAnyInitSelf())
+  if (isAnyInitSelf() || getAsTypeWrapperLocalStorageVar())
     Result = "self";
   else if (ValueDecl *VD =
                dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
@@ -468,19 +468,37 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
+  // If this is an element of a `_storage` tuple, we need to
+  // check the `$Storage` to determine whether underlying storage
+  // backing element is immutable.
+  if (auto *storageVar = getAsTypeWrapperLocalStorageVar()) {
+    auto *wrappedType = cast<NominalTypeDecl>(
+        storageVar->getDeclContext()->getInnermostTypeContext());
+    assert(wrappedType && "_storage reference without type wrapper");
+
+    auto storageVarType = storageVar->getInterfaceType()->getAs<TupleType>();
+    assert(Element < storageVarType->getNumElements());
+    auto propertyName = storageVarType->getElement(Element).getName();
+
+    auto *storageDecl = wrappedType->getTypeWrapperStorageDecl();
+    auto *property = storageDecl->lookupDirect(propertyName).front();
+    return cast<VarDecl>(property)->isLet();
+  }
+
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
   if (!isNonDelegatingInit())
     return IsLet;
 
-  auto &Module = MemoryInst->getModule();
+  auto NTD = MemorySILType.getNominalOrBoundGenericNominal();
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
     return false;
   }
+
+  auto &Module = MemoryInst->getModule();
 
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   for (auto *VD : NTD->getStoredProperties()) {
@@ -534,6 +552,13 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
             return ctor;
+
+  return nullptr;
+}
+
+VarDecl *DIMemoryObjectInfo::getAsTypeWrapperLocalStorageVar() const {
+  if (isTypeWrapperLocalStorageVar(getFunction(), MemoryInst))
+    return getLoc().getAsASTNode<VarDecl>();
 
   return nullptr;
 }
@@ -1990,4 +2015,33 @@ void swift::ownership::collectDIElementUsesFrom(
   ElementUseCollector collector(MemoryInfo, UseInfo, VisitedClosures);
   collector.collectFrom(MemoryInfo.getUninitializedValue(),
                         /*collectDestroysOfContainer*/ true);
+}
+
+bool swift::ownership::canHaveTypeWrapperLocalStorageVar(SILFunction &F) {
+  auto *DC = F.getDeclContext();
+  if (!DC)
+    return false;
+
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl());
+  if (!ctor || ctor->isImplicit() || !ctor->isDesignatedInit())
+    return false;
+
+  auto *parentType = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  return parentType && parentType->hasTypeWrapper();
+}
+
+bool swift::ownership::isTypeWrapperLocalStorageVar(
+    SILFunction &F, MarkUninitializedInst *Inst) {
+  if (!Inst->isVar())
+    return false;
+
+  if (!canHaveTypeWrapperLocalStorageVar(F))
+    return false;
+
+  if (auto *var = Inst->getLoc().getAsASTNode<VarDecl>()) {
+    auto &ctx = var->getASTContext();
+    return var->isImplicit() && var->getName() == ctx.Id_localStorageVar;
+  }
+
+  return false;
 }

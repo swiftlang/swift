@@ -157,11 +157,11 @@ Globals
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
   global ::= nominal-type 'MC'           // metadata for remote mirrors: superclass descriptor
 
-  // TODO check this::
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
   global ::= mangled-name 'TQ' index               // Async await continuation partial function
   global ::= mangled-name 'TY' index               // Async suspend continuation partial function
+  global ::= mangled-name 'TwS'                    // #_hasSymbol query function
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
@@ -637,7 +637,6 @@ Types
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
   METATYPE-REPR ::= 'o'                      // ObjC metatype representation
 
-  type ::= archetype
   type ::= associated-type
   type ::= any-generic-type
   type ::= protocol-list 'p'                 // existential type
@@ -654,6 +653,12 @@ Types
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
   
+  type ::= pattern-type count-type 'Qp'      // pack expansion type
+  type ::= pack-element-list 'QP'            // pack type
+
+  pack-element-list ::= type '_' type*
+  pack-element-list ::= empty-list
+  
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
     type ::= type assoc-type-list 'QX' // associated type relative to base `type`
@@ -668,11 +673,8 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= associated-type
-
   associated-type ::= substitution
-  associated-type ::= protocol 'QP'          // self type of protocol
-  associated-type ::= archetype identifier 'Qa' // associated type
+  associated-type ::= type identifier 'Qa' // associated type
 
   assoc-type-name ::= identifier                // associated type name without protocol
   assoc-type-name ::= identifier protocol 'P'   //

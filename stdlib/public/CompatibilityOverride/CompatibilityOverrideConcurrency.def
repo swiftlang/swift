@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines x-macros used for metaprogramming with the set of
-// compatibility override functions.
+// compatibility override functions.  See CompatibilityOverride.h for
+// a detailed explanation of how this system works.
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,13 +33,42 @@
 ///
 /// The entries are organized by group. A user may define OVERRIDE to get all
 /// entries, or define one or more of the more specific OVERRIDE_* variants to
-/// get only those entries.
+/// get only those entries.  The more specific OVERRIDE_* variants group
+/// entries into the functions that are emitted in the specified file;
+/// for example, OVERRIDE_ACTOR identifies the functions that are defined
+/// in Actor.cpp.
 
-// NOTE: this file is used to build the definition of OverrideSection in
-// CompatibilityOverride.cpp, which is part of the ABI. Moving or removing
-// entries in this file will break the ABI. Additional entries can be added to
-// the end. ABI breaks or version-specific changes can be accommodated by
-// changing the name of the override section in that file.
+// NOTE: the entries in this file are used to build the struct layout for
+// the OverrideSection in the CompatibilityOverride.cpp that is built into
+// the concurrency runtime.  A matching file must be used to build the
+// ConcurrencyOverrideSection in Overrides.cpp for future compatibility
+// override libraries that target this release.
+//
+// Because compatibility override libraries target a specific release of
+// Swift, there is no inherent reason the entries in this file cannot be
+// arbitrarily rearranged between release cycles, as long as a matching
+// file is used to build any future compatibility override library
+// targeting this release.  However, the targeting of compatibility
+// override libraries is precise only to a specific major+minor release
+// number (e.g. 5.6).  Therefore, care must be taken to avoid ABI breaks
+// in this file between patch releases, or else it will become impossible
+// to create a compatibility override library for this release:
+//
+// - Moving or removing entries in this file will break the ABI.
+//
+// - Changing an entry to use a different implementation file is allowed,
+//   but do not move the entry to be grouped with the other entries for
+//   the implementation file, as this will break the ABI.
+//
+// - New entries can be added to the end without breaking the ABI.  This
+//   is possible even if there have already been patch releases for this
+//   major+minor release, since older patch releases of the runtime will
+//   simply not read the new fields.  It is not possible if a compatibility
+//   override library has already been released for this major+minor
+//   release, but that is unlikely for releases under active development.
+//
+// When creating a new compatibility override library, always clone the
+// last .def files from the appropriate release branch and edit this comment.
 
 #ifdef OVERRIDE
 #  define OVERRIDE_ACTOR OVERRIDE
@@ -319,9 +349,9 @@ OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))
 
-OVERRIDE_TASK_STATUS(task_cancel_group_child_tasks, void,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskGroup *group), (group))
+OVERRIDE_TASK_GROUP(task_cancel_group_child_tasks, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (TaskGroup *group), (group))
 
 OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

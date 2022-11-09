@@ -1281,6 +1281,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     switch (constraint->getKind()) {
     case ConstraintKind::Subtype:
+    case ConstraintKind::SubclassOf:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
@@ -1358,6 +1359,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
+  case ConstraintKind::SubclassOf:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
@@ -1394,6 +1396,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::Conjunction:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
+  case ConstraintKind::ShapeOf:
     // Constraints from which we can't do anything.
     break;
 
@@ -2204,8 +2208,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.insert(srcLocator);
 
+    // Fail if hole reporting fails.
     if (type->isPlaceholder() && reportHole())
-      return true;
+      return false;
   }
 
   if (cs.simplify())

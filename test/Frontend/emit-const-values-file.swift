@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'print("Hello, World!")' > %t/main.swift
-// RUN: echo "[Foo]" > %t/protocols.json
+// RUN: echo "["Foo"]" > %t/protocols.json
 // RUN: cd %t
 
 // RUN: %target-swift-frontend -typecheck -const-gather-protocols-file %t/protocols.json -emit-const-values-path %t/main.swiftconstvalues -primary-file %t/main.swift

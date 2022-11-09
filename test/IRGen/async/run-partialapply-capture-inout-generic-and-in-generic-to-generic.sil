@@ -28,7 +28,7 @@ entry(%out : $*T, %in : $*T, %inout : $*T):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %printGeneric_result1 = apply %printGeneric<T>(%in) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 876
   %printGeneric_result2 = apply %printGeneric<T>(%inout) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 678
-  copy_addr %inout to [initialization] %out : $*T
+  copy_addr %inout to [init] %out : $*T
   %result = tuple ()
   return %result : $()
 }

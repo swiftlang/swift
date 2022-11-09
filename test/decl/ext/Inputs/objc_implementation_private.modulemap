@@ -1,0 +1,4 @@
+module objc_implementation_private {
+  header "objc_implementation.h"
+  export *
+}

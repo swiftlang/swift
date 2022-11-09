@@ -286,3 +286,25 @@ private struct StructPrivateGeneric<T, U, V> {
 
   private static func privateStaticGeneric<A>(_: A) {}
 }
+
+public struct StructDynamicMembers {
+  public dynamic init() {}
+  public dynamic init(x: Int) {
+    self.init()
+  }
+  public dynamic func dynamicMethod() {}
+  public dynamic static func dynamicStaticMethod() {}
+}
+
+extension StructDynamicMembers {
+  @_dynamicReplacement(for: init(x:))
+  public init(y: Int) {
+    self.init()
+  }
+
+  @_dynamicReplacement(for: dynamicMethod())
+  public func methodReplacement() {}
+
+  @_dynamicReplacement(for: dynamicStaticMethod())
+  public static func staticMethodReplacement() {}
+}

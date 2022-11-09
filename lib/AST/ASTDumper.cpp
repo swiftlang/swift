@@ -308,6 +308,63 @@ static StringRef getAssociativityString(Associativity value) {
   llvm_unreachable("Unhandled Associativity in switch.");
 }
 
+static void printArgument(raw_ostream &OS, const Argument &arg,
+                          unsigned indentLevel,
+                          std::function<void(Expr *)> printRec) {
+  OS.indent(indentLevel);
+  PrintWithColorRAII(OS, ParenthesisColor) << '(';
+  PrintWithColorRAII(OS, ExprColor) << "argument";
+
+  auto label = arg.getLabel();
+  if (!label.empty()) {
+    PrintWithColorRAII(OS, ArgumentsColor) << " label=";
+    PrintWithColorRAII(OS, ArgumentsColor) << label.str();
+  }
+  if (arg.isInOut())
+    PrintWithColorRAII(OS, ArgModifierColor) << " inout";
+
+  OS << '\n';
+  printRec(arg.getExpr());
+  PrintWithColorRAII(OS, ParenthesisColor) << ')';
+}
+
+static void printArgumentList(raw_ostream &OS,
+                              const ArgumentList *argList,
+                              unsigned &indentLevel,
+                              std::function<void(Expr *)> printRec,
+                              bool indent = true) {
+  if (indent)
+    indentLevel += 2;
+
+  OS.indent(indentLevel);
+  PrintWithColorRAII(OS, ParenthesisColor) << '(';
+  PrintWithColorRAII(OS, ExprColor) << "argument_list";
+
+  if (argList->isImplicit())
+    PrintWithColorRAII(OS, ArgModifierColor) << " implicit";
+
+  if (argList->hasAnyArgumentLabels()) {
+    PrintWithColorRAII(OS, ArgumentsColor) << " labels=";
+    for (auto arg : *argList) {
+      auto label = arg.getLabel();
+      PrintWithColorRAII(OS, ArgumentsColor)
+      << (label.empty() ? "_" : label.str()) << ":";
+    }
+  }
+
+  indentLevel += 2;
+  for (auto arg : *argList) {
+    OS << '\n';
+    printArgument(OS, arg, indentLevel, printRec);
+  }
+  indentLevel -= 2;
+
+  PrintWithColorRAII(OS, ParenthesisColor) << ')';
+
+  if (indent)
+    indentLevel -= 2;
+}
+
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
@@ -591,19 +648,14 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
-                                      const char *name) {
-      printCommon(decl, name);
-    }
-
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
-      printAbstractTypeParamCommon(decl, "generic_type_param");
+      printCommon(decl, "generic_type_param");
       OS << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
-      printAbstractTypeParamCommon(decl, "associated_type_decl");
+      printCommon(decl, "associated_type_decl");
       if (auto defaultDef = decl->getDefaultDefinitionType()) {
         OS << " default=";
         defaultDef.print(OS);
@@ -747,13 +799,21 @@ namespace {
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
 
-      if (auto decls = SF.getCachedTopLevelDecls()) {
-        for (Decl *D : *decls) {
-          if (D->isImplicit())
+      if (auto items = SF.getCachedTopLevelItems()) {
+        for (auto item : *items) {
+          if (item.isImplicit())
             continue;
 
           OS << '\n';
-          printRec(D);
+
+          if (auto decl = item.dyn_cast<Decl *>()) {
+            printRec(decl);
+          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
+            stmt->dump(OS, &SF.getASTContext(), Indent + 2);
+          } else {
+            auto expr = item.get<Expr *>();
+            expr->dump(OS, Indent + 2);
+          }
         }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -1246,6 +1306,18 @@ namespace {
           << '\"' << MMD->getName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+
+    void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+      printCommon(MED, "macro_expansion_decl ");
+      OS << MED->getMacro();
+      if (MED->getArgs()) {
+        OS << '\n';
+        OS.indent(Indent + 2);
+        printArgumentList(OS, MED->getArgs(), Indent,
+                          [&](Expr *E) { printRec(E); });
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
   };
 } // end anonymous namespace
 
@@ -1257,8 +1329,6 @@ void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   PrintDecl(OS, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
-
-
 
 void Decl::dump() const {
   dump(llvm::errs(), 0);
@@ -1391,6 +1461,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
 
 void LLVM_ATTRIBUTE_USED ValueDecl::dumpRef() const {
   dumpRef(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 void SourceFile::dump() const {
@@ -1402,7 +1473,7 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   // parsing request as by default the dumping logic tries not to kick any
   // requests.
   if (parseIfNeeded)
-    (void)getTopLevelDecls();
+    (void)getTopLevelItems();
 
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
@@ -2140,15 +2211,6 @@ public:
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitPackExpr(PackExpr *E) {
-    printCommon(E, "pack_expr");
-
-    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      OS << '\n';
-      printRec(E->getElement(i));
-    }
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
@@ -2295,11 +2357,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitReifyPackExpr(ReifyPackExpr *E) {
-    printCommon(E, "reify_pack") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());
@@ -2429,6 +2486,12 @@ public:
   void visitVarargExpansionExpr(VarargExpansionExpr *E) {
     printCommon(E, "vararg_expansion_expr") << '\n';
     printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPackExpansionExpr(PackExpansionExpr *E) {
+    printCommon(E, "pack_expansion_expr") << "\n";
+    printRec(E->getPatternExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2582,55 +2645,9 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void printArgument(const Argument &arg) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, ExprColor) << "argument";
-
-    auto label = arg.getLabel();
-    if (!label.empty()) {
-      PrintWithColorRAII(OS, ArgumentsColor) << " label=";
-      PrintWithColorRAII(OS, ArgumentsColor) << label.str();
-    }
-    if (arg.isInOut())
-      PrintWithColorRAII(OS, ArgModifierColor) << " inout";
-
-    OS << '\n';
-    printRec(arg.getExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void printArgumentList(const ArgumentList *argList, bool indent = true) {
-    if (indent)
-      Indent += 2;
-
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, ExprColor) << "argument_list";
-
-    if (argList->isImplicit())
-      PrintWithColorRAII(OS, ArgModifierColor) << " implicit";
-
-    if (argList->hasAnyArgumentLabels()) {
-      PrintWithColorRAII(OS, ArgumentsColor) << " labels=";
-      for (auto arg : *argList) {
-        auto label = arg.getLabel();
-        PrintWithColorRAII(OS, ArgumentsColor)
-            << (label.empty() ? "_" : label.str()) << ":";
-      }
-    }
-
-    Indent += 2;
-    for (auto arg : *argList) {
-      OS << '\n';
-      printArgument(arg);
-    }
-    Indent -= 2;
-
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-
-    if (indent)
-      Indent -= 2;
+    ::printArgumentList(OS, argList, Indent, [&](Expr *E) { printRec(E); },
+                        indent);
   }
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
@@ -2958,6 +2975,20 @@ public:
       OS << '\n';
     }
 
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    printCommon(E, "macro_expansion_expr");
+    PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getMacroName();
+    if (E->getArgs()) {
+      OS << '\n';
+      printArgumentList(E->getArgs());
+    }
+    if (auto rewritten = E->getRewritten()) {
+      OS << '\n';
+      printRec(rewritten);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
@@ -3728,9 +3759,7 @@ namespace {
       printField("num_elements", T->getNumElements());
       Indent += 2;
       for (Type elt : T->getElementTypes()) {
-        OS.indent(Indent) << "(";
         printRec(elt);
-        OS << ")";
       }
       Indent -= 2;
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3738,8 +3767,8 @@ namespace {
 
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
       printCommon(label, "pack_expansion_type");
-      printField("pattern", T->getPatternType());
-      printField("count", T->getCountType());
+      printRec("pattern", T->getPatternType());
+      printRec("count", T->getCountType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -3885,10 +3914,15 @@ namespace {
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    void visitSequenceArchetypeType(SequenceArchetypeType *T, StringRef label) {
-      printArchetypeCommon(T, "sequence_archetype_type", label);
+    void visitPackArchetypeType(PackArchetypeType *T, StringRef label) {
+      printArchetypeCommon(T, "pack_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+    void visitElementArchetypeType(ElementArchetypeType *T, StringRef label) {
+      printArchetypeCommon(T, "element_archetype_type", label);
+      printField("opened_element_id", T->getOpenedElementID());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -4160,10 +4194,6 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return; // not needed for the parser library.
-  #endif
-
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
@@ -4277,8 +4307,8 @@ void Requirement::dump() const {
 }
 void Requirement::dump(raw_ostream &out) const {
   switch (getKind()) {
-  case RequirementKind::SameCount:
-    out << "same_count: ";
+  case RequirementKind::SameShape:
+    out << "same_shape: ";
     break;
   case RequirementKind::Conformance:
     out << "conforms_to: ";

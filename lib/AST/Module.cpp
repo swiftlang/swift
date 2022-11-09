@@ -514,6 +514,136 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
+void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
+  AuxiliaryFiles.push_back(&sourceFile);
+}
+
+namespace {
+  /// Compare the source location ranges for two files, as an ordering to
+  /// use for fast searches.
+  struct SourceFileRangeComparison {
+    SourceManager *sourceMgr;
+
+    bool operator()(SourceFile *lhs, SourceFile *rhs) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getStart().getOpaquePointerValue(),
+          (const char *)rhsRange.getStart().getOpaquePointerValue());
+    }
+
+    bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
+          (const char *)rhsLoc.getOpaquePointerValue());
+    }
+
+    bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsLoc.getOpaquePointerValue(),
+          (const char *)rhsRange.getEnd().getOpaquePointerValue());
+    }
+  };
+}
+
+class swift::ModuleSourceFileLocationMap {
+public:
+  unsigned numFiles = 0;
+  unsigned numAuxiliaryFiles = 0;
+  std::vector<SourceFile *> allSourceFiles;
+  SourceFile *lastSourceFile = nullptr;
+};
+
+void ModuleDecl::updateSourceFileLocationMap() {
+  // Allocate a source file location map, if we don't have one already.
+  if (!sourceFileLocationMap) {
+    ASTContext &ctx = getASTContext();
+    sourceFileLocationMap = ctx.Allocate<ModuleSourceFileLocationMap>();
+    ctx.addCleanup([sourceFileLocationMap=sourceFileLocationMap]() {
+      sourceFileLocationMap->~ModuleSourceFileLocationMap();
+    });
+  }
+
+  // If we are up-to-date, there's nothing to do.
+  if (sourceFileLocationMap->numFiles == getFiles().size() &&
+      sourceFileLocationMap->numAuxiliaryFiles ==
+          AuxiliaryFiles.size())
+    return;
+
+  // Rebuild the range structure.
+  sourceFileLocationMap->allSourceFiles.clear();
+
+  // First, add all of the source files with a backing buffer.
+  for (auto *fileUnit : getFiles()) {
+    if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
+      if (sourceFile->getBufferID())
+        sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+    }
+  }
+
+  // Next, add all of the macro expansion files.
+  for (auto *sourceFile : AuxiliaryFiles)
+    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+
+  // Finally, sort them all so we can do a binary search for lookup.
+  std::sort(sourceFileLocationMap->allSourceFiles.begin(),
+            sourceFileLocationMap->allSourceFiles.end(),
+            SourceFileRangeComparison{&getASTContext().SourceMgr});
+}
+
+SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
+  if (loc.isInvalid())
+    return nullptr;
+
+
+  // Check whether this location is in a "replaced" range, in which case
+  // we want to use the original source file.
+  auto &sourceMgr = getASTContext().SourceMgr;
+  SourceLoc adjustedLoc = loc;
+  for (const auto &pair : sourceMgr.getReplacedRanges()) {
+    if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
+      adjustedLoc = pair.first.Start;
+      break;
+    }
+  }
+
+  // Before we do any extra work, check the last source file we found a result
+  // in to see if it contains this.
+  if (sourceFileLocationMap) {
+    if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
+      auto range = sourceMgr.getRangeForBuffer(*lastSourceFile->getBufferID());
+      if (range.contains(adjustedLoc))
+        return lastSourceFile;
+    }
+  }
+
+  updateSourceFileLocationMap();
+
+  auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
+                                sourceFileLocationMap->allSourceFiles.end(),
+                                adjustedLoc,
+                                SourceFileRangeComparison{&sourceMgr});
+  if (found == sourceFileLocationMap->allSourceFiles.end())
+    return nullptr;
+
+  auto foundSourceFile = *found;
+  auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
+  if (!foundRange.contains(adjustedLoc))
+    return nullptr;
+
+  // Update the last source file.
+  sourceFileLocationMap->lastSourceFile = foundSourceFile;
+  return foundSourceFile;
+}
+
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
@@ -745,6 +875,14 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMembers(accessPath, consumer);
+}
+
+SourceFile *SourceFile::getEnclosingSourceFile() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto sourceLoc = macroExpansion.getStartLoc();
+  return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -1186,7 +1324,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     SmallVector<TupleTypeElt, 4> genericElements;
     SmallVector<Requirement, 4> conditionalRequirements;
     for (const auto &elt : tupleType->getElements()) {
-      auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
+      auto genericParam = GenericTypeParamType::get(/*isParameterPack*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
       typeSubstitutions.push_back(elt.getType());
@@ -3075,19 +3213,26 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ParsingOptions parsingOpts, bool isPrimary)
+                       ParsingOptions parsingOpts, bool isPrimary,
+                       ASTNode macroExpansion)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary),
+      macroExpansion(macroExpansion), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
          "A primary cannot appear outside the main module");
+  assert(macroExpansion.isNull() == (K != SourceFileKind::MacroExpansion) &&
+         "Macro expansions always need an expansion node");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
     assert(!problem && "multiple main files?");
     (void)problem;
   }
+
+  if (Kind == SourceFileKind::MacroExpansion)
+    M.addAuxiliaryFile(*this);
 }
 
 SourceFile::ParsingOptions
@@ -3144,8 +3289,37 @@ void SourceFile::addHoistedDecl(Decl *d) {
 ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, ParseTopLevelDeclsRequest{mutableThis}, {});
+}
+
+void SourceFile::addTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->push_back(d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+void SourceFile::prependTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->insert(Items->begin(), d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+ArrayRef<ASTNode> SourceFile::getTopLevelItems() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {}).TopLevelDecls;
+                           {}).TopLevelItems;
 }
 
 ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
@@ -3203,20 +3377,21 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : getTopLevelDecls()) {
-#ifndef NDEBUG
-    PrettyStackTraceDecl debugStack("walking into decl", D);
-#endif
-
-    if (D->walk(walker))
-      return true;
+  for (auto Item : getTopLevelItems()) {
+    if (auto D = Item.dyn_cast<Decl *>()) {
+      if (D->walk(walker))
+        return true;
+    } else {
+      Item.walk(walker);
+    }
 
     if (walker.shouldWalkAccessorsTheOldWay()) {
       // Pretend that accessors share a parent with the storage.
       //
       // FIXME: Update existing ASTWalkers to deal with accessors appearing as
       // children of the storage instead.
-      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(
+              Item.dyn_cast<Decl *>())) {
         for (auto AD : ASD->getAllAccessors()) {
           if (AD->walk(walker))
             return true;

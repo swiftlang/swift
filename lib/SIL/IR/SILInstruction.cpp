@@ -24,7 +24,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/Basic/AssertImplements.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -1356,13 +1355,6 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
-}
-
-bool SILInstruction::maySynchronize() const {
-  // TODO: We need side-effect analysis and library annotation for this to be
-  //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this) || isa<EndApplyInst>(this) ||
-         isa<AbortApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

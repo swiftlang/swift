@@ -12,7 +12,7 @@ func transform<T>(_ a: Any, c: (Any) -> T?) -> T? {
 // CHECK-LABEL: sil {{.*}}@$s4test1XC6testityACSgypFACXDSgypXEfU_ :
 // CHECK: bb0({{.*}}, {{%[0-9]+}} : $@thick @dynamic_self X.Type):
 
-// The checked_cast_addr_br must have %1 as implicit type dependend operand.
+// The checked_cast_addr_br must have %1 as implicit type dependent operand.
 // CHECK:   checked_cast_addr_br take_always Any in %{{[0-9]+}} : $*Any to @dynamic_self X in %{{[0-9]+}} : $*X, bb1, bb2
 // CHECK: } // end sil function '$s4test1XC6testityACSgypFACXDSgypXEfU_'
 

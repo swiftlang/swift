@@ -13,6 +13,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 
 using namespace swift;
@@ -74,7 +75,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   // temporaries.
   SmallVector<Operand *, 16> paiUses;
 
-  // Of course we must inlude all apply instructions which we want to optimize.
+  // Of course we must include all apply instructions which we want to optimize.
   for (FullApplySite ai : applies) {
     paiUses.push_back(ai.getCalleeOperand());
   }
@@ -178,7 +179,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
         builder.createCopyAddr(pai->getLoc(), arg, ASI, IsTake_t::IsNotTake,
                                IsInitialization_t::IsInitialization);
-        paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
+        paiAI.insertAfterApplication([&](SILBuilder &builder) {
           builder.createDeallocStack(destroyloc, ASI);
         });
         arg = ASI;
@@ -206,7 +207,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // We also need to destroy the partial_apply instruction itself because it is
   // consumed by the apply_instruction.
   if (!pai->hasCalleeGuaranteedContext()) {
-    paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
+    paiAI.insertAfterApplication([&](SILBuilder &builder) {
       builder.emitDestroyValueOperation(destroyloc, pai);
     });
   }

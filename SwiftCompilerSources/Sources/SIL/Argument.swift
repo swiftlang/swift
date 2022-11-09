@@ -128,6 +128,36 @@ public enum ArgumentConvention {
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
 
+  public var isIndirect: Bool {
+    switch self {
+    case .indirectIn, .indirectInConstant, .indirectInGuaranteed,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed:
+      return false
+    }
+  }
+
+  public var isIndirectIn: Bool {
+    switch self {
+    case .indirectIn, .indirectInConstant, .indirectInGuaranteed:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return false
+    }
+  }
+
+  public var isGuaranteed: Bool {
+    switch self {
+    case .indirectInGuaranteed, .directGuaranteed:
+      return true
+    case .indirectIn, .indirectInConstant, .directOwned, .directUnowned,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return false
+    }
+  }
+
   public var isExclusiveIndirect: Bool {
     switch self {
     case .indirectIn,

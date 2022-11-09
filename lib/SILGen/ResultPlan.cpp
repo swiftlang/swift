@@ -97,7 +97,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   SmallVector<Requirement, 2> requirements;
   for (const unsigned i : indices(openedTypes)) {
     auto *param = GenericTypeParamType::get(
-        /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
+        /*isParameterPack*/ false, /*depth*/ 0, /*index*/ i, ctx);
     params.push_back(param);
 
     Type constraintTy = openedTypes[i]->getExistentialType();
@@ -991,7 +991,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // If the tuple is address-only, we'll get much better code if we
   // emit into a single buffer.
   auto &substTL = SGF.getTypeLowering(substType);
-  if (substTL.isAddressOnly()) {
+  if (substTL.isAddressOnly() && SGF.F.getConventions().useLoweredAddresses()) {
     // Create a temporary.
     auto temporary = SGF.emitTemporary(loc, substTL);
 

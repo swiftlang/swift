@@ -50,10 +50,10 @@ public:
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
-  void printIdentifier(StringRef name);
+  void printIdentifier(StringRef name) const;
 
   /// Print the base name of the given declaration.
-  void printBaseName(const ValueDecl *decl);
+  void printBaseName(const ValueDecl *decl) const;
 
   /// Print the C-style prefix for the given module name, that's used for
   /// C type names inside the module.
@@ -76,6 +76,19 @@ public:
   ///    2) For Swift's `Array<T>` type, it will print `template<class
   ///    T_0_0>\nrequires swift::isUsableInGenericContext<T_0_0>\n`
   bool printNominalTypeOutsideMemberDeclTemplateSpecifiers(
+      const NominalTypeDecl *typeDecl);
+
+  /// Print out additional C++ `static_assert` clauses that
+  /// are required to emit a generic member definition outside a C++ class that
+  /// is generated for the given Swift type declaration.
+  ///
+  /// \returns true if nothing was printed.
+  ///
+  /// Examples:
+  ///    1) For Swift's `String` type, it will print nothing.
+  ///    2) For Swift's `Array<T>` type, it will print
+  ///    `static_assert(swift::isUsableInGenericContext<T_0_0>);\n`
+  bool printNominalTypeOutsideMemberDeclInnerStaticAssert(
       const NominalTypeDecl *typeDecl);
 
   /// Print out the C++ class access qualifier for the given Swift  type
@@ -105,14 +118,18 @@ public:
   void printNominalTypeQualifier(const NominalTypeDecl *typeDecl,
                                  const ModuleDecl *moduleContext);
 
-  /// Print a C++ namespace declaration with the give name and body.
-  void
-  printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
-                 llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+  enum class NamespaceTrivia { None, AttributeSwiftPrivate };
 
-  void
-  printNamespace(StringRef name,
-                 llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+  void printModuleNamespaceStart(const ModuleDecl &moduleContext) const;
+
+  /// Print a C++ namespace declaration with the give name and body.
+  void printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
+                      llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+                      NamespaceTrivia trivia = NamespaceTrivia::None) const;
+
+  void printNamespace(StringRef name,
+                      llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+                      NamespaceTrivia trivia = NamespaceTrivia::None) const;
 
   /// Print an extern C block with given body.
   void
@@ -163,6 +180,11 @@ public:
   /// its requirements.
   void printGenericSignature(const CanGenericSignature &signature);
 
+  /// Print the `static_assert` statements used for legacy type-checking for
+  /// generics in C++14/C++17 mode.
+  void
+  printGenericSignatureInnerStaticAsserts(const CanGenericSignature &signature);
+
   /// Print the C++ template parameters that should be passed for a given
   /// generic signature.
   void printGenericSignatureParams(const CanGenericSignature &signature);
@@ -183,6 +205,20 @@ public:
   // class for the given nominal type.
   void printPrimaryCxxTypeName(const NominalTypeDecl *type,
                                const ModuleDecl *moduleContext);
+
+  // Print the #include sequence for the specified C++ interop shim header.
+  void printIncludeForShimHeader(StringRef headerName);
+
+  // Print the #define for the given macro.
+  void printDefine(StringRef macroName);
+
+  // Print the ignored Clang diagnostic preprocessor directives around the given
+  // source.
+  void printIgnoredDiagnosticBlock(StringRef diagName,
+                                   llvm::function_ref<void()> bodyPrinter);
+
+  void printIgnoredCxx17ExtensionDiagnosticBlock(
+      llvm::function_ref<void()> bodyPrinter);
 
 protected:
   raw_ostream &os;

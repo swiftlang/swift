@@ -343,6 +343,10 @@ def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark and file path of each loaded module">;
 
+def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark when indexing a system module">;
+
 def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface-build">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if an explicit module interface invocation has an early exit because the expected output is up-to-date">;
@@ -630,6 +634,11 @@ def enable_experimental_cxx_interop :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
+def experimental_c_foreign_reference_types :
+  Flag<["-"], "experimental-c-foreign-reference-types">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Enable experimental C foreign references types (with reference coutning).">;
+
 def enable_experimental_cxx_interop_in_clang_header :
   Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
@@ -657,6 +666,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Don't treat warnings as errors">;
+  
+def suppress_remarks : Flag<["-"], "suppress-remarks">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all remarks">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -1694,5 +1707,12 @@ def nostartfiles:
   HelpText<"Do not link in the Swift language startup routines">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
+
+def load_plugin_library:
+  Separate<["-"], "load-plugin-library">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to a dynamic library containing compiler plugins such as "
+           "macros">,
+  MetaVarName<"<path>">;
 
 include "FrontendOptions.td"

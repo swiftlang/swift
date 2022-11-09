@@ -92,8 +92,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, getterType, importedDecl, clangNode);
+      /*ThrowsLoc=*/SourceLoc(), params, getterType, importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -122,8 +121,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, voidTy, importedDecl, clangNode);
+      /*ThrowsLoc=*/SourceLoc(), params, voidTy, importedDecl, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -409,8 +407,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, type, dc);
+      /*ThrowsLoc=*/SourceLoc(), params, type, dc);
   func->setStatic(isStatic);
   func->setAccess(getOverridableAccessLevel(dc));
   func->setIsObjC(false);
@@ -1341,8 +1338,7 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, rawTy, enumDecl);
+      /*ThrowsLoc=*/SourceLoc(), params, rawTy, enumDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -1406,8 +1402,7 @@ AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, computedType, structDecl);
+      /*ThrowsLoc=*/SourceLoc(), params, computedType, structDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -1436,8 +1431,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       /*StaticLoc=*/SourceLoc(), subscript->getStaticSpelling(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, elementTy, dc, getter->getClangNode());
+      /*ThrowsLoc=*/SourceLoc(), params, elementTy, dc, getter->getClangNode());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
@@ -1480,8 +1474,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       /*StaticLoc=*/SourceLoc(), subscript->getStaticSpelling(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, valueIndicesPL, TupleType::getEmpty(C), dc,
+      /*ThrowsLoc=*/SourceLoc(), valueIndicesPL, TupleType::getEmpty(C), dc,
       setter->getClangNode());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1622,7 +1615,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
       ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
       subscript, SourceLoc(), subscript->getStaticSpelling(),
       /*async*/ false, SourceLoc(),
-      /*throws*/ false, SourceLoc(), nullptr, bodyParams, elementTy, dc);
+      /*throws*/ false, SourceLoc(), bodyParams, elementTy, dc);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
@@ -1649,7 +1642,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
         ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
         subscript, SourceLoc(), subscript->getStaticSpelling(),
         /*async*/ false, SourceLoc(),
-        /*throws*/ false, SourceLoc(), nullptr, setterParamList,
+        /*throws*/ false, SourceLoc(), setterParamList,
         TupleType::getEmpty(ctx), dc);
     setterDecl->setAccess(AccessLevel::Public);
     setterDecl->setImplicit();
@@ -1697,8 +1690,8 @@ VarDecl *SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
       ctx, dereferenceFunc->getLoc(), dereferenceFunc->getLoc(),
       AccessorKind::Get, result, SourceLoc(), StaticSpellingKind::None,
       /*async*/ false, SourceLoc(),
-      /*throws*/ false, SourceLoc(), nullptr, ParameterList::createEmpty(ctx),
-      elementTy, dc);
+      /*throws*/ false, SourceLoc(), ParameterList::createEmpty(ctx), elementTy,
+      dc);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
@@ -1993,7 +1986,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
       ctx, getter->getLoc(), getter->getLoc(), AccessorKind::Get, result,
       SourceLoc(), StaticSpellingKind::None,
       /*async*/ false, SourceLoc(),
-      /*throws*/ false, SourceLoc(), nullptr, ParameterList::createEmpty(ctx),
+      /*throws*/ false, SourceLoc(), ParameterList::createEmpty(ctx),
       getter->getResultInterfaceType(), dc);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
@@ -2019,7 +2012,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
         ctx, setter->getLoc(), setter->getLoc(), AccessorKind::Set, result,
         SourceLoc(), StaticSpellingKind::None,
         /*async*/ false, SourceLoc(),
-        /*throws*/ false, SourceLoc(), nullptr, setterParamList,
+        /*throws*/ false, SourceLoc(), setterParamList,
         setter->getResultInterfaceType(), dc);
     setterDecl->setAccess(AccessLevel::Public);
     setterDecl->setImplicit();

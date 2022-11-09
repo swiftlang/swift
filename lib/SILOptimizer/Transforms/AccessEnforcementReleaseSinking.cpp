@@ -51,7 +51,7 @@ static bool isSinkable(SILInstruction &inst) {
 static bool isBarrier(SILInstruction *inst) {
   // Calls hide many dangers, from checking reference counts, to beginning
   // keypath access, to forcing memory to be live. Checking for these and other
-  // possible barries at ever call is certainly not worth it.
+  // possible barriers at ever call is certainly not worth it.
   if (FullApplySite::isa(inst) != FullApplySite())
     return true;
 
@@ -193,6 +193,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
       return true;
     }
   }

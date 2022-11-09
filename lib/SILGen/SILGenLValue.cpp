@@ -30,6 +30,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -466,6 +467,15 @@ InOutConversionScope::~InOutConversionScope() {
 
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
+
+void PhysicalPathComponent::set(SILGenFunction &SGF, SILLocation loc,
+                                ArgumentSource &&value, ManagedValue base) && {
+  auto finalDestAddr = std::move(*this).project(SGF, loc, base);
+  assert(finalDestAddr.getType().isAddress());
+
+  auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
+  std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
+}
 
 void PathComponent::dump() const {
   dump(llvm::errs());
@@ -1407,6 +1417,21 @@ namespace {
       return false;
     }
 
+    bool canRewriteSetAsTypeWrapperInit(SILGenFunction &SGF) const {
+      auto *VD = dyn_cast<VarDecl>(Storage);
+      if (!(VD && VD->isAccessedViaTypeWrapper()))
+        return false;
+
+      auto *fnDecl = SGF.FunctionDC->getAsDecl();
+      // Type wrapper transform applies only to user-defined
+      // designated initializers.
+      if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(fnDecl)) {
+        return !ctor->isImplicit() && ctor->isDesignatedInit();
+      }
+
+      return false;
+    }
+
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
       assert(getAccessorDecl()->isSetter());
@@ -1470,6 +1495,162 @@ namespace {
       assert(!ActorIso && "no support for cross-actor set operations");
       SILDeclRef setter = Accessor;
 
+      auto getSetterFRef = [&]() -> SILValue {
+        auto setterInfo =
+            SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
+        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
+          // Emit a thunk we might have to bridge arguments.
+          auto foreignSetterThunk = setter.asForeign(false);
+          return SGF
+              .emitDynamicMethodRef(
+                  loc, foreignSetterThunk,
+                  SGF.SGM.Types
+                      .getConstantInfo(SGF.getTypeExpansionContext(),
+                                       foreignSetterThunk)
+                      .SILFnType)
+              .getValue();
+        }
+
+        return SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
+      };
+
+      auto getSetterType = [&](SILValue setterFRef) {
+        CanSILFunctionType setterTy =
+            setterFRef->getType().castTo<SILFunctionType>();
+        return setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
+                                          SGF.getTypeExpansionContext());
+      };
+
+      auto emitPartialSetterApply =
+          [&](SILValue setterFRef,
+              const SILFunctionConventions &setterConv) -> ManagedValue {
+        // Emit captures for thI e setter
+        SmallVector<SILValue, 4> capturedArgs;
+        auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
+        if (!captureInfo.getCaptures().empty()) {
+          SmallVector<ManagedValue, 4> captures;
+          SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper,
+                           captures);
+
+          for (auto capture : captures)
+            capturedArgs.push_back(capture.forward(SGF));
+        } else {
+          assert(base);
+
+          SILValue capturedBase;
+          unsigned argIdx = setterConv.getNumSILArguments() - 1;
+
+          if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+            capturedBase = base.getValue();
+          } else if (base.getType().isAddress() &&
+                     base.getType().getObjectType() ==
+                         setterConv.getSILArgumentType(
+                             argIdx, SGF.getTypeExpansionContext())) {
+            // If the base is a reference and the setter expects a value, emit a
+            // load. This pattern is emitted for property wrappers with a
+            // nonmutating setter, for example.
+            capturedBase = SGF.B.createTrivialLoadOr(
+                loc, base.getValue(), LoadOwnershipQualifier::Copy);
+          } else {
+            capturedBase = base.copy(SGF, loc).forward(SGF);
+          }
+
+          capturedArgs.push_back(capturedBase);
+        }
+
+        PartialApplyInst *setterPAI = SGF.B.createPartialApply(
+            loc, setterFRef, Substitutions, capturedArgs,
+            ParameterConvention::Direct_Guaranteed);
+        return SGF.emitManagedRValueWithCleanup(setterPAI);
+      };
+
+      auto emitValue =
+          [&](VarDecl *field, Type fieldType, CanSILFunctionType setterTy,
+              const SILFunctionConventions &setterConv) -> ManagedValue {
+        // FIXME: This should use CallEmission instead of doing everything
+        // manually.
+        assert(value.isRValue());
+        ManagedValue Mval =
+            std::move(value).asKnownRValue(SGF).getAsSingleValue(SGF, loc);
+        auto param = setterTy->getParameters()[0];
+        SILType loweredSubstArgType = Mval.getType();
+        if (param.isIndirectInOut()) {
+          loweredSubstArgType = SILType::getPrimitiveAddressType(
+              loweredSubstArgType.getASTType());
+        }
+        auto loweredSubstParamTy = SILType::getPrimitiveType(
+            param.getArgumentType(SGF.SGM.M, setterTy,
+                                  SGF.getTypeExpansionContext()),
+            loweredSubstArgType.getCategory());
+        // Handle reabstraction differences.
+        if (Mval.getType() != loweredSubstParamTy) {
+          Mval = SGF.emitSubstToOrigValue(
+              loc, Mval, SGF.SGM.Types.getAbstractionPattern(field),
+              fieldType->getCanonicalType());
+        }
+
+        // If we need the argument in memory, materialize an address.
+        if (setterConv.getSILArgumentConvention(0).isIndirectConvention() &&
+            !Mval.getType().isAddress()) {
+          Mval = Mval.materialize(SGF, loc);
+        }
+
+        return Mval;
+      };
+
+      auto getTupleFieldIndex =
+          [&](VarDecl *var, Identifier fieldName) -> Optional<unsigned> {
+        auto *tupleType = var->getInterfaceType()->castTo<TupleType>();
+        int fieldIdx = tupleType->getNamedElementId(fieldName);
+        if (fieldIdx < 0)
+          return None;
+        return fieldIdx;
+      };
+
+      if (canRewriteSetAsTypeWrapperInit(SGF)) {
+        auto *ctor = cast<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
+        auto *field = cast<VarDecl>(Storage);
+        auto FieldType = field->getValueInterfaceType();
+        if (!Substitutions.empty()) {
+          FieldType = FieldType.subst(Substitutions);
+        }
+
+        auto *localVar = ctor->getLocalTypeWrapperStorageVar();
+
+        // First, we need to find index of the current field in `_storage.
+        auto fieldIdx = getTupleFieldIndex(localVar, field->getName());
+        assert(fieldIdx.hasValue());
+
+        // Load `_storage.<name>`
+        auto localVarRef =
+            SGF.maybeEmitValueOfLocalVarDecl(localVar, AccessKind::Write);
+
+        auto typeData = getLogicalStorageTypeData(
+            SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
+            FieldType->getCanonicalType());
+
+        TupleElementComponent TEC(*fieldIdx, typeData);
+        auto storage = std::move(TEC).project(SGF, loc, localVarRef);
+
+        // Partially apply the setter so it could be used by assign_by_wrapper
+
+        auto setterFRef = getSetterFRef();
+        auto setterTy = getSetterType(setterFRef);
+        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto setterFn = emitPartialSetterApply(setterFRef, setterConv);
+
+        // Create the assign_by_wrapper with the initializer and setter.
+
+        auto Mval = emitValue(field, FieldType, setterTy, setterConv);
+
+        // Inject assign_by_wrapper instruction
+
+        SGF.B.createAssignByTypeWrapper(
+            loc, Mval.forward(SGF), storage.forward(SGF), setterFn.getValue(),
+            AssignByWrapperInst::Unknown);
+        return;
+      }
+
       if (canRewriteSetAsPropertyWrapperInit(SGF) &&
           !Storage->isStatic() &&
           isBackingVarVisible(cast<VarDecl>(Storage),
@@ -1490,29 +1671,51 @@ namespace {
           ValType = ValType.subst(Substitutions);
         }
 
-        // TODO: revist minimal
-        SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-            TypeExpansionContext::minimal(), backingVar,
+        auto typeData = getLogicalStorageTypeData(
+            SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
             ValType->getCanonicalType());
-        auto typeData =
-            getLogicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                      getTypeData().AccessKind,
-                                      ValType->getCanonicalType());
 
-        // Get the address of the storage property.
+        // Stores the address of the storage property.
         ManagedValue proj;
-        if (!BaseFormalType) {
-          proj = SGF.maybeEmitValueOfLocalVarDecl(
-              backingVar, AccessKind::Write);
-        } else if (BaseFormalType->mayHaveSuperclass()) {
-          RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
-                                  typeData, /*actorIsolation=*/None);
-          proj = std::move(REC).project(SGF, loc, base);
+
+        // If this is a type wrapper managed property, we emit everything
+        // through local `_storage` variable because wrapper property
+        // in this case is backed by `$storage` which has to get initialized
+        // first.
+        if (backingVar->isAccessedViaTypeWrapper()) {
+          auto *ctor = cast<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
+          auto *localVar = ctor->getLocalTypeWrapperStorageVar();
+
+          // First, we need to find index of the backing storage field in
+          // `_storage`.
+          auto fieldIdx = getTupleFieldIndex(localVar, backingVar->getName());
+          assert(fieldIdx.hasValue());
+
+          // Load `_storage.<name>`
+          auto localVarRef =
+              SGF.maybeEmitValueOfLocalVarDecl(localVar, AccessKind::Write);
+
+          TupleElementComponent TEC(*fieldIdx, typeData);
+          proj = std::move(TEC).project(SGF, loc, localVarRef);
         } else {
-          assert(BaseFormalType->getStructOrBoundGenericStruct());
-          StructElementComponent SEC(backingVar, varStorageType,
-                                     typeData, /*actorIsolation=*/None);
-          proj = std::move(SEC).project(SGF, loc, base);
+          // TODO: revist minimal
+          SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
+              TypeExpansionContext::minimal(), backingVar,
+              ValType->getCanonicalType());
+
+          if (!BaseFormalType) {
+            proj =
+                SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
+          } else if (BaseFormalType->mayHaveSuperclass()) {
+            RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
+                                    typeData, /*actorIsolation=*/None);
+            proj = std::move(REC).project(SGF, loc, base);
+          } else {
+            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            StructElementComponent SEC(backingVar, varStorageType, typeData,
+                                       /*actorIsolation=*/None);
+            proj = std::move(SEC).project(SGF, loc, base);
+          }
         }
 
         // The property wrapper backing initializer forms an instance of
@@ -1528,99 +1731,18 @@ namespace {
         ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
         // Create the allocating setter function. It captures the base address.
-        auto setterInfo =
-            SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
-        SILValue setterFRef;
-        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
-          // Emit a thunk we might have to bridge arguments.
-          auto foreignSetterThunk = setter.asForeign(false);
-          setterFRef =
-              SGF.emitDynamicMethodRef(
-                     loc, foreignSetterThunk,
-                     SGF.SGM.Types
-                         .getConstantInfo(SGF.getTypeExpansionContext(), foreignSetterThunk)
-                         .SILFnType)
-                  .getValue();
+        auto setterFRef = getSetterFRef();
+        auto setterTy = getSetterType(setterFRef);
+        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto setterFn = emitPartialSetterApply(setterFRef, setterConv);
 
-        } else {
-          setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
-        }
+        // Create the assign_by_wrapper with the initializer and setter.
 
-        CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
-        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
-                                                        SGF.getTypeExpansionContext());
-        SILFunctionConventions setterConv(substSetterTy, SGF.SGM.M);
+        auto Mval = emitValue(field, FieldType, setterTy, setterConv);
 
-        // Emit captures for the setter
-        SmallVector<SILValue, 4> capturedArgs;
-        auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
-        if (!captureInfo.getCaptures().empty()) {
-          SmallVector<ManagedValue, 4> captures;
-          SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
-
-          for (auto capture : captures)
-            capturedArgs.push_back(capture.forward(SGF));
-        } else {
-          assert(base);
-
-          SILValue capturedBase;
-          unsigned argIdx = setterConv.getNumSILArguments() - 1;
-
-          if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
-            capturedBase = base.getValue();
-          } else if (base.getType().isAddress() &&
-                     base.getType().getObjectType() ==
-                     setterConv.getSILArgumentType(argIdx,
-                                                   SGF.getTypeExpansionContext())) {
-            // If the base is a reference and the setter expects a value, emit a
-            // load. This pattern is emitted for property wrappers with a
-            // nonmutating setter, for example.
-            capturedBase = SGF.B.createTrivialLoadOr(
-                loc, base.getValue(), LoadOwnershipQualifier::Copy);
-          } else {
-            capturedBase = base.copy(SGF, loc).forward(SGF);
-          }
-
-          capturedArgs.push_back(capturedBase);
-        }
-
-        PartialApplyInst *setterPAI =
-          SGF.B.createPartialApply(loc, setterFRef,
-                                   Substitutions, capturedArgs,
-                                   ParameterConvention::Direct_Guaranteed);
-        ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
-
-        // Create the assign_by_wrapper with the allocator and setter.
-        // FIXME: This should use CallEmission instead of doing everything manually.
-        assert(value.isRValue());
-        ManagedValue Mval = std::move(value).asKnownRValue(SGF).
-                              getAsSingleValue(SGF, loc);
-        auto param = substSetterTy->getParameters()[0];
-        SILType loweredSubstArgType = Mval.getType();
-        if (param.isIndirectInOut()) {
-          loweredSubstArgType =
-            SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
-        }
-        auto loweredSubstParamTy = SILType::getPrimitiveType(
-            param.getArgumentType(SGF.SGM.M, substSetterTy,
-                                  SGF.getTypeExpansionContext()),
-            loweredSubstArgType.getCategory());
-        // Handle reabstraction differences.
-        if (Mval.getType() != loweredSubstParamTy) {
-          Mval = SGF.emitSubstToOrigValue(loc, Mval,
-                                          SGF.SGM.Types.getAbstractionPattern(field),
-                                          FieldType->getCanonicalType());
-        }
-
-        // If we need the argument in memory, materialize an address.
-        if (setterConv.getSILArgumentConvention(0).isIndirectConvention() &&
-            !Mval.getType().isAddress()) {
-          Mval = Mval.materialize(SGF, loc);
-        }
-
-        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
-                                     initFn.getValue(), setterFn.getValue(),
-                                     AssignByWrapperInst::Unknown);
+        SGF.B.createAssignByPropertyWrapper(
+            loc, Mval.forward(SGF), proj.forward(SGF), initFn.getValue(),
+            setterFn.getValue(), AssignByWrapperInst::Unknown);
 
         return;
       }
@@ -3793,11 +3915,21 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
 
   ManagedValue addr = SGF.emitAddressOfLValue(e, std::move(baseLV));
 
-  // Now create the temporary and
+  // Now create the temporary and move our value into there.
   auto temp =
       SGF.emitFormalAccessTemporary(e, SGF.F.getTypeLowering(addr.getType()));
   auto toAddr = temp->getAddressForInPlaceInitialization(SGF, e);
-  SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+
+  // If we have a move only type, we use a copy_addr that will be handled by the
+  // address move only checker. If we have a copyable type, we need to use a
+  // mark_unresolved_move_addr to ensure that the move operator checker performs
+  // the relevant checking.
+  if (addr.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(e, addr.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+  }
   temp->finishInitialization(SGF);
 
   // Now return the temporary in a value component.
@@ -4717,6 +4849,10 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
   if (setterComponent.canRewriteSetAsPropertyWrapperInit(SGF))
     return false;
+
+  if (setterComponent.canRewriteSetAsTypeWrapperInit(SGF))
+    return false;
+
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
                                        std::move(src));
   return true;;
@@ -4783,12 +4919,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr =
-      std::move(component).project(*this, loc, destAddr);
-    assert(finalDestAddr.getType().isAddress());
-
-    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
-    std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
+    std::move(component.asPhysical()).set(*this, loc, std::move(src), destAddr);
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }

@@ -483,9 +483,6 @@ struct SILDeclRef {
     return result;
   }
 
-  /// True is the decl ref references any kind of thunk.
-  bool isAnyThunk() const;
-
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
   bool isForeignToNativeThunk() const;
@@ -512,9 +509,6 @@ struct SILDeclRef {
   /// True if the decl ref references a method which introduces a new witness
   /// table entry.
   bool requiresNewWitnessTableEntry() const;
-
-  /// True if the decl is a method which introduces a new witness table entry.
-  static bool requiresNewWitnessTableEntry(AbstractFunctionDecl *func);
 
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
@@ -567,6 +561,11 @@ struct SILDeclRef {
   /// this is not a method, there is no such class, or the class cannot be
   /// subclassed.
   SubclassScope getSubclassScope() const;
+
+  /// For a SILDeclRef that describes a variable initializer or backing
+  /// initializer, retrieves the expression that will be emitted for that
+  /// initialization. Otherwise, returns \c nullptr.
+  Expr *getInitializationExpr() const;
 
   bool isDynamicallyReplaceable() const;
 

@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -target %target-cpu-apple-macosx12.0
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx
 
 import RegexBuilder

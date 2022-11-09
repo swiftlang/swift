@@ -45,6 +45,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
           return false;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           return true;
@@ -3446,6 +3447,7 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::Destructor:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
+  case DeclKind::MacroExpansion:
     return None;
 
   case DeclKind::PatternBinding:
@@ -4468,6 +4470,13 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
   if (isa<ProtocolDecl>(nominal))
     return nullptr;
 
+  // Move only nominal types are currently never sendable since we have not yet
+  // finished the generics model for them.
+  //
+  // TODO: Remove this once this is complete!
+  if (nominal->isMoveOnly())
+    return nullptr;
+
   // Actor types are always Sendable; they don't get it via this path.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl && classDecl->isActor())
@@ -4485,6 +4494,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
           return nullptr;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           break;
@@ -5073,6 +5083,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::Destructor:
+  case DeclKind::MacroExpansion:
     return true;
 
   case DeclKind::EnumElement:

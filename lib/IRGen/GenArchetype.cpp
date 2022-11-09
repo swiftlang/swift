@@ -342,7 +342,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   }
 
   // Otherwise, for now, always use an opaque indirect type.
-  llvm::Type *storageType = IGM.OpaquePtrTy->getPointerElementType();
+  llvm::Type *storageType = IGM.OpaqueTy;
 
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
@@ -410,9 +410,9 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   llvm::Value *metadata =
     emitArchetypeTypeMetadataRef(IGF, archetype, MetadataState::Complete)
       .getMetadata();
-  return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                                {addr.getAddress(), metadata,
-                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
+  return IGF.Builder.CreateCall(
+      IGF.IGM.getGetDynamicTypeFunctionPointer(),
+      {addr.getAddress(), metadata, llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
 }
 
 static void
@@ -505,7 +505,7 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFunctionPointer();
   auto opaqueDecl = archetype->getDecl();
   auto genericParam = archetype->getInterfaceType()
       ->castTo<GenericTypeParamType>();
@@ -532,7 +532,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFunctionPointer();
   auto opaqueDecl = archetype->getDecl();
   assert(archetype->isRoot() && "Can only follow from the root");
 

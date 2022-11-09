@@ -15,8 +15,10 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILBridgingUtils.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Compiler.h"
@@ -362,4 +364,36 @@ BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
   auto iter = cl.begin() + index;
   assert(index >= 0 && iter < cl.end());
   return {*iter};
+}
+
+static InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFunction;
+static CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFunction = nullptr;
+
+void CalleeAnalysis_register(
+    InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFn,
+    CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFn) {
+  instructionIsDeinitBarrierFunction = instructionIsDeinitBarrierFn;
+  getMemBehvaiorFunction = getMemBehvaiorFn;
+}
+
+SILInstruction::MemoryBehavior BasicCalleeAnalysis::
+getMemoryBehavior(ApplySite as, bool observeRetains) {
+  if (getMemBehvaiorFunction) {
+    auto b = getMemBehvaiorFunction({pm->getSwiftPassInvocation()},
+                                    {as.getInstruction()->asSILNode()},
+                                    observeRetains);
+    return (SILInstruction::MemoryBehavior)b;
+  }
+  return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+}
+
+bool swift::isDeinitBarrier(SILInstruction *const instruction,
+                            BasicCalleeAnalysis *bca) {
+  if (!instructionIsDeinitBarrierFunction) {
+    return mayBeDeinitBarrierNotConsideringSideEffects(instruction);
+  }
+  BridgedInstruction inst = {
+      cast<SILNode>(const_cast<SILInstruction *>(instruction))};
+  BridgedCalleeAnalysis analysis = {bca};
+  return instructionIsDeinitBarrierFunction(inst, analysis);
 }

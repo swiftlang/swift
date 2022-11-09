@@ -314,8 +314,10 @@ public:
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
       forwardDeclare(ED);
-    } else if (isa<AbstractTypeParamDecl>(TD)) {
-      llvm_unreachable("should not see type params here");
+    } else if (isa<GenericTypeParamDecl>(TD)) {
+      llvm_unreachable("should not see generic parameters here");
+    } else if (isa<AssociatedTypeDecl>(TD)) {
+      llvm_unreachable("should not see associated types here");
     } else if (isa<StructDecl>(TD) &&
                TD->getModuleContext()->isStdlibModule()) {
       // stdlib has some @_cdecl functions with structs.
@@ -561,7 +563,8 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (ED->lookupConformance(errorTypeProto, conformances)) {
+    if (outputLangMode != OutputLanguageMode::Cxx
+        && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
@@ -759,6 +762,11 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
                       OutputLanguageMode::Cxx);
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
+  if (M.isStdlibModule()) {
+    // Embed an overlay for the standard library.
+    ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
+        "_SwiftStdlibCxxOverlay.h");
+  }
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
@@ -768,10 +776,14 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {
-    os << "#endif\n";
+    // FIXME: This is a workaround for prologue being emitted outside of
+    // __cplusplus.
+    if (!M.isStdlibModule())
+      os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
     M.ValueDecl::getName().print(os);
+    os << " __attribute__((swift_private))";
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -779,7 +791,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
     os << prologueOS.str();
 
-    os << "\n#ifdef __cplusplus\n";
+    if (!M.isStdlibModule())
+      os << "\n#ifdef __cplusplus\n";
     os << "}\n";
     os << "}\n";
     os << "}\n";
@@ -788,6 +801,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   // Construct a C++ namespace for the module.
   ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
-      [&](raw_ostream &os) { os << moduleOS.str(); });
+      [&](raw_ostream &os) { os << moduleOS.str(); },
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
   return info;
 }

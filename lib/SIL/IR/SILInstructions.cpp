@@ -456,6 +456,21 @@ IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
   return Inst;
 }
 
+TestSpecificationInst *
+TestSpecificationInst::create(SILDebugLocation Loc,
+                              StringRef ArgumentsSpecification, SILModule &M) {
+  auto ArgumentsSpecificationLength = ArgumentsSpecification.size();
+  auto Size = totalSizeToAlloc<char>(ArgumentsSpecificationLength);
+  auto Buffer = M.allocateInst(Size, alignof(TestSpecificationInst));
+
+  auto *Inst =
+      ::new (Buffer) TestSpecificationInst(Loc, ArgumentsSpecificationLength);
+  std::uninitialized_copy(ArgumentsSpecification.begin(),
+                          ArgumentsSpecification.end(),
+                          Inst->getTrailingObjects<char>());
+  return Inst;
+}
+
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
@@ -1164,12 +1179,13 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                           SILValue Src, SILValue Dest,
-                                           SILValue Initializer,
-                                           SILValue Setter,
-                                           AssignByWrapperInst::Mode mode) :
-    AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
+                                         AssignByWrapperInst::Originator origin,
+                                         SILValue Src, SILValue Dest,
+                                         SILValue Initializer, SILValue Setter,
+                                         AssignByWrapperInst::Mode mode)
+    : AssignInstBase(Loc, Src, Dest, Initializer, Setter), originator(origin) {
+  assert(Initializer->getType().is<SILFunctionType>() ||
+         (isa<SILUndef>(Initializer) && originator == Originator::TypeWrapper));
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
@@ -2868,6 +2884,9 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
 
 bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
   switch (inst->getKind()) {
+  // Explicitly list instructions which definitely involve a representation
+  // change.
+  case SILInstructionKind::SwitchEnumInst:
   default:
     // Conservatively assume that a conversion changes representation.
     // Operations can be added as needed to participate in SIL opaque values.

@@ -1003,7 +1003,7 @@ void SILClosureSpecializerTransform::run() {
 
   // Invalidate everything since we delete calls as well as add new
   // calls and branches.
-  invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+  invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 static void markReabstractionPartialApplyAsUsed(
@@ -1073,6 +1073,8 @@ static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
   llvm_unreachable("covered switch");
 }
 
+const int SpecializationLevelLimit = 2;
+
 static int getSpecializationLevelRecursive(StringRef funcName, Demangler &parent) {
   using namespace Demangle;
 
@@ -1098,23 +1100,44 @@ static int getSpecializationLevelRecursive(StringRef funcName, Demangler &parent
     return 0;
   if (funcSpec->getKind() != Node::Kind::FunctionSignatureSpecialization)
     return 0;
-  Node *param = funcSpec->getChild(1);
-  if (param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
-    return 0;
-  if (param->getNumChildren() < 2)
-    return 0;
-  Node *kindNd = param->getChild(0);
-  if (kindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
-    return 0;
-  auto kind = FunctionSigSpecializationParamKind(kindNd->getIndex());
-  if (kind != FunctionSigSpecializationParamKind::ConstantPropFunction)
-    return 0;
-    
-  Node *payload = param->getChild(1);
-  if (payload->getKind() != Node::Kind::FunctionSignatureSpecializationParamPayload)
-    return 1;
-  // Check if the specialized function is a specialization itself.
-  return 1 + getSpecializationLevelRecursive(payload->getText(), demangler);
+
+  // Match any function specialization. We check for constant propagation at the
+  // parameter level.
+  Node *param = funcSpec->getChild(0);
+  if (param->getKind() != Node::Kind::SpecializationPassID)
+    return SpecializationLevelLimit + 1; // unrecognized format
+
+  unsigned maxParamLevel = 0;
+  for (unsigned paramIdx = 1; paramIdx < funcSpec->getNumChildren();
+       ++paramIdx) {
+    Node *param = funcSpec->getChild(paramIdx);
+    if (param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
+      return SpecializationLevelLimit + 1; // unrecognized format
+
+    // A parameter is recursive if it has a kind with index and type payload
+    if (param->getNumChildren() < 2)
+      continue;
+
+    Node *kindNd = param->getChild(0);
+    if (kindNd->getKind()
+        != Node::Kind::FunctionSignatureSpecializationParamKind) {
+      return SpecializationLevelLimit + 1; // unrecognized format
+    }
+    auto kind = FunctionSigSpecializationParamKind(kindNd->getIndex());
+    if (kind != FunctionSigSpecializationParamKind::ConstantPropFunction)
+      continue;
+    Node *payload = param->getChild(1);
+    if (payload->getKind()
+        != Node::Kind::FunctionSignatureSpecializationParamPayload) {
+      return SpecializationLevelLimit + 1; // unrecognized format
+    }
+    // Check if the specialized function is a specialization itself.
+    unsigned paramLevel =
+      1 + getSpecializationLevelRecursive(payload->getText(), demangler);
+    if (paramLevel > maxParamLevel)
+      maxParamLevel = paramLevel;
+  }
+  return maxParamLevel;
 }
 
 /// If \p function is a function-signature specialization for a constant-
@@ -1287,7 +1310,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
-        // We currently only support copying intermediate reabastraction
+        // We currently only support copying intermediate reabstraction
         // closures if the closure is ultimately passed trivially.
         bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()
@@ -1328,9 +1351,10 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         //
         // A limit of 2 is good enough and will not be exceed in "regular"
         // optimization scenarios.
-        if (getSpecializationLevel(getClosureCallee(ClosureInst)) > 2)
+        if (getSpecializationLevel(getClosureCallee(ClosureInst))
+            > SpecializationLevelLimit) {
           continue;
-
+        }
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
         if (!CInfo)
@@ -1395,6 +1419,8 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(FuncBuilder, CSDesc, NewFName);
         addFunctionToPassManagerWorklist(NewF, CSDesc.getApplyCallee());
+        LLVM_DEBUG(llvm::dbgs() << "\nThe rewritten callee is:\n";
+                   NewF->dump());
       }
 
       // Rewrite the call
@@ -1404,6 +1430,10 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       Changed = true;
     }
   }
+  LLVM_DEBUG(if (Changed) {
+      llvm::dbgs() << "\nThe rewritten caller is:\n";
+      Caller->dump();
+    });
   return Changed;
 }
 

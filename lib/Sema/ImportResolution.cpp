@@ -371,7 +371,8 @@ getModuleImpl(ImportPath::Module modulePath, ModuleDecl *loadingModule,
   //
   // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
   // for clang overlays as well.
-  if (moduleID.Item == loadingModule->getName() && modulePath.size() == 1) {
+  if (ctx.getRealModuleName(moduleID.Item) == loadingModule->getName() &&
+      modulePath.size() == 1) {
     if (auto importer = ctx.getClangModuleLoader())
       return importer->loadModule(moduleID.Loc, modulePath);
     return nullptr;

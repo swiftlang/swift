@@ -228,10 +228,10 @@ class DeadFunctionAndGlobalElimination {
           // already: see isAnchorFunction)
         } else {
           auto decl = cast<AbstractFunctionDecl>(method.getDecl());
-          if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+          if (auto clazz = dyn_cast<ClassDecl>(decl->getDeclContext())) {
             ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
                                    dyn_cast<FuncDecl>(decl),
-                                   clas);
+                                   clazz);
           } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
             ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
           } else {

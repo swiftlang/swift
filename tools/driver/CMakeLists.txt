@@ -17,6 +17,12 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
                           swiftDriverTool
                           swiftCompilerStub)
 
+  if(SWIFT_SWIFT_PARSER)
+    target_link_libraries(swift-frontend-bootstrapping0
+                          PRIVATE
+                            swiftCore)
+  endif()
+
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
@@ -36,6 +42,12 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
                           swiftDriverTool
                           swiftCompilerModules-bootstrapping1)
 
+  if(SWIFT_SWIFT_PARSER)
+    target_link_libraries(swift-frontend-bootstrapping1
+                          PRIVATE
+                            swiftCore)
+  endif()
+
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
@@ -51,6 +63,14 @@ target_link_libraries(swift-frontend
                       PUBLIC
                         swiftDriverTool
                         swiftCompilerModules)
+
+if(SWIFT_SWIFT_PARSER)
+  target_link_libraries(swift-frontend
+                        PRIVATE
+                          swiftCore)
+endif()
+
+_add_swift_runtime_link_flags(swift-frontend "../../lib" "")
 
 # Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.

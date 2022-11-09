@@ -35,7 +35,7 @@ func upcast(_ x: S) -> any P {
   // CHECK: store [[CONCRETE_VAL]] to [trivial] [[INIT_Q_INT_STRING_FLOAT]] : $*S
   // CHECK: [[OPEN_Q_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access [[Q_INT_STRING_FLOAT]] : $*any Q<Int, String, Float> to $*[[OPENED_Q_INT_STRING_FLOAT:@opened\(.*, any Q<Int, String, Float>\) Self]]
   // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*any P, $[[OPENED_Q_INT_STRING_FLOAT]]
-  // CHECK: copy_addr [[OPEN_Q_INT_STRING_FLOAT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_Q_INT_STRING_FLOAT]]
+  // CHECK: copy_addr [[OPEN_Q_INT_STRING_FLOAT]] to [init] [[RESULT_INIT]] : $*[[OPENED_Q_INT_STRING_FLOAT]]
 
   return x as any Q<Int, String, Float> as any P
 }
@@ -50,7 +50,7 @@ func upupupupcast(_ x: S) -> any P {
   // CHECK: [[OPEN_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access %3 : $*any P<Int, String, Float> to $*[[OPENED_P_INT_STRING_FLOAT:@opened\(.*, any P<Int, String, Float>\) Self]]
 
   // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*any P, $[[OPENED_P_INT_STRING_FLOAT]]
-  // CHECK: copy_addr [[OPEN_INT_STRING_FLOAT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_P_INT_STRING_FLOAT]]
+  // CHECK: copy_addr [[OPEN_INT_STRING_FLOAT]] to [init] [[RESULT_INIT]] : $*[[OPENED_P_INT_STRING_FLOAT]]
   return x as any P<Int, String, Float> as any P
 }
 
@@ -97,4 +97,15 @@ func upcastResult() {
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized5forceAA1P_px1TRts_q_1URtsq0_1VRtsXPyr1_lF : $@convention(thin) <T, U, V> () -> @out any P<T, U, V> {
 func force<T, U, V>() -> any P<T, U, V> {
   return R(force: { force() }).force()
+}
+
+protocol Box<Contents> {
+  associatedtype Contents
+
+  var contents: Contents { get }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s13parameterized13functionTypes3box5valueq_AA3Box_pq_xc8ContentsRts_XP_xtr0_lF : $@convention(thin) <T, U> (@in_guaranteed any Box<(T) -> U>, @in_guaranteed T) -> @out U {
+func functionTypes<T, U>(box: any Box<(T) -> U>, value: T) -> U {
+  return box.contents(value)
 }

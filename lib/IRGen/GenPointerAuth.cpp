@@ -48,9 +48,8 @@ llvm::Value *irgen::emitPointerAuthBlend(IRGenFunction &IGF,
                                          llvm::Value *address,
                                          llvm::Value *other) {
   address = IGF.Builder.CreatePtrToInt(address, IGF.IGM.Int64Ty);
-  auto intrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_blend);
-  return IGF.Builder.CreateCall(intrinsic, {address, other});
+  return IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ptrauth_blend,
+                                         {address, other});
 }
 
 llvm::Value *irgen::emitPointerAuthStrip(IRGenFunction &IGF,
@@ -58,9 +57,8 @@ llvm::Value *irgen::emitPointerAuthStrip(IRGenFunction &IGF,
                                           unsigned Key) {
   auto fnVal = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.Int64Ty);
   auto keyArg = llvm::ConstantInt::get(IGF.IGM.Int32Ty, Key);
-  auto intrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_strip);
-  auto strippedPtr = IGF.Builder.CreateCall(intrinsic, {fnVal, keyArg});
+  auto strippedPtr = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::ptrauth_strip, {fnVal, keyArg});
   return IGF.Builder.CreateIntToPtr(strippedPtr, fnPtr->getType());
 }
 
@@ -69,7 +67,8 @@ FunctionPointer irgen::emitPointerAuthResign(IRGenFunction &IGF,
                                           const PointerAuthInfo &newAuthInfo) {
   llvm::Value *fnPtr = emitPointerAuthResign(IGF, fn.getRawPointer(),
                                              fn.getAuthInfo(), newAuthInfo);
-  return FunctionPointer(fn.getKind(), fnPtr, newAuthInfo, fn.getSignature());
+  return FunctionPointer::createSigned(fn.getKind(), fnPtr, newAuthInfo,
+                                       fn.getSignature());
 }
 
 llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,
@@ -97,12 +96,11 @@ llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,
   auto oldPair = getPointerAuthPair(IGF, oldAuthInfo);
   auto newPair = getPointerAuthPair(IGF, newAuthInfo);
 
-  auto intrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_resign);
   llvm::Value *args[] = {
     fnPtr, oldPair.first, oldPair.second, newPair.first, newPair.second
   };
-  fnPtr = IGF.Builder.CreateCall(intrinsic, args);
+  fnPtr =
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ptrauth_resign, args);
   return IGF.Builder.CreateIntToPtr(fnPtr, origTy);
 }
 
@@ -113,12 +111,10 @@ llvm::Value *irgen::emitPointerAuthAuth(IRGenFunction &IGF, llvm::Value *fnPtr,
 
   auto oldPair = getPointerAuthPair(IGF, oldAuthInfo);
 
-  auto intrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_auth);
   llvm::Value *args[] = {
     fnPtr, oldPair.first, oldPair.second
   };
-  fnPtr = IGF.Builder.CreateCall(intrinsic, args);
+  fnPtr = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ptrauth_auth, args);
   return IGF.Builder.CreateIntToPtr(fnPtr, origTy);
 }
 
@@ -147,12 +143,10 @@ llvm::Value *irgen::emitPointerAuthSign(IRGenFunction &IGF, llvm::Value *fnPtr,
 
   auto newPair = getPointerAuthPair(IGF, newAuthInfo);
 
-  auto intrinsic = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_sign);
   llvm::Value *args[] = {
     fnPtr, newPair.first, newPair.second
   };
-  fnPtr = IGF.Builder.CreateCall(intrinsic, args);
+  fnPtr = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ptrauth_sign, args);
   return IGF.Builder.CreateIntToPtr(fnPtr, origTy);
 }
 

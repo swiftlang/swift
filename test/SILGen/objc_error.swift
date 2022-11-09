@@ -141,9 +141,9 @@ extension Error {
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
 	func convertToNSError() -> NSError {
     // CHECK: [[COPY:%.*]] = alloc_stack $Self
-    // CHECK: copy_addr [[SELF]] to [initialization] [[COPY]]
+    // CHECK: copy_addr [[SELF]] to [init] [[COPY]]
     // CHECK: [[COPY2:%.*]] = alloc_stack $Self
-    // CHECK: copy_addr [[COPY]] to [initialization] [[COPY2]]
+    // CHECK: copy_addr [[COPY]] to [init] [[COPY2]]
     // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @$ss24_getErrorEmbeddedNSErroryyXlSgxs0B0RzlF
     // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]<Self>([[COPY2]])
     // CHECK: switch_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>,
@@ -160,7 +160,7 @@ extension Error {
     // CHECK: [[ERROR_BOX:%[0-9]+]] = alloc_existential_box $any Error, $Self
     // CHECK: [[ERROR_PROJECTED:%[0-9]+]] = project_existential_box $Self in [[ERROR_BOX]] : $any Error
     // CHECK: store [[ERROR_BOX]] to [init] [[ERROR_BUF:%.*]] :
-    // CHECK: copy_addr [take] [[COPY]] to [initialization] [[ERROR_PROJECTED]] : $*Self
+    // CHECK: copy_addr [take] [[COPY]] to [init] [[ERROR_PROJECTED]] : $*Self
     // CHECK: [[ERROR_BOX2:%.*]] = load [take] [[ERROR_BUF]]
     // CHECK: br [[CONTINUATION]]([[ERROR_BOX2]] : $any Error)
 

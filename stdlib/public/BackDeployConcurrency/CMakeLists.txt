@@ -29,6 +29,10 @@ list(REMOVE_ITEM SWIFT_SDK_IOS_SIMULATOR_ARCHITECTURES "i386")
 list(REMOVE_ITEM SWIFT_SDK_IOS_ARCHITECTURES "arm64e")
 list(REMOVE_ITEM SWIFT_SDK_OSX_ARCHITECTURES "arm64e")
 
+# Don't build the libraries for 64-bit watchOS targets;
+# there is no back-deployment to them.
+list(REMOVE_ITEM SWIFT_SDK_WATCHOS_ARCHITECTURES "arm64" "arm64e")
+
 # The back-deployed library can only be shared.
 list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 

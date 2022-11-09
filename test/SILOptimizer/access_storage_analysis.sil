@@ -271,9 +271,9 @@ bb0:
 // A sil_global such as this without a corresponding Swift declaration must be
 // defined in another module. Such a global can only be identified when accessed
 // via global_addr instruction (as happens with C imports). Any access via an
-// addessor (as with Swift imports) will be Unidentified. For the purpose of
-// access analysis, a global is considered "external" based on the availabitiy
-// of a Swift declaraion. We only consider an global to be a disjoint access
+// accessor (as with Swift imports) will be Unidentified. For the purpose of
+// access analysis, a global is considered "external" based on the availability
+// of a Swift declaration. We only consider an global to be a disjoint access
 // location if its declaration is available.
 sil_global @external_global : $Int64
 
@@ -439,7 +439,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
   %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0
-  copy_addr %leftAddr to [initialization] %0 : $*TreeB<T>
+  copy_addr %leftAddr to [init] %0 : $*TreeB<T>
   end_access %boxAccess : $*(left: TreeB<T>, right: TreeB<T>)
   %v = tuple ()
   return %v : $()

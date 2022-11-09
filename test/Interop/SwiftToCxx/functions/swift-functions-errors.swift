@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions {
+// CHECK-LABEL: namespace Functions __attribute__((swift_private)) {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -13,11 +13,17 @@
 
 // CHECK: }
 
-enum NaiveErrors : Error {
+@_expose(Cxx)
+public enum NaiveErrors : Error {
     case returnError
     case throwError
+
+    public func getMessage() {
+        print(self)
+    }
 }
 
+@_expose(Cxx)
 public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 
 // CHECK: inline void emptyThrowFunction() {
@@ -34,10 +40,12 @@ class TestDestroyed {
   }
 }
 
+@_expose(Cxx)
 public struct DestroyedError : Error {
   let t = TestDestroyed()
 }
 
+@_expose(Cxx)
 public func testDestroyedError() throws { throw DestroyedError() }
 
 // CHECK: inline void testDestroyedError() {
@@ -48,6 +56,7 @@ public func testDestroyedError() throws { throw DestroyedError() }
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
 
+@_expose(Cxx)
 public func throwFunction() throws {
     print("passThrowFunction")
     throw NaiveErrors.throwError
@@ -61,6 +70,7 @@ public func throwFunction() throws {
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
 
+@_expose(Cxx)
 public func throwFunctionWithReturn() throws -> Int {
     print("passThrowFunctionWithReturn")
     throw NaiveErrors.returnError

@@ -925,7 +925,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (EnumDecl *enumDecl = userValue->getType().getEnumOrBoundGenericEnum()) {
+  if (userValue->getType().getEnumOrBoundGenericEnum()) {
     storage.initializesEnum = true;
   }
   assert(!storage.isPhiProjection());
@@ -1019,7 +1019,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
   // SILValues can share storage via projections, but the storage is still
   // singly defined. However, allocatePhi may coalesce multiple values, or even
   // a single value across multiple loop iterations. The burden for checking
-  // inteference is entirely on allocatePhi.
+  // interference is entirely on allocatePhi.
   for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap)) {
     if (auto phi = PhiValue(valueStorageI.value)) {
       allocatePhi(phi);
@@ -1140,7 +1140,7 @@ bool OpaqueStorageAllocation::checkStorageDominates(
     }
     // Handle both phis and terminator results.
     auto *bbArg = cast<SILPhiArgument>(incomingValue);
-    // The storage block must strictly dominate the phi.
+    // The storage block must strictly dominate the argument block.
     if (!pass.domInfo->properlyDominates(allocInst->getParent(),
                                          bbArg->getParent())) {
       return false;
@@ -1159,7 +1159,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   coalescedPhi.coalesce(phi, pass.valueStorageMap);
 
   SmallVector<SILValue, 4> coalescedValues;
-  coalescedValues.resize(coalescedPhi.getCoalescedOperands().size());
+  coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
   for (SILValue value : coalescedPhi.getCoalescedValues())
     coalescedValues.push_back(value);
 
@@ -1183,7 +1183,8 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   storage.storageAddress = nullptr;
 
   // It's only use should be dealloc_stacks.
-  for (Operand *use : allocInst->getUses()) {
+  SmallVector<Operand *, 4> uses(allocInst->getUses());
+  for (Operand *use : uses) {
     pass.deleter.forceDelete(cast<DeallocStackInst>(use->getUser()));
   }
   pass.deleter.forceDelete(allocInst);
@@ -1365,7 +1366,7 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
 // the materialized address.
 //
 // If \p intoPhiOperand is false, then the materialized address is guaranteed to
-// domaninate the composing user. Map the user onto this address to avoid
+// dominate the composing user. Map the user onto this address to avoid
 // rematerialization.
 //
 // Note: This only materializes the address for the purpose of projection an
@@ -1556,7 +1557,7 @@ namespace {
 //
 // For blocks with multiple phis, all moves of phi operands semantically occur
 // in parallel on the CFG edge from the predecessor to the phi block. As these
-// moves are inserted into the predecessor's intruction list, maintain the
+// moves are inserted into the predecessor's instruction list, maintain the
 // illusion of parallel moves by resolving any interference between the phi
 // moves. This is done by checking for anti-dependencies to or from other phi
 // moves. If one phi move's source reads from another phi move's dest, then the
@@ -1581,9 +1582,9 @@ namespace {
 //     br bb3(val0, val1)
 //   bb2:
 //     temp = alloc_stack
-//     copy_addr [take] addr0 to [initialization] temp
-//     copy_addr [take] addr1 to [initialization] addr0
-//     copy_addr [take] temp to [initialization] addr1
+//     copy_addr [take] addr0 to [init] temp
+//     copy_addr [take] addr1 to [init] addr0
+//     copy_addr [take] temp to [init] addr1
 //     dealloc_stack temp
 //     br bb3(val1, val1)
 //   bb3(phi0, phi1):
@@ -1714,13 +1715,13 @@ namespace {
 /// object arguments with address-type arguments.
 class CallArgRewriter {
   AddressLoweringState &pass;
-  FullApplySite apply;
+  ApplySite apply;
   SILLocation callLoc;
   SILBuilder argBuilder;
   AddressMaterialization addrMat;
 
 public:
-  CallArgRewriter(FullApplySite apply, AddressLoweringState &pass)
+  CallArgRewriter(ApplySite apply, AddressLoweringState &pass)
       : pass(pass), apply(apply), callLoc(apply.getLoc()),
         argBuilder(pass.getBuilder(apply.getInstruction()->getIterator())),
         addrMat(pass, argBuilder) {}
@@ -1777,7 +1778,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   if (apply.getArgumentConvention(*operand).isOwnedConvention()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
-    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+    apply.insertAfterApplication([&](SILBuilder &callBuilder) {
       callBuilder.createDeallocStack(callLoc, allocInst);
     });
     operand->set(allocInst);
@@ -1786,7 +1787,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     auto *store =
         argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
     auto *storeBorrow = dyn_cast<StoreBorrowInst>(store);
-    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+    apply.insertAfterApplication([&](SILBuilder &callBuilder) {
       if (storeBorrow) {
         callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
       }
@@ -2070,13 +2071,13 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
   auto *allocInst = argBuilder.createAllocStack(callLoc, argTy);
 
   // Instead of using resultBuilder, insert dealloc immediately after the call
-  // for stack discpline across loadable indirect results.
-  apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+  // for stack discipline across loadable indirect results.
+  apply.insertAfterApplication([&](SILBuilder &callBuilder) {
     callBuilder.createDeallocStack(callLoc, allocInst);
   });
 
   if (oldResult && !oldResult->use_empty()) {
-    // Insert reloads immediately after the call. Get the reaload insertion
+    // Insert reloads immediately after the call. Get the reload insertion
     // point after emitting dealloc to ensure the reload happens first.
     auto reloadBuilder = pass.getBuilder(getResultInsertionPoint());
 
@@ -2599,13 +2600,17 @@ protected:
     CallArgRewriter(applyInst, pass).rewriteIndirectArgument(use);
   }
 
+  void visitPartialApplyInst(PartialApplyInst *pai) {
+    CallArgRewriter(pai, pass).rewriteIndirectArgument(use);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteIndirectArgument(use);
   }
 
   void visitYieldInst(YieldInst *yield) {
     SILValue addr = addrMat.materializeAddress(use->get());
-    yield->setOperand(0, addr);
+    yield->setOperand(use->getOperandNumber(), addr);
   }
 
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
@@ -2613,9 +2618,50 @@ protected:
     vmi->setOperand(opAddr);
   }
 
+  void visitExistentialMetatypeInst(ExistentialMetatypeInst *emi) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    emi->setOperand(opAddr);
+  }
+
+  void visitAddressOfBorrowBuiltinInst(BuiltinInst *bi, bool stackProtected) {
+    SILValue value = bi->getOperand(0);
+    SILValue addr = pass.valueStorageMap.getStorage(value).storageAddress;
+    auto &astCtx = pass.getModule()->getASTContext();
+    SILType rawPointerType = SILType::getRawPointerType(astCtx);
+    SILValue result = builder.createAddressToPointer(
+        bi->getLoc(), addr, rawPointerType, stackProtected);
+    bi->replaceAllUsesWith(result);
+  }
+
+  void visitBuiltinInst(BuiltinInst *bi) {
+    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    case BuiltinValueKind::Copy: {
+      SILValue opAddr = addrMat.materializeAddress(use->get());
+      bi->setOperand(0, opAddr);
+      break;
+    }
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+      visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
+      break;
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+      visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/false);
+      break;
+    default:
+      bi->dump();
+      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value use.");
+    }
+  }
+
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
+
+  void visitFixLifetimeInst(FixLifetimeInst *fli) {
+    SILValue value = fli->getOperand();
+    SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
+    builder.createFixLifetime(fli->getLoc(), address);
+    pass.deleter.forceDelete(fli);
+  }
 
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
@@ -2647,7 +2693,7 @@ protected:
   void visitDeinitExistentialValueInst(
       DeinitExistentialValueInst *deinitExistential) {
     // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented DeinitExsitentialValue use.");
+    llvm::report_fatal_error("Unimplemented DeinitExistentialValue use.");
   }
 
   void visitDestroyValueInst(DestroyValueInst *destroy) {
@@ -2705,6 +2751,21 @@ protected:
 
   void emitExtract(SingleValueInstruction *extractInst);
 
+  void visitSelectEnumInst(SelectEnumInst *sei) {
+    SmallVector<std::pair<EnumElementDecl *, SILValue>> caseValues;
+    for (unsigned index = 0, count = sei->getNumCases(); index < count;
+         ++index) {
+      caseValues.push_back(sei->getCase(index));
+    }
+
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    SILValue addr =
+        builder.createSelectEnumAddr(sei->getLoc(), opAddr, sei->getType(),
+                                     sei->getDefaultResult(), caseValues);
+    sei->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(sei);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 
@@ -2735,7 +2796,26 @@ protected:
         uncheckedCastInst->getLoc(), srcAddr,
         uncheckedCastInst->getType().getAddressType());
 
-    markRewritten(uncheckedCastInst, destAddr);
+    if (uncheckedCastInst->getType().isAddressOnly(*pass.function)) {
+      markRewritten(uncheckedCastInst, destAddr);
+      return;
+    }
+
+    // For loadable cast destination type, replace copies with load copies.
+    if (Operand *use = uncheckedCastInst->getSingleUse()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+        auto *load = builder.createLoad(cvi->getLoc(), destAddr,
+                                        LoadOwnershipQualifier::Copy);
+        cvi->replaceAllUsesWith(load);
+        pass.deleter.forceDelete(cvi);
+        return;
+      }
+    }
+    SILValue load =
+        builder.emitLoadBorrowOperation(uncheckedCastInst->getLoc(), destAddr);
+    uncheckedCastInst->replaceAllUsesWith(load);
+    pass.deleter.forceDelete(uncheckedCastInst);
+    emitEndBorrows(load);
   }
 
   void visitUnconditionalCheckedCastInst(
@@ -2772,13 +2852,15 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 
   // Borrows are irrelevant unless they are marked lexical.
   if (borrow->isLexical()) {
-    if (auto *allocStack = dyn_cast<AllocStackInst>(address)) {
-      allocStack->setIsLexical();
-      return;
+    if (auto base = getAccessBase(address)) {
+      if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
+        allocStack->setIsLexical();
+        return;
+      }
+      // Function arguments are inherently lexical.
+      if (isa<SILFunctionArgument>(base))
+        return;
     }
-    // Function arguments are inherently lexical.
-    if (isa<SILFunctionArgument>(address))
-      return;
 
     SWIFT_ASSERT_ONLY(address->dump());
     llvm_unreachable("^^^ unknown lexical address producer");
@@ -2857,13 +2939,14 @@ void UseRewriter::emitEndBorrows(SILValue value) {
   findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   PrunedLivenessBoundary guaranteedBoundary;
-  guaranteedBoundary.compute(liveness);
+  liveness.computeBoundary(guaranteedBoundary);
   guaranteedBoundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         pass.getBuilder(insertPt).createEndBorrow(pass.genLoc(), value);
@@ -2928,7 +3011,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
       return;
 
     assert(caseBB->getArguments().size() == 1);
-    SILArgument *caseArg = caseBB->getArguments()[0];
+    SILArgument *caseArg = caseBB->getArgument(0);
 
     assert(&switchEnum->getOperandRef(0) == getReusedStorageOperand(caseArg));
     assert(caseDecl->hasAssociatedValues() && "caseBB has a payload argument");
@@ -2970,6 +3053,20 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     defaultCounter = switchEnum->getDefaultCount();
     if (auto defaultDecl = switchEnum->getUniqueCaseForDefault()) {
       rewriteCase(defaultDecl.get(), defaultBB);
+    } else {
+      assert(defaultBB->getArguments().size() == 1);
+      SILArgument *arg = defaultBB->getArgument(0);
+      assert(arg->getType().isAddressOnly(*pass.function));
+      auto builder = pass.getBuilder(defaultBB->begin());
+      auto addr = enumAddr;
+      auto *load = builder.createTrivialLoadOr(switchEnum->getLoc(), addr,
+                                               LoadOwnershipQualifier::Take);
+      // Remap arg to the new dummy load which will be deleted during
+      // deleteRewrittenInstructions.
+      arg->replaceAllUsesWith(load);
+      pass.valueStorageMap.replaceValue(arg, load);
+      markRewritten(load, addr);
+      defaultBB->eraseArgument(0);
     }
   }
   auto builder = pass.getTermBuilder(switchEnum);
@@ -3075,6 +3172,12 @@ public:
 protected:
   // Set the storage address for an opaque block arg and mark it rewritten.
   void rewriteArg(SILPhiArgument *arg) {
+    if (auto *tai =
+            dyn_cast_or_null<TryApplyInst>(arg->getTerminatorForResult())) {
+      CallArgRewriter(tai, pass).rewriteArguments();
+      ApplyRewriter(tai, pass).convertApplyWithIndirectResults();
+      return;
+    }
     LLVM_DEBUG(llvm::dbgs() << "REWRITE ARG "; arg->dump());
     if (storage.storageAddress)
       LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage.storageAddress->dump());
@@ -3103,6 +3206,22 @@ protected:
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteArguments();
     ApplyRewriter(bai, pass).convertBeginApplyWithOpaqueYield();
+  }
+
+  void visitBuiltinInst(BuiltinInst *bi) {
+    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    case BuiltinValueKind::Copy: {
+      SILValue addr = addrMat.materializeAddress(bi);
+      builder.createBuiltin(
+          bi->getLoc(), bi->getName(),
+          SILType::getEmptyTupleType(bi->getType().getASTContext()),
+          bi->getSubstitutions(), {addr, bi->getOperand(0)});
+      break;
+    }
+    default:
+      bi->dump();
+      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
+    }
   }
 
   // Rewrite the apply for an indirect result.
@@ -3223,7 +3342,7 @@ protected:
 //===----------------------------------------------------------------------===//
 
 // Rewrite applies with indirect parameters or results of loadable types which
-// were not visited during opaque value rewritting.
+// were not visited during opaque value rewriting.
 static void rewriteIndirectApply(FullApplySite apply,
                                  AddressLoweringState &pass) {
   // If all indirect args were loadable, then they still need to be rewritten.
@@ -3258,13 +3377,29 @@ static void rewriteFunction(AddressLoweringState &pass) {
       DefRewriter::rewriteValue(valueDef, pass);
       valueAndStorage.storage.markRewritten();
     }
+    // The def of interest may have been changed by rewriteValue.  Get that
+    // redefinition back out of the ValueStoragePair.
+    valueDef = valueAndStorage.value;
     // Rewrite a use of any non-address value mapped to storage (does not
     // include the already rewritten uses of indirect arguments).
     if (valueDef->getType().isAddress())
       continue;
 
+    SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
-    for (Operand *oper : uses) {
+    for (auto *oper : uses) {
+      originalUses.insert(oper);
+      UseRewriter::rewriteUse(oper, pass);
+    }
+    // Rewrite every new uses that was added.
+    uses.clear();
+    for (auto *use : valueDef->getUses()) {
+      if (originalUses.contains(use))
+        continue;
+      uses.push_back(use);
+    }
+    for (auto *oper : uses) {
+      assert(isa<DebugValueInst>(oper->getUser()));
       UseRewriter::rewriteUse(oper, pass);
     }
   }
@@ -3297,7 +3432,7 @@ static void filterDeadArgs(OperandValueArrayRef origArgs,
                            SmallVectorImpl<SILValue> &newArgs) {
   auto nextDeadArgI = deadArgIndices.begin();
   for (unsigned i : indices(origArgs)) {
-    if (i == *nextDeadArgI) {
+    if (i == *nextDeadArgI && nextDeadArgI != deadArgIndices.end()) {
       ++nextDeadArgI;
       continue;
     }

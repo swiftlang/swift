@@ -554,15 +554,13 @@ deriveHashable_hashInto(
       /*Throws=*/false,
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
-  addNonIsolatedToSynthesized(derived.Nominal, hashDecl);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
   // The derived hash(into:) for an actor must be non-isolated.
-  if (derived.Nominal->isActor() ||
-      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
-    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
-  }
+  if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
+      derived.Nominal->isActor())
+    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -891,18 +889,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
-  addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
-  AccessorDecl *getterDecl = AccessorDecl::create(C,
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params,
-      intType, parentDC);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setSynthesized();
@@ -919,10 +915,9 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                                       /*sourceIsParentContext*/ true);
 
   // The derived hashValue of an actor must be nonisolated.
-  if (derived.Nominal->isActor() ||
-      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
-    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
-  }
+  if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
+      derived.Nominal->isActor())
+    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
 
   Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);

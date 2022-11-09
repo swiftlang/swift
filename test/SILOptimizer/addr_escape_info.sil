@@ -133,6 +133,44 @@ bb0:
   return %5 : $X
 }
 
+sil @return_x : $@convention(thin) (@guaranteed X) -> @owned X
+
+// CHECK-LABEL: Address escape information for test_class_argument:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %0 = alloc_ref $X
+// CHECK-NEXT:    %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:  may alias
+// CHECK:       End function test_class_argument
+sil @test_class_argument : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = function_ref @return_x : $@convention(thin) (@guaranteed X) -> @owned X
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed X) -> @owned X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %0 : $X
+  fix_lifetime %3 : $*Str
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_reachable_no_alias:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    %0 = alloc_ref $XandIntClass
+// CHECK-NEXT:  address reachable but no alias
+// CHECK:       End function test_reachable_no_alias
+sil @test_reachable_no_alias : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $XandIntClass
+  %1 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
+  %2 = load %1 : $*X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %3 : $*Str
+  fix_lifetime %0 : $XandIntClass
+  %12 = tuple ()
+  return %12 : $()
+}
+
 // CHECK-LABEL: Address escape information for test_struct_with_class:
 // CHECK:       value:  %1 = struct $Container (%0 : $X)
 // CHECK-NEXT:    ==>   %7 = apply %6(%1) : $@convention(thin) (@guaranteed Container) -> ()
@@ -240,7 +278,7 @@ bb0:
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
   %3 = alloc_stack $Str
-  copy_addr %1 to [initialization] %3 : $*Str
+  copy_addr %1 to [init] %3 : $*Str
   %5 = function_ref @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
   %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
   strong_release %0 : $X

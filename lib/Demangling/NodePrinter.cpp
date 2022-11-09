@@ -307,6 +307,7 @@ private:
     case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
+    case Node::Kind::Pack:
     case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
@@ -337,6 +338,7 @@ private:
     case Node::Kind::ProtocolListWithAnyObject:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
+    case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
@@ -604,6 +606,7 @@ private:
     case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
+    case Node::Kind::HasSymbolQuery:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1462,6 +1465,17 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::TupleElementName:
     Printer << Node->getText() << ": ";
     return nullptr;
+  case Node::Kind::Pack: {
+    Printer << "Pack{";
+    printChildren(Node, depth, ", ");
+    Printer << "}";
+    return nullptr;
+  }
+  case Node::Kind::PackExpansion: {
+    print(Node->getChild(0), depth + 1);
+    Printer << "...";
+    return nullptr;
+  }
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
       Printer << " -> " << Node->getText();
@@ -3046,6 +3060,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
     return nullptr;
   }
+  case Node::Kind::HasSymbolQuery:
+    Printer << "#_hasSymbol query for ";
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");

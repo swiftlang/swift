@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 // This test checks the performance of appending to an array.
+//
+// Note: Several benchmarks are marked .unstable until we have a way
+// of controlling malloc behavior from the benchmark driver.
 
 import TestsUtils
 
@@ -26,28 +29,28 @@ public let benchmarks = [
   BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: t,
     setUpFunction: { otherStructs = Array(repeating: S(x: 3, y: 4.2), count: 10_000) },
     tearDownFunction: {  otherStructs = nil }, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: t + [.skip], legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: t + [.unstable], legacyFactor: 34),
   BenchmarkInfo(name: "ArrayAppendLatin1Substring", runFunction: run_ArrayAppendLatin1Substring, tags: t, legacyFactor: 36),
   BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: t,
     setUpFunction: { blackHole(array) }, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: t,
+  BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: t + [.unstable],
     setUpFunction: { otherOptionalOnes = Array(repeating: 1, count: 10_000) },
     tearDownFunction: {  otherOptionalOnes = nil }, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: t + [.unstable], legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendReserved", runFunction: run_ArrayAppendReserved, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendSequence", runFunction: run_ArrayAppendSequence, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendStrings", runFunction: run_ArrayAppendStrings, tags: t,
     setUpFunction: { otherStrings = stride(from: 0, to: 10_000, by: 1).map { "\($0)" } },
     tearDownFunction: {  otherStrings = nil }, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: t + [.skip],
+  BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: t + [.unstable],
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: t + [.skip], legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: t + [.unstable], legacyFactor: 34),
   BenchmarkInfo(name: "ArrayAppendUTF16Substring", runFunction: run_ArrayAppendUTF16Substring, tags: t, legacyFactor: 36),
   BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: t + [.unstable],
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: t + [.skip], legacyFactor: 37),
+  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: t + [.unstable], legacyFactor: 37),
   BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: t, legacyFactor: 47),
   BenchmarkInfo(name: "ArrayPlusEqualThreeElements", runFunction: run_ArrayPlusEqualThreeElements, tags: t, legacyFactor: 10),
 ]

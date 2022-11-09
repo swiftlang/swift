@@ -25,13 +25,6 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 // Diagnostic Engine
 //===----------------------------------------------------------------------===//
 
-// TODO: Move this to somewhere common header.
-#if __has_attribute(enum_extensibility)
-#define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
-#else
-#define ENUM_EXTENSIBILITY_ATTR(arg)
-#endif
-
 // NOTE: This must be the same underlying value as C++ 'swift::DiagID' defined
 // in 'DiagnosticList.cpp'.
 typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
@@ -44,6 +37,8 @@ void DiagnosticEngine_diagnose(swift::DiagnosticEngine &, swift::SourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
                                swift::CharSourceRange highlight,
                                BridgedArrayRef fixIts);
+
+using ArrayRefOfDiagnosticArgument = llvm::ArrayRef<swift::DiagnosticArgument>;
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

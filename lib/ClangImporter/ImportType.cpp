@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -227,7 +228,7 @@ namespace {
 
     ImportResult VisitType(const Type*) = delete;
 
-    // TODO: Add support for dependent types (SR-13809).
+    // TODO(https://github.com/apple/swift/issues/56206): Add support for dependent types.
 #define DEPENDENT_TYPE(Class, Base)                                            \
   ImportResult Visit##Class##Type(const clang::Class##Type *) { return Impl.SwiftContext.getAnyExistentialType(); }
 #define TYPE(Class, Base)
@@ -697,10 +698,9 @@ namespace {
         if (!swiftParamTy)
           return Type();
 
-        // FIXME: If we were walking TypeLocs, we could actually get parameter
-        // names. The probably doesn't matter outside of a FuncDecl, which
-        // we'll have to special-case, but it's an interesting bit of data loss.
-        // <https://bugs.swift.org/browse/SR-2529>
+        // FIXME(https://github.com/apple/swift/issues/45134): If we were walking TypeLocs, we could actually get parameter names.
+        // The probably doesn't matter outside of a FuncDecl, which we'll have
+        // to special-case, but it's an interesting bit of data loss.
         params.push_back(FunctionType::Param(swiftParamTy));
       }
 
@@ -1072,29 +1072,13 @@ namespace {
               importedTypeArgs.push_back(importedTypeArg);
             }
           } else {
+            auto *genericEnv = imported->getGenericEnvironment();
+
             for (auto typeParam : imported->getGenericParams()->getParams()) {
-              if (typeParam->getSuperclass() &&
-                  typeParam->getConformingProtocols().empty()) {
-                importedTypeArgs.push_back(typeParam->getSuperclass());
-                continue;
-              }
-
-              SmallVector<Type, 4> memberTypes;
-
-              if (auto superclassType = typeParam->getSuperclass())
-                memberTypes.push_back(superclassType);
-
-              for (auto protocolDecl : typeParam->getConformingProtocols())
-                memberTypes.push_back(protocolDecl->getDeclaredInterfaceType());
-
-              bool hasExplicitAnyObject = false;
-              if (memberTypes.empty())
-                hasExplicitAnyObject = true;
-
-              Type importedTypeArg = ExistentialType::get(
-                  ProtocolCompositionType::get(
-                      Impl.SwiftContext, memberTypes,
-                      hasExplicitAnyObject));
+              Type importedTypeArg = genericEnv->mapTypeIntoContext(
+                  typeParam->getDeclaredInterfaceType())
+                  ->castTo<ArchetypeType>()
+                  ->getExistentialType();
               importedTypeArgs.push_back(importedTypeArg);
             }
           }
@@ -2085,6 +2069,15 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
 
+  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
+  // idiomatic in Swift, let's drop these return values.
+  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
+  if (op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+      op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+      op == clang::OverloadedOperatorKind::OO_StarEqual ||
+      op == clang::OverloadedOperatorKind::OO_SlashEqual)
+    return {SwiftContext.getVoidType(), false};
+
   // Fix up optionality.
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
@@ -2446,7 +2439,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
                            bool shouldCheckResultType) -> bool {
     auto paramDecl = genericParam->getClangDecl();
     auto templateTypeParam = cast<clang::TemplateTypeParmDecl>(paramDecl);
-    // TODO(SR-13809): This won't work when we support importing dependent types.
+    // TODO(https://github.com/apple/swift/issues/56206): This won't work when we support importing dependent types.
     // We'll have to change this logic to traverse the type tree of the imported
     // Swift type (basically whatever ends up in the parameters variable).
     // Check if genericParam's corresponding clang template type is used by

@@ -21,14 +21,14 @@ public final class ClassWithIntField {
   }
 }
 
-// CHECK: namespace Class {
+// CHECK: namespace Class __attribute__((swift_private)) {
 
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
 
-// CHECK: namespace Class {
+// CHECK: namespace Class __attribute__((swift_private)) {
 
 // CHECK: class ClassWithIntField;
 // CHECK-NEXT: } // end namespace
@@ -43,7 +43,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: } // namespace swift
 
 // CHECK: namespace
-// CHECK-SAME: Class {
+// CHECK-SAME: Class __attribute__((swift_private)) {
 
 // CHECK: namespace
 // CHECK-SAME: _impl {
@@ -92,7 +92,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Class {
+// CHECK-NEXT: namespace Class __attribute__((swift_private)) {
 
 // CHECK: inline ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));

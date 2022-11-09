@@ -21,7 +21,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/Utils.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 
@@ -185,10 +185,11 @@ public:
     StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 
-  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name,
+                      const PrintOptions &Options) override {
     unsigned StartOffset = OS.tell();
     Info.References.emplace_back(Mod, StartOffset, Name.str().size());
-    StreamPrinter::printModuleRef(Mod, Name);
+    StreamPrinter::printModuleRef(Mod, Name, Options);
   }
 };
 

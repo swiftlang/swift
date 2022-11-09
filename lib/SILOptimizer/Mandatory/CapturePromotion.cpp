@@ -1649,7 +1649,7 @@ void CapturePromotionPass::processFunction(
         processPartialApplyInst(funcBuilder, pai, indicesPair.second, worklist);
     (void)clonedFn;
   }
-  invalidateAnalysis(func, SILAnalysis::InvalidationKind::Everything);
+  invalidateAnalysis(func, SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 SILTransform *swift::createCapturePromotion() {

@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_GENENUM_H
 
 #include "TypeInfo.h"
+#include "LoadableTypeInfo.h"
 
 namespace llvm {
   class BasicBlock;
@@ -441,8 +442,8 @@ public:
   virtual bool needsPayloadSizeInMetadata() const = 0;
   virtual unsigned getPayloadSizeForMetadata() const;
   
-  virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
-                                         Address addr) const;
+  virtual LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+                                      Address addr) const;
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,

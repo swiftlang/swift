@@ -148,7 +148,6 @@ set(SWIFT_INSTALL_COMPONENTS
       sourcekit-inproc
       swift-remote-mirror
       swift-remote-mirror-headers
-      parser-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS

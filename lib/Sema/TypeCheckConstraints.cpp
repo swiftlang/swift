@@ -144,10 +144,10 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
          locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
-bool TypeVariableType::Implementation::isTypeSequence() const {
+bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isTypeSequence();
+      && locator->getGenericParameter()->isParameterPack();
 }
 
 bool TypeVariableType::Implementation::isCodeCompletionToken() const {
@@ -159,18 +159,21 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
-                                      ArrayRef<TupleTypeElt> toTuple,
+bool constraints::computeTupleShuffle(TupleType *fromTuple,
+                                      TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
   const unsigned unassigned = -1;
   
-  SmallVector<bool, 4> consumed(fromTuple.size(), false);
+  auto fromElts = fromTuple->getElements();
+  auto toElts = toTuple->getElements();
+
+  SmallVector<bool, 4> consumed(fromElts.size(), false);
   sources.clear();
-  sources.assign(toTuple.size(), unassigned);
+  sources.assign(toElts.size(), unassigned);
 
   // Match up any named elements.
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
-    const auto &toElt = toTuple[i];
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
+    const auto &toElt = toElts[i];
 
     // Skip unnamed elements.
     if (!toElt.hasName())
@@ -180,7 +183,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple) {
+      for (auto field : fromElts) {
         if (field.getName() == toElt.getName() && !consumed[index]) {
           matched = index;
           break;
@@ -197,14 +200,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
   }  
 
   // Resolve any unmatched elements.
-  unsigned fromNext = 0, fromLast = fromTuple.size();
+  unsigned fromNext = 0, fromLast = fromElts.size();
   auto skipToNextAvailableInput = [&] {
     while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
   };
   skipToNextAvailableInput();
 
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
     // Check whether we already found a value for this element.
     if (sources[i] != unassigned)
       continue;
@@ -215,11 +218,11 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     }
 
     // Otherwise, assign this input to the next output element.
-    const auto &elt2 = toTuple[i];
+    const auto &elt2 = toElts[i];
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
-    if (fromTuple[fromNext].hasName() && elt2.hasName())
+    if (fromElts[fromNext].hasName() && elt2.hasName())
       return true;
 
     sources[i] = fromNext;
@@ -649,8 +652,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::SameType: {
         auto lhsTy = requirement.getFirstType();
@@ -1736,7 +1739,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     case CheckedCastKind::Unresolved:
       // Even though we know the elements cannot be downcast, we cannot return
       // Unresolved here as it's possible for an empty Array, Set or Dictionary
-      // to be cast to any element type at runtime (SR-6192). The one exception
+      // to be cast to any element type at runtime
+      // (https://github.com/apple/swift/issues/48744). The one exception
       // to this is when we're checking whether we can treat a coercion as a
       // checked cast because we don't want to tell the user to use as!, as it's
       // probably the wrong suggestion.

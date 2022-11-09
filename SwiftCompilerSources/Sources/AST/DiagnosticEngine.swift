@@ -46,7 +46,7 @@ public struct DiagnosticFixIt {
       let bridgedDiagnosticFixIt = swift.DiagnosticInfo.FixIt(
         swift.CharSourceRange(start.bridged, UInt32(byteLength)),
         bridgedTextRef,
-        llvm.ArrayRef<swift.DiagnosticArgument>())
+        ArrayRefOfDiagnosticArgument())
       fn(bridgedDiagnosticFixIt)
     }
   }

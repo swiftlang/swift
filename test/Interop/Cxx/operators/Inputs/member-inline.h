@@ -50,6 +50,16 @@ struct LoadableBoolWrapper {
   }
 };
 
+template<class T>
+struct TemplatedWithFriendOperator {
+  friend bool operator==(const TemplatedWithFriendOperator &lhs,
+                         const TemplatedWithFriendOperator &rhs) {
+    return true;
+  }
+};
+
+using TemplatedWithFriendOperatorSpec = TemplatedWithFriendOperator<int>;
+
 struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int value;
 
@@ -157,6 +167,32 @@ public:
   int &operator[](int x) {
     return values[x];
   }
+};
+
+struct ReadOnlyRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+};
+
+struct ReadWriteRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int&& x) { return values[x]; }
+};
+
+struct ReadWriteRvalueGetterParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+  
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int x) { return values[x]; }
 };
 
 struct DifferentTypesArray {

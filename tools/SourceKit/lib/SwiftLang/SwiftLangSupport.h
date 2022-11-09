@@ -24,10 +24,10 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CancellableResult.h"
-#include "swift/IDE/CompileInstance.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/Indenting.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
+#include "swift/IDETool/CompileInstance.h"
+#include "swift/IDETool/CompletionInstance.h"
 #include "swift/Index/IndexSymbol.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
@@ -686,14 +686,14 @@ public:
 
   void collectExpressionTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-      SourceKitCancellationToken CancellationToken,
+      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+      bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
   void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length,
+      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;

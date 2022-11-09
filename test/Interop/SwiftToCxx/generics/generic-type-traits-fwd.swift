@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Generics -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h)
 
 @_expose(Cxx)
 public enum ComesFirstEnum {
@@ -39,7 +39,7 @@ public struct LaterGeneric<T> {
 // CHECK: class ComesFirstEnum final {
 // CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const;
 
-// CHECK: namespace Generics {
+// CHECK: namespace Generics __attribute__((swift_private)) {
 // CHECK-EMPTY:
 // CHECK-NEXT:  namespace _impl {
 // CHECK-EMPTY:

@@ -195,7 +195,8 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
     // Then RAUW the phi with the entryBlockOptionalNone and erase the
     // argument.
     phi->replaceAllUsesWith(initialValue);
-    erasePhiArgument(phi->getParent(), phi->getIndex());
+    erasePhiArgument(phi->getParent(), phi->getIndex(),
+                     /*cleanupDeadPhiOp*/ false);
   }
 }
 
@@ -286,17 +287,13 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
     cvtUser->setOperand(cvtUse->getOperandNumber(), mdi);
   }
 
-  auto fixupSILForLifetimeExtension = [&](SILValue value) {
+  auto fixupSILForLifetimeExtension = [&](SILValue value, SILValue entryValue) {
     // Use SSAUpdater to find insertion points for lifetime ends.
     updater.initialize(optionalEscapingClosureTy, value->getOwnershipKind());
     SmallVector<SILPhiArgument *, 8> insertedPhis;
     updater.setInsertedPhis(&insertedPhis);
 
-    // Create an optional none at the function entry.
-    auto *optionalNone =
-        SILBuilderWithScope(fn.getEntryBlock()->begin())
-            .createOptionalNone(loc, optionalEscapingClosureTy);
-    updater.addAvailableValue(fn.getEntryBlock(), optionalNone);
+    updater.addAvailableValue(fn.getEntryBlock(), entryValue);
     updater.addAvailableValue(value->getParentBlock(), value);
     {
       // Since value maybe in a loop, insert an extra lifetime end. Since we
@@ -316,12 +313,17 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
     // TODO: Should we sort inserted phis before or after we initialize
     // the worklist or maybe backwards? We should investigate how the
     // SSA updater adds phi nodes to this list to resolve this question.
-    cleanupDeadTrivialPhiArgs(optionalNone, insertedPhis);
+    cleanupDeadTrivialPhiArgs(entryValue, insertedPhis);
   };
 
+  // Create an optional none at the function entry.
+  auto *optionalNone = SILBuilderWithScope(fn.getEntryBlock()->begin())
+                           .createOptionalNone(loc, optionalEscapingClosureTy);
+  auto *borrowNone = SILBuilderWithScope(optionalNone->getNextInstruction())
+                         .createBeginBorrow(loc, optionalNone);
   // Use the SSAUpdater to create lifetime ends for the copy and the borrow.
-  fixupSILForLifetimeExtension(borrow);
-  fixupSILForLifetimeExtension(optionalSome);
+  fixupSILForLifetimeExtension(borrow, borrowNone);
+  fixupSILForLifetimeExtension(optionalSome, optionalNone);
 }
 
 static SILInstruction *lookThroughRebastractionUsers(
@@ -429,7 +431,7 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
   }
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
-  fas.insertAfterFullEvaluation(insertAtNonUnreachable);
+  fas.insertAfterApplication(insertAtNonUnreachable);
 }
 
 static SILValue skipConvert(SILValue v) {

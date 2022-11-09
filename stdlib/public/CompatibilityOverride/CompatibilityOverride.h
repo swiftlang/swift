@@ -1,4 +1,4 @@
-//===--- CompatibilityOverride.h - Back-deploying compatibility fixes --*- C++ -*-===//
+//===--- CompatibilityOverride.h - Back-deployment patches ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,71 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Support back-deploying compatibility fixes for newer apps running on older runtimes.
+// The compatibility override system supports the back-deployment of
+// bug fixes and ABI additions to existing Swift systems.  This is
+// primarily of interest on Apple platforms, since other platforms don't
+// ship with a stable Swift runtime that cannot simply be replaced.
+//
+// The compatibility override system works as follows:
+//
+// 1. Certain runtime functions are "hooked" so that they can be replaced
+//    by the program at launch time.  The function at the public symbol
+//    (we will use `swift_task_cancel` as a consistent example) is a
+//    thunk that either calls the standard implementation or its dynamic
+//    replacement.  If a dynamic replacement is called, it is passed
+//    the standard implementation as an extra argument.
+//
+// 2. The public thunks are defined in different .cpp files throughout
+//    the runtime by the COMPATIBILITY_OVERRIDE macro below, triggered
+//    by an #include at the bottom of the file.  The list of definitions
+//    to expand in a particular file is defined by the appropriate
+//    CompatibilityOverride*.def file for the current runtime component
+//    (i.e. either the main runtime or the concurrency runtime).
+//    The standard implementation must be defined in that file as a
+//    function with the suffix `Impl`, e.g. `swift_task_cancelImpl`.
+//    Usually the standard implementation should be static, and
+//    everywhere else in the runtime should call the public symbol.
+//
+// 3. The public thunks determine their replacement by calling an
+//    override accessor for the symbol the first time they are called.
+//    These accessors are named e.g. `swift::getOverride_swift_task_cancel`
+//    and are defined by CompatibilityOverride.cpp, which is built
+//    separately for each runtime component using different build
+//    settings.
+//
+// 4. The override accessors check for a Mach-O section with a specific
+//    name, and if it exists, they interpret the section as a struct
+//    with one field per replaceable function.  The order of fields is
+//    determined by the appropriate CompatibilityOverride*.def file.
+//    The section name, the struct layout, and the function signatures of
+//    the replacement functions are the only parts of this which are ABI;
+//    everything else is an internal detail of the runtime which can be
+//    changed if useful.
+//
+// 5. The name of the Mach-O section is specific to both the current
+//    runtime component and the current version of the Swift runtime.
+//    Therefore, a compatibility override library always targets a
+//    specific runtime version and implicitly does nothing on other
+//    versions.
+//
+// 6. Compatibility override libraries define a Mach-O section with the
+//    appropriate name and layout for their target component and version
+//    and initialize the appropriate fields within it to the replacement
+//    functions.  This occurs in the Overrides.cpp file in the library.
+//    Compatibility override libraries are linked against later override
+//    libraries for the same component, so if a patch needs to be applied
+//    to multiple versions, the last version can define public symbols
+//    that the other versions can use (assuming that any internal runtime
+//    structures are roughly compatible).
+//
+// 7. Compatibility override libraries are rebuilt with every Swift
+//    release in case that release requires new patches to the target
+//    runtime.  They are therefore live code, unlike e.g. the
+//    back-deployment concurrency runtime.
+//
+// 8. The back-deployment concurrency runtime looks for the same section
+//    name as the OS-installed 5.6 runtime and therefore will be patched
+//    by the 5.6 compatibility override library.
 //
 //===----------------------------------------------------------------------===//
 

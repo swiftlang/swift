@@ -115,7 +115,7 @@ only(%wrapper : $Wrapper):
 // The function take_wrapper has a single argument of type Wrapper from which
 // it uses only the klass field.  The int field goes unused.  Argument explosion
 // should *not* result in a specialization in this case because (1) the
-// function is definend outside this module (so a thunk would be generated if
+// function is defined outside this module (so a thunk would be generated if
 // we specialized) and (2) specializing does not reduce ARC traffic because the
 // stripped field is trivial.
 // 
@@ -153,7 +153,7 @@ only(%wrapper : $Wrapper):
 // VERIFY: EXPLODE: (Wrapper) => (#Wrapper.klass)
 // The function take_wrapper_shared has a single argument of type Wrapper from
 // which it uses only the klass field.  The int field goes unused.  Argument
-// explosion should result in a specialization in this case because because 
+// explosion should result in a specialization in this case because 
 // there are dead leaves of the relevant sort, the relevant sort here being
 // potentially trivial because specializing the function will not result in a
 // thunk.
@@ -224,7 +224,7 @@ only(%wrapper : $Wrapper):
   %func = function_ref @take_wrapper_hidden : $@convention(thin) (Wrapper) -> ()
   %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
   return %result : $()
-} // end sil funcntion 'take_wrapper_hidden_caller'
+} // end sil function 'take_wrapper_hidden_caller'
 
 
 
@@ -552,7 +552,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_unused_hidden : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_unused_hidden_caller'
+} // end sil function 'take_pair_unused_hidden_caller'
 
 
 
@@ -588,7 +588,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_unused_private : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_unused_private_caller'
+} // end sil function 'take_pair_unused_private_caller'
 
 
 
@@ -715,7 +715,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass1_hidden_caller'
+} // end sil function 'take_pair_for_klass1_hidden_caller'
 
 
 
@@ -756,7 +756,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass1_private : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass1_private_caller'
+} // end sil function 'take_pair_for_klass1_private_caller'
 
 
 
@@ -883,7 +883,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass2_hidden_caller'
+} // end sil function 'take_pair_for_klass2_hidden_caller'
 
 
 
@@ -924,7 +924,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass2_private : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass2_private_caller'
+} // end sil function 'take_pair_for_klass2_private_caller'
 
 
 
@@ -1051,7 +1051,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass1_and_klass2_hidden : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass1_and_klass2_hidden_caller'
+} // end sil function 'take_pair_for_klass1_and_klass2_hidden_caller'
 
 
 
@@ -1090,7 +1090,7 @@ only(%pair : $Pair):
   %func = function_ref @take_pair_for_klass1_and_klass2_private : $@convention(thin) (Pair) -> ()
   %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
   return %result : $()
-} // end sil funcntion 'take_pair_for_klass1_and_klass2_private_caller'
+} // end sil function 'take_pair_for_klass1_and_klass2_private_caller'
 
 
 
@@ -1850,7 +1850,7 @@ only(%quintuple : $Quintuple):
 // Nothing to check.
 
 // TEST_WrKlPuEx:
-// Nothig to check.
+// Nothing to check.
 
 // TEST_WrKlSh:
 // CHECK: sil shared [noinline] @$s19take_wrapper_sharedTf4x_n : $@convention(thin) (Klass) -> () {

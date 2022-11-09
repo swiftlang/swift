@@ -257,7 +257,7 @@ bb0(%0 : $*Builtin.Int64):
 
 // A begin_access may not be used by a partial_apply or a nested
 // begin_access prior to mandatory inlining. Nonetheless, this does
-// occur in deserialzied SIL. This SIL is only well-formed because the
+// occur in deserialized SIL. This SIL is only well-formed because the
 // function is marked [canonical].
 sil [canonical] [ossa] @accessAroundClosure : $@convention(thin) () -> () {
 bb0:
@@ -286,7 +286,7 @@ bb0:
 //
 // The top level function, testDirectApplyNoescapeDynamic, has no
 // access markers, but it does define a box that escapes into two
-// closures. Since one of thoses captures is a box, they both need
+// closures. Since one of those captures is a box, they both need
 // dynamic enforcement. The unique thing about this case is that the
 // non-escaping closure is directly applied, so has no partial_apply
 // to indicate the presence of a captured argument.

@@ -234,10 +234,8 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = GenericTypeParamDecl::create(
-      &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
-  return genericParam;
+  return GenericTypeParamDecl::createImplicit(
+      &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
@@ -2273,10 +2271,6 @@ static bool isValidCmpXChgOrdering(StringRef SuccessString,
 }
 
 ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return nullptr; // not needed for the parser library.
-  #endif
-
   // Builtin.TheTupleType resolves to the singleton instance of BuiltinTupleDecl.
   if (Id == Context.Id_TheTupleType)
     return Context.getBuiltinTupleDecl();
@@ -2703,7 +2697,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::AddressOfBorrowOpaque:
   case BuiltinValueKind::UnprotectedAddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 

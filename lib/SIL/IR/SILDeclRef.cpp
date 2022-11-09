@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -313,6 +314,25 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // user code into their body.
   switch (kind) {
   case Kind::Func: {
+    if (getAbstractClosureExpr()) {
+      // Auto-closures have user-written code.
+      if (auto *ACE = getAutoClosureExpr()) {
+        // Currently all types of auto-closures can contain user code. Note this
+        // logic does not affect delayed emission, as we eagerly emit all
+        // closure definitions. This does however affect profiling.
+        switch (ACE->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::AsyncLet:
+          return true;
+        }
+        llvm_unreachable("Unhandled case in switch!");
+      }
+      // Otherwise, assume an implicit closure doesn't have user code.
+      return false;
+    }
+
     // Lazy getters splice in the user-written initializer expr.
     if (auto *accessor = dyn_cast<AccessorDecl>(getFuncDecl())) {
       auto *storage = accessor->getStorage();
@@ -398,6 +418,13 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Forced-static-dispatch functions are created on-demand and have
     // at best shared linkage.
     if (fn->hasForcedStaticDispatch())
+      return Limit::OnDemand;
+  }
+  
+  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+    // The destructor of a class implemented with @_objcImplementation is only
+    // ever called by its ObjC thunk, so it should not be public.
+    if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
       return Limit::OnDemand;
   }
 
@@ -545,7 +572,8 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // Stored property initializers have linkage based on the access level of
   // their nominal.
   if (isStoredPropertyInitializer())
-    decl = cast<NominalTypeDecl>(decl->getDeclContext());
+    decl = cast<NominalTypeDecl>(
+               decl->getDeclContext()->getImplementedObjCContext());
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
@@ -771,7 +799,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
@@ -912,11 +940,6 @@ bool SILDeclRef::isBackDeployed() const {
     return afd->isBackDeployed();
 
   return false;
-}
-
-bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
-         isDistributedThunk() || isBackDeploymentThunk();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1082,7 +1105,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!NameA->Name.empty() && !isAnyThunk()) {
+      if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
       
@@ -1163,7 +1186,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
+// FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");
@@ -1210,11 +1233,7 @@ bool SILDeclRef::requiresNewVTableEntry() const {
 }
 
 bool SILDeclRef::requiresNewWitnessTableEntry() const {
-  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-}
-
-bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
-  return func->getOverriddenDecls().empty();
+  return cast<AbstractFunctionDecl>(getDecl())->requiresNewWitnessTableEntry();
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
@@ -1481,6 +1500,45 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   }
 
   llvm_unreachable("Unhandled access level in switch.");
+}
+
+Expr *SILDeclRef::getInitializationExpr() const {
+  switch (kind) {
+  case Kind::StoredPropertyInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto *pbd = var->getParentPatternBinding();
+    unsigned idx = pbd->getPatternEntryIndexForVarDecl(var);
+    auto *init = pbd->getInit(idx);
+    assert(!pbd->isInitializerSubsumed(idx));
+
+    // If this is the backing storage for a property with an attached wrapper
+    // that was initialized with `=`, use that expression as the initializer.
+    if (auto originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
+        auto wrapperInfo =
+            originalProperty->getPropertyWrapperInitializerInfo();
+        auto *placeholder = wrapperInfo.getWrappedValuePlaceholder();
+        init = placeholder->getOriginalWrappedValue();
+        assert(init);
+      }
+    }
+    return init;
+  }
+  case Kind::PropertyWrapperBackingInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromWrappedValue());
+    return wrapperInfo.getInitFromWrappedValue();
+  }
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromProjectedValue());
+    return wrapperInfo.getInitFromProjectedValue();
+  }
+  default:
+    return nullptr;
+  }
 }
 
 unsigned SILDeclRef::getParameterListCount() const {

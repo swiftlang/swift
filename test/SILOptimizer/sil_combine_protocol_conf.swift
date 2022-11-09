@@ -248,7 +248,7 @@ public class OtherClass {
 // CHECK: [[ACC2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R2]]
 // CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[ACC2]] : $*any GenericPropProtocol to $*@opened("{{.*}}", any GenericPropProtocol) Self
 // CHECK: [[T1:%.*]] = alloc_stack $@opened
-// CHECK: copy_addr [[O2]] to [initialization] [[T1]]
+// CHECK: copy_addr [[O2]] to [init] [[T1]]
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}", any GenericPropProtocol) Self, #GenericPropProtocol.val!getter : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}", any GenericPropProtocol) Self : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W2]]<@opened("{{.*}}", any GenericPropProtocol) Self>([[T1]]) : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
@@ -272,7 +272,7 @@ public class OtherClass {
 // CHECK: [[ACC5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R5]]
 // CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[ACC5]] : $*any GenericNestedPropProtocol to $*@opened("{{.*}}", any GenericNestedPropProtocol) Self
 // CHECK: [[T2:%.*]] = alloc_stack $@opened
-// CHECK: copy_addr [[O5]] to [initialization] [[T2]]
+// CHECK: copy_addr [[O5]] to [init] [[T2]]
 // CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}", any GenericNestedPropProtocol) Self, #GenericNestedPropProtocol.val!getter : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}", any GenericNestedPropProtocol) Self : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W5]]<@opened("{{.*}}", any GenericNestedPropProtocol) Self>([[T2]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
@@ -343,7 +343,7 @@ public class OtherKlass {
 // CHECK: [[ACC1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R1]]
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[ACC1]] : $*any AGenericProtocol to $*@opened("{{.*}}", any AGenericProtocol) Self
 // CHECK: [[T1:%.*]] = alloc_stack $@opened
-// CHECK: copy_addr [[O1]] to [initialization] [[T1]]
+// CHECK: copy_addr [[O1]] to [init] [[T1]]
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}", any AGenericProtocol) Self, #AGenericProtocol.val!getter : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}", any AGenericProtocol) Self : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}", any AGenericProtocol) Self>([[T1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract

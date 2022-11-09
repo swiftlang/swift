@@ -220,7 +220,7 @@ public:
   SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
     assert(!calculatedValues.count(addr));
     Type valueType =
-        substituteGenericParamsAndSimpify(addr->getType().getASTType());
+        substituteGenericParamsAndSimplify(addr->getType().getASTType());
     auto *memObject = SymbolicValueMemoryObject::create(
         valueType, initialValue, evaluator.getAllocator());
     auto result = SymbolicValue::getAddress(memObject);
@@ -257,9 +257,9 @@ public:
       SILBasicBlock::iterator instI,
       SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
 
-  Type substituteGenericParamsAndSimpify(Type ty);
-  CanType substituteGenericParamsAndSimpify(CanType ty) {
-    return substituteGenericParamsAndSimpify(Type(ty))->getCanonicalType();
+  Type substituteGenericParamsAndSimplify(Type ty);
+  CanType substituteGenericParamsAndSimplify(CanType ty) {
+    return substituteGenericParamsAndSimplify(Type(ty))->getCanonicalType();
   }
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
@@ -292,7 +292,7 @@ private:
 
 /// Simplify the specified type based on knowledge of substitutions if we have
 /// any.
-Type ConstExprFunctionState::substituteGenericParamsAndSimpify(Type ty) {
+Type ConstExprFunctionState::substituteGenericParamsAndSimplify(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
@@ -314,7 +314,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // types.
   if (auto *mti = dyn_cast<MetatypeInst>(value)) {
     auto metatype = mti->getType().castTo<MetatypeType>();
-    auto type = substituteGenericParamsAndSimpify(metatype->getInstanceType())
+    auto type = substituteGenericParamsAndSimplify(metatype->getInstanceType())
         ->getCanonicalType();
     return SymbolicValue::getMetatype(type);
   }
@@ -384,7 +384,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     }
     CanType structType = value->getType().getASTType();
     return SymbolicValue::getAggregate(
-        elts, substituteGenericParamsAndSimpify(structType),
+        elts, substituteGenericParamsAndSimplify(structType),
         evaluator.getAllocator());
   }
 
@@ -954,7 +954,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
 
     Type resultType =
-        substituteGenericParamsAndSimpify(apply->getType().getASTType());
+        substituteGenericParamsAndSimplify(apply->getType().getASTType());
     assert(resultType->is<TupleType>());
     Type arrayType = resultType->castTo<TupleType>()->getElementType(0);
     Type arrayEltType = getArrayElementType(arrayType);
@@ -1167,7 +1167,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     // Get the type of the argument and check if it is a signed or
     // unsigned integer.
     SILValue integerArgument = apply->getOperand(1);
-    CanType argumentType = substituteGenericParamsAndSimpify(
+    CanType argumentType = substituteGenericParamsAndSimplify(
         integerArgument->getType().getASTType());
     Optional<bool> isSignedIntegerType =
         getSignIfStdlibIntegerType(argumentType);
@@ -1531,9 +1531,9 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
       // Try finding a writer among the users of `teai`. For example:
       //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
       //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   copy_addr %114 to [init] %183 : $*Int32
       //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //   copy_addr [take] %191 to [init] %178 : $*Int32
       //
       // The workflow is: when const-evaluating %178, we const-evaluate %191,
       // which in turn triggers const-evaluating %179, thereby enter this
@@ -1781,7 +1781,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     if (structDecl && structDecl->getStoredProperties().empty()) {
       createMemoryObject(asi, SymbolicValue::getAggregate(
                                   ArrayRef<SymbolicValue>(),
-                                  substituteGenericParamsAndSimpify(structType),
+                                  substituteGenericParamsAndSimplify(structType),
                                   evaluator.getAllocator()));
       return None;
     }
@@ -1983,11 +1983,11 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
       // not a CheckedCastBranchAddr inst. Therefore, it has to be a struct
       // type or String or Metatype. Since the types of aggregates are not
       // tracked, we recover it from the declared type of the source operand
-      // and generic parameter subsitutions in the interpreter state.
-      sourceType = substituteGenericParamsAndSimpify(
+      // and generic parameter substitutions in the interpreter state.
+      sourceType = substituteGenericParamsAndSimplify(
                                       checkedCastInst->getSourceFormalType());
     }
-    CanType targetType = substituteGenericParamsAndSimpify(
+    CanType targetType = substituteGenericParamsAndSimplify(
         checkedCastInst->getTargetFormalType());
     DynamicCastFeasibility castResult = classifyDynamicCast(
         inst->getModule().getSwiftModule(), sourceType, targetType);

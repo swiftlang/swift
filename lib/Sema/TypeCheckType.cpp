@@ -647,8 +647,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   llvm_unreachable("invalid requirement check type");
 }
 
-static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
-
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -678,7 +676,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
     if (auto *const unboundTy = type->getAs<UnboundGenericType>()) {
-      if (!options.is(TypeResolverContext::TypeAliasDecl)) {
+      if (!options.is(TypeResolverContext::TypeAliasDecl) &&
+          !options.is(TypeResolverContext::ExtensionBinding)) {
         // If the resolution object carries an opener, attempt to open
         // the unbound generic type.
         // TODO: We should be able to just open the generic arguments as N
@@ -755,10 +754,11 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+    if (resolution.getOptions().isConstraintImplicitExistential() &&
+        !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
-                     protoDecl->getExistentialType(),
+                     protoDecl->getDeclaredExistentialType(),
                      /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
 
       return ErrorType::get(ctx);
@@ -809,15 +809,15 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
   // Make sure we have the right number of generic arguments.
   //
-  // For generic types without type sequence parameters, we require
+  // For generic types without type parameter packs, we require
   // the number of declared generic parameters match the number of
   // arguments.
   //
-  // For generic types with type sequence parameters, we only require
+  // For generic types with type parameter packs, we only require
   // that the number of arguments is enough to saturate the number of
-  // regular generic parameters. The type sequence parameter will absorb
+  // regular generic parameters. The parameter pack will absorb
   // any excess parameters, or will have a substitution of `Void` if there
-  // is nothing to bind. This Void-binding behavior of type sequences
+  // is nothing to bind. This Void-binding behavior of parameter packs
   // also explains the offset of one that isn't otherwise present in
   // the plain generic parameter case.
   //
@@ -833,16 +833,16 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   // arguments are given.
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = decl->getGenericParams();
-  auto hasTypeSequence = llvm::any_of(
-      *genericParams, [](const auto *GPT) { return GPT->isTypeSequence(); });
-  if ((!hasTypeSequence && genericArgs.size() != genericParams->size()) ||
-      (hasTypeSequence && genericArgs.size() < genericParams->size() - 1)) {
+  auto hasParameterPack = llvm::any_of(
+      *genericParams, [](const auto *GPT) { return GPT->isParameterPack(); });
+  if ((!hasParameterPack && genericArgs.size() != genericParams->size()) ||
+      (hasParameterPack && genericArgs.size() < genericParams->size() - 1)) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       diags
           .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                    genericParams->size() - (hasTypeSequence ? 1 : 0),
+                    genericParams->size() - (hasParameterPack ? 1 : 0),
                     genericArgs.size(),
-                    genericArgs.size() < genericParams->size(), hasTypeSequence)
+                    genericArgs.size() < genericParams->size(), hasParameterPack)
           .highlight(generic->getAngleBrackets());
       decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
@@ -940,13 +940,13 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
     ArrayRef<Type> genericArgs) const {
-  const bool hasTypeSequence =
+  const bool hasParameterPack =
       llvm::any_of(*decl->getGenericParams(),
-                   [](const auto *GPT) { return GPT->isTypeSequence(); });
+                   [](const auto *GPT) { return GPT->isParameterPack(); });
   assert(
-      ((!hasTypeSequence &&
+      ((!hasParameterPack &&
         genericArgs.size() == decl->getGenericParams()->size()) ||
-       (hasTypeSequence &&
+       (hasParameterPack &&
         genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
       "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -999,7 +999,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     auto origTy = innerParams[i]->getDeclaredInterfaceType();
     auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
-    if (!origGP->isTypeSequence()) {
+    if (!origGP->isParameterPack()) {
       auto substTy = genericArgs[i];
 
       // Enter a substitution.
@@ -1012,19 +1012,19 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
 
     // Scan backwards to find the bounds of the longest run of
-    // types we can bind to this type sequence parameter.
+    // types we can bind to this parameter pack.
     unsigned tail;
     for (tail = 1; tail <= innerParams.size(); ++tail) {
       auto tailTy = innerParams[innerParams.size() - tail]
           ->getDeclaredInterfaceType();
       auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
-      if (tailGP->isTypeSequence()) {
+      if (tailGP->isParameterPack()) {
         assert(tailGP->isEqual(origGP) &&
-               "Found multiple type sequence parameters!");
+               "Found multiple type parameter packs!");
 
-        // Saturate the type sequence. Take care that if the prefix and suffix
-        // have bound all available arguments that we bind the type sequence
-        // parameter to `Void`.
+        // Saturate the parameter pack. Take care that if the prefix and suffix
+        // have bound all available arguments that we bind the parameter
+        // pack to `Void`.
         const size_t sequenceLength = tail + i <= genericArgs.size()
                                           ? genericArgs.size() - tail - i + 1
                                           : 0;
@@ -1699,6 +1699,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
+  auto isExtensionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
@@ -1712,14 +1713,14 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
     }
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
-      if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
-                                                     hasUnboundOpener)
-            != TypeChecker::UnsupportedMemberTypeAccessKind::None)
+      if (TypeChecker::isUnsupportedMemberTypeAccess(
+              parentTy, member, hasUnboundOpener, isExtensionBinding) !=
+          TypeChecker::UnsupportedMemberTypeAccessKind::None)
         return ErrorType::get(ctx);
     }
 
-    switch (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
-                                                       hasUnboundOpener)) {
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(
+        parentTy, member, hasUnboundOpener, isExtensionBinding)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::None:
       break;
 
@@ -1870,7 +1871,8 @@ resolveIdentTypeComponent(TypeResolution resolution,
   if (result->is<UnboundGenericType>() &&
       !isa<GenericIdentTypeRepr>(lastComp) &&
       !resolution.getUnboundTypeOpener() &&
-      !options.is(TypeResolverContext::TypeAliasDecl)) {
+      !options.is(TypeResolverContext::TypeAliasDecl) &&
+      !options.is(TypeResolverContext::ExtensionBinding)) {
 
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       // Tailored diagnostic for custom attributes.
@@ -1907,10 +1909,9 @@ static Type applyNonEscapingIfNecessary(Type ty,
 
     // We lost the sugar to flip the isNoEscape bit.
     //
-    // FIXME: It would be better to add a new AttributedType sugared type,
-    // which would wrap the TypeAliasType or ParenType, and apply the
-    // isNoEscape bit when de-sugaring.
-    // <https://bugs.swift.org/browse/SR-2520>
+    // FIXME(https://github.com/apple/swift/issues/45125): It would be better
+    // to add a new AttributedType sugared type, which would wrap the
+    // TypeAliasType and apply the isNoEscape bit when de-sugaring.
     return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
   }
 
@@ -2340,10 +2341,11 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         return ty;
       };
 
-      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)) {
         if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
           if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-            return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+            return diagnoseDisallowedExistential(
+                getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
         }
       }
 
@@ -4203,14 +4205,14 @@ TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
   if (patternTy->hasError())
     return std::make_pair(ErrorType::get(getASTContext()), Type());
 
-  // Find the first type sequence parameter and use that as the count type.
-  SmallVector<Type, 1> rootTypeSequenceParams;
-  patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
+  // Find the first type parameter pack and use that as the count type.
+  SmallVector<Type, 1> rootParameterPacks;
+  patternTy->getTypeParameterPacks(rootParameterPacks);
 
-  if (rootTypeSequenceParams.empty())
+  if (rootParameterPacks.empty())
     return std::make_pair(patternTy, Type());
 
-  return std::make_pair(patternTy, rootTypeSequenceParams[0]);
+  return std::make_pair(patternTy, rootParameterPacks[0]);
 }
 
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
@@ -4223,16 +4225,27 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
 
   // We might not allow variadic expansions here at all.
-  if (!options.isPackExpansionSupported()) {
+  if (!options.isPackExpansionSupported(getDeclContext())) {
     diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
     return ErrorType::get(ctx);
   }
 
-  // The pattern type must contain at least one variadic generic parameter.
   if (!pair.second) {
+    // Non-pack variadic parameters parse as PackExpansionTypeReprs. These
+    // can only appear in variadic function parameter types.
+    if (options.getContext() == TypeResolverContext::VariadicFunctionInput)
+      return pair.first;
+
+    // Otherwise, the pattern type must contain at least one pack reference.
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
     return ErrorType::get(ctx);
+  }
+
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    auto genericSig = resolution.getGenericSignature();
+    auto shapeType = genericSig->getReducedShape(pair.second);
+    return PackExpansionType::get(pair.first, shapeType);
   }
 
   return PackExpansionType::get(pair.first, pair.second);
@@ -4779,7 +4792,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
-                           proto->getExistentialType(),
+                           proto->getDeclaredExistentialType(),
                            /*isAlias=*/false)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
       }

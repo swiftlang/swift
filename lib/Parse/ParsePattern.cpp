@@ -254,70 +254,75 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status.setHasCodeCompletionAndIsError();
       }
     }
-    
-    // ('inout' | '__shared' | '__owned' | isolated)?
-    bool hasSpecifier = false;
-    while (Tok.is(tok::kw_inout) ||
-           Tok.isContextualKeyword("__shared") ||
-           Tok.isContextualKeyword("__owned") ||
-           Tok.isContextualKeyword("isolated") ||
-           Tok.isContextualKeyword("_const")) {
 
-      if (Tok.isContextualKeyword("isolated")) {
-        // did we already find an 'isolated' type modifier?
-        if (param.IsolatedLoc.isValid()) {
-          diagnose(Tok, diag::parameter_specifier_repeated)
+    {
+      SyntaxParsingContext ModifiersContext(SyntaxContext, SyntaxKind::ModifierList);
+
+      // ('inout' | '__shared' | '__owned' | isolated)?
+      bool hasSpecifier = false;
+      while (Tok.is(tok::kw_inout) ||
+             Tok.isContextualKeyword("__shared") ||
+             Tok.isContextualKeyword("__owned") ||
+             Tok.isContextualKeyword("isolated") ||
+             Tok.isContextualKeyword("_const")) {
+        SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
+
+        if (Tok.isContextualKeyword("isolated")) {
+          // did we already find an 'isolated' type modifier?
+          if (param.IsolatedLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
               .fixItRemove(Tok.getLoc());
-          consumeToken();
+            consumeToken();
+            continue;
+          }
+
+          // is this 'isolated' token the identifier of an argument label?
+          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+            if (Tok.is(tok::colon))
+              return true;  // isolated :
+
+            // isolated x :
+            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+          });
+
+          if (partOfArgumentLabel)
+            break;
+
+          // consume 'isolated' as type modifier
+          param.IsolatedLoc = consumeToken();
           continue;
         }
 
-        // is this 'isolated' token the identifier of an argument label?
-        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-          if (Tok.is(tok::colon))
-            return true;  // isolated :
-
-          // isolated x :
-          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
-        });
-
-        if (partOfArgumentLabel)
-          break;
-
-        // consume 'isolated' as type modifier
-        param.IsolatedLoc = consumeToken();
-        continue;
-      }
-
-      if (Tok.isContextualKeyword("_const")) {
-        param.CompileConstLoc = consumeToken();
-        continue;
-      }
-
-      if (!hasSpecifier) {
-        if (Tok.is(tok::kw_inout)) {
-          // This case is handled later when mapping to ParamDecls for
-          // better fixits.
-          param.SpecifierKind = ParamDecl::Specifier::InOut;
-          param.SpecifierLoc = consumeToken();
-        } else if (Tok.isContextualKeyword("__shared")) {
-          // This case is handled later when mapping to ParamDecls for
-          // better fixits.
-          param.SpecifierKind = ParamDecl::Specifier::Shared;
-          param.SpecifierLoc = consumeToken();
-        } else if (Tok.isContextualKeyword("__owned")) {
-          // This case is handled later when mapping to ParamDecls for
-          // better fixits.
-          param.SpecifierKind = ParamDecl::Specifier::Owned;
-          param.SpecifierLoc = consumeToken();
+        if (Tok.isContextualKeyword("_const")) {
+          param.CompileConstLoc = consumeToken();
+          continue;
         }
-        hasSpecifier = true;
-      } else {
-        // Redundant specifiers are fairly common, recognize, reject, and
-        // recover from this gracefully.
-        diagnose(Tok, diag::parameter_specifier_repeated)
-          .fixItRemove(Tok.getLoc());
-        consumeToken();
+
+        if (!hasSpecifier) {
+          if (Tok.is(tok::kw_inout)) {
+            // This case is handled later when mapping to ParamDecls for
+            // better fixits.
+            param.SpecifierKind = ParamDecl::Specifier::InOut;
+            param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("__shared")) {
+            // This case is handled later when mapping to ParamDecls for
+            // better fixits.
+            param.SpecifierKind = ParamDecl::Specifier::Shared;
+            param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("__owned")) {
+            // This case is handled later when mapping to ParamDecls for
+            // better fixits.
+            param.SpecifierKind = ParamDecl::Specifier::Owned;
+            param.SpecifierLoc = consumeToken();
+          }
+          hasSpecifier = true;
+        } else {
+          // Redundant specifiers are fairly common, recognize, reject, and
+          // recover from this gracefully.
+          diagnose(Tok, diag::parameter_specifier_repeated)
+            .fixItRemove(Tok.getLoc());
+          consumeToken();
+        }
       }
     }
     
@@ -434,7 +439,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             // warn about the misuse of this syntax and offer to
             // fix it.
             // An exception to this rule is when the type is declared with type sugar
-            // Reference: SR-11724
+            // Reference: https://github.com/apple/swift/issues/54133
             if (isa<OptionalTypeRepr>(param.Type)
                 || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
                 diagnose(typeStartLoc, diag::parameter_unnamed)

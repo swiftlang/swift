@@ -937,7 +937,8 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 ///
 /// We also emit diagnostics and potentially a fix-it to help the user.
 ///
-/// See SR-11160 and SR-11212 for more discussion.
+/// See https://github.com/apple/swift/issues/53557 and
+/// https://github.com/apple/swift/issues/53611 for more discussion.
 //
 // type ~ (T1, ..., Tn) (n >= 2)
 //   1a. pat ~ ((P1, ..., Pm)) (m >= 2) -> untuple the pattern
@@ -1384,16 +1385,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast: {
-      diags.diagnose(IP->getLoc(),
-                     diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastType());
-      IP->setType(ErrorType::get(Context));
-      if (Pattern *sub = IP->getSubPattern())
-        sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
-      return P;
-    }
-
+    case CheckedCastKind::SetDowncast:
     case CheckedCastKind::ValueCast:
       IP->setCastKind(castKind);
       break;

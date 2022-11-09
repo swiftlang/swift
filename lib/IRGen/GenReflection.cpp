@@ -264,10 +264,10 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
-        bindFromGenericRequirementsBuffer(IGF, requirements,
-            Address(bindingsBufPtr, IGM.getPointerAlignment()),
-            MetadataState::Complete,
-            [&](CanType t) {
+        bindFromGenericRequirementsBuffer(
+            IGF, requirements,
+            Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
+            MetadataState::Complete, [&](CanType t) {
               return genericEnv
                 ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
                 : t;
@@ -368,9 +368,6 @@ IRGenModule::getLoweredTypeRef(SILType loweredType,
   auto substTy =
     substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
   auto type = substTy.getASTType();
-  if (substTy.hasArchetype())
-    type = type->mapTypeOutOfContext()->getCanonicalType();
-
   return getTypeRefImpl(*this, type, genericSig, role);
 }
 
@@ -421,10 +418,10 @@ IRGenModule::emitWitnessTableRefString(CanType type,
           if (type->hasTypeParameter()) {
             auto bindingsBufPtr = IGF.collectParameters().claimNext();
 
-            bindFromGenericRequirementsBuffer(IGF, requirements,
-                Address(bindingsBufPtr, getPointerAlignment()),
-                MetadataState::Complete,
-                [&](CanType t) {
+            bindFromGenericRequirementsBuffer(
+                IGF, requirements,
+                Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
+                MetadataState::Complete, [&](CanType t) {
                   return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
                 });
 
@@ -513,8 +510,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Set the low bit.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(
-    addr->getType()->getPointerElementType(), addr, bitConstant);
+  addr = llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
 
   // Update the entry.
   entry = {var, addr};
@@ -1325,7 +1321,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addLoweredTypeRef(CaptureType, sig);
+      addLoweredTypeRef(CaptureType.mapTypeOutOfContext(), sig);
     }
 
     // Add the pairs that make up the generic param -> metadata source map
@@ -1557,6 +1553,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   if (auto *SD = dyn_cast<StructDecl>(D)) {
     if (SD->hasClangNode())
       needsOpaqueDescriptor = true;
+  }
+
+  if (auto *CD = dyn_cast<ClassDecl>(D)) {
+    if (CD->getObjCImplementationDecl())
+      needsFieldDescriptor = false;
   }
 
   // If the type has custom @_alignment, emit a fixed record with the

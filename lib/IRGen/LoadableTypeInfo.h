@@ -36,11 +36,13 @@ namespace irgen {
 
 struct LoadedRef {
   llvm::PointerIntPair<llvm::Value*, 1> ValAndNonNull;
+  ReferenceCounting style;
 public:
-  LoadedRef(llvm::Value *V, bool nonNull): ValAndNonNull(V, nonNull) {}
-
+  LoadedRef(llvm::Value *V, bool nonNull, ReferenceCounting style): ValAndNonNull(V, nonNull), style(style) {}
+  LoadedRef(const LoadedRef &ref, bool nonNull): ValAndNonNull(ref.getValue(), nonNull), style(ref.getStyle()) {}
   llvm::Value *getValue() const { return ValAndNonNull.getPointer(); }
   bool isNonNull() const { return ValAndNonNull.getInt(); }
+  ReferenceCounting getStyle() const { return style; }
 };
 
 /// LoadableTypeInfo - A refinement of FixedTypeInfo designed for use

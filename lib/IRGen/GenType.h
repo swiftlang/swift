@@ -319,7 +319,7 @@ SILType getSingletonAggregateFieldType(IRGenModule &IGM,
 /// An IRGenFunction interface for generating type layout verifiers.
 class IRGenTypeVerifierFunction : public IRGenFunction {
 private:
-  llvm::Constant *VerifierFn;
+  FunctionPointer VerifierFn;
 
   struct VerifierArgumentBuffers {
     Address runtimeBuf, staticBuf;

@@ -13,7 +13,6 @@ set(SWIFT_INCLUDE_TESTS NO CACHE BOOL "")
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")
 
 # NOTE(compnerd) these are part of the toolchain, not the runtime.
-set(SWIFT_BUILD_SYNTAXPARSERLIB NO CACHE BOOL "")
 set(SWIFT_BUILD_SOURCEKIT NO CACHE BOOL "")
 
 # NOTE(compnerd) build with the compiler specified, not a just built compiler.

@@ -32,36 +32,31 @@
 
 using namespace swift;
 
-namespace {
-
-/// Find available closure discriminators.
-///
-/// The parser typically takes care of assigning unique discriminators to
-/// closures, but the parser is unavailable during semantic analysis.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned NextDiscriminator = 0;
-
-public:
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-    if (!ACE)
-      return Action::Continue(E);
-
-    unsigned Discriminator = ACE->getDiscriminator();
-    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
-           "Existing closures should have valid discriminators");
-    if (Discriminator >= NextDiscriminator)
-      NextDiscriminator = Discriminator + 1;
+ASTWalker::PostWalkResult<Expr *>
+DiscriminatorFinder::walkToExprPost(Expr *E)  {
+  auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+  if (!ACE)
     return Action::Continue(E);
-  }
 
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator() {
-    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
-      llvm::report_fatal_error("Out of valid closure discriminators");
-    return NextDiscriminator++;
-  }
-};
+  unsigned Discriminator = ACE->getDiscriminator();
+  assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+         "Existing closures should have valid discriminators");
+  if (Discriminator >= NextDiscriminator)
+    NextDiscriminator = Discriminator + 1;
+  if (FirstDiscriminator == AbstractClosureExpr::InvalidDiscriminator ||
+      Discriminator < FirstDiscriminator)
+    FirstDiscriminator = Discriminator;
+
+  return Action::Continue(E);
+}
+
+unsigned DiscriminatorFinder::getNextDiscriminator() {
+  if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+    llvm::report_fatal_error("Out of valid closure discriminators");
+  return NextDiscriminator++;
+}
+
+namespace {
 
 /// Instrument decls with sanity-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {

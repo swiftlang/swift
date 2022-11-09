@@ -262,3 +262,9 @@ do {
   for (x, y) in (0, 0) {}
   // expected-error@-1 {{for-in loop requires '(Int, Int)' to conform to 'Sequence'}}
 }
+
+// rdar://100343275 - Sema is accepting incorrect code which leads to a crash in SILGen
+do {
+  for (x, y, z) in [] { // expected-error {{tuple pattern cannot match values of non-tuple type 'Any'}}
+  }
+}

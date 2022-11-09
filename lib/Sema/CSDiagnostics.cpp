@@ -794,6 +794,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
+    case ConstraintLocator::TernaryBranch:
+      diagnostic = diag::ternary_expr_cases_mismatch;
+      break;
+
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
@@ -1371,6 +1375,22 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItInsert(sourceRange.End, "!.");
     }
   } else {
+    // Check whether or not the base of this optional unwrap is implicit self
+    // This can only happen with a [weak self] capture, and is not permitted.
+    if (auto dotExpr = getAsExpr<UnresolvedDotExpr>(locator->getAnchor())) {
+      if (auto baseDeclRef = dyn_cast<DeclRefExpr>(dotExpr->getBase())) {
+        ASTContext &Ctx = baseDeclRef->getDecl()->getASTContext();
+        if (baseDeclRef->isImplicit() &&
+            baseDeclRef->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
+          emitDiagnostic(diag::optional_self_not_unwrapped);
+
+          emitDiagnostic(diag::optional_self_chain)
+              .fixItInsertAfter(sourceRange.End, "self?.");
+          return true;
+        }
+      }
+    }
+    
     emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                    unwrappedBaseType);
 
@@ -1843,7 +1863,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   if (!callExpr)
     return false;
 
-  // FIXME: We ought to handle multiple trailing closures here (SR-15054)
+  // FIXME(https://github.com/apple/swift/issues/57381): We ought to handle multiple trailing closures here.
   if (callExpr->getArgs()->getNumTrailingClosures() != 1)
     return false;
   if (callExpr->getFn() != anchor)
@@ -4535,9 +4555,7 @@ bool PartialApplicationFailure::diagnoseAsError() {
     kind = RefKind::SuperMethod;
   }
 
-  /* TODO(diagnostics): SR-15250, 
-  Add a "did you mean to call it?" note with a fix-it for inserting '()'
-  if function type has no params or all have a default value. */
+  // TODO(https://github.com/apple/swift/issues/57572, diagnosticsQoI): Add a "did you mean to call it?" note with a fix-it for inserting '()' if function type has no params or all have a default value.
   auto diagnostic = CompatibilityWarning
                         ? diag::partial_application_of_function_invalid_swift4
                         : diag::partial_application_of_function_invalid;
@@ -5756,12 +5774,41 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
+  auto diagnoseSingleElement = [&](Diag<Type, Type> msg, Type eltType,
+                                   Type contextualType) {
+    auto diagnostic = emitDiagnostic(msg, eltType, contextualType);
+    (void)trySequenceSubsequenceFixIts(diagnostic);
+  };
+
   auto diagnoseAllOccurrences = [&](Diag<Type, Type> diagnostic) {
     assert(AffectedElements.size() > 1);
     for (auto *element : AffectedElements) {
       emitDiagnosticAt(element->getLoc(), diagnostic, eltType, contextualType);
     }
   };
+
+  if (locator->isForSequenceElementType()) {
+    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
+         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
+        contextualType->hasUnresolvedType()) {
+      auto diagnostic = emitDiagnostic(
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType);
+      (void)trySequenceSubsequenceFixIts(diagnostic);
+    } else {
+      diagnoseSingleElement(contextualType->isExistentialType()
+                                ? diag::cannot_convert_sequence_element_protocol
+                                : diag::cannot_convert_sequence_element_value,
+                            eltType, contextualType);
+    }
+    return true;
+  }
 
   auto isFixedToDictionary = [&](ArrayExpr *anchor) {
     return llvm::any_of(getSolution().Fixes, [&](ConstraintFix *fix) {
@@ -5772,7 +5819,6 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   };
 
   bool treatAsDictionary = false;
-  Optional<InFlightDiagnostic> diagnostic;
   if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
     if (!(treatAsDictionary = isFixedToDictionary(AE))) {
       if (AffectedElements.size() > 1) {
@@ -5780,8 +5826,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
-                                        eltType, contextualType));
+      diagnoseSingleElement(diag::cannot_convert_array_element, eltType,
+                            contextualType);
+      return true;
     }
   }
 
@@ -5794,9 +5841,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_key, eltType,
-                                        contextualType));
-      break;
+      diagnoseSingleElement(diag::cannot_convert_dict_key, eltType,
+                            contextualType);
+      return true;
     }
 
     case 1: { // value
@@ -5805,9 +5852,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_value,
-                                        eltType, contextualType));
-      break;
+      diagnoseSingleElement(diag::cannot_convert_dict_value, eltType,
+                            contextualType);
+      return true;
     }
 
     default:
@@ -5815,33 +5862,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     }
   }
 
-  if (locator->isForSequenceElementType()) {
-    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
-    // If this is a conversion failure related to binding of `for-each`
-    // statement it has to be diagnosed as pattern match if there are
-    // holes present in the contextual type.
-    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
-         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
-        contextualType->hasUnresolvedType()) {
-      diagnostic.emplace(emitDiagnostic(
-          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
-              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
-              : diag::cannot_match_unresolved_expr_pattern_with_value,
-          eltType));
-    } else {
-      diagnostic.emplace(
-          emitDiagnostic(contextualType->isExistentialType()
-                             ? diag::cannot_convert_sequence_element_protocol
-                             : diag::cannot_convert_sequence_element_value,
-                         eltType, contextualType));
-    }
-  }
-
-  if (!diagnostic)
-    return false;
-
-  (void)trySequenceSubsequenceFixIts(*diagnostic);
-  return true;
+  return false;
 }
 
 bool MissingContextualConformanceFailure::diagnoseAsError() {
@@ -7160,7 +7181,6 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
-  case ConversionRestrictionKind::ReifyPackToType:
     llvm_unreachable("Expected an ephemeral conversion!");
   }
 }
@@ -8282,9 +8302,7 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
 bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
   const auto toType = getToType();
   auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
-  // FIXME: This literal diagnostics needs to be revisited by a proposal
-  // to unify casting semantics for literals.
-  // https://bugs.swift.org/browse/SR-12093
+  // FIXME(https://github.com/apple/swift/issues/54529): This literal diagnostics needs to be revisited by a proposal to unify casting semantics for literals.
   auto &ctx = getASTContext();
   auto *dc = getDC();
   if (isa<LiteralExpr>(sub)) {

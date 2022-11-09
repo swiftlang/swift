@@ -30,7 +30,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 
 using namespace swift;
 
@@ -58,13 +58,16 @@ struct CheckerLivenessInfo {
   SmallSetVector<Operand *, 8> consumingUse;
   SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
-  PrunedLiveness liveness;
+  DiagnosticPrunedLiveness liveness;
 
   CheckerLivenessInfo()
       : nonLifetimeEndingUsesInLiveOut(),
         liveness(nullptr, &nonLifetimeEndingUsesInLiveOut) {}
 
-  void initDef(SILValue def) { defUseWorklist.insert(def); }
+  void initDef(SILValue def) {
+    liveness.initializeDef(def);
+    defUseWorklist.insert(def);
+  }
 
   /// Compute the liveness for any value currently in the defUseWorklist.
   ///
@@ -149,14 +152,15 @@ bool CheckerLivenessInfo::compute() {
             // Otherwise, try to update liveness for a borrowing operand
             // use. This will make it so that we add the end_borrows of the
             // liveness use. If we have a reborrow here, we will bail.
-            bool failed = !liveness.updateForBorrowingOperand(use);
-            if (failed)
+            if (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained) {
               return false;
+            }
           }
         }
         break;
       }
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
         // A forwarding borrow is validated as part of its parent borrow. So
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
@@ -187,6 +191,7 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::EndBorrow:
         // Don't care about this use.
         break;
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::Reborrow:
         // Reborrows do not occur this early in the pipeline.
         llvm_unreachable(
@@ -395,7 +400,8 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+    if (arg->getOwnershipKind() == OwnershipKind::Owned &&
+        !arg->getType().isMoveOnly()) {
       LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
     }
@@ -404,7 +410,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical()) {
+        if (bbi->isLexical() && !bbi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);
@@ -546,19 +552,28 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
           SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
-    // Now search through our function one last time and any move_value
-    // [allows_diagnostics] that remain are ones that we did not know how to
-    // check so emit a diagnostic so the user doesn't assume that they have
-    // guarantees.
+    // Now search through our function one last time and:
+    //
+    // 1. Given any move_value on a move only type, just unset the allows
+    //    diagnostics flag. The move checker will have emitted any errors caused
+    //    by our move [allows_diagnostic] earlier in the compilation pipeline.
+    //
+    // 2. Any move_value [allows_diagnostics] that remain that are not on a move
+    //    only type are ones that we did not know how to check so emit a
+    //    diagnostic so the user doesn't assume that they have guarantees.
     //
     // TODO: Emit specific diagnostics here (e.x.: _move of global).
-    if (DisableUnhandledMoveDiagnostic)
-      return;
     for (auto &block : *fn) {
       for (auto &inst : block) {
         if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
           if (mvi->getAllowDiagnostics()) {
-            emitUnsupportedUseCaseError(mvi);
+            if (mvi->getType().isMoveOnly()) {
+              mvi->setAllowsDiagnostics(false);
+              continue;
+            }
+
+            if (!DisableUnhandledMoveDiagnostic)
+              emitUnsupportedUseCaseError(mvi);
           }
         }
       }

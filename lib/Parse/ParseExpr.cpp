@@ -432,7 +432,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
    return sub;
   }
 
-  if (Tok.isContextualKeyword("_move")) {
+  if (Context.LangOpts.hasFeature(Feature::MoveOnly)
+      && Tok.isContextualKeyword("_move")) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -619,7 +620,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 ///   !
 ///   [ expression ]
 ParserResult<Expr> Parser::parseExprKeyPath() {
-  SyntaxParsingContext KeyPathCtx(SyntaxContext, SyntaxKind::KeyPathExpr);
+  SyntaxParsingContext KeyPathCtx(SyntaxContext, SyntaxKind::OldKeyPathExpr);
   // Consume '\'.
   SourceLoc backslashLoc = consumeToken(tok::backslash);
   llvm::SaveAndRestore<bool> S(InSwiftKeyPath, true);
@@ -1141,7 +1142,7 @@ static MagicIdentifierLiteralExpr::Kind
 getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
-    // TODO: Enable by default at the next source break. (SR-13199)
+    // TODO(https://github.com/apple/swift/issues/55639): Enable by default at the next source break.
     return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
@@ -1713,11 +1714,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
                 /*UnexpectedNodes=*/None,
-                /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
+                /*Identifier=*/SyntaxContext->popToken(),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         ParsedExprSyntax ExprNode =
             ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
                 /*UnexpectedNodes=*/None,
-                /*Pattern=*/std::move(PatternNode), *SyntaxContext);
+                /*Pattern=*/std::move(PatternNode),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1881,6 +1884,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::pound:
+    if (Context.LangOpts.hasFeature(Feature::Macros)) {
+      return parseExprMacroExpansion(isExprBasic);
+    }
     if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundUnknown(SourceLoc());
@@ -3625,6 +3631,44 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   return makeParserResult(ParserStatus(argList) | fn,
                           CallExpr::create(Context, fn.get(), argList.get(),
                                            /*implicit=*/false));
+}
+
+ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
+  SyntaxParsingContext ExprContext(
+      SyntaxContext, SyntaxKind::MacroExpansionExpr);
+  SourceLoc poundLoc = consumeToken(tok::pound);
+  DeclNameLoc macroNameLoc;
+  DeclNameRef macroNameRef = parseDeclNameRef(
+      macroNameLoc, diag::macro_expansion_expr_expected_macro_identifier,
+      DeclNameOptions());
+  if (!macroNameRef)
+    return makeParserError();
+
+  ArgumentList *argList = nullptr;
+  if (Tok.isFollowingLParen()) {
+    auto result = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic,
+                                /*allowTrailingClosure*/ true);
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    if (result.isParseError())
+      return makeParserError();
+    argList = result.get();
+  } else if (Tok.is(tok::l_brace) &&
+             isValidTrailingClosure(isExprBasic, *this)) {
+    SmallVector<Argument, 2> trailingClosures;
+    auto status = parseTrailingClosures(isExprBasic,
+                                        macroNameLoc.getSourceRange(),
+                                        trailingClosures);
+    if (status.isError() || trailingClosures.empty())
+      return makeParserError();
+    argList = ArgumentList::createParsed(Context, SourceLoc(),
+                                         trailingClosures, SourceLoc(),
+                                         /*trailingClosureIdx*/ 0);
+  }
+
+  return makeParserResult(
+      new (Context) MacroExpansionExpr(
+          poundLoc, macroNameRef, macroNameLoc, argList));
 }
 
 /// parseExprCollection - Parse a collection literal expression.

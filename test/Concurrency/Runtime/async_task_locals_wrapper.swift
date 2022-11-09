@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: reflection
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

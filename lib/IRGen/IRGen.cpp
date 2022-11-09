@@ -35,6 +35,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
@@ -43,7 +44,6 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/StringSet.h"
@@ -181,8 +181,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
-  // WebAssembly doesn't support atomics yet, see https://bugs.swift.org/browse/SR-12097
-  // for more details.
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
 
@@ -1347,6 +1347,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
 
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
+
+    // Emit functions supporting `if #_hasSymbol(...)` conditions.
+    IGM.emitHasSymbolFunctions();
 
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {

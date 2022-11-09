@@ -84,20 +84,37 @@ int main() {
   {
     auto val = createCIntOpt(2);
     takeCIntOpt(val);
+    assert((bool)val);
     assert(val.isSome());
     assert(val.getUnsafelyUnwrapped() == 2);
+    assert(val.get() == 2);
     resetOpt(val);
+    assert(!(bool)val);
     assert(val.isNone());
     takeCIntOpt(val);
   }
 // CHECK: Optional(2)
 // CHECK-NEXT: nil
   {
+    auto val = Optional<int>::some(-97);
+    takeCIntOpt(val);
+    assert((bool)val);
+    assert(val.get() == -97);
+    auto val2 = Optional<int>::none();
+    assert(!(bool)val2);
+    takeCIntOpt(val2);
+  }
+// CHECK-NEXT: Optional(-97)
+// CHECK-NEXT: nil
+  {
     auto val = createSmallStructOpt(0xFA);
     takeSmallStructOpt(val);
+    assert((bool)val);
     assert(val.isSome());
     assert(val.getUnsafelyUnwrapped().getX() == 0xFA);
+    assert(val.get().getX() == 0xFA);
     resetOpt(val);
+    assert(!(bool)val);
     assert(val.isNone());
     takeSmallStructOpt(val);
   }

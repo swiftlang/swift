@@ -1242,12 +1242,11 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getSrc()),
-                                      getOpValue(Inst->getDest()),
-                                      getOpValue(Inst->getInitializer()),
-                                      getOpValue(Inst->getSetter()),
-                                      Inst->getMode()));
+      Inst, getBuilder().createAssignByWrapper(
+                getOpLocation(Inst->getLoc()), Inst->getOriginator(),
+                getOpValue(Inst->getSrc()), getOpValue(Inst->getDest()),
+                getOpValue(Inst->getInitializer()),
+                getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
 template<typename ImplClass>
@@ -2630,6 +2629,15 @@ void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
                               getOpLocation(Inst->getLoc()),
                               Inst->getCounterIndex(), Inst->getPGOFuncName(),
                               Inst->getNumCounters(), Inst->getPGOFuncHash()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTestSpecificationInst(
+    TestSpecificationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createTestSpecificationInst(
+                                    getOpLocation(Inst->getLoc()),
+                                    Inst->getArgumentsSpecification()));
 }
 
 template<typename ImplClass>

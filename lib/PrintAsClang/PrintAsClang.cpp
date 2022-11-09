@@ -12,6 +12,7 @@
 
 #include "swift/PrintAsClang/PrintAsClang.h"
 
+#include "ClangSyntaxPrinter.h"
 #include "ModuleContentsWriter.h"
 #include "SwiftToClangInteropContext.h"
 
@@ -107,17 +108,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
         out << "#include <type_traits>\n";
-        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
-        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.\n";
-        out << "#if __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)\n";
-        out << "#include <../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>\n";
-        out << "#elif __has_include(<../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)\n";
-        out << "//  '<toolchain>/usr/local/lib/clang/<version>/include/../../../../lib/swift/swiftToCxx'.\n";
-        out << "#include <../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>\n";
-        out << "// Alternatively, allow user to find the header using additional include path into '<toolchain>/lib/swift'.\n";
-        out << "#elif __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)\n";
-        out << "#include <swiftToCxx/_SwiftCxxInteroperability.h>\n";
-        out << "#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
@@ -519,28 +509,44 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     bool enableCxx = frontendOpts.ClangHeaderExposedDecls.hasValue() ||
                      frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
                      M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
-    if (enableCxx) {
-      bool requiresExplicitExpose = !frontendOpts.ClangHeaderExposedDecls.hasValue() ||
-        *frontendOpts.ClangHeaderExposedDecls == FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr;
-      // Default dependency behavior is used when the -clang-header-expose-decls flag is not specified.
-      bool defaultDependencyBehavior = !frontendOpts.ClangHeaderExposedDecls.hasValue();
+    if (!enableCxx)
+      return;
+    // Include the shim header only in the C++ mode.
+    ClangSyntaxPrinter(os).printIncludeForShimHeader(
+        "_SwiftCxxInteroperability.h");
 
-      std::string moduleContentsBuf;
-      llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-      auto deps = printModuleContentsAsCxx(moduleContents, *M, interopContext,
-                               /*requiresExposedAttribute=*/requiresExplicitExpose);
-      // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
-      writeImports(os, deps.imports, *M, bridgingHeader, /*useCxxImport=*/true);
+    bool requiresExplicitExpose =
+        !frontendOpts.ClangHeaderExposedDecls.hasValue() ||
+        *frontendOpts.ClangHeaderExposedDecls ==
+            FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr;
+    // Default dependency behavior is used when the -clang-header-expose-decls
+    // flag is not specified.
+    bool defaultDependencyBehavior =
+        !frontendOpts.ClangHeaderExposedDecls.hasValue();
 
-      // Embed the standard library directly.
-      if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
-        assert(!M->isStdlibModule());
-        SwiftToClangInteropContext interopContext(*M->getASTContext().getStdlibModule(), irGenOpts);
-        printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(), interopContext, /*requiresExposedAttribute=*/true);
+    std::string moduleContentsBuf;
+    llvm::raw_string_ostream moduleContents{moduleContentsBuf};
+    auto deps = printModuleContentsAsCxx(
+        moduleContents, *M, interopContext,
+        /*requiresExposedAttribute=*/requiresExplicitExpose);
+    // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
+    writeImports(os, deps.imports, *M, bridgingHeader, /*useCxxImport=*/true);
+
+    // Embed the standard library directly.
+    if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
+      assert(!M->isStdlibModule());
+      SwiftToClangInteropContext interopContext(
+          *M->getASTContext().getStdlibModule(), irGenOpts);
+      auto macroGuard = computeMacroGuard(M->getASTContext().getStdlibModule());
+      os << "#ifndef " << macroGuard << "\n";
+      os << "#define " << macroGuard << "\n";
+      printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(),
+                               interopContext,
+                               /*requiresExposedAttribute=*/true);
+      os << "#endif // " << macroGuard << "\n";
       }
 
       os << moduleContents.str();
-    }
   });
   writeEpilogue(os);
 

@@ -8,7 +8,7 @@
 
 // RUN: %target-build-swift %s -parse-as-library -target %target-cpu-apple-macosx10.15 -I %t/includes -emit-module -emit-library -module-name AssociatedTypeRequirements -o %t/AssociatedTypeRequirements %t/includes/testModB.o
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/AssociatedTypeRequirements | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/AssociatedTypeRequirements | %FileCheck %s
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: - AssociatedTypeRequirements.Foo : AssociatedTypeRequirements.myProto

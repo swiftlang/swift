@@ -58,7 +58,32 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.Flags << "\n";
+      << Opts.Flags;
+
+  // Insert additional -module-alias flags
+  if (Opts.AliasModuleNames) {
+    llvm::SmallSet<StringRef, 2> aliasTargets;
+    StringRef moduleName = M->getNameStr();
+    aliasTargets.insert(M->getNameStr());
+    out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
+           moduleName << "=" << moduleName;
+
+    SmallVector<ImportedModule> imports;
+    M->getImportedModules(imports,
+                          {ModuleDecl::ImportFilterKind::Default,
+                           ModuleDecl::ImportFilterKind::Exported,
+                           ModuleDecl::ImportFilterKind::SPIOnly,
+                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+    for (ImportedModule import: imports) {
+      StringRef importedName = import.importedModule->getNameStr();
+      if (aliasTargets.insert(importedName).second) {
+        out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
+               importedName << "=" << importedName;
+      }
+    }
+  }
+  out << "\n";
+
   if (!Opts.IgnorableFlags.empty()) {
     out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
         << Opts.IgnorableFlags << "\n";
@@ -81,7 +106,7 @@ llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
                      ": (.+)$", llvm::Regex::Newline);
 }
 
-// MARK: Module name shadowing warnings (SR-898)
+// MARK(https://github.com/apple/swift/issues/43510): Module name shadowing warnings
 //
 // When swiftc emits a module interface, it qualifies most types with their
 // module name. This usually makes the interface less ambiguous, but if a type
@@ -295,6 +320,8 @@ static void printImports(raw_ostream &out,
     }
 
     out << "import ";
+    if (Opts.AliasModuleNames)
+      out << MODULE_DISAMBIGUATING_PREFIX;
     importedModule->getReverseFullModuleName().printForward(out);
 
     // Write the access path we should be honoring but aren't.
@@ -758,7 +785,8 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   printImports(out, Opts, M);
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs);
+      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs,
+      Opts.AliasModuleNames);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

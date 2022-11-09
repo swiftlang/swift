@@ -588,10 +588,6 @@ static bool isMainActor(Type type) {
 
 void swift::printClangDeclName(const clang::NamedDecl *ND,
                                llvm::raw_ostream &os) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return; // not needed for the parser library.
-#endif
-
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
@@ -644,10 +640,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::Identifier:
-    assert(Modifier.empty() && "Improper modifier for identifier argument");
-    Out << FormatOpts.OpeningQuotationMark;
-    Arg.getAsIdentifier().printPretty(Out);
-    Out << FormatOpts.ClosingQuotationMark;
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              Arg.getAsIdentifier() ? 1 : 0, FormatOpts,
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for identifier argument");
+      Out << FormatOpts.OpeningQuotationMark;
+      Arg.getAsIdentifier().printPretty(Out);
+      Out << FormatOpts.ClosingQuotationMark;
+    }
     break;
 
   case DiagnosticArgumentKind::ObjCSelector:
@@ -1019,6 +1021,11 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (warningsAsErrors)
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
+      lvl = DiagnosticBehavior::Ignore;
+  }
+  
+  if (lvl == DiagnosticBehavior::Remark) {
+    if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
 

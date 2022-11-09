@@ -227,6 +227,8 @@ NODE(ThinFunctionType)
 NODE(Tuple)
 NODE(TupleElement)
 NODE(TupleElementName)
+NODE(Pack)
+NODE(PackExpansion)
 NODE(Type)
 CONTEXT_NODE(TypeSymbolicReference)
 CONTEXT_NODE(TypeAlias)
@@ -344,7 +346,9 @@ NODE(UniqueExtendedExistentialTypeShapeSymbolicReference)
 NODE(NonUniqueExtendedExistentialTypeShapeSymbolicReference)
 NODE(SymbolicExtendedExistentialType)
 
+// Added in Swift 5.8
 NODE(MetatypeParamsRemoved)
+NODE(HasSymbolQuery)
 
 #undef CONTEXT_NODE
 #undef NODE

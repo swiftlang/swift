@@ -49,7 +49,7 @@ bb0(%out : $*P):
   %existential = alloc_stack $P
   %existential_addr = init_existential_addr %existential : $*P, $S
   store %instance to %existential_addr : $*S
-  copy_addr %existential to [initialization] %out : $*P
+  copy_addr %existential to [init] %out : $*P
   destroy_addr %existential : $*P
   dealloc_stack %existential : $*P
   %result = tuple ()
@@ -64,7 +64,7 @@ bb0:
   %existential_addr = open_existential_addr immutable_access %existential : $*P to $*@opened("1819CC6E-FEC6-11EA-876D-D0817AD71B77", P) Self
   %any = alloc_stack $Any
   %any_addr = init_existential_addr %any : $*Any, $@opened("1819CC6E-FEC6-11EA-876D-D0817AD71B77", P) Self
-  copy_addr %existential_addr to [initialization] %any_addr : $*@opened("1819CC6E-FEC6-11EA-876D-D0817AD71B77", P) Self
+  copy_addr %existential_addr to [init] %any_addr : $*@opened("1819CC6E-FEC6-11EA-876D-D0817AD71B77", P) Self
   %printAny = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
   %result = apply %printAny(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
   destroy_addr %any : $*Any

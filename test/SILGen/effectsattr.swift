@@ -15,12 +15,12 @@
 @_effects(releasenone) @_silgen_name("func4") func func4() { }
 
 //CHECK-LABEL: sil hidden [ossa] @func5
-//CHECK-NEXT:  [%0!: noescape **]
+//CHECK-NEXT:  [%0: noescape! **]
 //CHECK-NEXT:  {{^[^[]}}
 @_effects(notEscaping t.**) @_silgen_name("func5") func func5<T>(_ t: T) { }
 
 //CHECK-LABEL: sil hidden [ossa] @func6
-//CHECK-NEXT:  [%1!: escape v**.c* => %0.v**]
+//CHECK-NEXT:  [%1: escape! v**.c* => %0.v**]
 //CHECK-NEXT:  {{^[^[]}}
 @_effects(escaping t.value**.class* => return.value**) @_silgen_name("func6") func func6<T>(_ t: T) -> T { }
 
@@ -28,8 +28,8 @@ struct Mystr<T> {
   var sf: T
 
   //CHECK-LABEL: sil hidden [ossa] @func7
-  //CHECK-NEXT:  [%3!: noescape **]
-  //CHECK-NEXT:  [%2!: escape v** -> %1.s0.v**]
+  //CHECK-NEXT:  [%2: escape! v** -> %1.s0.v**]
+  //CHECK-NEXT:  [%3: noescape! **]
   //CHECK-NEXT:  {{^[^[]}}
   @_effects(notEscaping self.**)
   @_effects(escaping s.value** -> t.sf.value**)

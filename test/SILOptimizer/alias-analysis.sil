@@ -20,7 +20,7 @@ struct OuterStruct {
   @_hasStorage @_hasInitialValue var s: MyStruct { get set }
 }
 
-// Test overlaping access on a different path; the user has misused an index offset
+// Test overlapping access on a different path; the user has misused an index offset
 // CHECK-LABEL: @testOffsetBehindProjection
 // CHECK: PAIR #23.
 // CHECK:   %3 = index_addr %1 : $*Int64, %2 : $Builtin.Word

@@ -106,7 +106,8 @@ enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   SIL,      ///< Came from a .sil file.
-  Interface ///< Came from a .swiftinterface file, representing another module.
+  Interface, ///< Came from a .swiftinterface file, representing another module.
+  MacroExpansion, ///< Came from a macro expansion.
 };
 
 /// Contains information about where a particular path is used in
@@ -157,6 +158,10 @@ enum class ResilienceStrategy : unsigned {
 };
 
 class OverlayFile;
+
+/// A mapping used to find the source file that contains a particular source
+/// location.
+class ModuleSourceFileLocationMap;
 
 /// The minimum unit of compilation.
 ///
@@ -228,6 +233,13 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  /// Mapping used to find the source file associated with a given source
+  /// location.
+  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
+
+  /// The set of auxiliary source files build as part of this module.
+  SmallVector<SourceFile *, 2> AuxiliaryFiles;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -328,6 +340,13 @@ public:
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
+  /// Add an auxiliary source file, introduced as part of the translation.
+  void addAuxiliaryFile(SourceFile &sourceFile);
+
+  /// Produces the source file that contains the given source location, or
+  /// \c nullptr if the source location isn't in this module.
+  SourceFile *getSourceFileContainingLocation(SourceLoc loc);
+
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -413,6 +432,9 @@ private:
   /// along with the name of the required bystander module. Used by tooling to
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
+
+  /// Update the source-file location map to make it current.
+  void updateSourceFileLocationMap();
 
 public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
@@ -542,6 +564,15 @@ public:
   }
   void setIsSystemModule(bool flag = true) {
     Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
+  /// Returns true if the module was rebuilt from a module interface instead
+  /// of being built from the full source.
+  bool isBuiltFromInterface() const {
+    return Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setIsBuiltFromInterface(bool flag = true) {
+    Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into

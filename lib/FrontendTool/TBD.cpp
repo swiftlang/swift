@@ -21,7 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/TBDGen/TBDGen.h"
+#include "swift/IRGen/TBDGen.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -67,7 +67,8 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
 static bool isSymbolIgnored(const StringRef& name,
                             const llvm::Module &IRModule) {
   if (llvm::Triple(IRModule.getTargetTriple()).isOSWindows()) {
-    // (SR-15938) Error when referencing #dsohandle in a Swift test on Windows
+    // https://github.com/apple/swift/issues/58199
+    // Error when referencing #dsohandle in a Swift test on Windows.
     // On Windows, ignore the lack of __ImageBase in the TBD file.
     if (name == "__ImageBase") {
       return true;

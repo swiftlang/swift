@@ -725,6 +725,7 @@ private:
       return cast<llvm::DIModule>(Val->second);
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
+    std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -736,7 +737,7 @@ private:
                                               : llvm::dwarf::DW_LANG_C99,
                               DIB.createFile(Name, RemappedIncludePath),
                               TheCU->getProducer(), true, StringRef(), 0,
-                              ASTFile, llvm::DICompileUnit::FullDebug,
+                              RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
         DIB.finalize();
       }
@@ -871,7 +872,7 @@ private:
           return true;
         }
 
-        if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+        if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
           Sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
           return true;
         }
@@ -909,7 +910,7 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
-    // TODO(SR-15377): We currently cannot round trip some C++ types.
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
@@ -1553,7 +1554,8 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::SequenceArchetype: {
+    case TypeKind::ElementArchetype:
+    case TypeKind::PackArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
       if (auto depMemTy = Archetype->getInterfaceType()

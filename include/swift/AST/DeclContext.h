@@ -507,6 +507,11 @@ public:
   LLVM_READONLY
   DeclContext *getModuleScopeContext() const;
 
+  /// If this DeclContext is an \c \@_objcImplementation extension, returns the
+  /// \c DeclContext for the Objective-C declaration it implements. Otherwise
+  /// returns \c this.
+  DeclContext *getImplementedObjCContext() const;
+
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
   LLVM_READONLY
@@ -823,6 +828,11 @@ public:
   /// associated lazy loader; this should only be used as part of implementing
   /// abstractions on top of member loading, such as a name lookup table.
   DeclRange getCurrentMembersWithoutLoading() const;
+
+  /// Return the context that contains the actual implemented members. This
+  /// is \em usually just \c this, but if \c this is an imported class or
+  /// category, it may be a Swift extension instead.
+  IterableDeclContext *getImplementationContext();
 
   /// Add a member to this context.
   ///

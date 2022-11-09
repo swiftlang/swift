@@ -1775,9 +1775,6 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
-    if (E.isImplicit())
-      return;
-
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
@@ -1933,10 +1930,9 @@ public:
     } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
                    node.dyn_cast<Decl *>())) {
       if (patternBinding->isAsyncLet()) {
-        auto var = patternBinding->getAnchoringVarDecl(0);
-        Diags.diagnose(
-            e->getLoc(), diag::async_let_in_illegal_context,
-            var->getName(), static_cast<unsigned>(getKind()));
+        Diags.diagnose(patternBinding->getLoc(),
+                       diag::async_let_binding_illegal_context,
+                       static_cast<unsigned>(getKind()));
         return;
       }
     }

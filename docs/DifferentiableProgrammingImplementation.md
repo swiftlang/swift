@@ -885,7 +885,7 @@ sil hidden [ossa] @$s4main7genericyxxlF : $@convention(thin) <T> (@in_guaranteed
 // %1                                             // users: %3, %2
 bb0(%0 : $*T, %1 : $*T):
   debug_value_addr %1 : $*T, let, name "x", argno 1 // id: %2
-  copy_addr %1 to [initialization] %0 : $*T       // id: %3
+  copy_addr %1 to [init] %0 : $*T       // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 } // end sil function '$s4main7genericyxxlF'

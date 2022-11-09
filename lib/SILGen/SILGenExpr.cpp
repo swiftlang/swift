@@ -41,6 +41,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -446,7 +447,7 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
-    RValue visitReifyPackExpr(ReifyPackExpr *E, SGFContext C);
+    RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -474,7 +475,6 @@ namespace {
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
-    RValue visitPackExpr(PackExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
@@ -551,6 +551,7 @@ namespace {
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitMoveExpr(MoveExpr *E, SGFContext C);
+    RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -1445,7 +1446,7 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::get(/*type sequence*/ false,
+  auto nativeType = Type(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                    /*depth*/ 0, /*index*/ 0,
                                                    SGF.getASTContext()))
                         .subst(subs);
@@ -1513,8 +1514,9 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
 }
 
 RValue
-RValueEmitter::visitReifyPackExpr(ReifyPackExpr *E, SGFContext C) {
-  llvm_unreachable("Unimplemented!");
+RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
+                                      SGFContext C) {
+  llvm_unreachable("not implemented for PackExpansionExpr");
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -2301,10 +2303,6 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
-RValue RValueEmitter::visitPackExpr(PackExpr *E, SGFContext C) {
-  llvm_unreachable("Unimplemented!");
-}
-
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
                                          SGFContext resultCtx) {
   assert(!e->getType()->is<LValueType>() &&
@@ -2867,7 +2865,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
     auto accessor = getRepresentativeAccessorForKeyPath(property);
-    if (!SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
+    if (!accessor->requiresNewWitnessTableEntry()) {
       // Find the getter that does have a witness table entry.
       auto wtableAccessor =
         cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(accessor));
@@ -3030,7 +3028,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
     auto setter = property->getOpaqueAccessor(AccessorKind::Set);
-    if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
+    if (!setter->requiresNewWitnessTableEntry()) {
       // Find the setter that does have a witness table entry.
       auto wtableSetter =
         cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(setter));
@@ -3332,7 +3330,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
           formalTy,
-          GenericTypeParamType::get(/*type sequence*/ false,
+          GenericTypeParamType::get(/*isParameterPack*/ false,
                                     /*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 
@@ -5555,8 +5553,14 @@ public:
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = SGF.B.createUnmanagedToRef(loc, unowned, strongType);
     auto ownedMV = SGF.emitManagedRetain(loc, owned);
-    
-    // Reassign the +1 storage with it.
+
+    // Then create a mark dependence in between the base and the ownedMV. This
+    // is important to ensure that the destroy of the assign is not hoisted
+    // above the retain. We are doing unmanaged things here so we need to be
+    // extra careful.
+    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base);
+
+    // Then reassign the mark dependence into the +1 storage.
     ownedMV.assignInto(SGF, loc, base.getUnmanagedValue());
   }
   
@@ -5931,7 +5935,11 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
   }
 
   // If we aren't loadable, then create a temporary initialization and
-  // mark_unresolved_move into that.
+  // mark_unresolved_move into that if we have a copyable type if we have a move
+  // only, just add a copy_addr init.
+  //
+  // The reason why we do this is that we only use mark_unresolved_move_addr and
+  // the move operator checker for copyable values.
   std::unique_ptr<TemporaryInitialization> optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
@@ -5942,9 +5950,21 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
       SGF.emitRValue(subExpr, SGFContext(SGFContext::AllowImmediatePlusZero))
           .getAsSingleValue(SGF, subExpr);
   assert(mv.getType().isAddress());
-  SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
+  if (mv.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(subExpr, mv.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
+  }
   optTemp->finishInitialization(SGF);
   return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+}
+
+RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
+                                              SGFContext C) {
+  auto *rewritten = E->getRewritten();
+  assert(rewritten && "Macro should have been rewritten by SILGen");
+  return visit(rewritten, C);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
