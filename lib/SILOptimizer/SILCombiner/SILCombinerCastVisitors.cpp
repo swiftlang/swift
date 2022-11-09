@@ -1074,18 +1074,20 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   //
   // This unblocks the `thin_to_thick_function` peephole optimization below.
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(Cvt->getConverted())) {
-    if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
-      if (TTTFI->getSingleUse()) {
-        auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
-        auto convertedThinType = convertedThickType->getWithRepresentation(
+    if (CFI->getSingleUse()) {
+      if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+        if (TTTFI->getSingleUse()) {
+          auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
+          auto convertedThinType = convertedThickType->getWithRepresentation(
             SILFunctionTypeRepresentation::Thin);
-        auto *newCFI = Builder.createConvertFunction(
+          auto *newCFI = Builder.createConvertFunction(
             CFI->getLoc(), TTTFI->getConverted(),
             SILType::getPrimitiveObjectType(convertedThinType),
             CFI->withoutActuallyEscaping());
-        auto *newTTTFI = Builder.createThinToThickFunction(
+          auto *newTTTFI = Builder.createThinToThickFunction(
             TTTFI->getLoc(), newCFI, CFI->getType());
-        replaceInstUsesWith(*CFI, newTTTFI);
+          replaceInstUsesWith(*CFI, newTTTFI);
+        }
       }
     }
   }
