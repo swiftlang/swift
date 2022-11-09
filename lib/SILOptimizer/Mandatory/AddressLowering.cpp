@@ -3011,7 +3011,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
       return;
 
     assert(caseBB->getArguments().size() == 1);
-    SILArgument *caseArg = caseBB->getArguments()[0];
+    SILArgument *caseArg = caseBB->getArgument(0);
 
     assert(&switchEnum->getOperandRef(0) == getReusedStorageOperand(caseArg));
     assert(caseDecl->hasAssociatedValues() && "caseBB has a payload argument");
@@ -3053,6 +3053,20 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     defaultCounter = switchEnum->getDefaultCount();
     if (auto defaultDecl = switchEnum->getUniqueCaseForDefault()) {
       rewriteCase(defaultDecl.get(), defaultBB);
+    } else {
+      assert(defaultBB->getArguments().size() == 1);
+      SILArgument *arg = defaultBB->getArgument(0);
+      assert(arg->getType().isAddressOnly(*pass.function));
+      auto builder = pass.getBuilder(defaultBB->begin());
+      auto addr = enumAddr;
+      auto *load = builder.createTrivialLoadOr(switchEnum->getLoc(), addr,
+                                               LoadOwnershipQualifier::Take);
+      // Remap arg to the new dummy load which will be deleted during
+      // deleteRewrittenInstructions.
+      arg->replaceAllUsesWith(load);
+      pass.valueStorageMap.replaceValue(arg, load);
+      markRewritten(load, addr);
+      defaultBB->eraseArgument(0);
     }
   }
   auto builder = pass.getTermBuilder(switchEnum);
