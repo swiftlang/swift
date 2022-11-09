@@ -9,7 +9,7 @@
 func testGlobalFunctions() {
   if #_hasSymbol(function(with:)) {}
   // CHECK: define linkonce_odr hidden swiftcc i1 @"$s17has_symbol_helper8function4withySi_tFTwS"()
-  // CHECK:   ret i1 icmp ne (void (i64)* @"$s17has_symbol_helper8function4withySi_tF", void (i64)* null)
+  // CHECK:   ret i1 icmp ne (void ({{i32|i64}})* @"$s17has_symbol_helper8function4withySi_tF", void (i64)* null)
 
   if #_hasSymbol(throwingFunc) {}
   // CHECK: define linkonce_odr hidden swiftcc i1 @"$s17has_symbol_helper12throwingFuncyyKFTwS"()
