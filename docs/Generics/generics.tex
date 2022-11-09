@@ -2168,7 +2168,7 @@ Associated type declarations appear inside protocols. The declared interface typ
 \paragraph{Function declarations}
 Functions can either appear at the top level, inside of a local context such as another function, or as a member of a type, called a method. If a function is itself generic or nested inside of a generic context, the interface type is a generic function type, otherwise it is a function type.
 
-The interface type of of a function is constructed from the interface types of the function's parameter declarations, and the function's return type. If the return type is omitted, it becomes the empty tuple type \texttt{()}. For methods, this function type is then wrapped in another level of function type representing the base of the call which becomes the \texttt{self} parameter of the method.
+The interface type of a function is constructed from the interface types of the function's parameter declarations, and the function's return type. If the return type is omitted, it becomes the empty tuple type \texttt{()}. For methods, this function type is then wrapped in another level of function type representing the base of the call which becomes the \texttt{self} parameter of the method.
 
 \index{self interface type}
 \index{method self parameter}
@@ -3489,7 +3489,7 @@ If we omit the second requirement, \texttt{T.[Sequence]Element} and \texttt{U.[S
 
 \index{equivalence class graph}
 \index{directed graph}
-For a generic signature, we can can construct a directed graph called the \emph{equivalence class graph}. A directed graph is defined by a set of vertices, and a set of edges, which are ordered pairs of vertices. The vertices here are reduced type parameters. There is an edge from a type parameter \texttt{T} to a type parameter \texttt{U} if for some associated type declaration \texttt{A} in a protocol \texttt{P}, \texttt{T} is conforms to \texttt{P}, and \texttt{T.[P]A} reduces to \texttt{U}. Edges are labeled with their associated type declarations.
+For a generic signature, we can construct a directed graph called the \emph{equivalence class graph}. A directed graph is defined by a set of vertices, and a set of edges, which are ordered pairs of vertices. The vertices here are reduced type parameters. There is an edge from a type parameter \texttt{T} to a type parameter \texttt{U} if for some associated type declaration \texttt{A} in a protocol \texttt{P}, \texttt{T} is conforms to \texttt{P}, and \texttt{T.[P]A} reduces to \texttt{U}. Edges are labeled with their associated type declarations.
 
 A type parameter can be thought of as a \emph{path} through this directed graph, starting from a generic parameter, then traversing successive edges for each associated type declaration until reaching the type parameter's equivalence class. Two reduced-equal type parameters represent two different paths that end at the same equivalence class.
 
@@ -5745,7 +5745,7 @@ func myAlgorithm<S: Sequence>(_ seq: S) where S.Element: Comparable {
   helper(s2)
 }
 \end{Verbatim}
-The inner \texttt{helper()} function has a distinct generic signature, and therefore a distinct generic environment, from the outer \texttt{complexAlgorithm()} function. In particular, the outer function's generic parameter \texttt{S} maps to two \emph{different} archetypes inside the two declarations; say, $\archetype{S}_1$ and $\archetype{S}_2$. The type of the expression \texttt{s1} in \texttt{print(s1)} is $\archetype{S}_1$, and the type of \texttt{s2} in \texttt{helper(s2)} is $\archetype{S}_2$. The call to \texttt{helper()} supplies a substitution map which replaces the generic parameter \texttt{S} with the archetype $\archetype{S}_2$, and \texttt{T} with the contextual type \texttt{Array<}$\archetype{S}_2$\texttt{>}.
+The inner \texttt{helper()} function has a distinct generic signature, and therefore a distinct generic environment, from the outer \texttt{myAlgorithm()} function. In particular, the outer function's generic parameter \texttt{S} maps to two \emph{different} archetypes inside the two declarations; say, $\archetype{S}_1$ and $\archetype{S}_2$. The type of the expression \texttt{s1} in \texttt{print(s1)} is $\archetype{S}_1$, and the type of \texttt{s2} in \texttt{helper(s2)} is $\archetype{S}_2$. The call to \texttt{helper()} supplies a substitution map which replaces the generic parameter \texttt{S} with the archetype $\archetype{S}_2$, and \texttt{T} with the contextual type \texttt{Array<}$\archetype{S}_2$\texttt{>}.
 
 The only case where a generic environment is inherited by an inner declaration is if the inner declaration is not ``more generic'' in any way; it does not declare generic parameters, \emph{or} a \texttt{where} clause. As another example, anonymous closure expressions always inherit the generic environment of the outer declaration, because they cannot be generic except by referencing outer generic parameters.
 
