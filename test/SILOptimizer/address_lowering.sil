@@ -941,6 +941,7 @@ bb0(%0 : @owned $P):
 // CHECK: bb0(%0 : $*any P):
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P, var, name "q"
 // CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
+// CHECK:   debug_value %0 : $*any P, var, name "q"
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
 // CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
@@ -948,8 +949,8 @@ bb0(%0 : @owned $P):
 // CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   %10 = apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr %9 : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
+// CHECK:   apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
 // CHECK:   destroy_addr %0 : $*any P
 // CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
@@ -1129,6 +1130,24 @@ bb4:
   return %31 : $()
 }
 
+// Verify the handling of non-unique default case blocks when there is more
+// than one case handled by default.
+// CHECK-LABEL: sil [ossa] @f221_testSwitchDefault : $@convention(thin) <T> (@in Optional<T>) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : $*Optional<T>):
+// CHECK:         switch_enum_addr [[INSTANCE]] : $*Optional<T>, default [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[INSTANCE]] : $*Optional<T>
+// CHECK-LABEL: } // end sil function 'f221_testSwitchDefault'
+sil [ossa] @f221_testSwitchDefault : $@convention(thin) <T> (@in Optional<T>) -> () {
+entry(%instance : @owned $Optional<T>):
+  switch_enum %instance : $Optional<T>, default exit
+
+exit(%instance_2 : @owned $Optional<T>):
+  destroy_value %instance_2 : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @f230_testTryApply : $@convention(thin) <T> (@in T) -> (@out T, @error any Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   [[F:%.*]] = function_ref @throwsError : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error any Error)
@@ -1226,6 +1245,47 @@ bb1(%3 : @owned $(T, Int, Int, T)):
 
 bb2(%9 : $Error):
   throw %9 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @f261_testTryApplyIntoEnum : $@convention(thin) <T> () -> (@out Optional<T>, @error any Error) {
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>):
+// CHECK:         [[SOME_ADDR:%[^,]+]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:         try_apply undef<T>([[SOME_ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]], error {{bb[0-9]+}}
+// CHECK:       [[NORMAL]]
+// CHECK:         inject_enum_addr [[OUT_ADDR]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-LABEL: } // end sil function 'f261_testTryApplyIntoEnum'
+sil [ossa] @f261_testTryApplyIntoEnum : $@convention(thin) <T> () -> (@out Optional<T>, @error any Error) {
+entry:
+  try_apply undef<T>() : $@convention(thin) <T> () -> (@out T, @error any Error), normal okay, error nopers
+
+okay(%instance : @owned $T):
+  %some = enum $Optional<T>, #Optional.some!enumelt, %instance : $T
+  return %some : $Optional<T>
+
+nopers(%error : @owned $any Error):
+  throw %error : $any Error
+}
+
+// CHECK-LABEL: sil [ossa] @f262_testTryApplyIntoPhi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         try_apply undef<R>([[ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
+// CHECK:       [[NORMAL]](%2 : $()):                                    
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         return {{%[^,]+}} : $()                                 
+// CHECK-LABEL: } // end sil function 'f262_testTryApplyIntoPhi'
+sil [ossa] @f262_testTryApplyIntoPhi : $@convention(thin) <R> () -> (@out R, @error any Error) {
+entry:
+  try_apply undef<R>() : $@convention(thin) <U> () -> (@out U, @error any Error), normal good, error bad
+
+good(%instance : @owned $R):
+  br exit(%instance : $R)
+
+exit(%instance_2 : @owned $R):
+  return %instance_2 : $R
+
+bad(%41 : @owned $any Error):
+  throw %41 : $any Error
 }
 
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {

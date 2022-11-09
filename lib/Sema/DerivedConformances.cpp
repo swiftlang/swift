@@ -270,9 +270,9 @@ void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
 
   if (shouldDiagnose) {
     auto &ctx = nominal->getASTContext();
-    ctx.Diags.diagnose(nominal->getLoc(),
-                       diag::automatic_protocol_synthesis_unsupported,
-                       protocol->getName().str(), isa<StructDecl>(nominal));
+    ctx.Diags.diagnose(
+        nominal->getLoc(), diag::automatic_protocol_synthesis_unsupported,
+        protocol->getName().str(), nominal->getDescriptiveKind());
   }
 }
 

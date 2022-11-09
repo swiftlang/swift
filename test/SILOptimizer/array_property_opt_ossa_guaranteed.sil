@@ -36,7 +36,7 @@ bb0(%0: @guaranteed $MyArray<MyClass>):
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'load_and_copy_within_loop'
+// CHECK-LABEL: } // end sil function 'load_and_copy_within_loop'
 sil [ossa] @load_and_copy_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load [copy] %0 : $*MyArray<MyClass>
@@ -66,7 +66,7 @@ bb3:
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'test_simple'
+// CHECK-LABEL: } // end sil function 'test_simple'
 sil [ossa] @test_simple : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load [copy] %0 : $*MyArray<MyClass>
@@ -96,7 +96,7 @@ bb3:
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'clone_switch_enum_exit'
+// CHECK-LABEL: } // end sil function 'clone_switch_enum_exit'
 /// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
 /// after cloning.
 sil [ossa] @clone_switch_enum_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
@@ -145,7 +145,7 @@ sil [ossa] @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
+// CHECK-LABEL: } // end sil function 'clone_try_apply_exit'
 sil [ossa] @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error any Error) {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load [copy] %0 : $*MyArray<MyClass>
@@ -184,7 +184,7 @@ bb5(%9 : $Error):
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
+// CHECK-LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
 sil [ossa] @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load [copy] %0 : $*MyArray<MyClass>
@@ -236,7 +236,7 @@ bb10:
 // CHECK: bb3:
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
-// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
+// CHECK-LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
 sil [ossa] @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load [copy] %0 : $*MyArray<MyClass>

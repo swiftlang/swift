@@ -40,10 +40,10 @@ func testing(obj: C) {
 }
 
 // CHECK_1:      -----BEGIN CONFORMING METHOD LIST-----
-// CHECK_1_NEXT: - TypeName: C
-// CHECK_1_NEXT: - Members:
-// CHECK_1_NEXT:    - Name: returnsConcreteTarget1()
-// CHECK_1_NEXT:      TypeName: ConcreteTarget1
-// CHECK_1_NEXT:    - Name: returnsConcreteTarget1()
-// CHECK_1_NEXT:      TypeName: ConcreteTarget1
-// CHECK_1_NEXT: -----END CONFORMING METHOD LIST-----
+// CHECK_1-NEXT: - TypeName: C
+// CHECK_1-NEXT: - Members:
+// CHECK_1-NEXT:    - Name: returnsConcreteTarget1()
+// CHECK_1-NEXT:      TypeName: ConcreteTarget1
+// CHECK_1-NEXT:    - Name: returnsConcreteTarget2()
+// CHECK_1-NEXT:      TypeName: ConcreteTarget2
+// CHECK_1-NEXT: -----END CONFORMING METHOD LIST-----

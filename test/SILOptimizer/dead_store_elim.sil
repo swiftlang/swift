@@ -318,7 +318,7 @@ bb3:
 // CHECK: bb0(
 // CHECK-NOT: {{ store}}
 // CHECK: bb1:
-// CHECK_NOT: store
+// CHECK-NOT: store
 // CHECK: bb2:
 // CHECK: bb3:
 // CHECK: {{ store}}

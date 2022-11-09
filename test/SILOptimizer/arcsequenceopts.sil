@@ -411,13 +411,13 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   return %1 : $()
 }
 
-// CHECK_LABEL: sil hidden [noinline] @$test_guaranteed_call :
+// CHECK-LABEL: sil hidden [noinline] @$test_guaranteed_call :
 // CHECK: bb1{{.*}}:
 // CHECK-NOT: strong_retain
 // CHECK: apply
 // CHECK-NOT: strong_release
 // CHECK: bb2:
-// CHECK_LABEL: } // end sil function '$test_guaranteed_call'
+// CHECK-LABEL: } // end sil function '$test_guaranteed_call'
 sil hidden [noinline] @$test_guaranteed_call : $@convention(thin) () -> () {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
@@ -2172,10 +2172,10 @@ bb2(%4 : $Error):
   throw %4 : $Error
 }
 
-// CHECK_LABEL: sil hidden [noinline] @$try_apply_test_3 :
+// CHECK-LABEL: sil hidden [noinline] @$try_apply_test_3 :
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-// CHECK_LABEL: } // end sil function '$try_apply_test_3'
+// CHECK-LABEL: } // end sil function '$try_apply_test_3'
 sil hidden [noinline] @$try_apply_test_3 : $@convention(thin) () -> @error any Error {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>

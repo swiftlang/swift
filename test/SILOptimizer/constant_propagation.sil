@@ -331,9 +331,9 @@ bb0:
 // CHECK-LABEL: sil @fold_binary_bitwise
 // CHECK: bb0:
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
-// CHECK_NEXT: %1 = integer_literal $Builtin.Int64, 1
-// CHECK_NEXT: %2 = integer_literal $Builtin.Int64, 1
-// CHECK_NEXT: return %2 : $Builtin.Int64
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT: %2 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT: return %2 : $Builtin.Int64
 }
 
 // For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
