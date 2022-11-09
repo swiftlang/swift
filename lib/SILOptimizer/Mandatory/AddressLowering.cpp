@@ -139,6 +139,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -423,6 +424,9 @@ struct AddressLoweringState {
   // rewritten.
   SmallVector<UnconditionalCheckedCastInst *, 2> nonopaqueResultUCCs;
 
+  // checked_cast_br instructions to loadable type which need to be rewritten.
+  SmallVector<CheckedCastBranchInst *, 2> nonopaqueResultCCBs;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
@@ -653,6 +657,19 @@ void OpaqueValueVisitor::visitValue(SILValue value) {
               pass.function->getModule(), ucci->getSourceFormalType(),
               ucci->getTargetFormalType())) {
         pass.nonopaqueResultUCCs.push_back(ucci);
+      }
+    } else if (auto *arg = dyn_cast<SILArgument>(value)) {
+      if (auto *ccbi = dyn_cast_or_null<CheckedCastBranchInst>(
+              arg->getTerminatorForResult())) {
+        if (ccbi->getSuccessBB() != arg->getParent())
+          return;
+        if (ccbi->getSourceLoweredType().isAddressOnly(*pass.function))
+          return;
+        if (!canIRGenUseScalarCheckedCastInstructions(
+                pass.function->getModule(), ccbi->getSourceFormalType(),
+                ccbi->getTargetFormalType())) {
+          pass.nonopaqueResultCCBs.push_back(ccbi);
+        }
       }
     }
     return;
@@ -3451,6 +3468,10 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
   for (auto *ucci : pass.nonopaqueResultUCCs) {
     rewriteNonopaqueUnconditionalCheckedCast(ucci, pass);
+  }
+
+  for (auto *ccbi : pass.nonopaqueResultCCBs) {
+    CheckedCastBrRewriter(ccbi, pass).rewrite();
   }
 
   // Rewrite this function's return value now that all opaque values within the

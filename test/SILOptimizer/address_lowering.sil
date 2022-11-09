@@ -1643,6 +1643,60 @@ bb3(%12 : @owned $Optional<T>):
   return %12 : $Optional<T>
 }
 
+// Verify that checked_cast_br neither from nor to an address-only value but
+// whose operands require rewriting to checked_cast_addr_br gets rewritten.
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [init] [[SRC_ADDR]]
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         checked_cast_addr_br take_on_success AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[FAILURE]]:
+// CHECK:         load [take] [[SRC_ADDR]] : $*AnyObject
+// CHECK:       [[SUCCESS]]:
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_checked_cast_br5'
+sil [ossa] @test_checked_cast_br5 : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  checked_cast_br %instance : $AnyObject to any AnyObject.Type, success, failure
+
+success(%metatype : $@thick any AnyObject.Type):
+  br exit
+
+failure(%original : @owned $AnyObject):
+  destroy_value %original : $AnyObject
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that checked_cast_br which both has an address-only value and also
+// produces a value whose type would anyway require rewriting but is not
+// address-only gets lowered properly.
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br6 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type     
+// CHECK:         checked_cast_addr_br take_on_success T in [[SRC]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS]], [[FAILURE]] 
+// CHECK:       [[FAILURE]]:                                              
+// CHECK:         destroy_addr [[SRC]] : $*T                           
+// CHECK:       [[SUCCESS]]:                                              
+// CHECK:         [[REGISTER_3:%[^,]+]] = load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_checked_cast_br6'
+sil [ossa] @test_checked_cast_br6 : $@convention(thin) <T> (@in T) -> () {
+entry(%instance : @owned $T):
+  checked_cast_br %instance : $T to any AnyObject.Type, success, failure
+success(%metatype : $@thick any AnyObject.Type):
+  br exit
+failure(%original : @owned $T):
+  destroy_value %original : $T
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
 // CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
 // CHECK:   [[STK:%.*]] = alloc_stack $T
