@@ -2,7 +2,7 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: New Feature
+labels: feature request
 assignees: ''
 
 ---
@@ -16,14 +16,20 @@ SwiftUI, Combine, etc., please report it to https://feedbackassistant.apple.com
 instead.
 -->
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**Motivation**
+<!-- Describe the problem that your feature seeks to address. -->
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**Solution**
+<!--
+Describe your solution to the problem. Provide examples and describe how
+they work.
+-->
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+**Alternatives considered**
+<!--
+Describe any alternative approaches or features that you have considered in
+addressing the problem, and why you chose this approach instead.
+-->
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+<!-- Add any other context about your feature as appropriate. -->
+<!-- **Additional context** -->
