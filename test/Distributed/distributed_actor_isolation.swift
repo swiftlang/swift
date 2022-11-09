@@ -131,6 +131,7 @@ distributed actor DistributedActor_1 {
 
   func test_inside() async throws {
     _ = self.name
+    _ = self.computed
     _ = self.computedMutable
 
     _ = try await self.distInt()
@@ -157,6 +158,11 @@ func test_outside(
   // ==== properties
   _ = distributed.id // ok
   distributed.id = ActorAddress(parse: "mock://1.1.1.1:8080/#123121") // expected-error{{cannot assign to property: 'id' is immutable}}
+
+  // ==== computed properties
+  _ = try await distributed.computed
+  _ = await distributed.computed
+  _ = distributed.computed
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
