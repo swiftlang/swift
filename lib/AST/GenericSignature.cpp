@@ -799,9 +799,6 @@ bool
 Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
                          bool allowMissing) const {
   switch (getKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirements not supported here");
-
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
@@ -833,6 +830,10 @@ Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
 
   case RequirementKind::SameType:
     return getFirstType()->isEqual(getSecondType());
+
+  case RequirementKind::SameShape:
+    return (getFirstType()->getReducedShape() ==
+            getSecondType()->getReducedShape());
   }
 
   llvm_unreachable("Bad requirement kind");
