@@ -1761,7 +1761,7 @@ Associated type declarations appear inside protocols. The declared interface typ
 \paragraph{Function declarations}
 Functions can either appear at the top level, inside of a local context such as another function, or as a member of a type, called a method. If a function is itself generic or nested inside of a generic context, the interface type is a generic function type, otherwise it is a function type.
 
-The interface type of of a function is constructed from the interface types of the function's parameter declarations, and the function's return type. If the return type is omitted, it becomes the empty tuple type \texttt{()}. For methods, this function type is then wrapped in another level of function type representing the base of the call which becomes the \texttt{self} parameter of the method.
+The interface type of a function is constructed from the interface types of the function's parameter declarations, and the function's return type. If the return type is omitted, it becomes the empty tuple type \texttt{()}. For methods, this function type is then wrapped in another level of function type representing the base of the call which becomes the \texttt{self} parameter of the method.
 
 \index{method self parameter}
 The \texttt{self} parameter's type and parameter flags are constructed from the self interface type of the method's type declaration, and various attributes of the method:
