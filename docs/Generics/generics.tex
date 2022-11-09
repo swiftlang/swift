@@ -2996,7 +2996,7 @@ If we omit the second requirement, \texttt{T.[Sequence]Element} and \texttt{U.[S
 
 \index{equivalence class graph}
 \index{directed graph}
-For a generic signature, we can can construct a directed graph called the \emph{equivalence class graph}. A directed graph is defined by a set of vertices, and a set of edges, which are ordered pairs of vertices. The vertices here are reduced type parameters. There is an edge from a type parameter \texttt{T} to a type parameter \texttt{U} if for some associated type declaration \texttt{A} in a protocol \texttt{P}, \texttt{T} is conforms to \texttt{P}, and \texttt{T.[P]A} reduces to \texttt{U}. Edges are labeled with their associated type declarations.
+For a generic signature, we can construct a directed graph called the \emph{equivalence class graph}. A directed graph is defined by a set of vertices, and a set of edges, which are ordered pairs of vertices. The vertices here are reduced type parameters. There is an edge from a type parameter \texttt{T} to a type parameter \texttt{U} if for some associated type declaration \texttt{A} in a protocol \texttt{P}, \texttt{T} is conforms to \texttt{P}, and \texttt{T.[P]A} reduces to \texttt{U}. Edges are labeled with their associated type declarations.
 
 A type parameter can be thought of as a \emph{path} through this directed graph, starting from a generic parameter, then traversing successive edges for each associated type declaration until reaching the type parameter's equivalence class. Two reduced-equal type parameters represent two different paths that end at the same equivalence class.
 
