@@ -1847,7 +1847,9 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
 
     // The branch should forward one of the objc_method call.
     if (auto *br = dyn_cast<BranchInst>(inst)) {
-      if (br->getNumArgs() == 0 || br->getNumArgs() > 1)
+      if (br->getNumArgs() == 0)
+        continue;
+      if (br->getNumArgs() > 1)
         return false;
       auto branchArg = br->getArg(0);
       if (std::find(objCApplies.begin(), objCApplies.end(), branchArg) ==
@@ -1895,6 +1897,9 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
       continue;
     }
     if (auto *noneBranch = dyn_cast<BranchInst>(inst)) {
+      if (noneBranch->getNumArgs() == 0) {
+        continue;
+      }
       if (noneBranch->getNumArgs() != 1 ||
           (noneBranch->getArg(0) != SEI->getOperand() &&
            noneBranch->getArg(0) != optionalNone))
@@ -2006,12 +2011,6 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
 ///    %4 = enum #Optional.none
 ///    br mergeBB(%4)
 bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
-  // TODO: OSSA; handle non-trivial enum case cleanup
-  // (simplify_switch_enum_objc.sil).
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    return false;
-  }
-
   auto optional = SEI->getOperand();
   auto optionalPayloadType = optional->getType().getOptionalObjectType();
   if (!optionalPayloadType ||
@@ -2048,10 +2047,20 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
                                                      optionalPayloadType);
   optionalPayload->replaceAllUsesWith(payloadCast);
   auto *switchBB = SEI->getParent();
-  if (someBB->getNumArguments())
-    Builder.createBranch(SEI->getLoc(), someBB, SILValue(payloadCast));
-  else
+
+  if (!someBB->args_empty()) {
+    assert(someBB->getNumArguments() == 1);
+    auto *someBBArg = someBB->getArgument(0);
+    if (!someBBArg->use_empty()) {
+      assert(optionalPayload != someBBArg);
+      someBBArg->replaceAllUsesWith(payloadCast);
+    }
+    someBB->eraseArgument(0);
     Builder.createBranch(SEI->getLoc(), someBB);
+  } else {
+    assert(!Fn.hasOwnership());
+    Builder.createBranch(SEI->getLoc(), someBB);
+  }
 
   SEI->eraseFromParent();
   addToWorklist(switchBB);

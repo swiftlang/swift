@@ -55,21 +55,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
       isa<CopyBlockWithoutEscapingInst>(user))
     return false;
 
-  // Ignore uses that are totally uninteresting. partial_apply [stack] is
-  // terminated by a dealloc_stack instruction.
-  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
-      isa<DeallocStackInst>(user))
-    return false;
-
-  // Before checking conversions in general below (getSingleValueCopyOrCast),
-  // check for convert_function to [without_actually_escaping]. Assume such
-  // conversion are not actually escaping without following their uses.
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
-    if (CFI->withoutActuallyEscaping())
-      return false;
-  }
-
   // Look through copies, borrows, and conversions.
+  // getSingleValueCopyOrCast handles all result producing instructions for
+  // which onlyAffectsRefCount returns true.
   if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
     // Only follow the copied operand. Other operands are incidental,
     // as in the second operand of mark_dependence.
@@ -77,6 +65,22 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
       followUses(copy);
 
     return false;
+  }
+
+  // Ignore uses that are totally uninteresting. partial_apply [stack] is
+  // terminated by a dealloc_stack instruction.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+      isa<DeallocStackInst>(user)) {
+    assert(user->getNumResults() == 0);
+    return false;
+  }
+
+  // Before checking conversions in general below (getSingleValueCopyOrCast),
+  // check for convert_function to [without_actually_escaping]. Assume such
+  // conversion are not actually escaping without following their uses.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
+    if (CFI->withoutActuallyEscaping())
+      return false;
   }
 
   // Look through `differentiable_function`.
