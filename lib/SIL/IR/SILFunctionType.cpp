@@ -4128,7 +4128,10 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType origType) {
-    llvm_unreachable("Unimplemented!");
+    CanType patternType = visit(origType.getPatternType());
+    CanType countType = visit(origType.getCountType());
+
+    return CanType(PackExpansionType::get(patternType, countType));
   }
 
   /// Tuples need to have their component types substituted by these

@@ -98,3 +98,14 @@ func upcastResult() {
 func force<T, U, V>() -> any P<T, U, V> {
   return R(force: { force() }).force()
 }
+
+protocol Box<Contents> {
+  associatedtype Contents
+
+  var contents: Contents { get }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s13parameterized13functionTypes3box5valueq_AA3Box_pq_xc8ContentsRts_XP_xtr0_lF : $@convention(thin) <T, U> (@in_guaranteed any Box<(T) -> U>, @in_guaranteed T) -> @out U {
+func functionTypes<T, U>(box: any Box<(T) -> U>, value: T) -> U {
+  return box.contents(value)
+}
