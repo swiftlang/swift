@@ -542,6 +542,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
+    // Only run this pass if the move only language feature is enabled.
+    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
+      return;
+
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
