@@ -12,46 +12,26 @@ let globalActorSystem = LocalTestingDistributedActorSystem()
 distributed actor MyDistributedActor {
   typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed var distributedProperty: Set<Int> { [] }
+  distributed var accessMe: Set<Int> { [] }
+  // expected-note@-1{{access to distributed property 'accessMe' from outside the distributed actor 'MyDistributedActor' must be asynchronous}}
 }
 
-actor MyActor {
-  init(distributedActor: MyDistributedActor) {
-    self.distributedActor = distributedActor
-  }
+func test(da: MyDistributedActor) async throws {
+  _ = await da.distributedProperty // expected-error{{property access can throw but is not marked with 'try'}}
+  // expected-note@-1{{did you mean to use 'try'?}}
+  // expected-note@-2{{did you mean to handle error as optional value?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
 
-  let distributedActor: MyDistributedActor
+  _ = try da.distributedProperty // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{property access is 'async'}}
 
-  static func makeActor(actorSystem: LocalTestingDistributedActorSystem) async throws -> MyActor {
-    let distributedActor = try MyDistributedActor.resolve(id: LocalTestingActorID(id: "42"), using: actorSystem)
-    return MyActor(distributedActor: distributedActor)
-  }
+  _ = try await da.distributedProperty // ok, implicitly async + throws
 }
 
-class Caller {
-  public var value: Set<Int> {
-    get async {
-      var value: Set<Int>
-      do {
-        let actor = try await makeActor(actorSystem: globalActorSystem)
-        let da = actor.distributedActor
-
-        _ = await da.distributedProperty // expected-error{{property access can throw but is not marked with 'try'}}
-        // expected-note@-1{{did you mean to use 'try'?}}
-        // expected-note@-2{{did you mean to handle error as optional value?}}
-        // expected-note@-3{{did you mean to disable error propagation?}}
-
-        _ = try da.distributedProperty // expected-error{{expression is 'async' but is not marked with 'await'}}
-        // expected-note@-1{{property access is 'async'}}
-
-        value = try await da.distributedProperty // ok, implicitly async + throws
-      } catch {
-        fatalError("\(error)")
-      }
-      return value
-    }
-  }
-
-  func makeActor(actorSystem: LocalTestingDistributedActorSystem) async throws -> MyActor {
-    try await MyActor.makeActor(actorSystem: actorSystem)
-  }
+func testSyncFunc(da: MyDistributedActor) throws {
+  _ = da.accessMe // expected-error{{actor-isolated distributed property 'accessMe' can not be referenced from a non-isolated context}}
+  // expected-error@-1{{property access can throw but is not marked with 'try'}}
+  // expected-note@-2{{did you mean to use 'try'?}}
+  // expected-note@-3{{did you mean to handle error as optional value?}}
+  // expected-note@-4{{did you mean to disable error propagation?}}
 }

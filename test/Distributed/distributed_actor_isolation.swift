@@ -159,11 +159,6 @@ func test_outside(
   _ = distributed.id // ok
   distributed.id = ActorAddress(parse: "mock://1.1.1.1:8080/#123121") // expected-error{{cannot assign to property: 'id' is immutable}}
 
-  // ==== computed properties
-  _ = try await distributed.computed
-  _ = await distributed.computed
-  _ = distributed.computed
-
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a non-isolated context}}
