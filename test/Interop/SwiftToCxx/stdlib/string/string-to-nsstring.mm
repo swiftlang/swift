@@ -32,10 +32,10 @@ int main() {
   NSString *nsStr = emptyString;
 }
 
-// CHECKARC: %[[VAL:.*]] = call swiftcc i8* @"$sSS23_bridgeToObjectiveCImplyXlyF"
-// CHECKARC: call i8* @llvm.objc.autorelease(i8* %[[VAL]])
+// CHECKARC: %[[VAL:.*]] = {{(tail )?}}call swiftcc ptr @"$sSS23_bridgeToObjectiveCImplyXlyF"
+// CHECKARC: call ptr @llvm.objc.autorelease(ptr %[[VAL]])
 // CHECKARC: @llvm.objc.
-// CHECKARC-SAME: autorelease(i8*)
+// CHECKARC-SAME: autorelease(ptr)
 // CHECKARC-NOT: @llvm.objc.
 
 //--- string-to-nsstring.mm

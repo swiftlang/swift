@@ -450,16 +450,16 @@ bb3:
 // CHECK:   [[V3:%[0-9]+]] = struct $Int32
 // CHECK: bb2:
 // CHECK-NOT:   store
-// CHECK:   br bb4([[V3]] : $Int32)
+// CHECK:   br bb4
 // CHECK: bb3:
 // CHECK-NOT:   store
-// CHECK:   br bb4([[V3]] : $Int32)
-// CHECK: bb4([[V4:%[0-9]+]] : $Int32):
+// CHECK:   br bb4
+// CHECK: bb4:
 // CHECK:   cond_br
 // CHECK: bb5:
-// CHECK:   br bb1([[V4]] : $Int32)
+// CHECK:   br bb1([[V3]] : $Int32)
 // CHECK: bb6:
-// CHECK:   store [[V4]] to %0
+// CHECK:   store [[V3]] to %0
 // CHECK: } // end sil function 'hoist_load_and_two_stores'
 sil @hoist_load_and_two_stores : $@convention(thin) (@inout Int32, Int32) -> () {
 bb0(%0 : $*Int32, %1 : $Int32):

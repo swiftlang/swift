@@ -967,11 +967,13 @@ bb9:
 // in bb9 and bb10.
 //
 // CHECK-LABEL: reuse_silargument_multiple_bb_forwarding :
-// CHECK: bb8([[ARG:%.*]] : $Int)
-// CHECK: bb9
-// CHECK-NOT: = load
-// CHECK: bb10
-// CHECK-NOT: = load
+// CHECK:       bb10:
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}(%3)
+// CHECK:         br bb11(%3 : $Int)
+// CHECK:       bb11([[A:%[0-9]+]] : $Int)
+// CHECK-NOT:     load
+// CHECK:         return [[A]]
 // CHECK-LABEL: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
 sil hidden [ossa] @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (Bool) -> Int {
 bb0(%0 : $Bool):
@@ -1007,22 +1009,22 @@ bb6:
   br bb8
 
 bb7:
-  br bb10
+  br bb11
 
 bb8:
-  cond_br undef, bb9, bb8a
-
-bb8a:
- br bb10
+  cond_br undef, bb10, bb9
 
 bb9:
+ br bb11
+
+bb10:
   %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %22 = load [trivial] %21 : $*Int
   %23 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   %24 = apply %23(%22) : $@convention(thin) (Int) -> ()
-  br bb10
+  br bb11
 
-bb10:
+bb11:
   %26 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %27 = load [trivial] %26 : $*Int
   dealloc_stack %1 : $*TwoField
