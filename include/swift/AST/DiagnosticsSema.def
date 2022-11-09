@@ -3211,8 +3211,8 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "of %3 to %2",
      (unsigned, Type, Type, Type))
 NOTE(automatic_protocol_synthesis_unsupported,none,
-    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
-    (StringRef, unsigned))
+    "automatic synthesis of '%0' is not supported for %1 declarations",
+    (StringRef, DescriptiveDeclKind))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
      "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
      (Type, Type, Type))
