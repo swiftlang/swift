@@ -103,3 +103,11 @@ func eat(_ myfruit: inout Basket) -> Basket {
   return myfruit
 }
 
+protocol P {
+  associatedtype A: P
+  var value: A { get }
+}
+
+struct S: P {
+  var value: P { self }
+}
