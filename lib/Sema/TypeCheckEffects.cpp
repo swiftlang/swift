@@ -2483,18 +2483,22 @@ private:
                                   ConditionalEffectKind::Always,
                                   getKindOfEffectfulProp(member)));
 
-    } else if (E->isImplicitlyAsync()) {
+    } else {
       EffectList effects;
-      effects.push_back(EffectKind::Async); // implicitly async
+      if (E->isImplicitlyAsync()) {
+        effects.push_back(EffectKind::Async);
+      }
       if (E->isImplicitlyThrows()) {
         // E.g. it may be a distributed computed property, accessed across actors.
         effects.push_back(EffectKind::Throws);
       }
 
-      checkThrowAsyncSite(E, true,
-                          Classification::forEffect(effects,
-                                                    ConditionalEffectKind::Always,
-                                                    getKindOfEffectfulProp(member)));
+      if (!effects.empty()) {
+        checkThrowAsyncSite(E, true,
+                            Classification::forEffect(effects,
+                                                      ConditionalEffectKind::Always,
+                                                      getKindOfEffectfulProp(member)));
+      }
     }
 
     return ShouldRecurse;
