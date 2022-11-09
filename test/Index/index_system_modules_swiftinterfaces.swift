@@ -55,9 +55,9 @@
 // RUN:     2>&1 | %FileCheck -check-prefix=BROKEN-BUILD %s
 
 /// We don't expect so see the swiftinterface error for indexing
-// BROKEN-BUILD: indexing system module {{.*}} skipping
 // BROKEN-BUILD-NOT: error
 // BROKEN-BUILD-NOT: breaking_the_swifinterface
+// BROKEN-BUILD: indexing system module {{.*}} skipping
 
 /// We don't expect SystemModule to be indexed with a broken swiftinterface
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=BROKEN-UNIT %s

@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
 
+// REQUIRES: executable_test
+
 func test1(x: Int, fn: (Int) -> Int) -> Int {
   let xx = fn(42)
   return fn(x)
