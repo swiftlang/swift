@@ -661,7 +661,7 @@ private:
         LabelIndex++;
       }
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
-      auto *args = CallParent->getArgs();
+      auto *args = CallParent->getArgs()->getOriginalArgs();
       Args.append(args->begin(), args->end());
     }
 
