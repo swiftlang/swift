@@ -1763,6 +1763,39 @@ bb0(%0 : @guaranteed $T):
   return %6 : $U
 }
 
+// Verify lowering of unconditional_checked_cast not involving address-only
+// values.
+// CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [init] [[SRC_ADDR]] : $*AnyObject
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast4'
+sil hidden [ossa] @test_unconditional_checked_cast4 : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  %casted = unconditional_checked_cast %instance : $AnyObject to any AnyObject.Type
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify lowering of unconditional_checked_cast that involves address-only
+// values and also non-address-only values which on its own requires lowering
+// to unconditional_checked_cast_addr.
+// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC_ADDR:%[^,]+]] :
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast5'
+sil [ossa] @test_unconditional_checked_cast5 : $@convention(thin) <T> (@in T) -> () {
+entry(%instance : @owned $T):
+  %casted = unconditional_checked_cast %instance : $T to any AnyObject.Type
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @yield_two : {{.*}} {
 // CHECK:         tuple_element_addr
 // CHECK:         tuple_element_addr
