@@ -55,6 +55,16 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
       isa<CopyBlockWithoutEscapingInst>(user))
     return false;
 
+  // Look through copies, borrows, and conversions.
+  if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
+    // Only follow the copied operand. Other operands are incidental,
+    // as in the second operand of mark_dependence.
+    if (oper->getOperandNumber() == 0)
+      followUses(copy);
+
+    return false;
+  }
+
   // Ignore uses that are totally uninteresting. partial_apply [stack] is
   // terminated by a dealloc_stack instruction.
   if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
@@ -67,16 +77,6 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
     if (CFI->withoutActuallyEscaping())
       return false;
-  }
-
-  // Look through copies, borrows, and conversions.
-  if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
-    // Only follow the copied operand. Other operands are incidental,
-    // as in the second operand of mark_dependence.
-    if (oper->getOperandNumber() == 0)
-      followUses(copy);
-
-    return false;
   }
 
   // Look through `differentiable_function`.

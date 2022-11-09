@@ -321,6 +321,19 @@ struct SimplifyCFGSimplifySwitchEnumBlock : UnitTest {
   }
 };
 
+struct SimplifyCFGSwitchEnumOnObjcClassOptional : UnitTest {
+  SimplifyCFGSwitchEnumOnObjcClassOptional(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifySwitchEnumOnObjcClassOptional(
+            cast<SwitchEnumInst>(arguments.takeInstruction()));
+  }
+};
+
 struct SimplifyCFGSimplifySwitchEnumUnreachableBlocks : UnitTest {
   SimplifyCFGSimplifySwitchEnumUnreachableBlocks(UnitTestRunner *pass)
       : UnitTest(pass) {}
@@ -515,6 +528,9 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS(
         "simplify-cfg-simplify-switch-enum-unreachable-blocks",
         SimplifyCFGSimplifySwitchEnumUnreachableBlocks)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+        SimplifyCFGSwitchEnumOnObjcClassOptional)
     ADD_UNIT_TEST_SUBCLASS(
         "simplify-cfg-simplify-term-with-identical-dest-blocks",
         SimplifyCFGSimplifyTermWithIdenticalDestBlocks)
