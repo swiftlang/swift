@@ -2485,16 +2485,18 @@ private:
 
     } else {
       EffectList effects;
+      bool requiresTry = false;
       if (E->isImplicitlyAsync()) {
         effects.push_back(EffectKind::Async);
       }
       if (E->isImplicitlyThrows()) {
         // E.g. it may be a distributed computed property, accessed across actors.
         effects.push_back(EffectKind::Throws);
+        requiresTry = true;
       }
 
       if (!effects.empty()) {
-        checkThrowAsyncSite(E, true,
+        checkThrowAsyncSite(E, requiresTry,
                             Classification::forEffect(effects,
                                                       ConditionalEffectKind::Always,
                                                       getKindOfEffectfulProp(member)));
