@@ -345,6 +345,11 @@ public:
   /// are errors. The resulting serialized AST may include errors types and
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
+  
+  /// Whether or not the compiler must be strict in ensuring that implicit downstream
+  /// module dependency build tasks must inherit the parent compiler invocation's context,
+  /// such as `-Xcc` flags, etc.
+  bool StrictImplicitModuleContext = false;
 
   /// Downgrade all errors emitted in the module interface verification phase
   /// to warnings.
