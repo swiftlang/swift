@@ -5341,6 +5341,15 @@ bool ClassDecl::hasRefCountingAnnotations() const {
 }
 
 ReferenceCounting ClassDecl::getObjectModel() const {
+  auto retainOperation = evaluateOrDefault(
+      getASTContext().evaluator,
+    CustomRefCountingOperation(
+        {this, CustomRefCountingOperationKind::retain}),
+    {});
+if (retainOperation.kind ==
+    CustomRefCountingOperationResult::foundOperation)
+  return ReferenceCounting::Custom;
+
   if (isForeignReferenceType())
     return hasRefCountingAnnotations() ? ReferenceCounting::Custom
                                        : ReferenceCounting::None;

@@ -6466,32 +6466,33 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
                                  ? "retain:"
                                  : "release:";
 
-  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
-  if (!decl->hasAttrs())
-    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+  auto retainFnAttr = llvm::find_if(swiftDecl->getSemanticsAttrs(), [operationStr](const SemanticsAttr *attr) {
+    return attr->Value.startswith(operationStr);
+  });
 
-  auto retainFnAttr =
-      llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
-        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-          return swiftAttr->getAttribute().startswith(operationStr);
-        return false;
-      });
-  if (retainFnAttr == decl->getAttrs().end()) {
+//  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+//  if (!decl->hasAttrs())
+//    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+//
+//  auto retainFnAttr =
+//      llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
+//        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+//          return swiftAttr->getAttribute().startswith(operationStr);
+//        return false;
+//      });
+  if (retainFnAttr == swiftDecl->getSemanticsAttrs().end()) {
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
   }
 
-  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)
-                  ->getAttribute()
+  auto name = retainFnAttr.operator*()->Value
                   .drop_front(StringRef(operationStr).size())
                   .str();
 
-  if (name == "immortal")
-    return {CustomRefCountingOperationResult::immortal, nullptr, name};
+//  if (name == "immortal")
+//    return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
-      swiftDecl->getClangDecl()->getOwningModule());
-  ctx.lookupInModule(parentModule, name, results);
+  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
 
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),

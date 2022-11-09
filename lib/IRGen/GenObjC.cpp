@@ -1605,11 +1605,14 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value) {
-  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
+//  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
+//
+//  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
+//  auto llvmFn = cast<llvm::Function>(
+//      IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 
-  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
-  auto llvmFn = cast<llvm::Function>(
-      IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
+  auto silFn = IGM.getSILModule().lookUpFunction(SILDeclRef(fn, SILDeclRef::Kind::Func));
+  auto llvmFn = IGM.getAddrOfSILFunction(silFn, NotForDefinition);
 
   auto argType =
       cast<llvm::FunctionType>(llvmFn->getFunctionType())->getParamType(0);

@@ -68,6 +68,8 @@ public:
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
+
+
       auto releaseFn =
           evaluateOrDefault(
               getClass()->getASTContext().evaluator,

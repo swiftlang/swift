@@ -20,6 +20,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -5977,6 +5978,17 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
+
+  if (auto classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass()) {
+    auto retainOperation = evaluateOrDefault(
+        ctx.evaluator,
+        CustomRefCountingOperation(
+            {classDecl, CustomRefCountingOperationKind::retain}),
+        {});
+    if (retainOperation.kind ==
+        CustomRefCountingOperationResult::foundOperation)
+      return ReferenceCounting::Custom;
+  }
 
   if (isForeignReferenceType())
     return lookThroughAllOptionalTypes()
