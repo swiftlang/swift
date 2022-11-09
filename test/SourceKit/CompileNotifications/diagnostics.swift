@@ -95,5 +95,5 @@
 // RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s | %FileCheck %s -check-prefix=SYNTACTIC
 // SYNTACTIC: key.syntaxmap:
 
-// TODO: Is this correct?
+// TODO: Is this correct?  this correct? rdar://102092136
 // SYNTACTIC: key.notification: source.notification.compile-did-finish

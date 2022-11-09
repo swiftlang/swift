@@ -180,10 +180,14 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
               ? DescriptiveDeclKind::GenericStruct
               : DescriptiveDeclKind::Struct;
 
-   case DeclKind::Class:
+   case DeclKind::Class: {
+     bool isActor = cast<ClassDecl>(this)->isActor();
      return cast<ClassDecl>(this)->getGenericParams()
-              ? DescriptiveDeclKind::GenericClass
-              : DescriptiveDeclKind::Class;
+                ? (isActor ? DescriptiveDeclKind::GenericActor
+                           : DescriptiveDeclKind::GenericClass)
+                : (isActor ? DescriptiveDeclKind::Actor
+                           : DescriptiveDeclKind::Class);
+   }
 
    case DeclKind::Var: {
      auto var = cast<VarDecl>(this);
@@ -317,10 +321,12 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Enum, "enum");
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
+  ENTRY(Actor, "actor");
   ENTRY(Protocol, "protocol");
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
+  ENTRY(GenericActor, "generic actor");
   ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(StaticSubscript, "static subscript");

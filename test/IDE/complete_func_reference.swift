@@ -121,7 +121,7 @@ do {
 }
 
 // ANY_INT: Begin completions
-// ANY_INT_DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:); name=anyToInt(a:)
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:)[#(Any) -> Int#]; name=anyToInt(a:)
 // ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
 // ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
 // ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: voidToVoid()[#Void#];

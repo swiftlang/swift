@@ -2767,7 +2767,7 @@ protocol someProtocol {
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT: destroy_addr
 // CHECK-NEXT: [[T0:%.*]] = witness_method $T
-// CHECK_NEXT: apply [[T0]]<T>
+// CHECK-NEXT: apply [[T0]]<T>
 // CHECK: return
 sil @witness_archetype : $@convention(thin) <T where T : someProtocol> (@in T) -> () {
 bb0(%0 : $*T):

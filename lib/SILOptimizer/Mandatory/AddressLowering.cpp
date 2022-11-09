@@ -1159,7 +1159,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   coalescedPhi.coalesce(phi, pass.valueStorageMap);
 
   SmallVector<SILValue, 4> coalescedValues;
-  coalescedValues.resize(coalescedPhi.getCoalescedOperands().size());
+  coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
   for (SILValue value : coalescedPhi.getCoalescedValues())
     coalescedValues.push_back(value);
 
@@ -3011,7 +3011,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
       return;
 
     assert(caseBB->getArguments().size() == 1);
-    SILArgument *caseArg = caseBB->getArguments()[0];
+    SILArgument *caseArg = caseBB->getArgument(0);
 
     assert(&switchEnum->getOperandRef(0) == getReusedStorageOperand(caseArg));
     assert(caseDecl->hasAssociatedValues() && "caseBB has a payload argument");
@@ -3053,6 +3053,20 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     defaultCounter = switchEnum->getDefaultCount();
     if (auto defaultDecl = switchEnum->getUniqueCaseForDefault()) {
       rewriteCase(defaultDecl.get(), defaultBB);
+    } else {
+      assert(defaultBB->getArguments().size() == 1);
+      SILArgument *arg = defaultBB->getArgument(0);
+      assert(arg->getType().isAddressOnly(*pass.function));
+      auto builder = pass.getBuilder(defaultBB->begin());
+      auto addr = enumAddr;
+      auto *load = builder.createTrivialLoadOr(switchEnum->getLoc(), addr,
+                                               LoadOwnershipQualifier::Take);
+      // Remap arg to the new dummy load which will be deleted during
+      // deleteRewrittenInstructions.
+      arg->replaceAllUsesWith(load);
+      pass.valueStorageMap.replaceValue(arg, load);
+      markRewritten(load, addr);
+      defaultBB->eraseArgument(0);
     }
   }
   auto builder = pass.getTermBuilder(switchEnum);
@@ -3158,6 +3172,12 @@ public:
 protected:
   // Set the storage address for an opaque block arg and mark it rewritten.
   void rewriteArg(SILPhiArgument *arg) {
+    if (auto *tai =
+            dyn_cast_or_null<TryApplyInst>(arg->getTerminatorForResult())) {
+      CallArgRewriter(tai, pass).rewriteArguments();
+      ApplyRewriter(tai, pass).convertApplyWithIndirectResults();
+      return;
+    }
     LLVM_DEBUG(llvm::dbgs() << "REWRITE ARG "; arg->dump());
     if (storage.storageAddress)
       LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage.storageAddress->dump());
@@ -3357,13 +3377,29 @@ static void rewriteFunction(AddressLoweringState &pass) {
       DefRewriter::rewriteValue(valueDef, pass);
       valueAndStorage.storage.markRewritten();
     }
+    // The def of interest may have been changed by rewriteValue.  Get that
+    // redefinition back out of the ValueStoragePair.
+    valueDef = valueAndStorage.value;
     // Rewrite a use of any non-address value mapped to storage (does not
     // include the already rewritten uses of indirect arguments).
     if (valueDef->getType().isAddress())
       continue;
 
+    SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
-    for (Operand *oper : uses) {
+    for (auto *oper : uses) {
+      originalUses.insert(oper);
+      UseRewriter::rewriteUse(oper, pass);
+    }
+    // Rewrite every new uses that was added.
+    uses.clear();
+    for (auto *use : valueDef->getUses()) {
+      if (originalUses.contains(use))
+        continue;
+      uses.push_back(use);
+    }
+    for (auto *oper : uses) {
+      assert(isa<DebugValueInst>(oper->getUser()));
       UseRewriter::rewriteUse(oper, pass);
     }
   }
@@ -3396,7 +3432,7 @@ static void filterDeadArgs(OperandValueArrayRef origArgs,
                            SmallVectorImpl<SILValue> &newArgs) {
   auto nextDeadArgI = deadArgIndices.begin();
   for (unsigned i : indices(origArgs)) {
-    if (i == *nextDeadArgI) {
+    if (i == *nextDeadArgI && nextDeadArgI != deadArgIndices.end()) {
       ++nextDeadArgI;
       continue;
     }

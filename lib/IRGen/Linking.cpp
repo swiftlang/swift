@@ -1140,6 +1140,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
   case Kind::TypeMetadataLazyCacheVariable:

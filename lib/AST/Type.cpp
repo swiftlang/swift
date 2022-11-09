@@ -655,6 +655,20 @@ static bool isLegalSILType(CanType type) {
     return true;
   }
 
+  // Packs are legal if all their elements are legal.
+  if (auto packType = dyn_cast<PackType>(type)) {
+    for (auto eltType : packType.getElementTypes()) {
+      if (!isLegalSILType(eltType)) return false;
+    }
+    return true;
+  }
+
+  // Pack expansions are legal if all their pattern and count types are legal.
+  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
+    return (isLegalSILType(packExpansionType.getPatternType()) &&
+            isLegalSILType(packExpansionType.getCountType()));
+  }
+
   // Optionals are legal if their object type is legal.
   if (auto objectType = type.getOptionalObjectType()) {
     return isLegalSILType(objectType);
