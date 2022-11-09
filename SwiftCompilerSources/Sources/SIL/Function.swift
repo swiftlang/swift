@@ -121,6 +121,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  /// True if the callee function is annotated with @_semantics("programtermination_point").
+  /// This means that the function terminates the program.
+  public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }
+
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
     /// No effect attribute is specified.
