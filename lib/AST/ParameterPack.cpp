@@ -15,10 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Types.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
@@ -121,6 +122,19 @@ PackExpansionType *PackExpansionType::expand() {
 
   auto *packType = PackType::get(getASTContext(), expandedTypes);
   return PackExpansionType::get(packType, countType);
+}
+
+CanType PackExpansionType::getReducedShape() {
+  if (auto *archetypeType = countType->getAs<PackArchetypeType>()) {
+    auto shape = archetypeType->getReducedShape();
+    return CanType(PackExpansionType::get(shape, shape));
+  } else if (auto *packType = countType->getAs<PackType>()) {
+    auto shape = packType->getReducedShape();
+    return CanType(PackExpansionType::get(shape, shape));
+  }
+
+  assert(countType->is<PlaceholderType>());
+  return getASTContext().TheEmptyTupleType;
 }
 
 bool TupleType::containsPackExpansionType() const {
@@ -264,6 +278,44 @@ PackType *PackType::flattenPackTypes() {
     return this;
 
   return PackType::get(getASTContext(), elts);
+}
+
+CanPackType PackType::getReducedShape() {
+  SmallVector<Type, 4> elts;
+
+  auto &ctx = getASTContext();
+
+  for (auto elt : getElementTypes()) {
+    // T... => shape(T)...
+    if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
+      elts.push_back(packExpansionType->getReducedShape());
+      continue;
+    }
+
+    // Use () as a placeholder for scalar shape.
+    assert(!elt->is<PackArchetypeType>() &&
+           "Pack archetype outside of a pack expansion");
+    elts.push_back(ctx.TheEmptyTupleType);
+  }
+
+  return CanPackType(PackType::get(ctx, elts));
+}
+
+CanType TypeBase::getReducedShape() {
+  if (auto *packArchetype = getAs<PackArchetypeType>())
+    return packArchetype->getReducedShape();
+
+  if (auto *packType = getAs<PackType>())
+    return packType->getReducedShape();
+
+  if (auto *expansionType = getAs<PackExpansionType>())
+    return expansionType->getReducedShape();
+
+  assert(!isTypeVariableOrMember());
+  assert(!hasTypeParameter());
+
+  // Use () as a placeholder for scalar shape.
+  return getASTContext().TheEmptyTupleType;
 }
 
 unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,

@@ -1290,6 +1290,18 @@ public:
   /// Error.
   bool isExistentialWithError();
 
+  /// Returns the reduced shape of the type, which represents an equivalence
+  /// class for the same-shape generic requirement:
+  ///
+  /// - The shape of a scalar type is always the empty tuple type ().
+  /// - The shape of a pack archetype is computed from the generic signature
+  ///   using same-shape requirements.
+  /// - The shape of a pack type is computed recursively from its elements.
+  ///
+  /// Two types satisfy a same-shape requirement if their reduced shapes are
+  /// equal as canonical types.
+  CanType getReducedShape();
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
@@ -6028,7 +6040,7 @@ public:
       LayoutConstraint Layout);
 
   // Returns the reduced shape type for this pack archetype.
-  Type getShape() const;
+  CanType getReducedShape() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;
@@ -6481,6 +6493,8 @@ public:
 
   PackType *flattenPackTypes();
 
+  CanTypeWrapper<PackType> getReducedShape();
+
 public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getElementTypes());
@@ -6552,6 +6566,8 @@ public:
   Type getCountType() const { return countType; }
 
   PackExpansionType *expand();
+
+  CanType getReducedShape();
 
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {
