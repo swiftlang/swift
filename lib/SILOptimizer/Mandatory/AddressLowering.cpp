@@ -3172,6 +3172,12 @@ public:
 protected:
   // Set the storage address for an opaque block arg and mark it rewritten.
   void rewriteArg(SILPhiArgument *arg) {
+    if (auto *tai =
+            dyn_cast_or_null<TryApplyInst>(arg->getTerminatorForResult())) {
+      CallArgRewriter(tai, pass).rewriteArguments();
+      ApplyRewriter(tai, pass).convertApplyWithIndirectResults();
+      return;
+    }
     LLVM_DEBUG(llvm::dbgs() << "REWRITE ARG "; arg->dump());
     if (storage.storageAddress)
       LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage.storageAddress->dump());
@@ -3371,6 +3377,9 @@ static void rewriteFunction(AddressLoweringState &pass) {
       DefRewriter::rewriteValue(valueDef, pass);
       valueAndStorage.storage.markRewritten();
     }
+    // The def of interest may have been changed by rewriteValue.  Get that
+    // redefinition back out of the ValueStoragePair.
+    valueDef = valueAndStorage.value;
     // Rewrite a use of any non-address value mapped to storage (does not
     // include the already rewritten uses of indirect arguments).
     if (valueDef->getType().isAddress())
