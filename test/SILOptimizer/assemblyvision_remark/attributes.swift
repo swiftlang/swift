@@ -40,13 +40,13 @@ public func failMatch() {
 
 @_semantics("optremark")
 public func allocateInlineCallee() -> Klass {
-    return Klass() // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return Klass() // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.allocateInlineCallee()"}}
                    // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
 }
 
 @_semantics("optremark.sil-inliner")
 public func allocateInlineCallee2() -> Klass {
-    return Klass() // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return Klass() // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.allocateInlineCallee2()"}}
 }
 
 // This makes sure we don't emit any remarks if we do not have semantics.
@@ -58,14 +58,14 @@ public func allocateInlineCallee3() -> Klass {
 @_semantics("optremark.sil-assembly-vision-remark-gen")
 public func mix1() -> (Klass, Klass) {
     let x = getGlobal()
-    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return (x, Klass()) // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.mix1()"}}
                         // expected-remark @-1:16 {{heap allocated ref of type 'Klass'}}
 }
 
 @_semantics("optremark.sil-inliner")
 public func mix2() -> (Klass, Klass) {
     let x = getGlobal()
-    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return (x, Klass()) // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.mix2()"}}
 }
 
 @_semantics("optremark.sil-assembly-vision-remark-gen")
@@ -77,7 +77,7 @@ public func mix3() -> (Klass, Klass) {
 @_semantics("optremark")
 public func mix4() -> (Klass, Klass) {
     let x = getGlobal()
-    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return (x, Klass()) // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.mix4()"}}
                         // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
 }
 
@@ -89,6 +89,6 @@ public func mix5() -> (Klass, Klass) {
 @_assemblyVision
 public func mix4a() -> (Klass, Klass) {
     let x = getGlobal()
-    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+    return (x, Klass()) // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.mix4a()"}}
                         // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
 }
