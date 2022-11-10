@@ -30,6 +30,7 @@ extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
 public protocol CxxRandomAccessCollection: CxxSequence, RandomAccessCollection {
   override associatedtype RawIterator: UnsafeCxxRandomAccessIterator
+  override associatedtype Iterator = CxxIterator<Self>
   override associatedtype Element = RawIterator.Pointee
   override associatedtype Index = Int
   override associatedtype Indices = Range<Int>

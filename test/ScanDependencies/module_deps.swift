@@ -210,6 +210,10 @@ import SubE
 
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "B.pcm"
+// CHECK: "contextHash": [[B_CONTEXT:"{{.*}}"]],
+// CHECK: "-o"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "%t/clang-module-cache/B-[[B_CONTEXT]].pcm",
 
 // CHECK-NEXT: sourceFiles
 // CHECK-DAG: module.modulemap
@@ -222,7 +226,11 @@ import SubE
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
-
+// CHECK: "contextHash": [[SHIMS_CONTEXT:"{{.*}}"]],
+// CHECK: "-o"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "%t/clang-module-cache/SwiftShims-[[SHIMS_CONTEXT]].pcm",
+// CHECK: "-fmodule-file=A=%t/clang-module-cache/A-{{.*}}.pcm"
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies
