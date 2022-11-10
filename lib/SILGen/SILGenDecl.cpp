@@ -2081,3 +2081,21 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   llvm_unreachable("unhandled case");
 }
+
+void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                                                  ManagedValue value, bool isInit) {
+  // Normally we do not do anything if we have a black hole
+  // initialization... but if we have a move only object, insert a move value.
+  if (!value.getType().isMoveOnly())
+    return;
+
+  // If we have an address, then this will create a new temporary allocation
+  // which will trigger the move checker. If we have an object though, we need
+  // to insert an extra move_value to make sure the object checker behaves
+  // correctly.
+  value = value.ensurePlusOne(SGF, loc);
+  if (value.getType().isAddress())
+    return;
+
+  value = SGF.B.createMoveValue(loc, value);
+}
