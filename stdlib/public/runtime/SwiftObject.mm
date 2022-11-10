@@ -609,7 +609,10 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   // bit set.
   SWIFT_MUSTTAIL return objcRetainAndReturn(object);
 #else
-  return swift_retain(static_cast<HeapObject *>(objectRef));
+  // No tail call here. When !SWIFT_OBJC_INTEROP, the value of objectRef may be
+  // different from that of object, e.g. on Linux ARM64.
+  swift_retain(static_cast<HeapObject *>(objectRef));
+  return object;
 #endif
 }
 
