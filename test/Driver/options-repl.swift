@@ -20,7 +20,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: bootstrapping_mode
+// UNSUPPORTED: swift_in_compiler
 
 // LLDB: lldb{{(\.exe)?"?}} {{"?}}--repl=
 // LLDB-NOT: -module-name
