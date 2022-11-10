@@ -1135,7 +1135,7 @@ static ManagedValue emitCBridgedToNativeValue(
     }
 
     // Otherwise, we use more complicated logic that handles results that
-    // were unexpetedly null.
+    // were unexpectedly null.
 
     assert(bridgedType.isAnyClassReferenceType());
 
