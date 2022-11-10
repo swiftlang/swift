@@ -506,16 +506,15 @@ Example invocations:
 
         else:
             tmpargs = copy.copy(args)
-            else:
-                # Build the tablegen binaries so we can use them for the cross-compile
-                # build.
-                native_build_dir = os.path.join(objroot, platform.machine() + "-tblgen")
-                tmpargs.lto_type = None
-                builder = Builder(toolchain, tmpargs, "macosx", platform.machine())
-                shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
-                with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
-                    builder.configure(enable_debuginfo=False)
-                    builder.build_targets(native_build_dir, ["llvm-tblgen", "clang-tblgen"])
+            # Build the tablegen binaries so we can use them for the cross-compile
+            # build.
+            native_build_dir = os.path.join(objroot, platform.machine() + "-tblgen")
+            tmpargs.lto_type = None
+            builder = Builder(toolchain, tmpargs, "macosx", platform.machine())
+            shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
+            with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
+                builder.configure(enable_debuginfo=False)
+                builder.build_targets(native_build_dir, ["llvm-tblgen", "clang-tblgen"])
 
         for arch in architectures:
             args.build_dir = os.path.join(objroot, arch, "obj")
