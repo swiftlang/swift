@@ -4491,7 +4491,7 @@ public:
 
     dtor->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
+    dtor->setAccess(std::max(cast<NominalTypeDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
     if (isImplicit)
