@@ -683,14 +683,28 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  ContinuationAsyncContextTy = createStructType(
-      *this, "swift.continuation_context",
-      {SwiftContextTy,       // AsyncContext header
-       SizeTy,               // flags
-       SizeTy,               // await synchronization
-       ErrorPtrTy,           // error result pointer
-       OpaquePtrTy,          // normal result address
-       SwiftExecutorTy});    // resume to executor
+  if (Context.LangOpts.isConcurrencyModelTaskToThread()) {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy,      // resume to executor
+         SizeTy                // pointer to condition variable
+         });
+  } else {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy       // resume to executor
+         });
+  }
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
