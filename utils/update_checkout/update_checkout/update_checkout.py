@@ -268,7 +268,19 @@ def update_single_repository(pool_args):
 
 
 def get_timestamp_to_match(match_timestamp, source_root):
-    # type: (str, str) -> str | None
+    # type: (str | None, str) -> str | None
+    """Computes a timestamp of the last commit on the current branch in
+    the `swift` repository.
+
+    Args:
+        match_timestamp (str | None): value of `--match-timestamp` to check.
+        source_root (str): directory that contains sources of the Swift project.
+
+    Returns:
+        str | None: a timestamp of the last commit of `swift` repository if
+        `match_timestamp` argument has a value, `None` if `match_timestamp` is
+        falsy.
+    """    
     if not match_timestamp:
         return None
     with shell.pushd(os.path.join(source_root, "swift"),
@@ -511,15 +523,21 @@ def full_target_name(repository, target):
     raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
 
 
-def skip_list_for_platform(config):
-    """Computes a list of repositories to skip when updating or cloning.
+def skip_list_for_platform(config, all_repos):
+    """Computes a list of repositories to skip when updating or cloning, if not
+    overriden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
+        all_repos (List[str]): repositories not required for current platform.
 
     Returns:
-        List[str]: a resulting list of repositories to skip.
+        List[str]: a resulting list of repositories to skip or empty list if
+        `all_repos` is not empty.
     """
+
+    if all_repos:
+        return []  # Do not skip any platform-specific repositories
 
     # If there is a platforms key only include the repo if the
     # platform is in the list
@@ -647,6 +665,7 @@ repositories.
     skip_tags = args.skip_tags
     scheme_name = args.scheme
     github_comment = args.github_comment
+    all_repos = args.all_repositories
 
     with open(args.config) as f:
         config = json.load(f)
@@ -669,7 +688,7 @@ repositories.
 
     clone_results = None
     if clone or clone_with_ssh:
-        skip_repo_list = skip_list_for_platform(config)
+        skip_repo_list = skip_list_for_platform(config, all_repos)
         skip_repo_list.extend(args.skip_repository_list)
         clone_results = obtain_all_additional_swift_sources(args, config,
                                                             clone_with_ssh,
