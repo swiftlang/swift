@@ -569,6 +569,7 @@ namespace irgen {
     /// Given that this callee is an ObjC method, return the receiver
     /// argument.  This might not be 'self' anymore.
     llvm::Value *getObjCMethodSelector() const;
+    bool isDirectObjCMethod() const;
   };
 
   FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn);
