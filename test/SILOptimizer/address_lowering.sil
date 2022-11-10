@@ -1614,7 +1614,7 @@ bb3:
 }
 
 // Test the result being stored into an @out enum.
-// CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>, [[INSTANCE:%[^,]+]] : @owned $TestGeneric<Element>):
 // CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Optional<T>
 // CHECK:         [[CAST_DEST_ADDR:%[^,]+]] = init_enum_data_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
