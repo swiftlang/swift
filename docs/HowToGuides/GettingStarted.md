@@ -238,11 +238,20 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --swift-disable-dead-stripping
      ```
+     > **Warning**  
+     > On Macs with Apple silicon (arm64), pass `--bootstrapping=off`.
+     > (https://github.com/apple/swift/issues/62017)
+
    - Linux:
      ```sh
      utils/build-script --release-debuginfo --skip-early-swift-driver \
        --skip-early-swiftsyntax
      ```
+
+   > **Note**  
+   > If you aren't planning to edit the parts of the compiler that are written
+   > in Swift, pass `--bootstrapping=off` to speed up local development.
+
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
    If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
