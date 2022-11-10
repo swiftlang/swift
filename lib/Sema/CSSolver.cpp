@@ -90,7 +90,7 @@ Solution ConstraintSystem::finalize() {
 
     case FreeTypeVariableBinding::Allow:
       break;
-        
+
     case FreeTypeVariableBinding::UnresolvedType:
       assignFixedType(tv, ctx.TheUnresolvedType);
       break;
@@ -99,6 +99,12 @@ Solution ConstraintSystem::finalize() {
 
   // For each of the type variables, get its fixed type.
   for (auto tv : getTypeVariables()) {
+    // This type variable has no binding. Allowed only
+    // when `FreeTypeVariableBinding::Allow` is set,
+    // which is checked above.
+    if (!getFixedType(tv))
+      continue;
+
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
@@ -221,8 +227,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
-    if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateState=*/false);
+    if (getFixedType(binding.first))
+      continue;
+
+    assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
