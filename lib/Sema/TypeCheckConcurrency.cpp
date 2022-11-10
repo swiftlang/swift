@@ -1303,11 +1303,19 @@ static void noteIsolatedActorMember(
   // FIXME: Make this diagnostic more sensitive to the isolation context of
   // the declaration.
   if (isDistributedActor) {
-    if (isa<VarDecl>(decl)) {
-      // Distributed actor properties are never accessible externally.
-      decl->diagnose(diag::distributed_actor_isolated_property,
-                     decl->getDescriptiveKind(), decl->getName(),
-                     nominal->getName());
+    if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+      if (varDecl->isDistributed()) {
+        // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
+        decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      } else {
+        // Distributed actor properties are never accessible externally.
+        decl->diagnose(diag::distributed_actor_isolated_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      }
+
     } else {
       // it's a function or subscript
       decl->diagnose(diag::note_distributed_actor_isolated_method,
