@@ -26,13 +26,13 @@ We describe how to build both standalone and with build-script below.
 
 ### build-script invoking CMake
 
-By default, Swift benchmarks for OS X are compiled during the Swift build
+By default, Swift benchmarks for macOS are compiled during the Swift build
 process. To build Swift benchmarks for additional platforms, pass the following
 flags:
 
     $ swift/utils/build-script --ios --watchos --tvos
 
-OS X benchmark driver binaries are placed in `bin` alongside `swiftc`.
+macOS benchmark driver binaries are placed in `bin` alongside `swiftc`.
 Additional platform binaries are placed in the `benchmark/bin` build directory.
 
 The required Swift standard library dylibs are placed in `lib`. The
