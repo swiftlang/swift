@@ -3520,6 +3520,7 @@ static void dumpSubstitutionMapRec(
     if (replacementTypes[i]) {
       PrintOptions opts;
       opts.PrintForSIL = true;
+      opts.PrintTypesForDebugging = true;
       replacementTypes[i]->print(out, opts);
     }
     else
