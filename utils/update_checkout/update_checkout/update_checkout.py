@@ -75,6 +75,18 @@ def check_parallel_results(results, op):
 
 
 def confirm_tag_in_repo(tag, repo_name):
+    """Confirm that a given tag exists in a git repository. This function
+    assumes that the repository is already a current working directory before
+    it's called.
+
+    Args:
+        tag (str): tag to look up in the repository
+        repo_name (str): name the repository for the look up, used for logging
+
+    Returns:
+        str: returns `tag` argument value or `None` if the tag doesn't exist.
+    """
+
     tag_exists = shell.capture(['git', 'ls-remote', '--tags',
                                 'origin', tag], echo=False)
     if not tag_exists:
@@ -255,10 +267,11 @@ def update_single_repository(pool_args):
         return value
 
 
-def get_timestamp_to_match(args):
-    if not args.match_timestamp:
+def get_timestamp_to_match(match_timestamp, source_root):
+    # type: (str, str) -> str | None
+    if not match_timestamp:
         return None
-    with shell.pushd(os.path.join(args.source_root, "swift"),
+    with shell.pushd(os.path.join(source_root, "swift"),
                      dry_run=False, echo=False):
         return shell.capture(["git", "log", "-1", "--format=%cI"],
                              echo=False).strip()
@@ -289,7 +302,7 @@ def get_scheme_map(config, scheme_name):
 
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
     pool_args = []
-    timestamp = get_timestamp_to_match(args)
+    timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
             print("Skipping update of '" + repo_name + "', requested by user")
@@ -498,9 +511,15 @@ def full_target_name(repository, target):
     raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
 
 
-def skip_list_for_platform(config, all_repos):
-    if all_repos:
-        return []  # Do not skip any platform-specific repositories
+def skip_list_for_platform(config):
+    """Computes a list of repositories to skip when updating or cloning.
+
+    Args:
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`
+
+    Returns:
+        List[str]: a resulting list of repositories to skip.
+    """
 
     # If there is a platforms key only include the repo if the
     # platform is in the list
@@ -628,7 +647,6 @@ repositories.
     skip_tags = args.skip_tags
     scheme_name = args.scheme
     github_comment = args.github_comment
-    all_repos = args.all_repositories
 
     with open(args.config) as f:
         config = json.load(f)
@@ -649,8 +667,19 @@ repositories.
 
     scheme_map = get_scheme_map(config, scheme_name)
 
+    clone_results = None
+    if clone or clone_with_ssh:
+        skip_repo_list = skip_list_for_platform(config)
+        skip_repo_list.extend(args.skip_repository_list)
+        clone_results = obtain_all_additional_swift_sources(args, config,
+                                                            clone_with_ssh,
+                                                            scheme_name,
+                                                            skip_history,
+                                                            skip_tags,
+                                                            skip_repo_list)
+
     swift_repo_path = os.path.join(args.source_root, 'swift')
-    if os.path.exists(swift_repo_path):
+    if not 'swift' in skip_repo_list and os.path.exists(swift_repo_path):
         with shell.pushd(swift_repo_path, dry_run=False, echo=True):
             # Check if `swift` repo itself needs to switch to a cross-repo branch.
             branch_name, cross_repo = get_branch_for_repo(config, 'swift',
@@ -674,17 +703,6 @@ repositories.
     if args.dump_hashes_config:
         dump_repo_hashes(args, config, args.dump_hashes_config)
         return (None, None)
-
-    clone_results = None
-    if clone or clone_with_ssh:
-        skip_repo_list = skip_list_for_platform(config, all_repos)
-        skip_repo_list.extend(args.skip_repository_list)
-        clone_results = obtain_all_additional_swift_sources(args, config,
-                                                            clone_with_ssh,
-                                                            scheme_name,
-                                                            skip_history,
-                                                            skip_tags,
-                                                            skip_repo_list)
 
     # Quick check whether somebody is calling update in an empty directory
     directory_contents = os.listdir(args.source_root)
