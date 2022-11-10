@@ -5468,7 +5468,7 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
   // Now create the verification of the withoutActuallyEscaping operand.
-  // Either we fail the uniquenes check (which means the closure has escaped)
+  // Either we fail the uniqueness check (which means the closure has escaped)
   // and abort or we continue and destroy the ultimate reference.
   auto isEscaping = SGF.B.createIsEscapingClosure(
       loc, borrowedClosure.getValue(),
