@@ -844,7 +844,9 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     // Note that solution is removed here. This is done
     // because we want build a single complete solution
     // incrementally.
-    CS.applySolution(Solutions.pop_back_val());
+    auto solution = Solutions.pop_back_val();
+    CS.applySolution(solution);
+    CumulativeScore += solution.getFixedScore();
   }
 
   // Make sure that element is solved in isolation
@@ -987,12 +989,9 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
           CS.applySolution(solution);
 
-          // `applySolution` changes best/current scores
-          // of the constraint system, so they have to be
-          // restored right afterwards because score of the
-          // element does contribute to the overall score.
-          restoreBestScore();
-          restoreCurrentScore(solution.getFixedScore());
+          // `applySolution` applies the solution score to the constraint
+          // system, but it needs to be added to the score of the outer scope.
+          applySolutionScoreToOuter(solution.getFixedScore());
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
@@ -1023,7 +1022,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       }
 
       auto solution = Solutions.pop_back_val();
-      auto score = solution.getFixedScore();
+      CumulativeScore += solution.getFixedScore();
 
       // Restore outer type variables and prepare to solve
       // constraints associated with outer context together
@@ -1031,7 +1030,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       Snapshot->setupOuterContext(std::move(solution));
 
       // Pretend that conjunction never happened.
-      restoreOuterState(score);
+      restoreOuterState(CumulativeScore);
 
       // Now that all of the information from the conjunction has
       // been applied, let's attempt to solve the outer scope.
@@ -1046,8 +1045,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
   // Restore best/current score, since upcoming step is going to
   // work with outer scope in relation to the conjunction.
-  restoreBestScore();
-  restoreCurrentScore(solutionScore);
+  applySolutionScoreToOuter(solutionScore);
 
   // Active all of the previously out-of-scope constraints
   // because conjunction can propagate type information up

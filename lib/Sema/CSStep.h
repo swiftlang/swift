@@ -965,6 +965,8 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// in isolated mode.
   SmallVector<Solution, 4> IsolatedSolutions;
 
+  Score CumulativeScore;
+
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
                   SmallVectorImpl<Solution> &solutions)
@@ -994,13 +996,10 @@ public:
     // Restore conjunction constraint.
     restore(AfterConjunction, Conjunction);
 
-    // Restore best score only if conjunction fails because
+    // Restore current score only if conjunction fails because
     // successful outcome should keep a score set by `restoreOuterState`.
-    if (HadFailure) {
-      auto solutionScore = Score();
-      restoreBestScore();
-      restoreCurrentScore(solutionScore);
-    }
+    if (HadFailure)
+      restoreCurrentScore();
 
     if (OuterTimeRemaining) {
       auto anchor = OuterTimeRemaining->first;
@@ -1052,13 +1051,17 @@ protected:
 
 private:
   /// Restore best and current scores as they were before conjunction.
-  void restoreCurrentScore(const Score &solutionScore) const {
+  void restoreCurrentScore() const {
     CS.CurrentScore = CurrentScore;
-    CS.increaseScore(SK_Fix, solutionScore.Data[SK_Fix]);
-    CS.increaseScore(SK_Hole, solutionScore.Data[SK_Hole]);
+    CS.solverState->BestScore = BestScore;
   }
 
-  void restoreBestScore() const { CS.solverState->BestScore = BestScore; }
+  /// Restore best and current scores as they were before conjunction,
+  /// with the score of a given solution applied on top.
+  void applySolutionScoreToOuter(const Score &solutionScore) const {
+    restoreCurrentScore();
+    CS.CurrentScore += solutionScore;
+  }
 
   // Restore constraint system state before conjunction.
   //

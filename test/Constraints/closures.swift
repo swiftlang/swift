@@ -1224,3 +1224,6 @@ func closureWithCaseArchetype<T>(_: T.Type) {
     }
   }
 }
+
+// Make sure we can type-check this without ambiguities.
+let _ = { (); return 1 }() + { (); return 2 }()
