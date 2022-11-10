@@ -3586,10 +3586,7 @@ namespace {
       B.add(metadata);
     }
 
-    void addLayoutStringPointer() {
-      // TODO: really add the pointer
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
+    void addLayoutStringPointer() { B.addNullPointer(IGM.Int8PtrTy); }
 
     void addDestructorFunction() {
       if (asImpl().getFieldLayout().hasObjCImplementation())
@@ -4784,13 +4781,33 @@ namespace {
       return emitValueWitnessTable(relativeReference);
     }
 
-    void addLayoutStringPointer() {
-      // TODO: really add the pointer
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
-
     void addValueWitnessTable() {
       B.add(asImpl().getValueWitnessTable(false).getValue());
+    }
+
+    llvm::Constant *emitLayoutString() {
+      auto lowered = getLoweredType();
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto layoutStr = typeLayoutEntry.layoutString(IGM);
+      // assert(layoutStr && "Failed to make layout string");
+      if (!layoutStr) {
+        return nullptr;
+      }
+      llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
+          llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
+      return layoutArray;
+    }
+
+    llvm::Constant *getLayoutString() {
+      return emitLayoutString();
+    }
+
+    void addLayoutStringPointer() {
+      if (auto *layoutString = getLayoutString()) {
+        B.add(layoutString);
+      } else {
+        B.addNullPointer(IGM.Int8PtrTy);
+      }
     }
 
     void addFieldOffset(VarDecl *var) {

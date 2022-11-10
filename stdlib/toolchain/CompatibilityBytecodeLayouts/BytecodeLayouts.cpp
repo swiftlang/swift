@@ -413,6 +413,8 @@ size_t computeSize(const uint8_t *typeLayout, Metadata *metadata) {
     return 4;
   case LayoutType::I64:
     return 8;
+  case LayoutType::I128:
+    return 16;
   case LayoutType::ErrorReference:
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
@@ -462,6 +464,8 @@ BitVector spareBits(const uint8_t *typeLayout, Metadata *metadata) {
     return BitVector(32);
   case LayoutType::I64:
     return BitVector(64);
+  case LayoutType::I128:
+    return BitVector(128);
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
   case LayoutType::NativeWeakReference:
@@ -698,6 +702,7 @@ uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
   case LayoutType::I16:
   case LayoutType::I32:
   case LayoutType::I64:
+  case LayoutType::I128:
     assert(false && "cannot get enum tag from Int types");
     return UINT32_MAX;
   case LayoutType::AlignedGroup: {
@@ -771,6 +776,7 @@ uint32_t numExtraInhabitants(const uint8_t *layoutString, Metadata *metadata) {
   case LayoutType::I16:
   case LayoutType::I32:
   case LayoutType::I64:
+  case LayoutType::I128:
     return 0;
   case LayoutType::AlignedGroup: {
     // Pick the field with the most number of extra inhabitants and return that
@@ -930,6 +936,7 @@ swift_generic_destroy(void *address, void *metadata,
   case LayoutType::I16:
   case LayoutType::I32:
   case LayoutType::I64:
+  case LayoutType::I128:
     return;
   case LayoutType::ErrorReference:
     swift_errorRelease(*(SwiftError **)addr);
@@ -1119,6 +1126,9 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     return;
   case LayoutType::I64:
     memcpy(dest, src, 8);
+    return;
+  case LayoutType::I128:
+    memcpy(dest, src, 16);
     return;
   case LayoutType::ErrorReference:
     *(void **)dest =

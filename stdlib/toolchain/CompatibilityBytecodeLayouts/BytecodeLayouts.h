@@ -94,6 +94,7 @@ enum class LayoutType : char {
   I16 = 's',
   I32 = 'l',
   I64 = 'L',
+  I128 = 'Q',
   ErrorReference = 'r',
   NativeStrongReference = 'N',
   NativeUnownedReference = 'n',

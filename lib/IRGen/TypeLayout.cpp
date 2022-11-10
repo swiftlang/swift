@@ -69,6 +69,26 @@ static bool isNullableRefCounted(ScalarKind kind) {
   }
 }
 
+static std::string scalarToString(ScalarKind kind) {
+  switch (kind) {
+  case ScalarKind::ErrorReference: return "ErrorReference";
+  case ScalarKind::NativeStrongReference: return "NativeStrongReference";
+  case ScalarKind::NativeUnownedReference: return "NativeUnownedReference";
+  case ScalarKind::NativeWeakReference: return "NativeWeakReference";
+  case ScalarKind::UnknownUnownedReference: return "UnknownUnownedReference";
+  case ScalarKind::UnknownWeakReference: return "UnknownWeakReference";
+  case ScalarKind::UnknownReference: return "UnknownReference";
+  case ScalarKind::BlockReference: return "BlockReference";
+  case ScalarKind::BridgeReference: return "BridgeReference";
+  case ScalarKind::ObjCReference: return "ObjCReference";
+  case ScalarKind::POD: return "POD";
+  case ScalarKind::Immovable: return "Immovable";
+  case ScalarKind::BlockStorage: return "BlockStorage";
+  case ScalarKind::ThickFunc: return "ThickFunc";
+  case ScalarKind::ExistentialReference: return "ExistentialReference";
+  }
+}
+
 TypeLayoutEntry::~TypeLayoutEntry() {}
 
 void TypeLayoutEntry::computeProperties() {
@@ -798,6 +818,8 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
       return {{'l'}};
     case 64:
       return {{'L'}};
+    case 128:
+      return {{'Q'}};
     default:
       assert(false && "unsupported size");
     }
@@ -1034,6 +1056,7 @@ bool ScalarTypeLayoutEntry::classof(const TypeLayoutEntry *entry) {
 LLVM_DUMP_METHOD void ScalarTypeLayoutEntry::dump() const {
   if (typeInfo.isFixedSize())
     llvm::dbgs() << "{ scalar isFixedSize:" << (bool)typeInfo.isFixedSize()
+                 << " scalarKind: " << scalarToString(scalarKind)
                  << " isLoadable: " << (bool)typeInfo.isLoadable() << " size: "
                  << cast<FixedTypeInfo>(typeInfo).getFixedSize().getValue()
                  << " alignment: "
@@ -3087,11 +3110,10 @@ TypeInfoBasedTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 void TypeInfoBasedTypeLayoutEntry::destroy(IRGenFunction &IGF,
                                            Address addr) const {
   auto alignment = typeInfo.getFixedAlignment();
-  auto storageTy = typeInfo.getStorageType();
-  auto addressType = storageTy->getPointerTo();
-  auto &Builder = IGF.Builder;
-  addr = Address(Builder.CreateBitCast(addr.getAddress(), addressType),
-                 storageTy, alignment);
+  auto addressType = typeInfo.getStorageType();
+  auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                             addressType->getPointerTo());
+  addr = Address(castAddr, addressType, alignment);
   typeInfo.destroy(IGF, addr, representative, true);
 }
 
@@ -3196,7 +3218,7 @@ TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void TypeInfoBasedTypeLayoutEntry::dump() const {
   if (typeInfo.isFixedSize())
-    llvm::dbgs() << "{ scalar isFixedSize:" << (bool)typeInfo.isFixedSize()
+    llvm::dbgs() << "{ scalar (TLB) isFixedSize:" << (bool)typeInfo.isFixedSize()
                  << " isLoadable: " << (bool)typeInfo.isLoadable() << " size: "
                  << cast<FixedTypeInfo>(typeInfo).getFixedSize().getValue()
                  << " alignment: "
