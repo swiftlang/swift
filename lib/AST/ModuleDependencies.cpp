@@ -230,7 +230,7 @@ GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()
                          clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
                          clang::tooling::dependencies::ScanningOutputFormat::Full,
                          clang::CASOptions(),
-                         /* Cache */ nullptr,
+                         /* Cache (llvm::cas::ActionCache) */ nullptr,
                          /* SharedFS */ nullptr,
                          /* ReuseFileManager */ false,
                          /* OptimizeArgs */ false) {}

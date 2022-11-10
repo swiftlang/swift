@@ -22,26 +22,32 @@
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift;
 
 using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
-static std::string lookupModuleOutput(const ModuleID &MID,
-                                      ModuleOutputKind MOK) {
-  // Deciding the output paths is done in swift-driver.
+static std::string moduleCacheRelativeLookupModuleOutput(const ModuleID &MID,
+                                                         ModuleOutputKind MOK,
+                                                         const std::string &moduleCachePathStr) {
+  llvm::SmallString<128> outputPath(moduleCachePathStr);
+  llvm::sys::path::append(outputPath, MID.ModuleName + "-" + MID.ContextHash);
   switch (MOK) {
   case ModuleOutputKind::ModuleFile:
-    return "<replace-me>";
+    llvm::sys::path::replace_extension(outputPath, getExtension(swift::file_types::TY_ClangModuleFile));
+    break;
   case ModuleOutputKind::DependencyFile:
-    return "<replace-me>";
+    llvm::sys::path::replace_extension(outputPath, getExtension(swift::file_types::TY_Dependencies));
+    break;
   case ModuleOutputKind::DependencyTargets:
     return MID.ModuleName + "-" + MID.ContextHash;
   case ModuleOutputKind::DiagnosticSerializationFile:
-    return "<replace-me>";
+    llvm::sys::path::replace_extension(outputPath, getExtension(swift::file_types::TY_SerializedDiagnostics));
+    break;
   }
-  llvm_unreachable("Fully covered switch above!");
+  return outputPath.str().str();
 }
 
 // Add search paths.
@@ -228,6 +234,12 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     workingDir = *(clangWorkingDirPos - 1);
   }
 
+  auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
+  auto lookupModuleOutput = [moduleCachePath] (const ModuleID &MID,
+                                               ModuleOutputKind MOK) -> std::string {
+    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
+  };
+
   auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
       commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
       lookupModuleOutput, moduleName);
@@ -283,6 +295,12 @@ bool ClangImporter::addBridgingHeaderDependencies(
     getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+
+  auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
+  auto lookupModuleOutput = [moduleCachePath] (const ModuleID &MID,
+                                               ModuleOutputKind MOK) -> std::string {
+    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
+  };
 
   auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
       commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
