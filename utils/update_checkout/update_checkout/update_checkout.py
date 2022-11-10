@@ -75,6 +75,7 @@ def check_parallel_results(results, op):
 
 
 def confirm_tag_in_repo(tag, repo_name):
+    # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
     it's called.
@@ -84,7 +85,8 @@ def confirm_tag_in_repo(tag, repo_name):
         repo_name (str): name the repository for the look up, used for logging
 
     Returns:
-        str: returns `tag` argument value or `None` if the tag doesn't exist.
+        str | None: returns `tag` argument value or `None` if the tag doesn't
+        exist.
     """
 
     tag_exists = shell.capture(['git', 'ls-remote', '--tags',
@@ -280,7 +282,7 @@ def get_timestamp_to_match(match_timestamp, source_root):
         str | None: a timestamp of the last commit of `swift` repository if
         `match_timestamp` argument has a value, `None` if `match_timestamp` is
         falsy.
-    """    
+    """
     if not match_timestamp:
         return None
     with shell.pushd(os.path.join(source_root, "swift"),
@@ -687,6 +689,7 @@ repositories.
     scheme_map = get_scheme_map(config, scheme_name)
 
     clone_results = None
+    skip_repo_list = []
     if clone or clone_with_ssh:
         skip_repo_list = skip_list_for_platform(config, all_repos)
         skip_repo_list.extend(args.skip_repository_list)
@@ -698,7 +701,7 @@ repositories.
                                                             skip_repo_list)
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
-    if not 'swift' in skip_repo_list and os.path.exists(swift_repo_path):
+    if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):
         with shell.pushd(swift_repo_path, dry_run=False, echo=True):
             # Check if `swift` repo itself needs to switch to a cross-repo branch.
             branch_name, cross_repo = get_branch_for_repo(config, 'swift',
