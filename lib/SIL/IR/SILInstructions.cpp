@@ -199,15 +199,23 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                  Var ? Var->Type.hasValue() : false,
                                  Var ? Var->Loc.hasValue() : false,
                                  Var ? Var->Scope != nullptr : false),
-      VarInfo(Var, getTrailingObjects<char>(),
-                   getTrailingObjects<SILType>(),
-                   getTrailingObjects<SILLocation>(),
-                   getTrailingObjects<const SILDebugScope *>(),
-                   getTrailingObjects<SILDIExprElement>()) {
+      // Initialize VarInfo with a temporary raw value of 0. The real
+      // initialization can only be done after `numOperands` is set (see below).
+      VarInfo(0) {
   sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = isLexical;
   sharedUInt8().AllocStackInst.wasMoved = wasMoved;
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
+
+  // VarInfo must be initialized after `sharedUInt32().AllocStackInst.numOperands`!
+  // Otherwise the trailing object addresses are wrong.
+  VarInfo = TailAllocatedDebugVariable(Var,
+               getTrailingObjects<char>(),
+               getTrailingObjects<SILType>(),
+               getTrailingObjects<SILLocation>(),
+               getTrailingObjects<const SILDebugScope *>(),
+               getTrailingObjects<SILDIExprElement>());
+
   assert(sharedUInt32().AllocStackInst.numOperands ==
          TypeDependentOperands.size() && "Truncation");
   auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
