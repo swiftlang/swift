@@ -3364,6 +3364,7 @@ ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
   if (trySubstitution(node, entry))
     return ManglingError::Success;
 
+  DEMANGLER_ASSERT(node->getNumChildren() >= 3, node);
   RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   auto boundGenerics = node->getChild(2);
   for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
