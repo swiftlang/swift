@@ -1499,7 +1499,8 @@ public:
 
   Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind);
+                         FunctionPointerKind kind,
+                         bool forStaticCall = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

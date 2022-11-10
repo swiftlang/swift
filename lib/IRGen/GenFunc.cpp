@@ -120,43 +120,51 @@ using namespace irgen;
 namespace {
   /// Information about the IR-level signature of a function type.
   class FuncSignatureInfo {
-  private:
+  protected:
     /// The SIL function type being represented.
     const CanSILFunctionType FormalType;
-    
+
     mutable Signature TheSignature;
-    
+
   public:
     FuncSignatureInfo(CanSILFunctionType formalType)
       : FormalType(formalType) {}
-    
+
     Signature getSignature(IRGenModule &IGM) const;
   };
 
+  class ObjCFuncSignatureInfo : public FuncSignatureInfo {
+  private:
+    mutable Signature TheDirectSignature;
+
+  public:
+    ObjCFuncSignatureInfo(CanSILFunctionType formalType)
+      : FuncSignatureInfo(formalType) {}
+
+    Signature getDirectSignature(IRGenModule &IGM) const;
+  };
+
   /// The @thin function type-info class.
-  class ThinFuncTypeInfo : public PODSingleScalarTypeInfo<ThinFuncTypeInfo,
-                                                          LoadableTypeInfo>,
-                           public FuncSignatureInfo {
-    ThinFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+  template <class Derived>
+  class ThinFuncTypeInfoImpl :
+    public PODSingleScalarTypeInfo<Derived, LoadableTypeInfo> {
+
+  protected:
+    const Derived &asDerived() const {
+      return static_cast<const Derived &>(*this);
+    }
+
+    ThinFuncTypeInfoImpl(CanSILFunctionType formalType, llvm::Type *storageType,
                      Size size, Alignment align,
                      const SpareBitVector &spareBits)
-      : PODSingleScalarTypeInfo(storageType, size, spareBits, align),
-        FuncSignatureInfo(formalType)
+      : PODSingleScalarTypeInfo<Derived, LoadableTypeInfo>(storageType, size, spareBits, align)
     {
     }
 
   public:
-    static const ThinFuncTypeInfo *create(CanSILFunctionType formalType,
-                                          llvm::Type *storageType,
-                                          Size size, Alignment align,
-                                          const SpareBitVector &spareBits) {
-      return new ThinFuncTypeInfo(formalType, storageType, size, align,
-                                  spareBits);
-    }
-
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -188,6 +196,49 @@ namespace {
                .storeExtraInhabitant(IGF, index, dest);
     }
   };
+
+  /// The @thin function type-info class.
+  class ThinFuncTypeInfo : public ThinFuncTypeInfoImpl<ThinFuncTypeInfo>,
+                           public FuncSignatureInfo {
+  public:
+
+    ThinFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                     Size size, Alignment align,
+                     const SpareBitVector &spareBits) :
+      ThinFuncTypeInfoImpl(formalType, storageType, size, align, spareBits),
+      FuncSignatureInfo(formalType) {}
+
+
+    static const ThinFuncTypeInfo *create(CanSILFunctionType formalType,
+                                          llvm::Type *storageType,
+                                          Size size, Alignment align,
+                                          const SpareBitVector &spareBits) {
+      return new ThinFuncTypeInfo(formalType, storageType, size, align,
+                                  spareBits);
+    }
+  };
+
+  /// The (objc_method) function type-info class.
+  class ObjCFuncTypeInfo : public ThinFuncTypeInfoImpl<ThinFuncTypeInfo>,
+                           public ObjCFuncSignatureInfo {
+  public:
+
+    ObjCFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                     Size size, Alignment align,
+                     const SpareBitVector &spareBits) :
+      ThinFuncTypeInfoImpl(formalType, storageType, size, align, spareBits),
+      ObjCFuncSignatureInfo(formalType) {}
+
+
+    static const ObjCFuncTypeInfo *create(CanSILFunctionType formalType,
+                                          llvm::Type *storageType,
+                                          Size size, Alignment align,
+                                          const SpareBitVector &spareBits) {
+      return new ObjCFuncTypeInfo(formalType, storageType, size, align,
+                                  spareBits);
+    }
+  };
+
 
   /// The @thick function type-info class.
   class FuncTypeInfo :
@@ -530,10 +581,15 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
-  case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Closure:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
+                                    IGM.FunctionPtrTy,
+                                    IGM.getPointerSize(),
+                                    IGM.getPointerAlignment(),
+                                    IGM.getFunctionPointerSpareBits());
+  case SILFunctionType::Representation::ObjCMethod:
+    return ObjCFuncTypeInfo::create(CanSILFunctionType(T),
                                     IGM.FunctionPtrTy,
                                     IGM.getPointerSize(),
                                     IGM.getPointerAlignment(),
@@ -575,6 +631,19 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
   return TheSignature;
 }
 
+Signature ObjCFuncSignatureInfo::getDirectSignature(IRGenModule &IGM) const {
+  // If it's already been filled in, we're done.
+  if (TheDirectSignature.isValid())
+    return TheDirectSignature;
+
+  // Update the cache and return.
+  TheDirectSignature = Signature::getUncached(IGM, FormalType,
+                                        FunctionPointerKind(FormalType),
+                                        /*forStaticCall*/ true);
+  assert(TheDirectSignature.isValid());
+  return TheDirectSignature;
+}
+
 static const FuncSignatureInfo &
 getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   auto &ti = IGM.getTypeInfoForLowered(type);
@@ -586,9 +655,10 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
-  case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Closure:
     return ti.as<ThinFuncTypeInfo>();
+  case SILFunctionType::Representation::ObjCMethod:
+    return static_cast<const FuncSignatureInfo &>(ti.as<ObjCFuncTypeInfo>());
   case SILFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
   }
@@ -600,12 +670,19 @@ Signature IRGenModule::getSignature(CanSILFunctionType type) {
 }
 
 Signature IRGenModule::getSignature(CanSILFunctionType type,
-                                    FunctionPointerKind kind) {
+                                    FunctionPointerKind kind,
+                                    bool forStaticCall) {
   // Don't bother caching if we're working with a special kind.
   if (kind.isSpecial())
     return Signature::getUncached(*this, type, kind);
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
+
+  if (forStaticCall &&
+      type->getRepresentation() == SILFunctionType::Representation::ObjCMethod) {
+    auto &objcSigInfo = static_cast<const ObjCFuncSignatureInfo &>(sigInfo);
+    return objcSigInfo.getDirectSignature(*this);
+  }
   return sigInfo.getSignature(*this);
 }
 

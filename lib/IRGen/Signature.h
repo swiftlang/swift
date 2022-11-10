@@ -201,7 +201,8 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               FunctionPointerKind kind);
+                               FunctionPointerKind kind,
+                               bool forStaticCall = false);
 
   static SignatureExpansionABIDetails
   getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,

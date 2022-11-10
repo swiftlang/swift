@@ -817,10 +817,8 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
 
 Callee irgen::getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer &fn,
                                         llvm::Value *selfValue) {
-  // Direct calls to Objective-C methods have a selector value of `undef`.
-  auto selectorType = fn.getFunctionType()->getParamType(1);
-  auto selectorValue = llvm::UndefValue::get(selectorType);
-  return Callee(std::move(info), fn, selfValue, selectorValue);
+  // Direct calls to Objective-C methods don't have a selector value.
+  return Callee(std::move(info), fn, selfValue, nullptr);
 }
 
 /// Call [self allocWithZone: nil].
