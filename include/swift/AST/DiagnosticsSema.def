@@ -4981,6 +4981,9 @@ ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
       (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
+      "access to %0 %1 from outside the distributed actor %2 must be asynchronous",
+      (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
