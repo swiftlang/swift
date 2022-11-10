@@ -1590,9 +1590,12 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
 
   emitAbstractFuncDecl(dd);
 
-  // Emit the deallocating destructor.
-  SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
-  emitFunctionDefinition(deallocator, getFunction(deallocator, ForDefinition));
+  // Emit the deallocating destructor if we have a body.
+  if (dd->hasBody()) {
+    SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
+    emitFunctionDefinition(deallocator,
+                           getFunction(deallocator, ForDefinition));
+  }
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
