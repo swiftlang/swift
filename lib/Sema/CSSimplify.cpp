@@ -10797,8 +10797,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   setSolutionApplicationTarget(closure, target);
 
   // Generate constraints from the body of this closure.
-  return !generateConstraints(
-      AnyFunctionRef(cast<AbstractClosureExpr>(closure)), closure->getBody());
+  return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
 }
 
 ConstraintSystem::SolutionKind
