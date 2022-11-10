@@ -352,7 +352,7 @@ public:
 
   /// Add an arbitrary argument source to these arguments.
   ///
-  /// An argument list with an arbtrary argument source can't generally
+  /// An argument list with an arbitrary argument source can't generally
   /// be copied.
   void addArbitrary(ArgumentSource &&arg) {
     assert(!isNull());
