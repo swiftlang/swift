@@ -474,6 +474,7 @@ public:
                                 Address enumAddr) const;
 
   bool isMultiPayloadEnum() const;
+  bool isSingleton() const;
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;

@@ -388,16 +388,21 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-       if (ElementsWithPayload.empty())
-         return IGM.typeLayoutCache.getEmptyEntry();
-       if (!ElementsAreABIAccessible)
-         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
-       if (TIK >= Loadable) {
-         return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
-       }
+      if (ElementsWithPayload.empty())
+        return IGM.typeLayoutCache.getEmptyEntry();
+      if (!ElementsAreABIAccessible)
+        return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+      if (TIK >= Loadable) {
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+      }
 
-       return getSingleton()->buildTypeLayoutEntry(IGM,
-                                                   getSingletonType(IGM, T));
+      unsigned emptyCases = 0;
+      std::vector<TypeLayoutEntry *> nonEmptyCases;
+      nonEmptyCases.push_back(
+        getSingleton()->buildTypeLayoutEntry(IGM,
+                                             getSingletonType(IGM, T)));
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
+                                                      nonEmptyCases);
     }
 
     llvm::Value *
