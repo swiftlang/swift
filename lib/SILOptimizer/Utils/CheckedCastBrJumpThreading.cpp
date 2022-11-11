@@ -771,6 +771,9 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
+    if (edit->SuccessArg->isErased())
+      continue;
+
     BasicBlockCloner Cloner(edit->CCBBlock, deBlocks);
     if (!Cloner.canCloneBlock())
       continue;
