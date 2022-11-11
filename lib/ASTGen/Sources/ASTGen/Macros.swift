@@ -1,3 +1,4 @@
+import SwiftParser
 import SwiftSyntax
 @_spi(Testing) import _SwiftSyntaxMacros
 
@@ -104,20 +105,35 @@ extension ExportedMacro {
   }
 }
 
-/// Query the macro evaluation context of the given macro.
+/// Query the macro evaluation context given the evaluation
+/// context sources.
 @_cdecl("swift_ASTGen_getMacroEvaluationContext")
 public func getMacroEvaluationContext(
   sourceFilePtr: UnsafePointer<UInt8>,
   declContext: UnsafeMutableRawPointer,
   context: UnsafeMutableRawPointer,
-  macroPtr: UnsafeMutablePointer<UInt8>,
-  contextPtr: UnsafeMutablePointer<UnsafeMutableRawPointer?>
-) {
-  contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
-    return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
-      .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
-      .rawValue
+  evaluatedSourceBuffer: UnsafePointer<UInt8>,
+  evaluatedSourceBufferLength: Int
+) -> UnsafeMutableRawPointer? {
+  let evaluatedSource = UnsafeBufferPointer(
+      start: evaluatedSourceBuffer,
+      count: evaluatedSourceBufferLength
+  )
+  let sourceFile = Parser.parse(source: evaluatedSource)
+
+  // Dig out the top-level struct declaration. That's all we'll
+  // parse.
+  guard let structDecl = sourceFile.statements.first(
+    where: { item in item.item.is(StructDeclSyntax.self)
+    })?.item.as(StructDeclSyntax.self) else {
+    return nil
   }
+
+  // Parse and ASTGen that top-level declaration.
+  // FIXME: we need to emit diagnostics from this.
+  return ASTGenVisitor(
+    ctx: context, base: sourceFilePtr, declContext: declContext
+  ).visit(structDecl).rawValue
 }
 
 @_cdecl("swift_ASTGen_evaluateMacro")
