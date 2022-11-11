@@ -571,17 +571,9 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_variadic_generics :
-  Flag<["-"], "enable-experimental-variadic-generics">,
-  HelpText<"Enable experimental support for variadic generic types">;
-
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
-
-def enable_experimental_implicit_some :
-  Flag<["-"], "enable-experimental-implicit-some">,
-  HelpText<"Enable experimental implicit some">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
