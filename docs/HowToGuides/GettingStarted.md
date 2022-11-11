@@ -238,11 +238,20 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --swift-disable-dead-stripping
      ```
+     > **Warning**  
+     > On Macs with Apple silicon (arm64), pass `--bootstrapping=off`.
+     > (https://github.com/apple/swift/issues/62017)
+
    - Linux:
      ```sh
      utils/build-script --release-debuginfo --skip-early-swift-driver \
        --skip-early-swiftsyntax
      ```
+
+   > **Note**  
+   > If you aren't planning to edit the parts of the compiler that are written
+   > in Swift, pass `--bootstrapping=off` to speed up local development.
+
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
    If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
@@ -341,7 +350,7 @@ several more steps are necessary to set up this environment:
 * Create a new Xcode workspace.
 * Add the generated Xcode projects or Swift packages that are relevant to your
   tasks to your workspace. All the Xcode projects can be found among the
-  build artifacts in `build/Xcode-DebugAssert`. For example:
+  build artifacts under `build/Xcode-DebugAssert`. For example:
   * If you are aiming for the compiler, add `build/Xcode-DebugAssert/swift-macosx-*/Swift.xcodeproj`.
     This project also includes the standard library and runtime sources. If you
     need the parts of the compiler that are implemented in Swift itself, add the
@@ -366,14 +375,14 @@ several more steps are necessary to set up this environment:
 * For a Ninja target that you want to build (e.g. `swift-frontend`), add a
   target to the empty project, using the _External Build System_ template.
 * In the _Info_ pane of the target settings, set
-  * _Build Tool_ to the path of the `ninja` executable (the output of
+  * _Build Tool_ to the absolute path of the `ninja` executable (the output of
     `which ninja` on the command line)
   * _Arguments_ to the Ninja target name (e.g. `swift-frontend`)
-  * _Directory_ to the path of the build directory associated with the Ninja
-    target. For Swift targets, including the standard library and runtime, you
-    want `path/to/swift-project/build/Ninja-*/swift-macosx-*`
-* Add a scheme for the target. Be careful not to select a target from one of the
-  generated Xcode projects.
+  * _Directory_ to the absolute path of the directory where the Ninja target
+    lives. For Swift targets (the compiler, standard library, runtime, and
+    related tooling), this is the `build/Ninja-*/swift-macosx-*` directory.
+* Add a scheme for the target. In the drop-down menu, be careful not to mistake
+  your target for a similar one that belongs to a generated Xcode project.
 * > **Note**  
   > Ignore this step if the target associates to a non-executable Ninja target
     like `swift-stdlib`.
