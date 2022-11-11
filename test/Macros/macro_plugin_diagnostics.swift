@@ -6,6 +6,9 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+// rdar://102160067
+// UNSUPPORTED: CPU=arm64e
+
 // CHECK: <unknown>:{{.*}}: warning: compiler plugin module 'MacroDefinitionMissingAllMacros' (in {{.*}}/libMacroDefinitionMissingAllMacros.dylib) is missing a top-level computed property 'public var allMacros: [Any.Type]' to declare all macros; undeclared macros will be ignored
 
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))

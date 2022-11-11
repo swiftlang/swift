@@ -5,6 +5,9 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+// rdar://102160067
+// UNSUPPORTED: CPU=arm64e
+
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))
 
 // CHECK: (macro_expansion_expr type='(Int, String)' {{.*}} name=customStringify
