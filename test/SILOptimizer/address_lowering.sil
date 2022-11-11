@@ -1351,9 +1351,9 @@ entry(%instance : @owned $Pair<T>):
 // CHECK:       {{bb[0-9]+}}([[INDEX_OUT:%[^,]+]] : $*Self.Index, [[SELF:%[^,]+]] : $*Self):
 // CHECK:         [[MAYBE_INDEX_ADDR:%[^,]+]] = alloc_stack $Optional<Builtin.Int64>
 // CHECK:         try_apply {{%[^,]+}}<Self, Builtin.Int64>([[MAYBE_INDEX_ADDR]], [[SELF]]) : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error), normal [[YES_BLOCK:bb[0-9]+]], error [[NO_BLOCK:bb[0-9]+]]
-// CHECK:       [[NO_BLOCK]]([[REGISTER_16:%[^,]+]] : @owned $any Error):
+// CHECK:       [[NO_BLOCK]]([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK:         dealloc_stack [[MAYBE_INDEX_ADDR]]
-// CHECK:         br [[EXIT_ERROR:bb[0-9]+]]([[REGISTER_16]] : $any Error)
+// CHECK:         br [[EXIT_ERROR:bb[0-9]+]]([[ERROR]] : $any Error)
 // CHECK:       [[EXIT_ERROR]]([[ERROR_TO_THROW:%[^,]+]] : @owned $any Error):
 // CHECK:         throw [[ERROR_TO_THROW]]
 // CHECK:       [[YES_BLOCK]]
@@ -1682,7 +1682,7 @@ exit:
 // CHECK:       [[FAILURE]]:                                              
 // CHECK:         destroy_addr [[SRC]] : $*T                           
 // CHECK:       [[SUCCESS]]:                                              
-// CHECK:         [[REGISTER_3:%[^,]+]] = load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br6'
 sil [ossa] @test_checked_cast_br6 : $@convention(thin) <T> (@in T) -> () {
 entry(%instance : @owned $T):
