@@ -11,6 +11,9 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
 
+// rdar://102167469
+// UNSUPPORTED: CPU=arm64e
+
 #include <cassert>
 #include <cstdio>
 #include "functions.h"
