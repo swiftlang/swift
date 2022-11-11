@@ -223,6 +223,7 @@ public:
   }
 
   Expr *findStorageReferenceExprForBorrow() &&;
+  Expr *findStorageReferenceExprForMoveOnlyBorrow() &&;
 
   /// Given that this source is an expression, extract and clear
   /// that expression.
