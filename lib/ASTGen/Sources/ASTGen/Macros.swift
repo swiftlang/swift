@@ -82,26 +82,33 @@ private func allocateUTF8String(
   }
 }
 
+@_cdecl("swift_ASTGen_getMacroGenericSignature")
+public func getMacroGenericSignature(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  genericSignaturePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  genericSignatureLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    guard let genericSig = macro.pointee.macro.genericSignature else {
+      (genericSignaturePtr.pointee, genericSignatureLengthPtr.pointee) = (nil, 0)
+      return
+    }
+
+    (genericSignaturePtr.pointee, genericSignatureLengthPtr.pointee) =
+      allocateUTF8String(genericSig.description)
+  }
+}
+
 /// Query the type signature of the given macro.
 @_cdecl("swift_ASTGen_getMacroTypeSignature")
 public func getMacroTypeSignature(
   macroPtr: UnsafeMutablePointer<UInt8>,
-  evaluationContextPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  evaluationContextLengthPtr: UnsafeMutablePointer<Int>
+  signaturePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  signatureLengthPtr: UnsafeMutablePointer<Int>
 ) {
   macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
-    (evaluationContextPtr.pointee, evaluationContextLengthPtr.pointee) =
-      allocateUTF8String(macro.pointee.evaluationContext, nullTerminated: true)
-  }
-}
-
-extension ExportedMacro {
-  var evaluationContext: String {
-    """
-    struct __MacroEvaluationContext\(self.macro.genericSignature?.description ?? "") {
-      typealias SignatureType = \(self.macro.signature)
-    }
-    """
+    (signaturePtr.pointee, signatureLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.signature.description)
   }
 }
 

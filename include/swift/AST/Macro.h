@@ -59,9 +59,6 @@ namespace swift {
     /// The type signature of the macro.
     const Type signature;
 
-    /// Documentation for the macro.
-    const StringRef documentation;
-
     /// The module with which this macro is associated.
     ModuleDecl * const owningModule;
 
@@ -75,18 +72,14 @@ namespace swift {
     Macro(
       Kind kind, ImplementationKind implementationKind, Identifier name,
       GenericSignature genericSignature, Type signature,
-      StringRef documentation, ModuleDecl *owningModule,
+      ModuleDecl *owningModule,
       ArrayRef<ModuleDecl *> supplementalSignatureModules,
       void *opaqueHandle
     ) : kind(kind), implementationKind(implementationKind), name(name),
         genericSignature(genericSignature), signature(signature),
-        documentation(documentation), owningModule(owningModule),
+        owningModule(owningModule),
         supplementalSignatureModules(supplementalSignatureModules),
         opaqueHandle(opaqueHandle) { }
-    
-    /// Whether this is a "function-like" macro, meaning that it's expected
-    /// to have function call arguments.
-    bool isFunctionLike() const;
   };
 }
 

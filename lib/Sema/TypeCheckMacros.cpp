@@ -22,6 +22,7 @@
 #include "swift/AST/Macro.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
@@ -44,12 +45,16 @@ extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 extern "C" void
-swift_ASTGen_getMacroTypeSignature(void *macro,
-                                   const char **evaluationContextPtr,
-                                   ptrdiff_t *evaluationContextLengthPtr);
+swift_ASTGen_getMacroGenericSignature(void *macro,
+                                      const char **genericSignaturePtr,
+                                      ptrdiff_t *genericSignatureLengthPtr);
 
-/// Compute the macro signature given the the source containing macro signature
-/// source.
+extern "C" void
+swift_ASTGen_getMacroTypeSignature(void *macro,
+                                   const char **signaturePtr,
+                                   ptrdiff_t *signatureLengthPtr);
+
+/// Create a new macro signature context buffer describing the macro signature.
 ///
 /// The macro signature is a user-defined generic signature and return
 /// type that serves as the "interface type" of references to the macro. The
@@ -66,14 +71,38 @@ swift_ASTGen_getMacroTypeSignature(void *macro,
 /// facilities to map the parsed signature type back into a semantic
 /// \c GenericSignature and \c Type ASTs. The macro signature source above is
 /// provided via \c signatureSource.
+static NullTerminatedStringRef
+getMacroSignatureContextBuffer(
+    ASTContext &ctx, Optional<StringRef> genericSignature,
+    StringRef typeSignature
+) {
+  std::string source;
+  llvm::raw_string_ostream out(source);
+  out << "struct __MacroEvaluationContext"
+      << (genericSignature ? *genericSignature : "") << " {\n"
+      << "  typealias SignatureType = " << typeSignature << "\n"
+      << "}";
+  auto len = source.length();
+  auto *buffer = (char *)malloc(len + 1);
+  memcpy(buffer, source.data(), len + 1);
+  return {buffer, len};
+}
+
+/// Compute the macro signature for a macro given the source code for its
+/// generic signature and type signature.
 static Optional<std::pair<GenericSignature, Type>>
 getMacroSignature(
     ModuleDecl *mod, Identifier macroName,
-    NullTerminatedStringRef signatureSource
+    Optional<StringRef> genericSignature,
+    StringRef typeSignature
 ) {
+  // Form a buffer containing the macro signature context.
+  ASTContext &ctx = mod->getASTContext();
+  StringRef signatureSource = getMacroSignatureContextBuffer(
+      ctx, genericSignature, typeSignature);
+
   // Create a new source buffer with the contents of the macro's
   // signature.
-  ASTContext &ctx = mod->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
   std::string bufferName;
   {
@@ -115,20 +144,16 @@ getMacroSignature(
       signature->getGenericSignature(), signature->getUnderlyingType());
 }
 
-/// Create a builtin macro.
-static Macro *createBuiltinMacro(
-    ModuleDecl *mod, Identifier macroName, void *opaqueHandle) {
-  // Form the macro type signature.
-  const char *evaluatedSourcePtr;
-  ptrdiff_t evaluatedSourceLength;
-  swift_ASTGen_getMacroTypeSignature(opaqueHandle, &evaluatedSourcePtr,
-                                     &evaluatedSourceLength);
-
+/// Create a macro.
+static Macro *createMacro(
+    ModuleDecl *mod, Identifier macroName,
+    Macro::ImplementationKind implKind,
+    Optional<StringRef> genericSignature, StringRef typeSignature,
+    void* opaqueHandle
+) {
   // Get the type signature of the macro.
   auto signature = getMacroSignature(
-      mod, macroName,
-      NullTerminatedStringRef(
-        evaluatedSourcePtr,(size_t)evaluatedSourceLength));
+      mod, macroName, genericSignature, typeSignature);
   if (!signature) {
     // FIXME: Swap in ErrorTypes, perhaps?
     return nullptr;
@@ -137,45 +162,61 @@ static Macro *createBuiltinMacro(
   // FIXME: All macros are expression macros right now
   ASTContext &ctx = mod->getASTContext();
   return new (ctx) Macro(
-      Macro::Expression, Macro::ImplementationKind::Builtin, macroName,
-      signature->first, signature->second, /*FIXME:Documentation*/StringRef(),
+      Macro::Expression, implKind, macroName,
+      signature->first, signature->second,
       /*FIXME:owningModule*/mod, /*FIXME:supplementalImportModules*/{},
       opaqueHandle);
 }
 
-static NullTerminatedStringRef
-getPluginMacroTypeSignature(CompilerPlugin *plugin, ASTContext &ctx) {
-  auto genSig = plugin->invokeGenericSignature();
-  auto typeSig = plugin->invokeTypeSignature();
-  std::string source;
-  llvm::raw_string_ostream out(source);
-  out << "struct __MacroEvaluationContext" << (genSig ? *genSig : "") << " {\n"
-      << "  typealias SignatureType = " << typeSig << "\n"
-      << "}";
-  auto len = source.length();
-  auto *buffer = (char *)malloc(len + 1);
-  memcpy(buffer, source.data(), len + 1);
-  return {buffer, len};
+/// Create a builtin macro.
+static Macro *createBuiltinMacro(
+    ModuleDecl *mod, Identifier macroName, void *opaqueHandle) {
+  // Form the macro generic signature.
+  const char *genericSignaturePtr;
+  ptrdiff_t genericSignatureLength;
+  swift_ASTGen_getMacroGenericSignature(opaqueHandle, &genericSignaturePtr,
+                                        &genericSignatureLength);
+  SWIFT_DEFER {
+    free((void*)genericSignaturePtr);
+  };
+
+  Optional<StringRef> genericSignature;
+  if (genericSignaturePtr && genericSignatureLength)
+    genericSignature = StringRef(genericSignaturePtr, genericSignatureLength);
+
+  // Form the macro type signature.
+  const char *typeSignaturePtr;
+  ptrdiff_t typeSignatureLength;
+  swift_ASTGen_getMacroTypeSignature(opaqueHandle, &typeSignaturePtr,
+                                     &typeSignatureLength);
+  SWIFT_DEFER {
+    free((void*)typeSignaturePtr);
+  };
+  StringRef typeSignature = StringRef(typeSignaturePtr, typeSignatureLength);
+
+  return createMacro(
+      mod, macroName, Macro::ImplementationKind::Builtin,
+      genericSignature, typeSignature,
+      opaqueHandle);
 }
 
 /// Create a plugin-based macro.
 static Macro *createPluginMacro(
     ModuleDecl *mod, Identifier macroName, CompilerPlugin *plugin) {
-  // Get the type signature of the macro.
-  ASTContext &ctx = mod->getASTContext();
-  auto signature = getMacroSignature(
-      mod, macroName, getPluginMacroTypeSignature(plugin, ctx));
-  if (!signature) {
-    // FIXME: Swap in ErrorTypes, perhaps?
-    return nullptr;
-  }
+  auto genSignature = plugin->invokeGenericSignature();
+  SWIFT_DEFER {
+    if (genSignature)
+      free((void*)genSignature->data());
+  };
 
-  // FIXME: All macros are expression macros right now
-  return new (ctx) Macro(
-      Macro::Expression, Macro::ImplementationKind::Plugin, macroName,
-      signature->first, signature->second, /*FIXME:Documentation*/StringRef(),
-      /*FIXME:owningModule*/mod, /*FIXME:supplementalImportModules*/{},
-      plugin);
+  auto typeSignature = plugin->invokeTypeSignature();
+  SWIFT_DEFER {
+    free((void*)typeSignature.data());
+  };
+
+  return createMacro(
+      mod, macroName, Macro::ImplementationKind::Plugin, genSignature,
+      typeSignature, plugin);
 }
 
 ArrayRef<Macro *> MacroLookupRequest::evaluate(
