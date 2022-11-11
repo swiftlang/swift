@@ -2082,3 +2082,271 @@ bb2:
   destroy_value %9 : $(key: Key, value: Value)
   unwind
 }
+
+// CHECK-LABEL: sil [ossa] @test_yield_2_1loadable_nontrivial_guaranteed_as_inguaranteed : {{.*}} {
+// CHECK:         ([[INSTANCE:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         [[STORE_BORROW:%[^,]+]] = store_borrow [[INSTANCE]] to [[ADDR]]
+// CHECK:         yield [[STORE_BORROW]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         end_borrow [[STORE_BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         end_borrow [[STORE_BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: }
+sil [ossa] @test_yield_2_1loadable_nontrivial_guaranteed_as_inguaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed AnyObject {
+entry:
+  (%instance, %token) = begin_apply undef() : $@yield_once @convention(thin) () -> @yields @guaranteed AnyObject
+  yield %instance : $AnyObject, resume resumebb, unwind unwindbb
+
+resumebb:
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  abort_apply %token
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_3_1loadable_nontrivial_owned_as_inguaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed AnyObject {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[STORE_BORROW:%[^,]+]] = store_borrow [[BORROW]] to [[ADDR]]
+// CHECK:         yield [[STORE_BORROW]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         end_borrow [[STORE_BORROW]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         end_borrow [[STORE_BORROW]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_3_1loadable_nontrivial_owned_as_inguaranteed'
+sil [ossa] @test_yield_3_1loadable_nontrivial_owned_as_inguaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed AnyObject {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> @owned AnyObject
+  yield %instance : $AnyObject, resume resumebb, unwind unwindbb
+
+resumebb:
+  destroy_value %instance : $AnyObject
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  destroy_value %instance : $AnyObject
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_3_1trivial_as_inguaranteed {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $I
+// CHECK:         store [[INSTANCE]] to [trivial] [[ADDR]]
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_3_1trivial_as_inguaranteed'
+sil [ossa] @test_yield_3_1trivial_as_inguaranteed : $@yield_once @convention(thin) @substituted <T> () -> @yields @in_guaranteed T for <I> {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> I
+  yield %instance : $I, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_4_1addressonly_owned_as_inguaranteed : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[ADDR]])
+// CHECK:         yield [[ADDR]] {{.*}}, resume bb2, unwind bb1
+// CHECK:       bb1:
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       bb2:
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_4_1addressonly_owned_as_inguaranteed'
+sil [ossa] @test_yield_4_1addressonly_owned_as_inguaranteed : $@yield_once @convention(thin) <T> () -> @yields @in_guaranteed T {
+entry:
+  %instance = apply undef<T>() : $@convention(thin) <T> () -> @out T
+  yield %instance : $T, resume resumebb, unwind unwindbb
+
+resumebb:
+  destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  destroy_value %instance : $T
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_5_1loadable_nontrivial_owned_as_in : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[INSTANCE]] to [init] [[ADDR]]
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_5_1loadable_nontrivial_owned_as_in'
+sil [ossa] @test_yield_5_1loadable_nontrivial_owned_as_in : $@yield_once @convention(thin) () -> @yields @in AnyObject {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> @owned AnyObject
+  yield %instance : $AnyObject, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_6_1trivial_as_in : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $I
+// CHECK:         store [[INSTANCE]] to [trivial] [[ADDR]]
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_6_1trivial_as_in'
+sil [ossa] @test_yield_6_1trivial_as_in : $@yield_once @convention(thin) @substituted <T> () -> @yields @in T for <I> {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> I
+  yield %instance : $I, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_7_1addressonly_owned_as_in : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[ADDR]])
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]] : $*T
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]] : $*T
+// CHECK-LABEL: } // end sil function 'test_yield_7_1addressonly_owned_as_in'
+sil [ossa] @test_yield_7_1addressonly_owned_as_in : $@yield_once @convention(thin) <T> () -> @yields @in T {
+entry:
+  %instance = apply undef<T>() : $@convention(thin) <T> () -> @out T
+  yield %instance : $T, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_8_1loadable_nontrivial_owned_as_inconstant : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[INSTANCE]] to [init] [[ADDR]] : $*AnyObject
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_8_1loadable_nontrivial_owned_as_inconstant'
+sil [ossa] @test_yield_8_1loadable_nontrivial_owned_as_inconstant : $@yield_once @convention(thin) () -> @yields @in_constant AnyObject {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> @owned AnyObject
+  yield %instance : $AnyObject, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_9_1trivial_as_inconstant : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $I
+// CHECK:         store [[INSTANCE]] to [trivial] [[ADDR]]
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_yield_9_1trivial_as_inconstant'
+sil [ossa] @test_yield_9_1trivial_as_inconstant : $@yield_once @convention(thin) @substituted <T> () -> @yields @in_constant T for <I> {
+entry:
+  %instance = apply undef() : $@convention(thin) () -> I
+  yield %instance : $I, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_A_1addressonly_owned_as_inconstant : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[ADDR]])
+// CHECK:         yield [[ADDR]] {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         dealloc_stack [[ADDR]] : $*T
+// CHECK:       [[RESUME]]:
+// CHECK:         dealloc_stack [[ADDR]] : $*T
+// CHECK-LABEL: } // end sil function 'test_yield_A_1addressonly_owned_as_inconstant'
+sil [ossa] @test_yield_A_1addressonly_owned_as_inconstant : $@yield_once @convention(thin) <T> () -> @yields @in_constant T {
+entry:
+  %instance = apply undef<T>() : $@convention(thin) <T> () -> @out T
+  yield %instance : $T, resume resumebb, unwind unwindbb
+
+resumebb:
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @test_yield_C_1loadable_nontrivial_guaranteed_as_inguaranteed_1address_only_owned_as_inguaranteed : {{.*}} {
+// CHECK:         ([[INSTANCE_1:%[^,]+]], [[INSTANCE_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         [[BORROW:%[^,]+]] = store_borrow [[INSTANCE_1]] to [[ADDR]] : $*AnyObject
+// CHECK:         yield ([[BORROW]] : $*AnyObject, [[INSTANCE_2]] : $*T), resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         end_borrow [[BORROW]] : $*AnyObject
+// CHECK:         dealloc_stack [[ADDR]] : $*AnyObject
+// CHECK:       [[RESUME]]:
+// CHECK:         end_borrow [[BORROW]] : $*AnyObject
+// CHECK:         dealloc_stack [[ADDR]] : $*AnyObject
+// CHECK-LABEL: } // end sil function 'test_yield_C_1loadable_nontrivial_guaranteed_as_inguaranteed_1address_only_owned_as_inguaranteed'
+sil [ossa] @test_yield_C_1loadable_nontrivial_guaranteed_as_inguaranteed_1address_only_owned_as_inguaranteed : $@yield_once @convention(thin) <T> () -> (@yields @in_guaranteed AnyObject, @yields @in_guaranteed T) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef() : $@yield_once @convention(thin) () -> (@yields @guaranteed AnyObject, @yields @in_guaranteed T)
+  yield (%instance_1 : $AnyObject, %instance_2 : $T), resume resumebb, unwind unwindbb
+
+resumebb:
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+
+unwindbb:
+  abort_apply %token
+  unwind
+}
