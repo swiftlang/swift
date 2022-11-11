@@ -27,6 +27,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: remote_run
 
 // rdar://102159307 - #_hasSymbol needs to be implemented with a SILInstruction
 // REQUIRES: swift_test_mode_optimize_none
