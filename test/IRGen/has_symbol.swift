@@ -4,6 +4,9 @@
 
 // REQUIRES: VENDOR=apple
 
+// rdar://102246128
+// REQUIRES: PTRSIZE=64
+
 @_weakLinked import has_symbol_helper
 
 func testGlobalFunctions() {
