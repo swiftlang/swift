@@ -195,6 +195,8 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
 /// If \p pseudoResult represents multiple results and at least one result is
 /// used, then return the destructure.
 static DestructureTupleInst *getCallDestructure(FullApplySite apply) {
+  if (apply.getKind() == FullApplySiteKind::BeginApplyInst)
+    return nullptr;
   if (apply.getSubstCalleeConv().getNumDirectSILResults() == 1)
     return nullptr;
 
@@ -640,7 +642,8 @@ void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
     ++calleeArgIdx;
   }
 
-  if (applySite.getSubstCalleeType()->hasIndirectFormalResults()) {
+  if (applySite.getSubstCalleeType()->hasIndirectFormalResults() ||
+      applySite.getSubstCalleeType()->hasIndirectFormalYields()) {
     pass.indirectApplies.insert(applySite);
   }
 }
@@ -2125,6 +2128,11 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
 static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
 
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
+  // Avoid revisiting this apply.
+  bool erased = pass.indirectApplies.erase(apply);
+  assert(erased && "all yields should be rewritten at the same time");
+  (void)erased;
+
   auto *origCall = cast<BeginApplyInst>(apply.getInstruction());
   SmallVector<SILValue, 4> opValues;
 
@@ -2144,11 +2152,33 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   auto newResults = newCall->getAllResultsBuffer();
   assert(oldResults.size() == newResults.size());
   for (auto i : indices(oldResults)) {
-    if (oldResults[i].getType().isAddressOnly(*pass.function)) {
-      pass.valueStorageMap.setStorageAddress(&oldResults[i], &newResults[i]);
-      pass.valueStorageMap.getStorage(&oldResults[i]).markRewritten();
+    auto &oldResult = oldResults[i];
+    auto &newResult = newResults[i];
+    if (oldResult.getType().isAddressOnly(*pass.function)) {
+      if (!oldResult.getType().isAddress()) {
+        pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
+        pass.valueStorageMap.getStorage(&oldResult).markRewritten();
+      } else {
+        oldResult.replaceAllUsesWith(&newResult);
+      }
     } else {
-      oldResults[i].replaceAllUsesWith(&newResults[i]);
+      if (oldResult.getType().isObject() && newResult.getType().isAddress()) {
+        if (oldResult.getOwnershipKind() == OwnershipKind::Guaranteed) {
+          SILValue load =
+              resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
+          oldResult.replaceAllUsesWith(load);
+          emitEndBorrows(load, pass);
+        } else {
+          auto *load = resultBuilder.createLoad(
+              callLoc, &newResult,
+              newResult.getType().isTrivial(*pass.function)
+                  ? LoadOwnershipQualifier::Trivial
+                  : LoadOwnershipQualifier::Take);
+          oldResult.replaceAllUsesWith(load);
+        }
+      } else {
+        oldResult.replaceAllUsesWith(&newResult);
+      }
     }
   }
 }
@@ -3369,14 +3399,27 @@ static void rewriteIndirectApply(FullApplySite apply,
   // If all indirect args were loadable, then they still need to be rewritten.
   CallArgRewriter(apply, pass).rewriteArguments();
 
-  if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
-    return;
+  switch (apply.getKind()) {
+  case FullApplySiteKind::ApplyInst:
+  case FullApplySiteKind::TryApplyInst: {
+    if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
+      return;
+    }
+    // If the call has indirect results and wasn't already rewritten, rewrite it
+    // now. This handles try_apply, which is not rewritten when DefRewriter
+    // visits block arguments. It also handles apply with loadable indirect
+    // results.
+    ApplyRewriter(apply, pass).convertApplyWithIndirectResults();
+    break;
   }
-
-  // If the call has indirect results and wasn't already rewritten, rewrite it
-  // now. This handles try_apply, which is not rewritten when DefRewriter visits
-  // block arguments. It also handles apply with loadable indirect results.
-  ApplyRewriter(apply, pass).convertApplyWithIndirectResults();
+  case FullApplySiteKind::BeginApplyInst: {
+    if (!apply.getSubstCalleeType()->hasIndirectFormalYields()) {
+      return;
+    }
+    ApplyRewriter(apply, pass).convertBeginApplyWithOpaqueYield();
+    break;
+  }
+  }
 
   if (!apply.getInstruction()->isDeleted()) {
     assert(!getCallDestructure(apply)
