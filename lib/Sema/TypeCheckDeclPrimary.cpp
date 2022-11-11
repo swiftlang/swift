@@ -1217,6 +1217,7 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
 
         case SourceFileKind::Library:
         case SourceFileKind::Main:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::SIL:
           break;
         }
