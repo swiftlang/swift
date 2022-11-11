@@ -101,6 +101,14 @@ public:
 
   SILBasicBlock *getParent() const { return parentBlock; }
 
+  /// Returns true if this argument is erased from a basic block.
+  ///
+  /// Note that SILArguments which are erased from a SILBasicBlock are not
+  /// destroyed and freed, but are kept in memory. So it's safe to keep a
+  /// pointer to an erased argument and then at a later time check if its
+  /// erased.
+  bool isErased() const { return !parentBlock; }
+
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
 
