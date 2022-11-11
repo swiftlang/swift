@@ -5,9 +5,12 @@
 //////////////////
 
 @_moveOnly
+public class Klass2 {}
+
+@_moveOnly
 public class Klass {
     var intField: Int
-    var klsField: Klass?
+    var klsField: Klass2
 
     // CHECK-LABEL: sil hidden [ossa] @$s8moveonly5KlassCACycfc : $@convention(method) (@owned Klass) -> @owned Klass {
     // CHECK: bb0([[ARG:%.*]] : @owned $Klass):
@@ -15,16 +18,25 @@ public class Klass {
     // CHECK:   [[MARK_NO_IMP_COPY:%.*]] = mark_must_check [no_implicit_copy] [[MARK_UNINIT]]
     // CHECK: } // end sil function '$s8moveonly5KlassCACycfc'
     init() {
-        klsField = Klass()
+        klsField = Klass2()
         intField = 5
     }
 }
 
 public func nonConsumingUseKlass(_ k: Klass) {}
+public func nonConsumingUseKlass2(_ k: Klass2) {}
+
+@_moveOnly
+public struct NonTrivialStruct2 {
+    var k = Klass()
+}
+
+public func nonConsumingUseNonTrivialStruct2(_ s: NonTrivialStruct2) {}
 
 @_moveOnly
 public struct NonTrivialStruct {
     var k = Klass()
+    var k2 = NonTrivialStruct2()
 }
 
 public func nonConsumingUseNonTrivialStruct(_ s: NonTrivialStruct) {}
@@ -242,4 +254,144 @@ func blackHoleVarInitialization2() {
     var x = Klass()
     x = Klass()
     var _ = x
+}
+
+////////////////////////////////
+// Borrow Function Call Tests //
+////////////////////////////////
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly24borrowObjectFunctionCallyyF : $@convention(thin) () -> () {
+// CHECK: [[CLS:%.*]] = mark_must_check [no_implicit_copy]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[CLS]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF
+// CHECK: apply [[FN]]([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: } // end sil function '$s8moveonly24borrowObjectFunctionCallyyF'
+func borrowObjectFunctionCall() {
+    let k = Klass()
+    nonConsumingUseKlass(k)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly25borrowAddressFunctionCallyyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = mark_must_check [no_implicit_copy]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[BOX]]
+// CHECK: [[BORROW:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF
+// CHECK: apply [[FN]]([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: } // end sil function '$s8moveonly25borrowAddressFunctionCallyyF'
+func borrowAddressFunctionCall() {
+    var k = Klass()
+    k = Klass()
+    nonConsumingUseKlass(k)
+}
+
+// We currently have the wrong behavior here since the class is treated by
+// LValue emission as a base. That being said, move only classes are not our
+// high order bit here, so I filed: ...;
+//
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly31klassBorrowAddressFunctionCall2yyF : $@convention(thin) () -> () {
+// CHECK: [[MARK:%.*]] = mark_must_check [no_implicit_copy]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARK]]
+// CHECK: } // end sil function '$s8moveonly31klassBorrowAddressFunctionCall2yyF'
+func klassBorrowAddressFunctionCall2() {
+    var k = Klass()
+    k = Klass()
+    nonConsumingUseKlass2(k.klsField)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly31structBorrowObjectFunctionCall1yyF : $@convention(thin) () -> () {
+// CHECK: [[VALUE:%.*]] = mark_must_check [no_implicit_copy]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[VALUE]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly31nonConsumingUseNonTrivialStructyyAA0efG0VF : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+// CHECK: apply [[FN]]([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[VALUE]]
+// CHECK: [[STRUCT_EXT:%.*]] = struct_extract [[BORROW]]
+// CHECK: [[STRUCT_EXT_COPY:%.*]] = copy_value [[STRUCT_EXT]]
+// TODO: Should we insert a mark_must_check_here?
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF
+// CHECK: apply [[FN]]([[STRUCT_EXT_COPY]])
+// CHECK: destroy_value [[STRUCT_EXT_COPY]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[VALUE]]
+// CHECK: [[STRUCT_EXT:%.*]] = struct_extract [[BORROW]]
+// CHECK: [[STRUCT_EXT_COPY:%.*]] = copy_value [[STRUCT_EXT]]
+// CHECK: [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
+// CHECK: [[METHOD:%.*]] = class_method [[STRUCT_EXT_COPY_BORROW]]
+// CHECK: [[KLS2:%.*]] = apply [[METHOD]]([[STRUCT_EXT_COPY_BORROW]])
+// CHECK: end_borrow [[STRUCT_EXT_COPY_BORROW]]
+// CHECK: [[BORROWED_KLS2:%.*]] = begin_borrow [[KLS2]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly21nonConsumingUseKlass2yyAA0E0CF
+// CHECK: apply [[FN]]([[BORROWED_KLS2]])
+// CHECK: destroy_value [[STRUCT_EXT_COPY]]
+// CHECK: destroy_value [[KLS2]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[VALUE]]
+// CHECK: } // end sil function '$s8moveonly31structBorrowObjectFunctionCall1yyF'
+func structBorrowObjectFunctionCall1() {
+    let k = NonTrivialStruct()
+    nonConsumingUseNonTrivialStruct(k)
+    nonConsumingUseKlass(k.k)
+    nonConsumingUseKlass2(k.k.klsField)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly31structBorrowObjectFunctionCall2yyF : $@convention(thin) () -> () {
+// CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [no_implicit_copy]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK: [[BORROW:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly31nonConsumingUseNonTrivialStructyyAA0efG0VF :
+// CHECK: apply [[FN]]([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK: [[STRUCT_EXT:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[BORROW:%.*]] = load_borrow [[STRUCT_EXT]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF
+// CHECK: apply [[FN]]([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: end_access [[ACCESS]]
+//
+// This case we fail due to the class being a base element. We need to use the
+// scope expansion approach to handle this.
+//
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK:   [[STRUCT_EXT:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK:   [[STRUCT_EXT_COPY:%.*]] = load [copy] [[STRUCT_EXT]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
+// CHECK:   [[METHOD:%.*]] = class_method [[STRUCT_EXT_COPY_BORROW]]
+// CHECK:   [[KLS:%.*]] = apply [[METHOD]]([[STRUCT_EXT_COPY_BORROW]])
+// CHECK:   end_borrow [[STRUCT_EXT_COPY_BORROW]]
+// CHECK:   [[BORROWED_KLS:%.*]] = begin_borrow [[KLS]]
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly21nonConsumingUseKlass2yyAA0E0CF
+// CHECK:   apply [[FN]]([[BORROWED_KLS]])
+// CHECK:   end_borrow [[BORROWED_KLS]]
+// CHECK:   destroy_value [[STRUCT_EXT_COPY]]
+// CHECK:   destroy_value [[KLS]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK:   [[GEP:%.*]] = struct_element_addr [[ACCESS]] : $*NonTrivialStruct, #NonTrivialStruct.k2
+// CHECK:   [[BORROW:%.*]] = load_borrow [[GEP]]
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly32nonConsumingUseNonTrivialStruct2yyAA0efG0VF : $@convention(thin) (@guaranteed NonTrivialStruct2) -> ()
+// CHECK:   apply [[FN]]([[BORROW]])
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK:   [[GEP1:%.*]] = struct_element_addr [[ACCESS]] : $*NonTrivialStruct, #NonTrivialStruct.k2
+// CHECK:   [[GEP2:%.*]] = struct_element_addr [[GEP1]] : $*NonTrivialStruct2, #NonTrivialStruct2.k
+// CHECK:   [[BORROW:%.*]] = load_borrow [[GEP2]]
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   apply [[FN]]([[BORROW]])
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK: } // end sil function '$s8moveonly31structBorrowObjectFunctionCall2yyF'
+func structBorrowObjectFunctionCall2() {
+    var k = NonTrivialStruct()
+    k = NonTrivialStruct()
+    nonConsumingUseNonTrivialStruct(k)
+    nonConsumingUseKlass(k.k)
+    nonConsumingUseKlass2(k.k.klsField)
+    nonConsumingUseNonTrivialStruct2(k.k2)
+    nonConsumingUseKlass(k.k2.k)
 }
