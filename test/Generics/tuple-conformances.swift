@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics -parse-stdlib
+
+// REQUIRES: asserts
 
 import Swift
 

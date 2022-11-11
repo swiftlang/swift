@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -enable-experimental-variadic-generics %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -enable-experimental-feature VariadicGenerics %s -debug-generic-signatures 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
 
 protocol P {
   associatedtype A
