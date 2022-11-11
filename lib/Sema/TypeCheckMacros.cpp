@@ -59,12 +59,11 @@ swift_ASTGen_getMacroTypeSignature(void *macro,
 /// The macro signature is a user-defined generic signature and return
 /// type that serves as the "interface type" of references to the macro. The
 /// current implementation takes those pieces of syntax from the macro itself,
-/// then inserts them into a Swift struct that looks like
+/// then inserts them into a Swift typealias that looks like
 ///
 /// \code
-/// struct __MacroEvaluationContext\(macro.genericSignature) {
-///   typealias SignatureType = \(macro.signature)
-/// }
+/// typealias __MacroEvaluationContext\(macro.genericSignature ?? "") =
+///     \(macro.signature)
 /// \endcode
 ///
 /// So that we can use all of Swift's native name lookup and type resolution
@@ -78,10 +77,9 @@ getMacroSignatureContextBuffer(
 ) {
   std::string source;
   llvm::raw_string_ostream out(source);
-  out << "struct __MacroEvaluationContext"
-      << (genericSignature ? *genericSignature : "") << " {\n"
-      << "  typealias SignatureType = " << typeSignature << "\n"
-      << "}";
+  out << "typealias __MacroEvaluationContext"
+     << (genericSignature ? *genericSignature : "")
+     << " = " << typeSignature << "\n";
   auto len = source.length();
   auto *buffer = (char *)malloc(len + 1);
   memcpy(buffer, source.data(), len + 1);
@@ -132,16 +130,12 @@ getMacroSignature(
   if (!decl)
     return None;
 
-  auto structDecl = cast<StructDecl>(decl);
-
   // Make sure imports are resolved in this file.
   performImportResolution(*macroSourceFile);
 
-  // Dig the SignatureType typealias out of the struct and return that type.
-  auto sigName = ctx.getIdentifier("SignatureType");
-  auto *signature = cast<TypeAliasDecl>(structDecl->lookupDirect(sigName).front());
+  auto typealias = cast<TypeAliasDecl>(decl);
   return std::make_pair(
-      signature->getGenericSignature(), signature->getUnderlyingType());
+      typealias->getGenericSignature(), typealias->getUnderlyingType());
 }
 
 /// Create a macro.

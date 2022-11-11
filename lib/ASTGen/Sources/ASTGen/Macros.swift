@@ -128,11 +128,11 @@ public func getMacroEvaluationContext(
   )
   let sourceFile = Parser.parse(source: evaluatedSource)
 
-  // Dig out the top-level struct declaration. That's all we'll
+  // Dig out the top-level typealias declaration. That's all we'll
   // parse.
-  guard let structDecl = sourceFile.statements.first(
-    where: { item in item.item.is(StructDeclSyntax.self)
-    })?.item.as(StructDeclSyntax.self) else {
+  guard let typealiasDecl = sourceFile.statements.first(
+    where: { item in item.item.is(TypealiasDeclSyntax.self)
+    })?.item.as(TypealiasDeclSyntax.self) else {
     return nil
   }
 
@@ -140,7 +140,7 @@ public func getMacroEvaluationContext(
   // FIXME: we need to emit diagnostics from this.
   return ASTGenVisitor(
     ctx: context, base: sourceFilePtr, declContext: declContext
-  ).visit(structDecl).rawValue
+  ).visit(typealiasDecl).rawValue
 }
 
 @_cdecl("swift_ASTGen_evaluateMacro")
