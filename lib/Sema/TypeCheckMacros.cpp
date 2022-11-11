@@ -54,6 +54,15 @@ swift_ASTGen_getMacroTypeSignature(void *macro,
                                    const char **signaturePtr,
                                    ptrdiff_t *signatureLengthPtr);
 
+extern "C" void
+swift_ASTGen_getMacroOwningModule(void *macro,
+                                  const char **owningModuleNamePtr,
+                                  ptrdiff_t *owningModuleNameLengthPtr);
+
+extern "C" void
+swift_ASTGen_getMacroSupplementalSignatureModules(
+    void *macro, const char **moduleNamesPtr, ptrdiff_t *moduleNamesLengthPtr);
+
 /// Create a new macro signature context buffer describing the macro signature.
 ///
 /// The macro signature is a user-defined generic signature and return
@@ -138,13 +147,39 @@ getMacroSignature(
       typealias->getGenericSignature(), typealias->getUnderlyingType());
 }
 
+
+
 /// Create a macro.
 static Macro *createMacro(
     ModuleDecl *mod, Identifier macroName,
     Macro::ImplementationKind implKind,
     Optional<StringRef> genericSignature, StringRef typeSignature,
+    StringRef owningModuleName,
+    ArrayRef<StringRef> supplementalImportModuleNames,
     void* opaqueHandle
 ) {
+  ASTContext &ctx = mod->getASTContext();
+
+  // Look up the owning module.
+  ModuleDecl *owningModule = ctx.getLoadedModule(
+      ctx.getIdentifier(owningModuleName));
+  if (!owningModule) {
+    // FIXME: diagnostic here
+    return nullptr;
+  }
+  // FIXME: Check that mod imports owningModule
+
+  // Look up all of the supplemental import modules.
+  SmallVector<ModuleDecl *, 1> supplementalImportModules;
+  for (auto supplementalModuleName : supplementalImportModuleNames) {
+    auto supplementalModuleId = ctx.getIdentifier(supplementalModuleName);
+    if (auto supplementalModule = ctx.getLoadedModule(supplementalModuleId)) {
+      supplementalImportModules.push_back(supplementalModule);
+
+      // FIXME: Check that mod imports supplementalModule somewhere.
+    }
+  }
+
   // Get the type signature of the macro.
   auto signature = getMacroSignature(
       mod, macroName, genericSignature, typeSignature);
@@ -154,18 +189,17 @@ static Macro *createMacro(
   }
 
   // FIXME: All macros are expression macros right now
-  ASTContext &ctx = mod->getASTContext();
   return new (ctx) Macro(
       Macro::Expression, implKind, macroName,
       signature->first, signature->second,
-      /*FIXME:owningModule*/mod, /*FIXME:supplementalImportModules*/{},
+      owningModule, supplementalImportModules,
       opaqueHandle);
 }
 
 /// Create a builtin macro.
 static Macro *createBuiltinMacro(
     ModuleDecl *mod, Identifier macroName, void *opaqueHandle) {
-  // Form the macro generic signature.
+  // Get the macro generic signature.
   const char *genericSignaturePtr;
   ptrdiff_t genericSignatureLength;
   swift_ASTGen_getMacroGenericSignature(opaqueHandle, &genericSignaturePtr,
@@ -178,7 +212,7 @@ static Macro *createBuiltinMacro(
   if (genericSignaturePtr && genericSignatureLength)
     genericSignature = StringRef(genericSignaturePtr, genericSignatureLength);
 
-  // Form the macro type signature.
+  // Get the macro type signature.
   const char *typeSignaturePtr;
   ptrdiff_t typeSignatureLength;
   swift_ASTGen_getMacroTypeSignature(opaqueHandle, &typeSignaturePtr,
@@ -188,9 +222,34 @@ static Macro *createBuiltinMacro(
   };
   StringRef typeSignature = StringRef(typeSignaturePtr, typeSignatureLength);
 
+  // Get the owning module name.
+  const char *owningModuleNamePtr;
+  ptrdiff_t owningModuleNameLength;
+  swift_ASTGen_getMacroOwningModule(opaqueHandle, &owningModuleNamePtr,
+                                    &owningModuleNameLength);
+  SWIFT_DEFER {
+    free((void*)owningModuleNamePtr);
+  };
+  StringRef owningModuleName = StringRef(
+      owningModuleNamePtr, owningModuleNameLength);
+
+  // Get the supplemental signature module names.
+  const char *supplementalModuleNamesPtr;
+  ptrdiff_t supplementalModuleNamesLength;
+  swift_ASTGen_getMacroSupplementalSignatureModules(
+      opaqueHandle, &supplementalModuleNamesPtr,
+      &supplementalModuleNamesLength);
+  SWIFT_DEFER {
+    free((void*)supplementalModuleNamesPtr);
+  };
+  SmallVector<StringRef, 2> supplementalModuleNames;
+  StringRef(owningModuleNamePtr, owningModuleNameLength)
+    .split(supplementalModuleNames, ";", -1, false);
+
   return createMacro(
       mod, macroName, Macro::ImplementationKind::Builtin,
       genericSignature, typeSignature,
+      owningModuleName, supplementalModuleNames,
       opaqueHandle);
 }
 
@@ -208,9 +267,24 @@ static Macro *createPluginMacro(
     free((void*)typeSignature.data());
   };
 
+  auto owningModuleName = plugin->invokeOwningModule();
+  SWIFT_DEFER {
+    free((void*)owningModuleName.data());
+  };
+
+  // Get the supplemental signature module names.
+  auto supplementalModuleNamesStr =
+      plugin->invokeSupplementalSignatureModules();
+  SWIFT_DEFER {
+    free((void*)supplementalModuleNamesStr.data());
+  };
+  SmallVector<StringRef, 2> supplementalModuleNames;
+  supplementalModuleNamesStr
+    .split(supplementalModuleNames, ";", -1, false);
+
   return createMacro(
       mod, macroName, Macro::ImplementationKind::Plugin, genSignature,
-      typeSignature, plugin);
+      typeSignature, owningModuleName, supplementalModuleNames, plugin);
 }
 
 ArrayRef<Macro *> MacroLookupRequest::evaluate(

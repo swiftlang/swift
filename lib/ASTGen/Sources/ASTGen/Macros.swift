@@ -112,6 +112,48 @@ public func getMacroTypeSignature(
   }
 }
 
+/// Query the documentation of the given macro.
+@_cdecl("swift_ASTGen_getMacroDocumentation")
+public func getMacroDocumentation(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  documentationPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  documentationLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    (documentationPtr.pointee, documentationLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.documentation)
+  }
+}
+
+/// Query the owning module of the given macro.
+@_cdecl("swift_ASTGen_getMacroOwningModule")
+public func getMacroOwningModule(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  owningModulePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  owningModuleLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    (owningModulePtr.pointee, owningModuleLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.owningModule)
+  }
+}
+
+/// Query the supplemental signature modules of the given macro,
+/// as a semicolon-separated string
+@_cdecl("swift_ASTGen_getMacroSupplementalSignatureModules")
+public func getMacroSupplementableSignatureModules(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  modulesPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  modulesLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    let modules = macro.pointee.macro.supplementalSignatureModules
+        .joined(separator: ";")
+    (modulesPtr.pointee, modulesLengthPtr.pointee) =
+        allocateUTF8String(modules)
+  }
+}
+
 /// Query the macro evaluation context given the evaluation
 /// context sources.
 @_cdecl("swift_ASTGen_getMacroEvaluationContext")
