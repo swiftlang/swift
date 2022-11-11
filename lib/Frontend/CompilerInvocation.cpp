@@ -1831,6 +1831,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableStackProtection =
       Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
                    Opts.EnableStackProtection);
+  Opts.EnableMoveInoutStackProtection =
+      Args.hasFlag(OPT_enable_move_inout_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableMoveInoutStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
