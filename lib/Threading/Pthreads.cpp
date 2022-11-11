@@ -101,8 +101,12 @@ swift::threading_impl::thread_get_current_stack_bounds() {
 #if defined(__FreeBSD__)
   if (pthread_attr_init(&attr))
     return {};
-#endif
-
+#elif __APPLE__
+  begin = pthread_get_stackaddr_np(pthread_self());
+  size = pthread_get_stacksize_np(pthread_self());
+  stack_bounds result = { begin, (char *)begin + size };
+  return result;
+#else
   if (!pthread_getattr_np(pthread_self(), &attr)) {
     if (!pthread_attr_getstack(&attr, &begin, &size)) {
       stack_bounds result = { begin, (char *)begin + size };
@@ -112,8 +116,8 @@ swift::threading_impl::thread_get_current_stack_bounds() {
 
     pthread_attr_destroy(&attr);
   }
-
   return {};
+#endif
 }
 #endif
 
