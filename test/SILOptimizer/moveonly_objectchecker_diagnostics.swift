@@ -2337,3 +2337,13 @@ func moveOperatorTest(_ k: __owned Klass) {
     let _ = _move k2 // expected-note {{consuming use}}
     let _ = k3
 }
+
+/////////////////////////////////////////
+// Black hole initialization test case//
+/////////////////////////////////////////
+
+func blackHoleTestCase(_ k: __owned Klass) {
+    let k2 = k // expected-error {{'k2' consumed more than once}}
+    let _ = k2 // expected-note {{consuming use}}
+    let _ = k2 // expected-note {{consuming use}}
+}
