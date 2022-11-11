@@ -974,7 +974,7 @@ public:
   }
       
   Demangle::NodePointer visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
-    auto decl = Dem.demangleSymbol(O->getID());
+    auto decl = Dem.demangleType(O->getID());
     if (!decl)
       return nullptr;
     

@@ -653,6 +653,7 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
   
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
