@@ -45,12 +45,14 @@ toolchain as a one-off, there are a couple of differences:
    system. Experimental instructions for Windows are available under
    [Windows.md](/docs/Windows.md).
 2. Python 3: Several utility scripts are written in Python.
-3. Disk space:
+3. Git 2.x to check out the sources. We find that older versions of Git
+   raise errors when doing the full checkout.
+4. Disk space:
    Make sure that you have enough available disk space before starting.
    The source code, including full git history, requires about 3.5 GB.
    Build artifacts take anywhere between 5 GB to 70 GB, depending on the
    build settings.
-4. Time:
+5. Time:
    Depending on your machine and build settings,
    a from-scratch build can take a few minutes to several hours,
    so you might want to grab a beverage while you follow the instructions.
