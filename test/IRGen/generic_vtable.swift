@@ -37,7 +37,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for m2()
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m2yyF"
 // --
-// CHECK-SAME: section "{{.*}}", align 4
+// CHECK-SAME: section "{{.*}}",{{.*}} align 4
 
 //// Type metadata for 'Base' has a static vtable.
 
@@ -82,7 +82,7 @@ public class Concrete : Derived<Int> {
 // CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
 // CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable7DerivedCACyxGycfC"
-// CHECK-SAME: section "{{.*}}", align 4
+// CHECK-SAME: section "{{.*}}",{{.*}} align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
@@ -120,7 +120,7 @@ public class Concrete : Derived<Int> {
 // CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCACycfC"
 // --
-// CHECK-SAME: section "{{.*}}", align 4
+// CHECK-SAME: section "{{.*}}",{{.*}} align 4
 
 //// Type metadata for 'Concrete' has a static vtable.
 

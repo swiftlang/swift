@@ -54,7 +54,7 @@ import resilient_objc_class
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCACycfC"
 // -- class stub
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMt"
-// CHECK-SAME: }>, section "__TEXT,__const", align 4
+// CHECK-SAME: }>, section "__TEXT,__const",{{.*}} align 4
 
 
 // -- Symbols for full stubs; the address point is one word in, and defined below
