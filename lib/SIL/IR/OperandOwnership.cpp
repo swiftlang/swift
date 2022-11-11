@@ -180,6 +180,8 @@ OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
+// select_value is only supported for integer types currently.
+OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -422,23 +424,6 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
     /*allowUnowned*/true);
 }
 
-OperandOwnership
-OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
-  if (getValue() == i->getDefaultResult())
-    return OperandOwnership::GuaranteedForwarding;
-
-  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
-    SILValue casevalue;
-    SILValue result;
-    std::tie(casevalue, result) = i->getCase(idx);
-
-    if (getValue() == casevalue) {
-      return OperandOwnership::GuaranteedForwarding;
-    }
-  }
-  return OperandOwnership::TrivialUse;
-}
-
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   ValueOwnershipKind destBlockArgOwnershipKind =
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
@@ -678,6 +663,8 @@ struct OperandOwnershipBuiltinClassifier
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ErrorInMain)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnexpectedError)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, WillThrow)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfBorrowOpaque)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnprotectedAddressOfBorrowOpaque)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)
@@ -821,7 +808,14 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
-BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
+OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
+                                                              StringRef) {
+  if (bi->getFunction()->getConventions().useLoweredAddresses()) {
+    return OperandOwnership::UnownedInstantaneousUse;
+  } else {
+    return OperandOwnership::DestroyingConsume;
+  }
+}
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLetWithLocalBuffer)

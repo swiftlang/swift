@@ -175,3 +175,71 @@ extension NonTrivialEnum {
         let _ = x
     }
 }
+
+///////////////////////////////
+// Black Hole Initialization //
+///////////////////////////////
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization1yyF : $@convention(thin) () -> () {
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[X:%.*]] = apply [[FN]](
+// CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
+// CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [no_implicit_copy] [[X_MV_LEXICAL]]
+// CHECK: [[X_MV_ONLY_BORROW:%.*]] = begin_borrow [[X_MV_ONLY]]
+// CHECK: [[X_MV_ONLY_COPY:%.*]] = copy_value [[X_MV_ONLY_BORROW]]
+// CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
+// CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization1yyF'
+func blackHoleLetInitialization1() {
+    let x = Klass()
+    let _ = x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization2yyF : $@convention(thin) () -> () {
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[X:%.*]] = apply [[FN]](
+// CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
+// CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [no_implicit_copy] [[X_MV_LEXICAL]]
+// CHECK: [[X_MV_ONLY_BORROW:%.*]] = begin_borrow [[X_MV_ONLY]]
+// CHECK: [[X_MV_ONLY_COPY:%.*]] = copy_value [[X_MV_ONLY_BORROW]]
+// CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
+// CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization2yyF'
+func blackHoleLetInitialization2() {
+    let x = Klass()
+    var _ = x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleVarInitialization1yyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BOX_BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[PROJECT_BOX:%.*]] = project_box [[BOX_BORROW]]
+// CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [no_implicit_copy] [[PROJECT_BOX]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[X:%.*]] = apply [[FN]](
+// CHECK: store [[X]] to [init] [[MARKED_ADDR]]
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK: [[LD:%.*]] = load [copy] [[READ]]
+// CHECK: [[CONSUME:%.*]] = move_value [[LD]]
+// CHECK: } // end sil function '$s8moveonly27blackHoleVarInitialization1yyF'
+func blackHoleVarInitialization1() {
+    var x = Klass()
+    x = Klass()
+    let _ = x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleVarInitialization2yyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BOX_BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[PROJECT_BOX:%.*]] = project_box [[BOX_BORROW]]
+// CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [no_implicit_copy] [[PROJECT_BOX]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[X:%.*]] = apply [[FN]](
+// CHECK: store [[X]] to [init] [[MARKED_ADDR]]
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK: [[LD:%.*]] = load [copy] [[READ]]
+// CHECK: [[CONSUME:%.*]] = move_value [[LD]]
+// CHECK: } // end sil function '$s8moveonly27blackHoleVarInitialization2yyF'
+func blackHoleVarInitialization2() {
+    var x = Klass()
+    x = Klass()
+    var _ = x
+}

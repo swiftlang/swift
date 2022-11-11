@@ -76,6 +76,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv64",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -368,6 +369,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
     break;
+  case llvm::Triple::ArchType::riscv64:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
   default:
     UnsupportedArch = true;
   }
@@ -386,6 +390,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
   case llvm::Triple::ArchType::x86:
   case llvm::Triple::ArchType::x86_64:
+  case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::ppc64:
@@ -443,6 +448,17 @@ bool swift::isSuppressibleFeature(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
+bool swift::isFeatureAvailableInProduction(Feature feature) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  case Feature::FeatureName: return true;
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)            \
+  case Feature::FeatureName: return AvailableInProd;
+#include "swift/Basic/Features.def"
+  }
+  llvm_unreachable("covered switch");
+}
+
 llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
@@ -455,7 +471,7 @@ llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
 llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
   return llvm::StringSwitch<Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define EXPERIMENTAL_FEATURE(FeatureName) \
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                  \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                    .Default(None);

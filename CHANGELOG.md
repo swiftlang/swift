@@ -2,13 +2,13 @@
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-## Swift 6.0
+## Swift 5.8
 
 * [SE-0365][]:
  
   Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
 
-  For example, the usage of implicit `self` below is now permitted:
+  For example, the usage of implicit `self` below is permitted:
 
   ```swift
   class ViewController {
@@ -43,8 +43,6 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   ```
 
   In Swift 6, the above code will no longer compile. `weak self` captures in non-escaping closures now have the same behavior as captures in escaping closures (as described in [SE-0365][]). Code relying on the previous behavior will need to be updated to either unwrap `self` (e.g. by adding a `guard let self else return` statement), or to use a different capture method (e.g. using `[self]` or `[unowned self]` instead of `[weak self]`).
-
-## Swift 5.8
 
 * [SE-0362][]:
 

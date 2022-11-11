@@ -241,6 +241,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << " final {\n";
   os << "public:\n";
+  if (genericSignature)
+    ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+        *genericSignature);
 
   // Print out the destructor.
   os << "  inline ~";
@@ -339,13 +342,6 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "  }\n";
-
-    for (const auto &pair : interopContext.getIrABIDetails().getEnumTagMapping(
-             cast<EnumDecl>(typeDecl))) {
-      os << "  using _impl_" << pair.first->getNameStr() << " = decltype(";
-      ClangSyntaxPrinter(os).printIdentifier(pair.first->getNameStr());
-      os << ");\n";
-    }
   }
   // Print out the storage for the value type.
   os << "  ";
@@ -373,6 +369,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
         printCxxImplClassName(os, typeDecl);
         os << " {\n";
         os << "public:\n";
+        if (genericSignature)
+          ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+              *genericSignature);
 
         os << "  static inline char * _Nonnull getOpaquePointer(";
         printCxxTypeName(os, typeDecl, moduleContext);
@@ -497,9 +496,8 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   }
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }
 
 void ClangValueTypePrinter::printTypeGenericTraits(
@@ -593,7 +591,6 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }

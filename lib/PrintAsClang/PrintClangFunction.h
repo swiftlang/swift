@@ -105,6 +105,7 @@ public:
   void printCxxThunkBody(const AbstractFunctionDecl *FD,
                          const LoweredFunctionSignature &signature,
                          StringRef swiftSymbolName,
+                         const NominalTypeDecl *typeDeclContext,
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params, bool hasThrows = false,
                          const AnyFunctionType *funcType = nullptr);
@@ -146,9 +147,11 @@ public:
 
   /// Print generated C++ helper function
   void printCustomCxxFunction(const SmallVector<Type> &neededTypes,
+                              bool NeedsReturnTypes,
                               PrinterTy retTypeAndNamePrinter,
                               PrinterTy paramPrinter, bool isConstFunc,
-                              PrinterTy bodyPrinter, ModuleDecl *emittedModule,
+                              PrinterTy bodyPrinter, ValueDecl *valueDecl,
+                              ModuleDecl *emittedModule,
                               raw_ostream &outOfLineOS);
 
 private:

@@ -279,7 +279,7 @@ private:
   llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
       MoveOnlyDeinitMap;
 
-  /// The list of SILVTables in the module.
+  /// The list of move only deinits in the module.
   std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
 
   /// Declarations which are externally visible.
@@ -314,6 +314,9 @@ private:
 
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef *> UndefValues;
+
+  /// The list of decls that require query functions for #_hasSymbol conditions.
+  llvm::SetVector<ValueDecl *> hasSymbolDecls;
 
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
@@ -698,6 +701,12 @@ public:
   }
   bool isExternallyVisibleDecl(ValueDecl *decl) {
     return externallyVisible.count(decl) != 0;
+  }
+
+  void addHasSymbolDecl(ValueDecl *decl) { hasSymbolDecls.insert(decl); }
+
+  ArrayRef<ValueDecl *> getHasSymbolDecls() {
+    return hasSymbolDecls.getArrayRef();
   }
 
   using sil_global_iterator = GlobalListType::iterator;

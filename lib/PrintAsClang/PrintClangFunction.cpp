@@ -986,17 +986,17 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
     llvm::raw_string_ostream os(resultTyName);
     ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
   }
-
-  os << "  if constexpr (std::is_base_of<::swift::"
-     << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
-     << resultTyName << ">::value) {\n";
-  os << "  void *returnValue;\n  ";
-  if (!initializeWithTakeFromValue) {
-    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
-  } else {
-    os << "returnValue = *reinterpret_cast<void **>("
-       << *initializeWithTakeFromValue << ")";
-  }
+  ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+    os << "  if constexpr (std::is_base_of<::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
+       << resultTyName << ">::value) {\n";
+    os << "  void *returnValue;\n  ";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+    } else {
+      os << "returnValue = *reinterpret_cast<void **>("
+         << *initializeWithTakeFromValue << ")";
+    }
     os << ";\n";
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
@@ -1010,41 +1010,49 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
        << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
     if (!initializeWithTakeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
-  } else {
-    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-       << "::implClassFor<" << resultTyName
-       << ">::type::initializeWithTake(reinterpret_cast<char * "
-          "_Nonnull>(returnValue), "
-       << *initializeWithTakeFromValue << ")";
-  }
-  os << ";\n  });\n";
-  os << "  } else if constexpr (::swift::"
-     << cxx_synthesis::getCxxImplNamespaceName() << "::isSwiftBridgedCxxRecord<"
-     << resultTyName << ">) {\n";
-  if (!initializeWithTakeFromValue) {
-    ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
-                                                 invocationPrinter);
-  } else {
-    // FIXME: support taking a C++ record type.
-    os << "abort();\n";
-  }
-  os << "  } else {\n";
-  os << "  " << resultTyName << " returnValue;\n";
-  if (!initializeWithTakeFromValue) {
-    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
-  } else {
-    os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
-       << ", sizeof(returnValue))";
-  }
-  os << ";\n  return returnValue;\n";
-  os << "  }\n";
+    } else {
+      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::implClassFor<" << resultTyName
+         << ">::type::initializeWithTake(reinterpret_cast<char * "
+            "_Nonnull>(returnValue), "
+         << *initializeWithTakeFromValue << ")";
+    }
+    os << ";\n  });\n";
+    os << "  } else if constexpr (::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName()
+       << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
+    if (!initializeWithTakeFromValue) {
+      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
+                                                   invocationPrinter);
+    } else {
+      // FIXME: support taking a C++ record type.
+      os << "abort();\n";
+    }
+    os << "  } else {\n";
+    os << "  " << resultTyName << " returnValue;\n";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+    } else {
+      os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
+         << ", sizeof(returnValue))";
+    }
+    os << ";\n  return returnValue;\n";
+    os << "  }\n";
+  });
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
-    StringRef swiftSymbolName, const ModuleDecl *moduleContext, Type resultTy,
-    const ParameterList *params, bool hasThrows,
-    const AnyFunctionType *funcType) {
+    StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
+    const ModuleDecl *moduleContext, Type resultTy, const ParameterList *params,
+    bool hasThrows, const AnyFunctionType *funcType) {
+  if (typeDeclContext)
+    ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
+        typeDeclContext);
+  if (FD->isGeneric()) {
+    auto Signature = FD->getGenericSignature().getCanonicalSignature();
+    ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(Signature);
+  }
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
     os << "  void* _ctx = nullptr;\n";
@@ -1280,8 +1288,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(FD, signature, swiftSymbolName, FD->getModuleContext(),
-                    resultTy, FD->getParameters(), FD->hasThrows(),
+  printCxxThunkBody(FD, signature, swiftSymbolName, typeDeclContext,
+                    FD->getModuleContext(), resultTy, FD->getParameters(),
+                    FD->hasThrows(),
                     FD->getInterfaceType()->castTo<AnyFunctionType>());
   os << "  }\n";
 }
@@ -1339,7 +1348,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(accessor, signature, swiftSymbolName,
+  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
                     accessor->getModuleContext(), resultTy,
                     accessor->getParameters());
   os << "  }\n";
@@ -1365,7 +1374,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(accessor, signature, swiftSymbolName,
+  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
                     accessor->getModuleContext(), resultTy,
                     accessor->getParameters());
   os << "  }\n";
@@ -1385,10 +1394,12 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
-    const SmallVector<Type> &neededTypes, PrinterTy retTypeAndNamePrinter,
-    PrinterTy paramPrinter, bool isConstFunc, PrinterTy bodyPrinter,
-    ModuleDecl *emittedModule, raw_ostream &outOfLineOS) {
+    const SmallVector<Type> &neededTypes, bool NeedsReturnTypes,
+    PrinterTy retTypeAndNamePrinter, PrinterTy paramPrinter, bool isConstFunc,
+    PrinterTy bodyPrinter, ValueDecl *valueDecl, ModuleDecl *emittedModule,
+    raw_ostream &outOfLineOS) {
   llvm::MapVector<Type, std::string> types;
+  llvm::MapVector<Type, std::string> typeRefs;
 
   for (auto &type : neededTypes) {
     std::string typeStr;
@@ -1396,18 +1407,28 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
     OptionalTypeKind optKind;
     Type objectType;
     std::tie(objectType, optKind) =
-        DeclAndTypePrinter::getObjectTypeAndOptionality(
-            type->getNominalOrBoundGenericNominal(), type);
+        DeclAndTypePrinter::getObjectTypeAndOptionality(valueDecl, type);
 
-    // Use FunctionSignatureTypeUse::ReturnType to avoid printing extra const or
-    // references
     CFunctionSignatureTypePrinter typePrinter(
         typeOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
         interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
-        emittedModule, declPrinter, FunctionSignatureTypeUse::ReturnType);
-    typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+        emittedModule, declPrinter,
+        NeedsReturnTypes ? FunctionSignatureTypeUse::ReturnType
+                         : FunctionSignatureTypeUse::ParamType);
+    auto support =
+        typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    (void)support;
+    assert(!support.isUnsupported());
+    types.insert({type, typeOS.str()});
 
-    types.insert({type, typeStr});
+    std::string typeRefStr;
+    llvm::raw_string_ostream typeRefOS(typeRefStr);
+    CFunctionSignatureTypePrinter typeRefPrinter(
+        typeRefOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+        interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+        emittedModule, declPrinter, FunctionSignatureTypeUse::TypeReference);
+    typeRefPrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    typeRefs.insert({type, typeRefOS.str()});
   }
 
   retTypeAndNamePrinter(types);
@@ -1421,6 +1442,6 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
     outOfLineOS << " const";
   }
   outOfLineOS << " {\n";
-  bodyPrinter(types);
+  bodyPrinter(typeRefs);
   outOfLineOS << "}\n";
 }

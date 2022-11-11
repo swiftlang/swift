@@ -56,7 +56,7 @@ takesParallelSequences(t: Array<String>(), Set<Int>(), u: Array<Int>(), Set<Stri
 // Same-shape requirements
 
 func zip<T..., U...>(t: T..., u: U...) -> ((T, U)...) {}
-// expected-note@-1 {{where 'T' = 'U', 'U' = 'Pack{T...}'}}
+// expected-note@-1 {{where 'T' = 'T', 'U' = 'U'}}
 
 let _ = zip()  // ok
 let _ = zip(t: 1, u: "hi")  // ok
@@ -72,5 +72,5 @@ func goodCallToZip<T..., U...>(t: T..., u: U...) where ((T, U)...): Any {
 
 func badCallToZip<T..., U...>(t: T..., u: U...) {
   _ = zip(t: t..., u: u...)
-  // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'U' and 'Pack{T...}' have the same shape}}
+  // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'T' and 'U' have the same shape}}
 }

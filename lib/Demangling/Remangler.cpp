@@ -2243,6 +2243,18 @@ ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::manglePack(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
+  Buffer << "QP";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "Qp";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleNumber(Node *node, unsigned depth) {
   mangleIndex(node->getIndex());
   return ManglingError::Success;
@@ -3364,6 +3376,7 @@ ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
   if (trySubstitution(node, entry))
     return ManglingError::Success;
 
+  DEMANGLER_ASSERT(node->getNumChildren() >= 3, node);
   RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   auto boundGenerics = node->getChild(2);
   for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {

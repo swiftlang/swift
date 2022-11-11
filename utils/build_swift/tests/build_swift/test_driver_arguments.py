@@ -636,12 +636,13 @@ class TestDriverArgumentParser(
         self.assertFalse(namespace.test_tvos_host)
         self.assertFalse(namespace.test_watchos_host)
         self.assertFalse(namespace.test_android_host)
-        self.assertFalse(namespace.build_libparser_only)
 
     def test_implied_defaults_swift_disable_dead_stripping(self):
         namespace = self.parse_default_args(['--swift-disable-dead-stripping'])
         self.assertTrue(namespace.swift_disable_dead_stripping)
 
-    def test_build_lib_swiftsyntaxparser_only(self):
-        namespace = self.parse_default_args(['--build-libparser-only'])
-        self.assertTrue(namespace.build_libparser_only)
+    def test_implied_defaults_xcode(self):
+        namespace = self.parse_default_args(['--xcode'])
+        self.assertEqual(namespace.cmake_generator, 'Xcode')
+        self.assertTrue(namespace.skip_build)
+        self.assertFalse(namespace.build_early_swift_driver)

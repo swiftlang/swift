@@ -572,13 +572,6 @@ option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
   "Enable global isel on arm64"
   FALSE)
 
-cmake_dependent_option(SWIFT_BUILD_SYNTAXPARSERLIB
-  "Build the Swift Syntax Parser library" TRUE
-  "SWIFT_ENABLE_DISPATCH" FALSE)
-cmake_dependent_option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  "Only build the Swift Syntax Parser library" FALSE
-  "SWIFT_BUILD_SYNTAXPARSERLIB" FALSE)
-
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
   "Build SourceKit" TRUE
   "SWIFT_ENABLE_DISPATCH" FALSE)
@@ -637,13 +630,13 @@ set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   # Only build libdispatch for the host if the host tools are being built and
   # specifically if these two libraries that depend on it are built.
-  if(SWIFT_INCLUDE_TOOLS AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
+  if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SOURCEKIT)
     set(SWIFT_BUILD_HOST_DISPATCH TRUE)
   endif()
 
   if(SWIFT_BUILD_HOST_DISPATCH OR SWIFT_CONCURRENCY_USES_DISPATCH)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SyntaxParserLib, SourceKit, and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SourceKit and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()

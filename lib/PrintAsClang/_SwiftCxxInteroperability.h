@@ -24,6 +24,9 @@
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
+#if !defined(SWIFT_CALL)
+# define SWIFT_CALL __attribute__((swiftcall))
+#endif
 
 // FIXME: Use always_inline, artificial.
 #define SWIFT_INLINE_THUNK inline
@@ -128,6 +131,11 @@ public:
   static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
     return object._opaquePointer;
   }
+  static inline void *_Nonnull copyOpaquePointer(
+      const RefCountedClass &object) {
+    swift_retain(object._opaquePointer);
+    return object._opaquePointer;
+  }
 };
 
 } // namespace _impl
@@ -191,6 +199,46 @@ extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
 
 extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
 
+extern "C" int $ss5ErrorMp; // external global %swift.protocol, align 4
+
+extern "C"
+    const void * _Nullable
+    swift_getTypeByMangledNameInContext(
+        const char *_Nullable typeNameStart,
+        size_t typeNameLength,
+        const void *_Nullable context,
+        const void *_Nullable const *_Nullable genericArgs) SWIFT_CALL;
+
+extern "C" bool swift_dynamicCast(void *_Nullable dest, void *_Nullable src,
+                                  const void *_Nullable srcType,
+                                  const void * _Nullable targetType,
+                                  uint32_t flags);
+
+struct SymbolicP {
+  alignas(2) uint8_t _1;
+  uint32_t _2;
+  uint8_t _3[2];
+  uint8_t _4;
+} __attribute__((packed));
+
+inline const void *_Nullable getErrorMetadata() {
+  static swift::SymbolicP errorSymbol;
+  static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
+  errorSymbol._1 = 2;
+  errorSymbol._2 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&got_ss5ErrorMp) - reinterpret_cast<uintptr_t>(&errorSymbol._2));
+  errorSymbol._3[0] = '_';
+  errorSymbol._3[1] = 'p';
+  errorSymbol._4 = 0;
+  static_assert(sizeof(errorSymbol) == 8, "");
+  auto charErrorSymbol = reinterpret_cast<const char *>(&errorSymbol);
+
+  const void *ptr2 =
+      swift::swift_getTypeByMangledNameInContext(charErrorSymbol,
+                                                 sizeof(errorSymbol) - 1,
+                                                 nullptr, nullptr);
+  return ptr2;
+}
+
 class Error {
 public:
   Error() {}
@@ -207,6 +255,29 @@ public:
     if (other.opaqueValue)
       swift_errorRetain(other.opaqueValue);
     opaqueValue = other.opaqueValue;
+  }
+
+  // FIXME: Return a Swift::Optional instead.
+  template<class T>
+  T as() {
+    alignas(alignof(T)) char buffer[sizeof(T)];
+    const void *em = getErrorMetadata();
+    void *ep = getPointerToOpaquePointer();
+    auto metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
+
+    // Dynamic cast will release the error, so we need to retain it.
+    swift::swift_errorRetain(ep);
+    bool dynamicCast =
+        swift::swift_dynamicCast(buffer, &ep, em, metadata,
+                                 /*take on success  destroy on failure*/ 6);
+
+    if (dynamicCast) {
+      return swift::_impl::implClassFor<T>::type::returnNewValue([&](char *dest) {
+            swift::_impl::implClassFor<T>::type::initializeWithTake(dest, buffer);
+          });
+    }
+    abort();
+    // FIXME: return nil.
   }
 
 private:

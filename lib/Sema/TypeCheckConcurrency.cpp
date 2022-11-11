@@ -45,6 +45,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
           return false;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           return true;
@@ -1302,11 +1303,19 @@ static void noteIsolatedActorMember(
   // FIXME: Make this diagnostic more sensitive to the isolation context of
   // the declaration.
   if (isDistributedActor) {
-    if (isa<VarDecl>(decl)) {
-      // Distributed actor properties are never accessible externally.
-      decl->diagnose(diag::distributed_actor_isolated_property,
-                     decl->getDescriptiveKind(), decl->getName(),
-                     nominal->getName());
+    if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+      if (varDecl->isDistributed()) {
+        // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
+        decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      } else {
+        // Distributed actor properties are never accessible externally.
+        decl->diagnose(diag::distributed_actor_isolated_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      }
+
     } else {
       // it's a function or subscript
       decl->diagnose(diag::note_distributed_actor_isolated_method,
@@ -4469,6 +4478,13 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
   if (isa<ProtocolDecl>(nominal))
     return nullptr;
 
+  // Move only nominal types are currently never sendable since we have not yet
+  // finished the generics model for them.
+  //
+  // TODO: Remove this once this is complete!
+  if (nominal->isMoveOnly())
+    return nullptr;
+
   // Actor types are always Sendable; they don't get it via this path.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl && classDecl->isActor())
@@ -4486,6 +4502,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
           return nullptr;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           break;

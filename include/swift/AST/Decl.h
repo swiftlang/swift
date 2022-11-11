@@ -159,10 +159,12 @@ enum class DescriptiveDeclKind : uint8_t {
   Enum,
   Struct,
   Class,
+  Actor,
   Protocol,
   GenericEnum,
   GenericStruct,
   GenericClass,
+  GenericActor,
   GenericType,
   Subscript,
   StaticSubscript,
@@ -499,9 +501,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+1+1,
     : NumPadBits,
 
     Depth : 16,
@@ -533,7 +534,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -570,6 +571,9 @@ protected:
 
     /// Whether we have a lazy-loaded list of primary associated types.
     HasLazyPrimaryAssociatedTypes : 1,
+
+    /// Whether we've computed the protocol requirements list yet.
+    ProtocolRequirementsValid : 1,
 
     : NumPadBits,
 
@@ -617,7 +621,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -631,6 +635,10 @@ protected:
     ///
     /// \sa ResilienceStrategy
     RawResilienceStrategy : 1,
+
+    /// Whether the module was rebuilt from a module interface instead of being
+    /// build from the full source.
+    IsBuiltFromInterface : 1,
 
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
@@ -2379,6 +2387,10 @@ public:
   /// Asserts if this is not a member of a protocol.
   bool isProtocolRequirement() const;
 
+  /// Return true if this is a member implementation for an \c @_objcImplementation
+  /// extension.
+  bool isObjCMemberImplementation() const;
+
   void setUserAccessible(bool Accessible) {
     Bits.ValueDecl.IsUserAccessible = Accessible;
   }
@@ -3174,29 +3186,6 @@ public:
   }
 };
 
-/// Abstract class describing generic type parameters and associated types,
-/// whose common purpose is to anchor the abstract type parameter and specify
-/// requirements for any corresponding type argument.
-class AbstractTypeParamDecl : public TypeDecl {
-protected:
-  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
-                        SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }) { }
-
-public:
-  /// Return the superclass of the generic parameter.
-  Type getSuperclass() const;
-
-  /// Retrieve the set of protocols to which this abstract type
-  /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
-
-  static bool classof(const Decl *D) {
-    return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
-           D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
-  }
-};
-
 /// A declaration of a generic type parameter.
 ///
 /// A generic type parameter introduces a new, named type parameter along
@@ -3211,7 +3200,7 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl final
-    : public AbstractTypeParamDecl,
+    : public TypeDecl,
       private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *,
                                     SourceLoc> {
   friend TrailingObjects;
@@ -3438,7 +3427,7 @@ public:
 ///   func getNext() -> Element?
 /// }
 /// \endcode
-class AssociatedTypeDecl : public AbstractTypeParamDecl {
+class AssociatedTypeDecl : public TypeDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
 
@@ -3502,7 +3491,7 @@ public:
   /// Retrieve the (first) overridden associated type declaration, if any.
   AssociatedTypeDecl *getOverriddenDecl() const {
     return cast_or_null<AssociatedTypeDecl>(
-                                   AbstractTypeParamDecl::getOverriddenDecl());
+        TypeDecl::getOverriddenDecl());
   }
 
   /// Retrieve the set of associated types overridden by this associated
@@ -4598,6 +4587,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
+  ArrayRef<ValueDecl *> ProtocolRequirements;
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4679,6 +4669,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
   friend class PrimaryAssociatedTypesRequest;
+  friend class ProtocolRequirementsRequest;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -4722,6 +4713,10 @@ public:
   /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
   ArrayRef<AssociatedTypeDecl *> getPrimaryAssociatedTypes() const;
 
+  /// Returns the list of all requirements (associated type and value)
+  /// associated with this protocol.
+  ArrayRef<ValueDecl *> getProtocolRequirements() const;
+
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.
   ValueDecl *getSingleRequirement(DeclName name) const;
@@ -4731,7 +4726,7 @@ public:
   AssociatedTypeDecl *getAssociatedType(Identifier name) const;
 
   /// Returns the existential type for this protocol.
-  Type getExistentialType() const {
+  Type getDeclaredExistentialType() const {
     return ExistentialType::get(getDeclaredInterfaceType());
   }
 
@@ -4793,6 +4788,13 @@ private:
   }
   void setInheritedProtocolsValid() {
     Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
+
+  bool areProtocolRequirementsValid() const {
+    return Bits.ProtocolDecl.ProtocolRequirementsValid;
+  }
+  void setProtocolRequirementsValid() {
+    Bits.ProtocolDecl.ProtocolRequirementsValid = true;
   }
 
 public:

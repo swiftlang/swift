@@ -5774,12 +5774,41 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
+  auto diagnoseSingleElement = [&](Diag<Type, Type> msg, Type eltType,
+                                   Type contextualType) {
+    auto diagnostic = emitDiagnostic(msg, eltType, contextualType);
+    (void)trySequenceSubsequenceFixIts(diagnostic);
+  };
+
   auto diagnoseAllOccurrences = [&](Diag<Type, Type> diagnostic) {
     assert(AffectedElements.size() > 1);
     for (auto *element : AffectedElements) {
       emitDiagnosticAt(element->getLoc(), diagnostic, eltType, contextualType);
     }
   };
+
+  if (locator->isForSequenceElementType()) {
+    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
+         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
+        contextualType->hasUnresolvedType()) {
+      auto diagnostic = emitDiagnostic(
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType);
+      (void)trySequenceSubsequenceFixIts(diagnostic);
+    } else {
+      diagnoseSingleElement(contextualType->isExistentialType()
+                                ? diag::cannot_convert_sequence_element_protocol
+                                : diag::cannot_convert_sequence_element_value,
+                            eltType, contextualType);
+    }
+    return true;
+  }
 
   auto isFixedToDictionary = [&](ArrayExpr *anchor) {
     return llvm::any_of(getSolution().Fixes, [&](ConstraintFix *fix) {
@@ -5790,7 +5819,6 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   };
 
   bool treatAsDictionary = false;
-  Optional<InFlightDiagnostic> diagnostic;
   if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
     if (!(treatAsDictionary = isFixedToDictionary(AE))) {
       if (AffectedElements.size() > 1) {
@@ -5798,8 +5826,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
-                                        eltType, contextualType));
+      diagnoseSingleElement(diag::cannot_convert_array_element, eltType,
+                            contextualType);
+      return true;
     }
   }
 
@@ -5812,9 +5841,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_key, eltType,
-                                        contextualType));
-      break;
+      diagnoseSingleElement(diag::cannot_convert_dict_key, eltType,
+                            contextualType);
+      return true;
     }
 
     case 1: { // value
@@ -5823,9 +5852,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
         return true;
       }
 
-      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_value,
-                                        eltType, contextualType));
-      break;
+      diagnoseSingleElement(diag::cannot_convert_dict_value, eltType,
+                            contextualType);
+      return true;
     }
 
     default:
@@ -5833,33 +5862,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     }
   }
 
-  if (locator->isForSequenceElementType()) {
-    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
-    // If this is a conversion failure related to binding of `for-each`
-    // statement it has to be diagnosed as pattern match if there are
-    // holes present in the contextual type.
-    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
-         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
-        contextualType->hasUnresolvedType()) {
-      diagnostic.emplace(emitDiagnostic(
-          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
-              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
-              : diag::cannot_match_unresolved_expr_pattern_with_value,
-          eltType));
-    } else {
-      diagnostic.emplace(
-          emitDiagnostic(contextualType->isExistentialType()
-                             ? diag::cannot_convert_sequence_element_protocol
-                             : diag::cannot_convert_sequence_element_value,
-                         eltType, contextualType));
-    }
-  }
-
-  if (!diagnostic)
-    return false;
-
-  (void)trySequenceSubsequenceFixIts(*diagnostic);
-  return true;
+  return false;
 }
 
 bool MissingContextualConformanceFailure::diagnoseAsError() {

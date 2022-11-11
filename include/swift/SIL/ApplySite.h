@@ -474,6 +474,33 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// If this is a terminator apply site, then pass a builder to insert at the
+  /// first instruction of each successor to \p func. Otherwise, pass a builder
+  /// to insert at std::next(Inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not an apply site is a terminator when inserting
+  /// instructions after an apply site. This results in eliminating unnecessary
+  /// if-else code otherwise required to handle such situations.
+  ///
+  /// NOTE: We pass std::next() for begin_apply. If one wishes to insert code
+  /// /after/ the end_apply/abort_apply, please use instead
+  /// insertAfterApplication.
+  void insertAfterInvocation(function_ref<void(SILBuilder &)> func) const;
+
+  /// Pass a builder with insertion points that are guaranteed to be immediately
+  /// after this apply site has been applied.
+  ///
+  /// For apply and try_apply, that means after the apply.  For partial_apply,
+  /// that means after the partial_apply.  For begin_apply, that means after its
+  /// end_apply and abort_apply instructions.
+  ///
+  /// This is just like insertAfterInvocation except that if the full apply site
+  /// is a begin_apply, we pass the insertion points after the end_apply,
+  /// abort_apply rather than an insertion point right after the
+  /// begin_apply. For such functionality, please invoke insertAfterInvocation.
+  void insertAfterApplication(function_ref<void(SILBuilder &)> func) const;
+
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.
   bool isNonThrowing() const {
@@ -659,29 +686,6 @@ public:
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
-
-  /// If this is a terminator apply site, then pass a builder to insert at the
-  /// first instruction of each successor to \p func. Otherwise, pass a builder
-  /// to insert at std::next(Inst).
-  ///
-  /// The intention is that this abstraction will enable the compiler writer to
-  /// ignore whether or not an apply site is a terminator when inserting
-  /// instructions after an apply site. This results in eliminating unnecessary
-  /// if-else code otherwise required to handle such situations.
-  ///
-  /// NOTE: We pass std::next() for begin_apply. If one wishes to insert code
-  /// /after/ the end_apply/abort_apply, please use instead
-  /// insertAfterFullEvaluation.
-  void insertAfterInvocation(function_ref<void(SILBuilder &)> func) const;
-
-  /// Pass a builder with insertion points that are guaranteed to be immediately
-  /// after this full apply site has completely finished executing.
-  ///
-  /// This is just like insertAfterInvocation except that if the full apply site
-  /// is a begin_apply, we pass the insertion points after the end_apply,
-  /// abort_apply rather than an insertion point right after the
-  /// begin_apply. For such functionality, please invoke insertAfterInvocation.
-  void insertAfterFullEvaluation(function_ref<void(SILBuilder &)> func) const;
 
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.

@@ -40,6 +40,9 @@ FeatureName,
 /// Determine whether the given feature is suppressible.
 bool isSuppressibleFeature(Feature feature);
 
+/// Check whether the given feature is available in production compilers.
+bool isFeatureAvailableInProduction(Feature feature);
+
 /// Determine the in-source name of the given feature.
 llvm::StringRef getFeatureName(Feature feature);
 

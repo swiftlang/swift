@@ -418,7 +418,24 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // First canonicalize ownership.
-    changed |= canonicalizer.canonicalizeValueLifetime(markedValue);
+    if (!canonicalizer.canonicalizeValueLifetime(markedValue)) {
+      // If we failed to canonicalize ownership, there was something in the SIL
+      // that copy propagation did not understand. Emit a we did not understand
+      // error.
+      if (markedValue->getType().isMoveOnlyWrapped()) {
+        diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+      } else {
+        diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_moveonly);
+      }
+      valuesWithDiagnostics.insert(markedValue);
+      continue;
+    } else {
+      // Always set changed to true if we succeeded in canonicalizing since we
+      // may have rewritten copies.
+      changed = true;
+    }
 
     // If we are asked to perform guaranteed checking, emit an error if we have
     // /any/ consuming uses.
@@ -525,12 +542,19 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
+    // Only run this pass if the move only language feature is enabled.
+    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
+      return;
+
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
+
+    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
+                            << fn->getName() << '\n');
 
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();

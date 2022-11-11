@@ -167,10 +167,11 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
 
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
-  if (auto *CD = dyn_cast<ClassDecl>(VD)) {
-    // Actors are not exposable to C++.
-    if (CD->isAnyActor())
-      return {Unsupported, UnrepresentableActorClass};
+  if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
+    return {Unsupported, UnrepresentableIsolatedInActor};
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (AFD->hasAsync())
+      return {Unsupported, UnrepresentableAsync};
   }
   return {Representable, llvm::None};
 }

@@ -1274,7 +1274,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
   // appear in the type of `origFnType`.
-  // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+  // TODO: If possible, change `autodiff::getLoweredParameterIndices` to
   // take `CaptureInfo` into account.
   if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
     silParamIndices = silParamIndices->extendingCapacity(
@@ -1440,7 +1440,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   if (declCtx->getSelfClassDecl()) {
     // Designated initializers for classes, as well as @objc convenience
-    // initializers, have have separate entry points for allocation and
+    // initializers, have separate entry points for allocation and
     // initialization.
     if (decl->isDesignatedInit() || decl->isObjC()) {
       emitOrDelayFunction(*this, constant);
@@ -1590,9 +1590,12 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
 
   emitAbstractFuncDecl(dd);
 
-  // Emit the deallocating destructor.
-  SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
-  emitFunctionDefinition(deallocator, getFunction(deallocator, ForDefinition));
+  // Emit the deallocating destructor if we have a body.
+  if (dd->hasBody()) {
+    SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
+    emitFunctionDefinition(deallocator,
+                           getFunction(deallocator, ForDefinition));
+  }
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,

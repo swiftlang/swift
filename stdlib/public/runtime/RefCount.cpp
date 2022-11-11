@@ -15,10 +15,10 @@
 namespace swift {
 
 template <typename RefCountBits>
-void RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
-                                            uint32_t n) {
+HeapObject *RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
+                                                   uint32_t n) {
   if (oldbits.isImmortal(false)) {
-    return;
+    return getHeapObject();
   }
   else if (oldbits.hasSideTable()) {
     // Out-of-line slow path.
@@ -29,9 +29,14 @@ void RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
     // Retain count overflow.
     swift::swift_abortRetainOverflow();
   }
+  return getHeapObject();
 }
-template void RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits, uint32_t n);
-template void RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits, uint32_t n);
+template HeapObject *
+RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits,
+                                             uint32_t n);
+template HeapObject *
+RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits,
+                                                uint32_t n);
 
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,

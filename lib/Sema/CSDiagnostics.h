@@ -443,7 +443,8 @@ protected:
 /// }
 /// ```
 ///
-/// `S.T` is not the same type as `Int`, which is required by `foo`.
+/// The generic parameter packs `T` and `U` are not known to have the same
+/// shape, which is required by `foo()`.
 class SameShapeRequirementFailure final : public RequirementFailure {
 public:
   SameShapeRequirementFailure(const Solution &solution, Type lhs, Type rhs,

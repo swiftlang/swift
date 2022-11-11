@@ -2,7 +2,7 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module > %t/out.ir
-// RUN: %FileCheck --input-file=%t/out.ir %s
+// RUN: %FileCheck --input-file=%t/out.ir %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
@@ -121,7 +121,8 @@ protocol InheritingProtocol : BaseProtocol { }
 // CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
 class ImplementingClass : InheritingProtocol { }
 
-// CHECK: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = weak hidden constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+// CHECK-linux: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = weak hidden constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+// CHECK-macosx: @"_OBJC_$_PROTOCOL_REFS_NSDoubleInheritedFunging" = internal global{{.*}}i64 2{{.*}} @"_OBJC_PROTOCOL_$_NSFungingAndRuncing"{{.*}} @"_OBJC_PROTOCOL_$_NSFunging"
 
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @"$s14objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F"
@@ -216,4 +217,14 @@ func gallop<T : Vanner>(_ t: Stirrup<T>) {
 // https://github.com/apple/swift/issues/49678
 func triggerDoubleInheritedFunging() -> AnyObject {
   return NSDoubleInheritedFunging.self as AnyObject
+}
+
+class TestNonRuntimeProto : RuntimeP { }
+
+class TestNonRuntime2Proto : Runtime2P {}
+
+public class SomeImpl : DeclarationOnlyUser {
+    public func printIt() {
+        print("hello")
+    }
 }

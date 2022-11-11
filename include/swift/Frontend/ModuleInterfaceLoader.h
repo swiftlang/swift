@@ -300,6 +300,7 @@ struct ModuleInterfaceLoaderOptions {
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
+  bool strictImplicitModuleContext = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
@@ -307,6 +308,7 @@ struct ModuleInterfaceLoaderOptions {
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
     downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
+    strictImplicitModuleContext(Opts.StrictImplicitModuleContext),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
@@ -439,7 +441,8 @@ public:
       StringRef OutPath, StringRef ABIOutputPath,
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t RequireOSSAModules);
+      RequireOSSAModules_t RequireOSSAModules,
+      bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
@@ -479,6 +482,7 @@ private:
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,
@@ -522,6 +526,7 @@ public:
                                            StringRef interfacePath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
+                                           bool silenceErrors,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;

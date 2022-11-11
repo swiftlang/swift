@@ -3,7 +3,10 @@ add_swift_host_library(swiftSIL STATIC
 target_link_libraries(swiftSIL PUBLIC
   swiftDemangling)
 target_link_libraries(swiftSIL PRIVATE
-  swiftSema)
+  swiftAST
+  swiftClangImporter
+  swiftSema
+  swiftSerialization)
 
 add_subdirectory(IR)
 add_subdirectory(Utils)

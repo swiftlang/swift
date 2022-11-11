@@ -13,14 +13,16 @@ add_swift_host_library(swiftFrontend STATIC
   ModuleInterfaceLoader.cpp
   ModuleInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
+  Serialization.cpp
   SerializedDiagnosticConsumer.cpp)
 add_dependencies(swiftFrontend
   SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
+  swiftAPIDigester
   swiftAST
   swiftConstExtract
+  swiftIDE
   swiftSIL
-  swiftMigrator
   swiftOption
   swiftSILGen
   swiftSILOptimizer
@@ -28,6 +30,6 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftLocalization
   swiftSema
   swiftSerialization
-  swiftAPIDigester)
+  swiftSymbolGraphGen)
 
 set_swift_llvm_is_available(swiftFrontend)

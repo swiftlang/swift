@@ -34,8 +34,9 @@
 /// and OVERRIDE_KEYPATH to get only those entries.
 
 // NOTE: this file is used to build the definition of OverrideSection in
-// CompatibilityOverride.cpp, which is part of the ABI. Do not move or remove entries
-// in this file after ABI stability. Additional entries can be added to the end.
+// Overrides.cpp for the 5.0 compatibility library.  It matches the
+// definition of OverrideSection for the 5.0 release and must not be
+// edited.
 
 #ifdef OVERRIDE
 #  define OVERRIDE_METADATALOOKUP OVERRIDE

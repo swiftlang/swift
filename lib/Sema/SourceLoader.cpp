@@ -94,7 +94,8 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ImportPath::Module path) {
+                                     ImportPath::Module path,
+                                     bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;

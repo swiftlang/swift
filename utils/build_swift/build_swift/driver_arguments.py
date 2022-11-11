@@ -122,6 +122,10 @@ def _apply_default_arguments(args):
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
+    elif args.cmake_generator == 'Xcode':
+        # Building with Xcode is deprecated.
+        args.skip_build = True
+        args.build_early_swift_driver = False
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
@@ -749,9 +753,6 @@ def create_argument_parser():
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
-
-    option(['--build-libparser-only'], toggle_true('build_libparser_only'),
-           help='build only libParser for SwiftSyntax')
 
     option(['--build-lld'], toggle_true('build_lld'),
            help='build lld as part of llvm')

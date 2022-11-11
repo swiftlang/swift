@@ -136,6 +136,7 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   auto tmpBufferID = tmpSM.addNewSourceBuffer(std::move(*tmpBuffer));
   SourceFile *tmpSF = new (tmpCtx)
       SourceFile(*tmpM, SF.Kind, tmpBufferID, SF.getParsingOptions());
+  tmpM->addAuxiliaryFile(*tmpSF);
 
   // If the top-level code has been changed, we can't do anything.
   if (SF.getInterfaceHash() != tmpSF->getInterfaceHash())

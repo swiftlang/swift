@@ -2913,6 +2913,7 @@ namespace {
 
       auto elementResultType = CS.getType(expr->getPatternExpr());
       auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                             TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
@@ -3633,6 +3634,12 @@ namespace {
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
         auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        if (!refType) {
+          ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
+                             macroIdent)
+              .highlight(expr->getMacroNameLoc().getSourceRange());
+          return Type();
+        }
         if (expr->getArgs()) {
           CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
           // FIXME: Do we have object-like vs. function-like macros?

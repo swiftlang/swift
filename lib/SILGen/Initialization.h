@@ -341,9 +341,7 @@ public:
   }
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override {
-    /// This just ignores the provided value.
-  }
+                           ManagedValue value, bool isInit) override;
 
   void finishUninitialized(SILGenFunction &SGF) override {
     // do nothing

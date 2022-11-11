@@ -16,6 +16,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -24,18 +25,18 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -4490,7 +4491,7 @@ public:
 
     dtor->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
+    dtor->setAccess(std::max(cast<NominalTypeDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
     if (isImplicit)
@@ -5129,6 +5130,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       default:
         // We don't know how to deserialize this kind of attribute.
         MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+      }
+
+      // Do a quick check to see if this attribute is a move only attribute. If
+      // so, emit a nice error if we don't have experimental move only enabled.
+      if (Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
+          !MF.getContext().LangOpts.Features.contains(Feature::MoveOnly)) {
+        MF.getContext().Diags.diagnose(
+            SourceLoc(),
+            diag::
+                experimental_moveonly_feature_can_only_be_imported_when_enabled,
+            MF.getAssociatedModule()->getName());
       }
 
       if (!skipAttr) {

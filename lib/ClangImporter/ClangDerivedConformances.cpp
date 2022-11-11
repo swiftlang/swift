@@ -41,6 +41,22 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   return result;
 }
 
+/// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
+/// dependency on Sema.
+static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
+                               ModuleDecl *module) {
+  if (conformanceRef.isInvalid())
+    return false;
+  if (!conformanceRef.isConcrete())
+    return false;
+  auto conformance = conformanceRef.getConcrete();
+  auto subMap = conformance->getSubstitutions(module);
+  return llvm::all_of(subMap.getConformances(),
+                      [&](ProtocolConformanceRef each) -> bool {
+                        return isConcreteAndValid(each, module);
+                      });
+}
+
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
@@ -126,7 +142,9 @@ static ValueDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    if (!module->conformsToProtocol(returnTy, binaryIntegerProto))
+    auto conformanceRef =
+        module->lookupConformance(returnTy, binaryIntegerProto);
+    if (!isConcreteAndValid(conformanceRef, module))
       return false;
     return true;
   };
@@ -273,13 +291,13 @@ void swift::conformToCxxIteratorIfNeeded(
 
   // Try to conform to UnsafeCxxRandomAccessIterator if possible.
 
-  auto minus = dyn_cast<FuncDecl>(getMinusOperator(decl));
+  auto minus = dyn_cast_or_null<FuncDecl>(getMinusOperator(decl));
   if (!minus)
     return;
   auto distanceTy = minus->getResultInterfaceType();
   // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
 
-  auto plusEqual = dyn_cast<FuncDecl>(getPlusEqualOperator(decl, distanceTy));
+  auto plusEqual = dyn_cast_or_null<FuncDecl>(getPlusEqualOperator(decl, distanceTy));
   if (!plusEqual)
     return;
 
@@ -331,9 +349,10 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef = decl->getModuleContext()->conformsToProtocol(
-      rawIteratorTy, cxxIteratorProto);
-  if (!rawIteratorConformanceRef || !rawIteratorConformanceRef.isConcrete())
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -356,11 +375,57 @@ void swift::conformToCxxSequenceIfNeeded(
           return declSelfTy;
         return Type(dependentType);
       },
-      LookUpConformanceInModule(decl->getModuleContext()));
+      LookUpConformanceInModule(module));
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
+
+  // Try to conform to CxxRandomAccessCollection if possible.
+
+  auto cxxRAIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRAIteratorProto ||
+      !ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection))
+    return;
+
+  // Check if `begin()` and `end()` are non-mutating.
+  if (begin->isMutating() || end->isMutating())
+    return;
+
+  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
+  auto rawIteratorRAConformanceRef =
+      decl->getModuleContext()->lookupConformance(rawIteratorTy,
+                                                   cxxRAIteratorProto);
+  if (!isConcreteAndValid(rawIteratorRAConformanceRef, module))
+    return;
+
+  // CxxRandomAccessCollection always uses Int as an Index.
+  auto indexTy = ctx.getIntType();
+
+  auto sliceTy = ctx.getSliceType();
+  sliceTy = sliceTy.subst(
+      [&](SubstitutableType *dependentType) {
+        if (dependentType->isEqual(cxxSequenceSelfTy))
+          return declSelfTy;
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(module));
+
+  auto indicesTy = ctx.getRangeType();
+  indicesTy = indicesTy.subst(
+      [&](SubstitutableType *dependentType) {
+        if (dependentType->isEqual(cxxSequenceSelfTy))
+          return indexTy;
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(module));
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"), sliceTy);
+  impl.addSynthesizedProtocolAttrs(
+      decl, {KnownProtocolKind::CxxRandomAccessCollection});
 }

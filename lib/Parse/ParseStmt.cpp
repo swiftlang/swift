@@ -206,6 +206,7 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
   case BraceItemListKind::Brace:
   case BraceItemListKind::TopLevelCode:
   case BraceItemListKind::TopLevelLibrary:
+  case BraceItemListKind::MacroExpansion:
     return false;
   case BraceItemListKind::Case: {
     if (Tok.is(tok::pound_if)) {

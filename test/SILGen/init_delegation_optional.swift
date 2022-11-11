@@ -423,7 +423,7 @@ extension Optional where Wrapped == Optional<Bool> {
     self = .none
   }
 
-  // CHECK_LABEL: sil hidden [ossa] @$sSq24init_delegation_optionalSbSgRszlE13SpecFailable3ABSgSgyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$sSq24init_delegation_optionalSbSgRszlE13SpecFailable3ABSgSgyt_tcfC
   init?(SpecFailable3: ()) {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin Optional<Optional<Bool>>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Optional<Optional<Bool>> }, var

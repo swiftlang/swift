@@ -12,12 +12,6 @@
 // CHECK:   typealias RawIterator = ConstIteratorOutOfLineEq
 // CHECK: }
 
-// CHECK: struct SimpleArrayWrapper : CxxSequence {
-// CHECK:   typealias Element = UnsafePointer<Int32>.Pointee
-// CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapper>
-// CHECK:   typealias RawIterator = UnsafePointer<Int32>
-// CHECK: }
-
 // CHECK: struct SimpleArrayWrapperNullableIterators : CxxSequence {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapperNullableIterators>

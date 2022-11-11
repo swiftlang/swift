@@ -47,7 +47,7 @@ def fixit_loc(start_col, orig_suffix):
 // No physical file with the same name
 //
 
-// There shoud be no warning for a purely virtual file.
+// There should be no warning for a purely virtual file.
 // no-warning
 #sourceLocation(file: "other_file_a.swift", line: 40)
 #sourceLocation()

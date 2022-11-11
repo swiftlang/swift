@@ -1881,26 +1881,6 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
   return *decl->getObjCRuntimeName(true);
 }
 
-static bool isObjCImplementation(AbstractFunctionDecl *method,
-                                 ObjCSelector methodName) {
-  auto ext = dyn_cast<ExtensionDecl>(method->getDeclContext());
-  if (!ext || !ext->isObjCImplementation())
-    return false;
-
-  auto contextInterface =
-      dyn_cast<IterableDeclContext>(ext->getImplementedObjCDecl());
-
-  for (auto otherMember : contextInterface->getMembers()) {
-    auto otherMethod = dyn_cast<AbstractFunctionDecl>(otherMember);
-    if (!otherMethod) continue;
-
-    if (otherMethod->getObjCSelector() == methodName)
-      return true;
-  }
-
-  return false;
-}
-
 /// Mark the given declaration as being Objective-C compatible (or
 /// not) as appropriate.
 ///
@@ -2062,8 +2042,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
     // Record the method in the type, if it's a member of one.
     if (auto tyDecl = D->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (!isObjCImplementation(method, selector))
-        tyDecl->recordObjCMethod(method, selector);
+      tyDecl->recordObjCMethod(method, selector);
     }
 
     // Record the method in the source file.

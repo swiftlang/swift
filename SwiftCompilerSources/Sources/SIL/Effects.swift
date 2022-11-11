@@ -128,6 +128,14 @@ extension Function {
     default:
       break
     }
+    if isProgramTerminationPoint {
+      // We can ignore any memory writes in a program termination point, because it's not relevant
+      // for the caller. But we need to consider memory reads, otherwise preceeding memory writes
+      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
+      // for error strings which are printed by the program termination point.
+      // Regarding ownership: a program termination point must not touch any reference counted objects.
+      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+    }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
     case .none:

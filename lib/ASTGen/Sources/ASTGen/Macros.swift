@@ -116,12 +116,13 @@ public func getMacroEvaluationContext(
   contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
     return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
       .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
+      .rawValue
   }
 }
 
-
 @_cdecl("swift_ASTGen_evaluateMacro")
-public func evaluateMacro(
+@usableFromInline
+func evaluateMacro(
   sourceFilePtr: UnsafePointer<UInt8>,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
@@ -154,7 +155,8 @@ public func evaluateMacro(
     }
 
     guard let parentSyntax = token.parent,
-          parentSyntax.is(MacroExpansionExprSyntax.self) else {
+      parentSyntax.is(MacroExpansionExprSyntax.self)
+    else {
       print("not on a macro expansion node: \(token.recursiveDescription)")
       return -1
     }
@@ -188,4 +190,26 @@ public func evaluateMacro(
 
     return 0
   }
+}
+
+/// Calls the given `allMacros: [Any.Type]` function pointer and produces a
+/// newly allocated buffer containing metadata pointers.
+@_cdecl("swift_ASTGen_getMacroTypes")
+@usableFromInline
+func getMacroTypes(
+  getterAddress: UnsafeRawPointer,
+  resultAddress: UnsafeMutablePointer<UnsafePointer<UnsafeRawPointer>?>,
+  count: UnsafeMutablePointer<Int>
+) {
+  let getter = unsafeBitCast(
+    getterAddress, to: (@convention(thin) () -> [Any.Type]).self)
+  let metatypes = getter()
+  let address = UnsafeMutableBufferPointer<Any.Type>.allocate(
+    capacity: metatypes.count
+  )
+  _ = address.initialize(from: metatypes)
+  address.withMemoryRebound(to: UnsafeRawPointer.self) {
+    resultAddress.initialize(to: UnsafePointer($0.baseAddress))
+  }
+  count.initialize(to: address.count)
 }

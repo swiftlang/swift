@@ -373,4 +373,94 @@ struct HasNoDereferenceOperator {
   }
 };
 
+// MARK: Types that claim to be random access iterators, but actually aren't.
+
+struct HasNoMinusOperator {
+  int value;
+
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasNoMinusOperator(int value) : value(value) {}
+  HasNoMinusOperator(const HasNoMinusOperator &other) = default;
+
+  const int &operator*() const { return value; }
+
+  HasNoMinusOperator &operator++() {
+    value++;
+    return *this;
+  }
+  void operator+=(difference_type v) { value += v; }
+  void operator-=(difference_type v) { value -= v; }
+  HasNoMinusOperator operator+(difference_type v) const {
+    return HasNoMinusOperator(value + v);
+  }
+  HasNoMinusOperator operator-(difference_type v) const {
+    return HasNoMinusOperator(value - v);
+  }
+  friend HasNoMinusOperator operator+(difference_type v,
+                                      const HasNoMinusOperator &it) {
+    return it + v;
+  }
+
+  bool operator<(const HasNoMinusOperator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const HasNoMinusOperator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasNoMinusOperator &other) const {
+    return value != other.value;
+  }
+};
+
+struct HasNoPlusEqualOperator {
+  int value;
+
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasNoPlusEqualOperator(int value) : value(value) {}
+  HasNoPlusEqualOperator(const HasNoPlusEqualOperator &other) = default;
+
+  const int &operator*() const { return value; }
+
+  HasNoPlusEqualOperator &operator++() {
+    value++;
+    return *this;
+  }
+  void operator-=(difference_type v) { value -= v; }
+  HasNoPlusEqualOperator operator+(difference_type v) const {
+    return HasNoPlusEqualOperator(value + v);
+  }
+  HasNoPlusEqualOperator operator-(difference_type v) const {
+    return HasNoPlusEqualOperator(value - v);
+  }
+  friend HasNoPlusEqualOperator operator+(difference_type v,
+                                          const HasNoPlusEqualOperator &it) {
+    return it + v;
+  }
+  int operator-(const HasNoPlusEqualOperator &other) const {
+    return value - other.value;
+  }
+
+  bool operator<(const HasNoPlusEqualOperator &other) const {
+    return value < other.value;
+  }
+
+  bool operator==(const HasNoPlusEqualOperator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasNoPlusEqualOperator &other) const {
+    return value != other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

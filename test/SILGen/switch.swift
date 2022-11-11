@@ -635,6 +635,133 @@ func test_isa_class_2(x: B) -> AnyObject {
 }
 // CHECK: } // end sil function '$s6switch16test_isa_class_21xyXlAA1BC_tF'
 
+// https://github.com/apple/swift/issues/56139
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch31test_isa_pattern_array_downcast2psySayAA1P_pG_tF : $@convention(thin) (@guaranteed Array<any P>) -> () {
+func test_isa_pattern_array_downcast(ps: Array<P>) {
+  // CHECK: bb0(%0 : @guaranteed $Array<any P>):
+  switch ps {
+  // CHECK: checked_cast_addr_br copy_on_success Array<any P> in [[P:%[0-9]+]] : $*Array<any P> to Array<X> in {{%[0-9]+}} : $*Array<X>, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  case is [X]:
+    // CHECK: [[IS_X]]:
+    // CHECK: function_ref @$s6switch1ayyF
+    a()
+    // CHECK: br [[CONT:bb[0-9]+]]
+
+  // CHECK: [[IS_NOT_X]]:
+  // CHECK: [[DEST:%[0-9]+]] = alloc_stack $Array<Y>
+  // CHECK-NEXT: checked_cast_addr_br copy_on_success Array<any P> in [[P:%[0-9]+]] : $*Array<any P> to Array<Y> in [[DEST]] : $*Array<Y>, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  case let _ as [Y]:
+    // CHECK: [[IS_Y]]:
+    // CHECK-NEXT: load [take] [[DEST]] : $*Array<Y>
+    // CHECK: function_ref @$s6switch1byyF
+    b()
+    // CHECK: br [[CONT]]
+  default:
+    // CHECK: [[IS_NOT_Y]]:
+    // CHECK: function_ref @$s6switch1cyyF
+    c()
+    // CHECK: br [[CONT]]
+  }
+  // CHECK: [[CONT]]:
+  // CHECK: function_ref @$s6switch1dyyF
+  d()
+}
+// CHECK: } // end sil function '$s6switch31test_isa_pattern_array_downcast2psySayAA1P_pG_tF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch39test_isa_pattern_array_downcast_closureyyF : $@convention(thin) () -> () {
+// CHECK: function_ref @$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_
+// CHECK: } // end sil function '$s6switch39test_isa_pattern_array_downcast_closureyyF'
+func test_isa_pattern_array_downcast_closure() {
+// CHECK-LABEL: sil private [ossa] @$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_ : $@convention(thin) (@guaranteed Array<any P>) -> () {
+  let _ = { (ps: [P]) -> Void in
+    // CHECK: bb0(%0 : @guaranteed $Array<any P>):
+    switch ps {
+    // CHECK: [[DEST:%[0-9]+]] = alloc_stack $Array<X>
+    // CHECK-NEXT: checked_cast_addr_br copy_on_success Array<any P> in [[P:%[0-9]+]] : $*Array<any P> to Array<X> in [[DEST]] : $*Array<X>, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+    case let _ as [X]:
+      // CHECK: [[IS_X]]:
+      // CHECK-NEXT: load [take] [[DEST]] : $*Array<X>
+      // CHECK: function_ref @$s6switch1ayyF
+      a()
+      // CHECK: br [[CONT:bb[0-9]+]]
+
+    // CHECK: [[IS_NOT_X]]:
+    // CHECK: br [[DEF:bb[0-9]+]]
+    default:
+      // CHECK: [[DEF]]:
+      // CHECK: function_ref @$s6switch1byyF
+      b()
+      // CHECK: br [[CONT]]
+    }
+  }
+  // CHECK: } // end sil function '$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_'
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch30test_isa_pattern_dict_downcast2psySDySSAA1P_pG_tF : $@convention(thin) (@guaranteed Dictionary<String, any P>) -> () {
+func test_isa_pattern_dict_downcast(ps: Dictionary<String, P>) {
+  // CHECK: bb0(%0 : @guaranteed $Dictionary<String, any P>):
+  switch ps {
+  // CHECK: checked_cast_addr_br copy_on_success Dictionary<String, any P> in [[P:%[0-9]+]] : $*Dictionary<String, any P> to Dictionary<String, X> in {{%[0-9]+}} : $*Dictionary<String, X>, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  case is [String : X]:
+    // CHECK: [[IS_X]]:
+    // CHECK: function_ref @$s6switch1ayyF
+    a()
+    // CHECK: br [[CONT:bb[0-9]+]]
+
+  // CHECK: [[IS_NOT_X]]:
+  // CHECK: [[DEST:%[0-9]+]] = alloc_stack $Dictionary<String, Y>
+  // CHECK-NEXT: checked_cast_addr_br copy_on_success Dictionary<String, any P> in [[P:%[0-9]+]] : $*Dictionary<String, any P> to Dictionary<String, Y> in [[DEST]] : $*Dictionary<String, Y>, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  case let _ as [String : Y]:
+    // CHECK: [[IS_Y]]:
+    // CHECK-NEXT: load [take] [[DEST]] : $*Dictionary<String, Y>
+    // CHECK: function_ref @$s6switch1byyF
+    b()
+    // CHECK: br [[CONT]]
+  default:
+    // CHECK: [[IS_NOT_Y]]:
+    // CHECK: function_ref @$s6switch1cyyF
+    c()
+    // CHECK: br [[CONT]]
+  }
+  // CHECK: [[CONT]]:
+  // CHECK: function_ref @$s6switch1dyyF
+  d()
+}
+// CHECK-LABEL: } // end sil function '$s6switch30test_isa_pattern_dict_downcast2psySDySSAA1P_pG_tF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch29test_isa_pattern_set_downcast2psyShyxG_tSHRzlF : $@convention(thin) <T where T : Hashable> (@guaranteed Set<T>) -> () {
+func test_isa_pattern_set_downcast<T: Hashable>(ps: Set<T>) {
+  // CHECK: bb0(%0 : @guaranteed $Set<T>):
+  switch ps {
+  // CHECK: checked_cast_addr_br copy_on_success Set<T> in [[P:%[0-9]+]] : $*Set<T> to Set<Int> in {{%[0-9]+}} : $*Set<Int>, [[IS_INT:bb[0-9]+]], [[IS_NOT_INT:bb[0-9]+]]
+  case is Set<Int>:
+    // CHECK: [[IS_INT]]:
+    // CHECK: function_ref @$s6switch1ayyF
+    a()
+    // CHECK: br [[CONT:bb[0-9]+]]
+
+  // CHECK: [[IS_NOT_INT]]:
+  // CHECK: [[DEST:%[0-9]+]] = alloc_stack $Set<Bool>
+  // CHECK-NEXT: checked_cast_addr_br copy_on_success Set<T> in [[P:%[0-9]+]] : $*Set<T> to Set<Bool> in [[DEST]] : $*Set<Bool>, [[IS_BOOL:bb[0-9]+]], [[IS_NOT_BOOL:bb[0-9]+]]
+  case let _ as Set<Bool>:
+    // CHECK: [[IS_BOOL]]:
+    // CHECK-NEXT: load [take] [[DEST]] : $*Set<Bool>
+    // CHECK: function_ref @$s6switch1byyF
+    b()
+    // CHECK: br [[CONT]]
+  default:
+    // CHECK: [[IS_NOT_BOOL]]:
+    // CHECK: function_ref @$s6switch1cyyF
+    c()
+    // CHECK: br [[CONT]]
+  }
+  // CHECK: [[CONT]]:
+  // CHECK: function_ref @$s6switch1dyyF
+  d()
+}
+// CHECK: } // end sil function '$s6switch29test_isa_pattern_set_downcast2psyShyxG_tSHRzlF'
+
 enum MaybePair {
   case Neither
   case Left(Int)

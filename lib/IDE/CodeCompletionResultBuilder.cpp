@@ -27,7 +27,7 @@ using namespace swift::ide;
 
 static bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   // Avoid trying to generate a USR for some declaration types.
-  if (isa<AbstractTypeParamDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
+  if (isa<GenericTypeParamDecl>(VD))
     return false;
   if (isa<ParamDecl>(VD))
     return false;

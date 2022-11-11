@@ -8,6 +8,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: freestanding
 
 import StdlibUnittest
 

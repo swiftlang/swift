@@ -25,6 +25,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp
+  GenHasSymbol.cpp
   GenHeap.cpp
   GenInit.cpp
   GenIntegerLiteral.cpp
@@ -50,6 +51,7 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenSILPasses.cpp
   IRGenRequests.cpp
   IRGenSIL.cpp
+  IRSymbolVisitor.cpp
   Linking.cpp
   LoadableByAddress.cpp
   LocalTypeData.cpp

@@ -16,7 +16,6 @@ filename =
 
     ./utils/80+-check,
     ./utils/backtrace-check,
-    ./utils/build-parser-lib,
     ./utils/build-script,
     ./utils/check-incremental,
     ./utils/coverage/coverage-build-db,

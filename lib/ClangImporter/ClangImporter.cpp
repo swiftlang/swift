@@ -1926,10 +1926,11 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ImportPath::Module path) {
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
+  auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().Item.str(), /*ImportLoc=*/clang::SourceLocation(),
+      realModuleName, /*ImportLoc=*/clang::SourceLocation(),
       /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
@@ -1937,9 +1938,14 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   // Convert the Swift import path over to a Clang import path.
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
       clangPath;
+  bool isTopModuleComponent = true;
   for (auto component : path) {
+    StringRef item = isTopModuleComponent? realModuleName:
+                                           component.Item.str();
+    isTopModuleComponent = false;
+
     clangPath.emplace_back(
-        getClangPreprocessor().getIdentifierInfo(component.Item.str()),
+        getClangPreprocessor().getIdentifierInfo(item),
         exportSourceLoc(component.Loc));
   }
 
@@ -2023,7 +2029,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
 ModuleDecl *
 ClangImporter::loadModule(SourceLoc importLoc,
-                          ImportPath::Module path) {
+                          ImportPath::Module path,
+                          bool AllowMemoryCache) {
   return Impl.loadModule(importLoc, path);
 }
 

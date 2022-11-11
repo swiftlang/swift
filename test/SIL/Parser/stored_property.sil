@@ -8,7 +8,7 @@ class Rect {
   init(orgx: Double)
 }
 
-// CHECK_LABEL: sil @_TFC4rect4Rectg4orgxSd
+// CHECK-LABEL: sil @_TFC4rect4Rectg4orgxSd
 sil @_TFC4rect4Rectg4orgxSd : $@convention(method) (@guaranteed Rect) -> Double {
 bb0(%0 : $Rect):
   debug_value %0 : $Rect
@@ -19,7 +19,7 @@ bb0(%0 : $Rect):
   return %3 : $Double
 }
 
-// CHECK_LABEL: sil_vtable Rect
+// CHECK-LABEL: sil_vtable Rect
 sil_vtable Rect {
   // CHECK: #Rect.orgx!getter
   #Rect.orgx!getter: @_TFC4rect4Rectg4orgxSd

@@ -46,6 +46,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/IDETool/CompletionInstance.h"
 #include "swift/Index/Index.h"
 #include "swift/Markup/Markup.h"
@@ -2840,9 +2841,10 @@ public:
     StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     OS << "</ref>";
   }
-  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name,
+                      const PrintOptions &Options) override {
     OS << "<ref:module>";
-    StreamPrinter::printModuleRef(Mod, Name);
+    StreamPrinter::printModuleRef(Mod, Name, Options);
     OS << "</ref>";
   }
 };

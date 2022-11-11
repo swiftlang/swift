@@ -222,11 +222,15 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param AllowMemoryCache Affects only loading serialized Swift modules,
+  /// this parameter has no effect in the ClangImporter.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual ModuleDecl *loadModule(
                         SourceLoc importLoc,
-                        ImportPath::Module path)
+                        ImportPath::Module path,
+                        bool AllowMemoryCache = true)
                       override;
 
   /// Determine whether \c overlayDC is within an overlay module for the

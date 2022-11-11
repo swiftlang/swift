@@ -577,6 +577,10 @@ public:
 
   bool isPlaceholder();
 
+  /// Returns true if this is a move only type. Returns false if this is a
+  /// non-move only type or a move only wrapped type.
+  bool isPureMoveOnly() const;
+
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
@@ -6683,17 +6687,6 @@ inline bool TypeBase::isOpenedExistential() const {
 
   CanType T = getCanonicalType();
   return isa<OpenedArchetypeType>(T);
-}
-
-inline bool TypeBase::isOpenedExistentialWithError() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    return archetype->getExistentialType()->isExistentialWithError();
-  }
-  return false;
 }
 
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {

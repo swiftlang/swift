@@ -395,7 +395,7 @@ public:
   static bool classof(SILNodePointer node) { return true; }
 };
 
-static_assert(sizeof(SILNode) <= 4 * sizeof(void *),
+static_assert(sizeof(SILNode) <= 4 * sizeof(uint64_t),
               "SILNode must stay small");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

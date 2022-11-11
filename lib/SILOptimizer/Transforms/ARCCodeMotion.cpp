@@ -657,14 +657,22 @@ public:
 
 /// ReleaseCodeMotionContext - Context to perform release code motion.
 class ReleaseCodeMotionContext : public CodeMotionContext {
-  /// All the release block state for all the basic blocks in the function. 
+  SILFunctionTransform *parentTransform;
+
+  /// All the release block state for all the basic blocks in the function.
   BasicBlockData<ReleaseBlockState> BlockStates;
+
+  InstructionSet releaseInstructions;
 
   /// We are not moving epilogue releases.
   bool FreezeEpilogueReleases;
 
   /// The epilogue release matcher we are currently using.
   ConsumedArgToEpilogueReleaseMatcher &ERM;
+
+  bool isRelease(SILInstruction *inst) const {
+    return releaseInstructions.contains(inst);
+  }
 
   /// Return true if the instruction blocks the Ptr to be moved further.
   bool mayBlockCodeMotion(SILInstruction *II, SILValue Ptr) override {
@@ -677,7 +685,7 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
       return true;
     // Identical RC root blocks code motion, we will be able to move this release
     // further once we move the blocking release.
-    if (isReleaseInstruction(II) && getRCRoot(II) == Ptr) {
+    if (isRelease(II) && getRCRoot(II) == Ptr) {
       LLVM_DEBUG(if (printCtx) llvm::dbgs()
                  << "Release " << Ptr << "  at matching release " << *II);
       return true;
@@ -698,19 +706,23 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     if (&*I->getParent()->begin() == I)
       return nullptr;
     auto Prev = &*std::prev(SILBasicBlock::iterator(I));
-    if (isReleaseInstruction(Prev) && getRCRoot(Prev) == Root)
+    if (isRelease(Prev) && getRCRoot(Prev) == Root)
       return Prev;
     return nullptr;
   }
 
 public:
   /// Constructor.
-  ReleaseCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  ReleaseCodeMotionContext(SILFunctionTransform *parentTransform,
+                           llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                            SILFunction *F, PostOrderFunctionInfo *PO,
                            AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI), BlockStates(F),
+      : CodeMotionContext(BPA, F, PO, AA, RCFI),
+        parentTransform(parentTransform),
+        BlockStates(F),
+        releaseInstructions(F),
         FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {}
 
   /// virtual destructor.
@@ -781,6 +793,9 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
       // Do not try to enumerate if we are not hoisting epilogue releases.
       if (FreezeEpilogueReleases && ERM.isEpilogueRelease(&II))
         continue;
+      if (!parentTransform->continueWithNextSubpassRun(&II))
+        continue;
+      releaseInstructions.insert(&II);
       SILValue Root = getRCRoot(&II);
       RCInstructions.insert(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
@@ -831,7 +846,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionBBMaxSet() {
    // NOTE: this is a conservative approximation, because some releases may be
    // blocked before it reaches this block.
    for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
-      if (!isReleaseInstruction(&*II))
+      if (!isRelease(&*II))
         continue;
       State.BBMaxSet.set(RCRootIndex[getRCRoot(&*II)]);
     }
@@ -859,7 +874,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
         continue;
 
       // If this is a release instruction, it also generates.
-      if (isReleaseInstruction(&*I)) {
+      if (isRelease(&*I)) {
         unsigned idx = RCRootIndex[getRCRoot(&*I)];
         State.BBGenSet.set(idx);
         assert(State.BBKillSet.test(idx) && "Killset computed incorrectly");
@@ -1049,7 +1064,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
         continue;
 
       // This release generates.
-      if (isReleaseInstruction(&*I)) {
+      if (isRelease(&*I)) {
         S.BBSetOut.set(RCRootIndex[getRCRoot(&*I)]);
       }
     }
@@ -1201,7 +1216,7 @@ public:
             Conv,
             ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
-      ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 
+      ReleaseCodeMotionContext RelCM(this, BPA, F, PO, AA, RCFI, 
                                      FreezeEpilogueReleases, ERM); 
       // Run release hoisting.
       InstChanged |= RelCM.run();

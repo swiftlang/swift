@@ -47,6 +47,7 @@ class ImplicitModuleInterfaceBuilder {
   const StringRef backupInterfaceDir;
   const StringRef ABIDescriptorPath;
   const bool disableInterfaceFileLock;
+  const bool silenceInterfaceDiagnostics;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   SmallVector<StringRef, 3> extraDependencies;
@@ -87,6 +88,7 @@ public:
       StringRef moduleName, StringRef moduleCachePath,
       StringRef backupInterfaceDir, StringRef prebuiltCachePath,
       StringRef ABIDescriptorPath, bool disableInterfaceFileLock = false,
+      bool silenceInterfaceDiagnostics = false,
       SourceLoc diagnosticLoc = SourceLoc(),
       DependencyTracker *tracker = nullptr)
       : sourceMgr(sourceMgr), diags(diags), subASTDelegate(subASTDelegate),
@@ -95,6 +97,7 @@ public:
         backupInterfaceDir(backupInterfaceDir),
         ABIDescriptorPath(ABIDescriptorPath),
         disableInterfaceFileLock(disableInterfaceFileLock),
+        silenceInterfaceDiagnostics(silenceInterfaceDiagnostics),
         diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {}
 
   /// Ensures the requested file name is added as a dependency of the resulting

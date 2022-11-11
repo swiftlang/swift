@@ -289,22 +289,57 @@ case (let (_, _, _)) + 1:
   ()
 }
 
-// FIXME: We don't currently allow subpatterns for "isa" patterns that
-// require interesting conditional downcasts.
-class Base { }
-class Derived : Base { }
+// "isa" patterns.
 
+// https://github.com/apple/swift/issues/56139
+// Allow subpatterns for "isa" patterns that require conditional
+// collection downcasts
+do {
+  class Base { }
+  class Derived : Base { }
 
-switch [Derived(), Derived(), Base()] {
-case let ds as [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
-  ()
-case is [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
-  ()
+  let arr: [Base]
 
-default:
-  ()
+  if case let _ as [Derived] = arr {}
+  // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
+  guard case let _ as [Derived] = arr else {}
+  // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
+  while case let _ as [Derived] = arr {}
+  // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
+
+  // FIXME: https://github.com/apple/swift/issues/61850
+  // expected-warning@+1 {{heterogeneous collection literal could only be inferred to '[[Base]]'; add explicit type annotation if this is intentional}}
+  for case _ as [Derived] in [arr] {}
+
+  if case is [Derived] = arr {}
+
+  guard case is [Derived] = arr else {}
+
+  while case is [Derived] = arr {}
+
+  for case is [Derived] in [arr] {}
+
+  switch arr {
+  case let ds as [Derived]:
+    // expected-warning@-1 {{immutable value 'ds' was never used; consider replacing with '_' or removing it}}
+    ()
+  case is [Derived]:
+    ()
+
+  default:
+    ()
+  }
+
+  let _ = { (arr: [Base]) -> Void in
+    switch arr {
+    case let ds as [Derived]:
+      // expected-warning@-1 {{immutable value 'ds' was never used; consider replacing with '_' or removing it}}
+      ()
+    default:
+      ()
+    }
+  }
 }
-
 
 // Optional patterns.
 let op1 : Int?

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/ConstTypeInfo.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Effects.h"
@@ -707,26 +706,6 @@ private:
 
   // Evaluation.
   PropertyWrapperTypeInfo
-  evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
-/// Retrieve information about compile-time-known
-class ConstantValueInfoRequest
-  : public SimpleRequest<ConstantValueInfoRequest,
-                         ConstValueTypeInfo(NominalTypeDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  ConstValueTypeInfo
   evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:

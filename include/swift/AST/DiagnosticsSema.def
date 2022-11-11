@@ -1511,10 +1511,6 @@ ERROR(attr_objc_implementation_category_not_found,none,
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
-ERROR(attr_objc_implementation_no_objc_final,none,
-      "%0 %1 cannot be 'final' because Objective-C subclasses of %2 can "
-      "override it",
-      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
 
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%0 %1 does not match any %0 declared in the headers for %2; did you use "
@@ -1542,8 +1538,10 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
-ERROR(expose_unsupported_actor_to_cxx,none,
-      "actor %0 can not be exposed to C++", (DeclName))
+ERROR(expose_unsupported_async_decl_to_cxx,none,
+      "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_unsupported_actor_isolated_to_cxx,none,
+      "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -2027,10 +2025,6 @@ ERROR(synthesized_nominal_extension,none,
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
-
-// FIXME: SwiftUI source compatibility hack; see usage for details.
-WARNING(type_does_not_conform_swiftui_warning,none,
-        "type %0 does not conform to protocol %1", (Type, Type))
 
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
@@ -3217,8 +3211,8 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "of %3 to %2",
      (unsigned, Type, Type, Type))
 NOTE(automatic_protocol_synthesis_unsupported,none,
-    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
-    (StringRef, unsigned))
+    "automatic synthesis of '%0' is not supported for %1 declarations",
+    (StringRef, DescriptiveDeclKind))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
      "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
      (Type, Type, Type))
@@ -4471,10 +4465,6 @@ NOTE(unowned_assignment_requires_strong,none,
      "a strong reference is required to prevent the instance from being "
      "deallocated", ())
 
-ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
-      "collection downcast in cast pattern is not implemented; use an explicit "
-      "downcast to %0 instead", (Type))
-
 //------------------------------------------------------------------------------
 // MARK: Error-handling diagnostics
 //------------------------------------------------------------------------------
@@ -4580,14 +4570,6 @@ NOTE(async_call_without_await_in_async_let,none,
 
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
-ERROR(async_call_in_illegal_context,none,
-      "'async' call cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
-ERROR(await_in_illegal_context,none,
-      "'await' operation cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
@@ -4635,10 +4617,32 @@ ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
 NOTE(async_let_without_await,none,
       "reference to async let %0 is 'async'", (DeclName))
+
+#define EFFECTS_CONTEXT_KIND \
+  "%select{<<ERROR>>|" \
+  "a default argument|" \
+  "a property wrapper initializer|" \
+  "a property initializer|" \
+  "a global variable initializer|" \
+  "an enum case raw value|" \
+  "a catch pattern|" \
+  "a catch guard expression|" \
+  "a defer body}" \
+
+ERROR(async_call_in_illegal_context,none,
+      "'async' call cannot occur in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
+ERROR(await_in_illegal_context,none,
+      "'await' operation cannot occur in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
 ERROR(async_let_in_illegal_context,none,
-      "async let %0 cannot be referenced in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      "async let %0 cannot be referenced in " EFFECTS_CONTEXT_KIND "1",
       (DeclName, unsigned))
+ERROR(async_let_binding_illegal_context,none,
+      "'async let' cannot be used on declarations in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
+
+#undef EFFECTS_CONTEXT_KIND
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4976,6 +4980,9 @@ ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
       ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
+      "access to %0 %1 from outside the distributed actor %2 must be asynchronous",
       (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
@@ -6526,6 +6533,11 @@ ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental move only is disabled! Pass"
       " the frontend flag -enable-experimental-move-only to swift to enable "
       "the usage of this language feature", ())
+ERROR(experimental_moveonly_feature_can_only_be_imported_when_enabled,
+      none, "Can not import module %0 that uses move only features when "
+      "experimental move only is disabled! Pass the frontend flag "
+      "-enable-experimental-move-only to swift to enable the usage of this "
+      "language feature", (Identifier))
 ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
@@ -6609,7 +6621,8 @@ ERROR(type_wrapper_requires_two_generic_params,none,
       "wrapped and storage types", ())
 
 ERROR(cannot_use_multiple_type_wrappers,none,
-      "type %0 cannot use more than one type wrapper", ())
+      "%0 %1 cannot use more than one type wrapper",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"
@@ -6696,8 +6709,12 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 //------------------------------------------------------------------------------
 // MARK: Macros
 //------------------------------------------------------------------------------
+
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
+ERROR(macro_undefined,PointsToFirstBadToken,
+      "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
+      "libraries that contain this macro", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Reflectable Diagnostics
@@ -6720,5 +6737,22 @@ ERROR(implicit_reflectable_conversion,none,
 ERROR(conformance_to_reflectable_with_extension,none,
       "extensions cannot declare protocol conformance to Reflectable", ())
 
+//------------------------------------------------------------------------------
+// MARK: Move Only Errors
+//------------------------------------------------------------------------------
+
+ERROR(moveonly_copyable_type_that_contains_moveonly_type, none,
+      "%0 %1 cannot contain a move-only type without also being move-only",
+      (DescriptiveDeclKind, DeclName))
+NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
+     "contained move-only %0 '%1.%2'",
+     (DescriptiveDeclKind, StringRef, StringRef))
+ERROR(moveonly_cannot_conform_to_protocol, none,
+     "move-only %0 %1 cannot conform yet to any protocols",
+     (DescriptiveDeclKind, DeclName))
+ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
+     "move-only %0 %1 cannot conform to protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
+

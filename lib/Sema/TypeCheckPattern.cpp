@@ -727,9 +727,11 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   // property definition.
   auto &Context = dc->getASTContext();
   auto *Repr = TP->getTypeRepr();
-  if (Repr && Repr->hasOpaque()) {
+  if (Repr && (Repr->hasOpaque() ||
+               (Context.LangOpts.hasFeature(Feature::ImplicitSome) &&
+                Repr->isProtocol(dc)))) {
     auto named = dyn_cast<NamedPattern>(
-                           TP->getSubPattern()->getSemanticsProvidingPattern());
+        TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
       Context.Diags.diagnose(TP->getLoc(),
                              diag::opaque_type_unsupported_pattern);
@@ -1385,16 +1387,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast: {
-      diags.diagnose(IP->getLoc(),
-                     diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastType());
-      IP->setType(ErrorType::get(Context));
-      if (Pattern *sub = IP->getSubPattern())
-        sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
-      return P;
-    }
-
+    case CheckedCastKind::SetDowncast:
     case CheckedCastKind::ValueCast:
       IP->setCastKind(castKind);
       break;
