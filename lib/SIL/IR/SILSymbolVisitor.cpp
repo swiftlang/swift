@@ -318,21 +318,16 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     // Metaclasses and ObjC classes (duh) are an ObjC thing, and so are not
     // needed in build artifacts/for classes which can't touch ObjC.
     if (objCCompatible) {
-      bool addObjCClass = false;
-      if (isObjC) {
-        addObjCClass = true;
-        Visitor.addObjCClass(CD);
-      }
+      if (isObjC)
+        Visitor.addObjCInterface(CD);
 
       if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC) {
-        addObjCClass = true;
-        Visitor.addObjCMetaclass(CD);
+        // If an ObjCInterface was not added, ObjC Metaclass may still need to
+        // be included.
+        if (!isObjC)
+          Visitor.addObjCMetaclass(CD);
       } else
         Visitor.addSwiftMetaclassStub(CD);
-
-      if (addObjCClass) {
-        Visitor.addObjCInterface(CD);
-      }
     }
 
     // Some members of classes get extra handling, beyond members of
