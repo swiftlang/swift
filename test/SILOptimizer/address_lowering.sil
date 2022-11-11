@@ -27,6 +27,8 @@ protocol Error {}
 
 struct I {}
 
+class Klass {}
+
 struct SI<T> {
   var element: T
   var index: I
@@ -1425,8 +1427,6 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
   %10 = tuple ()
   return %10 : $()
 }
-
-class Klass {}
 
 // CHECK-LABEL: sil hidden [ossa] @testBeginApply2LoadableYieldWithIndirectConv :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<Klass>):
