@@ -180,6 +180,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
   SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, Kind, D);
   NewArg->setParent(this);
+  ArgumentList[i]->parentBlock = nullptr;
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
@@ -203,6 +204,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 
   SILPhiArgument *NewArg = new (M) SILPhiArgument(Ty, Kind, D);
   NewArg->setParent(this);
+  ArgumentList[i]->parentBlock = nullptr;
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
@@ -257,9 +259,17 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
   return arg;
 }
 
+void SILBasicBlock::dropAllArguments() {
+  for (SILArgument *arg : ArgumentList) {
+    arg->parentBlock = nullptr;
+  }
+  ArgumentList.clear();
+}
+
 void SILBasicBlock::eraseArgument(int Index) {
   assert(getArgument(Index)->use_empty() &&
          "Erasing block argument that has uses!");
+  ArgumentList[Index]->parentBlock = nullptr;
   ArgumentList.erase(ArgumentList.begin() + Index);
 }
 
