@@ -614,7 +614,8 @@ class ModuleInterfaceLoaderImpl {
     StringRef inParentDirName =
       path::filename(path::parent_path(interfacePath));
     if (path::extension(inParentDirName) == ".swiftmodule") {
-      assert(path::stem(inParentDirName) == moduleName);
+      assert(path::stem(inParentDirName) ==
+             ctx.getRealModuleName(ctx.getIdentifier(moduleName)).str());
       path::append(scratch, inParentDirName);
     }
     path::append(scratch, path::filename(modulePath));
