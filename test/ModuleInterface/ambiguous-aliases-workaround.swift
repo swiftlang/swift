@@ -18,6 +18,14 @@
 // RUN:     -alias-module-names-in-module-interface
 // RUN: %target-swift-typecheck-module-from-interface(%t/AmbiguousClientName.swiftinterface) -I%t
 
+// RUN: %target-swift-frontend -emit-module -module-name OverlayClient \
+// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -o %t/OverlayClient.swiftmodule \
+// RUN:     -emit-module-interface-path %t/OverlayClient.swiftinterface \
+// RUN:     %t/OverlayClient.swift -I%t \
+// RUN:     -alias-module-names-in-module-interface
+// RUN: %target-swift-typecheck-module-from-interface(%t/OverlayClient.swiftinterface) -I%t
+
 //--- module.modulemap
 module AmbiguousClientName {
     header "AmbiguousClientName.h"
@@ -64,3 +72,10 @@ public func refToNestedInLib(_ a: AmbiguousLib.Nested) {}
 public func refToStdlib(_ a: Swift.Int) {}
 public func refToUnderlying(_ a: UnderlyingType) {}
 public func refToC(_ a: CType) {}
+
+//--- OverlayClient.swift
+
+import AmbiguousClientName
+
+public func refToImportedType(_ a: SomeType) {}
+public func refToImportedUnderlying(_ a: UnderlyingType) {}
