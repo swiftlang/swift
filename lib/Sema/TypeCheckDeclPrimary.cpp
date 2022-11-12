@@ -2645,7 +2645,7 @@ public:
     if (!nomDecl->isMoveOnly())
       return;
 
-    for (auto *prot : nomDecl->getAllProtocols()) {
+    for (auto *prot : nomDecl->getLocalProtocols()) {
       nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
                         nomDecl->getDescriptiveKind(),
                         nomDecl->getBaseName(), prot->getBaseName());

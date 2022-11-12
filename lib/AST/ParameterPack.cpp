@@ -15,34 +15,47 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Types.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
-void TypeBase::getTypeParameterPacks(
-    SmallVectorImpl<Type> &rootParameterPacks) const {
-  llvm::SmallDenseSet<CanType, 2> visited;
+namespace {
 
-  auto recordType = [&](Type t) {
-    if (visited.insert(t->getCanonicalType()).second)
-      rootParameterPacks.push_back(t);
-  };
+/// Collects all unique pack type parameters referenced from the pattern type,
+/// skipping those captured by nested pack expansion types.
+struct PackTypeParameterCollector: TypeWalker {
+  llvm::SetVector<Type> typeParams;
 
-  Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
+  Action walkToTypePre(Type t) override {
+    if (t->is<PackExpansionType>())
+      return Action::SkipChildren;
+
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isParameterPack()) {
-        recordType(paramTy);
-      }
+      if (paramTy->isParameterPack())
+        typeParams.insert(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      if (archetypeTy->isRoot()) {
-        recordType(t);
-      }
+      if (archetypeTy->isRoot())
+        typeParams.insert(paramTy);
     }
-  });
+
+    return Action::Continue;
+  }
+};
+
+}
+
+void TypeBase::getTypeParameterPacks(
+    SmallVectorImpl<Type> &rootParameterPacks) {
+  PackTypeParameterCollector collector;
+  Type(this).walk(collector);
+
+  rootParameterPacks.append(collector.typeParams.begin(),
+                            collector.typeParams.end());
 }
 
 bool GenericTypeParamType::isParameterPack() const {
@@ -121,6 +134,19 @@ PackExpansionType *PackExpansionType::expand() {
 
   auto *packType = PackType::get(getASTContext(), expandedTypes);
   return PackExpansionType::get(packType, countType);
+}
+
+CanType PackExpansionType::getReducedShape() {
+  if (auto *archetypeType = countType->getAs<PackArchetypeType>()) {
+    auto shape = archetypeType->getReducedShape();
+    return CanType(PackExpansionType::get(shape, shape));
+  } else if (auto *packType = countType->getAs<PackType>()) {
+    auto shape = packType->getReducedShape();
+    return CanType(PackExpansionType::get(shape, shape));
+  }
+
+  assert(countType->is<PlaceholderType>());
+  return getASTContext().TheEmptyTupleType;
 }
 
 bool TupleType::containsPackExpansionType() const {
@@ -264,6 +290,44 @@ PackType *PackType::flattenPackTypes() {
     return this;
 
   return PackType::get(getASTContext(), elts);
+}
+
+CanPackType PackType::getReducedShape() {
+  SmallVector<Type, 4> elts;
+
+  auto &ctx = getASTContext();
+
+  for (auto elt : getElementTypes()) {
+    // T... => shape(T)...
+    if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
+      elts.push_back(packExpansionType->getReducedShape());
+      continue;
+    }
+
+    // Use () as a placeholder for scalar shape.
+    assert(!elt->is<PackArchetypeType>() &&
+           "Pack archetype outside of a pack expansion");
+    elts.push_back(ctx.TheEmptyTupleType);
+  }
+
+  return CanPackType(PackType::get(ctx, elts));
+}
+
+CanType TypeBase::getReducedShape() {
+  if (auto *packArchetype = getAs<PackArchetypeType>())
+    return packArchetype->getReducedShape();
+
+  if (auto *packType = getAs<PackType>())
+    return packType->getReducedShape();
+
+  if (auto *expansionType = getAs<PackExpansionType>())
+    return expansionType->getReducedShape();
+
+  assert(!isTypeVariableOrMember());
+  assert(!hasTypeParameter());
+
+  // Use () as a placeholder for scalar shape.
+  return getASTContext().TheEmptyTupleType;
 }
 
 unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,

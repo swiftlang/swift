@@ -1787,22 +1787,26 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printRequirement(const Requirement &req) {
-  printTransformedType(req.getFirstType());
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << ".shape == ";
+    Printer << "((";
+    printTransformedType(req.getFirstType());
+    Printer << ", ";
     printTransformedType(req.getSecondType());
-    Printer << ".shape";
+    Printer << ")...) : Any";
     return;
   case RequirementKind::Layout:
+    printTransformedType(req.getFirstType());
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
+    printTransformedType(req.getFirstType());
     Printer << " : ";
     break;
   case RequirementKind::SameType:
+    printTransformedType(req.getFirstType());
     Printer << " == ";
     break;
   }

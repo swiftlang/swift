@@ -2928,7 +2928,7 @@ namespace {
           return;
 
         if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = archetype->getShape();
+          shapeType = archetype->getReducedShape();
         }
       });
 
