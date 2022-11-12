@@ -177,9 +177,7 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
-  /// Do not call \c addUnvalidatedDeclWithOpaqueResultType when in an inactive
-  /// clause because ASTScopes are not created in those contexts and lookups to
-  /// those decls will fail.
+  /// ASTScopes are not created in inactive clauses and lookups to decls will fail.
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
 
