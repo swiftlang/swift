@@ -251,6 +251,13 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
   auto metatype = MetatypeType::get(interfaceType);
   opaqueDecl->setInterfaceType(metatype);
+
+  // Record the opaque return type decl in the parent source file,
+  // which will be used in IRGen to emit all opaque type decls
+  // in a Swift module for type reconstruction.
+  if (auto *sourceFile = dc->getParentSourceFile())
+    sourceFile->addOpaqueResultTypeDecl(opaqueDecl);
+
   return opaqueDecl;
 }
 
