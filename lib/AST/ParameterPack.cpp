@@ -24,26 +24,38 @@
 
 using namespace swift;
 
-void TypeBase::getTypeParameterPacks(
-    SmallVectorImpl<Type> &rootParameterPacks) const {
-  llvm::SmallDenseSet<CanType, 2> visited;
+namespace {
 
-  auto recordType = [&](Type t) {
-    if (visited.insert(t->getCanonicalType()).second)
-      rootParameterPacks.push_back(t);
-  };
+/// Collects all unique pack type parameters referenced from the pattern type,
+/// skipping those captured by nested pack expansion types.
+struct PackTypeParameterCollector: TypeWalker {
+  llvm::SetVector<Type> typeParams;
 
-  Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
+  Action walkToTypePre(Type t) override {
+    if (t->is<PackExpansionType>())
+      return Action::SkipChildren;
+
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isParameterPack()) {
-        recordType(paramTy);
-      }
+      if (paramTy->isParameterPack())
+        typeParams.insert(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      if (archetypeTy->isRoot()) {
-        recordType(t);
-      }
+      if (archetypeTy->isRoot())
+        typeParams.insert(paramTy);
     }
-  });
+
+    return Action::Continue;
+  }
+};
+
+}
+
+void TypeBase::getTypeParameterPacks(
+    SmallVectorImpl<Type> &rootParameterPacks) {
+  PackTypeParameterCollector collector;
+  Type(this).walk(collector);
+
+  rootParameterPacks.append(collector.typeParams.begin(),
+                            collector.typeParams.end());
 }
 
 bool GenericTypeParamType::isParameterPack() const {

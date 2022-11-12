@@ -661,7 +661,7 @@ public:
 
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(
-      SmallVectorImpl<Type> &rootParameterPacks) const;
+      SmallVectorImpl<Type> &rootParameterPacks);
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
