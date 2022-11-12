@@ -1104,6 +1104,9 @@ def enable_stack_protector :
 def disable_stack_protector :
   Flag<["-"], "disable-stack-protector">,
   HelpText<"Disable the stack-protector">;
+def enable_move_inout_stack_protector :
+  Flag<["-"], "enable-move-inout-stack-protector">,
+  HelpText<"Enable the stack protector by moving values to temporaries">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
