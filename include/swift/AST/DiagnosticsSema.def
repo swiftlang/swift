@@ -4832,6 +4832,22 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
+ERROR(isolated_parameter_duplicate,none,
+      "cannot have more than one 'isolated' parameter", ())
+ERROR(isolated_parameter_duplicate_type,none,
+      "function type cannot have more than one 'isolated' parameter", ())
+NOTE(isolated_parameter_previous_note,none,
+     "previous 'isolated' parameter %0", (DeclName))
+ERROR(isolated_parameter_combined_global_actor_attr,none,
+      "%0 with 'isolated' parameter cannot have a global actor",
+      (DescriptiveDeclKind))
+ERROR(isolated_parameter_closure_combined_global_actor_attr,none,
+      "closure with 'isolated' parameter %0 cannot have a global actor", (DeclName))
+ERROR(isolated_parameter_global_actor_type,none,
+      "function type cannot have global actor and 'isolated' parameter", ())
+ERROR(isolated_parameter_combined_nonisolated,none,
+      "%0 with 'isolated' parameter cannot be 'nonisolated'",
+      (DescriptiveDeclKind))
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"

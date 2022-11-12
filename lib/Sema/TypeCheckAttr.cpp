@@ -6960,8 +6960,24 @@ public:
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(
         ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
-    if (globalActorAttr && globalActorAttr->first == attr)
-      return;
+
+    if (globalActorAttr && globalActorAttr->first == attr) {
+      // if there is an `isolated` parameter, then this global-actor attribute
+      // is invalid.
+      for (auto param : *closure->getParameters()) {
+        if (param->isIsolated()) {
+          param->diagnose(
+                   diag::isolated_parameter_closure_combined_global_actor_attr,
+                   param->getName())
+              .fixItRemove(attr->getRangeWithAt())
+              .warnUntilSwiftVersion(6);
+          attr->setInvalid();
+          break; // don't need to complain about this more than once.
+        }
+      }
+
+      return; // it's OK
+    }
 
     // Otherwise, it's an error.
     std::string typeName;
