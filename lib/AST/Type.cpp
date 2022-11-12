@@ -4013,9 +4013,9 @@ PackArchetypeType::get(const ASTContext &Ctx,
       {ShapeType}));
 }
 
-Type PackArchetypeType::getShape() const {
+CanType PackArchetypeType::getReducedShape() const {
   auto shapeType = getTrailingObjects<PackShape>()->shapeType;
-  return getGenericEnvironment()->mapTypeIntoContext(shapeType);
+  return getGenericEnvironment()->mapTypeIntoContext(shapeType)->getCanonicalType();
 }
 
 ElementArchetypeType::ElementArchetypeType(

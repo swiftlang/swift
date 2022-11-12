@@ -5144,6 +5144,10 @@ ERROR(tuple_duplicate_label,none,
 ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
 
+ERROR(expansion_not_same_shape,none,
+      "variadic expansion %0 requires that %1 and %2 have the same shape",
+      (Type, Type, Type))
+
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
 ERROR(unlabeled_parameter_following_variadic_parameter,none,

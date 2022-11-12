@@ -135,11 +135,11 @@ struct UnsafePointerWithOwner<T> {
 // Make sure we error whenever we attempt to conform a move only type to a
 // protocol.
 protocol P {}
-@_moveOnly class ProtocolCheckMoveOnlyKlass {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform to protocol 'P'}}
-@_moveOnly struct ProtocolCheckMoveOnlyStruct { // expected-error {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform to protocol 'P'}}
+@_moveOnly class ProtocolCheckMoveOnlyKlass {}
+@_moveOnly struct ProtocolCheckMoveOnlyStruct {
     var k: MoveOnlyKlass
 }
-@_moveOnly enum ProtocolCheckMoveOnlyEnum {} // expected-error {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to protocol 'P'}}
+@_moveOnly enum ProtocolCheckMoveOnlyEnum {}
 
 extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform yet to any protocols}}
 extension ProtocolCheckMoveOnlyStruct : P {} // expected-error {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform yet to any protocols}}

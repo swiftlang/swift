@@ -2912,8 +2912,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
 
   switch (reqt.getKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
   case RequirementKind::Layout:
     break;
   case RequirementKind::Conformance: {
@@ -2925,7 +2923,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
+  case RequirementKind::SameShape: {
     Type SecondTy = reqt.getSecondType();
     appendType(SecondTy->getCanonicalType(), sig);
     break;
@@ -2957,7 +2956,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     assert(gpBase);
     switch (reqt.getKind()) {
       case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
+        llvm_unreachable("Same-shape requirement with a dependent member type?");
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase, lhsBaseIsProtocolSelf);
@@ -2977,8 +2976,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
   GenericTypeParamType *gpBase = FirstTy->castTo<GenericTypeParamType>();
   switch (reqt.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
     case RequirementKind::Layout:
@@ -2989,6 +2986,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
       return appendOpWithGenericParamIndex("Rb", gpBase);
     case RequirementKind::SameType:
       return appendOpWithGenericParamIndex("Rs", gpBase);
+    case RequirementKind::SameShape:
+      return appendOpWithGenericParamIndex("Rh", gpBase);
   }
   llvm_unreachable("bad requirement type");
 }

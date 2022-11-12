@@ -77,6 +77,7 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   ProtocolConformanceRef.cpp
   RawComment.cpp
+  Requirement.cpp
   RequirementEnvironment.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp

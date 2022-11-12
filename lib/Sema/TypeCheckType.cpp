@@ -4238,7 +4238,18 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   if (resolution.getStage() == TypeResolutionStage::Interface) {
     auto genericSig = resolution.getGenericSignature();
     auto shapeType = genericSig->getReducedShape(pair.second);
-    return PackExpansionType::get(pair.first, shapeType);
+
+    auto result = PackExpansionType::get(pair.first, shapeType);
+
+    SmallVector<Type, 2> rootParameterPacks;
+    pair.first->getTypeParameterPacks(rootParameterPacks);
+    for (auto type : rootParameterPacks) {
+      if (!genericSig->haveSameShape(type, shapeType)) {
+        ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
+                           result, shapeType, type);
+      }
+    }
+    return result;
   }
 
   return PackExpansionType::get(pair.first, pair.second);
