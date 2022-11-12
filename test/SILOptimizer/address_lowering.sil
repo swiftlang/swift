@@ -1654,8 +1654,8 @@ entry:
 }
 
 // CHECK-LABEL: sil [ossa] @testBeginApplyEYieldOpaqueInoutAndYield : {{.*}}{
-// CHECK:         ([[REGISTER_0:%[^,]+]], {{%[^,]+}}) = begin_apply
-// CHECK:         yield [[REGISTER_0]] : $*T
+// CHECK:         ([[ADDR:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         yield [[ADDR]] : $*T
 // CHECK-LABEL: } // end sil function 'testBeginApplyEYieldOpaqueInoutAndYield'
 sil [ossa] @testBeginApplyEYieldOpaqueInoutAndYield : $@yield_once @convention(thin) <T> () -> @yields @inout T {
 entry:
