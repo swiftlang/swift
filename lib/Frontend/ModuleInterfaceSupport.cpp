@@ -74,6 +74,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                            ModuleDecl::ImportFilterKind::Exported,
                            ModuleDecl::ImportFilterKind::SPIOnly,
                            ModuleDecl::ImportFilterKind::SPIAccessControl});
+    M->getMissingImportedModules(imports);
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
       if (aliasTargets.insert(importedName).second) {
