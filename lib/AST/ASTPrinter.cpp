@@ -132,7 +132,10 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs,
-                                                   bool aliasModuleNames) {
+                                                   bool aliasModuleNames,
+                                                   llvm::SmallSet<StringRef, 4>
+                                                     *aliasModuleNamesTargets
+                                                   ) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -154,6 +157,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
+  result.AliasModuleNamesTargets = aliasModuleNamesTargets;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -5393,7 +5397,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    if (Options.AliasModuleNames) {
+    if (Options.AliasModuleNames && Options.AliasModuleNamesTargets &&
+        Options.AliasModuleNamesTargets->contains(Name.str())) {
       auto nameTwine = MODULE_DISAMBIGUATING_PREFIX + Name.str();
       Name = Mod->getASTContext().getIdentifier(nameTwine.str());
     }
