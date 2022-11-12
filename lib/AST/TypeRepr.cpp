@@ -245,15 +245,6 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
-IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
-                                ArrayRef<ComponentIdentTypeRepr *> Components) {
-  assert(!Components.empty());
-  if (Components.size() == 1)
-    return Components.front();
-
-  return CompoundIdentTypeRepr::create(C, Components);
-}
-
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
                              ArrayRef<TypeRepr *> Args) {
   if (Args.empty())

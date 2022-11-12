@@ -2225,7 +2225,7 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
-  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
+  auto *NewTypeRepr = CompoundIdentTypeRepr::create(C, Components);
   return new (C) TypeExpr(NewTypeRepr);
 }
 
@@ -2246,7 +2246,7 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
-  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
+  auto *NewTypeRepr = CompoundIdentTypeRepr::create(C, Components);
   return new (C) TypeExpr(NewTypeRepr);
 }
 
@@ -2295,7 +2295,12 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
     components.push_back(genericComp);
 
-    auto *genericRepr = IdentTypeRepr::create(C, components);
+    TypeRepr *genericRepr = nullptr;
+    if (components.size() == 1) {
+      genericRepr = components.front();
+    } else {
+      genericRepr = CompoundIdentTypeRepr::create(C, components);
+    }
     return new (C) TypeExpr(genericRepr);
   }
 

@@ -256,11 +256,6 @@ protected:
   explicit IdentTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
-  /// Copies the provided array and creates a CompoundIdentTypeRepr or just
-  /// returns the single entry in the array if it contains only one.
-  static IdentTypeRepr *create(ASTContext &C,
-                               ArrayRef<ComponentIdentTypeRepr *> Components);
-  
   class ComponentRange;
   inline ComponentRange getComponentRange();
 

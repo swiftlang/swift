@@ -752,7 +752,11 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
   IdentTypeRepr *ITR = nullptr;
   if (!ComponentsR.empty()) {
-    ITR = IdentTypeRepr::create(Context, ComponentsR);
+    if (ComponentsR.size() == 1) {
+      ITR = ComponentsR.front();
+    } else {
+      ITR = CompoundIdentTypeRepr::create(Context, ComponentsR);
+    }
   }
 
   if (Status.hasCodeCompletion()) {
