@@ -3004,10 +3004,21 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
       markRewritten(result, extractAddr);
     } else {
       assert(!pass.valueStorageMap.contains(result));
-      SILValue loadElement = builder.createTrivialLoadOr(
-          destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
-
+      auto guaranteed = !result->getType().isTrivial(*pass.function) &&
+                        destructure->getOperand(0)->getOwnershipKind() ==
+                            OwnershipKind::Guaranteed;
+      SILValue loadElement;
+      if (guaranteed) {
+        loadElement =
+            builder.emitLoadBorrowOperation(destructure->getLoc(), extractAddr);
+      } else {
+        loadElement = builder.createTrivialLoadOr(
+            destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
+      }
       result->replaceAllUsesWith(loadElement);
+      if (guaranteed) {
+        emitEndBorrows(loadElement, pass);
+      }
     }
   }
 }
