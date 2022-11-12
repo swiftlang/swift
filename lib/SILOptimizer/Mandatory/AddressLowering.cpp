@@ -3298,7 +3298,7 @@ void UseRewriter::visitUnconditionalCheckedCastInst(
       uncondCheckedCast->getLoc(), destAddr,
       destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
           ? LoadOwnershipQualifier::Trivial
-          : LoadOwnershipQualifier::Copy);
+          : LoadOwnershipQualifier::Take);
   nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
   uncondCheckedCast->replaceAllUsesWith(dest);
 }

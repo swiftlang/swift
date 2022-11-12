@@ -2077,6 +2077,20 @@ entry(%instance : @owned $T):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast6 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Klass
+// CHECK:         unconditional_checked_cast_addr T in [[INSTANCE]]
+// CHECK:         [[KLASS:%[^,]+]] = load [take] [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast6'
+sil [ossa] @test_unconditional_checked_cast6 : $@convention(method) <T> (@in T) -> () {
+bb0(%instance : @owned $T):
+  %klass = unconditional_checked_cast %instance : $T to Klass
+  destroy_value %klass : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
 // CHECK-LABEL: sil [ossa] @test_yield_1_two_values : {{.*}} {
 // CHECK:         tuple_element_addr
 // CHECK:         tuple_element_addr
