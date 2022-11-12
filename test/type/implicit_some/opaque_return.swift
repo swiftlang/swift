@@ -112,4 +112,6 @@ protocol P {
 
 struct S: P {
   var value: P { self }
+
+  var asExistential: any P { self }
 }
