@@ -23,7 +23,7 @@ import Metal
 
 // Ensure the dependency on Darwin is captured even though it is a placeholder
 
-// CHECK:   "modulePath": "Metal.swiftmodule",
+// CHECK:   "modulePath": "{{.*}}{{/|\\}}Metal-{{.*}}.swiftmodule",
 // CHECK-NEXT:   "sourceFiles": [
 // CHECK-NEXT:   ],
 // CHECK:     {
