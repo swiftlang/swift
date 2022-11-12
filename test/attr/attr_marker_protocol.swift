@@ -66,4 +66,4 @@ extension Array: P9 where Element: P9 { }
 protocol P10 { }
 
 extension Array: P10 where Element: P10, Element: P8 { }
-// expected-error@-1{{conditional conformance to non-marker protocol 'P10' cannot depend on conformance of 'Element' to non-marker protocol 'P8'}}
+// expected-error@-1{{conditional conformance to non-marker protocol 'P10' cannot depend on conformance of 'Element' to marker protocol 'P8'}}
