@@ -607,6 +607,11 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
   auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
+    // TextAPI ObjC Class Kinds represents two symbols.
+    else if (kind == SymbolKind::ObjectiveCClass) {
+      symbols.push_back((llvm::MachO::ObjC2ClassNamePrefix + symbol).str());
+      symbols.push_back((llvm::MachO::ObjC2MetaClassNamePrefix + symbol).str());
+    }
   };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
