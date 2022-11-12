@@ -3484,14 +3484,12 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
-  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
-    if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-      auto inserted = ValidatedOpaqueReturnTypes.insert(
-                {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
-                 opaqueDecl});
-      if (inserted.second) {
-        OpaqueReturnTypes.push_back(opaqueDecl);
-      }
+  for (auto *opaqueDecl : UnvalidatedOpaqueReturnTypes.takeVector()) {
+    auto inserted = ValidatedOpaqueReturnTypes.insert(
+              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
+               opaqueDecl});
+    if (inserted.second) {
+      OpaqueReturnTypes.push_back(opaqueDecl);
     }
   }
 
