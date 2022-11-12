@@ -657,8 +657,14 @@ importer::getNormalInvocationArguments(
   }
 
   if (searchPathOpts.getSDKPath().empty()) {
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-nostdsysteminc");
+    // On FreeBSD, passing `-nostdsysteminc` breaks most header module imports,
+    // since clang adds the default header search paths in its frontend, not
+    // its driver.  (This is different from the behavior on Darwin, Linux, and
+    // OpenBSD.)
+    if (!triple.isOSFreeBSD()) {
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("-nostdsysteminc");
+    }
   } else {
     if (triple.isWindowsMSVCEnvironment()) {
       llvm::SmallString<261> path; // MAX_PATH + 1
