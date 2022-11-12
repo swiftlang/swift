@@ -158,12 +158,7 @@ public:
     addLinkEntity(LinkEntity::forNominalTypeDescriptor(NTD));
   }
 
-  void addObjCClass(ClassDecl *CD) override {
-    addLinkEntity(LinkEntity::forObjCClass(CD));
-  }
-
   void addObjCInterface(ClassDecl *CD) override {
-    // Pass through; Obj-C interfaces don't have linkable symbols.
     Visitor.addObjCInterface(CD);
   }
 

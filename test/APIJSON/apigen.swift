@@ -316,42 +316,6 @@ public func myFunction2() {}
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
 // CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_CLASS_$__TtC8MyModule4Test",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_CLASS_$__TtC8MyModule5Test3",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_CLASS_$__TtC8MyModule7Derived",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_METACLASS_$__TtC8MyModule4Test",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_METACLASS_$__TtC8MyModule5Test3",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_OBJC_METACLASS_$__TtC8MyModule7Derived",
-// CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
 // CHECK-NEXT: "interfaces": [
