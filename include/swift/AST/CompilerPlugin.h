@@ -52,6 +52,11 @@ private:
     GenericSignature = 4,
     // static func _typeSignature(...) -> (UnsafePointer<UInt8>, count: Int)
     TypeSignature = 5,
+    // static func _owningModule(...) -> (UnsafePointer<UInt8>, count: Int)
+    OwningModule = 6,
+    // static func _supplementalSignatureModules(...)
+    //     -> (UnsafePointer<UInt8>, count: Int)
+    SupplementalSignatureModules = 7,
   };
 
   /// The plugin type metadata.
@@ -99,6 +104,14 @@ public:
   /// Invoke the `_typeSignature` method. The caller assumes ownership of the
   /// result string buffer.
   StringRef invokeTypeSignature() const;
+
+  /// Invoke the `_owningModule` method. The caller assumes ownership of the
+  /// result string buffer.
+  StringRef invokeOwningModule() const;
+
+  /// Invoke the `_supplementalSignatureModules` method. The caller assumes
+  /// ownership of the result string buffer.
+  StringRef invokeSupplementalSignatureModules() const;
 
   StringRef getName() const {
     return name;

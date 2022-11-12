@@ -24,6 +24,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Macro.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -2472,25 +2473,22 @@ ConstraintSystem::getTypeOfMemberReference(
 }
 
 #if SWIFT_SWIFT_PARSER
-Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
+Type ConstraintSystem::getTypeOfMacroReference(Identifier macroName,
                                                Expr *anchor) {
-  auto req = MacroContextRequest{macroName.str(), DC->getParentModule()};
-  auto *macroCtx = evaluateOrDefault(getASTContext().evaluator, req, nullptr);
-  if (!macroCtx)
+  auto req = MacroLookupRequest{macroName, DC->getParentModule()};
+  auto macros = evaluateOrDefault(getASTContext().evaluator, req, { });
+  if (macros.empty())
     return Type();
 
-  auto *locator = getConstraintLocator(anchor);
-  // Dig through to __MacroEvaluationContext.SignatureType
-  auto sig = getASTContext().getIdentifier("SignatureType");
-  auto *signature = cast<TypeAliasDecl>(macroCtx->lookupDirect(sig).front());
-  auto type = signature->getUnderlyingType();
+  // FIXME: Handle macro overloading.
+  auto macro = macros.front();
 
   // Open any the generic types.
   OpenedTypeMap replacements;
-  openGeneric(signature->getParent(), signature->getGenericSignature(),
-              locator, replacements);
+  openGeneric(macro->owningModule, macro->genericSignature,
+              getConstraintLocator(anchor), replacements);
 
-  return openType(type, replacements);
+  return openType(macro->signature, replacements);
 }
 #endif
 

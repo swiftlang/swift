@@ -1,3 +1,4 @@
+import SwiftParser
 import SwiftSyntax
 @_spi(Testing) import _SwiftSyntaxMacros
 
@@ -81,43 +82,107 @@ private func allocateUTF8String(
   }
 }
 
+@_cdecl("swift_ASTGen_getMacroGenericSignature")
+public func getMacroGenericSignature(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  genericSignaturePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  genericSignatureLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    guard let genericSig = macro.pointee.macro.genericSignature else {
+      (genericSignaturePtr.pointee, genericSignatureLengthPtr.pointee) = (nil, 0)
+      return
+    }
+
+    (genericSignaturePtr.pointee, genericSignatureLengthPtr.pointee) =
+      allocateUTF8String(genericSig.description)
+  }
+}
+
 /// Query the type signature of the given macro.
 @_cdecl("swift_ASTGen_getMacroTypeSignature")
 public func getMacroTypeSignature(
   macroPtr: UnsafeMutablePointer<UInt8>,
-  evaluationContextPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  evaluationContextLengthPtr: UnsafeMutablePointer<Int>
+  signaturePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  signatureLengthPtr: UnsafeMutablePointer<Int>
 ) {
   macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
-    (evaluationContextPtr.pointee, evaluationContextLengthPtr.pointee) =
-      allocateUTF8String(macro.pointee.evaluationContext, nullTerminated: true)
+    (signaturePtr.pointee, signatureLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.signature.description)
   }
 }
 
-extension ExportedMacro {
-  var evaluationContext: String {
-    """
-    struct __MacroEvaluationContext\(self.macro.genericSignature?.description ?? "") {
-      typealias SignatureType = \(self.macro.signature)
-    }
-    """
+/// Query the documentation of the given macro.
+@_cdecl("swift_ASTGen_getMacroDocumentation")
+public func getMacroDocumentation(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  documentationPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  documentationLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    (documentationPtr.pointee, documentationLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.documentation)
   }
 }
 
-/// Query the macro evaluation context of the given macro.
+/// Query the owning module of the given macro.
+@_cdecl("swift_ASTGen_getMacroOwningModule")
+public func getMacroOwningModule(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  owningModulePtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  owningModuleLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    (owningModulePtr.pointee, owningModuleLengthPtr.pointee) =
+        allocateUTF8String(macro.pointee.macro.owningModule)
+  }
+}
+
+/// Query the supplemental signature modules of the given macro,
+/// as a semicolon-separated string
+@_cdecl("swift_ASTGen_getMacroSupplementalSignatureModules")
+public func getMacroSupplementableSignatureModules(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  modulesPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  modulesLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    let modules = macro.pointee.macro.supplementalSignatureModules
+        .joined(separator: ";")
+    (modulesPtr.pointee, modulesLengthPtr.pointee) =
+        allocateUTF8String(modules)
+  }
+}
+
+/// Query the macro evaluation context given the evaluation
+/// context sources.
 @_cdecl("swift_ASTGen_getMacroEvaluationContext")
 public func getMacroEvaluationContext(
   sourceFilePtr: UnsafePointer<UInt8>,
   declContext: UnsafeMutableRawPointer,
   context: UnsafeMutableRawPointer,
-  macroPtr: UnsafeMutablePointer<UInt8>,
-  contextPtr: UnsafeMutablePointer<UnsafeMutableRawPointer?>
-) {
-  contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
-    return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
-      .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
-      .rawValue
+  evaluatedSourceBuffer: UnsafePointer<UInt8>,
+  evaluatedSourceBufferLength: Int
+) -> UnsafeMutableRawPointer? {
+  let evaluatedSource = UnsafeBufferPointer(
+      start: evaluatedSourceBuffer,
+      count: evaluatedSourceBufferLength
+  )
+  let sourceFile = Parser.parse(source: evaluatedSource)
+
+  // Dig out the top-level typealias declaration. That's all we'll
+  // parse.
+  guard let typealiasDecl = sourceFile.statements.first(
+    where: { item in item.item.is(TypealiasDeclSyntax.self)
+    })?.item.as(TypealiasDeclSyntax.self) else {
+    return nil
   }
+
+  // Parse and ASTGen that top-level declaration.
+  // FIXME: we need to emit diagnostics from this.
+  return ASTGenVisitor(
+    ctx: context, base: sourceFilePtr, declContext: declContext
+  ).visit(typealiasDecl).rawValue
 }
 
 @_cdecl("swift_ASTGen_evaluateMacro")

@@ -319,3 +319,27 @@ StringRef CompilerPlugin::invokeTypeSignature() const {
   llvm_unreachable("Incompatible host compiler");
 #endif
 }
+
+StringRef CompilerPlugin::invokeOwningModule() const {
+#if __clang__
+  using Method = SWIFT_CC CharBuffer(
+      SWIFT_CONTEXT const void *, const void *, const void *);
+  auto method = getWitnessMethodUnsafe<Method>(
+      WitnessTableEntry::OwningModule);
+  return method(metadata, metadata, witnessTable).str();
+#else
+  llvm_unreachable("Incompatible host compiler");
+#endif
+}
+
+StringRef CompilerPlugin::invokeSupplementalSignatureModules() const {
+#if __clang__
+  using Method = SWIFT_CC CharBuffer(
+      SWIFT_CONTEXT const void *, const void *, const void *);
+  auto method = getWitnessMethodUnsafe<Method>(
+      WitnessTableEntry::SupplementalSignatureModules);
+  return method(metadata, metadata, witnessTable).str();
+#else
+  llvm_unreachable("Incompatible host compiler");
+#endif
+}
