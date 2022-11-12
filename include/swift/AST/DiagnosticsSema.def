@@ -6447,7 +6447,7 @@ ERROR(marker_protocol_cast,none,
       "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 ERROR(marker_protocol_conditional_conformance,none,
       "conditional conformance to non-marker protocol %0 cannot depend on "
-      "conformance of %1 to non-marker protocol %2",
+      "conformance of %1 to marker protocol %2",
       (Identifier, Type, Identifier))
 
 //------------------------------------------------------------------------------
