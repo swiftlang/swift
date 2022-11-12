@@ -1638,3 +1638,8 @@ SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   return mod->getOptions().EnableStackProtection;
 }
+
+SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  return mod->getOptions().EnableMoveInoutStackProtection;
+}

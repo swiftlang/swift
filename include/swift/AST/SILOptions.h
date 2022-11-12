@@ -129,7 +129,11 @@ public:
   bool EnablePerformanceAnnotations = false;
 
   /// Enables the emission of stack protectors in functions.
-  bool EnableStackProtection = false;
+  bool EnableStackProtection = true;
+
+  /// Like `EnableStackProtection` and also enables moving of values to
+  /// temporaries for stack protection.
+  bool EnableMoveInoutStackProtection = false;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
