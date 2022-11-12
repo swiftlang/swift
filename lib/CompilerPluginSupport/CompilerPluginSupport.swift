@@ -69,4 +69,20 @@ public protocol _CompilerPlugin {
   /// - Returns: A newly allocated buffer containing the type signature. The
   ///   caller is responsible for managing the memory.
   static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int)
+
+
+  /// Returns the module that owns this macro.
+  ///
+  /// - Returns: A newly allocated buffer containing the owning module name. The
+  ///   caller is responsible for managing the memory.
+  static func _owningModule() -> (UnsafePointer<UInt8>, count: Int)
+
+  /// Returns the set of modules that are needed (beyond the owning module) to
+  /// process the module signature.
+  ///
+  /// - Returns: A newly allocated buffer containing a string with all of the
+  /// supplemental signature module names, separated by semicolons. The caller
+  /// is responsible for managing the memory.
+  static func _supplementalSignatureModules()
+      -> (UnsafePointer<UInt8>, count: Int)
 }
