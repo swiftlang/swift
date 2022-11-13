@@ -331,7 +331,7 @@ ArrayRef<MacroDecl *> MacroLookupRequest::evaluate(
 
 #if SWIFT_SWIFT_PARSER
 Expr *swift::expandMacroExpr(
-    DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType
+    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
 ) {
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -348,45 +348,45 @@ Expr *swift::expandMacroExpr(
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  // FIXME: The caller should tell us what macro is being expanded, so we
-  // don't do this lookup again.
+  MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
 
-  // Built-in macros go through `MacroSystem` in Swift Syntax linked to this
-  // compiler.
-  if (auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str())) {
-    auto astGenSourceFile = sourceFile->exportedSourceFile;
-    if (!astGenSourceFile)
-      return nullptr;
-  
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_evaluateMacro(
-        astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return nullptr;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
-    swift_ASTGen_destroyMacro(macro);
-  }
-  // Other macros go through a compiler plugin.
-  else {
-    auto mee = cast<MacroExpansionExpr>(expr);
-    auto *plugin = ctx.getLoadedPlugin(macroName);
-    assert(plugin && "Should have been checked during earlier type checking");
-    auto bufferID = sourceFile->getBufferID();
-    auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
-    auto evaluated = plugin->invokeRewrite(
-        /*targetModuleName*/ dc->getParentModule()->getName().str(),
-        /*filePath*/ sourceFile->getFilename(),
-        /*sourceFileText*/ sourceFileText,
-        /*range*/ Lexer::getCharSourceRangeFromSourceRange(
-            sourceMgr, mee->getSourceRange()),
-        ctx);
-    if (evaluated)
-      evaluatedSource = *evaluated;
-    else
-      return nullptr;
+  switch (macro->implementationKind) {
+    case MacroDecl::ImplementationKind::Builtin: {
+      // Builtin macros are handled via ASTGen.
+      auto astGenSourceFile = sourceFile->exportedSourceFile;
+      if (!astGenSourceFile)
+        return nullptr;
+
+      // FIXME: Tell ASTGen which macro to use.
+      const char *evaluatedSourceAddress;
+      ptrdiff_t evaluatedSourceLength;
+      swift_ASTGen_evaluateMacro(
+           astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
+           &evaluatedSourceAddress, &evaluatedSourceLength);
+      if (!evaluatedSourceAddress)
+        return nullptr;
+      evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
+                                                (size_t)evaluatedSourceLength);
+      break;
+    }
+
+    case MacroDecl::ImplementationKind::Plugin: {
+      auto *plugin = (CompilerPlugin *)macro->opaqueHandle;
+      auto bufferID = sourceFile->getBufferID();
+      auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
+      auto evaluated = plugin->invokeRewrite(
+          /*targetModuleName*/ dc->getParentModule()->getName().str(),
+          /*filePath*/ sourceFile->getFilename(),
+          /*sourceFileText*/ sourceFileText,
+          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
+              sourceMgr, expr->getSourceRange()),
+          ctx);
+      if (evaluated)
+        evaluatedSource = *evaluated;
+      else
+        return nullptr;
+      break;
+    }
   }
 
   // Figure out a reasonable name for the macro expansion buffer.
@@ -394,7 +394,7 @@ Expr *swift::expandMacroExpr(
   {
     llvm::raw_string_ostream out(bufferName);
 
-    out << "Macro expansion of #" << macroName;
+    out << "Macro expansion of #" << macro->getName();
     if (auto bufferID = sourceFile->getBufferID()) {
       unsigned startLine, startColumn;
       std::tie(startLine, startColumn) =
