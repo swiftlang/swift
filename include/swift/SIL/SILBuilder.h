@@ -2805,7 +2805,7 @@ private:
   }
 };
 
-/// An wrapper on top of SILBuilder's constructor that automatically sets the
+/// A wrapper on top of SILBuilder's constructor that automatically sets the
 /// current SILDebugScope based on the specified insertion point. This is useful
 /// for situations where a single SIL instruction is lowered into a sequence of
 /// SIL instructions.
