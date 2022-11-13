@@ -2982,9 +2982,6 @@ namespace {
         auto overload = solution.getOverloadChoice(locator);
 
         auto macro = cast<MacroDecl>(overload.choice.getDecl());
-        // FIXME: use the macro for expansion!
-        // FIXME: form a proper ConcreteDeclRef for the macro expansion!
-
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
         if (auto newExpr = expandMacroExpr(dc, expr, macroRef, expandedType)) {
           auto expansion = new (ctx) MacroExpansionExpr(

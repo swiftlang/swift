@@ -1610,10 +1610,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto macro = dyn_cast<MacroDecl>(value)) {
     Type macroType = macro->getInterfaceType();
 
-    // Remove argument labels when we have a function-like macro.
-    if (isa<AnyFunctionType>(macroType.getPointer()))
-      macroType = macroType->removeArgumentLabels(1);
-
     // Open any the generic types.
     OpenedTypeMap replacements;
     openGeneric(macro->getParentModule(), macro->getGenericSignature(),

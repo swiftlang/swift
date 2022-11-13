@@ -34,3 +34,10 @@ let _ = #customStringify(["a", "b", "c"] + ["d", "e", "f"])
 // CHECK:   (tuple_expr type='([String], String)'
 // CHECK:     (binary_expr type='[String]'
 // CHECK:     (string_literal_expr type='String'
+
+struct MyColor: _ExpressibleByColorLiteral {
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) { }
+}
+
+let _: MyColor = #customColorLiteral(red: 0.5, green: 0.5, blue: 0.2, alpha: 0.9)
+

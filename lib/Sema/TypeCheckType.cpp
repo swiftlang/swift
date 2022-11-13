@@ -3235,11 +3235,19 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    Identifier argumentLabel;
+    Identifier parameterName;
+    if (inputRepr->getElement(i).SecondNameLoc.isValid()) {
+      argumentLabel = inputRepr->getElement(i).Name;
+      parameterName = inputRepr->getElement(i).SecondName;
+    } else {
+      parameterName = inputRepr->getElementName(i);
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         isolated, noDerivative, compileTimeConst);
-    elements.emplace_back(ty, Identifier(), paramFlags,
-                          inputRepr->getElementName(i));
+    elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
   return elements;
