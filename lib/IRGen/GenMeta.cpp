@@ -1556,7 +1556,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable())) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1634,7 +1634,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable())) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1788,7 +1788,7 @@ namespace {
     }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable()) || getType()->isForeign()) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable()) || getType()->isForeign()) {
         B.addInt32(0);
         return;
       }

@@ -535,10 +535,20 @@ public:
     return OptMode == OptimizationMode::ForSize;
   }
 
-  bool shouldEmitReflectionMetadata(bool isTypeReflectable) const {
+  bool shouldEmitFieldDescriptorForDebugger() const {
     bool debuggingEnabled = (DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes || DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes);
+    bool emitForDebuggerOnly = ReflectionMetadata == ReflectionMetadataMode::DebuggerOnly;
+    return debuggingEnabled || emitForDebuggerOnly;
+  }
+
+  bool shouldEmitFieldDescriptor(bool isTypeReflectable) const {
     bool optInEnabledAndReflectable = isTypeReflectable && ReflectionMetadata == ReflectionMetadataMode::OptIn;
-    return ReflectionMetadata == ReflectionMetadataMode::Runtime || debuggingEnabled || optInEnabledAndReflectable;
+    return ReflectionMetadata == ReflectionMetadataMode::Runtime || shouldEmitFieldDescriptorForDebugger() || optInEnabledAndReflectable;
+  }
+
+  bool shouldReferenceFieldDescriptorInNTD(bool isTypeReflectable) const {
+    bool optInEnabledAndReflectable = isTypeReflectable && ReflectionMetadata == ReflectionMetadataMode::OptIn;
+    return ReflectionMetadata == ReflectionMetadataMode::Runtime || optInEnabledAndReflectable;
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator) const {

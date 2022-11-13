@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -target %target-cpu-apple-macosx99.99 -DOPTIN -enable-upcoming-feature OptInReflection %s -o %t/opt_in.out
+// RUN: %target-build-swift -target %target-cpu-apple-macosx99.99 -DOPTIN -g -enable-upcoming-feature OptInReflection %s -o %t/opt_in.out
 // RUN: %target-codesign %t/opt_in.out
 // RUN: %target-run %t/opt_in.out | %FileCheck %s --check-prefix=CHECK-OPT-IN
 
