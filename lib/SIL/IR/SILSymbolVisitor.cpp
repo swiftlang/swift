@@ -718,6 +718,7 @@ public:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::Macro:
     case DeclKind::MacroExpansion:
       return false;
     case DeclKind::BuiltinTuple:

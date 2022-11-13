@@ -612,6 +612,8 @@ private:
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
+    case DeclContextKind::MacroDecl:
+      return getOrCreateContext(DC->getParent());
     case DeclContextKind::GenericTypeDecl: {
       auto *NTD = cast<NominalTypeDecl>(DC);
       auto *Ty = NTD->getDeclaredType().getPointer();

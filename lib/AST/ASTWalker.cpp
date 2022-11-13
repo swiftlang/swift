@@ -407,6 +407,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMacroDecl(MacroDecl *MD) {
+    // FIXME: Nothing specific to visit right now.
+    return false;
+  }
+
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     if (MED->getArgs() && doIt(MED->getArgs()))
       return true;

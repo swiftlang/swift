@@ -3455,6 +3455,7 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::Destructor:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
   case DeclKind::MacroExpansion:
     return None;
 
@@ -5101,6 +5102,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Accessor:
   case DeclKind::Func:
   case DeclKind::Subscript:
+  case DeclKind::Macro:
     return false;
 
   case DeclKind::BuiltinTuple:

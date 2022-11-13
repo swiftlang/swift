@@ -24,7 +24,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/Macro.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -2485,10 +2484,10 @@ Type ConstraintSystem::getTypeOfMacroReference(Identifier macroName,
 
   // Open any the generic types.
   OpenedTypeMap replacements;
-  openGeneric(macro->owningModule, macro->genericSignature,
+  openGeneric(macro->getParentModule(), macro->getGenericSignature(),
               getConstraintLocator(anchor), replacements);
 
-  return openType(macro->signature, replacements);
+  return openType(macro->getInterfaceType(), replacements);
 }
 #endif
 

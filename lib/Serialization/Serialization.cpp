@@ -1819,6 +1819,7 @@ static bool shouldSerializeMember(Decl *D) {
     return false;
 
   case DeclKind::EnumCase:
+  case DeclKind::Macro:
   case DeclKind::MacroExpansion:
     return false;
 
@@ -1902,6 +1903,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::MacroDecl:
     llvm_unreachable("cannot cross-reference this context");
 
   case DeclContextKind::Module:
@@ -4310,6 +4312,10 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
+  }
+
+  void visitMacroDecl(const MacroDecl *) {
+    llvm_unreachable("macro decls shouldn't be serialized");
   }
 
   void visitMacroExpansionDecl(const MacroExpansionDecl *) {

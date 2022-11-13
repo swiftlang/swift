@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Macro.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -150,9 +149,9 @@ getMacroSignature(
 
 
 /// Create a macro.
-static Macro *createMacro(
+static MacroDecl *createMacro(
     ModuleDecl *mod, Identifier macroName,
-    Macro::ImplementationKind implKind,
+    MacroDecl::ImplementationKind implKind,
     Optional<StringRef> genericSignature, StringRef typeSignature,
     StringRef owningModuleName,
     ArrayRef<StringRef> supplementalImportModuleNames,
@@ -189,15 +188,20 @@ static Macro *createMacro(
   }
 
   // FIXME: All macros are expression macros right now
-  return new (ctx) Macro(
-      Macro::Expression, implKind, macroName,
-      signature->first, signature->second,
+  auto macro = new (ctx) MacroDecl(
+      MacroDecl::Expression, implKind, macroName,
       owningModule, supplementalImportModules,
       opaqueHandle);
+
+  // FIXME: Make these lazily computed.
+  macro->setGenericSignature(signature->first);
+  macro->setInterfaceType(signature->second);
+
+  return macro;
 }
 
 /// Create a builtin macro.
-static Macro *createBuiltinMacro(
+static MacroDecl *createBuiltinMacro(
     ModuleDecl *mod, Identifier macroName, void *opaqueHandle) {
   // Get the macro generic signature.
   const char *genericSignaturePtr;
@@ -247,14 +251,14 @@ static Macro *createBuiltinMacro(
     .split(supplementalModuleNames, ";", -1, false);
 
   return createMacro(
-      mod, macroName, Macro::ImplementationKind::Builtin,
+      mod, macroName, MacroDecl::ImplementationKind::Builtin,
       genericSignature, typeSignature,
       owningModuleName, supplementalModuleNames,
       opaqueHandle);
 }
 
 /// Create a plugin-based macro.
-static Macro *createPluginMacro(
+static MacroDecl *createPluginMacro(
     ModuleDecl *mod, Identifier macroName, CompilerPlugin *plugin) {
   auto genSignature = plugin->invokeGenericSignature();
   SWIFT_DEFER {
@@ -283,16 +287,16 @@ static Macro *createPluginMacro(
     .split(supplementalModuleNames, ";", -1, false);
 
   return createMacro(
-      mod, macroName, Macro::ImplementationKind::Plugin, genSignature,
+      mod, macroName, MacroDecl::ImplementationKind::Plugin, genSignature,
       typeSignature, owningModuleName, supplementalModuleNames, plugin);
 }
 
-ArrayRef<Macro *> MacroLookupRequest::evaluate(
+ArrayRef<MacroDecl *> MacroLookupRequest::evaluate(
     Evaluator &evaluator, Identifier macroName, ModuleDecl *mod
 ) const {
 #if SWIFT_SWIFT_PARSER
   ASTContext &ctx = mod->getASTContext();
-  SmallVector<Macro *, 2> macros;
+  SmallVector<MacroDecl *, 2> macros;
 
   // Look for a builtin macro with this name.
   if (auto *builtinHandle = swift_ASTGen_lookupMacro(

@@ -2379,6 +2379,9 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.
     return appendContext(ctx->getParent(), useModuleName);
+
+  case DeclContextKind::MacroDecl:
+    llvm_unreachable("macro declarations are never mangled");
   }
 
   llvm_unreachable("bad decl context");

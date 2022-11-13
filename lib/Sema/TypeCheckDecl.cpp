@@ -2543,6 +2543,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     return resultTy;
   }
+
+  case DeclKind::Macro: {
+    llvm_unreachable("macro types are precomputed right now");
+  }
   }
   llvm_unreachable("invalid decl kind");
 }

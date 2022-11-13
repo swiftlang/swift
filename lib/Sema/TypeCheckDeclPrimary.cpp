@@ -1978,6 +1978,10 @@ public:
     llvm_unreachable("should always be type-checked already");
   }
 
+  void visitMacroDecl(MacroDecl *MD) {
+    // Macros have no definitions, so there is nothing to check.
+  }
+
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     llvm_unreachable("FIXME: macro expansion decl not handled in DeclChecker");
   }

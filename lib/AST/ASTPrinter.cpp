@@ -1895,6 +1895,10 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
       return true;
   }
 
+  // Skip macros, which don't have an in-source representation.
+  if (isa<MacroDecl>(D))
+    return false;
+
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessFilter > AccessLevel::Private &&
@@ -4431,6 +4435,10 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   if (numFieldOffsetVectorEntries > 0)
     Printer << " (field offsets: " << numFieldOffsetVectorEntries << ")";
   Printer << " */";
+}
+
+void PrintAST::visitMacroDecl(MacroDecl *decl) {
+  // No in-source representation of macros.
 }
 
 void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
