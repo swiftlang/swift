@@ -6,6 +6,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// REQUIRES: reflection
 // REQUIRES: OS=macosx || OS=ios
 
 // rdar://76038845

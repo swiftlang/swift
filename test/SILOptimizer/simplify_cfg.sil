@@ -3233,3 +3233,89 @@ bb6:
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @dont_crash_in_cast_jump_threading
+// CHECK:         checked_cast_br
+// CHECK:       } // end sil function 'dont_crash_in_cast_jump_threading'
+sil @dont_crash_in_cast_jump_threading : $@convention(thin) (Optional<Base>) -> () {
+bb0(%0 : $Optional<Base>):
+  br bb1
+
+bb1:
+  switch_enum %0 : $Optional<Base>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb21
+
+
+bb2(%18 : $Base):
+  checked_cast_br %18 : $Base to Derived, bb3, bb4
+
+bb3(%21 : $Derived):
+  %22 = integer_literal $Builtin.Int1, -1
+  br bb5(%22 : $Builtin.Int1)
+
+bb4:
+  %24 = integer_literal $Builtin.Int1, 0
+  br bb5(%24 : $Builtin.Int1)
+
+
+bb5(%26 : $Builtin.Int1):
+  cond_br %26, bb6, bb19
+
+bb6:
+  checked_cast_br %18 : $Base to Derived, bb7, bb8
+
+
+bb7(%29 : $Derived):
+  %30 = enum $Optional<Derived>, #Optional.some!enumelt, %29 : $Derived
+  br bb9(%30 : $Optional<Derived>)
+
+bb8:
+  %32 = enum $Optional<Derived>, #Optional.none!enumelt
+  br bb9(%32 : $Optional<Derived>)
+
+
+bb9(%34 : $Optional<Derived>):
+  switch_enum %34 : $Optional<Derived>, case #Optional.some!enumelt: bb10, case #Optional.none!enumelt: bb18
+
+
+bb10(%36 : $Derived):
+  br bb11
+
+bb11:
+  checked_cast_br %18 : $Base to Derived, bb12, bb13
+
+
+bb12(%43 : $Derived):
+  %44 = enum $Optional<Derived>, #Optional.some!enumelt, %43 : $Derived
+  br bb14(%44 : $Optional<Derived>)
+
+bb13:
+  %46 = enum $Optional<Derived>, #Optional.none!enumelt
+  br bb14(%46 : $Optional<Derived>)
+
+
+bb14(%48 : $Optional<Derived>):
+  switch_enum %48 : $Optional<Derived>, case #Optional.some!enumelt: bb15, case #Optional.none!enumelt: bb17
+
+
+bb15(%50 : $Derived):
+  br bb16
+
+bb16:
+  br bb20
+
+bb17:
+  br bb16
+
+bb18:
+  br bb11
+
+bb19:
+  br bb20
+
+bb20:
+  br bb1
+
+bb21:
+  %75 = tuple ()
+  return %75 : $()
+}

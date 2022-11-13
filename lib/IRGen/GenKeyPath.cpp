@@ -893,6 +893,15 @@ emitKeyPathComponent(IRGenModule &IGM,
             componentCanSig, [&](GenericRequirement reqt) {
               auto substType =
                   reqt.TypeParameter.subst(subs)->getCanonicalType();
+
+              // FIXME: This seems wrong. We used to just mangle opened archetypes as
+              // their interface type. Let's make that explicit now.
+              substType = substType.transformRec([](Type t) -> Optional<Type> {
+                if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+                  return openedExistential->getInterfaceType();
+                return None;
+              })->getCanonicalType();
+
               if (!reqt.Protocol) {
                 // Type requirement.
                 externalSubArgs.push_back(emitMetadataTypeRefForKeyPath(

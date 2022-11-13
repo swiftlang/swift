@@ -128,6 +128,7 @@ CONSTANT_OWNERSHIP_INST(None, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(None, RefTailAddr)
 CONSTANT_OWNERSHIP_INST(None, RefToRawPointer)
 CONSTANT_OWNERSHIP_INST(None, SelectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, SelectValue)
 CONSTANT_OWNERSHIP_INST(None, StringLiteral)
 CONSTANT_OWNERSHIP_INST(None, StructElementAddr)
 CONSTANT_OWNERSHIP_INST(None, SuperMethod)
@@ -166,7 +167,6 @@ CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, SelectValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // OpenExistentialValue opens the boxed value inside an existential
@@ -382,6 +382,8 @@ struct ValueOwnershipKindBuiltinVisitor
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
 CONSTANT_OWNERSHIP_BUILTIN(Owned, COWBufferForReading)
+CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfBorrowOpaque)
+CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedAddressOfBorrowOpaque)
 CONSTANT_OWNERSHIP_BUILTIN(None, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericAShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, Add)

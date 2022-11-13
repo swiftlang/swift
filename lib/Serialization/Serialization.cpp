@@ -4611,16 +4611,25 @@ public:
                        S.addTypeRef(wrappedTy));
   }
 
-  void visitPackType(const PackType *pack) {
+  void visitPackExpansionType(const PackExpansionType *expansionTy) {
     using namespace decls_block;
-//    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
-    llvm_unreachable("Unimplemented!");
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackExpansionTypeLayout::Code];
+    PackExpansionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        S.addTypeRef(expansionTy->getPatternType()),
+                                        S.addTypeRef(expansionTy->getCountType()));
   }
 
-  void visitPackExpansionType(const PackExpansionType *pack) {
+  void visitPackType(const PackType *packTy) {
     using namespace decls_block;
-//    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
-    llvm_unreachable("Unimplemented!");
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackTypeLayout::Code];
+    TupleTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+
+    abbrCode = S.DeclTypeAbbrCodes[PackTypeEltLayout::Code];
+    for (auto elt : packTy->getElementTypes()) {
+      PackTypeEltLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(elt));
+    }
   }
 
   void visitParenType(const ParenType *parenTy) {
@@ -5161,6 +5170,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+  registerDeclTypeAbbr<PackExpansionTypeLayout>();
+  registerDeclTypeAbbr<PackTypeLayout>();
+  registerDeclTypeAbbr<PackTypeEltLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();

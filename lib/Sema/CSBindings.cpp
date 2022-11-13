@@ -2208,8 +2208,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.insert(srcLocator);
 
+    // Fail if hole reporting fails.
     if (type->isPlaceholder() && reportHole())
-      return true;
+      return false;
   }
 
   if (cs.simplify())

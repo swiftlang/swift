@@ -44,23 +44,16 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
 
   var collectedEffects = CollectedEffects(function: function, context)
 
-  var deadEndBlocks = DeadEndBlocks(function: function, context)
-  defer { deadEndBlocks.deinitialize() }
-  
   // First step: collect effects from all instructions.
   //
   for block in function.blocks {
-    // Effects in blocks from which the function doesn't return are not relevant for the caller.
-    if deadEndBlocks.isDeadEnd(block: block) {
-      continue
-    }
     for inst in block.instructions {
       collectedEffects.addInstructionEffects(inst)
     }
   }
 
   // Second step: If an argument has unknown uses, we must add all previously collected
-  // global effects to the argument, because we don't know to wich "global" side-effect
+  // global effects to the argument, because we don't know to which "global" side-effect
   // instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEcapingArgument(argument: argument)
@@ -380,7 +373,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
   mutating func hasUnknownUses(argument: FunctionArgument) -> Bool {
     if argument.type.isAddress {
       return walkDownUses(ofAddress: argument, path: UnusedWalkingPath()) == .abortWalk
-    } else if argument.hasTrivialType {
+    } else if argument.hasTrivialNonPointerType {
       return false
     } else {
       return walkDownUses(ofValue: argument, path: UnusedWalkingPath()) == .abortWalk

@@ -25,11 +25,12 @@
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -37,14 +38,14 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
-#include "llvm/Support/Compiler.h"
 #include "clang/AST/DeclObjC.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -1504,8 +1505,8 @@ public:
       // If we haven't allocated "self" yet at this point, do so.
       if (SGF.AllocatorMetatype) {
         bool usesObjCAllocation;
-        if (auto clas = dyn_cast<ClassDecl>(nominal)) {
-          usesObjCAllocation = usesObjCAllocator(clas);
+        if (auto clazz = dyn_cast<ClassDecl>(nominal)) {
+          usesObjCAllocation = usesObjCAllocator(clazz);
         } else {
           // In the protocol extension case, we should only be here if the callee
           // initializer is @objc.
@@ -2921,6 +2922,25 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   return nullptr;
 }
 
+Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow() && {
+  if (!isExpr())
+    return nullptr;
+
+  auto argExpr = asKnownExpr();
+  auto *li = dyn_cast<LoadExpr>(argExpr);
+  if (!li)
+    return nullptr;
+
+  auto lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
+
+  // Claim the value of this argument if we found a storage reference.
+  if (lvExpr) {
+    (void)std::move(*this).asKnownExpr();
+  }
+
+  return lvExpr;
+}
+
 Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   if (!isExpr()) return nullptr;
 
@@ -3054,6 +3074,13 @@ private:
     if (IsYield && param.isGuaranteed()) {
       if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
                           loweredSubstParamType, origParamType, paramSlice))
+        return;
+    }
+
+    if (loweredSubstArgType.isPureMoveOnly() && param.isGuaranteed()) {
+      if (tryEmitBorrowedMoveOnly(std::move(arg), loweredSubstArgType,
+                                  loweredSubstParamType, origParamType,
+                                  paramSlice))
         return;
     }
 
@@ -3220,6 +3247,23 @@ private:
     // Try to find an expression we can emit as an l-value.
     auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow();
     if (!lvExpr) return false;
+
+    emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
+                 origParamType, paramsSlice);
+    return true;
+  }
+
+  bool tryEmitBorrowedMoveOnly(ArgumentSource &&arg,
+                               SILType loweredSubstArgType,
+                               SILType loweredSubstParamType,
+                               AbstractionPattern origParamType,
+                               ClaimedParamsRef paramsSlice) {
+    assert(paramsSlice.size() == 1);
+
+    // Try to find an expression we can emit as an l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow();
+    if (!lvExpr)
+      return false;
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
                  origParamType, paramsSlice);

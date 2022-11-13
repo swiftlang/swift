@@ -76,7 +76,8 @@ public:
                     const SILSymbolVisitorContext &ctx);
 
   /// Override to prepare for enumeration of the symbols for a specific decl.
-  virtual void willVisitDecl(Decl *D) {}
+  /// Return \c true to proceed with visiting the decl or \c false to skip it.
+  virtual bool willVisitDecl(Decl *D) { return true; }
 
   /// Override to clean up after enumeration of the symbols for a specific decl.
   virtual void didVisitDecl(Decl *D) {}
@@ -106,7 +107,6 @@ public:
   virtual void addMethodDescriptor(SILDeclRef declRef) {}
   virtual void addMethodLookupFunction(ClassDecl *CD) {}
   virtual void addNominalTypeDescriptor(NominalTypeDecl *NTD) {}
-  virtual void addObjCClass(ClassDecl *CD) {}
   virtual void addObjCInterface(ClassDecl *CD) {}
   virtual void addObjCMetaclass(ClassDecl *CD) {}
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}

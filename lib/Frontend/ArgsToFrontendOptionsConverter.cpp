@@ -293,6 +293,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   Opts.EnableExperimentalCxxInteropInClangHeader =
       Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
+  
+  Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
+                                                 OPT_no_strict_implicit_module_context,
+                                                 false);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -755,14 +759,11 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       if (!allowModuleName) {
         if (value == options.ModuleName ||
             value == options.ModuleABIName ||
-            value == options.ModuleLinkName) {
+            value == options.ModuleLinkName ||
+            value == STDLIB_NAME) {
           diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
           return false;
         }
-      }
-      if (value == STDLIB_NAME) {
-        diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
-        return false;
       }
       if (!Lexer::isIdentifier(value)) {
         diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);

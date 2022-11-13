@@ -30,6 +30,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -466,6 +467,15 @@ InOutConversionScope::~InOutConversionScope() {
 
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
+
+void PhysicalPathComponent::set(SILGenFunction &SGF, SILLocation loc,
+                                ArgumentSource &&value, ManagedValue base) && {
+  auto finalDestAddr = std::move(*this).project(SGF, loc, base);
+  assert(finalDestAddr.getType().isAddress());
+
+  auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
+  std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
+}
 
 void PathComponent::dump() const {
   dump(llvm::errs());
@@ -1647,7 +1657,7 @@ namespace {
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
         // assign_by_wrapper with the allocating initializer function and the
-        // setter function as arguments. DefiniteInitializtion will then decide
+        // setter function as arguments. DefiniteInitialization will then decide
         // between the two functions, depending if it's an initialization or a
         // re-assignment.
         //
@@ -3905,11 +3915,21 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
 
   ManagedValue addr = SGF.emitAddressOfLValue(e, std::move(baseLV));
 
-  // Now create the temporary and
+  // Now create the temporary and move our value into there.
   auto temp =
       SGF.emitFormalAccessTemporary(e, SGF.F.getTypeLowering(addr.getType()));
   auto toAddr = temp->getAddressForInPlaceInitialization(SGF, e);
-  SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+
+  // If we have a move only type, we use a copy_addr that will be handled by the
+  // address move only checker. If we have a copyable type, we need to use a
+  // mark_unresolved_move_addr to ensure that the move operator checker performs
+  // the relevant checking.
+  if (addr.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(e, addr.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+  }
   temp->finishInitialization(SGF);
 
   // Now return the temporary in a value component.
@@ -4899,12 +4919,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr =
-      std::move(component).project(*this, loc, destAddr);
-    assert(finalDestAddr.getType().isAddress());
-
-    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
-    std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
+    std::move(component.asPhysical()).set(*this, loc, std::move(src), destAddr);
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }

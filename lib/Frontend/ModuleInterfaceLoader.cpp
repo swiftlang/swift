@@ -614,7 +614,8 @@ class ModuleInterfaceLoaderImpl {
     StringRef inParentDirName =
       path::filename(path::parent_path(interfacePath));
     if (path::extension(inParentDirName) == ".swiftmodule") {
-      assert(path::stem(inParentDirName) == moduleName);
+      assert(path::stem(inParentDirName) ==
+             ctx.getRealModuleName(ctx.getIdentifier(moduleName)).str());
       path::append(scratch, inParentDirName);
     }
     path::append(scratch, path::filename(modulePath));
@@ -1027,9 +1028,10 @@ class ModuleInterfaceLoaderImpl {
       }
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
+      Identifier realName = ctx.getRealModuleName(ctx.getIdentifier(moduleName));
       ImplicitModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
-        astDelegate, interfacePath, moduleName, cacheDir,
+        astDelegate, interfacePath, realName.str(), cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock,
         ctx.IgnoreAdjacentModules, diagnosticLoc,
@@ -1597,18 +1599,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
 
-  // We need to add these extra clang flags because explicit module building
-  // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
-  // and -fmodule-file=.
-  // If we don't add these flags, the interface will be built with implicit
-  // PCMs.
-  // FIXME: With Implicit Module Builds, if sub-invocations inherit `-fmodule-map-file=` options,
-  // those modulemaps become File dependencies of all downstream PCMs and their depending Swift
-  // modules, triggering unnecessary re-builds. We work around this by only inheriting these options
-  // when building with explicit modules. While this problem will not manifest with Explicit Modules
-  // (which do not use the ClangImporter to build PCMs), we may still need a better way to
-  // decide which options must be inherited here.
-  if (LoaderOpts.disableImplicitSwiftModule) {
+  // If the compiler has been asked to be strict with ensuring downstream dependencies
+  // get the parent invocation's context, or this is an Explicit build, inherit the
+  // extra Clang arguments also.
+  if (LoaderOpts.strictImplicitModuleContext || LoaderOpts.disableImplicitSwiftModule) {
+    // Inherit any clang-specific state of the compilation (macros, clang flags, etc.)
     subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
     for (auto arg : subClangImporterOpts.ExtraArgs) {
       GenericArgs.push_back("-Xcc");
@@ -1724,7 +1719,8 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
-  return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
+  return runInSubCompilerInstance(moduleName, interfacePath, outputPath,
+                                  diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
@@ -1739,6 +1735,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                                           StringRef interfacePath,
                                                           StringRef outputPath,
                                                           SourceLoc diagLoc,
+                                                          bool silenceErrors,
                   llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
@@ -1833,7 +1830,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   ForwardingDiagnosticConsumer FDC(*Diags);
-  subInstance.addDiagnosticConsumer(&FDC);
+  if (!silenceErrors)
+    subInstance.addDiagnosticConsumer(&FDC);
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);

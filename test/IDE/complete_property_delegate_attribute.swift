@@ -47,12 +47,12 @@ struct TestStruct {
   // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
   func sync1() {}
 
-  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG_LABEL^#) var test4
-// SECOND_ARG_LABEL: Begin completions, 1 items
-// SECOND_ARG_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Int#}[#Int#];
-// SECOND_ARG_LABEL: End completions
+  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG1^#) var test4
+// SECOND_ARG1: Begin completions, 1 items
+// SECOND_ARG1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Int#}[#Int#];
+// SECOND_ARG1: End completions
 
-  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG_LABEL_NO_VAR?check=SECOND_ARG_LABEL^#)
+  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG1_LABEL_NO_VAR?check=SECOND_ARG1^#)
 
   // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
   func sync2() {}

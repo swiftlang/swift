@@ -6011,6 +6011,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::SequenceElementType: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      recordAnyTypeVarAsPotentialHole(lhs);
+      recordAnyTypeVarAsPotentialHole(rhs);
+      return true;
+    }
+
     // This is going to be diagnosed as `missing conformance`,
     // so no need to create duplicate fixes.
     if (rhs->isExistentialType())
@@ -6021,6 +6027,21 @@ bool ConstraintSystem::repairFailures(
     // helps when conversion if between a type and a tuple e.g.
     // `Int` vs. `(_, _)`.
     recordAnyTypeVarAsPotentialHole(rhs);
+
+    // If the element type is `Any` i.e. `for (x, y) in [] { ... }`
+    // it would never match and the pattern (`rhs` = `(x, y)`)
+    // doesn't have any other source of contextual information,
+    // so instead of waiting for elements to become holes with an
+    // unrelated fixes, let's proactively bind all of the pattern
+    // elemnts to holes here.
+    if (lhs->isAny()) {
+      rhs.visit([&](Type type) {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          assignFixedType(typeVar,
+                          PlaceholderType::get(getASTContext(), typeVar));
+        }
+      });
+    }
 
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -8097,7 +8118,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  return toType->isEqual(nilLiteral->getExistentialType()) &&
+  return toType->isEqual(nilLiteral->getDeclaredExistentialType()) &&
          fromType->getOptionalObjectType();
 }
 
@@ -12582,40 +12603,6 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
-/// FIXME: Move this elsewhere if it is broadly useful
-static Type getReducedShape(Type type, ASTContext &ctx) {
-  // Pack archetypes know their reduced shape
-  if (auto *packArchetype = type->getAs<PackArchetypeType>())
-    return packArchetype->getShape();
-
-  // Reduced shape of pack is computed recursively
-  if (auto *packType = type->getAs<PackType>()) {
-    SmallVector<Type, 2> elts;
-
-    for (auto elt : packType->getElementTypes()) {
-      // T... => shape(T)...
-      if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
-        if (packExpansionType->getCountType()->is<PlaceholderType>()) {
-          elts.push_back(ctx.TheEmptyTupleType);
-          continue;
-        }
-        auto shapeType = getReducedShape(packExpansionType->getCountType(), ctx);
-        elts.push_back(PackExpansionType::get(shapeType, shapeType));
-      }
-
-      // Use () as a placeholder for scalar shape.
-      elts.push_back(ctx.TheEmptyTupleType);
-    }
-
-    return PackType::get(ctx, elts);
-  }
-
-  assert(!type->isTypeVariableOrMember());
-
-  // Use () as a placeholder for scalar shape.
-  return ctx.TheEmptyTupleType;
-}
-
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -12646,12 +12633,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
       return formUnsolved();
   }
 
-  if (Type shape = getReducedShape(type1, getASTContext())) {
-    addConstraint(ConstraintKind::Bind, shape, type2, locator);
-    return SolutionKind::Solved;
-  }
-
-  return SolutionKind::Error;
+  auto shape = type1->getReducedShape();
+  addConstraint(ConstraintKind::Bind, shape, type2, locator);
+  return SolutionKind::Solved;
 }
 
 static llvm::PointerIntPair<Type, 3, unsigned>
@@ -13827,6 +13811,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // each mismatched branch.
       if (branchElt->forElse())
         impact = 10;
+    }
+
+    // Increase impact of invalid conversions to `Any` and `AnyHashable`
+    // associated with collection elements (i.e. for-in sequence element)
+    // because it means that other side is structurally incompatible.
+    if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch) {
+      if (type2->isAny() || type2->isAnyHashable())
+        ++impact;
     }
 
     if (recordFix(fix, impact))

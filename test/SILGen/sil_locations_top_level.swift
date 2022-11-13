@@ -31,7 +31,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 // CHECK: return {{.*}}// {{.*}} line:5:12
 
 // Check explicit destructor
-// CHECK_LABEL: sil hidden [ossa] @$s23sil_locations_top_level16TopLevelObjectTyCfd
+// CHECK-LABEL: sil hidden [ossa] @$s23sil_locations_top_level16TopLevelObjectTyCfd
 // CHECK:   return {{.*}}// {{.*}} line:8:3
 
 // Check allocating constructor
@@ -44,5 +44,5 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 // CHECK: return {{.*}}// {{.*}} line:14:3:imp_return
 
 // Check implicit destructor
-// CHECK_LABEL: sil hidden [ossa] @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
+// CHECK-LABEL: sil hidden [ossa] @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
 // CHECK:   return {{.*}}// {{.*}} line:12:7:imp_return:auto_gen

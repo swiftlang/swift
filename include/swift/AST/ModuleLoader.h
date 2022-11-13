@@ -173,6 +173,7 @@ struct InterfaceSubContextDelegate {
                                                    StringRef interfacePath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
+                                                   bool silenceErrors,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;

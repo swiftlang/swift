@@ -4,15 +4,15 @@
 
 struct NotComparableStruct: Comparable {
   // expected-error@-1 {{type 'NotComparableStruct' does not conform to protocol 'Comparable'}}
-  // expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for structs}}
+  // expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for struct declarations}}
   var value = 0
 }
 
 class NotComparableClass: Comparable {
   // expected-error@-1 {{type 'NotComparableClass' does not conform to protocol 'Comparable'}}
-  // expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for classes}}
+  // expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for class declarations}}
   // expected-error@-3 {{type 'NotComparableClass' does not conform to protocol 'Equatable'}}
-  // expected-note@-4 {{automatic synthesis of 'Equatable' is not supported for classes}}
+  // expected-note@-4 {{automatic synthesis of 'Equatable' is not supported for class declarations}}
   var value = 1
 }
 

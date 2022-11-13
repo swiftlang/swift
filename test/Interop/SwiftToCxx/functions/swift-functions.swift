@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions {
+// CHECK-LABEL: namespace Functions __attribute__((swift_private)) {
 
 // CHECK-LABEL: namespace _impl {
 

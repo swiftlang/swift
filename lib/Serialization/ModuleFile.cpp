@@ -889,18 +889,6 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
-void ModuleFile::lookupImportedSPIGroups(
-                        const ModuleDecl *importedModule,
-                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
-  for (auto &dep : Dependencies) {
-    auto depSpis = dep.spiGroups;
-    if (dep.Import.hasValue() && dep.Import->importedModule == importedModule &&
-        !depSpis.empty()) {
-      spiGroups.insert(depSpis.begin(), depSpis.end());
-    }
-  }
-}
-
 void
 ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   for (const auto &lib : Core->LinkLibraries)

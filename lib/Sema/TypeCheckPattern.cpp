@@ -727,9 +727,11 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   // property definition.
   auto &Context = dc->getASTContext();
   auto *Repr = TP->getTypeRepr();
-  if (Repr && Repr->hasOpaque()) {
+  if (Repr && (Repr->hasOpaque() ||
+               (Context.LangOpts.hasFeature(Feature::ImplicitSome) &&
+                Repr->isProtocol(dc)))) {
     auto named = dyn_cast<NamedPattern>(
-                           TP->getSubPattern()->getSemanticsProvidingPattern());
+        TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
       Context.Diags.diagnose(TP->getLoc(),
                              diag::opaque_type_unsupported_pattern);

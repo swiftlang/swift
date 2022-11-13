@@ -75,6 +75,17 @@ final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
   override init(start: NonTrivialStruct, end: NonTrivialStruct)
 }
 
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+struct MyStruct {
+}
+
 sil_global @total_klass : $Klass
 sil_global @total_nontrivialstruct : $NonTrivialStruct
 
@@ -85,6 +96,7 @@ sil @use_a : $@convention(thin) (@owned A) -> ()
 sil @use_twofield : $@convention(thin) (@owned TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
 sil @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+sil [ossa] @get_array : $@convention(thin) () -> @owned MyArray<MyStruct>
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -1250,3 +1262,18 @@ bb14:
   return %26 : $()
 }
 
+// CHECK-LABEL: @test_is_unique :
+// CHECK:   load
+// CHECK: } // end sil function 'test_is_unique'
+sil [ossa] @test_is_unique : $@convention(thin) (@in MyArray<MyStruct>) -> () {
+bb0(%0 : $*MyArray<MyStruct>):
+  %1 = function_ref @get_array : $@convention(thin) () -> @owned MyArray<MyStruct>
+  %2 = apply %1() : $@convention(thin) () -> @owned MyArray<MyStruct>
+  store %2 to [assign] %0 : $*MyArray<MyStruct>
+  %4 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
+  %5 = is_unique %4 : $*ArrayIntBuffer
+  %7 = load [take] %0 : $*MyArray<MyStruct>
+  destroy_value %7 : $MyArray<MyStruct>
+  %t = tuple ()
+  return %t : $() 
+}

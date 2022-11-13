@@ -3256,13 +3256,15 @@ public:
     }
 
     if (auto *LE = dyn_cast<LiteralExpr>(E)) {
-      auto Range = LE->getSourceRange();
-      if (auto *RLE = dyn_cast<RegexLiteralExpr>(LE)) {
-        // Regex literals require both the Regex<Output> type to be available,
-        // as well as the initializer that is implicitly called.
-        diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
+      if (auto literalType = LE->getType()) {
+        // Check availability of the type produced by implicit literal
+        // initializer.
+        if (auto *nominalDecl = literalType->getAnyNominal()) {
+          diagnoseDeclAvailability(nominalDecl, LE->getSourceRange(),
+                                   /*call=*/nullptr, Where);
+        }
       }
-      diagnoseDeclRefAvailability(LE->getInitializer(), Range);
+      diagnoseDeclRefAvailability(LE->getInitializer(), LE->getSourceRange());
     }
 
     if (auto *CE = dyn_cast<CollectionExpr>(E)) {

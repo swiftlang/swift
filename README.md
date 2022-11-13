@@ -137,7 +137,7 @@ More options may be added over time. Please pass ``--help`` to
 On macOS if one wants to install such a toolchain into Xcode:
 
 1. Untar and copy the toolchain to one of `/Library/Developer/Toolchains/` or
-   `~/Library/Developer/Toolchains/`. E.x.:
+   `~/Library/Developer/Toolchains/`. E.g.:
 
 ```
   $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C /

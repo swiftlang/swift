@@ -3198,7 +3198,7 @@ protocol someProtocol {
 // XHECK-NEXT: copy_addr
 // XHECK-NEXT: destroy_addr
 // XHECK-NEXT: [[T0:%.*]] = witness_method $T
-// XHECK_NEXT: apply [[T0]]<T>
+// XHECK-NEXT: apply [[T0]]<T>
 // XHECK: return
 sil [ossa] @witness_archetype : $@convention(thin) <T where T : someProtocol> (@in T) -> () {
 bb0(%0 : $*T):

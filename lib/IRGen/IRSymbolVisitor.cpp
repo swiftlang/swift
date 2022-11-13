@@ -72,8 +72,8 @@ public:
       : Visitor{Visitor}, Ctx{Ctx},
         PublicSymbolsOnly{Ctx.getSILCtx().getOpts().PublicSymbolsOnly} {}
 
-  void willVisitDecl(Decl *D) override {
-    Visitor.willVisitDecl(D);
+  bool willVisitDecl(Decl *D) override {
+    return Visitor.willVisitDecl(D);
   }
 
   void didVisitDecl(Decl *D) override {
@@ -158,12 +158,7 @@ public:
     addLinkEntity(LinkEntity::forNominalTypeDescriptor(NTD));
   }
 
-  void addObjCClass(ClassDecl *CD) override {
-    addLinkEntity(LinkEntity::forObjCClass(CD));
-  }
-
   void addObjCInterface(ClassDecl *CD) override {
-    // Pass through; Obj-C interfaces don't have linkable symbols.
     Visitor.addObjCInterface(CD);
   }
 

@@ -87,10 +87,10 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   }
 
   public func visit(_ node: SourceFileSyntax) -> [UnsafeMutableRawPointer] {
-    let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var out = [UnsafeMutableRawPointer]()
 
     for element in node.statements {
+      let loc = self.base.advanced(by: element.position.utf8Offset).raw
       let swiftASTNodes = visit(element)
       switch swiftASTNodes {
       case .decl(let d):

@@ -2476,15 +2476,30 @@ private:
         effects.push_back(EffectKind::Async);
       }
 
-      checkThrowAsyncSite(E, getter->hasThrows(),
+      bool requiresTry = getter->hasThrows();
+      checkThrowAsyncSite(E, requiresTry,
                           Classification::forEffect(effects,
                                   ConditionalEffectKind::Always,
                                   getKindOfEffectfulProp(member)));
 
-    } else if (E->isImplicitlyAsync()) {
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
-            Classification::forUnconditional(EffectKind::Async,
-                                             getKindOfEffectfulProp(member)));
+    } else {
+      EffectList effects;
+      bool requiresTry = false;
+      if (E->isImplicitlyAsync()) {
+        effects.push_back(EffectKind::Async);
+      }
+      if (E->isImplicitlyThrows()) {
+        // E.g. it may be a distributed computed property, accessed across actors.
+        effects.push_back(EffectKind::Throws);
+        requiresTry = true;
+      }
+
+      if (!effects.empty()) {
+        checkThrowAsyncSite(E, requiresTry,
+                            Classification::forEffect(effects,
+                                                      ConditionalEffectKind::Always,
+                                                      getKindOfEffectfulProp(member)));
+      }
     }
 
     return ShouldRecurse;

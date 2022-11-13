@@ -1303,11 +1303,19 @@ static void noteIsolatedActorMember(
   // FIXME: Make this diagnostic more sensitive to the isolation context of
   // the declaration.
   if (isDistributedActor) {
-    if (isa<VarDecl>(decl)) {
-      // Distributed actor properties are never accessible externally.
-      decl->diagnose(diag::distributed_actor_isolated_property,
-                     decl->getDescriptiveKind(), decl->getName(),
-                     nominal->getName());
+    if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+      if (varDecl->isDistributed()) {
+        // This is an attempt to access a `distributed var` synchronously, so offer a more detailed error
+        decl->diagnose(diag::distributed_actor_synchronous_access_distributed_computed_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      } else {
+        // Distributed actor properties are never accessible externally.
+        decl->diagnose(diag::distributed_actor_isolated_property,
+                       decl->getDescriptiveKind(), decl->getName(),
+                       nominal->getName());
+      }
+
     } else {
       // it's a function or subscript
       decl->diagnose(diag::note_distributed_actor_isolated_method,
@@ -3091,6 +3099,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
     if (auto superInit = ctor->getSuperInitCall())
       superInit->walk(checker);
   }
+
   if (decl->getAttrs().hasAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       checkDistributedFunction(func);
@@ -3700,6 +3709,39 @@ static Optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
   return None;
 }
 
+/// Verifies rules about `isolated` parameters for the given decl. There is more
+/// checking about these in TypeChecker::checkParameterList.
+///
+/// This function is focused on rules that apply when it's a declaration with
+/// an isolated parameter, rather than some generic parameter list in a
+/// DeclContext.
+///
+/// This function assumes the value already contains an isolated parameter.
+static void checkDeclWithIsolatedParameter(ValueDecl *value) {
+  // assume there is an isolated parameter.
+  assert(getIsolatedParamIndex(value));
+
+  // Suggest removing global-actor attributes written on it, as its ignored.
+  if (auto attr = value->getGlobalActorAttr()) {
+    if (!attr->first->isImplicit()) {
+      value->diagnose(diag::isolated_parameter_combined_global_actor_attr,
+                      value->getDescriptiveKind())
+          .fixItRemove(attr->first->getRangeWithAt())
+          .warnUntilSwiftVersion(6);
+    }
+  }
+
+  // Suggest removing `nonisolated` as it is also ignored
+  if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (!attr->isImplicit()) {
+      value->diagnose(diag::isolated_parameter_combined_nonisolated,
+                      value->getDescriptiveKind())
+          .fixItRemove(attr->getRangeWithAt())
+          .warnUntilSwiftVersion(6);
+    }
+  }
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -3713,6 +3755,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this declaration has an isolated parameter, it's isolated to that
   // parameter.
   if (auto paramIdx = getIsolatedParamIndex(value)) {
+    checkDeclWithIsolatedParameter(value);
+
     // FIXME: This doesn't allow us to find an Actor or DistributedActor
     // bound on the parameter type effectively.
     auto param = getParameterList(value)->get(*paramIdx);
@@ -4468,6 +4512,13 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  // Move only nominal types are currently never sendable since we have not yet
+  // finished the generics model for them.
+  //
+  // TODO: Remove this once this is complete!
+  if (nominal->isMoveOnly())
     return nullptr;
 
   // Actor types are always Sendable; they don't get it via this path.

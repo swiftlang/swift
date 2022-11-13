@@ -342,13 +342,6 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "  }\n";
-
-    for (const auto &pair : interopContext.getIrABIDetails().getEnumTagMapping(
-             cast<EnumDecl>(typeDecl))) {
-      os << "  using _impl_" << pair.first->getNameStr() << " = decltype(";
-      ClangSyntaxPrinter(os).printIdentifier(pair.first->getNameStr());
-      os << ");\n";
-    }
   }
   // Print out the storage for the value type.
   os << "  ";
@@ -503,9 +496,8 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   }
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }
 
 void ClangValueTypePrinter::printTypeGenericTraits(
@@ -599,7 +591,6 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }

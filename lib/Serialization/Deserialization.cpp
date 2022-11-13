@@ -16,6 +16,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -24,18 +25,18 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -2359,8 +2360,9 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from ImportResolver::getModule
+  Identifier parentName = FileContext->getParentModule()->getName();
   if (name.size() == 1 &&
-      name.front().Item == FileContext->getParentModule()->getName()) {
+      name.front().Item == getContext().getRealModuleName(parentName)) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
@@ -4490,7 +4492,7 @@ public:
 
     dtor->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
+    dtor->setAccess(std::max(cast<NominalTypeDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
     if (isImplicit)
@@ -5129,6 +5131,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       default:
         // We don't know how to deserialize this kind of attribute.
         MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+      }
+
+      // Do a quick check to see if this attribute is a move only attribute. If
+      // so, emit a nice error if we don't have experimental move only enabled.
+      if (Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
+          !MF.getContext().LangOpts.Features.contains(Feature::MoveOnly)) {
+        MF.getContext().Diags.diagnose(
+            SourceLoc(),
+            diag::
+                experimental_moveonly_feature_can_only_be_imported_when_enabled,
+            MF.getAssociatedModule()->getName());
       }
 
       if (!skipAttr) {
@@ -6416,6 +6429,51 @@ Expected<Type> DESERIALIZE_TYPE(UNBOUND_GENERIC_TYPE)(
   auto parentTy = MF.getType(parentID);
 
   return UnboundGenericType::get(genericDecl, parentTy, MF.getContext());
+}
+
+Expected<Type> DESERIALIZE_TYPE(PACK_EXPANSION_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID patternID;
+  TypeID countID;
+  decls_block::PackExpansionTypeLayout::readRecord(scratch, patternID, countID);
+
+  auto patternTy = MF.getTypeChecked(patternID);
+  if (!patternTy)
+    return patternTy.takeError();
+  auto countTy = MF.getTypeChecked(countID);
+  if (!countTy)
+    return countTy.takeError();
+
+  return PackExpansionType::get(patternTy.get(), countTy.get());
+}
+
+Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  // The pack record itself is empty. Read all trailing elements.
+  SmallVector<Type, 8> elements;
+  while (true) {
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::PACK_TYPE_ELT)
+      break;
+
+    TypeID typeID;
+    decls_block::PackTypeEltLayout::readRecord(scratch, typeID);
+
+    auto elementTy = MF.getTypeChecked(typeID);
+    if (!elementTy)
+      return elementTy.takeError();
+
+    elements.push_back(elementTy.get());
+  }
+
+  return PackType::get(MF.getContext(), elements);
 }
 
 Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,

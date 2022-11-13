@@ -97,10 +97,6 @@ Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
 }
 
 void UnexpectedClangTypeError::dump() {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return; // not needed for the parser library.
-#endif
-
   auto &e = llvm::errs();
   using Kind = UnexpectedClangTypeError::Kind;
   switch (errorKind) {

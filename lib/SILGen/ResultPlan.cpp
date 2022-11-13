@@ -991,7 +991,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // If the tuple is address-only, we'll get much better code if we
   // emit into a single buffer.
   auto &substTL = SGF.getTypeLowering(substType);
-  if (substTL.isAddressOnly()) {
+  if (substTL.isAddressOnly() && SGF.F.getConventions().useLoweredAddresses()) {
     // Create a temporary.
     auto temporary = SGF.emitTemporary(loc, substTL);
 

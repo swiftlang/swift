@@ -571,17 +571,9 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_variadic_generics :
-  Flag<["-"], "enable-experimental-variadic-generics">,
-  HelpText<"Enable experimental support for variadic generic types">;
-
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
-
-def enable_experimental_implicit_some :
-  Flag<["-"], "enable-experimental-implicit-some">,
-  HelpText<"Enable experimental implicit some">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -904,6 +896,15 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def alias_module_names_in_module_interface :
+  Flag<["-"], "alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disambiguate modules using "
+           "distinct alias names">;
+def disable_alias_module_names_in_module_interface :
+  Flag<["-"], "disable-alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disable disambiguating modules "
+           "using distinct alias names">;
+
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
   HelpText<"Enable experimental support for SPI imports">;
@@ -1103,6 +1104,9 @@ def enable_stack_protector :
 def disable_stack_protector :
   Flag<["-"], "disable-stack-protector">,
   HelpText<"Disable the stack-protector">;
+def enable_move_inout_stack_protector :
+  Flag<["-"], "enable-move-inout-stack-protector">,
+  HelpText<"Enable the stack protector by moving values to temporaries">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

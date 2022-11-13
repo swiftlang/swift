@@ -167,7 +167,7 @@ extern "C" void parseTopLevelSwift(const char *buffer,
                                    void (*)(void *, void *));
 
 static void appendToVector(void *declPtr, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<Decl *> *>(vecPtr);
+  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
   auto decl = static_cast<Decl *>(declPtr);
 
   vec->push_back(decl);
@@ -7235,12 +7235,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       pattern = patternRes.get();
     }
     
-    bool hasOpaqueReturnTy = false;
-    if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
-    }
-    auto sf = CurDeclContext->getParentSourceFile();
-    
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
@@ -7252,9 +7246,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       setOriginalDeclarationForDifferentiableAttributes(Attributes, VD);
 
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
-        sf->addUnvalidatedDeclWithOpaqueResultType(VD);
-      }
     });
 
     // Check whether we have already established an initializer context.
@@ -7541,14 +7532,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
-
-  // Let the source file track the opaque return type mapping, if any.
-  if (FuncRetTy && FuncRetTy->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(FD);
-    }
-  }
   
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
@@ -8512,14 +8495,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
       ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
-  
-  // Let the source file track the opaque return type mapping, if any.
-  if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
-      !InInactiveClauseEnvironment) {
-    if (auto sf = CurDeclContext->getParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
-    }
-  }
 
   DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
 

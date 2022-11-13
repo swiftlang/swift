@@ -1350,6 +1350,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
 
+    // Emit functions supporting `if #_hasSymbol(...)` conditions.
+    IGM.emitHasSymbolFunctions();
+
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {
       IGM.emitBuiltinReflectionMetadata();

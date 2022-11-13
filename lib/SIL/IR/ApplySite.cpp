@@ -16,17 +16,18 @@
 
 using namespace swift;
 
-void FullApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) const {
+void ApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) const {
   SILBuilderWithScope::insertAfter(getInstruction(), func);
 }
 
-void FullApplySite::insertAfterFullEvaluation(
+void ApplySite::insertAfterApplication(
     function_ref<void(SILBuilder &)> func) const {
   switch (getKind()) {
-  case FullApplySiteKind::ApplyInst:
-  case FullApplySiteKind::TryApplyInst:
+  case ApplySiteKind::ApplyInst:
+  case ApplySiteKind::TryApplyInst:
+  case ApplySiteKind::PartialApplyInst:
     return insertAfterInvocation(func);
-  case FullApplySiteKind::BeginApplyInst:
+  case ApplySiteKind::BeginApplyInst:
     SmallVector<EndApplyInst *, 2> endApplies;
     SmallVector<AbortApplyInst *, 2> abortApplies;
     auto *bai = cast<BeginApplyInst>(getInstruction());

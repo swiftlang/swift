@@ -477,9 +477,9 @@ private:
     // substitute the witness's derivative generic signature in its derivative
     // function identifier.
     if (requirementRef.isAutoDiffDerivativeFunction()) {
-      auto *reqrRerivativeId = requirementRef.getDerivativeFunctionIdentifier();
+      auto *reqrDerivativeId = requirementRef.getDerivativeFunctionIdentifier();
       auto *witnessDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-          reqrRerivativeId->getKind(), reqrRerivativeId->getParameterIndices(),
+          reqrDerivativeId->getKind(), reqrDerivativeId->getParameterIndices(),
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
@@ -866,7 +866,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
-      protocol->getExistentialType()->getCanonicalType(), GenericSignature());
+      protocol->getDeclaredExistentialType()->getCanonicalType(),
+      GenericSignature());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,

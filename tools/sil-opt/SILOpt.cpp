@@ -148,6 +148,10 @@ static llvm::cl::opt<bool>
 EnableSpeculativeDevirtualization("enable-spec-devirt",
                   llvm::cl::desc("Enable Speculative Devirtualization pass."));
 
+static llvm::cl::opt<bool>
+EnableMoveInoutStackProtection("enable-move-inout-stack-protector",
+                  llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
+
 static llvm::cl::opt<bool> EnableOSSAModules(
     "enable-ossa-modules",
     llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
@@ -607,6 +611,7 @@ int main(int argc, char **argv) {
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
   SILOpts.EnableStackProtection = true;
+  SILOpts.EnableMoveInoutStackProtection = EnableMoveInoutStackProtection;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

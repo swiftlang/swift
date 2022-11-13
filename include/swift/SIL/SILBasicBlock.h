@@ -308,7 +308,7 @@ public:
                                     const ValueDecl *D = nullptr);
 
   /// Remove all block arguments.
-  void dropAllArguments() { ArgumentList.clear(); }
+  void dropAllArguments();
 
   //===--------------------------------------------------------------------===//
   // Successors

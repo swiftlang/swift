@@ -50,13 +50,13 @@ bool ClangSyntaxPrinter::isClangKeyword(Identifier name) {
   return ClangSyntaxPrinter::isClangKeyword(name.str());
 }
 
-void ClangSyntaxPrinter::printIdentifier(StringRef name) {
+void ClangSyntaxPrinter::printIdentifier(StringRef name) const {
   os << name;
   if (ClangSyntaxPrinter::isClangKeyword(name))
     os << '_';
 }
 
-void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
+void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
   assert(decl->getName().isSimpleName());
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
@@ -136,12 +136,23 @@ void ClangSyntaxPrinter::printNominalTypeQualifier(
   os << "::";
 }
 
+void ClangSyntaxPrinter::printModuleNamespaceStart(
+    const ModuleDecl &moduleContext) const {
+  os << "namespace ";
+  printBaseName(&moduleContext);
+  os << " __attribute__((swift_private))";
+  os << " {\n";
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
-    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+    NamespaceTrivia trivia) const {
   os << "namespace ";
   namePrinter(os);
+  if (trivia == NamespaceTrivia::AttributeSwiftPrivate)
+    os << " __attribute__((swift_private))";
   os << " {\n\n";
   bodyPrinter(os);
   os << "\n} // namespace ";
@@ -150,9 +161,9 @@ void ClangSyntaxPrinter::printNamespace(
 }
 
 void ClangSyntaxPrinter::printNamespace(
-    StringRef name,
-    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
-  printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
+    StringRef name, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+    NamespaceTrivia trivia) const {
+  printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter, trivia);
 }
 
 void ClangSyntaxPrinter::printExternC(

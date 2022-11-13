@@ -28,7 +28,7 @@ import subprocess
 import sys
 from imp import load_source
 
-from compare_perf_tests import LogParser, TestComparator, create_report
+from compare_perf_tests import PerformanceTestResult, TestComparator, create_report
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -204,12 +204,12 @@ def test_opt_levels(args):
     return 0
 
 
-def measure(driver, tests, i):
+def measure(driver, tests, i, min_num_samples):
     """Log and measure samples of the tests with the given driver.
 
     Collect increasing number of samples, depending on the iteration.
     """
-    num_samples = min(i + 3, 10)
+    num_samples = min(i + min_num_samples, 4 * min_num_samples)
     msg = "    Iteration {0} for {1}: num samples = {2}, ".format(
         i, driver.args.tests, num_samples
     )
@@ -246,7 +246,7 @@ def test_performance(
                                    optimization=opt_level))
         for dir in [old_dir, new_dir]
     ]
-    results = [measure(driver, driver.tests, i) for driver in [old, new]]
+    results = [measure(driver, driver.tests, i, num_samples) for driver in [old, new]]
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
 
@@ -254,11 +254,11 @@ def test_performance(
         i += 1
         if VERBOSE:
             log("        test again: " + str([test.name for test in changed]))
-        results = [
-            merge(the_results, measure(driver, [test.name for test in changed], i))
-            for the_results, driver in zip(results, [old, new])
-        ]
-        tests = TestComparator(results[0], results[1], threshold)
+        old_measurement = measure(old, [test.name for test in changed], i, num_samples)
+        old_results = merge(results[0], old_measurement)
+        new_measurement = measure(new, [test.name for test in changed], i, num_samples)
+        new_results = merge(results[1], new_measurement)
+        tests = TestComparator(old_results, new_results, threshold)
         changed = tests.decreased + tests.increased
 
         if len(old.tests) == len(changed):
@@ -269,7 +269,7 @@ def test_performance(
     log("")
     report_title = "Performance ({}): -{}".format(arch, opt_level)
     return report_results(
-        report_title, None, None, threshold * 1.4, output_file, *results
+        report_title, threshold * 1.4, output_file, old_results, new_results
     )
 
 
@@ -283,8 +283,8 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
         )
 
     idx = 1
-    old_lines = ""
-    new_lines = ""
+    old_results = {}
+    new_results = {}
     for oldfile in files:
         new_dir = os.path.join(new_dir, '')
         newfile = oldfile.replace(old_dir, new_dir, 1)
@@ -292,17 +292,13 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
             oldsize = get_codesize(oldfile)
             newsize = get_codesize(newfile)
             bname = os.path.basename(oldfile)
-
-            def result_line(value):
-                v = "," + str(value)
-                return str(idx) + "," + bname + ",1" + (v * 3) + ",0" + v + "\n"
-
-            old_lines += result_line(oldsize)
-            new_lines += result_line(newsize)
+            old_json = {"number": idx, "name": bname, "samples": [oldsize]}
+            new_json = {"number": idx, "name": bname, "samples": [newsize]}
+            old_results[bname] = PerformanceTestResult(old_json)
+            new_results[bname] = PerformanceTestResult(new_json)
             idx += 1
-
     return report_results(
-        "Code size: -" + opt_level, old_lines, new_lines, 0.01, output_file
+        "Code size: -" + opt_level, 0.01, output_file, old_results, new_results
     )
 
 
@@ -318,16 +314,11 @@ def get_codesize(filename):
 
 def report_results(
     title,
-    old_lines,
-    new_lines,
     threshold,
     output_file,
-    old_results=None,
-    new_results=None,
+    old_results,
+    new_results,
 ):
-    old_results = old_results or LogParser.results_from_string(old_lines)
-    new_results = new_results or LogParser.results_from_string(new_lines)
-
     print("------- " + title + " -------")
     print(create_report(old_results, new_results, threshold, "git"))
 

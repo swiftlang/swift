@@ -24,6 +24,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/AST/PrintOptions.h"
 
+// Prefix to use when printing module names in module interfaces to avoid
+// ambiguities with type names, in AliasModuleNames mode.
+#define MODULE_DISAMBIGUATING_PREFIX "Module___"
+
 namespace swift {
   class Decl;
   class DeclContext;
@@ -162,7 +166,8 @@ public:
       PrintNameContext NameContext = PrintNameContext::Normal);
 
   /// Called when printing the referenced name of a module.
-  virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
+  virtual void printModuleRef(ModuleEntity Mod, Identifier Name,
+                              const PrintOptions &Options);
 
   /// Called before printing a synthesized extension.
   virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,

@@ -167,6 +167,16 @@ def verify_incremental_dependencies :
   Flag<["-"], "verify-incremental-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
+  
+def strict_implicit_module_context :
+  Flag<["-"], "strict-implicit-module-context">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the strict forwarding of compilation context to downstream implicit module dependencies">;
+  
+def no_strict_implicit_module_context :
+  Flag<["-"], "no-strict-implicit-module-context">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
 def disallow_forwarding_driver :
   Flag<["-"], "disallow-use-new-driver">, Flags<[]>,
@@ -633,6 +643,11 @@ def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
+
+def experimental_c_foreign_reference_types :
+  Flag<["-"], "experimental-c-foreign-reference-types">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Enable experimental C foreign references types (with reference coutning).">;
 
 def enable_experimental_cxx_interop_in_clang_header :
   Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,

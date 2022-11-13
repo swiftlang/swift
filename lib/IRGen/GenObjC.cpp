@@ -433,6 +433,67 @@ getProtocolRefsList(llvm::Constant *protocol) {
   return std::make_pair(size, protocolRefsList);
 }
 
+// Get runtime protocol list used during emission of objective-c protocol
+// metadata taking non-runtime protocols into account.
+static std::vector<clang::ObjCProtocolDecl *>
+getRuntimeProtocolList(clang::ObjCProtocolDecl::protocol_range protocols) {
+
+  llvm::DenseSet<clang::ObjCProtocolDecl *> nonRuntimeProtocols;
+  std::vector<clang::ObjCProtocolDecl*> runtimeProtocols;
+  for (auto p: protocols) {
+    auto *proto = p->getCanonicalDecl();
+    if (proto->isNonRuntimeProtocol())
+      nonRuntimeProtocols.insert(proto);
+    else
+      runtimeProtocols.push_back(proto);
+  }
+
+  if (nonRuntimeProtocols.empty())
+    return runtimeProtocols;
+
+  // Find the non-runtime implied protocols: protocols that occur in the closest
+  // ancestry of a non-runtime protocol.
+  llvm::SetVector<clang::ObjCProtocolDecl *> nonRuntimeImpliedProtos;
+  std::vector<clang::ObjCProtocolDecl *> worklist;
+  llvm::DenseSet<clang::ObjCProtocolDecl*> seen;
+  for (auto *nonRuntimeProto : nonRuntimeProtocols) {
+    worklist.push_back(nonRuntimeProto);
+    while(!worklist.empty()) {
+       auto *item = worklist.back();
+       worklist.pop_back();
+       if (!seen.insert(item).second)
+         continue;
+
+       if (item->isNonRuntimeProtocol()) {
+         for (auto *parent : item->protocols())
+           worklist.push_back(parent);
+       } else {
+         nonRuntimeImpliedProtos.insert(item->getCanonicalDecl());
+       }
+    }
+  }
+
+  // Subtract the implied protocols of the runtime protocols and non runtime
+  // protoocls implied protocols form the non runtime implied protocols.
+  llvm::DenseSet<const clang::ObjCProtocolDecl *> impliedProtocols;
+  for (auto *p : runtimeProtocols) {
+    impliedProtocols.insert(p);
+    p->getImpliedProtocols(impliedProtocols);
+  }
+
+  for (auto *p : nonRuntimeImpliedProtos) {
+    p->getImpliedProtocols(impliedProtocols);
+  }
+
+  for (auto *p : nonRuntimeImpliedProtos) {
+    if (!impliedProtocols.contains(p)) {
+      runtimeProtocols.push_back(p);
+    }
+  }
+
+  return runtimeProtocols;
+}
+
 static void updateProtocolRefs(IRGenModule &IGM,
                                const clang::ObjCProtocolDecl *objcProtocol,
                                llvm::Constant *protocol) {
@@ -448,11 +509,18 @@ static void updateProtocolRefs(IRGenModule &IGM,
   llvm::ConstantArray *protocolRefs;
   std::tie(protocolRefsSize, protocolRefs) = getProtocolRefsList(protocol);
   unsigned currentIdx = 0;
-  for (auto inheritedObjCProtocol : objcProtocol->protocols()) {
+  auto inheritedObjCProtocols = getRuntimeProtocolList(objcProtocol->protocols());
+  for (auto inheritedObjCProtocol : inheritedObjCProtocols) {
     assert(currentIdx < protocolRefsSize);
     auto oldVar = protocolRefs->getOperand(currentIdx);
     // Map the objc protocol to swift protocol.
     auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);
+    // This should not happen but the compiler currently silently accepts
+    // protocol forward declarations without definitions (102058759).
+    if (!optionalDecl || *optionalDecl == nullptr) {
+      ++currentIdx;
+      continue;
+    }
     auto inheritedSwiftProtocol = cast<ProtocolDecl>(*optionalDecl);
     // Get the objc protocol record we use in Swift.
     auto record = IGM.getAddrOfObjCProtocolRecord(inheritedSwiftProtocol,

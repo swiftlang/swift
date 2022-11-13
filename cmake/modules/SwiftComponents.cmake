@@ -64,13 +64,12 @@
 #   Swift code.
 # * toolchain-tools -- a subset of tools that we will install to the OSS toolchain.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
-# * parser-lib -- Build the syntax parser library used by SwiftSyntax.
 # * static-mirror-lib -- Build the static mirror library used by SwiftStaticMirror.
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * llvm-toolchain-dev-tools -- install LLVM development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;static-mirror-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.

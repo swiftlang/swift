@@ -783,6 +783,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
     M.ValueDecl::getName().print(os);
+    os << " __attribute__((swift_private))";
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -800,6 +801,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   // Construct a C++ namespace for the module.
   ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
-      [&](raw_ostream &os) { os << moduleOS.str(); });
+      [&](raw_ostream &os) { os << moduleOS.str(); },
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
   return info;
 }

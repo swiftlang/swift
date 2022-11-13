@@ -2150,11 +2150,6 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  // Avoid calling `clang::ObjCMethodDecl::isDirectMethod()`.
-  return decls;
-#endif
-
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
     return decls;
@@ -2721,6 +2716,20 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   }
 
   return PD->getASTContext().AllocateCopy(result);
+}
+
+ArrayRef<ValueDecl *>
+ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  SmallVector<ValueDecl *, 4> requirements;
+
+  for (auto *member : PD->getABIMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (VD && VD->isProtocolRequirement())
+      requirements.push_back(VD);
+  }
+
+  return PD->getASTContext().AllocateCopy(requirements);
 }
 
 NominalTypeDecl *

@@ -2906,9 +2906,11 @@ private:
   template <
       typename T = BuilderType,
       typename std::enable_if_t<
-          !std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
+          !(std::is_same<
+                const bool,
+                decltype(T::needsToPrecomputeParentGenericContextShapes)>::
+                value &&
+            T::needsToPrecomputeParentGenericContextShapes),
           bool> = true>
   BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
@@ -2921,13 +2923,14 @@ private:
     return decl;
   }
 
-  template <
-      typename T = BuilderType,
-      typename std::enable_if_t<
-          std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
-          bool> = true>
+  template <typename T = BuilderType,
+            typename std::enable_if_t<
+                std::is_same<
+                    const bool,
+                    decltype(T::needsToPrecomputeParentGenericContextShapes)>::
+                        value &&
+                    T::needsToPrecomputeParentGenericContextShapes,
+                bool> = true>
   BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangler dem;
@@ -2944,12 +2947,17 @@ private:
                 countLevels(parentContext, runningCount);
 
           auto genericContext = current->getGenericContext();
-          if (!genericContext)
-            return;
-          auto contextHeader = genericContext->getGenericContextHeader();
-
-          paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
-          runningCount += paramsPerLevel.back();
+          // Only consider generic contexts of type class, enum or struct.
+          // There are other context types that can be generic, but they should
+          // not affect the generic shape.
+          if (genericContext &&
+              (current->getKind() == ContextDescriptorKind::Class ||
+               current->getKind() == ContextDescriptorKind::Enum ||
+               current->getKind() == ContextDescriptorKind::Struct)) {
+            auto contextHeader = genericContext->getGenericContextHeader();
+            paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
+            runningCount += paramsPerLevel.back();
+          }
         };
     countLevels(descriptor, runningCount);
     BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);

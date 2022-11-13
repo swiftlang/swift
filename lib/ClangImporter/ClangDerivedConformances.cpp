@@ -382,4 +382,50 @@ void swift::conformToCxxSequenceIfNeeded(
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
+
+  // Try to conform to CxxRandomAccessCollection if possible.
+
+  auto cxxRAIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRAIteratorProto ||
+      !ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection))
+    return;
+
+  // Check if `begin()` and `end()` are non-mutating.
+  if (begin->isMutating() || end->isMutating())
+    return;
+
+  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
+  auto rawIteratorRAConformanceRef =
+      decl->getModuleContext()->lookupConformance(rawIteratorTy,
+                                                   cxxRAIteratorProto);
+  if (!isConcreteAndValid(rawIteratorRAConformanceRef, module))
+    return;
+
+  // CxxRandomAccessCollection always uses Int as an Index.
+  auto indexTy = ctx.getIntType();
+
+  auto sliceTy = ctx.getSliceType();
+  sliceTy = sliceTy.subst(
+      [&](SubstitutableType *dependentType) {
+        if (dependentType->isEqual(cxxSequenceSelfTy))
+          return declSelfTy;
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(module));
+
+  auto indicesTy = ctx.getRangeType();
+  indicesTy = indicesTy.subst(
+      [&](SubstitutableType *dependentType) {
+        if (dependentType->isEqual(cxxSequenceSelfTy))
+          return indexTy;
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(module));
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"), sliceTy);
+  impl.addSynthesizedProtocolAttrs(
+      decl, {KnownProtocolKind::CxxRandomAccessCollection});
 }

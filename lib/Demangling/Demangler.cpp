@@ -77,6 +77,7 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
       return true;
@@ -1506,6 +1507,24 @@ NodePointer Demangler::popTuple() {
   return createType(Root);
 }
 
+NodePointer Demangler::popPack() {
+  NodePointer Root = createNode(Node::Kind::Pack);
+
+  if (!popNode(Node::Kind::EmptyList)) {
+    bool firstElem = false;
+    do {
+      firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty)
+        return nullptr;
+      Root->addChild(Ty, *this);
+    } while (!firstElem);
+
+    Root->reverseChildren();
+  }
+  return createType(Root);
+}
+
 NodePointer Demangler::popTypeList() {
   NodePointer Root = createNode(Node::Kind::TypeList);
 
@@ -2290,6 +2309,16 @@ NodePointer Demangler::demangleArchetype() {
     addSubstitution(T);
     return T;
   }
+  case 'p': {
+    NodePointer CountTy = popTypeAndGetChild();
+    NodePointer PatternTy = popTypeAndGetChild();
+    NodePointer PackExpansionTy = createType(
+          createWithChildren(Node::Kind::PackExpansion, PatternTy, CountTy));
+    addSubstitution(PackExpansionTy);
+    return PackExpansionTy;
+  }
+  case 'P':
+    return popPack();
   default:
     return nullptr;
   }
@@ -3663,7 +3692,7 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
   
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, Layout } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, SameShape, Layout } ConstraintKind;
 
   switch (nextChar()) {
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
@@ -3681,6 +3710,7 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'p': ConstraintKind = Protocol; TypeKind = Assoc; break;
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
+    case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
 
@@ -3714,6 +3744,9 @@ NodePointer Demangler::demangleGenericRequirement() {
         popNode(Node::Kind::Type));
   case SameType:
     return createWithChildren(Node::Kind::DependentGenericSameTypeRequirement,
+                              ConstrTy, popNode(Node::Kind::Type));
+  case SameShape:
+    return createWithChildren(Node::Kind::DependentGenericSameShapeRequirement,
                               ConstrTy, popNode(Node::Kind::Type));
   case Layout: {
     auto c = nextChar();

@@ -344,8 +344,12 @@ _swift_release_dealloc(HeapObject *object);
 SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.increment(1);
+  if (isValidPointerForNativeRetain(object)) {
+    // Return the result of increment() to make the eventual call to
+    // incrementSlow a tail call, which avoids pushing a stack frame on the fast
+    // path on ARM64.
+    return object->refCounts.increment(1);
+  }
   return object;
 }
 

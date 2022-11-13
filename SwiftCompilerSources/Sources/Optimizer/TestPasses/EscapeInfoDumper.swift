@@ -130,11 +130,24 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
         let projLhs = lhs.at(AliasAnalysis.getPtrOrAddressPath(for: lhs))
         let projRhs = rhs.at(AliasAnalysis.getPtrOrAddressPath(for: rhs))
         let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
-        assert(mayAlias == projRhs.canAddressAlias(with: projLhs, context),
-               "canAddressAlias(with:) must be symmetric")
+        if mayAlias != projRhs.canAddressAlias(with: projLhs, context) {
+          fatalError("canAddressAlias(with:) must be symmetric")
+        }
 
+        let addrReachable: Bool
+        if lhs.type.isAddress && !rhs.type.isAddress {
+          let anythingReachableFromRhs = rhs.at(SmallProjectionPath(.anything))
+          addrReachable = projLhs.canAddressAlias(with: anythingReachableFromRhs, context)
+          if mayAlias && !addrReachable {
+            fatalError("mayAlias implies addrReachable")
+          }
+        } else {
+          addrReachable = false
+        }
         if mayAlias {
           print("may alias")
+        } else if addrReachable {
+          print("address reachable but no alias")
         } else {
           print("no alias")
         }

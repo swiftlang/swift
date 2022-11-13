@@ -14,5 +14,5 @@ public func test() -> String {
     return ""
 }
 
-// CHECK: namespace Swift {
+// CHECK: namespace Swift __attribute__((swift_private)) {
 // CHECK: class String final {

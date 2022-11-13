@@ -540,13 +540,28 @@ std::string LinkEntity::mangleAsString() const {
   llvm_unreachable("bad entity kind!");
 }
 
-SILDeclRef LinkEntity::getSILDeclRef() const {
-  assert(getKind() == Kind::DistributedThunkAsyncFunctionPointer ||
-         getKind() == Kind::AsyncFunctionPointerAST);
+SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
+  switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::MethodDescriptor:
+    return SILDeclRef::Kind::Func;
+  case Kind::DispatchThunkInitializer:
+  case Kind::MethodDescriptorInitializer:
+    return SILDeclRef::Kind::Initializer;
+  case Kind::MethodDescriptorAllocator:
+  case Kind::DispatchThunkAllocator:
+    return SILDeclRef::Kind::Allocator;
+  case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
+    return static_cast<SILDeclRef::Kind>(
+        reinterpret_cast<uintptr_t>(SecondaryPointer));
+  default:
+    llvm_unreachable("unhandled kind");
+  }
+}
 
-  return SILDeclRef(const_cast<ValueDecl *>(getDecl()),
-             static_cast<SILDeclRef::Kind>(
-                 reinterpret_cast<uintptr_t>(SecondaryPointer)));
+SILDeclRef LinkEntity::getSILDeclRef() const {
+  return SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -1125,6 +1140,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
   case Kind::TypeMetadataLazyCacheVariable:

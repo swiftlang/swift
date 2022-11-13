@@ -1394,10 +1394,12 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
-    const SmallVector<Type> &neededTypes, PrinterTy retTypeAndNamePrinter,
-    PrinterTy paramPrinter, bool isConstFunc, PrinterTy bodyPrinter,
-    ModuleDecl *emittedModule, raw_ostream &outOfLineOS) {
+    const SmallVector<Type> &neededTypes, bool NeedsReturnTypes,
+    PrinterTy retTypeAndNamePrinter, PrinterTy paramPrinter, bool isConstFunc,
+    PrinterTy bodyPrinter, ValueDecl *valueDecl, ModuleDecl *emittedModule,
+    raw_ostream &outOfLineOS) {
   llvm::MapVector<Type, std::string> types;
+  llvm::MapVector<Type, std::string> typeRefs;
 
   for (auto &type : neededTypes) {
     std::string typeStr;
@@ -1405,18 +1407,28 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
     OptionalTypeKind optKind;
     Type objectType;
     std::tie(objectType, optKind) =
-        DeclAndTypePrinter::getObjectTypeAndOptionality(
-            type->getNominalOrBoundGenericNominal(), type);
+        DeclAndTypePrinter::getObjectTypeAndOptionality(valueDecl, type);
 
-    // Use FunctionSignatureTypeUse::ReturnType to avoid printing extra const or
-    // references
     CFunctionSignatureTypePrinter typePrinter(
         typeOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
         interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
-        emittedModule, declPrinter, FunctionSignatureTypeUse::ReturnType);
-    typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+        emittedModule, declPrinter,
+        NeedsReturnTypes ? FunctionSignatureTypeUse::ReturnType
+                         : FunctionSignatureTypeUse::ParamType);
+    auto support =
+        typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    (void)support;
+    assert(!support.isUnsupported());
+    types.insert({type, typeOS.str()});
 
-    types.insert({type, typeStr});
+    std::string typeRefStr;
+    llvm::raw_string_ostream typeRefOS(typeRefStr);
+    CFunctionSignatureTypePrinter typeRefPrinter(
+        typeRefOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+        interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+        emittedModule, declPrinter, FunctionSignatureTypeUse::TypeReference);
+    typeRefPrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    typeRefs.insert({type, typeRefOS.str()});
   }
 
   retTypeAndNamePrinter(types);
@@ -1430,6 +1442,6 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
     outOfLineOS << " const";
   }
   outOfLineOS << " {\n";
-  bodyPrinter(types);
+  bodyPrinter(typeRefs);
   outOfLineOS << "}\n";
 }

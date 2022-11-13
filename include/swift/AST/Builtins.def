@@ -915,6 +915,24 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 /// until the endAsyncLet.
 BUILTIN_MISC_OPERATION(EndAsyncLetLifetime, "endAsyncLetLifetime", "", Special)
 
+/// addressOfBorrowOpaque (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue.  The returned pointer is
+/// only valid within the scope of the borrow.  
+///
+/// Differs from addressOfBorrow only in that it is not lowered until
+/// AddressLowering.
+BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Special)
+
+/// unprotectedAddressOfBorrowOpaque (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+/// In contrast to `addressOfBorrowOpaque`, this builtin doesn't trigger an
+/// insertion of stack protectors.
+///
+/// Differs from unprotectedAddressOfBorrow only in that it is not lowered until
+/// AddressLowering.
+BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
+
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
 ///     @escaping () async throws -> T  // function

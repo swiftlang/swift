@@ -816,9 +816,6 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
   return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
@@ -864,10 +861,6 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
-
   OptimizeProtocolNames = false;
 
   beginMangling();
@@ -1242,12 +1235,29 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendAnyGenericType(decl);
     }
 
-    case TypeKind::Pack:
-    case TypeKind::PackExpansion:
-      assert(DWARFMangling && "sugared types are only legal for the debugger");
-      appendOperator("XSP");
-      llvm_unreachable("Unimplemented");
+    case TypeKind::PackExpansion: {
+      auto expansionTy = cast<PackExpansionType>(tybase);
+      appendType(expansionTy->getPatternType(), sig, forDecl);
+      appendType(expansionTy->getCountType(), sig, forDecl);
+      appendOperator("Qp");
       return;
+    }
+
+    case TypeKind::Pack: {
+      auto packTy = cast<PackType>(tybase);
+
+      if (packTy->getNumElements() == 0)
+        appendOperator("y");
+      else {
+        bool firstField = true;
+        for (auto element : packTy->getElementTypes()) {
+          appendType(element, sig, forDecl);
+          appendListSeparator(firstField);
+        }
+      }
+      appendOperator("QP");
+      return;
+    }
 
     case TypeKind::Paren:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
@@ -2100,10 +2110,6 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
 Optional<ASTMangler::SpecialContext>
 ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
                                       bool useObjCProtocolNames) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return None; // not needed for the parser library.
-  #endif
-
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
   //
@@ -2906,8 +2912,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
 
   switch (reqt.getKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
   case RequirementKind::Layout:
     break;
   case RequirementKind::Conformance: {
@@ -2919,7 +2923,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
+  case RequirementKind::SameShape: {
     Type SecondTy = reqt.getSecondType();
     appendType(SecondTy->getCanonicalType(), sig);
     break;
@@ -2951,7 +2956,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     assert(gpBase);
     switch (reqt.getKind()) {
       case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
+        llvm_unreachable("Same-shape requirement with a dependent member type?");
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase, lhsBaseIsProtocolSelf);
@@ -2971,8 +2976,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
   GenericTypeParamType *gpBase = FirstTy->castTo<GenericTypeParamType>();
   switch (reqt.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
     case RequirementKind::Layout:
@@ -2983,6 +2986,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
       return appendOpWithGenericParamIndex("Rb", gpBase);
     case RequirementKind::SameType:
       return appendOpWithGenericParamIndex("Rs", gpBase);
+    case RequirementKind::SameShape:
+      return appendOpWithGenericParamIndex("Rh", gpBase);
   }
   llvm_unreachable("bad requirement type");
 }

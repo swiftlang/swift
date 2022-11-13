@@ -131,7 +131,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs) {
+                                                   bool printSPIs,
+                                                   bool aliasModuleNames) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -152,6 +153,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
+  result.AliasModuleNames = aliasModuleNames;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -365,7 +367,11 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
   printName(Name, Context);
 }
 
-void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
+                                const PrintOptions &Options) {
+  if (Options.AliasModuleNames)
+    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
+
   printName(Name);
 }
 
@@ -960,10 +966,6 @@ public:
   }
 
   bool visit(Decl *D) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return false; // not needed for the parser library.
-    #endif
-
     bool Synthesize =
         Options.TransformContext &&
         Options.TransformContext->isPrintingSynthesizedExtension() &&
@@ -1785,22 +1787,26 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printRequirement(const Requirement &req) {
-  printTransformedType(req.getFirstType());
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << ".shape == ";
+    Printer << "((";
+    printTransformedType(req.getFirstType());
+    Printer << ", ";
     printTransformedType(req.getSecondType());
-    Printer << ".shape";
+    Printer << ")...) : Any";
     return;
   case RequirementKind::Layout:
+    printTransformedType(req.getFirstType());
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
+    printTransformedType(req.getFirstType());
     Printer << " : ";
     break;
   case RequirementKind::SameType:
+    printTransformedType(req.getFirstType());
     Printer << " == ";
     break;
   }
@@ -1847,11 +1853,7 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return false; // not needed for the parser library.
-  #endif
-
-  if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
@@ -2292,8 +2294,6 @@ static void addNamespaceMembers(Decl *decl,
       if (!name)
         continue;
 
-      // If we're building libSyntaxParser, #if out the clang importer request
-      // because libSyntaxParser doesn't know about the clang importer.
       CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
       for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
         if (addedMembers.insert(found).second)
@@ -2503,7 +2503,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                              Name = Declaring->getRealName();
                          }
                        }
-                       Printer.printModuleRef(Mods.front(), Name);
+                       Printer.printModuleRef(Mods.front(), Name, Options);
                        Mods = Mods.slice(1);
                      } else {
                        Printer << Elem.Item.str();
@@ -5391,7 +5391,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    Printer.printModuleRef(Mod, Name);
+    Printer.printModuleRef(Mod, Name, Options);
     Printer << ".";
   }
 
@@ -5476,10 +5476,6 @@ public:
   }
 
   void visit(Type T) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return; // not needed for the parser library.
-    #endif
-
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
@@ -5742,7 +5738,8 @@ public:
     Printer << "module<";
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
-    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName(),
+                           Options);
     Printer << ">";
   }
 
@@ -6479,6 +6476,13 @@ public:
       auto constraint = T->getExistentialType();
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
+
+      // Opaque archetype substitutions are always canonical, so re-sugar the
+      // constraint type using the owning declaration's generic parameter names.
+      auto genericSig = T->getDecl()->getNamingDecl()->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+      if (genericSig)
+        constraint = genericSig->getSugaredType(constraint);
 
       visit(constraint);
       return;

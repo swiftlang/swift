@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -g | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: objc_interop
 
 import Foundation
@@ -206,12 +206,12 @@ class SwiftSubGizmo : SwiftBaseGizmo {
 extension FungingArray {
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfC"
   // CHECK-SAME: (%objc_object* %0, %swift.type* swiftself %1)
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfc"
   // CHECK-SAME: (%objc_object* %0, %TSo12FungingArrayC* swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
   // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
   // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
@@ -225,12 +225,12 @@ extension FungingArray {
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfC"
   // CHECK-SAME: (%swift.type* %0, %swift.type* swiftself %1)
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfc"
   // CHECK-SAME: (%swift.type* %0, %TSo12FungingArrayC* swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
   // CHECK: [[OBJC_CLASS:%[^, =]+]] = call %objc_class* @swift_getObjCClassFromMetadata(%swift.type* %0)
   // CHECK: [[OBJC_CLASS_OBJ:%[^, =]+]] = bitcast %objc_class* [[OBJC_CLASS]]
   // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0

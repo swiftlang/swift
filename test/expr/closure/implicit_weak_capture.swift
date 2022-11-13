@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 
+// REQUIRES: concurrency
 // REQUIRES: executable_test
+
+// rdar://102155748
+// UNSUPPORTED: back_deployment_runtime
 
 func runIn10ms(_ closure: @escaping @Sendable () -> Void) {
   Task {

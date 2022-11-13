@@ -159,10 +159,12 @@ enum class DescriptiveDeclKind : uint8_t {
   Enum,
   Struct,
   Class,
+  Actor,
   Protocol,
   GenericEnum,
   GenericStruct,
   GenericClass,
+  GenericActor,
   GenericType,
   Subscript,
   StaticSubscript,
@@ -532,7 +534,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -569,6 +571,9 @@ protected:
 
     /// Whether we have a lazy-loaded list of primary associated types.
     HasLazyPrimaryAssociatedTypes : 1,
+
+    /// Whether we've computed the protocol requirements list yet.
+    ProtocolRequirementsValid : 1,
 
     : NumPadBits,
 
@@ -4579,6 +4584,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
+  ArrayRef<ValueDecl *> ProtocolRequirements;
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4660,6 +4666,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
   friend class PrimaryAssociatedTypesRequest;
+  friend class ProtocolRequirementsRequest;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -4703,6 +4710,10 @@ public:
   /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
   ArrayRef<AssociatedTypeDecl *> getPrimaryAssociatedTypes() const;
 
+  /// Returns the list of all requirements (associated type and value)
+  /// associated with this protocol.
+  ArrayRef<ValueDecl *> getProtocolRequirements() const;
+
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.
   ValueDecl *getSingleRequirement(DeclName name) const;
@@ -4712,7 +4723,7 @@ public:
   AssociatedTypeDecl *getAssociatedType(Identifier name) const;
 
   /// Returns the existential type for this protocol.
-  Type getExistentialType() const {
+  Type getDeclaredExistentialType() const {
     return ExistentialType::get(getDeclaredInterfaceType());
   }
 
@@ -4774,6 +4785,13 @@ private:
   }
   void setInheritedProtocolsValid() {
     Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
+
+  bool areProtocolRequirementsValid() const {
+    return Bits.ProtocolDecl.ProtocolRequirementsValid;
+  }
+  void setProtocolRequirementsValid() {
+    Bits.ProtocolDecl.ProtocolRequirementsValid = true;
   }
 
 public:

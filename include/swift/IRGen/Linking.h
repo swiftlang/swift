@@ -685,6 +685,8 @@ class LinkEntity {
             isa<ProtocolDecl>(decl->getDeclContext()));
   }
 
+  SILDeclRef::Kind getSILDeclRefKind() const;
+
 public:
   static LinkEntity forDispatchThunk(SILDeclRef declRef) {
     assert(isValidResilientMethodRef(declRef));
@@ -1537,6 +1539,15 @@ public:
   }
   bool isDynamicallyReplaceableFunctionKey() const {
     return getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+  bool isTypeMetadataAccessFunction() const {
+    return getKind() == Kind::TypeMetadataAccessFunction;
+  }
+  bool isDispatchThunk() const {
+    return getKind() == Kind::DispatchThunk ||
+           getKind() == Kind::DispatchThunkInitializer ||
+           getKind() == Kind::DispatchThunkAllocator ||
+           getKind() == Kind::DispatchThunkDerivative;
   }
 
   /// Determine whether this entity will be weak-imported.

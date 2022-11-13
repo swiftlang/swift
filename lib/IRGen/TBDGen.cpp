@@ -400,8 +400,15 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
   }
 }
 
-void TBDGenVisitor::willVisitDecl(Decl *D) {
+bool TBDGenVisitor::willVisitDecl(Decl *D) {
+  // A @_silgen_name("...") function without a body only exists to
+  // forward-declare a symbol from another library.
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>())
+      return false;
+
   DeclStack.push_back(D);
+  return true;
 }
 
 void TBDGenVisitor::didVisitDecl(Decl *D) {
@@ -600,6 +607,11 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
   auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
+    // TextAPI ObjC Class Kinds represents two symbols.
+    else if (kind == SymbolKind::ObjectiveCClass) {
+      symbols.push_back((llvm::MachO::ObjC2ClassNamePrefix + symbol).str());
+      symbols.push_back((llvm::MachO::ObjC2MetaClassNamePrefix + symbol).str());
+    }
   };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);

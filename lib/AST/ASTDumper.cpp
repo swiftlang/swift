@@ -3520,6 +3520,7 @@ static void dumpSubstitutionMapRec(
     if (replacementTypes[i]) {
       PrintOptions opts;
       opts.PrintForSIL = true;
+      opts.PrintTypesForDebugging = true;
       replacementTypes[i]->print(out, opts);
     }
     else
@@ -4194,10 +4195,6 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return; // not needed for the parser library.
-  #endif
-
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }

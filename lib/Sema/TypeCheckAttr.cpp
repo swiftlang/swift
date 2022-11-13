@@ -828,6 +828,11 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     diagnoseAndRemoveAttr(attr, isError.getValue(),
                                  /*array=*/isArray, type);
 
+  // Skip remaining diagnostics if the property has an
+  // attached wrapper.
+  if (VD->hasAttachedPropertyWrapper())
+    return;
+
   // If the type wasn't optional, an array, or unowned, complain.
   if (!wasOptional && !isArray) {
     diagnose(attr->getLocation(), diag::iboutlet_non_optional, type);
@@ -1931,7 +1936,7 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
-  const auto *VD = cast<ValueDecl>(D);
+  auto *VD = cast<ValueDecl>(D);
   // Expose cannot be mixed with '@objc'/'@_cdecl' declarations.
   if (VD->isObjC())
     diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@objc");
@@ -1957,9 +1962,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   if (repr.isUnsupported()) {
     using namespace cxx_translation;
     switch (*repr.error) {
-    case UnrepresentableActorClass:
-      diagnose(attr->getLocation(), diag::expose_unsupported_actor_to_cxx,
-               decl->getName());
+    case UnrepresentableAsync:
+      diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
+    case UnrepresentableIsolatedInActor:
+      diagnose(attr->getLocation(),
+               diag::expose_unsupported_actor_isolated_to_cxx,
+               VD->getDescriptiveKind(), VD);
       break;
     }
   }
@@ -6950,8 +6960,24 @@ public:
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(
         ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
-    if (globalActorAttr && globalActorAttr->first == attr)
-      return;
+
+    if (globalActorAttr && globalActorAttr->first == attr) {
+      // if there is an `isolated` parameter, then this global-actor attribute
+      // is invalid.
+      for (auto param : *closure->getParameters()) {
+        if (param->isIsolated()) {
+          param->diagnose(
+                   diag::isolated_parameter_closure_combined_global_actor_attr,
+                   param->getName())
+              .fixItRemove(attr->getRangeWithAt())
+              .warnUntilSwiftVersion(6);
+          attr->setInvalid();
+          break; // don't need to complain about this more than once.
+        }
+      }
+
+      return; // it's OK
+    }
 
     // Otherwise, it's an error.
     std::string typeName;

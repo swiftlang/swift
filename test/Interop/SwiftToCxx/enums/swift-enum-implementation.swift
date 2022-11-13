@@ -46,7 +46,7 @@ public struct S {
 // CHECK-EMPTY:
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions" // allow use of inline static data member
-// CHECK-NEXT:   inline const static struct {  // impl struct for case x
+// CHECK-NEXT:   inline const static struct _impl_x {  // impl struct for case x
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::x;
 // CHECK-NEXT:     }
@@ -55,7 +55,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isX() const;
 // CHECK-NEXT:   inline double getX() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   inline const static struct {  // impl struct for case y
+// CHECK-NEXT:   inline const static struct _impl_y {  // impl struct for case y
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::y;
 // CHECK-NEXT:     }
@@ -64,16 +64,16 @@ public struct S {
 // CHECK-NEXT:   inline bool isY() const;
 // CHECK-NEXT:   inline void const * _Nullable getY() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   inline const static struct {  // impl struct for case z
+// CHECK-NEXT:   inline const static struct _impl_z {  // impl struct for case z
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::z;
 // CHECK-NEXT:     }
-// CHECK-NEXT:     inline E operator()(const S &val) const;
+// CHECK-NEXT:     inline E operator()(const S& val) const;
 // CHECK-NEXT:   } z;
 // CHECK-NEXT:   inline bool isZ() const;
 // CHECK-NEXT:   inline S getZ() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   inline const static struct {  // impl struct for case w
+// CHECK-NEXT:   inline const static struct _impl_w {  // impl struct for case w
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::w;
 // CHECK-NEXT:     }
@@ -82,7 +82,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isW() const;
 // CHECK-NEXT:   inline swift::Int getW() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   inline const static struct {  // impl struct for case auto
+// CHECK-NEXT:   inline const static struct _impl_auto {  // impl struct for case auto
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::auto_;
 // CHECK-NEXT:     }
@@ -91,7 +91,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isAuto_() const;
 // CHECK-NEXT:   inline void * _Nonnull getAuto_() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   inline const static struct {  // impl struct for case foobar
+// CHECK-NEXT:   inline const static struct _impl_foobar {  // impl struct for case foobar
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::foobar;
 // CHECK-NEXT:     }
@@ -150,12 +150,6 @@ public struct S {
 // CHECK-NEXT:     const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:     return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   using _impl_x = decltype(x);
-// CHECK-NEXT:   using _impl_y = decltype(y);
-// CHECK-NEXT:   using _impl_z = decltype(z);
-// CHECK-NEXT:   using _impl_w = decltype(w);
-// CHECK-NEXT:   using _impl_auto = decltype(auto_);
-// CHECK-NEXT:   using _impl_foobar = decltype(foobar);
 // CHECK:      };
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace _impl {
@@ -172,7 +166,7 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
-// CHECK:      namespace Enums {
+// CHECK:      namespace Enums __attribute__((swift_private)) {
 // CHECK:        inline E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
@@ -209,7 +203,7 @@ public struct S {
 // CHECK-NEXT:     memcpy(&result, payloadFromDestruction, sizeof(result));
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline E E::_impl_z::operator()(const S &val) const {
+// CHECK-NEXT:   inline E E::_impl_z::operator()(const S& val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     alignas(S) unsigned char buffer[sizeof(S)];
 // CHECK-NEXT:     auto *valCopy = new(buffer) S(val);

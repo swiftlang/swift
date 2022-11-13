@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-implicit-some
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-feature ImplicitSome
+
+// REQUIRES: asserts
 
 protocol P { }
 

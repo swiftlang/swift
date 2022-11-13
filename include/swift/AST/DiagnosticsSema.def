@@ -1538,8 +1538,10 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
-ERROR(expose_unsupported_actor_to_cxx,none,
-      "actor %0 can not be exposed to C++", (DeclName))
+ERROR(expose_unsupported_async_decl_to_cxx,none,
+      "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_unsupported_actor_isolated_to_cxx,none,
+      "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -2023,10 +2025,6 @@ ERROR(synthesized_nominal_extension,none,
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
-
-// FIXME: SwiftUI source compatibility hack; see usage for details.
-WARNING(type_does_not_conform_swiftui_warning,none,
-        "type %0 does not conform to protocol %1", (Type, Type))
 
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
@@ -3213,8 +3211,8 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "of %3 to %2",
      (unsigned, Type, Type, Type))
 NOTE(automatic_protocol_synthesis_unsupported,none,
-    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
-    (StringRef, unsigned))
+    "automatic synthesis of '%0' is not supported for %1 declarations",
+    (StringRef, DescriptiveDeclKind))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
      "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
      (Type, Type, Type))
@@ -4834,6 +4832,22 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
+ERROR(isolated_parameter_duplicate,none,
+      "cannot have more than one 'isolated' parameter", ())
+ERROR(isolated_parameter_duplicate_type,none,
+      "function type cannot have more than one 'isolated' parameter", ())
+NOTE(isolated_parameter_previous_note,none,
+     "previous 'isolated' parameter %0", (DeclName))
+ERROR(isolated_parameter_combined_global_actor_attr,none,
+      "%0 with 'isolated' parameter cannot have a global actor",
+      (DescriptiveDeclKind))
+ERROR(isolated_parameter_closure_combined_global_actor_attr,none,
+      "closure with 'isolated' parameter %0 cannot have a global actor", (DeclName))
+ERROR(isolated_parameter_global_actor_type,none,
+      "function type cannot have global actor and 'isolated' parameter", ())
+ERROR(isolated_parameter_combined_nonisolated,none,
+      "%0 with 'isolated' parameter cannot be 'nonisolated'",
+      (DescriptiveDeclKind))
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"
@@ -4983,6 +4997,9 @@ ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
       (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
+      "access to %0 %1 from outside the distributed actor %2 must be asynchronous",
+      (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
@@ -5126,6 +5143,10 @@ ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
+
+ERROR(expansion_not_same_shape,none,
+      "variadic expansion %0 requires that %1 and %2 have the same shape",
+      (Type, Type, Type))
 
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
@@ -6446,7 +6467,7 @@ ERROR(marker_protocol_cast,none,
       "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 ERROR(marker_protocol_conditional_conformance,none,
       "conditional conformance to non-marker protocol %0 cannot depend on "
-      "conformance of %1 to non-marker protocol %2",
+      "conformance of %1 to marker protocol %2",
       (Identifier, Type, Identifier))
 
 //------------------------------------------------------------------------------
@@ -6532,6 +6553,11 @@ ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental move only is disabled! Pass"
       " the frontend flag -enable-experimental-move-only to swift to enable "
       "the usage of this language feature", ())
+ERROR(experimental_moveonly_feature_can_only_be_imported_when_enabled,
+      none, "Can not import module %0 that uses move only features when "
+      "experimental move only is disabled! Pass the frontend flag "
+      "-enable-experimental-move-only to swift to enable the usage of this "
+      "language feature", (Identifier))
 ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
@@ -6615,7 +6641,8 @@ ERROR(type_wrapper_requires_two_generic_params,none,
       "wrapped and storage types", ())
 
 ERROR(cannot_use_multiple_type_wrappers,none,
-      "type %0 cannot use more than one type wrapper", ())
+      "%0 %1 cannot use more than one type wrapper",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"
@@ -6709,5 +6736,22 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: Move Only Errors
+//------------------------------------------------------------------------------
+
+ERROR(moveonly_copyable_type_that_contains_moveonly_type, none,
+      "%0 %1 cannot contain a move-only type without also being move-only",
+      (DescriptiveDeclKind, DeclName))
+NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
+     "contained move-only %0 '%1.%2'",
+     (DescriptiveDeclKind, StringRef, StringRef))
+ERROR(moveonly_cannot_conform_to_protocol, none,
+     "move-only %0 %1 cannot conform yet to any protocols",
+     (DescriptiveDeclKind, DeclName))
+ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
+     "move-only %0 %1 cannot conform to protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
+

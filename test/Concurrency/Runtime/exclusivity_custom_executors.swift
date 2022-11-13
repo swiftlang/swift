@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// UNSUPPORTED: freestanding
 
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime

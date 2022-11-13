@@ -1231,7 +1231,8 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
-  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+  if ((superclassDecl->hasClangNode() ||
+       superclassDecl->getModuleContext() != decl->getParentModule()) &&
       superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
@@ -1604,13 +1605,14 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
-void swift::addNonIsolatedToSynthesized(
-    NominalTypeDecl *nominal, ValueDecl *value) {
+bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
+                                        ValueDecl *value) {
   if (!getActorIsolation(nominal).isActorIsolated())
-    return;
+    return false;
 
   ASTContext &ctx = nominal->getASTContext();
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+  return true;
 }
 
 static std::pair<BraceStmt *, /*isTypeChecked=*/bool>
