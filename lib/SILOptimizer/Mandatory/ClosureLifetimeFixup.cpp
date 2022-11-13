@@ -444,6 +444,12 @@ static SILValue skipConvert(SILValue v) {
   return pa;
 }
 
+static SILAnalysis::InvalidationKind
+analysisInvalidationKind(const bool &modifiedCFG) {
+  return modifiedCFG ? SILAnalysis::InvalidationKind::FunctionBody
+                     : SILAnalysis::InvalidationKind::CallsAndInstructions;
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -468,9 +474,10 @@ static SILValue skipConvert(SILValue v) {
 /// caller needs to use the StackNesting utility to update the dealloc_stack
 /// nesting.
 static SILValue tryRewriteToPartialApplyStack(
-    ConvertEscapeToNoEscapeInst *cvt,
-    SILInstruction *closureUser, InstructionDeleter &deleter,
-    llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
+    ConvertEscapeToNoEscapeInst *cvt, SILInstruction *closureUser,
+    DominanceAnalysis *dominanceAnalysis, InstructionDeleter &deleter,
+    llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
+    const bool &modifiedCFG) {
 
   auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
   if (!origPA)
@@ -567,16 +574,24 @@ static SILValue tryRewriteToPartialApplyStack(
     auto loc = RegularLocation(builder.getInsertionPointLoc());
     builder.createDeallocStack(loc, newPA);
     insertDestroyOfCapturedArguments(newPA, builder);
-    // dealloc_stack of the in_guaranteed capture is inserted
-    insertDeallocOfCapturedArguments(newPA, builder);
   });
+  // The CFG may have been modified during this run.  If it was, the dominance
+  // analysis would no longer be valid.  Invalidate it now if necessary,
+  // according to the kinds of changes that may have been made.  Note that if
+  // the CFG hasn't been modified, this is a noop thanks to
+  // DominanceAnalysis::shouldInvalidate's definition.
+  dominanceAnalysis->invalidate(closureUser->getFunction(),
+                                analysisInvalidationKind(modifiedCFG));
+  // Insert dealloc_stacks of any in_guaranteed captures.
+  insertDeallocOfCapturedArguments(
+      newPA, dominanceAnalysis->get(closureUser->getFunction()));
   return closure;
 }
 
 static bool tryExtendLifetimeToLastUse(
-    ConvertEscapeToNoEscapeInst *cvt,
+    ConvertEscapeToNoEscapeInst *cvt, DominanceAnalysis *dominanceAnalysis,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
-    InstructionDeleter &deleter) {
+    InstructionDeleter &deleter, const bool &modifiedCFG) {
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
   auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
@@ -597,8 +612,9 @@ static bool tryExtendLifetimeToLastUse(
     return false;
   }
 
-  if (SILValue closure = tryRewriteToPartialApplyStack(cvt, singleUser,
-                                                       deleter, memoized)) {
+  if (SILValue closure = tryRewriteToPartialApplyStack(
+          cvt, singleUser, dominanceAnalysis, deleter, memoized,
+          /*const*/ modifiedCFG)) {
     if (auto *cfi = dyn_cast<ConvertFunctionInst>(closure))
       closure = cfi->getOperand();
     if (endAsyncLet && isa<MarkDependenceInst>(closure)) {
@@ -993,8 +1009,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   return true;
 }
 
-static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
-                                  bool &modifiedCFG) {
+static bool fixupClosureLifetimes(SILFunction &fn,
+                                  DominanceAnalysis *dominanceAnalysis,
+                                  bool &checkStackNesting, bool &modifiedCFG) {
   bool changed = false;
 
   // tryExtendLifetimeToLastUse uses a cache of recursive instruction use
@@ -1027,7 +1044,9 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
         }
       }
 
-      if (tryExtendLifetimeToLastUse(cvt, memoizedQueries, updater.getDeleter())) {
+      if (tryExtendLifetimeToLastUse(cvt, dominanceAnalysis, memoizedQueries,
+                                     updater.getDeleter(),
+                                     /*const*/ modifiedCFG)) {
         changed = true;
         checkStackNesting = true;
         continue;
@@ -1064,15 +1083,15 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     bool checkStackNesting = false;
     bool modifiedCFG = false;
 
-    if (fixupClosureLifetimes(*getFunction(), checkStackNesting, modifiedCFG)) {
+    auto *dominanceAnalysis = PM->getAnalysis<DominanceAnalysis>();
+
+    if (fixupClosureLifetimes(*getFunction(), dominanceAnalysis,
+                              checkStackNesting, modifiedCFG)) {
       if (checkStackNesting){
         modifiedCFG |=
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;
       }
-      if (modifiedCFG)
-        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      else
-        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+      invalidateAnalysis(analysisInvalidationKind(modifiedCFG));
     }
     LLVM_DEBUG(getFunction()->verify());
 
