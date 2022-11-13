@@ -256,6 +256,12 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
    If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
 
+   > **Note:**
+   > `--release-debuginfo` means that although debug information will be produced, all targets will
+   > be compiled in release mode, meaning optimized code, which can affect your debugging experience.
+   > Consider [`--debug-swift` to build a debug variant of the compiler](#debugging-issues) and have 
+   > the swift targets (including `swift-frontend`) built in debug mode.
+
    If you would like to additionally build the Swift corelibs,
    ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
    on Linux, add the `--xctest` flag to `build-script`.
