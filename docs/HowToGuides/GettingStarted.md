@@ -250,9 +250,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    > **Note:**
    > `--release-debuginfo` means that although debug information will be produced, all targets will
    > be compiled in release mode, meaning optimized code, which can affect your debugging experience.
-   > Consider using `--release-debuginfo --debug-swift` to have only the swift targets (that includes `swift-frontend`)
-   > built in debug mode.
-   > To know more about each flag being passed to build script run `utils/build-script --help`.
+   > Consider [`--debug-swift` to build a debug variant of swift component](#debugging-issues) to have 
+   > the swift targets (that includes `swift-frontend`) built in debug mode.
 
    If you would like to additionally build the Swift corelibs,
    ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
