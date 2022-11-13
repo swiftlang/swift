@@ -46,7 +46,8 @@ toolchain as a one-off, there are a couple of differences:
    [Windows.md](/docs/Windows.md).
 2. Python 3: Several utility scripts are written in Python.
 3. Git 2.x to check out the sources. We find that older versions of Git
-   raise errors when doing the full checkout.
+   can't successfully check out all of the required repositories or
+   fail during a rebase when switching between checkout schemes.
 4. Disk space:
    Make sure that you have enough available disk space before starting.
    The source code, including full git history, requires about 3.5 GB.
