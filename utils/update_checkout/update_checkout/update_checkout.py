@@ -717,6 +717,7 @@ repositories.
                 with open(args.config) as f:
                     config = json.load(f)
                 validate_config(config)
+                scheme_map = get_scheme_map(config, scheme_name)
 
     if args.dump_hashes:
         dump_repo_hashes(args, config)

@@ -368,6 +368,7 @@ private:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
@@ -2672,6 +2673,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(fst, depth + 1);
     Printer << " == ";
     print(snd, depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::DependentGenericSameShapeRequirement: {
+    NodePointer fst = Node->getChild(0);
+    NodePointer snd = Node->getChild(1);
+
+    print(fst, depth + 1);
+    Printer << ".shape == ";
+    print(snd, depth + 1);
+    Printer << ".shape";
     return nullptr;
   }
   case Node::Kind::DependentGenericParamType: {

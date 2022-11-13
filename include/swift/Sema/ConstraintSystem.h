@@ -4911,7 +4911,7 @@ public:
   ///
   /// \returns The opened type of the macro with this name, or the null \c Type
   /// if no such macro exists.
-  Type getTypeOfMacroReference(StringRef macro, Expr *anchor);
+  Type getTypeOfMacroReference(Identifier macroName, Expr *anchor);
 #endif
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced

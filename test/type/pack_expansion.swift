@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+
+// REQUIRES: asserts
 
 func f1<T...>() -> T... {}
 // expected-error@-1 {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
@@ -48,3 +50,17 @@ enum E<T...> {
 
 func withWhereClause<T...>(_ x: T...) where T...: P {}
 // expected-error@-1 {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+
+struct Outer<T...> {
+  struct Bad<U...> {
+    typealias Value = ((T, U)...) // expected-error {{variadic expansion '(T, U)...' requires that 'T' and 'U' have the same shape}}
+  }
+
+  struct Good<U...> where ((T, U)...): Any {
+    typealias Value = ((T, U)...)
+  }
+
+  struct AlsoGood<U...> {
+    typealias Value = ((T, E<U... >)...)
+  }
+}

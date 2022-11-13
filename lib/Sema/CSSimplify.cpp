@@ -12631,40 +12631,6 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
-/// FIXME: Move this elsewhere if it is broadly useful
-static Type getReducedShape(Type type, ASTContext &ctx) {
-  // Pack archetypes know their reduced shape
-  if (auto *packArchetype = type->getAs<PackArchetypeType>())
-    return packArchetype->getShape();
-
-  // Reduced shape of pack is computed recursively
-  if (auto *packType = type->getAs<PackType>()) {
-    SmallVector<Type, 2> elts;
-
-    for (auto elt : packType->getElementTypes()) {
-      // T... => shape(T)...
-      if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
-        if (packExpansionType->getCountType()->is<PlaceholderType>()) {
-          elts.push_back(ctx.TheEmptyTupleType);
-          continue;
-        }
-        auto shapeType = getReducedShape(packExpansionType->getCountType(), ctx);
-        elts.push_back(PackExpansionType::get(shapeType, shapeType));
-      }
-
-      // Use () as a placeholder for scalar shape.
-      elts.push_back(ctx.TheEmptyTupleType);
-    }
-
-    return PackType::get(ctx, elts);
-  }
-
-  assert(!type->isTypeVariableOrMember());
-
-  // Use () as a placeholder for scalar shape.
-  return ctx.TheEmptyTupleType;
-}
-
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -12695,12 +12661,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
       return formUnsolved();
   }
 
-  if (Type shape = getReducedShape(type1, getASTContext())) {
-    addConstraint(ConstraintKind::Bind, shape, type2, locator);
-    return SolutionKind::Solved;
-  }
-
-  return SolutionKind::Error;
+  auto shape = type1->getReducedShape();
+  addConstraint(ConstraintKind::Bind, shape, type2, locator);
+  return SolutionKind::Solved;
 }
 
 static llvm::PointerIntPair<Type, 3, unsigned>

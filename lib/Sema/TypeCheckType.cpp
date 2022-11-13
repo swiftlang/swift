@@ -2516,6 +2516,20 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
+/// \returns true iff the # of isolated params is > \c lowerBound
+static bool hasMoreIsolatedParamsThan(FunctionTypeRepr* fnTy, unsigned lowerBound) {
+  unsigned count = 0;
+  for (auto arg : fnTy->getArgsTypeRepr()->getElements()) {
+    if (isa<IsolatedTypeRepr>(arg.Type))
+      count += 1;
+
+    if (count > lowerBound)
+      break;
+  }
+
+  return count > lowerBound;
+}
+
 NeverNullType
 TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                                     TypeResolutionOptions options) {
@@ -2545,7 +2559,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Resolve global actor.
   CustomAttr *globalActorAttr = nullptr;
   Type globalActor;
-  if (isa<FunctionTypeRepr>(repr)) {
+  if (auto fnTy = dyn_cast<FunctionTypeRepr>(repr)) {
     auto foundGlobalActor = checkGlobalActorAttributes(
         repr->getLoc(), getDeclContext(),
         std::vector<CustomAttr *>(
@@ -2555,6 +2569,15 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
       if (globalActor->hasError())
         globalActor = Type();
+
+      // make sure there is no `isolated` parameter in the type
+      if (globalActorAttr->isValid()) {
+        if (globalActor && hasMoreIsolatedParamsThan(fnTy, 0)) {
+          diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
+              .warnUntilSwiftVersion(6);
+          globalActorAttr->setInvalid();
+        }
+      }
     }
   }
 
@@ -3297,6 +3320,17 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   if (auto *genericParams = repr->getGenericParams())
     saveGenericParams.emplace(this->genericParams, genericParams);
+
+  // can't have more than 1 isolated parameter.
+  if (!repr->isWarnedAbout() && hasMoreIsolatedParamsThan(repr, 1)) {
+    diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
+        .warnUntilSwiftVersion(6);
+
+    if (getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+      return ErrorType::get(getASTContext());
+    else
+      repr->setWarned();
+  }
 
   // Diagnose a couple of things that we can parse in SIL mode but we don't
   // allow in formal types.
@@ -4204,7 +4238,18 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   if (resolution.getStage() == TypeResolutionStage::Interface) {
     auto genericSig = resolution.getGenericSignature();
     auto shapeType = genericSig->getReducedShape(pair.second);
-    return PackExpansionType::get(pair.first, shapeType);
+
+    auto result = PackExpansionType::get(pair.first, shapeType);
+
+    SmallVector<Type, 2> rootParameterPacks;
+    pair.first->getTypeParameterPacks(rootParameterPacks);
+    for (auto type : rootParameterPacks) {
+      if (!genericSig->haveSameShape(type, shapeType)) {
+        ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
+                           result, shapeType, type);
+      }
+    }
+    return result;
   }
 
   return PackExpansionType::get(pair.first, pair.second);

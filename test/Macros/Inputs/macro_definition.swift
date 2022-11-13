@@ -28,6 +28,24 @@ struct StringifyMacro: _CompilerPlugin {
     }
   }
 
+  static func _owningModule() -> (UnsafePointer<UInt8>, count: Int) {
+    var swiftModule = "Swift"
+    return swiftModule.withUTF8 { buffer in
+      let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
+      result.initialize(from: buffer.baseAddress!, count: buffer.count)
+      return (UnsafePointer(result), count: buffer.count)
+    }
+  }
+
+  static func _supplementalSignatureModules() -> (UnsafePointer<UInt8>, count: Int) {
+    var nothing = ""
+    return nothing.withUTF8 { buffer in
+      let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
+      result.initialize(from: buffer.baseAddress!, count: buffer.count)
+      return (UnsafePointer(result), count: buffer.count)
+    }
+  }
+
   static func _kind() -> _CompilerPluginKind {
     .expressionMacro
   }

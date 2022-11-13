@@ -2360,8 +2360,9 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from ImportResolver::getModule
+  Identifier parentName = FileContext->getParentModule()->getName();
   if (name.size() == 1 &&
-      name.front().Item == FileContext->getParentModule()->getName()) {
+      name.front().Item == getContext().getRealModuleName(parentName)) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
@@ -6428,6 +6429,51 @@ Expected<Type> DESERIALIZE_TYPE(UNBOUND_GENERIC_TYPE)(
   auto parentTy = MF.getType(parentID);
 
   return UnboundGenericType::get(genericDecl, parentTy, MF.getContext());
+}
+
+Expected<Type> DESERIALIZE_TYPE(PACK_EXPANSION_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID patternID;
+  TypeID countID;
+  decls_block::PackExpansionTypeLayout::readRecord(scratch, patternID, countID);
+
+  auto patternTy = MF.getTypeChecked(patternID);
+  if (!patternTy)
+    return patternTy.takeError();
+  auto countTy = MF.getTypeChecked(countID);
+  if (!countTy)
+    return countTy.takeError();
+
+  return PackExpansionType::get(patternTy.get(), countTy.get());
+}
+
+Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  // The pack record itself is empty. Read all trailing elements.
+  SmallVector<Type, 8> elements;
+  while (true) {
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::PACK_TYPE_ELT)
+      break;
+
+    TypeID typeID;
+    decls_block::PackTypeEltLayout::readRecord(scratch, typeID);
+
+    auto elementTy = MF.getTypeChecked(typeID);
+    if (!elementTy)
+      return elementTy.takeError();
+
+    elements.push_back(elementTy.get());
+  }
+
+  return PackType::get(MF.getContext(), elements);
 }
 
 Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+
+// REQUIRES: asserts
 
 // Test instantiation of constraint solver constraints from generic requirements
 // involving type pack parameters

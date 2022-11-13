@@ -15,6 +15,7 @@
 #include "ModuleFileSharedCore.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
@@ -1486,7 +1487,17 @@ SerializedASTFile::loadFingerprint(const IterableDeclContext *IDC) const {
 void SerializedASTFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
-  File.lookupImportedSPIGroups(importedModule, spiGroups);
+  auto M = getParentModule();
+  auto &imports = M->getASTContext().getImportCache();
+  for (auto &dep : File.Dependencies) {
+    if (!dep.Import.hasValue())
+      continue;
+
+    if (dep.Import->importedModule == importedModule ||
+        imports.isImportedBy(importedModule, dep.Import->importedModule)) {
+      spiGroups.insert(dep.spiGroups.begin(), dep.spiGroups.end());
+    }
+  }
 }
 
 Optional<CommentInfo>

@@ -107,7 +107,6 @@ public:
   virtual void addMethodDescriptor(SILDeclRef declRef) {}
   virtual void addMethodLookupFunction(ClassDecl *CD) {}
   virtual void addNominalTypeDescriptor(NominalTypeDecl *NTD) {}
-  virtual void addObjCClass(ClassDecl *CD) {}
   virtual void addObjCInterface(ClassDecl *CD) {}
   virtual void addObjCMetaclass(ClassDecl *CD) {}
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}

@@ -1077,6 +1077,28 @@ Remangler::mangleDependentGenericSameTypeRequirement(Node *node,
 }
 
 ManglingError
+Remangler::mangleDependentGenericSameShapeRequirement(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+  if (!Mangling.isSuccess())
+    return Mangling.error();
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
+  switch (NumMembersAndParamIdx.first) {
+  case 0:
+    Buffer << "Rh";
+    break;
+  default:
+    assert(false && "Invalid same-shape requirement");
+    return ManglingError::AssertionFailed;
+  }
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  return ManglingError::Success;
+}
+
+ManglingError
 Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
   auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
   if (!Mangling.isSuccess())

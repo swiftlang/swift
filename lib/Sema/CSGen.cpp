@@ -1200,7 +1200,8 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto openedType = CS.getTypeOfMacroReference(kind, expr);
+        auto openedType = CS.getTypeOfMacroReference(
+            ctx.getIdentifier(kind), expr);
         if (!openedType)
           return Type();
 
@@ -2927,7 +2928,7 @@ namespace {
           return;
 
         if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = archetype->getShape();
+          shapeType = archetype->getReducedShape();
         }
       });
 
@@ -3633,7 +3634,7 @@ namespace {
       auto &ctx = CS.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
-        auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        auto refType = CS.getTypeOfMacroReference(macroIdent, expr);
         if (!refType) {
           ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                              macroIdent)

@@ -3079,8 +3079,11 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   
   if (returnRepr && returnRepr->hasOpaque()) {
     return returnRepr;
-  } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome) && returnRepr->isProtocol(dc)) {
-    return returnRepr;
+  } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+    auto opaqueReprs = collectOpaqueReturnTypeReprs(returnRepr,
+                                                    getASTContext(),
+                                                    getDeclContext());
+    return opaqueReprs.empty() ? nullptr : returnRepr;
   } else {
     return nullptr;
   }

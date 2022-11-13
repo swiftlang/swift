@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+
+// REQUIRES: asserts
 
 func tuplify<T...>(_ t: T...) -> (T...) {
   return (t...)

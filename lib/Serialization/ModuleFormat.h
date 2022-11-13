@@ -1272,6 +1272,21 @@ namespace decls_block {
     TypeIDField  // parent
   );
 
+  TYPE_LAYOUT(PackExpansionTypeLayout,
+    PACK_EXPANSION_TYPE,
+    TypeIDField, // pattern type
+    TypeIDField  // count type
+  );
+
+  TYPE_LAYOUT(PackTypeLayout,
+    PACK_TYPE
+  );
+
+  using PackTypeEltLayout = BCRecordLayout<
+    PACK_TYPE_ELT,
+    TypeIDField         // type
+  >;
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name

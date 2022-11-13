@@ -2777,7 +2777,7 @@ public:
     if (!nomDecl->isMoveOnly())
       return;
 
-    for (auto *prot : nomDecl->getAllProtocols()) {
+    for (auto *prot : nomDecl->getLocalProtocols()) {
       nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
                         nomDecl->getDescriptiveKind(),
                         nomDecl->getBaseName(), prot->getBaseName());
@@ -3612,6 +3612,8 @@ void TypeChecker::typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked) {
 
 void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
+  Optional<ParamDecl*> firstIsolatedParam;
+  bool diagnosedDuplicateIsolatedParam = false;
   for (auto param: *params) {
     checkDeclAttributes(param);
 
@@ -3624,6 +3626,32 @@ void TypeChecker::checkParameterList(ParameterList *params,
           param->diagnose(diag::async_autoclosure_nonasync_function);
           if (auto func = dyn_cast<FuncDecl>(owner))
             addAsyncNotes(func);
+        }
+      }
+    }
+
+    // check for well-formed isolated parameters.
+    if (!diagnosedDuplicateIsolatedParam) {
+      if (param->isIsolated()) {
+        if (firstIsolatedParam) {
+          // cannot have more than one isolated parameter (SE-0313)
+          param->diagnose(diag::isolated_parameter_duplicate)
+              .highlight(param->getSourceRange())
+              .warnUntilSwiftVersion(6);
+          // I'd love to describe the context in which there is an isolated parameter,
+          // we had a DescriptiveDeclContextKind, but that only
+          // exists for Decls.
+
+          auto prevIso = firstIsolatedParam.value();
+          prevIso
+              ->diagnose(diag::isolated_parameter_previous_note,
+                         prevIso->getName())
+              .highlight(prevIso->getSourceRange());
+
+          // no need to complain about any further `isolated` params
+          diagnosedDuplicateIsolatedParam = true;
+        } else {
+          firstIsolatedParam = param; // save first one we've seen.
         }
       }
     }

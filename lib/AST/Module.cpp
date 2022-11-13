@@ -2871,11 +2871,12 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
+  auto &imports = getASTContext().getImportCache();
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
-        importedModule == import.module.importedModule) {
-      auto importedSpis = import.spiGroups;
-      spiGroups.insert(importedSpis.begin(), importedSpis.end());
+        (importedModule == import.module.importedModule ||
+         imports.isImportedBy(importedModule, import.module.importedModule))) {
+      spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
 }
@@ -3506,14 +3507,12 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
-  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
-    if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-      auto inserted = ValidatedOpaqueReturnTypes.insert(
-                {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
-                 opaqueDecl});
-      if (inserted.second) {
-        OpaqueReturnTypes.push_back(opaqueDecl);
-      }
+  for (auto *opaqueDecl : UnvalidatedOpaqueReturnTypes.takeVector()) {
+    auto inserted = ValidatedOpaqueReturnTypes.insert(
+              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
+               opaqueDecl});
+    if (inserted.second) {
+      OpaqueReturnTypes.push_back(opaqueDecl);
     }
   }
 
