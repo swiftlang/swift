@@ -46,7 +46,7 @@ From the settings application, go to `Update & Security`.  In the `For developer
 ## Clone the repositories
 
 1. Clone `swift/main` branch of `apple/llvm-project` into the build workspace
-2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-tools-support-core`, `apple/swift-llbuild`, `apple/swift-argument-parser`, `apple/swift-driver`, `apple/swift-package-manager`, `JPSim/Yams`, `apple/indexstore-db` into the build workspace
+2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-syntax`, `apple/swift-experimental-string-processing`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-tools-support-core`, `apple/swift-llbuild`, `apple/swift-argument-parser`, `apple/swift-driver`, `apple/swift-package-manager`, `JPSim/Yams`, `apple/indexstore-db` into the build workspace
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -62,6 +62,7 @@ git clone https://github.com/apple/llvm-project --branch swift/main llvm-project
 git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift swift
 git clone https://github.com/apple/swift-syntax swift-syntax
 git clone https://github.com/apple/swift-cmark cmark
+git clone https://github.com/apple/swift-experimental-string-processing swift-experimental-string-processing
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
@@ -136,6 +137,8 @@ cmake -B "S:\b\1" ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=S:\swift-syntax ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
+  -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=S:\swift-experimental-string-processing ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=ON ^
   -G Ninja ^
   -S S:\llvm-project\llvm
 
