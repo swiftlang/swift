@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -enable-experimental-feature ResultBuilderASTTransform
 // REQUIRES: OS=macosx
+// REQUIRES: rdar102298208
 
 import SwiftUI
 
