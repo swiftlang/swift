@@ -1772,6 +1772,10 @@ void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
   llvm_unreachable("top-level subscript?");
 }
 
+void SILGenModule::visitMacroDecl(MacroDecl *d) {
+  // nothing to emit for macros
+}
+
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
   auto *rewritten = d->getRewritten();
   assert(rewritten && "Macro must have been rewritten in SILGen");

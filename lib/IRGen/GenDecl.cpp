@@ -884,6 +884,7 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
   }
       
   case DeclContextKind::FileUnit:
+  case DeclContextKind::MacroDecl:
     parent = parent->getParentModule();
     LLVM_FALLTHROUGH;
       
@@ -2479,6 +2480,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::AssociatedType:
   case DeclKind::IfConfig: 
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Macro:
     return;
 
   case DeclKind::Enum:
@@ -5340,6 +5342,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
+    case DeclKind::Macro:
       continue;
 
     case DeclKind::Func:

@@ -16,8 +16,8 @@
 #ifndef SWIFT_SEMA_TYPECHECKMACROS_H
 #define SWIFT_SEMA_TYPECHECKMACROS_H
 
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
@@ -32,7 +32,7 @@ class TypeRepr;
 /// \returns the type-checked replacement expression, or NULL if the
 // macro could not be expanded.
 Expr *expandMacroExpr(
-    DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType);
+    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType);
 
 #endif // SWIFT_SWIFT_PARSER
 

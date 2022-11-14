@@ -127,6 +127,9 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   }
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
+  case DeclContextKind::MacroDecl:
+    // Macros are always public.
+    return AccessLevel::Public;
   }
   llvm_unreachable("unhandled kind");
 }

@@ -884,6 +884,7 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::MacroDecl:
     break;
   }
 
@@ -1074,6 +1075,7 @@ ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
   case swift::DeclContextKind::FileUnit:
   case swift::DeclContextKind::GenericTypeDecl:
   case swift::DeclContextKind::ExtensionDecl:
+  case swift::DeclContextKind::MacroDecl:
     return ExtractCheckResult();
   }
   return ExtractCheckResult(AllReasons);

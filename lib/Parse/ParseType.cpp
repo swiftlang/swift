@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -1067,6 +1068,11 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   return makeParserResult(Status, composition);
 }
 
+/// FIXME: This is an egregious hack.
+static bool isMacroSignatureFile(SourceFile &sf) {
+  return sf.getFilename().startswith("Macro signature of");
+}
+
 /// parseTypeTupleBody
 ///   type-tuple:
 ///     '(' type-tuple-body? ')'
@@ -1209,7 +1215,8 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 
     // If there was a first name, complain; arguments in function types are
     // always unlabeled.
-    if (element.NameLoc.isValid() && !element.Name.empty()) {
+    if (element.NameLoc.isValid() && !element.Name.empty() &&
+        /*FIXME: Gross hack*/!isMacroSignatureFile(SF)) {
       auto diag = diagnose(element.NameLoc, diag::function_type_argument_label,
                            element.Name);
       if (element.SecondNameLoc.isInvalid())

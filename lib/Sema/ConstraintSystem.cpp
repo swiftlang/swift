@@ -24,7 +24,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/Macro.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1607,6 +1606,25 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     return { type, type, type, type };
   }
 
+  // Unqualified reference to a macro.
+  if (auto macro = dyn_cast<MacroDecl>(value)) {
+    Type macroType = macro->getInterfaceType();
+
+    // Open any the generic types.
+    OpenedTypeMap replacements;
+    openGeneric(macro->getParentModule(), macro->getGenericSignature(),
+                locator, replacements);
+
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
+
+    Type openedType = openType(macroType, replacements);
+
+    // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
+
+    return { openedType, openedType, openedType, openedType };
+  }
+
   // Only remaining case: unqualified reference to a property.
   auto *varDecl = cast<VarDecl>(value);
 
@@ -2471,26 +2489,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
   return { origOpenedType, openedType, origType, type };
 }
-
-#if SWIFT_SWIFT_PARSER
-Type ConstraintSystem::getTypeOfMacroReference(Identifier macroName,
-                                               Expr *anchor) {
-  auto req = MacroLookupRequest{macroName, DC->getParentModule()};
-  auto macros = evaluateOrDefault(getASTContext().evaluator, req, { });
-  if (macros.empty())
-    return Type();
-
-  // FIXME: Handle macro overloading.
-  auto macro = macros.front();
-
-  // Open any the generic types.
-  OpenedTypeMap replacements;
-  openGeneric(macro->owningModule, macro->genericSignature,
-              getConstraintLocator(anchor), replacements);
-
-  return openType(macro->signature, replacements);
-}
-#endif
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,

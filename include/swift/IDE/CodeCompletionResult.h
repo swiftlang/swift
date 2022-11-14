@@ -117,6 +117,7 @@ enum class CodeCompletionDeclKind : uint8_t {
   LocalVar,
   GlobalVar,
   PrecedenceGroup,
+  Macro,
 };
 
 enum class CodeCompletionLiteralKind : uint8_t {
