@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
 
+// REQUIRES: asserts
+
 // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type16variadicFunction1t1ux_q_txQp_txxQp_q_q_Qptq_Rhzr0_lF : $@convention(thin) <T..., U... where ((T, U)...) : Any> (@in_guaranteed T..., @in_guaranteed U...) -> @out (T, U)... {
 // CHECK: bb0(%0 : $*(T, U)..., %1 : $*T..., %2 : $*U...):
 public func variadicFunction<T..., U...>(t: T..., u: U...) -> ((T, U)...) {}

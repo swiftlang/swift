@@ -2,6 +2,8 @@
 // RUN: %target-swift-emit-module-interface(%t/PackExpansionType.swiftinterface) %s -module-name PackExpansionType -enable-experimental-feature VariadicGenerics
 // RUN: %FileCheck %s < %t/PackExpansionType.swiftinterface
 
+// REQUIRES: asserts
+
 // CHECK: public func variadicFunction<T..., U...>(t: T..., u: U...) -> ((T, U)...) where ((T, U)...) : Any
 public func variadicFunction<T..., U...>(t: T..., u: U...) -> ((T, U)...) {}
 
