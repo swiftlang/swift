@@ -1221,17 +1221,6 @@ public:
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
-  /// Rewrite an expression without any particularly special context.
-  Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(SolutionApplicationTarget(
-        expr, context.getAsDeclContext(), CTP_Unused, Type(),
-        /*isDiscarded=*/false));
-    if (result)
-      return result->getAsExpr();
-
-    return nullptr;
-  }
-
   ASTNode visit(Stmt *S) {
     auto rewritten = ASTVisitor::visit(S);
     if (!rewritten)
