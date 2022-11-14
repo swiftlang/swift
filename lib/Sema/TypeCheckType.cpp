@@ -3237,7 +3237,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     Identifier argumentLabel;
     Identifier parameterName;
-    if (inputRepr->getElement(i).SecondNameLoc.isValid()) {
+    if (inputRepr->getElement(i).NameLoc.isValid() &&
+        inputRepr->getElement(i).SecondNameLoc.isValid() &&
+        inputRepr->getElement(i).NameLoc !=
+            inputRepr->getElement(i).SecondNameLoc) {
       argumentLabel = inputRepr->getElement(i).Name;
       parameterName = inputRepr->getElement(i).SecondName;
     } else {
