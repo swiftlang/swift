@@ -265,6 +265,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::SerializedLocal:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
+    case swift::DeclContextKind::MacroDecl:
       break;
   }
 }

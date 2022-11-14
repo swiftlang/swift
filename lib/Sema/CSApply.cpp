@@ -2975,14 +2975,17 @@ namespace {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = cs.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
-        auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
-            .drop_front();
         auto expandedType = solution.simplifyType(solution.getType(expr));
         cs.setType(expr, expandedType);
 
-        if (auto newExpr = expandMacroExpr(dc, expr, kind, expandedType)) {
+        auto locator = cs.getConstraintLocator(expr);
+        auto overload = solution.getOverloadChoice(locator);
+
+        auto macro = cast<MacroDecl>(overload.choice.getDecl());
+        ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
+        if (auto newExpr = expandMacroExpr(dc, expr, macroRef, expandedType)) {
           auto expansion = new (ctx) MacroExpansionExpr(
-              expr->getStartLoc(), DeclNameRef(ctx.getIdentifier(kind)),
+              expr->getStartLoc(), DeclNameRef(macro->getName()),
               DeclNameLoc(expr->getLoc()), nullptr, /*isImplicit=*/true,
               expandedType);
           expansion->setRewritten(newExpr);
@@ -5392,11 +5395,16 @@ namespace {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = cs.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
-        auto macroIdent = E->getMacroName().getBaseIdentifier();
         auto expandedType = solution.simplifyType(solution.getType(E));
         cs.setType(E, expandedType);
-        if (auto newExpr = expandMacroExpr(
-                dc, E, macroIdent.str(), expandedType)) {
+
+        auto locator = cs.getConstraintLocator(E);
+        auto overload = solution.getOverloadChoice(locator);
+
+        auto macro = cast<MacroDecl>(overload.choice.getDecl());
+        ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
+
+        if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);
           cs.cacheExprTypes(E);
           return E;
@@ -8189,6 +8197,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
       case DeclContextKind::FileUnit:
       case DeclContextKind::Module:
       case DeclContextKind::TopLevelCodeDecl:
+      case DeclContextKind::MacroDecl:
         break;
     }
 

@@ -4906,14 +4906,6 @@ public:
                           ConstraintLocator *locator,
                           OpenedTypeMap *replacements = nullptr);
 
-#if SWIFT_SWIFT_PARSER
-  /// Retrieve the opened type of a macro with the given name.
-  ///
-  /// \returns The opened type of the macro with this name, or the null \c Type
-  /// if no such macro exists.
-  Type getTypeOfMacroReference(Identifier macroName, Expr *anchor);
-#endif
-
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
   ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {

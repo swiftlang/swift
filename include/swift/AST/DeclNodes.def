@@ -171,6 +171,7 @@ ABSTRACT_DECL(Value, Decl)
     ABSTRACT_FUNCTION_DECL(Func, AbstractFunctionDecl)
       ABSTRACT_FUNCTION_DECL(Accessor, FuncDecl)
     DECL_RANGE(AbstractFunction, Constructor, Accessor)
+  GENERIC_VALUE_DECL(Macro, ValueDecl)
   CONTEXT_VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, Enum, EnumElement)
 

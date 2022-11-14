@@ -207,6 +207,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::AssociatedType:
   case DeclKind::Param:
   case DeclKind::OpaqueType:
+  case DeclKind::Macro:
     return cast<ValueDecl>(decl)->getBaseName().userFacingName();
 
   case DeclKind::Import:

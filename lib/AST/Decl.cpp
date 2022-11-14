@@ -168,6 +168,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
+  TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
 
    case DeclKind::Enum:
@@ -354,6 +355,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
   ENTRY(OpaqueVarType, "type");
+  ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
   }
 #undef ENTRY
@@ -481,6 +483,7 @@ bool Decl::isInvalid() const {
   case DeclKind::Destructor:
   case DeclKind::Func:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     return cast<ValueDecl>(this)->getInterfaceType()->hasError();
 
   case DeclKind::Accessor: {
@@ -524,6 +527,7 @@ void Decl::setInvalid() {
   case DeclKind::Func:
   case DeclKind::Accessor:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
     return;
 
@@ -1234,6 +1238,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Var;
 
   case DeclKind::Module:
+  case DeclKind::Macro:
     return ImportKind::Module;
   }
   llvm_unreachable("bad DeclKind");
@@ -2678,6 +2683,10 @@ bool ValueDecl::isInstanceMember() const {
 
   case DeclKind::Module:
     // Modules are never instance members.
+    return false;
+
+  case DeclKind::Macro:
+    // Macros are never instance members.
     return false;
 
   case DeclKind::BuiltinTuple:
@@ -9610,6 +9619,22 @@ bool ActorIsolation::isDistributedActor() const {
 BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
+
+MacroDecl::MacroDecl(
+  Kind kind, ImplementationKind implementationKind, Identifier name,
+  ModuleDecl *owningModule,
+  ArrayRef<ModuleDecl *> supplementalSignatureModules,
+  void *opaqueHandle
+) : GenericContext(DeclContextKind::MacroDecl, owningModule, nullptr),
+    ValueDecl(DeclKind::Macro, owningModule, name, SourceLoc()),
+    kind(kind), implementationKind(implementationKind),
+    supplementalSignatureModules(supplementalSignatureModules),
+    opaqueHandle(opaqueHandle) {
+}
+
+SourceRange MacroDecl::getSourceRange() const {
+  return SourceRange();
+}
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
   return SourceRange(PoundLoc,

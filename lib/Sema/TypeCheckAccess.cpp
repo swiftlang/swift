@@ -471,6 +471,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Macro, "cannot appear in a type context")
 
   UNREACHABLE(IfConfig, "does not have access control")
   UNREACHABLE(PoundDiagnostic, "does not have access control")
@@ -1098,6 +1099,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Macro, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
@@ -1707,6 +1709,7 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Macro, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
