@@ -1512,6 +1512,27 @@ private:
     return caseStmt;
   }
 
+  ASTNode visitBraceElement(ASTNode node) {
+    auto &cs = solution.getConstraintSystem();
+    if (auto *expr = node.dyn_cast<Expr *>()) {
+      // Rewrite the expression.
+      auto target = *cs.getSolutionApplicationTarget(expr);
+      if (auto rewrittenTarget = rewriteTarget(target)) {
+        node = rewrittenTarget->getAsExpr();
+
+        if (target.isDiscardedExpr())
+          TypeChecker::checkIgnoredExpr(castToExpr(node));
+      } else {
+        hadError = true;
+      }
+    } else if (auto stmt = node.dyn_cast<Stmt *>()) {
+      node = visit(stmt);
+    } else {
+      visitDecl(node.get<Decl *>());
+    }
+    return node;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     auto &cs = solution.getConstraintSystem();
 
@@ -1527,24 +1548,8 @@ private:
       }
     }
 
-    for (auto &node : braceStmt->getElements()) {
-      if (auto expr = node.dyn_cast<Expr *>()) {
-        // Rewrite the expression.
-        auto target = *cs.getSolutionApplicationTarget(expr);
-        if (auto rewrittenTarget = rewriteTarget(target)) {
-          node = rewrittenTarget->getAsExpr();
-
-          if (target.isDiscardedExpr())
-            TypeChecker::checkIgnoredExpr(castToExpr(node));
-        } else {
-          hadError = true;
-        }
-      } else if (auto stmt = node.dyn_cast<Stmt *>()) {
-        node = visit(stmt);
-      } else {
-        visitDecl(node.get<Decl *>());
-      }
-    }
+    for (auto &node : braceStmt->getElements())
+      node = visitBraceElement(node);
 
     // Source compatibility workaround.
     //
