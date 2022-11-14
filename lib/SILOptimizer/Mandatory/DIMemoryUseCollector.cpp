@@ -480,7 +480,8 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
     assert(Element < storageVarType->getNumElements());
     auto propertyName = storageVarType->getElement(Element).getName();
 
-    auto *storageDecl = wrappedType->getTypeWrapperStorageDecl();
+    auto *storageDecl =
+        cast<NominalTypeDecl>(wrappedType->getTypeWrapperStorageDecl());
     auto *property = storageDecl->lookupDirect(propertyName).front();
     return cast<VarDecl>(property)->isLet();
   }

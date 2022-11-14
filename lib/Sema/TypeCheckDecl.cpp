@@ -2752,15 +2752,22 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     TypeChecker::checkConformance(conformance->getRootNormalConformance());
   }
 
-  // If the type conforms to Encodable or Decodable, even via an extension,
-  // the CodingKeys enum is synthesized as a member of the type itself.
-  // Force it into existence.
   if (nominal) {
+    // If the type conforms to Encodable or Decodable, even via an extension,
+    // the CodingKeys enum is synthesized as a member of the type itself.
+    // Force it into existence.
     (void) evaluateOrDefault(
       ctx.evaluator,
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
+
+    // Synthesize $Storage type and `var $storage` associated with
+    // type wrapped type.
+    if (nominal->hasTypeWrapper()) {
+      (void)nominal->getTypeWrapperStorageDecl();
+      (void)nominal->getTypeWrapperProperty();
+    }
   }
 
   // If the decl has a @main attribute, we need to force synthesis of the
