@@ -515,6 +515,15 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
+  /// Cache of compiler plugins keyed by their name.
+  ///
+  /// Names can be overloaded, so there can be multiple plugins with the same
+  /// name.
+  llvm::StringMap<TinyPtrVector<CompilerPlugin*>> LoadedPlugins;
+
+  /// Cache of loaded symbols.
+  llvm::StringMap<void *> LoadedSymbols;
+
   /// The permanent arena.
   Arena Permanent;
 
@@ -579,6 +588,12 @@ ASTContext::Implementation::Implementation()
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
+
+  for (const auto &pluginsByName : LoadedPlugins) {
+    for (auto plugin : pluginsByName.second) {
+      delete plugin;
+    }
+  }
 }
 
 ConstraintCheckerArenaRAII::
@@ -6047,16 +6062,21 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
-CompilerPlugin *ASTContext::getLoadedPlugin(StringRef name) {
-  auto lookup = LoadedPlugins.find(name);
-  if (lookup == LoadedPlugins.end())
-    return nullptr;
-  return &lookup->second;
+TinyPtrVector<CompilerPlugin *> ASTContext::getLoadedPlugins(StringRef name) {
+  auto &loadedPlugins = getImpl().LoadedPlugins;
+  auto lookup = loadedPlugins.find(name);
+  if (lookup == loadedPlugins.end())
+    return { };
+  return lookup->second;
+}
+
+void ASTContext::addLoadedPlugin(StringRef name, CompilerPlugin *plugin) {
+  getImpl().LoadedPlugins[name].push_back(plugin);
 }
 
 void *ASTContext::getAddressOfSymbol(const char *name,
                                      void *libraryHandleHint) {
-  auto lookup = LoadedSymbols.try_emplace(name, nullptr);
+  auto lookup = getImpl().LoadedSymbols.try_emplace(name, nullptr);
   void *&address = lookup.first->getValue();
 #if !defined(_WIN32)
   if (lookup.second) {

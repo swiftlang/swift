@@ -352,12 +352,6 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
-  /// Cache of compiler plugins keyed by their name.
-  llvm::StringMap<CompilerPlugin> LoadedPlugins;
-
-  /// Cache of loaded symbols.
-  llvm::StringMap<void *> LoadedSymbols;
-
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -1452,8 +1446,11 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// Finds the loaded compiler plugin given its name.
-  CompilerPlugin *getLoadedPlugin(StringRef name);
+  /// Finds the loaded compiler plugins with the given name.
+  TinyPtrVector<CompilerPlugin *> getLoadedPlugins(StringRef name);
+
+  /// Add a loaded plugin with the given name.
+  void addLoadedPlugin(StringRef name, CompilerPlugin *plugin);
 
   /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
   /// search within the library.

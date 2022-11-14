@@ -37,7 +37,12 @@ let _ = #customStringify(["a", "b", "c"] + ["d", "e", "f"])
 
 struct MyColor: _ExpressibleByColorLiteral {
   init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) { }
+  init(_colorLiteralHue hue: Float, saturation: Float, value: Float) { }
 }
 
+// CHECK: (macro_expansion_expr type='MyColor' {{.*}} name=customColorLiteral
 let _: MyColor = #customColorLiteral(red: 0.5, green: 0.5, blue: 0.2, alpha: 0.9)
+
+// CHECK: (macro_expansion_expr type='MyColor' {{.*}} name=customColorLiteral
+let _: MyColor = #customColorLiteral(hue: 0.5, saturation: 0.5, value: 0.2)
 

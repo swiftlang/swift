@@ -317,7 +317,7 @@ ArrayRef<MacroDecl *> MacroLookupRequest::evaluate(
   // Look for a loaded plugin based on the macro name.
   // FIXME: This API needs to be able to return multiple plugins, because
   // several plugins could export a macro with the same name.
-  if (auto *plugin = ctx.getLoadedPlugin(macroName.str())) {
+  for (auto plugin: ctx.getLoadedPlugins(macroName.str())) {
     if (auto pluginMacro = createPluginMacro(mod, macroName, plugin)) {
       macros.push_back(pluginMacro);
     }

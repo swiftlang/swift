@@ -188,9 +188,9 @@ void ASTContext::loadCompilerPlugins() {
     swift_ASTGen_getMacroTypes(getter, &metatypesAddress, &metatypeCount);
     ArrayRef<const void *> metatypes(metatypesAddress, metatypeCount);
     for (const void *metatype : metatypes) {
-      CompilerPlugin plugin(metatype, lib, *this);
-      auto name = plugin.getName();
-      LoadedPlugins.try_emplace(name, std::move(plugin));
+      auto plugin = new CompilerPlugin(metatype, lib, *this);
+      auto name = plugin->getName();
+      addLoadedPlugin(name, plugin);
     }
     free(const_cast<void *>((const void *)metatypes.data()));
 #endif // SWIFT_SWIFT_PARSER
