@@ -128,8 +128,6 @@ getMacroSignature(
       *mod, SourceFileKind::Library, macroBufferID);
   mod->addAuxiliaryFile(*macroSourceFile);
 
-  // FIXME: Inject imports, which we don't yet have everywhere.
-
   // Parse the struct declaration used for the macro evaluation context.
   auto *start = sourceMgr.getLocForBufferStart(macroBufferID)
                     .getOpaquePointerValue();
