@@ -195,6 +195,7 @@ jobs:
     needs: [build-matrix]
     if: ${{ always() }}
     strategy:
+      fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.build-matrix.outputs.entries) }}
 
