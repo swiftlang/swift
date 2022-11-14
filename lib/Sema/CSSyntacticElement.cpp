@@ -1,8 +1,8 @@
-//===--- CSClosure.cpp - Closures -----------------------------------------===//
+//===--- CSSyntacticElement.cpp - Syntactic Element Constraints -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements constraint generation and solution application for
-// closures. It provides part of the implementation of the ConstraintSystem
-// class.
+// This file implements SyntacticElement constraint generation and solution
+// application, which is used to type-check the bodies of closures. It provides
+// part of the implementation of the ConstraintSystem class.
 //
 //===----------------------------------------------------------------------===//
 
