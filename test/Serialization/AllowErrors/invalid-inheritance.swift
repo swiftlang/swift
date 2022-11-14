@@ -32,9 +32,8 @@ extension undefined: SomeProto {} // expected-error {{cannot find type 'undefine
 
 public extension undefined { // expected-error {{cannot find type 'undefined' in scope}}
   protocol SomeProtoInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
-  // TODO: Why don't these have errors?
-  class SomeClassInner: undefined {}
-  struct SomeStructInner: undefined {}
+  class SomeClassInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
+  struct SomeStructInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
   enum SomeEnumInner: undefined { // expected-error {{cannot find type 'undefined' in scope}}
     case a
   }
