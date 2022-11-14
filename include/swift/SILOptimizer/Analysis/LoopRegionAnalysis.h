@@ -237,8 +237,7 @@ public:
 
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
-  class subregion_iterator :
-    public std::iterator<std::bidirectional_iterator_tag, unsigned> {
+  class subregion_iterator {
     friend struct SubregionData;
     llvm::SmallVectorImpl<SubregionID>::const_iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
@@ -323,8 +322,7 @@ public:
 
   /// An iterator that knows how to iterate over the backedge indices of a
   /// region.
-  class backedge_iterator
-      : public std::iterator<std::bidirectional_iterator_tag, unsigned> {
+  class backedge_iterator {
     friend struct SubregionData;
     using InnerIterTy = llvm::SmallVectorImpl<unsigned>::const_iterator;
     llvm::Optional<InnerIterTy> InnerIter;

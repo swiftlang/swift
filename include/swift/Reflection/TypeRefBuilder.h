@@ -87,14 +87,19 @@ public:
 };
 
 template<typename Self, typename Descriptor>
-class ReflectionSectionIteratorBase
-  : public std::iterator<std::forward_iterator_tag, Descriptor> {
+class ReflectionSectionIteratorBase {
   uint64_t OriginalSize;
 protected:
   Self &asImpl() {
     return *static_cast<Self *>(this);
   }
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Descriptor;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   RemoteRef<void> Cur;
   uint64_t Size;
   std::string Name;

@@ -65,9 +65,15 @@ inline void deleteAllDebugUses(SILInstruction *inst) {
 /// of uses, provided by the underlying ValueBaseUseIterator.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
 /// debug instructions. Otherwise it provides a view ot all debug-instructions.
-template <bool nonDebugInsts> class DebugUseIterator
-: public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
-  
+template <bool nonDebugInsts> class DebugUseIterator {
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
+private:
   ValueBaseUseIterator BaseIterator;
   
   // Skip any debug or non-debug instructions (depending on the nonDebugInsts
