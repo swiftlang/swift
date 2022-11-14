@@ -193,6 +193,11 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     printFullContext(Context->getParent(), Buffer);
     return;
 
+  case DeclContextKind::MacroDecl:
+    // Ignore the macro, which won't have anything in it; just print the module.
+    printFullContext(Context->getParent(), Buffer);
+    return;
+
   case DeclContextKind::Initializer:
     // FIXME
     Buffer << "<initializer>";

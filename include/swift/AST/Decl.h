@@ -192,6 +192,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Requirement,
   OpaqueResultType,
   OpaqueVarType,
+  Macro,
   MacroExpansion
 };
 
@@ -8268,6 +8269,68 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MissingMember;
   }
+};
+
+/// Provides a declaration of a macro.
+///
+/// Macros are defined externally via conformances to the 'Macro' type
+/// that is part of swift-syntax, and are introduced into the compiler via
+/// various mechanisms (built-in macros are linked in directly, plugin macros
+/// are introduced via compiler plugins, and so on). They have no explicit
+/// representation in the source code, but are still declarations.
+class MacroDecl : public GenericContext, public ValueDecl {
+public:
+  /// The kind of macro, which determines how it can be used in source code.
+  enum Kind: uint8_t {
+    /// An expression macro.
+    Expression,
+  };
+
+  /// Describes how the macro is implemented.
+  enum class ImplementationKind: uint8_t {
+    /// The macro is built-in to the compiler, linked against the same
+    /// underlying syntax tree libraries.
+    Builtin,
+
+    /// The macro was defined in a compiler plugin.
+    Plugin,
+  };
+
+  /// The kind of macro.
+  const Kind kind;
+
+  /// How the macro is implemented.
+  const ImplementationKind implementationKind;
+
+  /// Supplemental modules that should be imported when
+  const ArrayRef<ModuleDecl *> supplementalSignatureModules;
+
+  /// An opaque handle to the representation of the macro.
+  void * const opaqueHandle;
+
+public:
+  MacroDecl(
+    Kind kind, ImplementationKind implementationKind, Identifier name,
+    ModuleDecl *owningModule,
+    ArrayRef<ModuleDecl *> supplementalSignatureModules,
+    void *opaqueHandle
+  );
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Macro;
+  }
+
+  using DeclContext::operator new;
+  using DeclContext::operator delete;
+  using Decl::getASTContext;
 };
 
 class MacroExpansionDecl : public Decl {

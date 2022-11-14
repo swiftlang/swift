@@ -60,6 +60,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
       case CodeCompletionDeclKind::InstanceVar:
       case CodeCompletionDeclKind::LocalVar:
       case CodeCompletionDeclKind::GlobalVar:
+      case CodeCompletionDeclKind::Macro:
         return false;
       }
 

@@ -1222,6 +1222,10 @@ public:
     });
   }
 
+  void visitMacroDecl(MacroDecl *md) {
+    llvm_unreachable("macros aren't allowed in types");
+  }
+
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
     auto *rewritten = med->getRewritten();
     assert(rewritten && "Macro must have been rewritten in SILGen");
@@ -1391,6 +1395,10 @@ public:
     asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
+  }
+
+  void visitMacroDecl(MacroDecl *md) {
+    llvm_unreachable("macros aren't allowed in extensions");
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {

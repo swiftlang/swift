@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Macro.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -95,6 +94,8 @@ getMacroSignatureContextBuffer(
   return {buffer, len};
 }
 
+#if SWIFT_SWIFT_PARSER
+
 /// Compute the macro signature for a macro given the source code for its
 /// generic signature and type signature.
 static Optional<std::pair<GenericSignature, Type>>
@@ -150,9 +151,9 @@ getMacroSignature(
 
 
 /// Create a macro.
-static Macro *createMacro(
+static MacroDecl *createMacro(
     ModuleDecl *mod, Identifier macroName,
-    Macro::ImplementationKind implKind,
+    MacroDecl::ImplementationKind implKind,
     Optional<StringRef> genericSignature, StringRef typeSignature,
     StringRef owningModuleName,
     ArrayRef<StringRef> supplementalImportModuleNames,
@@ -189,15 +190,20 @@ static Macro *createMacro(
   }
 
   // FIXME: All macros are expression macros right now
-  return new (ctx) Macro(
-      Macro::Expression, implKind, macroName,
-      signature->first, signature->second,
+  auto macro = new (ctx) MacroDecl(
+      MacroDecl::Expression, implKind, macroName,
       owningModule, supplementalImportModules,
       opaqueHandle);
+
+  // FIXME: Make these lazily computed.
+  macro->setGenericSignature(signature->first);
+  macro->setInterfaceType(signature->second);
+
+  return macro;
 }
 
 /// Create a builtin macro.
-static Macro *createBuiltinMacro(
+static MacroDecl *createBuiltinMacro(
     ModuleDecl *mod, Identifier macroName, void *opaqueHandle) {
   // Get the macro generic signature.
   const char *genericSignaturePtr;
@@ -247,14 +253,14 @@ static Macro *createBuiltinMacro(
     .split(supplementalModuleNames, ";", -1, false);
 
   return createMacro(
-      mod, macroName, Macro::ImplementationKind::Builtin,
+      mod, macroName, MacroDecl::ImplementationKind::Builtin,
       genericSignature, typeSignature,
       owningModuleName, supplementalModuleNames,
       opaqueHandle);
 }
 
 /// Create a plugin-based macro.
-static Macro *createPluginMacro(
+static MacroDecl *createPluginMacro(
     ModuleDecl *mod, Identifier macroName, CompilerPlugin *plugin) {
   auto genSignature = plugin->invokeGenericSignature();
   SWIFT_DEFER {
@@ -283,16 +289,17 @@ static Macro *createPluginMacro(
     .split(supplementalModuleNames, ";", -1, false);
 
   return createMacro(
-      mod, macroName, Macro::ImplementationKind::Plugin, genSignature,
+      mod, macroName, MacroDecl::ImplementationKind::Plugin, genSignature,
       typeSignature, owningModuleName, supplementalModuleNames, plugin);
 }
+#endif
 
-ArrayRef<Macro *> MacroLookupRequest::evaluate(
+ArrayRef<MacroDecl *> MacroLookupRequest::evaluate(
     Evaluator &evaluator, Identifier macroName, ModuleDecl *mod
 ) const {
 #if SWIFT_SWIFT_PARSER
   ASTContext &ctx = mod->getASTContext();
-  SmallVector<Macro *, 2> macros;
+  SmallVector<MacroDecl *, 2> macros;
 
   // Look for a builtin macro with this name.
   if (auto *builtinHandle = swift_ASTGen_lookupMacro(
@@ -313,7 +320,7 @@ ArrayRef<Macro *> MacroLookupRequest::evaluate(
   // Look for a loaded plugin based on the macro name.
   // FIXME: This API needs to be able to return multiple plugins, because
   // several plugins could export a macro with the same name.
-  if (auto *plugin = ctx.getLoadedPlugin(macroName.str())) {
+  for (auto plugin: ctx.getLoadedPlugins(macroName.str())) {
     if (auto pluginMacro = createPluginMacro(mod, macroName, plugin)) {
       macros.push_back(pluginMacro);
     }
@@ -327,7 +334,7 @@ ArrayRef<Macro *> MacroLookupRequest::evaluate(
 
 #if SWIFT_SWIFT_PARSER
 Expr *swift::expandMacroExpr(
-    DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType
+    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
 ) {
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -344,45 +351,45 @@ Expr *swift::expandMacroExpr(
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  // FIXME: The caller should tell us what macro is being expanded, so we
-  // don't do this lookup again.
+  MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
 
-  // Built-in macros go through `MacroSystem` in Swift Syntax linked to this
-  // compiler.
-  if (auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str())) {
-    auto astGenSourceFile = sourceFile->exportedSourceFile;
-    if (!astGenSourceFile)
-      return nullptr;
-  
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_evaluateMacro(
-        astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return nullptr;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
-    swift_ASTGen_destroyMacro(macro);
-  }
-  // Other macros go through a compiler plugin.
-  else {
-    auto mee = cast<MacroExpansionExpr>(expr);
-    auto *plugin = ctx.getLoadedPlugin(macroName);
-    assert(plugin && "Should have been checked during earlier type checking");
-    auto bufferID = sourceFile->getBufferID();
-    auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
-    auto evaluated = plugin->invokeRewrite(
-        /*targetModuleName*/ dc->getParentModule()->getName().str(),
-        /*filePath*/ sourceFile->getFilename(),
-        /*sourceFileText*/ sourceFileText,
-        /*range*/ Lexer::getCharSourceRangeFromSourceRange(
-            sourceMgr, mee->getSourceRange()),
-        ctx);
-    if (evaluated)
-      evaluatedSource = *evaluated;
-    else
-      return nullptr;
+  switch (macro->implementationKind) {
+    case MacroDecl::ImplementationKind::Builtin: {
+      // Builtin macros are handled via ASTGen.
+      auto astGenSourceFile = sourceFile->exportedSourceFile;
+      if (!astGenSourceFile)
+        return nullptr;
+
+      // FIXME: Tell ASTGen which macro to use.
+      const char *evaluatedSourceAddress;
+      ptrdiff_t evaluatedSourceLength;
+      swift_ASTGen_evaluateMacro(
+           astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
+           &evaluatedSourceAddress, &evaluatedSourceLength);
+      if (!evaluatedSourceAddress)
+        return nullptr;
+      evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
+                                                (size_t)evaluatedSourceLength);
+      break;
+    }
+
+    case MacroDecl::ImplementationKind::Plugin: {
+      auto *plugin = (CompilerPlugin *)macro->opaqueHandle;
+      auto bufferID = sourceFile->getBufferID();
+      auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
+      auto evaluated = plugin->invokeRewrite(
+          /*targetModuleName*/ dc->getParentModule()->getName().str(),
+          /*filePath*/ sourceFile->getFilename(),
+          /*sourceFileText*/ sourceFileText,
+          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
+              sourceMgr, expr->getSourceRange()),
+          ctx);
+      if (evaluated)
+        evaluatedSource = *evaluated;
+      else
+        return nullptr;
+      break;
+    }
   }
 
   // Figure out a reasonable name for the macro expansion buffer.
@@ -390,7 +397,7 @@ Expr *swift::expandMacroExpr(
   {
     llvm::raw_string_ostream out(bufferName);
 
-    out << "Macro expansion of #" << macroName;
+    out << "Macro expansion of #" << macro->getName();
     if (auto bufferID = sourceFile->getBufferID()) {
       unsigned startLine, startColumn;
       std::tie(startLine, startColumn) =

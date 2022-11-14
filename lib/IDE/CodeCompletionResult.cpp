@@ -285,6 +285,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
+  case DeclKind::Macro:
+    return CodeCompletionDeclKind::Macro;
   }
   llvm_unreachable("invalid DeclKind");
 }
@@ -434,6 +436,9 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::PrecedenceGroup:
       Prefix.append("[PrecedenceGroup]");
+      break;
+    case CodeCompletionDeclKind::Macro:
+      Prefix.append("[Macro]");
       break;
     }
     break;
