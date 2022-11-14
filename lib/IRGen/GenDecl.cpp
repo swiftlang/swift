@@ -5859,7 +5859,7 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
 void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    f->setSection("__TEXT, __swift_colocat, regular");
+    f->setSection("__TEXT, __swift_colocat, regular, pure_instructions");
     break;
   case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
