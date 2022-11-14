@@ -2236,8 +2236,12 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
 
   // Create a new list of components.
   SmallVector<ComponentIdentTypeRepr *, 2> Components;
-  for (auto *Component : ParentTR->getComponentRange())
-    Components.push_back(Component);
+  if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(ParentTR)) {
+    Components.push_back(Comp);
+  } else {
+    auto OldComps = cast<CompoundIdentTypeRepr>(ParentTR)->getComponents();
+    Components.append(OldComps.begin(), OldComps.end());
+  }
 
   assert(!Components.empty());
 
@@ -2256,8 +2260,11 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
                                              ASTContext &C) {
   // Create a new list of components.
   SmallVector<ComponentIdentTypeRepr *, 2> components;
-  for (auto *component : ParentTR->getComponentRange()) {
-    components.push_back(component);
+  if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(ParentTR)) {
+    components.push_back(comp);
+  } else {
+    auto oldComps = cast<CompoundIdentTypeRepr>(ParentTR)->getComponents();
+    components.append(oldComps.begin(), oldComps.end());
   }
 
   auto *last = components.back();

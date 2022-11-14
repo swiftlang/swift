@@ -2425,7 +2425,14 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  DeclContext *dc, bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  for (const auto &component : ident->getComponentRange()) {
+  ArrayRef<ComponentIdentTypeRepr *> components;
+  if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(ident)) {
+    components = comp;
+  } else {
+    components = cast<CompoundIdentTypeRepr>(ident)->getComponents();
+  }
+
+  for (const auto &component : components) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
       current = {1, typeDecl};

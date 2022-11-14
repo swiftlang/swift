@@ -3115,7 +3115,15 @@ public:
   void visitIdentTypeRepr(IdentTypeRepr *T) {
     printCommon("type_ident");
     Indent += 2;
-    for (auto comp : T->getComponentRange()) {
+
+    ArrayRef<ComponentIdentTypeRepr *> components;
+    if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(T)) {
+      components = comp;
+    } else {
+      components = cast<CompoundIdentTypeRepr>(T)->getComponents();
+    }
+
+    for (auto comp : components) {
       OS << '\n';
       printCommon("component");
       PrintWithColorRAII(OS, IdentifierColor)

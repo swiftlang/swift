@@ -215,12 +215,11 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
-      const auto &componentRange = ITR->getComponentRange();
       // If it has more than one component, it can't be a module name.
-      if (std::distance(componentRange.begin(), componentRange.end()) != 1)
+      if (isa<CompoundIdentTypeRepr>(ITR))
         return false;
 
-      const auto &component = componentRange.front();
+      const auto *component = cast<ComponentIdentTypeRepr>(ITR);
       ImportPath::Module::Builder builder(
           component->getNameRef().getBaseIdentifier(),
           component->getLoc());

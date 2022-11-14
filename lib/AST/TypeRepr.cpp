@@ -127,6 +127,28 @@ SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   return SourceLoc();
 }
 
+TypeDecl *IdentTypeRepr::getBoundDecl() const {
+  return const_cast<IdentTypeRepr *>(this)->getLastComponent()->getBoundDecl();
+}
+
+DeclNameRef IdentTypeRepr::getNameRef() const {
+  return const_cast<IdentTypeRepr *>(this)->getLastComponent()->getNameRef();
+}
+
+TypeRepr *IdentTypeRepr::getBaseComponent() {
+  if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
+    return Comp;
+
+  return cast<CompoundIdentTypeRepr>(this)->getComponents().front();
+}
+
+ComponentIdentTypeRepr *IdentTypeRepr::getLastComponent() {
+  if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
+    return Comp;
+
+  return cast<CompoundIdentTypeRepr>(this)->getComponents().back();
+}
+
 DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
   if (IdOrDecl.is<DeclNameRef>())
     return IdOrDecl.get<DeclNameRef>();

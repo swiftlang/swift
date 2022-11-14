@@ -1326,11 +1326,10 @@ bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<InheritedEntry> Inher
 bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related) {
 
   if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
-    auto Comps = T->getComponentRange();
-    SourceLoc IdLoc = Comps.back()->getLoc();
+    SourceLoc IdLoc = T->getLoc();
     NominalTypeDecl *NTD = nullptr;
     bool isImplicit = false;
-    if (auto *VD = Comps.back()->getBoundDecl()) {
+    if (auto *VD = T->getBoundDecl()) {
       if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
         IndexSymbol Info;
         if (!reportRef(TAD, IdLoc, Info, None))
@@ -1426,8 +1425,7 @@ IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
   if (Type T = Ty.getType())
     return T->getAnyNominal();
   if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
-    auto Comp = T->getComponentRange().back();
-    if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(Comp->getBoundDecl()))
+    if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(T->getBoundDecl()))
       return NTD;
   }
   return nullptr;

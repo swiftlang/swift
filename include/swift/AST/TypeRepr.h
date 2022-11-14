@@ -256,8 +256,14 @@ protected:
   explicit IdentTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
-  class ComponentRange;
-  inline ComponentRange getComponentRange();
+  TypeRepr *getBaseComponent();
+  ComponentIdentTypeRepr *getLastComponent();
+
+  /// The type declaration the last component is bound to.
+  TypeDecl *getBoundDecl() const;
+
+  /// The identifier that describes the last component.
+  DeclNameRef getNameRef() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent  ||
@@ -443,38 +449,6 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
-
-/// This wraps an IdentTypeRepr and provides an iterator interface for the
-/// components (or the single component) it represents.
-class IdentTypeRepr::ComponentRange {
-  IdentTypeRepr *IdT;
-
-public:
-  explicit ComponentRange(IdentTypeRepr *T) : IdT(T) {}
-
-  typedef ComponentIdentTypeRepr * const* iterator;
-
-  iterator begin() const {
-    if (isa<ComponentIdentTypeRepr>(IdT))
-      return reinterpret_cast<iterator>(&IdT);
-    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().begin();
-  }
-
-  iterator end() const {
-    if (isa<ComponentIdentTypeRepr>(IdT))
-      return reinterpret_cast<iterator>(&IdT) + 1;
-    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().end();
-  }
-
-  bool empty() const { return begin() == end(); }
-
-  ComponentIdentTypeRepr *front() const { return *begin(); }
-  ComponentIdentTypeRepr *back() const { return *(end()-1); }
-};
-
-inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
-  return ComponentRange(this);
-}
 
 /// A function type.
 /// \code

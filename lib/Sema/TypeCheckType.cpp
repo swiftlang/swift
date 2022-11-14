@@ -2375,8 +2375,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       // be proper name lookup, OF COURSE.
       if (auto simpleIdent = dyn_cast<SimpleIdentTypeRepr>(
               opaqueRepr->getBase())) {
-        Identifier name = simpleIdent->getComponentRange().front()
-            ->getNameRef().getBaseIdentifier();
+        Identifier name = simpleIdent->getNameRef().getBaseIdentifier();
         if (auto gpDecl = opaqueRepr->getGenericParams()
                 ->lookUpGenericParam(name)) {
           auto outerGenericSignature = opaqueDecl->getNamingDecl()
@@ -3860,9 +3859,13 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 NeverNullType
 TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
                                     TypeResolutionOptions options) {
-  auto ComponentRange = IdType->getComponentRange();
-  auto Components = llvm::makeArrayRef(ComponentRange.begin(),
-                                       ComponentRange.end());
+  ArrayRef<ComponentIdentTypeRepr *> Components;
+  if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+    Components = comp;
+  } else {
+    Components = cast<CompoundIdentTypeRepr>(IdType)->getComponents();
+  }
+
   Type result = resolveIdentTypeComponent(resolution.withOptions(options),
                                           genericParams, Components);
   if (!result || result->hasError()) {
@@ -4714,7 +4717,7 @@ public:
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
-      visit(compound->getComponentRange().back());
+      visit(compound->getComponents().back());
       return Action::SkipChildren();
     }
     // Arbitrary protocol constraints are OK on opaque types.
@@ -4795,7 +4798,7 @@ public:
     }
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T) {
+  void visitComponentIdentTypeRepr(ComponentIdentTypeRepr *T) {
     if (T->isInvalid())
       return;
 
@@ -4830,17 +4833,17 @@ public:
     if (needsParens)
       OS << ")";
 
-    auto comp = T->getComponentRange().back();
-    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
+    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(T->getBoundDecl())) {
       if (proto->existentialRequiresAny() && !Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-        Ctx.Diags.diagnose(comp->getNameLoc(),
+        Ctx.Diags.diagnose(T->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
                            proto->getDeclaredExistentialType(),
                            /*isAlias=*/false)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
       }
-    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
+    } else if (auto *alias =
+                   dyn_cast_or_null<TypeAliasDecl>(T->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
 
       // If this is a type alias to a constraint type, the type
@@ -4852,7 +4855,7 @@ public:
           if (!protoDecl->existentialRequiresAny() || Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
             continue;
 
-          Ctx.Diags.diagnose(comp->getNameLoc(),
+          Ctx.Diags.diagnose(T->getNameLoc(),
                              diag::existential_requires_any,
                              alias->getDeclaredInterfaceType(),
                              ExistentialType::get(alias->getDeclaredInterfaceType()),

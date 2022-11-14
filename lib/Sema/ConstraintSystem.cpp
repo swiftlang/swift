@@ -1933,12 +1933,8 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
   if (!identTypeRepr)
     return false;
 
-  auto components = identTypeRepr->getComponentRange();
-  if (components.empty())
-    return false;
-
-  if (components.back()->getNameRef().getBaseName().userFacingName() !=
-        "DispatchQueue")
+  if (identTypeRepr->getNameRef().getBaseName().userFacingName() !=
+      "DispatchQueue")
     return false;
 
   return true;
