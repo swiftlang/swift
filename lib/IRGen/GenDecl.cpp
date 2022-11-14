@@ -5872,7 +5872,7 @@ void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
-    f->setSection(".sw5colo$B");
+    f->setSection(".sw5colo");
     break;
   }
 }
