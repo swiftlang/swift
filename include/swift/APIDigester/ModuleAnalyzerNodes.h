@@ -520,11 +520,16 @@ public:
   ViewerIterator end();
 };
 
-class SDKNodeVectorViewer::ViewerIterator :
-    public std::iterator<std::input_iterator_tag, VectorIt> {
+class SDKNodeVectorViewer::ViewerIterator {
   SDKNodeVectorViewer &Viewer;
   VectorIt P;
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = VectorIt;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   ViewerIterator(SDKNodeVectorViewer &Viewer, VectorIt P) : Viewer(Viewer), P(P) {}
   ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
   ViewerIterator& operator++();

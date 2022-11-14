@@ -689,7 +689,7 @@ static void printDifferentiableAttrArguments(
             return false;
         return true;
       });
-  if (!llvm::empty(requirementsToPrint)) {
+  if (!requirementsToPrint.empty()) {
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
