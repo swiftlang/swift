@@ -732,6 +732,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   cs.applySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
+    // Perform syntactic diagnostics on the type-checked target.
+    performSyntacticDiagnosticsForTarget(*result, /*isExprStmt=*/false);
     defaultValue = result->getAsExpr();
     return defaultValue->getType();
   }
