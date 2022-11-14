@@ -130,7 +130,7 @@ struct ColorLiteralMacro: _CompilerPlugin {
   }
 
   static func _owningModule() -> (UnsafePointer<UInt8>, count: Int) {
-    var swiftModule = "Swift"
+    var swiftModule = "ColorLib"
     return swiftModule.withUTF8 { buffer in
       let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
       result.initialize(from: buffer.baseAddress!, count: buffer.count)
@@ -191,12 +191,7 @@ struct HSVColorLiteralMacro: _CompilerPlugin {
   }
 
   static func _genericSignature() -> (UnsafePointer<UInt8>?, count: Int) {
-    var genSig = "<T>"
-    return genSig.withUTF8 { buffer in
-      let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
-      result.initialize(from: buffer.baseAddress!, count: buffer.count)
-      return (UnsafePointer(result), count: buffer.count)
-    }
+    return (nil, count: 0)
   }
 
   static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int) {
@@ -204,7 +199,7 @@ struct HSVColorLiteralMacro: _CompilerPlugin {
       """
       (
        hue hue: Float, saturation saturation: Float, value value: Float
-      ) -> T
+      ) -> MyColor
       """
     return typeSig.withUTF8 { buffer in
       let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
@@ -214,7 +209,7 @@ struct HSVColorLiteralMacro: _CompilerPlugin {
   }
 
   static func _owningModule() -> (UnsafePointer<UInt8>, count: Int) {
-    var swiftModule = "Swift"
+    var swiftModule = "ColorLib"
     return swiftModule.withUTF8 { buffer in
       let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
       result.initialize(from: buffer.baseAddress!, count: buffer.count)
