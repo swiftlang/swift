@@ -1217,6 +1217,7 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
     return AccessLevel::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::MacroDecl:
     return AccessLevel::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);

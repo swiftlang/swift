@@ -94,6 +94,8 @@ getMacroSignatureContextBuffer(
   return {buffer, len};
 }
 
+#if SWIFT_SWIFT_PARSER
+
 /// Compute the macro signature for a macro given the source code for its
 /// generic signature and type signature.
 static Optional<std::pair<GenericSignature, Type>>
@@ -290,6 +292,7 @@ static MacroDecl *createPluginMacro(
       mod, macroName, MacroDecl::ImplementationKind::Plugin, genSignature,
       typeSignature, owningModuleName, supplementalModuleNames, plugin);
 }
+#endif
 
 ArrayRef<MacroDecl *> MacroLookupRequest::evaluate(
     Evaluator &evaluator, Identifier macroName, ModuleDecl *mod
