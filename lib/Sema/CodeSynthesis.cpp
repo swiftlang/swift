@@ -1648,6 +1648,9 @@ synthesizeTypeWrappedTypeStorageWrapperInitializerBody(
 
 ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(
     Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
+  if (isa<ProtocolDecl>(wrappedType))
+    return nullptr;
+
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
@@ -1675,8 +1678,11 @@ synthesizeTypeWrappedTypeMemberwiseInitializerBody(AbstractFunctionDecl *decl,
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
+  assert(!isa<ProtocolDecl>(parent));
+
   // self.$storage = .init(storage: $Storage(...))
-  auto *storageType = parent->getTypeWrapperStorageDecl();
+  auto *storageType =
+      cast<NominalTypeDecl>(parent->getTypeWrapperStorageDecl());
   assert(storageType);
 
   auto *typeWrapperVar = parent->getTypeWrapperProperty();
@@ -1777,6 +1783,9 @@ synthesizeTypeWrappedTypeMemberwiseInitializerBody(AbstractFunctionDecl *decl,
 
 ConstructorDecl *SynthesizeTypeWrappedTypeMemberwiseInitializer::evaluate(
     Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
+  if (isa<ProtocolDecl>(wrappedType))
+    return nullptr;
+
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
