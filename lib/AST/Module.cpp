@@ -2175,6 +2175,14 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   return nullptr;
 }
 
+bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
+  auto clangModule = findUnderlyingClangModule();
+  if (!clangModule)
+    return false;
+
+  return other->getRealName().str() == clangModule->ExportAsModule;
+}
+
 void ModuleDecl::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   for (const FileUnit *fileUnit : getFiles()) {
