@@ -38,10 +38,12 @@ if(SWIFT_SWIFT_PARSER)
     MACCATALYST_BUILD_FLAVOR ""
     DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
 
-  # Add a custom target to create the module directory.
+  # Add a custom target to create the module directory and remove any old
+  # compiled module file.
   add_custom_command_target(
       create_module_dirs_dependency_target
       COMMAND "${CMAKE_COMMAND}" -E make_directory ${module_base}
+      COMMAND "${CMAKE_COMMAND}" -E rm "${module_file}"
       OUTPUT ${module_base}
       COMMENT "Generating module directory for ${module_name}")
   add_dependencies(${library_name} ${create_module_dirs_dependency_target})
@@ -52,10 +54,8 @@ if(SWIFT_SWIFT_PARSER)
     $<$<COMPILE_LANGUAGE:Swift>:
       -module-name;${module_name};
       -enable-library-evolution;
-      -emit-module-path;
-      "${module_file}";
       -emit-module-interface-path;
-      "${module_interface_file}";
+      "${module_interface_file}" ;
       -target;${target}>)
 
   target_link_libraries("${library_name}"
