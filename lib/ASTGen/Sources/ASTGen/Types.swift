@@ -11,10 +11,33 @@ extension ASTGenVisitor {
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
 
-    return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
+    guard let generics = node.genericArgumentClause else {
+      return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
+    }
+
+    let lAngle = self.base.advanced(by: generics.leftAngleBracket.position.utf8Offset).raw
+    let rAngle = self.base.advanced(by: generics.rightAngleBracket.position.utf8Offset).raw
+    return .type(
+      generics.arguments.map({
+        self.visit($0.argumentType)
+      }).withBridgedArrayRef {
+          genericArgs in
+          GenericIdentTypeRepr_create(
+            self.ctx, id, loc, genericArgs, lAngle, rAngle)
+      })
   }
 
   public func visit(_ node: MemberTypeIdentifierSyntax) -> ASTNode {
+    // Handle metatypes.
+    // FIXME: We might want to do this in the parser instead?
+    if node.name.tokenKind == .identifier("Type") &&
+        node.genericArgumentClause == nil {
+      let baseType = visit(node.baseType).rawValue
+      let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
+      return .type(
+        MetatypeTypeRepr_create(self.ctx, baseType, nameLoc))
+    }
+
     var path = [(TokenSyntax, GenericArgumentClauseSyntax?)]()
     var memberRef: Syntax? = Syntax(node)
     while let nestedMember = memberRef?.as(MemberTypeIdentifierSyntax.self) {
