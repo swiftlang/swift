@@ -102,7 +102,9 @@ static Optional<std::pair<GenericSignature, Type>>
 getMacroSignature(
     ModuleDecl *mod, Identifier macroName,
     Optional<StringRef> genericSignature,
-    StringRef typeSignature
+    StringRef typeSignature,
+    ModuleDecl *owningModule,
+    ArrayRef<ModuleDecl *> supplementalImportModules
 ) {
   // Form a buffer containing the macro signature context.
   ASTContext &ctx = mod->getASTContext();
@@ -139,6 +141,21 @@ getMacroSignature(
 
   if (!decl)
     return None;
+
+  /// Add an import to the module.
+  auto addImport = [&](ModuleDecl *importedModule) {
+    ImportPath::Builder importPath;
+    importPath.push_back(importedModule->getName(), SourceLoc());
+    auto importDecl = ImportDecl::create(
+        ctx, macroSourceFile, SourceLoc(), ImportKind::Module,
+        SourceLoc(), importPath.get());
+    importDecl->setImplicit();
+    macroSourceFile->addTopLevelDecl(importDecl);
+  };
+  addImport(owningModule);
+  std::for_each(supplementalImportModules.begin(),
+                supplementalImportModules.end(),
+                addImport);
 
   // Make sure imports are resolved in this file.
   performImportResolution(*macroSourceFile);
@@ -183,7 +200,8 @@ static MacroDecl *createMacro(
 
   // Get the type signature of the macro.
   auto signature = getMacroSignature(
-      mod, macroName, genericSignature, typeSignature);
+      mod, macroName, genericSignature, typeSignature, owningModule,
+      supplementalImportModules);
   if (!signature) {
     // FIXME: Swap in ErrorTypes, perhaps?
     return nullptr;
