@@ -60,6 +60,7 @@ subst S: <path to sources>
 S:
 git clone https://github.com/apple/llvm-project --branch swift/main llvm-project
 git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift swift
+git clone https://github.com/apple/swift-syntax swift-syntax
 git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
@@ -133,6 +134,7 @@ cmake -B "S:\b\1" ^
   -D LLVM_ENABLE_PDB=YES ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
+  -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=S:\swift-syntax ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -G Ninja ^
   -S S:\llvm-project\llvm
