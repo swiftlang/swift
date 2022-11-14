@@ -2377,9 +2377,15 @@ public:
                     const Decl *D = nullptr);
 
   template <typename T, typename DERIVED>
-  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
+  class iterator_base {
     T *Impl;
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     explicit iterator_base(T *Impl) : Impl(Impl) {}
     DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
     bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
@@ -2678,11 +2684,16 @@ public:
   }
 
   // Iterator for the custom type attributes.
-  class iterator
-      : public std::iterator<std::forward_iterator_tag, CustomAttr *> {
+  class iterator {
     CustomAttr *attr;
 
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = CustomAttr*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     iterator() : attr(nullptr) { }
     explicit iterator(CustomAttr *attr) : attr(attr) { }
 

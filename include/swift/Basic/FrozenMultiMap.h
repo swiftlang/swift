@@ -143,9 +143,12 @@ public:
   unsigned size() const { return storage.size(); }
   bool empty() const { return storage.empty(); }
 
-  struct iterator
-      : std::iterator<std::forward_iterator_tag,
-                      std::pair<Key, Optional<PairToSecondEltRange>>> {
+  struct iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::pair<Key, Optional<PairToSecondEltRange>>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
     using base_iterator = typename decltype(storage)::iterator;
 
     FrozenMultiMap &map;
