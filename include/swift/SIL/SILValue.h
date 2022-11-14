@@ -1160,11 +1160,16 @@ inline SILValue getSILValueType(const Operand &op) {
 using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 
 /// An iterator over all uses of a ValueBase.
-class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
-                                                  Operand*, ptrdiff_t> {
+class ValueBaseUseIterator {
 protected:
   Operand *Cur;
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   ValueBaseUseIterator() = default;
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
   Operand *operator->() const { return Cur; }
