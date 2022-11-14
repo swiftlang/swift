@@ -77,12 +77,3 @@ static void swift_image_constructor() {
 
   swift_addNewDSOImage(&sections);
 }
-
-static __attribute__((__used__))
-__attribute__((__section__(".note.swift_reflection_metadata")))
-__attribute__((__aligned__(1)))
-struct {
-  const char MagicString[sizeof(SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING)];
-  const swift::MetadataSections *Sections;
-} __attribute__((__packed__))
-Note = {SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING, &sections};
