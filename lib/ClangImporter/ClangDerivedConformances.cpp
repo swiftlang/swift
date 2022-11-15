@@ -381,7 +381,11 @@ void swift::conformToCxxSequenceIfNeeded(
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
+  // Not conforming the type to CxxSequence protocol here:
+  // The current implementation of CxxSequence triggers extra copies of the C++
+  // collection when creating a CxxIterator instance. It needs a more efficient
+  // implementation, which is not possible with the existing Swift features.
+  // impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
 
   // Try to conform to CxxRandomAccessCollection if possible.
 
