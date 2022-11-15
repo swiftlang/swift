@@ -43,7 +43,7 @@ if(SWIFT_SWIFT_PARSER)
   add_custom_command_target(
       create_module_dirs_dependency_target
       COMMAND "${CMAKE_COMMAND}" -E make_directory ${module_base}
-      COMMAND "${CMAKE_COMMAND}" -E rm "${module_file}"
+      COMMAND "${CMAKE_COMMAND}" -E rm -f "${module_file}"
       OUTPUT ${module_base}
       COMMENT "Generating module directory for ${module_name}")
   add_dependencies(${library_name} ${create_module_dirs_dependency_target})
