@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -164,8 +165,6 @@ getMacroSignature(
   return std::make_pair(
       typealias->getGenericSignature(), typealias->getUnderlyingType());
 }
-
-
 
 /// Create a macro.
 static MacroDecl *createMacro(
@@ -370,8 +369,10 @@ Expr *swift::expandMacroExpr(
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
+  {
+    PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
 
-  switch (macro->implementationKind) {
+    switch (macro->implementationKind) {
     case MacroDecl::ImplementationKind::Builtin: {
       // Builtin macros are handled via ASTGen.
       auto astGenSourceFile = sourceFile->exportedSourceFile;
@@ -382,8 +383,8 @@ Expr *swift::expandMacroExpr(
       const char *evaluatedSourceAddress;
       ptrdiff_t evaluatedSourceLength;
       swift_ASTGen_evaluateMacro(
-           astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-           &evaluatedSourceAddress, &evaluatedSourceLength);
+          astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
+          &evaluatedSourceAddress, &evaluatedSourceLength);
       if (!evaluatedSourceAddress)
         return nullptr;
       evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
@@ -396,17 +397,18 @@ Expr *swift::expandMacroExpr(
       auto bufferID = sourceFile->getBufferID();
       auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
       auto evaluated = plugin->invokeRewrite(
-          /*targetModuleName*/ dc->getParentModule()->getName().str(),
-          /*filePath*/ sourceFile->getFilename(),
-          /*sourceFileText*/ sourceFileText,
-          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
-              sourceMgr, expr->getSourceRange()),
-          ctx);
+         /*targetModuleName*/ dc->getParentModule()->getName().str(),
+         /*filePath*/ sourceFile->getFilename(),
+         /*sourceFileText*/ sourceFileText,
+         /*range*/ Lexer::getCharSourceRangeFromSourceRange(
+             sourceMgr, expr->getSourceRange()),
+         ctx);
       if (evaluated)
         evaluatedSource = *evaluated;
       else
         return nullptr;
       break;
+    }
     }
   }
 
@@ -483,6 +485,8 @@ Expr *swift::expandMacroExpr(
     ContextualTypePurpose::CTP_CoerceOperand
   };
 
+  PrettyStackTraceExpr debugStack(
+      ctx, "type checking expanded macro", expandedExpr);
   Type realExpandedType = TypeChecker::typeCheckExpression(
       expandedExpr, dc, contextualType);
   if (!realExpandedType)
