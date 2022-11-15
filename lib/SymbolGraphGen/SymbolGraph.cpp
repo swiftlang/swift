@@ -377,7 +377,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto VD = S.getSymbolDecl();
+  const auto VD = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (const auto &InheritanceLoc : NTD->getInherited()) {
       auto Ty = InheritanceLoc.getType();
@@ -390,7 +390,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
         continue;
       }
 
-      recordEdge(Symbol(this, VD, nullptr),
+      recordEdge(Symbol(this, NTD, nullptr),
                  Symbol(this, InheritedTypeDecl, nullptr),
                  RelationshipKind::InheritsFrom());
     }
