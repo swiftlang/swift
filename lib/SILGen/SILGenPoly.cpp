@@ -4483,6 +4483,8 @@ void SILGenFunction::emitProtocolWitness(
                                           ->getCanonicalType());
   }
 
+  assert(!witnessSubstTy->hasError());
+
   if (auto genericFnType = dyn_cast<GenericFunctionType>(reqtSubstTy)) {
     auto forwardingSubs = F.getForwardingSubstitutionMap();
     reqtSubstTy = cast<FunctionType>(genericFnType
@@ -4492,6 +4494,8 @@ void SILGenFunction::emitProtocolWitness(
     reqtSubstTy = cast<FunctionType>(F.mapTypeIntoContext(reqtSubstTy)
                                           ->getCanonicalType());
   }
+
+  assert(!reqtSubstTy->hasError());
 
   // Get the lowered type of the witness.
   auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,
