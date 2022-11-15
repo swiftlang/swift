@@ -2930,6 +2930,10 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
   return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
 }
 
+static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureParserRoundTrip(Decl *decl) {
   return false;
 }

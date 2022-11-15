@@ -154,6 +154,10 @@ EXPERIMENTAL_FEATURE(Macros, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
+/// Whether to enable experimental @runtimeMetadata feature which allows to
+/// declare an attribute which is discoverable and constructable at runtime.
+EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
