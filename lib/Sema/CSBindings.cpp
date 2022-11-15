@@ -1065,6 +1065,14 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   return !involvesTypeVariables();
 }
 
+bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
+  if (CS.shouldAttemptFixes() && isHole()) {
+    if (forClosureResult() || forGenericParameter())
+      return false;
+  }
+  return true;
+}
+
 BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
                                             bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&

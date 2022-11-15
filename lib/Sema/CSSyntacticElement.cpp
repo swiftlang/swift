@@ -1,8 +1,8 @@
-//===--- CSClosure.cpp - Closures -----------------------------------------===//
+//===--- CSSyntacticElement.cpp - Syntactic Element Constraints -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements constraint generation and solution application for
-// closures. It provides part of the implementation of the ConstraintSystem
-// class.
+// This file implements SyntacticElement constraint generation and solution
+// application, which is used to type-check the bodies of closures. It provides
+// part of the implementation of the ConstraintSystem class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -352,22 +352,95 @@ ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
   return std::make_tuple(node, context, isDiscarded, locator);
 }
 
+struct SyntacticElementContext
+    : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> {
+  // Inherit the constructors from PointerUnion.
+  using PointerUnion::PointerUnion;
+
+  static SyntacticElementContext forFunctionRef(AnyFunctionRef ref) {
+    if (auto *decl = ref.getAbstractFunctionDecl()) {
+      return {decl};
+    }
+
+    return {ref.getAbstractClosureExpr()};
+  }
+
+  static SyntacticElementContext forClosure(ClosureExpr *closure) {
+    return {closure};
+  }
+
+  static SyntacticElementContext forFunction(AbstractFunctionDecl *func) {
+    return {func};
+  }
+
+  DeclContext *getAsDeclContext() const {
+    if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
+      return fn;
+    } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
+      return closure;
+    } else {
+      llvm_unreachable("unsupported kind");
+    }
+  }
+
+  NullablePtr<AbstractClosureExpr> getAsAbstractClosureExpr() const {
+    return this->dyn_cast<AbstractClosureExpr *>();
+  }
+
+  NullablePtr<AbstractFunctionDecl> getAsAbstractFunctionDecl() const {
+    return this->dyn_cast<AbstractFunctionDecl *>();
+  }
+
+  Optional<AnyFunctionRef> getAsAnyFunctionRef() const {
+    if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
+      return {fn};
+    } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
+      return {closure};
+    } else {
+      return None;
+    }
+  }
+
+  BraceStmt *getBody() const {
+    if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
+      return fn->getBody();
+    } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
+      return closure->getBody();
+    } else {
+      llvm_unreachable("unsupported kind");
+    }
+  }
+
+  bool isSingleExpressionClosure(ConstraintSystem &cs) {
+    if (auto ref = getAsAnyFunctionRef()) {
+      if (cs.getAppliedResultBuilderTransform(*ref))
+        return false;
+
+      if (auto *closure = ref->getAbstractClosureExpr())
+        return closure->hasSingleExpressionBody();
+    }
+
+    return false;
+  }
+};
+
 /// Statement visitor that generates constraints for a given closure body.
 class SyntacticElementConstraintGenerator
     : public StmtVisitor<SyntacticElementConstraintGenerator, void> {
   friend StmtVisitor<SyntacticElementConstraintGenerator, void>;
 
   ConstraintSystem &cs;
-  AnyFunctionRef context;
+  SyntacticElementContext context;
   ConstraintLocator *locator;
 
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  SyntacticElementConstraintGenerator(ConstraintSystem &cs, AnyFunctionRef fn,
+  SyntacticElementConstraintGenerator(ConstraintSystem &cs,
+                                      SyntacticElementContext context,
                                       ConstraintLocator *locator)
-      : cs(cs), context(fn), locator(locator) {}
+      : cs(cs), context(context), locator(locator) {}
 
   void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
     auto parentElement =
@@ -608,7 +681,7 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    if (!isInSingleExpressionClosure()) {
+    if (!context.isSingleExpressionClosure(cs)) {
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (locator->isLastElement<LocatorPathElt::PatternBindingElement>())
           visitPatternBindingElement(patternBinding);
@@ -832,7 +905,7 @@ private:
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
-    if (isInSingleExpressionClosure()) {
+    if (context.isSingleExpressionClosure(cs)) {
       for (auto node : braceStmt->getElements()) {
         if (auto expr = node.dyn_cast<Expr *>()) {
           auto generatedExpr = cs.generateConstraints(
@@ -889,7 +962,7 @@ private:
     // so let's give them a special locator as to indicate that.
     // Return statements might not have a result if we have a closure whose
     // implicit returned value is coerced to Void.
-    if (isInSingleExpressionClosure() && returnStmt->hasResult()) {
+    if (context.isSingleExpressionClosure(cs) && returnStmt->hasResult()) {
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 
@@ -904,7 +977,7 @@ private:
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        contextualResultInfo.getType(),
                        cs.getConstraintLocator(
-                           context.getAbstractClosureExpr(),
+                           context.getAsAbstractClosureExpr().get(),
                            LocatorPathElt::ClosureBody(
                                /*hasReturn=*/!returnStmt->isImplicit())));
       return;
@@ -940,26 +1013,19 @@ private:
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
-  bool isInSingleExpressionClosure() {
-    if (!isExpr<ClosureExpr>(context.getAbstractClosureExpr()))
-      return false;
-
-    // Result builder transformed bodies are never single-expression.
-    if (cs.getAppliedResultBuilderTransform(context))
-      return false;
-
-    return context.hasSingleExpressionBody();
-  }
-
   ContextualTypeInfo getContextualResultInfo() const {
-    if (auto transform = cs.getAppliedResultBuilderTransform(context))
+    auto funcRef = context.getAsAnyFunctionRef();
+    if (!funcRef)
+      return {Type(), CTP_Unused};
+
+    if (auto transform = cs.getAppliedResultBuilderTransform(*funcRef))
       return {transform->bodyResultType, CTP_ReturnStmt};
 
     if (auto *closure =
-            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
+            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
       return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
-    return {context.getBodyResultType(), CTP_ReturnStmt};
+    return {funcRef->getBodyResultType(), CTP_ReturnStmt};
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -1061,7 +1127,8 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
 
   if (participatesInInference(closure)) {
     SyntacticElementConstraintGenerator generator(
-        *this, closure, getConstraintLocator(closure));
+        *this, SyntacticElementContext::forClosure(closure),
+        getConstraintLocator(closure));
 
     generator.visit(closure->getBody());
 
@@ -1097,7 +1164,8 @@ bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
     locator = getConstraintLocator(fn.getAbstractClosureExpr());
   }
 
-  SyntacticElementConstraintGenerator generator(*this, fn, locator.get());
+  SyntacticElementConstraintGenerator generator(
+      *this, SyntacticElementContext::forFunctionRef(fn), locator.get());
 
   generator.visit(body);
 
@@ -1148,23 +1216,22 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto anchor = locator.getAnchor();
 
-  DeclContext *context;
+  Optional<SyntacticElementContext> context;
   if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-    context = closure;
+    context = SyntacticElementContext::forClosure(closure);
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
-    context = fn;
+    context = SyntacticElementContext::forFunction(fn);
   } else {
     return SolutionKind::Error;
   }
 
-  AnyFunctionRef fn = AnyFunctionRef::fromFunctionDeclContext(context);
-
-  SyntacticElementConstraintGenerator generator(*this, fn,
+  SyntacticElementConstraintGenerator generator(*this, *context,
                                                 getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
-    SolutionApplicationTarget target(expr, context, contextInfo.purpose,
-                                     contextInfo.getType(), isDiscarded);
+    SolutionApplicationTarget target(expr, context->getAsDeclContext(),
+                                     contextInfo.purpose, contextInfo.getType(),
+                                     isDiscarded);
 
     if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
       return SolutionKind::Error;
@@ -1174,7 +1241,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
   } else if (auto *cond = element.dyn_cast<StmtConditionElement *>()) {
-    if (generateConstraints({*cond}, context))
+    if (generateConstraints({*cond}, context->getAsDeclContext()))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
     generator.visitPattern(pattern, contextInfo);
@@ -1199,10 +1266,9 @@ class SyntacticElementSolutionApplication
 
 protected:
   Solution &solution;
-  AnyFunctionRef context;
+  SyntacticElementContext context;
   Type resultType;
   RewriteTargetFn rewriteTarget;
-  bool isSingleExpression;
 
   /// All `func`s declared in the body of the closure.
   SmallVector<FuncDecl *, 4> LocalFuncs;
@@ -1212,26 +1278,15 @@ public:
   bool hadError = false;
 
   SyntacticElementSolutionApplication(Solution &solution,
-                                      AnyFunctionRef context, Type resultType,
+                                      SyntacticElementContext context,
+                                      Type resultType,
                                       RewriteTargetFn rewriteTarget)
       : solution(solution), context(context), resultType(resultType),
-        rewriteTarget(rewriteTarget),
-        isSingleExpression(context.hasSingleExpressionBody()) {}
+        rewriteTarget(rewriteTarget) {}
 
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
-  /// Rewrite an expression without any particularly special context.
-  Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(SolutionApplicationTarget(
-        expr, context.getAsDeclContext(), CTP_Unused, Type(),
-        /*isDiscarded=*/false));
-    if (result)
-      return result->getAsExpr();
-
-    return nullptr;
-  }
-
   ASTNode visit(Stmt *S) {
     auto rewritten = ASTVisitor::visit(S);
     if (!rewritten)
@@ -1523,6 +1578,27 @@ private:
     return caseStmt;
   }
 
+  ASTNode visitBraceElement(ASTNode node) {
+    auto &cs = solution.getConstraintSystem();
+    if (auto *expr = node.dyn_cast<Expr *>()) {
+      // Rewrite the expression.
+      auto target = *cs.getSolutionApplicationTarget(expr);
+      if (auto rewrittenTarget = rewriteTarget(target)) {
+        node = rewrittenTarget->getAsExpr();
+
+        if (target.isDiscardedExpr())
+          TypeChecker::checkIgnoredExpr(castToExpr(node));
+      } else {
+        hadError = true;
+      }
+    } else if (auto stmt = node.dyn_cast<Stmt *>()) {
+      node = visit(stmt);
+    } else {
+      visitDecl(node.get<Decl *>());
+    }
+    return node;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     auto &cs = solution.getConstraintSystem();
 
@@ -1538,24 +1614,8 @@ private:
       }
     }
 
-    for (auto &node : braceStmt->getElements()) {
-      if (auto expr = node.dyn_cast<Expr *>()) {
-        // Rewrite the expression.
-        auto target = *cs.getSolutionApplicationTarget(expr);
-        if (auto rewrittenTarget = rewriteTarget(target)) {
-          node = rewrittenTarget->getAsExpr();
-
-          if (target.isDiscardedExpr())
-            TypeChecker::checkIgnoredExpr(castToExpr(node));
-        } else {
-          hadError = true;
-        }
-      } else if (auto stmt = node.dyn_cast<Stmt *>()) {
-        node = visit(stmt);
-      } else {
-        visitDecl(node.get<Decl *>());
-      }
-    }
+    for (auto &node : braceStmt->getElements())
+      node = visitBraceElement(node);
 
     // Source compatibility workaround.
     //
@@ -1572,9 +1632,9 @@ private:
     // of the body if there is none. This wasn't needed before SE-0326
     // because result type was (incorrectly) inferred as `Void` due to
     // the body being skipped.
-    auto *closure = context.getAbstractClosureExpr();
-    if (closure && !closure->hasSingleExpressionBody() &&
-        closure->getBody() == braceStmt) {
+    auto closure = context.getAsAbstractClosureExpr();
+    if (closure && !closure.get()->hasSingleExpressionBody() &&
+        closure.get()->getBody() == braceStmt) {
       if (resultType->getOptionalObjectType() &&
           resultType->lookThroughAllOptionalTypes()->isVoid() &&
           !braceStmt->getLastElement().isStmt(StmtKind::Return)) {
@@ -1656,7 +1716,8 @@ private:
 
       // A single-expression closure with a Never expression type
       // coerces to any other function type.
-    } else if (isSingleExpression && resultExprType->isUninhabited()) {
+    } else if (context.isSingleExpressionClosure(cs) &&
+               resultExprType->isUninhabited()) {
       mode = coerceFromNever;
 
       // Normal rule is to coerce to the return expression to the closure type.
@@ -1671,7 +1732,7 @@ private:
       // Single-expression closures have to handle returns in a special
       // way so the target has to be created for them during solution
       // application based on the resolved type.
-      assert(isSingleExpression);
+      assert(context.isSingleExpressionClosure(cs));
       resultTarget = SolutionApplicationTarget(
           resultExpr, context.getAsDeclContext(),
           mode == convertToResult ? CTP_ClosureResult : CTP_Unused,
@@ -1743,7 +1804,8 @@ public:
                         const AppliedBuilderTransform &transform,
                         RewriteTargetFn rewriteTarget)
       : SyntacticElementSolutionApplication(
-            solution, context, transform.bodyResultType, rewriteTarget),
+            solution, SyntacticElementContext::forFunctionRef(context),
+            transform.bodyResultType, rewriteTarget),
         Transform(transform) {}
 
   bool apply() {
@@ -1752,11 +1814,14 @@ public:
     if (!body || hadError)
       return true;
 
-    context.setTypecheckedBody(castToStmt<BraceStmt>(body),
-                               /*hasSingleExpression=*/false);
+    auto funcRef = context.getAsAnyFunctionRef();
+    assert(funcRef);
+
+    funcRef->setTypecheckedBody(castToStmt<BraceStmt>(body),
+                                /*hasSingleExpression=*/false);
 
     if (auto *closure =
-            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
+            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
       solution.setExprTypes(closure);
 
     return false;
@@ -2021,7 +2086,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     DeclContext *&currentDC,
     RewriteTargetFn rewriteTarget) {
   auto &cs = solution.getConstraintSystem();
-  auto closure = dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr());
+  auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr());
   FunctionType *closureFnType = nullptr;
   if (closure) {
     // Update the closure's type.
@@ -2134,8 +2199,9 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
     resultTy = fn.getBodyResultType();
   }
 
-  SyntacticElementSolutionApplication application(solution, fn, resultTy,
-                                                  rewriteTarget);
+  SyntacticElementSolutionApplication application(
+      solution, SyntacticElementContext::forFunctionRef(fn), resultTy,
+      rewriteTarget);
 
   auto body = application.apply();
 
