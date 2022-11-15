@@ -395,7 +395,7 @@ extension Substring: StringProtocol {
         i = _uncheckedIndex(after: i)
       }
     } else if i > end {
-      while i > end { // Note `<` instead of `==`
+      while i > end { // Note `>` instead of `==`
         count -= 1
         i = _uncheckedIndex(before: i)
       }
