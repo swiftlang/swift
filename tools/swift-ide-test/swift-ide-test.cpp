@@ -2841,10 +2841,9 @@ public:
     StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     OS << "</ref>";
   }
-  void printModuleRef(ModuleEntity Mod, Identifier Name,
-                      const PrintOptions &Options) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     OS << "<ref:module>";
-    StreamPrinter::printModuleRef(Mod, Name, Options);
+    StreamPrinter::printModuleRef(Mod, Name);
     OS << "</ref>";
   }
 };
