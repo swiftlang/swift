@@ -3116,11 +3116,14 @@ public:
     printCommon("type_ident");
     Indent += 2;
 
-    ArrayRef<ComponentIdentTypeRepr *> components;
+    SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(T)) {
-      components = comp;
+      components.push_back(comp);
     } else {
-      components = cast<CompoundIdentTypeRepr>(T)->getComponents();
+      auto memberComps = cast<CompoundIdentTypeRepr>(T)->getMemberComponents();
+
+      components.push_back(cast<ComponentIdentTypeRepr>(T->getBaseComponent()));
+      components.append(memberComps.begin(), memberComps.end());
     }
 
     for (auto comp : components) {

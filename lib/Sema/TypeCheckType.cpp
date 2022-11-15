@@ -3805,34 +3805,35 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 NeverNullType
 TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
                                     TypeResolutionOptions options) {
-  ArrayRef<ComponentIdentTypeRepr *> Components;
-  if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-    Components = comp;
+  Type result;
+
+  auto *baseComp = IdType->getBaseComponent();
+  if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
+    // The base component uses unqualified lookup.
+    result = resolveTopLevelIdentTypeComponent(resolution.withOptions(options),
+                                               genericParams, identBase);
   } else {
-    Components = cast<CompoundIdentTypeRepr>(IdType)->getComponents();
+    result = resolveType(baseComp, options);
   }
 
-  // The first component uses unqualified lookup.
-  auto topLevelComp = Components.front();
-  auto result = resolveTopLevelIdentTypeComponent(
-      resolution.withOptions(options), genericParams, topLevelComp);
   if (result->hasError())
     return ErrorType::get(result->getASTContext());
 
   // Remaining components are resolved via iterated qualified lookups.
-  SourceRange parentRange(topLevelComp->getStartLoc(),
-                          topLevelComp->getEndLoc());
-  for (auto nestedComp : Components.drop_front()) {
-    result = resolveNestedIdentTypeComponent(resolution.withOptions(options),
-                                             genericParams, result, parentRange,
-                                             nestedComp);
-    if (result->hasError())
-      return ErrorType::get(result->getASTContext());
+  if (auto *compound = dyn_cast<CompoundIdentTypeRepr>(IdType)) {
+    SourceRange parentRange = baseComp->getSourceRange();
+    for (auto *nestedComp : compound->getMemberComponents()) {
+      result = resolveNestedIdentTypeComponent(resolution.withOptions(options),
+                                               genericParams, result,
+                                               parentRange, nestedComp);
+      if (result->hasError())
+        return ErrorType::get(result->getASTContext());
 
-    parentRange.End = nestedComp->getEndLoc();
+      parentRange.End = nestedComp->getEndLoc();
+    }
   }
 
-  auto lastComp = Components.back();
+  auto lastComp = IdType->getLastComponent();
 
   // Diagnose an error if the last component's generic arguments are missing.
   if (result->is<UnboundGenericType>() &&
@@ -4702,7 +4703,7 @@ public:
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
-      visit(compound->getComponents().back());
+      visit(compound->getLastComponent());
       return Action::SkipChildren();
     }
     // Arbitrary protocol constraints are OK on opaque types.

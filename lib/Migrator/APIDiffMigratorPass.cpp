@@ -206,7 +206,7 @@ public:
   }
 
   FoundResult visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-    return visit(T->getComponents().back());
+    return visit(T->getLastComponent());
   }
 
   FoundResult visitOptionalTypeRepr(OptionalTypeRepr *T) {

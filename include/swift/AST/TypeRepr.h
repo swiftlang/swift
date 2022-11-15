@@ -425,9 +425,19 @@ public:
   static CompoundIdentTypeRepr *create(const ASTContext &Ctx,
                                   ArrayRef<ComponentIdentTypeRepr*> Components);
 
+  TypeRepr *getBaseComponent() const { return getComponents().front(); }
+
   ArrayRef<ComponentIdentTypeRepr*> getComponents() const {
     return {getTrailingObjects<ComponentIdentTypeRepr*>(),
             Bits.CompoundIdentTypeRepr.NumComponents};
+  }
+
+  ArrayRef<ComponentIdentTypeRepr *> getMemberComponents() const {
+    return getComponents().slice(1);
+  }
+
+  ComponentIdentTypeRepr *getLastComponent() const {
+    return getMemberComponents().back();
   }
 
   static bool classof(const TypeRepr *T) {
@@ -437,14 +447,10 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const {
-    return getComponents().front()->getStartLoc();
+    return getBaseComponent()->getStartLoc();
   }
-  SourceLoc getEndLocImpl() const {
-    return getComponents().back()->getEndLoc();
-  }
-  SourceLoc getLocImpl() const {
-    return getComponents().back()->getLoc();
-  }
+  SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
+  SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
 
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;

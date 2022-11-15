@@ -2257,11 +2257,14 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
-            auto components = compound->getComponents();
-            if (components.size() == 2 &&
-                components[0]->getNameRef().isSimpleName("Builtin") &&
-                components[1]->getNameRef().isSimpleName("AnyObject")) {
-              anyObject = true;
+            if (auto identBase = dyn_cast<ComponentIdentTypeRepr>(
+                    compound->getBaseComponent())) {
+              auto memberComps = compound->getMemberComponents();
+              if (memberComps.size() == 1 &&
+                  identBase->getNameRef().isSimpleName("Builtin") &&
+                  memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
+                anyObject = true;
+              }
             }
           }
         }
@@ -2425,33 +2428,34 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  DeclContext *dc, bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  ArrayRef<ComponentIdentTypeRepr *> components;
-  if (auto *comp = dyn_cast<ComponentIdentTypeRepr>(ident)) {
-    components = comp;
+  auto *baseComp = ident->getBaseComponent();
+  if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
+    // If we already set a declaration, use it.
+    if (auto *typeDecl = identBase->getBoundDecl()) {
+      current = {1, typeDecl};
+    } else {
+      // For the base component, perform unqualified name lookup.
+      current = directReferencesForUnqualifiedTypeLookup(
+          identBase->getNameRef(), identBase->getLoc(), dc,
+          LookupOuterResults::Excluded, allowUsableFromInline);
+    }
   } else {
-    components = cast<CompoundIdentTypeRepr>(ident)->getComponents();
+    current = directReferencesForTypeRepr(evaluator, ctx, baseComp, dc,
+                                          allowUsableFromInline);
   }
 
-  for (const auto &component : components) {
+  auto *compound = dyn_cast<CompoundIdentTypeRepr>(ident);
+  if (!compound)
+    return current;
+
+  // If we didn't find anything, fail now.
+  if (current.empty())
+    return current;
+
+  for (const auto &component : compound->getMemberComponents()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
       current = {1, typeDecl};
-      continue;
-    }
-
-    // For the first component, perform unqualified name lookup.
-    if (current.empty()) {
-      current =
-        directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
-                                                 component->getLoc(),
-                                                 dc,
-                                                 LookupOuterResults::Excluded,
-                                                 allowUsableFromInline);
-
-      // If we didn't find anything, fail now.
-      if (current.empty())
-        return current;
-
       continue;
     }
 

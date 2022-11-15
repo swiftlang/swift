@@ -139,14 +139,14 @@ TypeRepr *IdentTypeRepr::getBaseComponent() {
   if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
     return Comp;
 
-  return cast<CompoundIdentTypeRepr>(this)->getComponents().front();
+  return cast<CompoundIdentTypeRepr>(this)->getBaseComponent();
 }
 
 ComponentIdentTypeRepr *IdentTypeRepr::getLastComponent() {
   if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
     return Comp;
 
-  return cast<CompoundIdentTypeRepr>(this)->getComponents().back();
+  return cast<CompoundIdentTypeRepr>(this)->getLastComponent();
 }
 
 DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
@@ -295,8 +295,8 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
-  printTypeRepr(getComponents().front(), Printer, Opts);
-  for (auto C : getComponents().slice(1)) {
+  printTypeRepr(getBaseComponent(), Printer, Opts);
+  for (auto C : getMemberComponents()) {
     Printer << ".";
     printTypeRepr(C, Printer, Opts);
   }
