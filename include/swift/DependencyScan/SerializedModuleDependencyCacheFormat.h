@@ -162,6 +162,7 @@ using SwiftPlaceholderModuleDetailsLayout =
 
 using ClangModuleDetailsLayout =
     BCRecordLayout<CLANG_MODULE_DETAILS_NODE, // ID
+                   FileIDField,               // pcmOutputPath
                    FileIDField,               // moduleMapPath
                    ContextHashField,          // contextHash
                    FlagIDArrayIDField,        // commandLine

@@ -590,6 +590,8 @@ static void writeJSON(llvm::raw_ostream &out,
       modulePath = get_C_string(swiftPlaceholderDeps->compiled_module_path);
     else if (swiftBinaryDeps)
       modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
+    else if (clangDeps)
+      modulePath = get_C_string(moduleInfo.module_path);
     else
       modulePath = moduleName + modulePathSuffix;
 
@@ -831,6 +833,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
       modulePath = swiftPlaceholderDeps->compiledModulePath;
     else if (swiftBinaryDeps)
       modulePath = swiftBinaryDeps->compiledModulePath;
+    else if (clangDeps)
+      modulePath = clangDeps->pcmOutputPath;
     else
       modulePath = module.first + modulePathSuffix;
 

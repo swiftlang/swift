@@ -446,12 +446,15 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       cache.configureForTriple(getTriple());
-      unsigned moduleMapPathID, contextHashID, commandLineArrayID,
+      unsigned pcmOutputPathID, moduleMapPathID, contextHashID, commandLineArrayID,
                fileDependenciesArrayID, capturedPCMArgsArrayID;
-      ClangModuleDetailsLayout::readRecord(Scratch, moduleMapPathID,
+      ClangModuleDetailsLayout::readRecord(Scratch, pcmOutputPathID, moduleMapPathID,
                                            contextHashID, commandLineArrayID,
                                            fileDependenciesArrayID,
                                            capturedPCMArgsArrayID);
+      auto pcmOutputPath = getIdentifier(pcmOutputPathID);
+      if (!pcmOutputPath)
+        llvm::report_fatal_error("Bad pcm output path");
       auto moduleMapPath = getIdentifier(moduleMapPathID);
       if (!moduleMapPath)
         llvm::report_fatal_error("Bad module map path");
@@ -469,7 +472,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
         llvm::report_fatal_error("Bad captured PCM Args");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forClangModule(
+      auto moduleDep = ModuleDependencies::forClangModule(*pcmOutputPath,
           *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies,
           *capturedPCMArgs);
 
@@ -850,6 +853,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     assert(clangDeps);
     ClangModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[ClangModuleDetailsLayout::Code],
+        getIdentifier(clangDeps->pcmOutputPath),
         getIdentifier(clangDeps->moduleMapFile),
         getIdentifier(clangDeps->contextHash),
         getArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine),
@@ -1017,6 +1021,7 @@ void Serializer::collectStringsAndArrays(
         case swift::ModuleDependenciesKind::Clang: {
           auto clangDeps = dependencyInfo.getAsClangModule();
           assert(clangDeps);
+          addIdentifier(clangDeps->pcmOutputPath);
           addIdentifier(clangDeps->moduleMapFile);
           addIdentifier(clangDeps->contextHash);
           addArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine,

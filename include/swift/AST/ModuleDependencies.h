@@ -237,6 +237,9 @@ public:
 /// This class is mostly an implementation detail for \c ModuleDependencies.
 class ClangModuleDependenciesStorage : public ModuleDependenciesStorageBase {
 public:
+  /// Destination output path
+  const std::string pcmOutputPath;
+  
   /// The module map file used to generate the Clang module.
   const std::string moduleMapFile;
 
@@ -254,12 +257,14 @@ public:
   const std::vector<std::string> capturedPCMArgs;
 
   ClangModuleDependenciesStorage(
+      const std::string &pcmOutputPath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang),
+      pcmOutputPath(pcmOutputPath),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
       nonPathCommandLine(nonPathCommandLine),
@@ -367,6 +372,7 @@ public:
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencies forClangModule(
+      const std::string &pcmOutputPath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
@@ -374,8 +380,8 @@ public:
       const std::vector<std::string> &capturedPCMArgs) {
     return ModuleDependencies(
         std::make_unique<ClangModuleDependenciesStorage>(
-          moduleMapFile, contextHash, nonPathCommandLine,
-          fileDependencies, capturedPCMArgs));
+          pcmOutputPath, moduleMapFile, contextHash,
+          nonPathCommandLine, fileDependencies, capturedPCMArgs));
   }
 
   /// Describe a placeholder dependency swift module.
