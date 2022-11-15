@@ -94,7 +94,7 @@ import SubE
 // CHECK-NEXT: },
 
 /// --------Clang module C
-// CHECK-LABEL: "modulePath": "C.pcm",
+// CHECK-LABEL: "modulePath": "{{.*}}/C-{{.*}}.pcm",
 
 // CHECK: "sourceFiles": [
 // CHECK-DAG: module.modulemap
@@ -181,7 +181,7 @@ import SubE
 // CHECK-NEXT: "clang": "SwiftShims"
 
 /// --------Clang module B
-// CHECK-LABEL: "modulePath": "B.pcm"
+// CHECK-LABEL: "modulePath": "{{.*}}/B-{{.*}}.pcm",
 
 // CHECK-NEXT: sourceFiles
 // CHECK-DAG: module.modulemap
@@ -193,4 +193,4 @@ import SubE
 // CHECK-NEXT: }
 
 /// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "SwiftShims.pcm",
+// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
