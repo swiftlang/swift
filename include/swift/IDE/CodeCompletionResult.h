@@ -184,7 +184,7 @@ enum class CodeCompletionKeywordKind : uint8_t {
   None,
 #define KEYWORD(X) kw_##X,
 #define POUND_KEYWORD(X) pound_##X,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
 };
 
 enum class CompletionKind : uint8_t {

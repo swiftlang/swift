@@ -17,8 +17,8 @@
 #ifndef SWIFT_MIGRATOR_MIGRATOR_H
 #define SWIFT_MIGRATOR_MIGRATOR_H
 
+#include "swift/Basic/References.h"
 #include "swift/Migrator/MigrationState.h"
-#include "swift/Syntax/References.h"
 
 namespace swift {
 class CompilerInstance;

@@ -12,7 +12,7 @@ option(BUILD_SOURCEKIT_XPC_SERVICE
   ${BUILD_SOURCEKIT_XPC_SERVICE_default})
 
 # Add generated libSyntax headers to global dependencies.
-list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
+list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 if(SWIFT_BUILD_SOURCEKIT)
   list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
 endif()
@@ -38,7 +38,6 @@ if(SWIFT_INCLUDE_TESTS OR SWIFT_INCLUDE_TEST_BINARIES)
   add_swift_tool_subdirectory(swift-ide-test)
   add_swift_tool_subdirectory(swift-remoteast-test)
   add_swift_tool_subdirectory(lldb-moduleimport-test)
-  add_swift_tool_subdirectory(swift-syntax-test)
 endif()
 
 if(LLVM_USE_SANITIZE_COVERAGE)

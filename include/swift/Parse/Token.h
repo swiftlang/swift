@@ -19,7 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Syntax/TokenKinds.h"
+#include "swift/Parse/TokenKinds.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -200,7 +200,7 @@ public:
   bool isKeyword() const {
     switch (Kind) {
 #define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
     default: return false;
     }
   }
@@ -220,7 +220,7 @@ public:
   bool isPunctuation() const {
     switch (Kind) {
 #define PUNCTUATOR(Name, Str) case tok::Name: return true;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
     default: return false;
     }
   }

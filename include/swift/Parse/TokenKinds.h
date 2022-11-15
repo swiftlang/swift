@@ -17,13 +17,14 @@
 #ifndef SWIFT_TOKENKINDS_H
 #define SWIFT_TOKENKINDS_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 enum class tok : uint8_t {
 #define TOKEN(X) X,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
 
   NUM_TOKENS
 };
@@ -35,7 +36,6 @@ bool isTokenTextDetermined(tok kind);
 /// If a token kind has determined text, return the text; otherwise assert.
 StringRef getTokenText(tok kind);
 
-void dumpTokenKind(llvm::raw_ostream &os, tok kind);
 } // end namespace swift
 
 #endif // SWIFT_TOKENKINDS_H

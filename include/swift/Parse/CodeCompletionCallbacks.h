@@ -29,6 +29,13 @@ enum class ObjCSelectorContext {
   SetterSelector
 };
 
+enum class PrecedenceGroupCompletionKind {
+  AttributeList,
+  Associativity,
+  Assignment,
+  Relation,
+};
+
 /// Parser's interface to code completion.
 class CodeCompletionCallbacks {
 protected:
@@ -194,7 +201,7 @@ public:
 
   /// Complete within a precedence group decl or after a colon in an
   /// operator decl.
-  virtual void completeInPrecedenceGroup(SyntaxKind SK) {};
+  virtual void completeInPrecedenceGroup(PrecedenceGroupCompletionKind Kind) {};
 
   /// Complete the platform names inside #available statements.
   virtual void completePoundAvailablePlatform() {};

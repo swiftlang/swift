@@ -438,7 +438,7 @@ operator<<(llvm::raw_ostream &OS, tok keyword) {
 #define KEYWORD(KW) case tok::kw_##KW: OS << #KW; break;
 #define POUND_KEYWORD(KW) case tok::pound_##KW: OS << "#"#KW; break;
 #define PUNCTUATOR(PUN, TEXT) case tok::PUN: OS << TEXT; break;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
   default:
     llvm_unreachable("unexpected keyword or punctuator kind");
   }
@@ -450,7 +450,7 @@ uint8_t swift::getKeywordLen(tok keyword) {
 #define KEYWORD(KW) case tok::kw_##KW: return StringRef(#KW).size();
 #define POUND_KEYWORD(KW) case tok::pound_##KW: return StringRef("#"#KW).size();
 #define PUNCTUATOR(PUN, TEXT) case tok::PUN: return StringRef(TEXT).size();
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
   default:
     llvm_unreachable("unexpected keyword or punctuator kind");
   }
@@ -472,7 +472,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   bool isKeyword = llvm::StringSwitch<bool>(keyword)
 #define KEYWORD(KW) \
       .Case(#KW, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
       .Default(false);
 
   switch (context) {

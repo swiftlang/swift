@@ -10,9 +10,6 @@ add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp
-  ParsedRawSyntaxNode.cpp
-  ParsedRawSyntaxRecorder.cpp
-  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -23,17 +20,11 @@ add_swift_host_library(swiftParse STATIC
   ParseStmt.cpp
   ParseType.cpp
   ParseVersion.cpp
-  PersistentParserState.cpp
-  SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp)
+  PersistentParserState.cpp)
 _swift_gyb_target_sources(swiftParse PRIVATE
-    ParsedSyntaxBuilders.cpp.gyb
-    ParsedSyntaxNodes.cpp.gyb
-    ParsedSyntaxRecorder.cpp.gyb)
+  TokenKinds.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax
-  swiftSyntaxParse
 )
 
 if (SWIFT_SWIFT_PARSER)

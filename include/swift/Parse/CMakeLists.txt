@@ -5,10 +5,7 @@ else()
 endif()
 
 set(generated_include_sources
-  ParsedSyntaxBuilders.h.gyb
-  ParsedSyntaxNodes.h.gyb
-  ParsedSyntaxRecorder.h.gyb
-)
+  TokenKinds.def.gyb)
 
 add_gyb_target(swift-parse-syntax-generated-headers
     "${generated_include_sources}")

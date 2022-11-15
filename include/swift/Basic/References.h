@@ -1,4 +1,4 @@
-//===--- UnknownSyntax.cpp - Swift Unknown  Syntax Implementation ---------===//
+//===--- References.h - Swift Syntax Reference-Counting Misc. ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/UnknownSyntax.h"
+#ifndef SWIFT_BASIC_REFERENCES_H
+#define SWIFT_BASIC_REFERENCES_H
 
-using namespace swift;
-using namespace swift::syntax;
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
-void UnknownSyntax::validate() const { assert(Data->getRaw()->isUnknown()); }
+namespace swift {
+
+/// A shorthand to clearly indicate that a value is a reference counted and
+/// heap-allocated.
+template <typename Inner>
+using RC = llvm::IntrusiveRefCntPtr<Inner>;
+
+} // end namespace swift
+
+#endif // SWIFT_BASIC_REFERENCES_H

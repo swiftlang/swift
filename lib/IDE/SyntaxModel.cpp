@@ -153,7 +153,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
 #undef KEYWORD
       case tok::contextual_keyword:
         Kind = SyntaxNodeKind::Keyword;
@@ -190,20 +190,20 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
 
 #define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
         Kind = SyntaxNodeKind::BuildConfigKeyword;
         break;
 
 #define POUND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
 #define POUND_COND_DIRECTIVE_KEYWORD(Name)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
         Kind = SyntaxNodeKind::PoundDirectiveKeyword;
         break;
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)
 #define POUND_DIRECTIVE_KEYWORD(Name)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:

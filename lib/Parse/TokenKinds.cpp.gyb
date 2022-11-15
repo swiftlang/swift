@@ -1,0 +1,46 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxKind.cpp.gyb.
+//// Do Not Edit Directly!
+//===-------------- SyntaxKind.cpp - Syntax Kind definitions --------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Parse/TokenKinds.h"
+
+namespace swift {
+
+static StringRef getTokenTextInternal(tok kind) {
+  switch(kind) {
+% for token in SYNTAX_TOKENS:
+%   if token.text:
+  case tok::${token.kind}: return "${token.text}";
+%   end
+% end
+  default: return StringRef();
+  }
+}
+
+bool isTokenTextDetermined(tok kind) {
+  return !getTokenTextInternal(kind).empty();
+}
+
+StringRef getTokenText(tok kind) {
+  auto text = getTokenTextInternal(kind);
+  assert(!text.empty() && "token kind cannot be determined");
+  return text;
+}
+
+}
+

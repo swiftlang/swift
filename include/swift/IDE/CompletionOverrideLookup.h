@@ -15,8 +15,8 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
+#include "swift/Parse/TokenKinds.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Syntax/TokenKinds.h"
 
 namespace swift {
 namespace ide {

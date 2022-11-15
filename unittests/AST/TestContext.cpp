@@ -56,8 +56,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
         Ctx, FileForLookups, Ctx.getIdentifier("ImplicitlyUnwrappedOptional")));
 
     auto result = SourceFileParsingResult{
-        Ctx.AllocateCopy(optionalTypes), /*tokens*/ None,
-        /*interfaceHash*/ None, /*syntaxRoot*/ None};
+      Ctx.AllocateCopy(optionalTypes), /*tokens*/ None, /*interfaceHash*/ None};
 
     Ctx.evaluator.cacheOutput(ParseSourceFileRequest{FileForLookups},
                               std::move(result));

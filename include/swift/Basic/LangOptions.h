@@ -420,19 +420,6 @@ namespace swift {
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
-    /// Whether to parse syntax tree. If the syntax tree is built, the generated
-    /// AST may not be correct when syntax nodes are reused as part of
-    /// incrementals parsing.
-    bool BuildSyntaxTree = false;
-
-    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
-    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
-    /// unnecessary name lookups that are not useful for pure syntactic parsing.
-    bool ParseForSyntaxTreeOnly = false;
-
-    /// Whether to verify the parsed syntax tree and emit related diagnostics.
-    bool VerifySyntaxTree = false;
-
     /// Whether to disable the evaluation of '#if' decls, such that the bodies
     /// of active clauses aren't hoisted into the enclosing scope.
     bool DisablePoundIfEvaluation = false;

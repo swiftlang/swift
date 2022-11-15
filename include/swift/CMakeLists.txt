@@ -10,6 +10,5 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(AST)
   add_subdirectory(Option)
   add_subdirectory(Parse)
-  add_subdirectory(Syntax)
 endif()
 

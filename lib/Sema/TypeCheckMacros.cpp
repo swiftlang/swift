@@ -16,6 +16,7 @@
 
 #include "TypeCheckMacros.h"
 #include "TypeChecker.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"

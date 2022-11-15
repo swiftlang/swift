@@ -1181,7 +1181,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/Parse/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1189,7 +1189,7 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/Parse/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }

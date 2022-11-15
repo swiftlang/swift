@@ -664,7 +664,7 @@ def create_argument_parser():
            help='install swiftpm')
 
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
-           help='build swiftSyntax')
+           help='build SwiftSyntax')
 
     option(['--skip-early-swiftsyntax'],
            toggle_false('build_early_swiftsyntax'),

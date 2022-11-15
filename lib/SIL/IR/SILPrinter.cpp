@@ -261,7 +261,7 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
             .Case("init", false)
 #define KEYWORD(kw) \
             .Case(#kw, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
             .Default(false);
 
     if (shouldEscape) {

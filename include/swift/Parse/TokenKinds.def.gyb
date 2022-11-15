@@ -154,7 +154,7 @@ ${token.macro_name()}(${token.unprefixed_kind})
 %   end
 %   end
 
-// The following tokens are irrelevant for swiftSyntax and thus only declared 
+// The following tokens are irrelevant for AST parsing and thus only declared 
 // in this .def file
 
 SIL_KEYWORD(undef)

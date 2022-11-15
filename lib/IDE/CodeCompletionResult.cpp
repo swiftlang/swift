@@ -455,7 +455,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case CodeCompletionKeywordKind::pound_##X:                                   \
     Prefix.append("[#" #X "]");                                                \
     break;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/Parse/TokenKinds.def"
     }
     break;
   case CodeCompletionResultKind::Pattern:

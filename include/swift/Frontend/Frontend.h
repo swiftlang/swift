@@ -37,7 +37,6 @@
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -96,9 +95,6 @@ class CompilerInvocation {
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
-  /// The \c SyntaxParsingCache to use when parsing the main file of this
-  /// invocation
-  SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
@@ -295,14 +291,6 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
-
-  void setMainFileSyntaxParsingCache(SyntaxParsingCache *Cache) {
-    MainFileSyntaxParsingCache = Cache;
-  }
-
-  SyntaxParsingCache *getMainFileSyntaxParsingCache() const {
-    return MainFileSyntaxParsingCache;
-  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
