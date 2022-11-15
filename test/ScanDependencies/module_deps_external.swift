@@ -96,7 +96,7 @@ import SomeExternalModule
 // CHECK-NEXT: "clang": "SwiftShims"
 
 /// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "SwiftShims.pcm",
+// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps_external.swift

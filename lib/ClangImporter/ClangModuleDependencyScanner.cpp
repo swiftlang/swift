@@ -159,6 +159,12 @@ void ClangImporter::recordModuleDependencies(
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
+    
+    auto pcmPath = moduleCacheRelativeLookupModuleOutput(clangModuleDep.ID,
+                                                         ModuleOutputKind::ModuleFile,
+                                                         getModuleCachePathFromClang(getClangInstance()));
+    swiftArgs.push_back("-o");
+    swiftArgs.push_back(pcmPath);
 
     // Ensure that the resulting PCM build invocation uses Clang frontend directly
     swiftArgs.push_back("-direct-clang-cc1-module-build");
@@ -186,6 +192,7 @@ void ClangImporter::recordModuleDependencies(
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
+        pcmPath,
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ID.ContextHash,
         swiftArgs,
