@@ -91,7 +91,7 @@ void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {
   case Status::Executing:
-    assert(false && "destroying a task that never completed");
+    swift_unreachable("destroying a task that never completed");
 
   case Status::Success:
     resultType->vw_destroy(getStoragePtr());
