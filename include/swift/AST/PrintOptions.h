@@ -615,7 +615,6 @@ struct PrintOptions {
     result.SkipPrivateStdlibDecls = true;
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
-    result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =

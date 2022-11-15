@@ -10,6 +10,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -Wno-error)
 
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 //--- header.h
 #include "swiftMod.h"
 

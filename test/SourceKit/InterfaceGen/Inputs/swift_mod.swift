@@ -5,7 +5,8 @@ public class MyClass {
   private func priv_method() {}
 }
 
-public func pub_function() {}
+@discardableResult
+public func pub_function() -> Int { return 0 }
 internal func int_function() {}
 fileprivate func fp_function() {}
 private func priv_function() {}
