@@ -80,4 +80,6 @@ if(SWIFT_SWIFT_PARSER)
     swift_install_in_component(DIRECTORY "${module_base}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift"
                                COMPONENT compiler)
+
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${library_name})
 endif()

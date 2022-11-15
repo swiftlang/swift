@@ -7,6 +7,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/usr/bin
+// RUN: mkdir -p %t/usr/lib
+// RUN: %copy-plugin-support-library(%t/usr/lib/)
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/usr/bin/swift)
 
 // RUN: %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
