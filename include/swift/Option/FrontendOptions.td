@@ -343,6 +343,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
 
+def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
+  HelpText<"Dumps the results of each macro expansion">;
+
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;

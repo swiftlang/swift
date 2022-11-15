@@ -433,6 +433,14 @@ Expr *swift::expandMacroExpr(
     }
   }
 
+  // Dump macro expansions to standard output, if requested.
+  if (ctx.LangOpts.DumpMacroExpansions) {
+    llvm::errs() << bufferName << " as " << expandedType.getString()
+      << "\n------------------------------\n"
+      << evaluatedSource
+      << "\n------------------------------\n";
+  }
+
   // Create a new source buffer with the contents of the expanded macro.
   auto macroBuffer =
       llvm::MemoryBuffer::getMemBuffer(evaluatedSource, bufferName);
