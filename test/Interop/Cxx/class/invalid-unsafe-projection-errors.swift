@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop
 
 //--- Inputs/module.modulemap
 module Test {
@@ -9,6 +9,7 @@ module Test {
 }
 
 //--- Inputs/test.h
+
 struct Ptr { int *p; };
 
 struct M {
@@ -18,18 +19,24 @@ struct M {
 
         int *begin() const;
 };
-
 //--- test.swift
 
 import Test
 
 public func test(x: M) {
-  // CHECK: note: C++ method 'test1' that returns unsafe projection of type 'pointer' not imported
-  x.test1()
-  // CHECK: note: C++ method 'test2' that returns unsafe projection of type 'reference' not imported
+  // expected-error@+2{{value of type 'M' has no member 'test1'}}
+  // expected-note@+1{{C++ method 'test1' is unavailable in Swift as it returns an address (or struct containing an address).}}
+  x.test1() 
+  // expected-error@+2{{value of type 'M' has no member 'test2'}}
+  // expected-note@+1{{the address returned by 'test2' may outlive the value it references resulting in an use-after-free.}}
   x.test2()
-  // CHECK: note: C++ method 'test3' that returns unsafe projection of type 'Ptr' not imported
+  // expected-error@+2{{value of type 'M' has no member 'test3'}}
+  // expected-note@+1{{C++ method 'test3' is unavailable in Swift as it returns an address (or struct containing an address).}}
   x.test3()
-  // CHECK: note: C++ method 'begin' that returns an unsafe iterator not imported: use Swift Sequence APIs instead
+  // expected-error@+2{{value of type 'M' has no member 'begin'}}
+  // expected-note@+1{{'begin' is unavailable in Swift as it returns a C++ iterator; Use 'for-in' loop or 'Sequence' methods such as 'map', 'reduce' to iterate over the collection}}
   x.begin()
 }
+
+
+

@@ -157,17 +157,24 @@ NOTE(reference_passed_by_value, none, "function uses foreign reference type "
                                       "'import_reference' contract (outlined in "
                                       "C++ Interop User Manual).",
      (StringRef, StringRef))
+
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "automatically importable: %1. "
                                                 "Refer to the C++ Interop User "
                                                 "Manual to classify this type.",
      (StringRef, StringRef))
-NOTE(projection_not_imported, none, "C++ method '%0' that returns unsafe "
-                                    "projection of type '%1' not imported",
-     (StringRef, StringRef))
-NOTE(dont_use_iterator_api, none, "C++ method '%0' that returns an unsafe "
-                                  "iterator not imported: use Swift Sequence "
-                                  "APIs instead",
+
+NOTE(projection_not_imported, none, "C++ method '%0' is unavailable in Swift "
+                                    "as it returns an address (or struct containing an address).",
+     (StringRef))
+
+NOTE(projection_not_imported_because, none, "the address returned by '%0' may outlive the value it "
+                                    "references resulting in an use-after-free.",
+     (StringRef))
+
+NOTE(dont_use_iterator_api, none, "'%0' is unavailable in Swift as it returns a C++ iterator; "
+                                   "Use 'for-in' loop or 'Sequence' methods such as 'map', "
+                                   "'reduce' to iterate over the collection",
      (StringRef))
 
 ERROR(reference_type_must_have_retain_attr,none,
