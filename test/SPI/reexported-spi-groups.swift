@@ -3,13 +3,13 @@
 
 /// Build lib defining SPIs
 // RUN: %target-swift-frontend -emit-module %t/Exported.swift \
-// RUN:   -module-name Exported -swift-version 5 \
+// RUN:   -module-name Exported -swift-version 5 -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exported.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exported.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Exported.private.swiftinterface
-// RUN: %target-swift-typecheck-module-from-interface(%t/Exported.swiftinterface)
-// RUN: %target-swift-typecheck-module-from-interface(%t/Exported.private.swiftinterface) -module-name Exported
+// RUN: %target-swift-typecheck-module-from-interface(%t/Exported.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Exported.private.swiftinterface) -module-name Exported -I %t
 
 /// Build lib reexporting SPIs
 // RUN: %target-swift-frontend -emit-module %t/Exporter.swift \
@@ -20,6 +20,15 @@
 // RUN:   -emit-private-module-interface-path %t/Exporter.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.private.swiftinterface) -module-name Exporter -I %t
+
+// RUN: %target-swift-frontend -emit-module %t/NonExportedAs.swift \
+// RUN:   -module-name NonExportedAs -swift-version 5 -I %t \
+// RUN:   -enable-library-evolution \
+// RUN:   -emit-module-path %t/NonExportedAs.swiftmodule \
+// RUN:   -emit-module-interface-path %t/NonExportedAs.swiftinterface \
+// RUN:   -emit-private-module-interface-path %t/NonExportedAs.private.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/NonExportedAs.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/NonExportedAs.private.swiftinterface) -module-name NonExportedAs -I %t
 
 /// Build lib not reexporting SPIs (a normal import)
 // RUN: %target-swift-frontend -emit-module %t/NonExporter.swift \
@@ -46,6 +55,11 @@
 // RUN:   %t/Client_FileA.swift %t/Client_FileB.swift\
 // RUN:   -swift-version 5 -I %t -verify
 
+/// Test that SPIs aren't avaible from a reexport without export_as
+// RUN: %target-swift-frontend -typecheck \
+// RUN:   %t/NonExportedAsClient.swift \
+// RUN:   -swift-version 5 -I %t -verify
+
 /// Test that SPIs don't leak when not reexported
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/NonExporterClient.swift \
@@ -63,8 +77,14 @@
 // RUN:   %t/PublicClient.swift \
 // RUN:   -swift-version 5 -I %t -verify
 
+//--- module.modulemap
+module Exported {
+    export_as Exporter
+}
 
 //--- Exported.swift
+
+@_exported import Exported
 
 public func exportedPublicFunc() {}
 
@@ -73,6 +93,12 @@ public func exportedPublicFunc() {}
 @_spi(X) public struct ExportedSpiType {}
 
 //--- Exporter.swift
+
+@_exported import Exported
+
+@_spi(X) public func exporterSpiFunc() {}
+
+//--- NonExportedAs.swift
 
 @_exported import Exported
 
@@ -125,6 +151,16 @@ public func clientB() {
     exportedPublicFunc()
     exportedSpiFunc() // expected-error {{cannot find 'exportedSpiFunc' in scope}}
     exporterSpiFunc() // expected-error {{cannot find 'exporterSpiFunc' in scope}}
+}
+
+//--- NonExportedAsClient.swift
+
+@_spi(X) import NonExportedAs
+
+public func client() {
+    exportedPublicFunc()
+    exportedSpiFunc() // expected-error {{cannot find 'exportedSpiFunc' in scope}}
+    exporterSpiFunc()
 }
 
 //--- NonExporterClient.swift
