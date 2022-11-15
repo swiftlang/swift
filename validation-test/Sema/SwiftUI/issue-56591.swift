@@ -2,7 +2,6 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-// REQUIRES: rdar102298208
 
 // https://github.com/apple/swift/issues/56591
 
