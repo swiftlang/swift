@@ -2822,26 +2822,37 @@ for host in "${ALL_HOSTS[@]}"; do
         # tree... but we are not building llvm with libcxx in tree when we build
         # swift. So we need to do configure's work here.
         if [[ "${product}" == "llvm" ]]; then
-            # Find the location of the c++ header dir.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-              HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
-            elif [[ "$(uname -s)" == "Haiku" ]] ; then
-              HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
-            elif [[ "${ANDROID_DATA}" ]] ; then
-              # This means we're building natively on Android in the Termux
-              # app, which supplies the $PREFIX variable.
-              HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
-            else # Linux
-              HOST_CXX_HEADERS_DIR="/usr/include/c++"
+                # We don't need this for Darwin since libcxx is present in SDKs present
+                # in Xcode 12.5 and onward (build-script requires Xcode 13.0 at a minimum),
+                # and clang knows how to find it there
+                # However, we should take care of removing the symlink
+                # laid down by a previous invocation, so to avoid failures
+                # finding c++ headers should the target folder become invalid
+                BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include/c++"
+                if [ -L "$BUILT_CXX_INCLUDE_DIR" ]; then
+                    echo "removing the symlink to system headers in the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+                    call unlink "$BUILT_CXX_INCLUDE_DIR"
+                fi
+            else
+                # Find the location of the c++ header dir.
+                if [[ "$(uname -s)" == "Haiku" ]] ; then
+                  HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
+                elif [[ "${ANDROID_DATA}" ]] ; then
+                  # This means we're building natively on Android in the Termux
+                  # app, which supplies the $PREFIX variable.
+                  HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
+                else # Linux
+                  HOST_CXX_HEADERS_DIR="/usr/include/c++"
+                fi
+
+                # Find the path in which the local clang build is expecting to find
+                # the c++ header files.
+                BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
+
+                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+                call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
             fi
-
-            # Find the path in which the local clang build is expecting to find
-            # the c++ header files.
-            BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
-
-            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
         fi
 
         # Build.
