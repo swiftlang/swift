@@ -1623,6 +1623,8 @@ namespace  {
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
+
+    UNINTERESTING_ATTR(RuntimeMetadata)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

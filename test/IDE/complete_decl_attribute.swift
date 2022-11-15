@@ -118,6 +118,7 @@ actor MyGlobalActor {
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 // KEYWORD3-NEXT:             Keyword/None:                       typeWrapper[#Class Attribute#]; name=typeWrapper
+// KEYWORD3-NEXT:             Keyword/None:                       runtimeMetadata[#Class Attribute#]; name=runtimeMetadata
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -153,6 +154,7 @@ actor MyGlobalActor {
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 // KEYWORD5-NEXT:             Keyword/None:                       typeWrapper[#Struct Attribute#]; name=typeWrapper
+// KEYWORD5-NEXT:             Keyword/None:                       runtimeMetadata[#Struct Attribute#]; name=runtimeMetadata
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
@@ -312,6 +314,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
+// ON_MEMBER_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -383,6 +386,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
+// KEYWORD_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper

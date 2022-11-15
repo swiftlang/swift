@@ -2931,7 +2931,7 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
-  return false;
+  return decl->getAttrs().hasAttribute<RuntimeMetadataAttr>();
 }
 
 static bool usesFeatureParserRoundTrip(Decl *decl) {
