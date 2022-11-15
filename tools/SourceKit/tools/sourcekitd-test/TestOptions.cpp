@@ -152,6 +152,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("diags", SourceKitRequest::Diagnostics)
         .Case("compile", SourceKitRequest::Compile)
         .Case("compile.close", SourceKitRequest::CompileClose)
+        .Case("collect-resolve-info", SourceKitRequest::CollectResolveInfo)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
         .Default(SourceKitRequest::None);
@@ -202,6 +203,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- collect-type\n"
                      << "- global-config\n"
                      << "- dependency-updated\n"
+                     << "- collect-resolve-info\n"
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) << "- refactoring." #ID "\n"
 #include "swift/Refactoring/RefactoringKinds.def"
                         "\n";

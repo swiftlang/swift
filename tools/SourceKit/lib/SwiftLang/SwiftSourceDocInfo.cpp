@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
-#include "SourceKit/Support/UIdent.h"
 #include "SwiftASTManager.h"
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
@@ -42,12 +42,12 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <numeric>
@@ -2587,6 +2587,129 @@ void SwiftLangSupport::collectExpressionTypes(
   getASTManager()->processASTAsync(Invok, std::move(Collector),
                                    &OncePerASTToken, CancellationToken,
                                    llvm::vfs::getRealFileSystem());
+}
+
+class ResolveInfoCollector : public SourceEntityWalker {
+  std::vector<ResolveInfo> &Decls;
+  const SourceManager &SM;
+  ASTUnitRef AstUnit;
+  llvm::BumpPtrAllocator Allocator;
+  SwiftLangSupport &Lang;
+
+public:
+  ResolveInfoCollector(std::vector<ResolveInfo> &Decls, const SourceManager &SM,
+                       ASTUnitRef AstUnit, SwiftLangSupport &Lang)
+      : Decls(Decls), SM(SM), AstUnit(std::move(AstUnit)), Lang(Lang) {}
+
+private:
+  DeclarationInfo getDeclarationInfo(ValueDecl *D) {
+    SmallString<256> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    DeclarationInfo DeclInfo = DeclarationInfo();
+
+    LocationInfo DeclLocation = LocationInfo();
+    setLocationInfo(D, DeclLocation);
+    DeclInfo.Location = DeclLocation;
+
+    SwiftLangSupport::printUSR(D, OS);
+    DeclInfo.USR = copyAndClearString(Allocator, Buffer);
+
+    if (DeclLocation.Filename.empty()) {
+      DeclInfo.ModuleName = getModuleName(D, Allocator);
+      if (auto GroupName = D->getGroupName()) {
+        DeclInfo.GroupName = GroupName->copy(Allocator);
+      }
+
+      if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(
+              DeclInfo.ModuleName,
+              AstUnit->getCompilerInstance().getInvocation()))
+        DeclInfo.ModuleInterfaceName = IFaceGenRef->getDocumentName();
+    }
+
+    const DeclKind Kind = D->getKind();
+    DeclInfo.Kind = Decl::getKindName(Kind).copy(Allocator);
+    DeclInfo.IsSynthesized = D->isSynthesized();
+
+    return DeclInfo;
+  }
+
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                          ReferenceMetaData Data) override {
+    if (!D)
+      return true;
+    const unsigned BufferID =
+        AstUnit->getPrimarySourceFile().getBufferID().getValue();
+    const unsigned RefOffset =
+        SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
+    const unsigned RefLength = Range.getByteLength();
+
+    const DeclarationInfo DInfo = getDeclarationInfo(D);
+    DeclarationInfo CtorDInfo = DeclarationInfo();
+    if (CtorTyRef) {
+      CtorDInfo = getDeclarationInfo(CtorTyRef);
+    }
+
+    Decls.push_back(ResolveInfo{RefOffset, RefLength, DInfo, CtorDInfo});
+    return true;
+  }
+};
+
+void SwiftLangSupport::collectResolvedReferences(
+    StringRef Filename, ArrayRef<const char *> Args,
+    Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<std::vector<ResolveInfo>> &)>
+        Receiver) {
+  class ResolveInfoConsumer : public SwiftASTConsumer {
+    std::function<void(const RequestResult<std::vector<ResolveInfo>> &)>
+        Receiver;
+    SwiftLangSupport &Lang;
+
+  public:
+    ResolveInfoConsumer(
+        std::function<void(const RequestResult<std::vector<ResolveInfo>> &)>
+            Receiver,
+        SwiftLangSupport &Lang)
+        : Receiver(std::move(Receiver)), Lang(Lang) {}
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &File = AstUnit->getPrimarySourceFile();
+      std::vector<ResolveInfo> Result;
+      ResolveInfoCollector Walker(Result, File.getASTContext().SourceMgr,
+                                  std::move(AstUnit), Lang);
+      Walker.walk(File);
+      Receiver(RequestResult<std::vector<ResolveInfo>>::fromResult(
+          llvm::makeArrayRef(Result)));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<std::vector<ResolveInfo>>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<std::vector<ResolveInfo>>::fromError(Error));
+    }
+  };
+
+  std::string Error;
+  auto FS = getFileSystem(vfsOptions, Filename, Error);
+  if (!FS)
+    return Receiver(RequestResult<std::vector<ResolveInfo>>::fromError(Error));
+
+  const SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, Filename, FS, Error);
+  if (!Invok) {
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RequestResult<std::vector<ResolveInfo>>::fromError(Error));
+    return;
+  }
+
+  auto Consumer = std::make_shared<ResolveInfoConsumer>(Receiver, *this);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Consumer),
+                                   &OncePerASTToken, CancellationToken, FS);
 }
 
 void SwiftLangSupport::collectVariableTypes(

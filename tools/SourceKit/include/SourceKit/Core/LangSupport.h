@@ -17,6 +17,7 @@
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/AST/Type.h"
+#include "swift/IDE/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -472,6 +473,23 @@ struct CursorSymbolInfo {
   llvm::Optional<unsigned> ParentNameOffset;
 };
 
+struct DeclarationInfo {
+  StringRef Kind = "";
+  StringRef USR = "";
+  StringRef ModuleName = "";
+  StringRef GroupName = "";
+  StringRef ModuleInterfaceName = "";
+  LocationInfo Location = LocationInfo();
+  bool IsSynthesized = false;
+};
+
+struct ResolveInfo {
+  unsigned RefOffset = 0;
+  unsigned RefLength = 0;
+  DeclarationInfo Decl;
+  DeclarationInfo SecondaryDecl;
+};
+
 struct CursorInfoData {
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
@@ -894,6 +912,13 @@ public:
       ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
       bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
+          Receiver) = 0;
+
+  virtual void collectResolvedReferences(
+      StringRef FileName, ArrayRef<const char *> Args,
+      Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<std::vector<ResolveInfo>> &)>
           Receiver) = 0;
 
   /// Collects variable types for a range defined by `Offset` and `Length` in

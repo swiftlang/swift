@@ -830,6 +830,58 @@ var-type-info ::=
 $ sourcekitd-test -req=collect-var-type /path/to/file.swift -- /path/to/file.swift
 ```
 
+## Resolve Info
+Collects all references in a document and returns their declarations. It returns the path to the document, the 
+offset, and the length of the declaration if this information is available. For the declarations that are not in the 
+project sources, it returns the USR and the module name. These can be used to find the offset in a generated interface 
+document (see `Module interface generation`). If a matching document is already open, its id is added to the response 
+as `module-interface-name`.
+
+### Request
+
+```
+{
+    <key.request>:                  (UID)     <source.request.resolve.info>,
+    <key.sourcefile>:               (string)  // Absolute path to the file.
+    <key.compilerargs>:             [string*] // Array of zero or more strings for the compiler arguments,
+                                              // e.g., ["-sdk", "/path/to/sdk"]. These must include the path to the 
+                                              // provided source file.
+}
+```
+
+### Response
+```
+{
+    <key.results>:       (array) [resolve-info*]   // A list containing the references in the source file and
+                                                   // information about the corresponding declaration for each reference.
+}
+```
+
+```
+resolve-info ::=
+{ 
+    <key.reference_offset>:             (int64)  // Byte offset of the reference in the provided source file.
+    <key.reference_length>:             (int64)  // Length of the reference in the provided source file.
+    <key.kind>:                         (string) // The declaration kind (Struct, Protocol, etc.).
+    <key.usr>:                          (string) // USR for the declaration.
+    <key.is_synthesized>:               (bool)   // True if the declaration is synthesized.
+    [opt] <key.offset>:                 (int64)  // Byte offset of the declaration.
+    [opt] <key.length>:                 (int64)  // Length of the declaration.
+    [opt] <key.modulename>:             (string) // Module that contains the declaration.
+    [opt] <key.groupname>:              (string) // Module group name.
+    [opt] <key.module_interface_name>:  (string) // If the declaration is in a generated interface document that is already
+                                                 // open, the unique id of the document is provided.
+    [opt] <key.secondary_declaration>:  (dict)   // If the reference points to a synthesized constructor, the secondary 
+                                                 // declaration contains the type declaration.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=collect-resolve-info /path/to/file.swift -- /path/to/file.swift
+```
+
 # UIDs
 
 ## Keys

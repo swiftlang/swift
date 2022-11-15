@@ -14,7 +14,6 @@
 
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -29,8 +28,8 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/thread.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/thread.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <sys/param.h>
@@ -97,6 +96,8 @@ static void prepareMangleRequest(sourcekitd_object_t Req,
                                  const TestOptions &Opts);
 static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
 static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
+
+static void printResolveInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 
 static unsigned
 resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
@@ -802,6 +803,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
+  case SourceKitRequest::CollectResolveInfo: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestCollectResolveInfo);
+    addRequestOptionsDirect(Req, Opts);
+    break;
+  }
+
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
   case SourceKitRequest::KIND:                                                 \
     setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
@@ -1355,6 +1363,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CollectVariableType:
       printVariableType(Info, SourceBuf.get(), llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectResolveInfo:
+      printResolveInfo(Info, llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -2077,6 +2089,76 @@ static void printVariableType(sourcekitd_variant_t Info,
        << " (explicit type: " << HasExplicitType << ")\n";
   }
   OS << "</VariableTypes>\n";
+}
+
+static void printDeclarationInfo(const sourcekitd_variant_t &DeclInfo,
+                                 llvm::raw_ostream &OS, bool isSecondary) {
+  const char *Kind =
+      sourcekitd_variant_dictionary_get_string(DeclInfo, KeyKind);
+  const char *USR = sourcekitd_variant_dictionary_get_string(DeclInfo, KeyUSR);
+  const char *Module =
+      sourcekitd_variant_dictionary_get_string(DeclInfo, KeyModuleName);
+  const char *ModuleGroup =
+      sourcekitd_variant_dictionary_get_string(DeclInfo, KeyGroupName);
+  const char *ModuleInterfaceName = sourcekitd_variant_dictionary_get_string(
+      DeclInfo, KeyModuleInterfaceName);
+  const char *Source =
+      sourcekitd_variant_dictionary_get_string(DeclInfo, KeyDeclSource);
+  const unsigned Offset =
+      sourcekitd_variant_dictionary_get_int64(DeclInfo, KeyOffset);
+  const unsigned Length =
+      sourcekitd_variant_dictionary_get_int64(DeclInfo, KeyLength);
+  const bool IsSynthesized =
+      sourcekitd_variant_dictionary_get_bool(DeclInfo, KeyIsSynthesized);
+
+  StringRef Indent = "\t";
+  if ((USR || Source) && isSecondary) {
+    OS << "\tSecondary declaration: \n";
+    Indent = "\t\t";
+  }
+  if (Kind) {
+    OS << Indent << "Kind: " << Kind << "\n";
+  }
+  if (USR) {
+    OS << Indent << "USR: " << USR << "\n";
+  }
+  if (Module) {
+    OS << Indent << "Module: " << Module << "\n";
+  }
+  if (ModuleGroup) {
+    OS << Indent << "Module group: " << ModuleGroup << "\n";
+  }
+  if (ModuleInterfaceName) {
+    OS << Indent << "Interface name: " << ModuleInterfaceName << "\n";
+  }
+  if (Source) {
+    OS << Indent << "Source: " << Source << "\n";
+    OS << Indent << "Range: (" << Offset << ", " << Offset + Length << ")\n";
+  }
+  if (USR || Source) {
+    OS << Indent << "Synthesized: " << IsSynthesized << "\n";
+  }
+}
+
+static void printResolveInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS) {
+  auto Result = sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  auto Count = sourcekitd_variant_array_get_count(Result);
+  OS << "<Declarations>\n";
+  for (unsigned i = 0; i != Count; ++i) {
+    const sourcekitd_variant_t DeclInfo =
+        sourcekitd_variant_array_get_value(Result, i);
+    const unsigned RefOffset =
+        sourcekitd_variant_dictionary_get_int64(DeclInfo, KeyRefOffset);
+    const unsigned RefLength =
+        sourcekitd_variant_dictionary_get_int64(DeclInfo, KeyRefLength);
+
+    OS << "Reference (" << RefOffset << ", " << RefOffset + RefLength << "):\n";
+    printDeclarationInfo(DeclInfo, OS, false);
+    const sourcekitd_variant_t SecondaryDecl =
+        sourcekitd_variant_dictionary_get_value(DeclInfo, KeySecondaryDecl);
+    printDeclarationInfo(SecondaryDecl, OS, true);
+  }
+  OS << "</Declarations>\n";
 }
 
 static void printFoundInterface(sourcekitd_variant_t Info,

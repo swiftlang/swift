@@ -124,7 +124,6 @@ UID_KEYS = [
     KEY('SwiftVersion', 'key.swift_version'),
     KEY('Value', 'key.value'),
     KEY('EnableDiagnostics', 'key.enablediagnostics'),
-    KEY('GroupName', 'key.groupname'),
     KEY('ActionName', 'key.actionname'),
     KEY('SynthesizedExtension', 'key.synthesizedextensions'),
     KEY('UsingSwiftArgs', 'key.usingswiftargs'),
@@ -136,6 +135,7 @@ UID_KEYS = [
     KEY('Overrides', 'key.overrides'),
     KEY('AssociatedUSRs', 'key.associated_usrs'),
     KEY('ModuleName', 'key.modulename'),
+    KEY('GroupName', 'key.groupname'),
     KEY('RelatedDecls', 'key.related_decls'),
     KEY('Simplified', 'key.simplified'),
     KEY('RangeContent', 'key.rangecontent'),
@@ -201,7 +201,11 @@ UID_KEYS = [
     # Before executing the actual request wait x ms. The request can be canceled
     # in this time. For cancellation testing purposes.
     KEY('SimulateLongRequest', 'key.simulate_long_request'),
+    KEY('RefOffset', 'key.reference_offset'),
+    KEY('RefLength', 'key.reference_length'),
+    KEY('DeclSource', 'key.declaration_source_file'),
     KEY('IsSynthesized', 'key.is_synthesized'),
+    KEY('SecondaryDecl', 'key.secondary_declaration')
 ]
 
 
@@ -260,6 +264,7 @@ UID_REQUESTS = [
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
     REQUEST('CollectVariableType', 'source.request.variable.type'),
+    REQUEST('CollectResolveInfo', 'source.request.resolve.info'),
     REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
     REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
     REQUEST('Diagnostics', 'source.request.diagnostics'),

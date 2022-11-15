@@ -30,8 +30,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -204,6 +204,10 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
 static void
 reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
                        ResponseReceiver Rec);
+
+static void
+reportResolveInfo(const RequestResult<std::vector<ResolveInfo>> &Result,
+                  ResponseReceiver Rec);
 
 static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
@@ -1240,6 +1244,16 @@ static void handleSemanticRequest(
         });
   }
 
+  if (ReqUID == RequestCollectResolveInfo) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
+    return Lang.collectResolvedReferences(
+        *SourceFile, Args, std::move(vfsOptions), CancellationToken,
+        [Rec](const RequestResult<std::vector<ResolveInfo>> &Result) {
+          reportResolveInfo(Result, Rec);
+        });
+  }
+
   if (ReqUID == RequestFindLocalRenameRanges) {
     int64_t Line = 0, Column = 0, Length = 0;
     if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
@@ -2131,6 +2145,63 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
   }
   Dict.setCustomBuffer(KeyVariableTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportResolvedReferences
+//===----------------------------------------------------------------------===//
+static void addDeclaration(ResponseBuilder::Dictionary &Builder,
+                           DeclarationInfo &Decl) {
+  if (!Decl.Kind.empty()) {
+    Builder.set(KeyKind, Decl.Kind);
+  }
+  if (!Decl.USR.empty()) {
+    Builder.set(KeyUSR, Decl.USR);
+  }
+  if (!Decl.ModuleName.empty()) {
+    Builder.set(KeyModuleName, Decl.ModuleName);
+  }
+  if (!Decl.GroupName.empty()) {
+    Builder.set(KeyGroupName, Decl.GroupName);
+  }
+  if (!Decl.ModuleInterfaceName.empty()) {
+    Builder.set(KeyModuleInterfaceName, Decl.ModuleInterfaceName);
+  }
+  if (!Decl.Location.Filename.empty()) {
+    Builder.set(KeyDeclSource, Decl.Location.Filename);
+    Builder.set(KeyOffset, Decl.Location.Offset);
+    Builder.set(KeyLength, Decl.Location.Length);
+  }
+  Builder.setBool(KeyIsSynthesized, Decl.IsSynthesized);
+}
+
+static void
+reportResolveInfo(const RequestResult<std::vector<ResolveInfo>> &Result,
+                  ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const std::vector<ResolveInfo> &Info = Result.value();
+
+  ResponseBuilder RespBuilder;
+  auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
+  for (auto result : Info) {
+    auto Decl = Arr.appendDictionary();
+    Decl.set(KeyRefOffset, result.RefOffset);
+    Decl.set(KeyRefLength, result.RefLength);
+
+    addDeclaration(Decl, result.Decl);
+
+    if (!result.SecondaryDecl.Location.Filename.empty() ||
+        !result.SecondaryDecl.USR.empty()) {
+      auto SecondaryDecl = Decl.setDictionary(KeySecondaryDecl);
+      addDeclaration(SecondaryDecl, result.SecondaryDecl);
+    }
+  }
+
+  Rec(RespBuilder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//

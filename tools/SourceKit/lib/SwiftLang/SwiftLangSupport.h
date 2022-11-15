@@ -680,6 +680,13 @@ public:
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
+  void collectResolvedReferences(
+      StringRef Filename, ArrayRef<const char *> Args,
+      Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<std::vector<ResolveInfo>> &)>
+          Receiver) override;
+
   void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
       Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
