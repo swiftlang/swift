@@ -149,12 +149,9 @@ private:
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of opaque type decls that have not yet been validated.
-  ///
-  /// \note This is populated as opaque type decls are created. Validation
-  /// requires mangling the naming decl, which would lead to circularity
-  /// if it were done from OpaqueResultTypeRequest.
-  llvm::SetVector<OpaqueTypeDecl *> UnvalidatedOpaqueReturnTypes;
+  /// The set of parsed decls with opaque return types that have not yet
+  /// been validated.
+  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
   /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
@@ -646,8 +643,11 @@ public:
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
-  void addOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    UnvalidatedOpaqueReturnTypes.insert(decl);
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
+  void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
+    UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
