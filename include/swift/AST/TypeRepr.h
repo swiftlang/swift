@@ -89,7 +89,7 @@ protected:
 
   SWIFT_INLINE_BITFIELD_FULL(CompoundIdentTypeRepr, IdentTypeRepr, 32,
     : NumPadBits,
-    NumComponents : 32
+    NumMemberComponents : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
@@ -412,28 +412,32 @@ class CompoundIdentTypeRepr final : public IdentTypeRepr,
                                   ComponentIdentTypeRepr *> {
   friend TrailingObjects;
 
-  CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
-      : IdentTypeRepr(TypeReprKind::CompoundIdent) {
-    Bits.CompoundIdentTypeRepr.NumComponents = Components.size();
-    assert(Components.size() > 1 &&
+  /// The base component, which is not necessarily an identifier type.
+  TypeRepr *Base;
+
+  CompoundIdentTypeRepr(TypeRepr *Base,
+                        ArrayRef<ComponentIdentTypeRepr *> MemberComponents)
+      : IdentTypeRepr(TypeReprKind::CompoundIdent), Base(Base) {
+    Bits.CompoundIdentTypeRepr.NumMemberComponents = MemberComponents.size();
+    assert(MemberComponents.size() > 0 &&
            "should have just used the single ComponentIdentTypeRepr directly");
-    std::uninitialized_copy(Components.begin(), Components.end(),
-                            getTrailingObjects<ComponentIdentTypeRepr*>());
+    std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
+                            getTrailingObjects<ComponentIdentTypeRepr *>());
   }
 
 public:
-  static CompoundIdentTypeRepr *create(const ASTContext &Ctx,
-                                  ArrayRef<ComponentIdentTypeRepr*> Components);
+  static CompoundIdentTypeRepr *
+  create(const ASTContext &Ctx, TypeRepr *Base,
+         ArrayRef<ComponentIdentTypeRepr *> MemberComponents);
 
-  TypeRepr *getBaseComponent() const { return getComponents().front(); }
+  static CompoundIdentTypeRepr *
+  create(const ASTContext &Ctx, ArrayRef<ComponentIdentTypeRepr *> Components);
 
-  ArrayRef<ComponentIdentTypeRepr*> getComponents() const {
-    return {getTrailingObjects<ComponentIdentTypeRepr*>(),
-            Bits.CompoundIdentTypeRepr.NumComponents};
-  }
+  TypeRepr *getBaseComponent() const { return Base; }
 
   ArrayRef<ComponentIdentTypeRepr *> getMemberComponents() const {
-    return getComponents().slice(1);
+    return {getTrailingObjects<ComponentIdentTypeRepr *>(),
+            Bits.CompoundIdentTypeRepr.NumMemberComponents};
   }
 
   ComponentIdentTypeRepr *getLastComponent() const {

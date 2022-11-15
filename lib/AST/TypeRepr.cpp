@@ -382,11 +382,19 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
-CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(const ASTContext &C,
-                                 ArrayRef<ComponentIdentTypeRepr*> Components) {
-  auto size = totalSizeToAlloc<ComponentIdentTypeRepr*>(Components.size());
+CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(
+    const ASTContext &C, TypeRepr *Base,
+    ArrayRef<ComponentIdentTypeRepr *> MemberComponents) {
+  auto size =
+      totalSizeToAlloc<ComponentIdentTypeRepr *>(MemberComponents.size());
   auto mem = C.Allocate(size, alignof(CompoundIdentTypeRepr));
-  return new (mem) CompoundIdentTypeRepr(Components);
+  return new (mem) CompoundIdentTypeRepr(Base, MemberComponents);
+}
+
+CompoundIdentTypeRepr *
+CompoundIdentTypeRepr::create(const ASTContext &Ctx,
+                              ArrayRef<ComponentIdentTypeRepr *> Components) {
+  return create(Ctx, Components.front(), Components.drop_front());
 }
 
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
