@@ -3192,7 +3192,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
       if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
         temp = IGF.Builder.CreateElementBitCast(
-            temp, fnType->getParamType(0)->getPointerElementType());
+            temp, fnType->getParamType(0)->getNonOpaquePointerElementType());
       }
       emitToMemory(temp, substResultTI, isOutlined);
       return;

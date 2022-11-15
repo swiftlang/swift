@@ -5433,7 +5433,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       shadowTy = IGM.Int8Ty;
     }
     assert(!IGM.getLLVMContext().supportsTypedPointers() ||
-           shadowTy == shadow->getType()->getPointerElementType());
+           shadowTy == shadow->getType()->getNonOpaquePointerElementType());
     addr = builder.CreateLoad(shadowTy, shadow);
   }
 

@@ -1028,9 +1028,13 @@ namespace {
       SmallVector<Edge, 8> Children;
     };
 
-    struct child_iterator
-        : public std::iterator<std::random_access_iterator_tag, Node *,
-                               ptrdiff_t> {
+    struct child_iterator {
+      using iterator_category = std::random_access_iterator_tag;
+      using value_type = Node*;
+      using difference_type = std::ptrdiff_t;
+      using pointer = value_type*;
+      using reference = value_type&;    
+
       SmallVectorImpl<Edge>::iterator baseIter;
 
       child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
