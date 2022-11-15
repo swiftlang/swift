@@ -158,9 +158,9 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
     assert(currentTripleID &&
            "Expected target triple ID for a MODULE_DETAILS_NODE record");
     auto triple = getIdentifier(currentTripleID);
-    if (!triple.hasValue())
+    if (!triple.has_value())
       llvm::report_fatal_error("Unexpected MODULE_DETAILS_NODE record");
-    return triple.getValue();
+    return triple.value();
   };
 
   while (!Cursor.AtEndOfStream()) {
@@ -267,7 +267,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencies::forSwiftInterfaceModule(
-          optionalSwiftInterfaceFile.getValue(), *compiledModuleCandidates,
+          optionalSwiftInterfaceFile.value(), *compiledModuleCandidates,
           buildCommandRefs, extraPCMRefs, *contextHash, isFramework);
 
       // Add dependencies of this module
@@ -767,7 +767,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
                                  Optional<std::string> triple,
                                  const ModuleDependencies &dependencyInfo) {
   using namespace graph_block;
-  auto tripleStrID = triple.hasValue() ? getIdentifier(triple.getValue()) : 0;
+  auto tripleStrID = triple.has_value() ? getIdentifier(triple.value()) : 0;
 
   ModuleInfoLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[ModuleInfoLayout::Code],
@@ -776,7 +776,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
 
   switch (dependencyInfo.getKind()) {
   case swift::ModuleDependenciesKind::SwiftInterface: {
-    assert(triple.hasValue() && "Expected triple for serializing MODULE_NODE");
+    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
     auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
     unsigned swiftInterfaceFileId =
@@ -784,7 +784,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     unsigned bridgingHeaderFileId =
         swiftTextDeps->textualModuleDetails.bridgingHeaderFile
             ? getIdentifier(swiftTextDeps->textualModuleDetails
-                                .bridgingHeaderFile.getValue())
+                                .bridgingHeaderFile.value())
             : 0;
     SwiftInterfaceModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[SwiftInterfaceModuleDetailsLayout::Code],
@@ -801,14 +801,14 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftSource: {
-    assert(!triple.hasValue() &&
+    assert(!triple.has_value() &&
            "Did not expect triple for serializing MODULE_NODE");
     auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
     assert(swiftSourceDeps);
     unsigned bridgingHeaderFileId =
         swiftSourceDeps->textualModuleDetails.bridgingHeaderFile
             ? getIdentifier(swiftSourceDeps->textualModuleDetails
-                                .bridgingHeaderFile.getValue())
+                                .bridgingHeaderFile.value())
             : 0;
     SwiftSourceModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[SwiftSourceModuleDetailsLayout::Code],
@@ -821,7 +821,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftBinary: {
-    assert(triple.hasValue() && "Expected triple for serializing MODULE_NODE");
+    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
     auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
     assert(swiftBinDeps);
     SwiftBinaryModuleDetailsLayout::emitRecord(
@@ -833,7 +833,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftPlaceholder: {
-    assert(triple.hasValue() && "Expected triple for serializing MODULE_NODE");
+    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
     auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
     assert(swiftPHDeps);
     SwiftPlaceholderModuleDetailsLayout::emitRecord(
@@ -845,7 +845,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::Clang: {
-    assert(triple.hasValue() && "Expected triple for serializing MODULE_NODE");
+    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
     auto clangDeps = dependencyInfo.getAsClangModule();
     assert(clangDeps);
     ClangModuleDetailsLayout::emitRecord(
@@ -937,8 +937,8 @@ void Serializer::collectStringsAndArrays(
            "Expected source-based dependency");
     auto optionalDependencyInfo =
         cache.findSourceModuleDependency(moduleID.first);
-    assert(optionalDependencyInfo.hasValue() && "Expected dependency info.");
-    auto dependencyInfo = optionalDependencyInfo.getValue();
+    assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
+    auto dependencyInfo = optionalDependencyInfo.value();
     // Add the module's name
     addIdentifier(moduleID.first);
     // Add the module's dependencies
@@ -948,9 +948,9 @@ void Serializer::collectStringsAndArrays(
     assert(swiftSourceDeps);
     addArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
              swiftSourceDeps->textualModuleDetails.extraPCMArgs);
-    if (swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.hasValue())
+    if (swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.has_value())
       addIdentifier(
-          swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.getValue());
+          swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.value());
     addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
              swiftSourceDeps->sourceFiles);
     addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
@@ -964,7 +964,7 @@ void Serializer::collectStringsAndArrays(
     for (auto &moduleID : cache.getAllNonSourceModules(triple)) {
       auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
           moduleID.first, moduleID.second);
-      assert(dependencyInfos.hasValue() && "Expected dependency info.");
+      assert(dependencyInfos.has_value() && "Expected dependency info.");
       for (auto &dependencyInfo : *dependencyInfos) {
         // Add the module's name
         addIdentifier(moduleID.first);
@@ -986,9 +986,9 @@ void Serializer::collectStringsAndArrays(
           addArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
                    swiftTextDeps->textualModuleDetails.extraPCMArgs);
           addIdentifier(swiftTextDeps->contextHash);
-          if (swiftTextDeps->textualModuleDetails.bridgingHeaderFile.hasValue())
+          if (swiftTextDeps->textualModuleDetails.bridgingHeaderFile.has_value())
             addIdentifier(swiftTextDeps->textualModuleDetails.bridgingHeaderFile
-                              .getValue());
+                              .value());
           addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
                    std::vector<std::string>());
           addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
@@ -1074,9 +1074,9 @@ void Serializer::writeInterModuleDependenciesCache(
   // First, write the source modules we've encountered
   for (auto &moduleID : cache.getAllSourceModules()) {
     auto dependencyInfo = cache.findSourceModuleDependency(moduleID.first);
-    assert(dependencyInfo.hasValue() && "Expected dependency info.");
+    assert(dependencyInfo.has_value() && "Expected dependency info.");
     writeModuleInfo(moduleID, llvm::Optional<std::string>(),
-                    dependencyInfo.getValue());
+                    dependencyInfo.value());
   }
 
   // Write all non-source modules, for each of the target triples this scanner
@@ -1085,7 +1085,7 @@ void Serializer::writeInterModuleDependenciesCache(
     for (auto &moduleID : cache.getAllNonSourceModules(triple)) {
       auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
           moduleID.first, moduleID.second);
-      assert(dependencyInfos.hasValue() && "Expected dependency info.");
+      assert(dependencyInfos.has_value() && "Expected dependency info.");
       for (auto &dependencyInfo : *dependencyInfos) {
         writeModuleInfo(moduleID, triple, dependencyInfo);
       }

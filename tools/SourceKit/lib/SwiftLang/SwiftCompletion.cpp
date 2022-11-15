@@ -224,7 +224,7 @@ static void getResultStructure(
   auto *CCStr = result.getCompletionString();
   auto FirstTextChunk = CCStr->getFirstTextChunkIndex(leadingPunctuation);
 
-  if (!FirstTextChunk.hasValue())
+  if (!FirstTextChunk.has_value())
     return;
 
   bool isOperator = result.isOperator();

@@ -302,6 +302,7 @@ public:
   T &getValue() LLVM_LVALUE_FUNCTION { return Storage.getValue(); }
 
   constexpr explicit operator bool() const { return hasValue(); }
+  constexpr bool has_value() const { return Storage.hasValue(); }
   constexpr bool hasValue() const { return Storage.hasValue(); }
   constexpr const T *operator->() const { return getPointer(); }
   T *operator->() { return getPointer(); }

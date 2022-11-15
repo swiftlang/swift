@@ -521,8 +521,8 @@ public:
     // We do this so in both cases we can return a simple pointer.
     std::vector<MemoryReader::ReadBytesResult> ReadDataBuffer;
     auto readData = [&](uint64_t Offset, uint64_t Size) -> const void * {
-      if (FileBuffer.hasValue()) {
-        auto Buffer = FileBuffer.getValue();
+      if (FileBuffer.has_value()) {
+        auto Buffer = FileBuffer.value();
         if (Offset + Size > Buffer.allocatedSize())
           return nullptr;
         return (const void *)((uint64_t)Buffer.base() + Offset);
@@ -608,7 +608,7 @@ public:
                 RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
             auto SecSize = Hdr->sh_size;
             MemoryReader::ReadBytesResult SecBuf;
-            if (FileBuffer.hasValue()) {
+            if (FileBuffer.has_value()) {
               // sh_offset gives us the offset to the section in the file,
               // while sh_addr gives us the offset in the process.
               auto Offset = Hdr->sh_offset;
@@ -981,7 +981,7 @@ public:
     auto Result = readMetadataFromInstance(*PointerValue);
     if (!Result)
       return {};
-    auto TypeResult = readTypeFromMetadata(Result.getValue());
+    auto TypeResult = readTypeFromMetadata(Result.value());
     if (!TypeResult)
       return {};
     return {{std::move(TypeResult), RemoteAddress(*PointerValue)}};

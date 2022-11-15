@@ -214,7 +214,7 @@ public:
 
   public:
     /// Returns true if the version has a valid source kind.
-    bool isValid() const { return SourceKind.hasValue(); }
+    bool isValid() const { return SourceKind.has_value(); }
 
     /// Returns the version, which may be empty if a version was not present or
     /// was unparsable.
@@ -223,7 +223,7 @@ public:
     /// Returns the kind of source of the module version. Do not call if
     /// \c isValid() returns false.
     ModuleVersionSourceKind getSourceKind() const {
-      return SourceKind.getValue();
+      return SourceKind.value();
     }
 
     void setVersion(llvm::VersionTuple version, ModuleVersionSourceKind kind) {

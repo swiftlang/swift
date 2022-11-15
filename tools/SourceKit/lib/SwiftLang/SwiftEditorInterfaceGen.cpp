@@ -296,13 +296,13 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
   if (!Group && InterestedUSR) {
-    Group = findGroupNameForUSR(Mod, InterestedUSR.getValue());
+    Group = findGroupNameForUSR(Mod, InterestedUSR.value());
   }
-  printModuleInterface(Mod, Group.hasValue()
-                         ? llvm::makeArrayRef(Group.getValue())
+  printModuleInterface(Mod, Group.has_value()
+                         ? llvm::makeArrayRef(Group.value())
                          : ArrayRef<StringRef>(),
                        TraversalOptions, Printer, Options,
-                       Group.hasValue() && SynthesizedExtensions);
+                       Group.has_value() && SynthesizedExtensions);
 
   Info.Text = std::string(OS.str());
   return false;
@@ -788,9 +788,9 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   if (!swiftVersion.empty()) {
     auto swiftVer =
         VersionParser::parseVersionString(swiftVersion, SourceLoc(), nullptr);
-    if (swiftVer.hasValue())
+    if (swiftVer.has_value())
       Invocation.getLangOptions().EffectiveLanguageVersion =
-          swiftVer.getValue();
+          swiftVer.value();
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,

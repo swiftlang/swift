@@ -346,7 +346,7 @@ private:
       return genericParamTypeTag;
     if (context.is(PrintStructureKind::TupleElement))
       return "tuple.element.type";
-    if (context.getPrintStructureKind().hasValue() || context.isType())
+    if (context.getPrintStructureKind().has_value() || context.isType())
       return "";
 
     assert(context.getDecl() && "unexpected context kind");
@@ -651,7 +651,7 @@ static void mapLocToLatestSnapshot(
 
       auto OptBegin = mapOffsetToNewerSnapshot(Location.Offset,
                                                PrevSnap, LatestSnap);
-      if (!OptBegin.hasValue()) {
+      if (!OptBegin.has_value()) {
         Location.Filename = StringRef();
         return;
       }
@@ -659,7 +659,7 @@ static void mapLocToLatestSnapshot(
       auto OptEnd = mapOffsetToNewerSnapshot(Location.Offset +
                                              Location.Length,
                                              PrevSnap, LatestSnap);
-      if (!OptEnd.hasValue()) {
+      if (!OptEnd.has_value()) {
         Location.Filename = StringRef();
         return;
       }
@@ -898,7 +898,7 @@ static void setLocationInfo(const ValueDecl *VD,
     };
     unsigned NameLen;
     if (auto SigLen = getSignatureRange(VD)) {
-      NameLen = SigLen.getValue();
+      NameLen = SigLen.value();
     } else if (VD->hasName()) {
       NameLen = VD->getBaseName().userFacingName().size();
     } else {
@@ -979,7 +979,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     auto *Group = DInfo.InSynthesizedExtension ? DInfo.BaseType->getAnyNominal()
                                                : DInfo.VD;
     if (auto Name = Group->getGroupName())
-      Symbol.GroupName = Name.getValue();
+      Symbol.GroupName = Name.value();
   }
 
   ide::getLocalizationKey(DInfo.VD, OS);
@@ -1416,14 +1416,14 @@ public:
             return Offset;
 
           auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
-          if (!OptOffset.hasValue())
+          if (!OptOffset.has_value())
             return None;
 
           // Check that the new and old offset still point to the same token.
           StringRef NewTok = getSourceToken(Offset, InputSnap);
           if (NewTok.empty())
             return None;
-          if (NewTok == getSourceToken(OptOffset.getValue(), Snap))
+          if (NewTok == getSourceToken(OptOffset.value(), Snap))
             return OptOffset;
 
           return None;
@@ -1433,7 +1433,7 @@ public:
     };
 
     auto OldOffsetOpt = mappedBackOffset();
-    if (OldOffsetOpt.hasValue()) {
+    if (OldOffsetOpt.has_value()) {
       Offset = *OldOffsetOpt;
       PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
       LOG_INFO_FUNC(High, "will try existing AST");
@@ -1478,7 +1478,7 @@ static void resolveCursor(
       auto &CompIns = AstUnit->getCompilerInstance();
       ModuleDecl *MainModule = CompIns.getMainModule();
       SourceManager &SM = CompIns.getSourceMgr();
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
+      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
@@ -1633,7 +1633,7 @@ static void computeDiagnostics(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       unsigned BufferID =
-          AstUnit->getPrimarySourceFile().getBufferID().getValue();
+          AstUnit->getPrimarySourceFile().getBufferID().value();
       auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
@@ -1679,7 +1679,7 @@ static void resolveName(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
+      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(CompIns.getSourceMgr(), BufferID, Offset);
       if (Loc.isInvalid()) {
@@ -2345,7 +2345,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
       SmallVector<std::pair<unsigned, unsigned>, 8> Ranges;
 
       auto Action = [&]() {
-        unsigned BufferID = SrcFile.getBufferID().getValue();
+        unsigned BufferID = SrcFile.getBufferID().value();
         SourceLoc Loc =
           Lexer::getLocForStartOfToken(CompInst.getSourceMgr(), BufferID, Offset);
         if (Loc.isInvalid())
@@ -2496,7 +2496,7 @@ void SwiftLangSupport::semanticRefactoring(
       ModuleDecl *MainModule = CompIns.getMainModule();
       RefactoringOptions Opts(getIDERefactoringKind(Info));
       Opts.Range.BufferId =  AstUnit->getPrimarySourceFile().getBufferID().
-        getValue();
+        value();
       Opts.Range.Line = Info.Line;
       Opts.Range.Column = Info.Column;
       Opts.Range.Length = Info.Length;
@@ -2628,9 +2628,9 @@ void SwiftLangSupport::collectVariableTypes(
       // offset/length are unset, the (default) range will be used, which
       // corresponds to the entire document.
       SourceRange Range;
-      if (Offset.hasValue() && Length.hasValue()) {
+      if (Offset.has_value() && Length.has_value()) {
         auto &SM = CompInst.getSourceMgr();
-        unsigned BufferID = SF->getBufferID().getValue();
+        unsigned BufferID = SF->getBufferID().value();
         SourceLoc Start = Lexer::getLocForStartOfToken(SM, BufferID, *Offset);
         SourceLoc End =
             Lexer::getLocForStartOfToken(SM, BufferID, *Offset + *Length);

@@ -2634,13 +2634,13 @@ public:
     return true;
   }
 
-  bool hasConvention() const { return ConventionArguments.hasValue(); }
+  bool hasConvention() const { return ConventionArguments.has_value(); }
 
   /// Returns the primary calling convention string.
   ///
   /// Note: For C conventions, this may not represent the full convention.
   StringRef getConventionName() const {
-    return ConventionArguments.getValue().Name;
+    return ConventionArguments.value().Name;
   }
 
   /// Show the string enclosed between @convention(..)'s parentheses.
@@ -2664,10 +2664,10 @@ public:
 #include "swift/AST/ReferenceStorage.def"
   }
 
-  bool hasOpenedID() const { return OpenedID.hasValue(); }
+  bool hasOpenedID() const { return OpenedID.has_value(); }
   UUID getOpenedID() const { return *OpenedID; }
 
-  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  bool hasConstraintType() const { return ConstraintType.has_value(); }
   TypeRepr *getConstraintType() const { return *ConstraintType; }
 
   /// Given a name like "autoclosure", return the type attribute ID that

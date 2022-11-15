@@ -797,8 +797,8 @@ ASTProducerRef
 SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
   llvm::sys::ScopedLock L(CacheMtx);
   llvm::Optional<ASTProducerRef> OptProducer = ASTCache.get(InvokRef->Impl.Key);
-  if (OptProducer.hasValue())
-    return OptProducer.getValue();
+  if (OptProducer.has_value())
+    return OptProducer.value();
   ASTProducerRef Producer = std::make_shared<ASTProducer>(InvokRef);
   ASTCache.set(InvokRef->Impl.Key, Producer);
   return Producer;

@@ -5826,7 +5826,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -5837,11 +5837,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 
   StructDecl *getStructDecl() const {
@@ -6116,7 +6116,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -6127,11 +6127,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 };
 
@@ -6172,7 +6172,7 @@ public:
     return index;
   }
 
-  bool hasOperand() const { return OptionalOperand.hasValue(); }
+  bool hasOperand() const { return OptionalOperand.has_value(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
 
   Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
@@ -8974,7 +8974,7 @@ protected:
       cases[i] = CaseBBs[i].first;
       if (Counts) {
         ::new (succs + i)
-            SILSuccessor(this, CaseBBs[i].second, Counts.getValue()[i]);
+            SILSuccessor(this, CaseBBs[i].second, Counts.value()[i]);
       } else {
         ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
       }
