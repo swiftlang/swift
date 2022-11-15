@@ -253,6 +253,9 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T, kind);
   }
 
@@ -293,6 +296,9 @@ private:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(asDerived(), T);
+    }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,
                                                       ScalarKind::POD);
   }

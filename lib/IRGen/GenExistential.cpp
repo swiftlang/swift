@@ -683,7 +683,9 @@ namespace {
         IsOptional(isOptional) {} \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                           SILType T) const override { \
-      if (Refcounting == ReferenceCounting::Native) { \
+      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
+      } else if (Refcounting == ReferenceCounting::Native) { \
         return IGM.typeLayoutCache.getOrCreateScalarEntry( \
             *this, T, ScalarKind::Native##Name##Reference); \
       } else { \
@@ -737,6 +739,9 @@ namespace {
     } \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                           SILType T) const override { \
+      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
+      } \
       ScalarKind kind; \
       switch (Refcounting) { \
         case ReferenceCounting::Native:  kind = ScalarKind::NativeStrongReference; break; \
@@ -795,6 +800,9 @@ namespace {
                                       spareBits, align, IsPOD, IsFixedSize) {} \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                           SILType T) const override { \
+      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
+      } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::POD); \
     } \
     const LoadableTypeInfo & \
@@ -863,6 +871,9 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(
         *this, T, ScalarKind::ExistentialReference);
   }
@@ -1015,7 +1026,8 @@ class ClassExistentialTypeInfo final
                                         SILType T) const override {
     // We can't create an objc typeinfo by itself, so don't destructure if we
     // have one
-    if (Refcounting == ReferenceCounting::ObjC) {
+    if (!IGM.getOptions().ForceStructTypeLayouts ||
+        Refcounting == ReferenceCounting::ObjC) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
 
@@ -1349,6 +1361,9 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
                                                       ScalarKind::POD);
   }
@@ -1386,6 +1401,9 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
     ScalarKind kind;
     switch (Refcounting) {
     case ReferenceCounting::Native:

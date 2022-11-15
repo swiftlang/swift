@@ -156,6 +156,9 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
                                                         ScalarKind::POD);
     }
@@ -224,7 +227,9 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-      if (isPOD(ResilienceExpansion::Maximal)) {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      } else if (isPOD(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
                                                            ScalarKind::POD);
       } else {
@@ -404,6 +409,9 @@ namespace {
     }
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(
           *this, T, ScalarKind::BlockReference);
     }
@@ -427,6 +435,9 @@ namespace {
     
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(
           *this, T, ScalarKind::BlockStorage);
     }
