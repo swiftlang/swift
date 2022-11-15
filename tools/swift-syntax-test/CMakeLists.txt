@@ -12,4 +12,4 @@ target_link_libraries(swift-syntax-test
                         swiftFrontend
                         swiftSema
                         swiftSyntax
-                        swiftCompilerModules_SwiftSyntax)
+                        swiftCompilerModules)
