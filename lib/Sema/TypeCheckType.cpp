@@ -1492,6 +1492,7 @@ static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
 
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
+/// \param silParams Used to look up generic parameters in SIL mode.
 ///
 /// \returns Either the resolved type or a null type, the latter of
 /// which indicates that some dependencies were unsatisfied.
@@ -1819,61 +1820,6 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
-}
-
-/// \param silParams Used to look up generic parameters in SIL mode.
-static Type
-resolveIdentTypeComponent(TypeResolution resolution,
-                          GenericParamList *silParams,
-                          ArrayRef<ComponentIdentTypeRepr *> components) {
-  // The first component uses unqualified lookup.
-  auto topLevelComp = components.front();
-  auto result = resolveTopLevelIdentTypeComponent(resolution, silParams,
-                                                  topLevelComp);
-  if (result->hasError())
-    return ErrorType::get(result->getASTContext());
-
-  // Remaining components are resolved via iterated qualified lookups.
-  SourceRange parentRange(topLevelComp->getStartLoc(),
-                          topLevelComp->getEndLoc());
-  for (auto nestedComp : components.drop_front()) {
-    result = resolveNestedIdentTypeComponent(resolution, silParams,
-                                             result, parentRange,
-                                             nestedComp);
-    if (result->hasError())
-      return ErrorType::get(result->getASTContext());
-
-    parentRange.End = nestedComp->getEndLoc();
-  }
-
-  // Diagnose an error if the last component's generic arguments are missing.
-  auto lastComp = components.back();
-  auto options = resolution.getOptions();
-
-  if (result->is<UnboundGenericType>() &&
-      !isa<GenericIdentTypeRepr>(lastComp) &&
-      !resolution.getUnboundTypeOpener() &&
-      !options.is(TypeResolverContext::TypeAliasDecl) &&
-      !options.is(TypeResolverContext::ExtensionBinding)) {
-
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      // Tailored diagnostic for custom attributes.
-      if (options.is(TypeResolverContext::CustomAttr)) {
-        auto &ctx = resolution.getASTContext();
-        ctx.Diags.diagnose(lastComp->getNameLoc(), diag::unknown_attribute,
-                           lastComp->getNameRef().getBaseIdentifier().str());
-
-        return ErrorType::get(ctx);
-      }
-
-      diagnoseUnboundGenericType(result,
-                                 lastComp->getNameLoc().getBaseNameLoc());
-    }
-
-    return ErrorType::get(result->getASTContext());
-  }
-
-  return result;
 }
 
 // Hack to apply context-specific @escaping to an AST function type.
@@ -3866,10 +3812,50 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     Components = cast<CompoundIdentTypeRepr>(IdType)->getComponents();
   }
 
-  Type result = resolveIdentTypeComponent(resolution.withOptions(options),
-                                          genericParams, Components);
-  if (!result || result->hasError()) {
-    return ErrorType::get(getASTContext());
+  // The first component uses unqualified lookup.
+  auto topLevelComp = Components.front();
+  auto result = resolveTopLevelIdentTypeComponent(
+      resolution.withOptions(options), genericParams, topLevelComp);
+  if (result->hasError())
+    return ErrorType::get(result->getASTContext());
+
+  // Remaining components are resolved via iterated qualified lookups.
+  SourceRange parentRange(topLevelComp->getStartLoc(),
+                          topLevelComp->getEndLoc());
+  for (auto nestedComp : Components.drop_front()) {
+    result = resolveNestedIdentTypeComponent(resolution.withOptions(options),
+                                             genericParams, result, parentRange,
+                                             nestedComp);
+    if (result->hasError())
+      return ErrorType::get(result->getASTContext());
+
+    parentRange.End = nestedComp->getEndLoc();
+  }
+
+  auto lastComp = Components.back();
+
+  // Diagnose an error if the last component's generic arguments are missing.
+  if (result->is<UnboundGenericType>() &&
+      !isa<GenericIdentTypeRepr>(lastComp) &&
+      !resolution.getUnboundTypeOpener() &&
+      !options.is(TypeResolverContext::TypeAliasDecl) &&
+      !options.is(TypeResolverContext::ExtensionBinding)) {
+
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      // Tailored diagnostic for custom attributes.
+      if (options.is(TypeResolverContext::CustomAttr)) {
+        auto &ctx = resolution.getASTContext();
+        ctx.Diags.diagnose(lastComp->getNameLoc(), diag::unknown_attribute,
+                           lastComp->getNameRef().getBaseIdentifier().str());
+
+        return ErrorType::get(ctx);
+      }
+
+      diagnoseUnboundGenericType(result,
+                                 lastComp->getNameLoc().getBaseNameLoc());
+    }
+
+    return ErrorType::get(result->getASTContext());
   }
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
@@ -3879,12 +3865,11 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
-      diagnose(Components.back()->getNameLoc(),
-               diag::cannot_find_type_in_scope, DeclNameRef(moduleName));
-      diagnose(Components.back()->getNameLoc(),
-               diag::note_module_as_type, moduleName);
+      diagnose(lastComp->getNameLoc(), diag::cannot_find_type_in_scope,
+               DeclNameRef(moduleName));
+      diagnose(lastComp->getNameLoc(), diag::note_module_as_type, moduleName);
     }
-    Components.back()->setInvalid();
+    lastComp->setInvalid();
     return ErrorType::get(getASTContext());
   }
 
