@@ -68,6 +68,7 @@ if (SWIFT_SWIFT_PARSER)
     $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
 
     swiftAST
+    swift_CompilerPluginSupport
   )
 
   target_include_directories(swiftASTGen PUBLIC

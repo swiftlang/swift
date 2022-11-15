@@ -6,8 +6,7 @@
 function(add_swift_parser_link_libraries target)
   if(SWIFT_SWIFT_PARSER)
     target_link_libraries(${target}
-                          PRIVATE
-                            swift_CompilerPluginSupport swiftCore)
+                          PRIVATE swiftCore)
   endif()
 endfunction()
 
@@ -68,11 +67,6 @@ target_link_libraries(swift-frontend
                         swiftCompilerModules)
 
 add_swift_parser_link_libraries(swift-frontend)
-if(SWIFT_SWIFT_PARSER)
-  set_property(
-    TARGET swift-frontend
-    APPEND PROPERTY INSTALL_RPATH "@executable_path/../lib")
-endif()
 
 _add_swift_runtime_link_flags(swift-frontend "../../lib" "")
 
