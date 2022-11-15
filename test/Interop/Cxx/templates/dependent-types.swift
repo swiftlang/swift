@@ -89,7 +89,6 @@ DependentTypesTestSuite.test("Complex different dependent return type inferrd.")
   expectEqual(m.getValue(), 42)
 }
 
-// TODO: Currently still failing: Could not cast value of type '__C.__CxxTemplateInst1MIlE' to 'Swift.Int'
 DependentTypesTestSuite.test("Complex different dependent argument and return type") {
   let m = complexDifferentDependentArgAndRet(42, T: Int.self, U: Int.self) as! Int
   expectEqual(m, 42)

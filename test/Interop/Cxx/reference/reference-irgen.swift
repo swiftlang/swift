@@ -32,7 +32,7 @@ public func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
 
 public func setCxxRef() {
   var val: CInt = 21
-  setStaticIntRef(&val)
+  setStaticIntRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main9setCxxRefyyF"()
@@ -48,7 +48,7 @@ public func setCxxConstRef() {
 
 public func setCxxRvalueRef() {
   var val: CInt = 21
-  setStaticIntRvalueRef(&val)
+  setStaticIntRvalueRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main15setCxxRvalueRefyyF"()

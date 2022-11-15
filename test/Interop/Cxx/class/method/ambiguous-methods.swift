@@ -59,11 +59,11 @@ CxxAmbiguousMethodTestSuite.test("Out Param Increment: (Int, Int, inout Int) -> 
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Non mutable version should NOT change count
-  instance.increment(0, 1, &out);
+  instance.increment(0, 1, out);
   expectEqual(1, out)
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
-  instance.incrementMutating(5, 2, &out);
+  instance.incrementMutating(5, 2, out);
   expectEqual(7, out)
   expectEqual(1, instance.numberOfMutableMethodsCalled())
 }
@@ -76,11 +76,11 @@ CxxAmbiguousMethodTestSuite.test("Inout Param Increment: (inout Int, Int) -> Voi
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Non mutable version should NOT change count
-  instance.increment(&inoutVal, 1);
+  instance.increment(inoutVal, 1);
   expectEqual(1, inoutVal)
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
-  instance.incrementMutating(&inoutVal, 2);
+  instance.incrementMutating(inoutVal, 2);
   expectEqual(3, inoutVal)
   expectEqual(1, instance.numberOfMutableMethodsCalled())
 }

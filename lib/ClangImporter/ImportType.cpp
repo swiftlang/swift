@@ -2301,8 +2301,11 @@ ClangImporter::Implementation::importParameterType(
     }
 
     paramTy = refType->getPointeeType();
-    if (!paramTy.isConstQualified())
+    if ((isa<clang::LValueReferenceType>(paramTy) &&
+        !paramTy.isConstQualified()) &&
+        !isa<clang::RValueReferenceType>(paramTy)) {
       isInOut = true;
+    }
   }
 
   // Special case for NSDictionary's subscript.

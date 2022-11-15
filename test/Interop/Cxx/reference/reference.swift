@@ -40,7 +40,7 @@ ReferenceTestSuite.test("write-rvalue-reference") {
 ReferenceTestSuite.test("pass-lvalue-reference") {
   expectNotEqual(21, getStaticInt())
   var val: CInt = 21
-  setStaticIntRef(&val)
+  setStaticIntRef(val)
   expectEqual(21, getStaticInt())
 }
 
@@ -54,7 +54,7 @@ ReferenceTestSuite.test("pass-const-lvalue-reference") {
 ReferenceTestSuite.test("pass-rvalue-reference") {
   expectNotEqual(52, getStaticInt())
   var val: CInt = 52
-  setStaticIntRvalueRef(&val)
+  setStaticIntRvalueRef(val)
   expectEqual(52, getStaticInt())
 }
 

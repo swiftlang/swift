@@ -6,8 +6,8 @@
 // CHECK: func getConstStaticIntRef() -> UnsafePointer<Int32>
 // CHECK: func getConstStaticIntRvalueRef() -> UnsafePointer<Int32>
 // CHECK: func setStaticInt(_: Int32)
-// CHECK: func setStaticIntRef(_: inout Int32)
-// CHECK: func setStaticIntRvalueRef(_: inout Int32)
+// CHECK: func setStaticIntRef(_: Int32)
+// CHECK: func setStaticIntRvalueRef(_: Int32)
 // CHECK: func setConstStaticIntRef(_: Int32)
 // CHECK: func setConstStaticIntRvalueRef(_: Int32)
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
