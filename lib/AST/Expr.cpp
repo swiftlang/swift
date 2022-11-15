@@ -215,8 +215,12 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS,
   }
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:  {
-    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    const auto *NE = cast<NumberLiteralExpr>(E);
+    auto digits = NE->getDigitsText();
     assert(!digits.empty());
+    if (NE->getMinusLoc().isValid()) {
+      print("-");
+    }
     print(digits);
     return true;
   }
