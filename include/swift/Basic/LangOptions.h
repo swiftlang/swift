@@ -528,6 +528,9 @@ namespace swift {
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
+    /// Enables dumping macro expansions.
+    bool DumpMacroExpansions = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
