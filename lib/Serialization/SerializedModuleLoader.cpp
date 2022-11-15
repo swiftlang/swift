@@ -1494,7 +1494,8 @@ void SerializedASTFile::lookupImportedSPIGroups(
       continue;
 
     if (dep.Import->importedModule == importedModule ||
-        imports.isImportedBy(importedModule, dep.Import->importedModule)) {
+        (imports.isImportedBy(importedModule, dep.Import->importedModule) &&
+         importedModule->isExportedAs(dep.Import->importedModule))) {
       spiGroups.insert(dep.spiGroups.begin(), dep.spiGroups.end());
     }
   }
