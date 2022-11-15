@@ -276,7 +276,7 @@ public:
   }
 
   const SignatureExpansionABIDetails &getABIDetails() {
-    assert(ABIDetails.hasValue());
+    assert(ABIDetails.has_value());
     return *ABIDetails;
   }
 };

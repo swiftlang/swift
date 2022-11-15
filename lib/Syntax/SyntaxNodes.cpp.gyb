@@ -95,7 +95,7 @@ ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
 ${node.name} ${node.name}::with${child.name}(
   llvm::Optional<${child.type_name}> New${child.type_name}) {
   const RawSyntax *raw;
-  if (New${child.type_name}.hasValue()) {
+  if (New${child.type_name}.has_value()) {
     raw = New${child.type_name}->getRaw();
   } else {
 % if child.is_optional:

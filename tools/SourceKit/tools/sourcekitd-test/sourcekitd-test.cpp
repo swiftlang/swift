@@ -583,7 +583,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   }
 
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
-  if (Opts.SourceText.hasValue()) {
+  if (Opts.SourceText.has_value()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(*Opts.SourceText, Opts.SourceFile);
   } else if (!SourceFile.empty()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(
@@ -967,7 +967,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
-                                       Opts.ReplaceText.getValue().c_str());
+                                       Opts.ReplaceText.value().c_str());
     addRequestOptionsDirect(Req, Opts);
     break;
 
@@ -1167,11 +1167,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyFilePath,
                                              Opts.HeaderPath.c_str());
   }
-  if (Opts.CancelOnSubsequentRequest.hasValue()) {
+  if (Opts.CancelOnSubsequentRequest.has_value()) {
     sourcekitd_request_dictionary_set_int64(Req, KeyCancelOnSubsequentRequest,
                                             *Opts.CancelOnSubsequentRequest);
   }
-  if (Opts.SimulateLongRequest.hasValue()) {
+  if (Opts.SimulateLongRequest.has_value()) {
     sourcekitd_request_dictionary_set_int64(Req, KeySimulateLongRequest,
                                             *Opts.SimulateLongRequest);
   }
@@ -1418,7 +1418,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       printRawResponse(Resp);
-      if (Opts.ReplaceText.hasValue()) {
+      if (Opts.ReplaceText.has_value()) {
         unsigned Offset =
             resolveFromLineCol(Opts.Line, Opts.Col, SourceFile, Opts.VFSFiles);
         unsigned Length = Opts.Length;
@@ -1431,7 +1431,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         sourcekitd_request_dictionary_set_int64(EdReq, KeyOffset, Offset);
         sourcekitd_request_dictionary_set_int64(EdReq, KeyLength, Length);
         sourcekitd_request_dictionary_set_string(EdReq, KeySourceText,
-                                           Opts.ReplaceText.getValue().c_str());
+                                           Opts.ReplaceText.value().c_str());
         bool EnableSyntaxMax = Opts.Request == SourceKitRequest::SyntaxMap;
         bool EnableSubStructure = Opts.Request == SourceKitRequest::Structure;
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableSyntaxMap,
@@ -2134,15 +2134,15 @@ static void printFoundUSR(sourcekitd_variant_t Info,
   if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL)
     Offset = sourcekitd_variant_int64_get_value(OffsetObj);
 
-  if (!Offset.hasValue()) {
+  if (!Offset.has_value()) {
     OS << "USR NOT FOUND\n";
     return;
   }
 
   int64_t Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
 
-  auto LineCol1 = resolveToLineCol(Offset.getValue(), SourceBuf);
-  auto LineCol2 = resolveToLineCol(Offset.getValue() + Length, SourceBuf);
+  auto LineCol1 = resolveToLineCol(Offset.value(), SourceBuf);
+  auto LineCol2 = resolveToLineCol(Offset.value() + Length, SourceBuf);
   OS << '(' << LineCol1.first << ':' << LineCol1.second << '-'
             << LineCol2.first << ':' << LineCol2.second << ")\n";
 }

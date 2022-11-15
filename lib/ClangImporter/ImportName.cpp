@@ -2243,11 +2243,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
               ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
               : None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [](const ForeignAsyncConvention::Info &info) {
               return info.completionHandlerParamIndex();
             }),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [&](const ForeignAsyncConvention::Info &info) {
               return method->getDeclName().getObjCSelector().getNameForSlot(
                                             info.completionHandlerParamIndex());

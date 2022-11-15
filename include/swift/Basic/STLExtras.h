@@ -405,7 +405,7 @@ class OptionalTransformIterator {
       typename std::iterator_traits<Iterator>::reference;
 
   using ResultReference =
-      typename std::result_of<OptionalTransform(UnderlyingReference)>::type;
+      typename std::invoke_result<OptionalTransform, UnderlyingReference>::type;
 
 public:
   /// Used to indicate when the current iterator has already been

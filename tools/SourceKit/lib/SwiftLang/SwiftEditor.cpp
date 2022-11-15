@@ -159,7 +159,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     }
   }
 
-  if (BufferIDOpt.hasValue()) {
+  if (BufferIDOpt.has_value()) {
     unsigned BufferID = *BufferIDOpt;
 
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
@@ -1056,11 +1056,11 @@ public:
       return;
     }
 
-    if (!AstUnit->getPrimarySourceFile().getBufferID().hasValue()) {
+    if (!AstUnit->getPrimarySourceFile().getBufferID().has_value()) {
       LOG_WARN_FUNC("Primary SourceFile is expected to have a BufferID");
       return;
     }
-    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
+    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
@@ -1199,7 +1199,7 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
       D->getKind() == DeclKind::EnumElement) {
     if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
       if (auto containerAccess = inferAccessSyntactically(container))
-        return std::max(containerAccess.getValue(), AccessLevel::Internal);
+        return std::max(containerAccess.value(), AccessLevel::Internal);
       return None;
     }
     return AccessLevel::Private;
@@ -1224,7 +1224,7 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
     AccessLevel access = AccessLevel::Internal;
     if (isa<ProtocolDecl>(generic)) {
       if (auto protoAccess = inferAccessSyntactically(generic))
-        access = std::max(AccessLevel::FilePrivate, protoAccess.getValue());
+        access = std::max(AccessLevel::FilePrivate, protoAccess.value());
     }
     return access;
   }
@@ -1317,14 +1317,14 @@ public:
         Node.Kind != SyntaxStructureKind::GenericTypeParam) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         if (auto Access = inferAccessSyntactically(VD))
-          AccessLevel = getAccessLevelUID(Access.getValue());
+          AccessLevel = getAccessLevelUID(Access.value());
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
         if (auto DefaultAccess = inferDefaultAccessSyntactically(ED))
-          AccessLevel = getAccessLevelUID(DefaultAccess.getValue());
+          AccessLevel = getAccessLevelUID(DefaultAccess.value());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
         if (auto SetAccess = inferSetterAccessSyntactically(ASD))
-          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
+          SetterAccessLevel = getAccessLevelUID(SetAccess.value());
       }
     }
 
@@ -1373,7 +1373,7 @@ public:
                                                     BufferID);
         }
 
-        auto AttrTuple = std::make_tuple(AttrUID.getValue(), AttrOffset,
+        auto AttrTuple = std::make_tuple(AttrUID.value(), AttrOffset,
                                          AttrEnd - AttrOffset);
         Attrs.push_back(AttrTuple);
       }
@@ -1844,7 +1844,7 @@ public:
     }
 
     // If there was no appropriate parent call expression, it's non-trailing.
-    if (!targetPlaceholderIndex.hasValue()) {
+    if (!targetPlaceholderIndex.has_value()) {
       OneClosureCallback(Args, /*useTrailingClosure=*/false,
                          /*isWrappedWithBraces=*/false, TargetClosureInfo);
       return true;
@@ -1857,7 +1857,7 @@ public:
     while (firstTrailingIndex != 0) {
       unsigned i = firstTrailingIndex - 1;
       if (params[i].isNonPlaceholderClosure ||
-          !params[i].placeholderClosure.hasValue())
+          !params[i].placeholderClosure.has_value())
         break;
       firstTrailingIndex = i;
     }
@@ -2119,9 +2119,9 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
 
   // If there's no value returned for diagnostics it means they are out-of-date
   // (based on a different snapshot).
-  if (SemaDiags.hasValue()) {
+  if (SemaDiags.has_value()) {
     Consumer.setDiagnosticStage(SemaDiagStage);
-    for (auto &Diag : SemaDiags.getValue())
+    for (auto &Diag : SemaDiags.value())
       Consumer.handleDiagnostic(Diag, SemaDiagStage);
   } else {
     Consumer.setDiagnosticStage(ParseDiagStage);
@@ -2400,8 +2400,8 @@ void SwiftLangSupport::editorOpen(
   EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
 
   if (Consumer.syntaxTreeEnabled()) {
-    assert(EditorDoc->getSyntaxTree().hasValue());
-    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
+    assert(EditorDoc->getSyntaxTree().has_value());
+    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().value());
   }
 }
 
@@ -2542,8 +2542,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     llvm::Optional<SyntaxParsingCache> SyntaxCache = llvm::None;
-    if (EditorDoc->getSyntaxTree().hasValue()) {
-      SyntaxCache.emplace(EditorDoc->getSyntaxTree().getValue());
+    if (EditorDoc->getSyntaxTree().has_value()) {
+      SyntaxCache.emplace(EditorDoc->getSyntaxTree().value());
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
     }
 
@@ -2551,7 +2551,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
 
 
     SyntaxParsingCache *SyntaxCachePtr = nullptr;
-    if (SyntaxCache.hasValue()) {
+    if (SyntaxCache.has_value()) {
       SyntaxCachePtr = SyntaxCache.getPointer();
     }
     EditorDoc->resetSyntaxInfo(Snapshot, *this, Consumer.syntaxTreeEnabled(),
@@ -2568,7 +2568,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/false);
 
     // Log reuse information
-    if (SyntaxCache.hasValue() && LogReuseRegions) {
+    if (SyntaxCache.has_value() && LogReuseRegions) {
       auto &SyntaxTree = EditorDoc->getSyntaxTree();
       auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
       LOG_SECTION("SyntaxCache", InfoHighPrio) {
@@ -2588,7 +2588,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     if (Consumer.syntaxTreeEnabled()) {
-      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
+      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().value());
     }
 
     if (ValidateSyntaxTree) {

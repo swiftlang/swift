@@ -178,7 +178,7 @@ SyntaxFactory::make${node.syntax_kind}(${child_params}) {
   auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
-    ${child.name}.hasValue() ? ${child.name}->getRaw() : nullptr,
+    ${child.name}.has_value() ? ${child.name}->getRaw() : nullptr,
 %       else:
     ${child.name}.getRaw(),
 %       end

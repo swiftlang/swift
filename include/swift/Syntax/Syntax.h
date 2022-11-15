@@ -159,7 +159,7 @@ public:
 
   SyntaxDataRef *getDataPtr() { return Data.getPointer(); }
 
-  bool hasValue() const { return Data.hasValue(); }
+  bool hasValue() const { return Data.has_value(); }
 
   explicit operator bool() const { return hasValue(); }
 

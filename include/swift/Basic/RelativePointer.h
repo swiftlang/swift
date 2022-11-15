@@ -551,7 +551,7 @@ public:
   }
 
   template <typename... ArgTy>
-  typename std::result_of<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
+  typename std::invoke_result<T*, ArgTy...>::type operator()(ArgTy... arg) const {
 #if SWIFT_PTRAUTH
     void *ptr = this->super::getWithoutCast();
     return reinterpret_cast<T *>(ptrauth_sign_unauthenticated(

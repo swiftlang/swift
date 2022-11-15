@@ -568,11 +568,11 @@ int parseFile(
     Deserializer = new swift::json::SyntaxDeserializer(
         llvm::MemoryBufferRef(*(Buffer.get())));
     auto OldSyntaxTree = Deserializer->getSourceFileSyntax();
-    if (!OldSyntaxTree.hasValue()) {
+    if (!OldSyntaxTree.has_value()) {
       llvm::errs() << "Could not deserialise old syntax tree.";
       return EXIT_FAILURE;
     }
-    SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.getValue());
+    SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.value());
 
     if (options::OldSourceFilename.empty()) {
       llvm::errs() << "The old syntax file must be provided to translate "

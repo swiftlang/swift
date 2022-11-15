@@ -404,7 +404,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
 
     case OPT_vfs_files:
-      VFSName = VFSName.getValueOr("in-memory-vfs");
+      VFSName = VFSName.value_or("in-memory-vfs");
       for (const char *vfsFile : InputArg->getValues()) {
         StringRef name, target;
         std::tie(name, target) = StringRef(vfsFile).split('=');

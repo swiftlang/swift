@@ -101,7 +101,7 @@ protected:
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
   static bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc){
-    return implicit.hasValue() ? *implicit : keyLoc.isInvalid();
+    return implicit.has_value() ? *implicit : keyLoc.isInvalid();
   }
   
 public:
@@ -1093,7 +1093,7 @@ public:
   void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }
+  bool hasBoundDecls() const { return CaseBodyVariables.has_value(); }
 
   /// Get the source location of the 'case', 'default', or 'catch' of the first
   /// label.
@@ -1152,7 +1152,7 @@ public:
     return a;
   }
 
-  bool hasCaseBodyVariables() const { return CaseBodyVariables.hasValue(); }
+  bool hasCaseBodyVariables() const { return CaseBodyVariables.has_value(); }
 
   /// Return an MutableArrayRef containing the case body variables of this
   /// CaseStmt.

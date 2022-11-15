@@ -3107,15 +3107,15 @@ protected:
                   RecursiveTypeProperties properties, unsigned NumParams,
                   Optional<ExtInfo> Info)
       : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
-    if (Info.hasValue()) {
+    if (Info.has_value()) {
       Bits.AnyFunctionType.HasExtInfo = true;
-      Bits.AnyFunctionType.ExtInfoBits = Info.getValue().getBits();
+      Bits.AnyFunctionType.ExtInfoBits = Info.value().getBits();
       Bits.AnyFunctionType.HasClangTypeInfo =
-          !Info.getValue().getClangTypeInfo().empty();
+          !Info.value().getClangTypeInfo().empty();
       Bits.AnyFunctionType.HasGlobalActor =
-          !Info.getValue().getGlobalActor().isNull();
+          !Info.value().getGlobalActor().isNull();
       // The use of both assert() and static_assert() is intentional.
-      assert(Bits.AnyFunctionType.ExtInfoBits == Info.getValue().getBits() &&
+      assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
       static_assert(
           ASTExtInfoBuilder::NumMaskBits == NumAFTExtInfoBits,
@@ -4918,8 +4918,8 @@ public:
              kind == innerty::ABIEscapeToNoEscapeConversion;
     }
 
-    bool hasPayload() const { return payload.hasValue(); }
-    uintptr_t getPayload() const { return payload.getValue(); }
+    bool hasPayload() const { return payload.has_value(); }
+    uintptr_t getPayload() const { return payload.value(); }
     StringRef getMessage() const;
   };
 

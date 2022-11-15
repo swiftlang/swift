@@ -854,9 +854,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
         swiftscan_string_ref_t moduleInterfacePath =
             create_clone(swiftTextualDeps->swiftInterfaceFile.c_str());
         swiftscan_string_ref_t bridgingHeaderPath =
-            swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.hasValue()
+            swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.has_value()
                 ? create_clone(
-                      swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.getValue().c_str())
+                      swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.value().c_str())
                 : create_null();
 
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
@@ -874,9 +874,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
-          swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.hasValue()
+          swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.has_value()
                 ? create_clone(
-                           swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.getValue().c_str())
+                           swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.value().c_str())
                 : create_null();
         // TODO: Once the clients are taught about the new dependency kind,
         // switch to using a bespoke kind here.
@@ -1149,7 +1149,7 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
   std::vector<StringRef> ExtraPCMArgs = {
     "-Xcc", apinotesVer
   };
-  if (!instance.getASTContext().LangOpts.ClangTarget.hasValue())
+  if (!instance.getASTContext().LangOpts.ClangTarget.has_value())
     ExtraPCMArgs.insert(ExtraPCMArgs.begin(),
                         {"-Xcc", "-target", "-Xcc",
                          instance.getASTContext().LangOpts.Target.str()});
@@ -1332,7 +1332,7 @@ bool swift::dependencies::batchScanDependencies(
   llvm::StringSaver saver(alloc);
   auto batchInput =
       parseBatchScanInputFile(instance.getASTContext(), batchInputFile, saver);
-  if (!batchInput.hasValue())
+  if (!batchInput.has_value())
     return true;
 
   auto batchScanResults = performBatchModuleScan(
@@ -1368,7 +1368,7 @@ bool swift::dependencies::batchPrescanDependencies(
   llvm::StringSaver saver(alloc);
   auto batchInput =
       parseBatchScanInputFile(instance.getASTContext(), batchInputFile, saver);
-  if (!batchInput.hasValue())
+  if (!batchInput.has_value())
     return true;
 
   auto batchPrescanResults =
@@ -1544,7 +1544,7 @@ swift::dependencies::performBatchModuleScan(
           rootDeps =
               ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
         }
-        if (!rootDeps.hasValue()) {
+        if (!rootDeps.has_value()) {
           // We cannot find the clang module, abort.
           batchScanResult.push_back(
               std::make_error_code(std::errc::invalid_argument));
@@ -1614,7 +1614,7 @@ swift::dependencies::performBatchModulePrescan(
           rootDeps =
               ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
         }
-        if (!rootDeps.hasValue()) {
+        if (!rootDeps.has_value()) {
           // We cannot find the clang module, abort.
           batchPrescanResult.push_back(
               std::make_error_code(std::errc::invalid_argument));
