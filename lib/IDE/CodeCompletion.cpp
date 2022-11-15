@@ -786,11 +786,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     // FIXME: This should use canUseAttributeOnDecl.
 
     // Remove user inaccessible keywords.
-    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK))
+    if (DAK.has_value() && DeclAttribute::isUserInaccessible(*DAK))
       return;
 
     // Remove keywords only available when concurrency is enabled.
-    if (DAK.hasValue() && !IsConcurrencyEnabled &&
+    if (DAK.has_value() && !IsConcurrencyEnabled &&
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
 

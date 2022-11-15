@@ -27,7 +27,7 @@ static void printKnownCType(Type t, PrimitiveTypeMapping &typeMapping,
                             raw_ostream &os) {
   auto info =
       typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
-  assert(info.hasValue() && "not a known type");
+  assert(info.has_value() && "not a known type");
   os << info->name;
   if (info->canBeNullable)
     os << " _Null_unspecified";

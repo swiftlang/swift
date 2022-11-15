@@ -296,9 +296,9 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumPrecedenceGroups += groups.size();
 
   auto bufID = SF->getBufferID();
-  if (bufID.hasValue()) {
+  if (bufID.has_value()) {
     C.NumSourceLines +=
-      SM.getEntireTextForBuffer(bufID.getValue()).count('\n');
+      SM.getEntireTextForBuffer(bufID.value()).count('\n');
   }
 }
 
@@ -374,7 +374,7 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
     auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
-    return !PCH.hasValue();
+    return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
@@ -911,7 +911,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     std::string BridgingHeaderPathForPrint;
     if (!opts.ImplicitObjCHeaderPath.empty()) {
-      if (opts.BridgingHeaderDirForPrint.hasValue()) {
+      if (opts.BridgingHeaderDirForPrint.has_value()) {
         // User specified preferred directory for including, use that dir.
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,

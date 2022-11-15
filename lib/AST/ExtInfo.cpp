@@ -149,7 +149,7 @@ void ASTExtInfoBuilder::checkInvariants() const {
   // See [NOTE: ExtInfo-Clang-type-invariant]
   if (auto error = UnexpectedClangTypeError::checkClangType(
           getSILRepresentation(), clangTypeInfo.getType(), false, false)) {
-    error.getValue().dump();
+    error.value().dump();
     llvm_unreachable("Ill-formed ASTExtInfoBuilder.");
   }
 }
@@ -169,7 +169,7 @@ void SILExtInfoBuilder::checkInvariants() const {
   // is removed.
   if (auto error = UnexpectedClangTypeError::checkClangType(
           getRepresentation(), clangTypeInfo.getType(), false, true)) {
-    error.getValue().dump();
+    error.value().dump();
     llvm_unreachable("Ill-formed SILExtInfoBuilder.");
   }
 }

@@ -1174,7 +1174,7 @@ bool SILInstruction::mayRelease() const {
     // If this is a builtin which might have side effect, but its side
     // effects do not cause reference counts to be decremented, return false.
     if (auto Kind = BI->getBuiltinKind()) {
-      switch (Kind.getValue()) {
+      switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:
           return false;
         default:
@@ -1182,7 +1182,7 @@ bool SILInstruction::mayRelease() const {
       }
     }
     if (auto ID = BI->getIntrinsicID()) {
-      switch (ID.getValue()) {
+      switch (ID.value()) {
         case llvm::Intrinsic::memcpy:
         case llvm::Intrinsic::memmove:
         case llvm::Intrinsic::memset:

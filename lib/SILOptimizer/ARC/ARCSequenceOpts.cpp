@@ -78,7 +78,7 @@ bool ARCPairingContext::performMatching(
   /// For each increment that we matched to a decrement, try to match it to a
   /// decrement -> increment pair.
   for (auto Pair : IncToDecStateMap) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILInstruction *Increment = Pair->first;

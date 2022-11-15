@@ -253,7 +253,7 @@ public:
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Knd == RequirementFailure);
 
-    return ReqFailureInfo.getValue();
+    return ReqFailureInfo.value();
   }
 
   operator Kind() const { return Knd; }

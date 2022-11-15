@@ -4475,7 +4475,7 @@ static bool diagnoseAmbiguity(
       } else if (llvm::all_of(solution.Fixes, [&](ConstraintFix *fix) {
                    return fix->getLocator()
                        ->findLast<LocatorPathElt::ApplyArgument>()
-                       .hasValue();
+                       .has_value();
                  })) {
         // All fixes have to do with arguments, so let's show the parameter
         // lists.
@@ -6874,7 +6874,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
     ExportContext where = ExportContext::forFunctionBody(DC, referenceLoc);
     auto maybeUnavail =
         TypeChecker::checkDeclarationAvailability(setter, where);
-    if (maybeUnavail.hasValue()) {
+    if (maybeUnavail.has_value()) {
       return true;
     }
   }

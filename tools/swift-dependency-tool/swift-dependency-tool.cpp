@@ -70,7 +70,7 @@ template <> struct ScalarTraits<swift::Fingerprint> {
   }
   static StringRef input(StringRef s, void *, swift::Fingerprint &fp) {
     if (auto convertedFP = swift::Fingerprint::fromString(s))
-      fp = convertedFP.getValue();
+      fp = convertedFP.value();
     else {
       llvm::errs() << "Failed to convert fingerprint '" << s << "'\n";
       exit(1);

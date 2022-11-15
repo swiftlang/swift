@@ -97,7 +97,7 @@ public:
       : Core(coreDependency) {}
 
     bool isLoaded() const {
-      return Import.hasValue() && Import->importedModule != nullptr;
+      return Import.has_value() && Import->importedModule != nullptr;
     }
 
     bool isExported() const {

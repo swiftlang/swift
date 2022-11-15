@@ -333,7 +333,7 @@ public:
   ~SourceFile();
 
   bool hasImports() const {
-    return Imports.hasValue();
+    return Imports.has_value();
   }
 
   /// Retrieve an immutable view of the source file's imports.

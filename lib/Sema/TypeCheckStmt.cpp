@@ -742,7 +742,7 @@ public:
   Stmt *visitReturnStmt(ReturnStmt *RS) {
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
 
-    if (!TheFunc.hasValue()) {
+    if (!TheFunc.has_value()) {
       getASTContext().Diags.diagnose(RS->getReturnLoc(),
                                      diag::return_invalid_outside_func);
       return nullptr;

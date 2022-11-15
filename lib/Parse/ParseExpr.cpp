@@ -3575,11 +3575,11 @@ ParserResult<Expr> Parser::parseExprCollection() {
 /// dictionary literal, or \c false otherwise.
 ParserResult<Expr>
 Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
-  auto Element = parseExpr(isDictionary.hasValue() && *isDictionary
+  auto Element = parseExpr(isDictionary.has_value() && *isDictionary
                                ? diag::expected_key_in_dictionary_literal
                                : diag::expected_expr_in_collection_literal);
 
-  if (!isDictionary.hasValue())
+  if (!isDictionary.has_value())
     isDictionary = Tok.is(tok::colon);
 
   if (!*isDictionary) {
@@ -3695,7 +3695,7 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
       Kind = AvailabilitySpecKind::PackageDescriptionVersionConstraint;
   }
 
-  if (!Kind.hasValue())
+  if (!Kind.has_value())
     return nullptr;
 
   PlatformAgnosticNameLoc = Tok.getLoc();
@@ -3706,7 +3706,7 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
   }
   return makeParserResult(new (Context)
                           PlatformAgnosticVersionConstraintAvailabilitySpec(
-                            Kind.getValue(), PlatformAgnosticNameLoc, Version, VersionRange));
+                            Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.
@@ -3748,7 +3748,7 @@ Parser::parsePlatformVersionConstraintSpec() {
   Optional<PlatformKind> Platform =
       platformFromString(PlatformIdentifier.str());
 
-  if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
+  if (!Platform.has_value() || Platform.value() == PlatformKind::none) {
     if (auto CorrectedPlatform =
             closestCorrectedPlatformString(PlatformIdentifier.str())) {
       diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
@@ -3770,5 +3770,5 @@ Parser::parsePlatformVersionConstraintSpec() {
   llvm::VersionTuple RuntimeVersion = Version;
   Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.getValue(), PlatformLoc, Version, RuntimeVersion, VersionRange));
+      Platform.value(), PlatformLoc, Version, RuntimeVersion, VersionRange));
 }

@@ -187,7 +187,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
       auto *swiftDep = getAsSwiftInterfaceModule();
       // Prefer interface path to binary module path if we have it.
       modulePath = swiftDep->swiftInterfaceFile;
-      assert(modulePath.hasValue());
+      assert(modulePath.has_value());
       StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
       if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
         modulePath = parentDir.str();
@@ -197,7 +197,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
     case swift::ModuleDependenciesKind::SwiftBinary: {
       auto *swiftBinaryDep = getAsSwiftBinaryModule();
       modulePath = swiftBinaryDep->compiledModulePath;
-      assert(modulePath.hasValue());
+      assert(modulePath.has_value());
       StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
       if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
         modulePath = parentDir.str();
@@ -207,7 +207,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
     case swift::ModuleDependenciesKind::Clang: {
       auto *clangDep = getAsClangModule();
       modulePath = clangDep->moduleMapFile;
-      assert(modulePath.hasValue());
+      assert(modulePath.has_value());
       break;
     }
     case swift::ModuleDependenciesKind::SwiftSource: {

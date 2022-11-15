@@ -91,7 +91,7 @@ namespace {
     }
     
     bool movedToTopLevel() {
-      return CC.hasValue();
+      return CC.has_value();
     }
     
     template <typename T>
@@ -480,16 +480,16 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
       if (ArgumentKind == IsMessage) {
         diagnoseDuplicate(Message.empty());
-        Message = Value.getValue();
+        Message = Value.value();
       } else {
-        ParsedDeclName parsedName = parseDeclName(Value.getValue());
+        ParsedDeclName parsedName = parseDeclName(Value.value());
         if (!parsedName) {
           diagnose(AttrLoc, diag::attr_availability_invalid_renamed, AttrName);
           AnyArgumentInvalid = true;
           break;
         }
         diagnoseDuplicate(Renamed.empty());
-        Renamed = Value.getValue();
+        Renamed = Value.value();
       }
 
       break;
@@ -584,7 +584,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.hasValue() &&
+  if (!PlatformKind.has_value() &&
       (Platform == "swift" || Platform == "_PackageDescription")) {
 
     if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
@@ -615,7 +615,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
   if (AnyArgumentInvalid)
     return nullptr;
-  if (!PlatformKind.hasValue()) {
+  if (!PlatformKind.has_value()) {
     if (auto CorrectedPlatform = closestCorrectedPlatformString(Platform)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform, Platform,
                AttrName, *CorrectedPlatform)
@@ -660,7 +660,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
   auto Attr = new (Context)
   AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
-                PlatformKind.getValue(),
+                PlatformKind.value(),
                 Message, Renamed, /*RenameDecl=*/nullptr,
                 Introduced.Version, Introduced.Range,
                 Deprecated.Version, Deprecated.Range,
@@ -711,8 +711,8 @@ bool Parser::parseSpecializeAttributeArguments(
         DiscardAttribute = true;
         return false;
       }
-      if ((ParamLabel == "exported" && Exported.hasValue()) ||
-          (ParamLabel == "kind" && Kind.hasValue()) ||
+      if ((ParamLabel == "exported" && Exported.has_value()) ||
+          (ParamLabel == "kind" && Kind.has_value()) ||
           (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
                  ParamLabel);
@@ -1024,10 +1024,10 @@ bool Parser::parseSpecializeAttribute(
     return false;
   }
   // Not exported by default.
-  if (!exported.hasValue())
+  if (!exported.has_value())
     exported = false;
   // Full specialization by default.
-  if (!kind.hasValue())
+  if (!kind.has_value())
     kind = SpecializeAttr::SpecializationKind::Full;
 
   if (DiscardAttribute) {
@@ -1037,8 +1037,8 @@ bool Parser::parseSpecializeAttribute(
 
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                                trailingWhereClause, exported.getValue(),
-                                kind.getValue(), targetFunction, spiGroups,
+                                trailingWhereClause, exported.value(),
+                                kind.value(), targetFunction, spiGroups,
                                 availableAttrs, typeErasedParamsCount);
   return true;
 }
@@ -1405,7 +1405,7 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // Ideal behavior: base type is parsed as `A.B`.
   if (P.Tok.is(tok::period)) {
     const Token &nextToken = P.peekToken();
-    if (isAccessorLabel(nextToken).hasValue())
+    if (isAccessorLabel(nextToken).has_value())
       return false;
   }
 
@@ -1468,7 +1468,7 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   if (P.Tok.is(tok::period)) {
     const Token &nextToken = P.peekToken();
     Optional<AccessorKind> kind = isAccessorLabel(nextToken);
-    if (kind.hasValue()) {
+    if (kind.has_value()) {
       original.AccessorKind = kind;
       P.consumeIf(tok::period);
       P.consumeIf(tok::identifier);
@@ -1828,7 +1828,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
 
       auto Platform = PlatformVersionSpec->getPlatform();
       auto Version = PlatformVersionSpec->getVersion();
-      if (Version.getSubminor().hasValue() || Version.getBuild().hasValue()) {
+      if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {
         diagnose(PlatformVersionSpec->getVersionSrcRange().Start,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
@@ -1851,7 +1851,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
-  if (!MaybePlatform.hasValue()) {
+  if (!MaybePlatform.has_value()) {
     if (auto correctedPlatform = closestCorrectedPlatformString(platformText)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform,
                platformText, AttrName, *correctedPlatform)
@@ -1879,14 +1879,14 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   }
 
   // Diagnose specification of patch versions (e.g. '13.0.1').
-  if (VerTuple.getSubminor().hasValue() ||
-      VerTuple.getBuild().hasValue()) {
+  if (VerTuple.getSubminor().has_value() ||
+      VerTuple.getBuild().has_value()) {
     diagnose(VersionRange.Start,
              diag::attr_availability_platform_version_major_minor_only,
              AttrName);
   }
 
-  if (MaybePlatform.hasValue()) {
+  if (MaybePlatform.has_value()) {
     auto Platform = *MaybePlatform;
     if (Platform != PlatformKind::none) {
       PlatformAndVersions.emplace_back(Platform, VerTuple);
@@ -2073,7 +2073,7 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return makeParserError();
   }
 
-  StringRef FinalMetadata = Metadata.getValueOr("");
+  StringRef FinalMetadata = Metadata.value_or("");
 
   return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
 }
@@ -2169,7 +2169,7 @@ parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       Optional<R> valueIfOmitted = None) {
   auto parsedIdentifier = parseSingleAttrOptionImpl(
              P, Loc, AttrRange,AttrName, DK,
-             /*allowOmitted=*/valueIfOmitted.hasValue(),
+             /*allowOmitted=*/valueIfOmitted.has_value(),
              Diagnostic(diag::attr_expected_option_such_as, AttrName,
                         options.front().first.str()));
   if (!parsedIdentifier)
@@ -2375,7 +2375,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
             { Context.Id_safe,   ReferenceOwnership::Unowned }
           }, ReferenceOwnership::Unowned)
             // Recover from errors by going back to Unowned.
-            .getValueOr(ReferenceOwnership::Unowned);
+            .value_or(ReferenceOwnership::Unowned);
     }
     else {
       AttrRange = SourceRange(Loc);
@@ -2527,7 +2527,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       consumeToken(tok::string_literal);
 
-      if (AsmName.hasValue())
+      if (AsmName.has_value())
         AttrRange = SourceRange(Loc, Tok.getRange().getStart());
       else
         DiscardAttribute = true;
@@ -2550,14 +2550,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute) {
       if (DK == DAK_SILGenName)
-        Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
-        Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
+        Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else if (DK == DAK_Expose)
         Attributes.add(new (Context) ExposeAttr(
-            AsmName ? AsmName.getValue() : StringRef(""), AtLoc, AttrRange,
+            AsmName ? AsmName.value() : StringRef(""), AtLoc, AttrRange,
             /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
@@ -2630,7 +2630,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     consumeToken(tok::string_literal);
 
-    if (Value.hasValue())
+    if (Value.has_value())
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
     else
       DiscardAttribute = true;
@@ -2642,7 +2642,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SemanticsAttr(Value.getValue(), AtLoc,
+      Attributes.add(new (Context) SemanticsAttr(Value.value(), AtLoc,
                                                  AttrRange,
                                                  /*Implicit=*/false));
     break;
@@ -2691,7 +2691,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (Tok.is(tok::string_literal)) {
           auto NameOp = getStringLiteralIfNotInterpolated(Tok.getLoc(),
                                                           "original module name");
-          if (NameOp.hasValue())
+          if (NameOp.has_value())
             OriginalModuleName = *NameOp;
           consumeToken();
         }
@@ -2780,7 +2780,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         return false;
       }
       filename = getStringLiteralIfNotInterpolated(Loc, "_private");
-      if (!filename.hasValue()) {
+      if (!filename.has_value()) {
         diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
         return false;
       }
@@ -3567,7 +3567,7 @@ bool Parser::parseConventionAttributeInternal(
       return true;
     }
     if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
-      convention.ClangType = { ty.getValue(), Tok.getLoc() };
+      convention.ClangType = { ty.value(), Tok.getLoc() };
     }
     consumeToken(tok::string_literal);
   }
@@ -5774,7 +5774,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 
       Filename =
           getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
-      if (!Filename.hasValue())
+      if (!Filename.has_value())
         return makeParserError();
       SourceLoc filenameLoc = consumeToken(tok::string_literal);
       SF.VirtualFilePaths.emplace_back(*Filename, filenameLoc);
@@ -5840,7 +5840,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
     }
     
     Filename = getStringLiteralIfNotInterpolated(Loc, "'#line'");
-    if (!Filename.hasValue())
+    if (!Filename.has_value())
       return makeParserError();
   }
 
@@ -5864,7 +5864,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 
   // Create a new virtual file for the region started by the #line marker.
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
-                                             Filename.getValue(), LineOffset);
+                                             Filename.value(), LineOffset);
   assert(isNewFile);(void)isNewFile;
 
   // Lexing of next token must be deferred until after virtual file setup.

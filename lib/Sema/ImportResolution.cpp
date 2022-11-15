@@ -1026,7 +1026,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
-  if (!actualKind.hasValue()) {
+  if (!actualKind.has_value()) {
     // FIXME: print entire module name?
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
                        accessPath.front().Item, module->getName());
@@ -1129,8 +1129,8 @@ UnboundImport::UnboundImport(
   // If either have a `@_documentation(visibility: <access>)` attribute, the
   // cross-import has the more restrictive of the two.
   if (declaringImport.docVisibility || bystandingImport.docVisibility) {
-    auto declaringAccess = declaringImport.docVisibility.getValueOr(AccessLevel::Public);
-    auto bystandingAccess = bystandingImport.docVisibility.getValueOr(AccessLevel::Public);
+    auto declaringAccess = declaringImport.docVisibility.value_or(AccessLevel::Public);
+    auto bystandingAccess = bystandingImport.docVisibility.value_or(AccessLevel::Public);
     import.docVisibility = std::min(declaringAccess, bystandingAccess);
   }
 }

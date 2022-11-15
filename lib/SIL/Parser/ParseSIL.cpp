@@ -456,7 +456,7 @@ namespace swift {
       StringRef Name;
       SourceLoc Loc;
 
-      bool isSet() const { return Value.hasValue(); }
+      bool isSet() const { return Value.has_value(); }
       T operator*() const { return *Value; }
     };
 
@@ -823,8 +823,8 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
 /// SIL linkage to a real one.
 static SILLinkage resolveSILLinkage(Optional<SILLinkage> linkage,
                                     bool isDefinition) {
-  if (linkage.hasValue()) {
-    return linkage.getValue();
+  if (linkage.has_value()) {
+    return linkage.value();
   } else if (isDefinition) {
     return SILLinkage::DefaultForDefinition;
   } else {
@@ -1565,7 +1565,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         Kind = SILDeclRef::Kind::Func;
         ParseState = 1;
       } else if (!ParseState &&
-                 (accessorKind = getAccessorKind(Id.str())).hasValue()) {
+                 (accessorKind = getAccessorKind(Id.str())).has_value()) {
         // Drill down to the corresponding accessor for each declaration,
         // compacting away decls that lack it.
         size_t destI = 0;
@@ -1746,7 +1746,7 @@ bool SILParser::parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
     return true;
   }
 
-  Opcode = MaybeOpcode.getValue();
+  Opcode = MaybeOpcode.value();
   P.consumeToken();
   return false;
 }
@@ -2762,7 +2762,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             .Default(None);
 
     if (kind) {
-      AccessKind = kind.getValue();
+      AccessKind = kind.value();
       return false;
     }
     P.diagnose(accessKindLoc, diag::expected_tok_in_sil_instr,
@@ -3579,7 +3579,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     if (!Qualifier)
       Qualifier = LoadOwnershipQualifier::Unqualified;
-    ResultVal = B.createLoad(InstLoc, Val, Qualifier.getValue());
+    ResultVal = B.createLoad(InstLoc, Val, Qualifier.value());
     break;
   }
 
@@ -4003,7 +4003,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                  "cast consumption kind");
       return true;
     }
-    auto consumptionKind = kind.getValue();
+    auto consumptionKind = kind.value();
 
     if (parseSourceAndDestAddress() || parseConditionalBranchDestinations() ||
         parseSILDebugLocation(InstLoc, B))
@@ -4196,7 +4196,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         StoreQualifier = StoreOwnershipQualifier::Unqualified;
       ResultVal =
           B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                        AddrVal, StoreQualifier.getValue());
+                        AddrVal, StoreQualifier.value());
     } else {
       assert(IsAssign);
       if (!AssignQualifier)
@@ -4204,7 +4204,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       ResultVal =
           B.createAssign(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                         AddrVal, AssignQualifier.getValue());
+                         AddrVal, AssignQualifier.value());
     }
 
     break;
@@ -6443,7 +6443,7 @@ bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
     auto &peek = P.peekToken();
     if (peek.is(tok::l_paren))
-      return getOpcodeByName(P.Tok.getText()).hasValue();
+      return getOpcodeByName(P.Tok.getText()).has_value();
     return !peek.is(tok::colon);
   }
   return false;
@@ -6865,19 +6865,19 @@ bool SILParserState::parseSILGlobal(Parser &P) {
     return true;
 
   // Non-external global variables are definitions by default.
-  if (!GlobalLinkage.hasValue())
+  if (!GlobalLinkage.has_value())
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
   // Lookup the global variable declaration for this sil_global.
   auto VD =
-      lookupGlobalDecl(GlobalName, GlobalLinkage.getValue(), GlobalType, P);
+      lookupGlobalDecl(GlobalName, GlobalLinkage.value(), GlobalType, P);
   if (!VD) {
     P.diagnose(NameLoc, diag::sil_global_variable_not_found, GlobalName);
     return true;
   }
   auto *GV = SILGlobalVariable::create(
-      M, GlobalLinkage.getValue(), isSerialized, GlobalName.str(), GlobalType,
-      RegularLocation(NameLoc), VD.getValue());
+      M, GlobalLinkage.value(), isSerialized, GlobalName.str(), GlobalType,
+      RegularLocation(NameLoc), VD.value());
 
   GV->setLet(isLet);
   // Parse static initializer if exists.

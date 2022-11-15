@@ -518,7 +518,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
   }
-  for (auto *vd : caseBodyVariables.getValueOr(MutableArrayRef<VarDecl *>())) {
+  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
     vd->setParentPatternStmt(this);
   }
 }

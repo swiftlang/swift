@@ -897,7 +897,7 @@ public:
                          SILDebugVariable VarInfo,
                          llvm::Optional<Alignment> _Align, bool Init,
                          bool WasMoved) {
-    auto Align = _Align.getValueOr(IGM.getPointerAlignment());
+    auto Align = _Align.value_or(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
 

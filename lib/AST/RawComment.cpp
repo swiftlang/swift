@@ -137,7 +137,7 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
-    auto P = RC.getValue();
+    auto P = RC.value();
     if (!SerializedOK || P.second)
       return P.first;
   }

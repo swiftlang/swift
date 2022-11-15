@@ -84,7 +84,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
       commandLineArgs.begin(), commandLineArgs.end(),
       "<swift-imported-modules>");
   assert(sourceFilePos != commandLineArgs.end());
-  if (sourceFileName.hasValue())
+  if (sourceFileName.has_value())
     *sourceFilePos = sourceFileName->str();
   else
     commandLineArgs.erase(sourceFilePos);

@@ -400,7 +400,7 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
       continue;
 
     // Merge together whether or not the RValue has cleanups.
-    if (!sameHaveCleanups.hasValue()) {
+    if (!sameHaveCleanups.has_value()) {
       sameHaveCleanups = v.hasCleanup();
     } else {
       assert(*sameHaveCleanups == v.hasCleanup());

@@ -3417,7 +3417,7 @@ namespace {
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
       mask.append(baseMask);
       mask.padWithSetBitsTo(totalSize);
-      return mask.build().getValue();
+      return mask.build().value();
     }
 
     ClusteredBitVector
@@ -5494,7 +5494,7 @@ namespace {
         auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
         mask.append(CommonSpareBits);
         mask.padWithSetBitsTo(fixedTI->getFixedSize().getValueInBits());
-        tagBits = mask.build().getValue();
+        tagBits = mask.build().value();
       }
       return tagBits;
     }
@@ -5555,7 +5555,7 @@ namespace {
         value.appendClearBits(CommonSpareBits.size());
         value.append(APInt(bits - CommonSpareBits.size(), mask & extraTagMask));
       }
-      return value.build().getValue();
+      return value.build().value();
     }
 
     ClusteredBitVector

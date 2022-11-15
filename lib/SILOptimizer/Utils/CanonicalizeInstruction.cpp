@@ -208,7 +208,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
       user = borrowedOper->getUser();
     } else {
       if (isa<EndBorrowInst>(user) &&
-          !loadInst.getOwnershipQualifier().hasValue()) {
+          !loadInst.getOwnershipQualifier().has_value()) {
         lifetimeEndingInsts.push_back(user);
         continue;
       }
@@ -284,7 +284,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     // When loading a trivial subelement, convert ownership.
     Optional<LoadOwnershipQualifier> loadOwnership =
         loadInst.getOwnershipQualifier();
-    if (loadOwnership.hasValue()) {
+    if (loadOwnership.has_value()) {
       if (*loadOwnership != LoadOwnershipQualifier::Unqualified &&
           projInst->getType().isTrivial(*projInst->getFunction()))
         loadOwnership = LoadOwnershipQualifier::Trivial;
@@ -556,7 +556,7 @@ tryEliminateUnneededForwardingInst(SILInstruction *i,
 SILBasicBlock::iterator
 CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   if (auto nextII = simplifyAndReplace(inst, *this))
-    return nextII.getValue();
+    return nextII.value();
 
   if (auto li = LoadOperation(inst)) {
     return splitAggregateLoad(li, *this);

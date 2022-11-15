@@ -1480,7 +1480,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
                                           Optional<Type> Result, bool IsOnType,
                                           Identifier addName) {
   foundFunction(CD);
-  Type MemberType = getTypeOfMember(CD, BaseType.getValueOr(ExprType));
+  Type MemberType = getTypeOfMember(CD, BaseType.value_or(ExprType));
   AnyFunctionType *ConstructorType = nullptr;
   if (auto MemberFuncType = MemberType->getAs<AnyFunctionType>())
     ConstructorType = MemberFuncType->getResult()->castTo<AnyFunctionType>();
@@ -1541,7 +1541,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
 
     addEffectsSpecifiers(Builder, ConstructorType, CD);
 
-    if (!Result.hasValue())
+    if (!Result.has_value())
       Result = ConstructorType->getResult();
     if (CD->isImplicitlyUnwrappedOptional()) {
       addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -2571,10 +2571,10 @@ void CompletionLookup::addPoundLiteralCompletions(bool needPound) {
     CodeCompletionResultBuilder builder(Sink, CodeCompletionResultKind::Keyword,
                                         SemanticContextKind::None);
     builder.addFlair(flair);
-    builder.setLiteralKind(literalKind.getValue());
+    builder.setLiteralKind(literalKind.value());
     builder.setKeywordKind(kwKind);
     builder.addBaseName(name);
-    addTypeRelationFromProtocol(builder, literalKind.getValue());
+    addTypeRelationFromProtocol(builder, literalKind.value());
   };
 
 #define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                     \
@@ -2957,17 +2957,17 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
-  if (!DK.hasValue())
+  if (!DK.has_value())
     return true;
-  return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
+  return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
 void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
                                                    Optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
-  if (DK.hasValue()) {
-    switch (DK.getValue()) {
+  if (DK.has_value()) {
+    switch (DK.value()) {
 #define DECL(Id, ...)                                                          \
   case DeclKind::Id:                                                           \
     TargetName = #Id;                                                          \

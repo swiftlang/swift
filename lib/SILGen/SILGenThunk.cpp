@@ -215,7 +215,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       maybeCompletionHandlerOrigTy = cast<AnyFunctionType>(
           completionHandlerOrigTy.getOptionalObjectType());
     }
-    return maybeCompletionHandlerOrigTy.getValue();
+    return maybeCompletionHandlerOrigTy.value();
   }();
   
   // Bridge the block type, so that if it is formally expressed in terms of
@@ -298,9 +298,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
       // for the fact that they are preceded by the block_storage arguments.
-      auto errorIndex = convention.completionHandlerErrorParamIndex().map(
+      auto errorIndex = convention.completionHandlerErrorParamIndex().transform(
           [](auto original) { return original + 1; });
-      auto flagIndex = convention.completionHandlerFlagParamIndex().map(
+      auto flagIndex = convention.completionHandlerFlagParamIndex().transform(
           [](auto original) { return original + 1; });
 
       FuncDecl *resumeIntrinsic;

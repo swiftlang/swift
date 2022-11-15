@@ -324,7 +324,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Solve the system. If the first extension is at least as specialized as the
   // second, we're done.
-  return cs.solveSingle().hasValue();
+  return cs.solveSingle().has_value();
 }
 
 /// Retrieve the adjusted parameter type for overloading purposes.

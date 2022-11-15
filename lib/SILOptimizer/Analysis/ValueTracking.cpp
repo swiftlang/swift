@@ -215,13 +215,13 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         // the Left. If Right is still not None, then get both values
         // and AND them together.
         if (Right) {
-          return Left.getValue() && Right.getValue();
+          return Left.value() && Right.value();
         }
 
         // Now we know that Right is None and Left has a value. If
         // Left's value is true, then we return None as the final
         // sign bit depends on the unknown Right value.
-        if (Left.getValue()) {
+        if (Left.value()) {
           return None;
         }
 
@@ -252,13 +252,13 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         // the Left. If Right is still not None, then get both values
         // and OR them together.
         if (Right) {
-          return Left.getValue() || Right.getValue();
+          return Left.value() || Right.value();
         }
 
         // Now we know that Right is None and Left has a value. If
         // Left's value is false, then we return None as the final
         // sign bit depends on the unknown Right value.
-        if (!Left.getValue()) {
+        if (!Left.value()) {
           return None;
         }
 
@@ -282,7 +282,7 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         // Now we know that both Left and Right must have a value.
         // For the sign of the final result to be set, only one
         // of Left or Right should be true.
-        return Left.getValue() != Right.getValue();
+        return Left.value() != Right.value();
       }
       case BuiltinValueKind::LShr: {
         // If count is provably >= 1, then top bit is not set.
