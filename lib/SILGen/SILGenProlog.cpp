@@ -34,10 +34,25 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
+SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
+
+  // If we have a move only type, then mark it with mark_must_check so we can't
+  // escape it.
+  if (selfType.isMoveOnly()) {
+    // For now, we do not handle move only class deinits. This is because we
+    // need to do a bit more refactoring to handle the weird way that it deals
+    // with ownership. But for simple move only deinits (like struct/enum), that
+    // are owned, lets mark them as needing to be no implicit copy checked so
+    // they cannot escape.
+    if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
+      selfValue = B.createMarkMustCheckInst(
+          selfDecl, selfValue, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
+  }
+
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
