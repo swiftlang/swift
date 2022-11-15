@@ -1271,15 +1271,15 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
     auto paramTy = fnType->getParamType(i);
     auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
     if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
       attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getPointerElementType());
+          paramTy->getNonOpaquePointerElementType());
     if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getPointerElementType() != attrList.getParamByValType(i))
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
       attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getPointerElementType());
+          paramTy->getNonOpaquePointerElementType());
   }
   return attrList;
 }

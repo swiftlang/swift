@@ -2251,9 +2251,13 @@ public:
     checkParams();
   }
   
-  struct iterator : public std::iterator<std::random_access_iterator_tag,
-                                         SILParameterInfo>
-  {
+  struct iterator {
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = SILParameterInfo;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     const SILParameterInfo *Base;
     unsigned I, SkipParamIndex;
     
