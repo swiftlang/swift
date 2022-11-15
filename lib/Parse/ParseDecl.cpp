@@ -7234,13 +7234,13 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       pattern = patternRes.get();
     }
-
+    
     bool hasOpaqueReturnTy = false;
     if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
       hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
     }
     auto sf = CurDeclContext->getParentSourceFile();
-
+    
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
@@ -7543,12 +7543,13 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.
-  if (FuncRetTy && FuncRetTy->hasOpaque() && !InInactiveClauseEnvironment) {
+  if (FuncRetTy && FuncRetTy->hasOpaque() &&
+      !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
     }
   }
-
+  
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
@@ -8511,7 +8512,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
       ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
-
+  
   // Let the source file track the opaque return type mapping, if any.
   if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
       !InInactiveClauseEnvironment) {

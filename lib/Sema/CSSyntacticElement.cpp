@@ -907,8 +907,7 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
-    if (auto closure = cast<ClosureExpr>(context.getAbstractClosureExpr());
-        context.getBody() == braceStmt) {
+    if (auto closure = cast<ClosureExpr>(context.getAsAbstractClosureExpr().getPtrOrNull()); context.getBody() == braceStmt) {
       // If this closure has an empty body and no explicit result type
       // let's bind result type to `Void` since that's the only type empty body
       // can produce. Otherwise, if (multi-statement) closure doesn't have
@@ -924,6 +923,8 @@ private:
             ctx.TheEmptyTupleType,
             cs.getConstraintLocator(closure, ConstraintLocator::ClosureResult));
       }
+      if (!cs.participatesInInference(closure))
+        return;
     }
 
     if (context.isSingleExpressionClosure(cs)) {
@@ -1147,20 +1148,7 @@ bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
   if (auto *func = fn.getAbstractFunctionDecl()) {
     locator = getConstraintLocator(func);
   } else {
-    auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-    locator = getConstraintLocator(closure);
-
-    if (participatesInInference(closure)) {
-      SyntacticElementConstraintGenerator generator(
-          *this, closure, getConstraintLocator(closure));
-
-      generator.visit(closure->getBody());
-
-      if (closure->hasSingleExpressionBody())
-        return generator.hadError;
-    }
-
-    return false;
+    locator = getConstraintLocator(fn.getAbstractClosureExpr());
   }
 
   SyntacticElementConstraintGenerator generator(
