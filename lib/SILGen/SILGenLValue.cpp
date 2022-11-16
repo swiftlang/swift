@@ -792,6 +792,7 @@ public:
 
 class RefElementComponent : public NominalTypeElementComponent {
   bool IsNonAccessing;
+  LValueOptions Options;
 
 public:
   RefElementComponent(VarDecl *field, LValueOptions options,
@@ -802,6 +803,40 @@ public:
         IsNonAccessing(options.IsNonAccessing) {}
 
   bool isLoadingPure() const override { return true; }
+
+  void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
+           ManagedValue base) &&
+      override {
+    if (isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
+        Field->hasAttachedPropertyWrapper() && Field->isLet()) {
+      auto backingVar = Field->getPropertyWrapperBackingProperty();
+      auto ValType = backingVar->getValueInterfaceType();
+      if (!Subs.empty()) {
+        ValType = ValType.subst(Subs);
+      }
+      auto wrapperValue = SGF.emitApplyOfPropertyWrapperBackingInitializer(
+          loc, Field, Subs, std::move(value).getAsRValue(SGF));
+
+      auto typeData = getLogicalStorageTypeData(
+          SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
+          ValType->getCanonicalType());
+      SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
+          TypeExpansionContext::minimal(), backingVar,
+          ValType->getCanonicalType());
+      RefElementComponent REC(backingVar, Options, varStorageType, typeData,
+                              Subs, /*actorIsolation=*/None);
+      auto proj = std::move(REC).project(SGF, loc, base);
+
+      auto srcRValue = std::move(wrapperValue).ensurePlusOne(SGF, loc);
+      std::move(srcRValue).assignInto(SGF, loc, proj.getValue());
+      return;
+    }
+    auto finalDestAddr = std::move(*this).project(SGF, loc, base);
+    assert(finalDestAddr.getType().isAddress());
+
+    auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
+    std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
+  }
 
   ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                        ManagedValue base) &&
