@@ -57,11 +57,25 @@ if(SWIFT_SWIFT_PARSER)
       -emit-module-interface-path;
       "${module_interface_file}" ;
       -target;${target}>)
-
-  target_link_libraries("${library_name}"
-    PRIVATE
-    swiftCore
-  )
+      
+  # Ensure that we do not link the _StringProcessing module. But we can
+  # only pass this flag for new-enough compilers that support it.
+  file(WRITE "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift" "")
+  execute_process(
+    COMMAND
+      "${CMAKE_Swift_COMPILER}"
+      -Xfrontend -disable-implicit-string-processing-module-import
+      -c - -o /dev/null
+    INPUT_FILE
+      "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift"
+    OUTPUT_QUIET ERROR_QUIET
+    RESULT_VARIABLE
+      SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  if(NOT SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+    add_compile_options(
+      $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
+      $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
+  endif()
 
   swift_install_in_component(TARGETS "${library_name}"
     RUNTIME
