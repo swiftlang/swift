@@ -430,6 +430,10 @@ macro(add_sourcekit_framework name)
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set(RPATH_LIST)
     add_sourcekit_swift_runtime_link_flags(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -461,6 +465,10 @@ macro(add_sourcekit_framework name)
         LIBRARY_DIR ${framework_location})
     set(RPATH_LIST)
     add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"

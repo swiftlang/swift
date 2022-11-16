@@ -6,7 +6,9 @@
 
 // RUN: rm -rf %t
 // RUN: %empty-directory(%t/bin)
+// RUN: %empty-directory(%t/lib)
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/bin/swiftc)
+// RUN: %copy-plugin-support-library(%t/lib/)
 // RUN: %empty-directory(%t/lib/swift/clang/lib/darwin/)
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
