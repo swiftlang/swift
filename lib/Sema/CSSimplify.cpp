@@ -2498,10 +2498,9 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   // The count types of two pack expansion types must have the same shape.
-  //
-  // FIXME: Locator for diagnostics.
-  auto *loc = getConstraintLocator(locator);
-  auto *shapeTypeVar = createTypeVariable(loc, TVO_CanBindToPack);
+  auto *shapeLoc = getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::PackShape));
+  auto *shapeTypeVar = createTypeVariable(shapeLoc, TVO_CanBindToPack);
   addConstraint(ConstraintKind::ShapeOf,
                 expansion1->getCountType(), shapeTypeVar, locator);
   addConstraint(ConstraintKind::ShapeOf,
@@ -14156,8 +14155,9 @@ void ConstraintSystem::addConstraint(Requirement req,
     auto type1 = req.getFirstType();
     auto type2 = req.getSecondType();
 
-    // FIXME: Locator for diagnostics
-    auto typeVar = createTypeVariable(getConstraintLocator(locator),
+    auto *shapeLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::PackShape));
+    auto typeVar = createTypeVariable(shapeLoc,
                                       TVO_CanBindToPack);
 
     addConstraint(ConstraintKind::ShapeOf, type1, typeVar, locator);
