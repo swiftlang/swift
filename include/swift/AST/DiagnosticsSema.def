@@ -6029,9 +6029,6 @@ ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
 
-ERROR(has_symbol_condition_in_inlinable, none,
-      "'#_hasSymbol' cannot be used in " FRAGILE_FUNC_KIND "0", (unsigned))
-
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,

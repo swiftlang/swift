@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 721; // has_symbol SIL instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 722; // has_symbol SIL serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

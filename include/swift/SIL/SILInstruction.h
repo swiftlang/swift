@@ -4101,7 +4101,8 @@ public:
                     SILType::getBuiltinIntegerType(1, Decl->getASTContext())),
         Decl{Decl} {}
 
-  ValueDecl *getDecl() { return Decl; }
+  ValueDecl *getDecl() const { return Decl; }
+  void getReferencedFunctions(llvm::SmallVector<SILFunction *, 4> &fns) const;
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

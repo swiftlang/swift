@@ -364,6 +364,12 @@ class DeadFunctionAndGlobalElimination {
           ensureAlive(GA->getReferencedGlobal());
         } else if (auto *GV = dyn_cast<GlobalValueInst>(&I)) {
           ensureAlive(GV->getReferencedGlobal());
+        } else if (auto *HSI = dyn_cast<HasSymbolInst>(&I)) {
+          SmallVector<SILFunction *, 4> fns;
+          HSI->getReferencedFunctions(fns);
+          for (auto fn : fns) {
+            ensureAlive(fn);
+          }
         }
       }
     }

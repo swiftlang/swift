@@ -33,9 +33,6 @@
 // to remote executors.
 // UNSUPPORTED: remote_run || device_run
 
-// rdar://102159307 - #_hasSymbol needs to be implemented with a SILInstruction
-// REQUIRES: swift_test_mode_optimize_none
-
 @_weakLinked import helper
 
 // HAS-ANSWER: 42
