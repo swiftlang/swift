@@ -3374,6 +3374,10 @@ enum class CustomAttrTypeKind {
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
+
+  /// Attributes that are discoverable/constructable at runtime given a name.
+  /// They allow unbound generic types.
+  RuntimeMetadata,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
