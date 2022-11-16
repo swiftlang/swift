@@ -2918,10 +2918,12 @@ namespace {
         CS.setType(binding, type);
       }
 
-      auto elementResultType = CS.getType(expr->getPatternExpr());
-      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto *patternLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
+      auto patternTy = CS.createTypeVariable(patternLoc,
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
+      auto elementResultType = CS.getType(expr->getPatternExpr());
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
 

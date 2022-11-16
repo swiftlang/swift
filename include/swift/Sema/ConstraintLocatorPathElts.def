@@ -198,6 +198,9 @@ CUSTOM_LOCATOR_PATH_ELT(PackElement)
 /// The shape of a parameter pack.
 SIMPLE_LOCATOR_PATH_ELT(PackShape)
 
+/// The pattern  of a pack expansion.
+SIMPLE_LOCATOR_PATH_ELT(PackExpansionPattern)
+
 /// An unresolved member.
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 

@@ -98,6 +98,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
   case ConstraintLocator::PackShape:
+  case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
   case ConstraintLocator::AnyPatternDecl:
@@ -447,6 +448,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::PackShape: {
     out << "pack shape";
+    break;
+  }
+
+  case ConstraintLocator::PackExpansionPattern: {
+    out << "pack expansion pattern";
     break;
   }
 

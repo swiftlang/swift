@@ -7559,9 +7559,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::SubclassOf, packExpansionType->getPatternType(),
-                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      classType, patternLoc);
       } else {
         addConstraint(ConstraintKind::SubclassOf, eltType,
                       classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
@@ -7677,11 +7678,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::ConformsTo,
                       packExpansionType->getPatternType(),
                       protocol->getDeclaredInterfaceType(),
-                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      patternLoc);
       } else {
         addConstraint(ConstraintKind::ConformsTo, eltType,
                       protocol->getDeclaredInterfaceType(),
