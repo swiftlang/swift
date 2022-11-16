@@ -10,6 +10,8 @@ include/swift/Parse @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 lib/Parse           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 test/Parse          @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 
+SwiftCompilerSources @eeckstein
+
 # C++ Interop
 include/swift/ClangImporter @zoecarver @hyp @egorzhdan
 include/swift/PrintAsClang  @zoecarver @hyp @egorzhdan
