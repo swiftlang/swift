@@ -145,6 +145,8 @@
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -432,6 +434,9 @@ struct AddressLoweringState {
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
+  // All instructions that yield values to callees.
+  TinyPtrVector<YieldInst *> yieldInsts;
+
   // Handle moves from a phi's operand storage to the phi storage.
   std::unique_ptr<PhiRewriter> phiRewriter;
 
@@ -615,6 +620,10 @@ void OpaqueValueVisitor::mapValueStorage() {
     for (auto &inst : *block) {
       if (auto apply = FullApplySite::isa(&inst))
         checkForIndirectApply(apply);
+
+      if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
+        pass.yieldInsts.push_back(yieldInst);
+      }
 
       for (auto result : inst.getResults()) {
         if (isPseudoCallResult(result) || isPseudoReturnValue(result))
@@ -2130,7 +2139,7 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   // Avoid revisiting this apply.
   bool erased = pass.indirectApplies.erase(apply);
-  assert(erased && "all yields should be rewritten at the same time");
+  assert(erased && "all begin_applies should be rewritten at the same time");
   (void)erased;
 
   auto *origCall = cast<BeginApplyInst>(apply.getInstruction());
@@ -2588,6 +2597,119 @@ void ReturnRewriter::rewriteElement(SILValue oldResult,
     // Store the result into the result argument.
     returnBuilder.createTrivialStoreOr(pass.genLoc(), oldResult, newResultArg,
                                        StoreOwnershipQualifier::Init);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                               YieldRewriter
+//
+//             Rewrite return instructions for indirect results.
+//===----------------------------------------------------------------------===//
+
+class YieldRewriter {
+  AddressLoweringState &pass;
+  SILFunctionConventions opaqueFnConv;
+
+public:
+  YieldRewriter(AddressLoweringState &pass)
+      : pass(pass), opaqueFnConv(pass.function->getConventions()) {}
+
+  void rewriteYields();
+
+  void rewriteYield(YieldInst *yieldInst);
+
+protected:
+  void rewriteOperand(YieldInst *yieldInst, unsigned index);
+};
+
+void YieldRewriter::rewriteYields() {
+  for (auto *yield : pass.yieldInsts) {
+    rewriteYield(yield);
+  }
+}
+
+void YieldRewriter::rewriteYield(YieldInst *yieldInst) {
+  for (unsigned index = 0, count = yieldInst->getNumOperands(); index < count;
+       ++index) {
+    rewriteOperand(yieldInst, index);
+  }
+}
+void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
+  auto info = opaqueFnConv.getYieldInfoForOperandIndex(index);
+  auto convention = info.getConvention();
+  auto ty =
+      opaqueFnConv.getSILType(info, pass.function->getTypeExpansionContext());
+  if (ty.isAddressOnly(*pass.function)) {
+    assert(yieldInst->getOperand(index)->getType().isAddress() &&
+           "rewriting yield of of address-only value after use rewriting!?");
+    return;
+  }
+
+  OwnershipKind ownership = OwnershipKind::None;
+  switch (convention) {
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Owned:
+    return;
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return;
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
+    ownership = OwnershipKind::Owned;
+    break;
+  case ParameterConvention::Indirect_In_Guaranteed:
+    ownership = OwnershipKind::Guaranteed;
+  }
+
+  if (ty.isTrivial(*pass.function))
+    ownership = OwnershipKind::None;
+
+  auto operand = yieldInst->getOperand(index);
+
+  auto builder = pass.getBuilder(yieldInst->getIterator());
+
+  auto *asi = builder.createAllocStack(yieldInst->getLoc(), ty);
+
+  auto withSuccessorBuilders = [&](auto perform) {
+    auto *resumeBB = &yieldInst->getResumeBB()->front();
+    auto *unwindBB = &yieldInst->getUnwindBB()->front();
+    auto resumeBuilder = pass.getBuilder(resumeBB->getIterator());
+    auto unwindBuilder = pass.getBuilder(unwindBB->getIterator());
+    perform(resumeBuilder, resumeBB->getLoc());
+    perform(unwindBuilder, unwindBB->getLoc());
+  };
+
+  switch (ownership) {
+  case OwnershipKind::Owned:
+  case OwnershipKind::None:
+    builder.createStore(yieldInst->getLoc(), operand, asi,
+                        ownership == OwnershipKind::None
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Init);
+    yieldInst->setOperand(index, asi);
+    withSuccessorBuilders(
+        [&](auto builder, auto loc) { builder.createDeallocStack(loc, asi); });
+    break;
+  case OwnershipKind::Guaranteed: {
+    BeginBorrowInst *bbi = nullptr;
+    if (operand->getOwnershipKind() == OwnershipKind::Owned) {
+      bbi = builder.createBeginBorrow(yieldInst->getLoc(), operand);
+    }
+    auto *storeBorrow = builder.createStoreBorrow(yieldInst->getLoc(),
+                                                  bbi ? bbi : operand, asi);
+    yieldInst->setOperand(index, storeBorrow);
+    withSuccessorBuilders([&](auto builder, auto loc) {
+      builder.createEndBorrow(loc, storeBorrow);
+      if (bbi)
+        builder.createEndBorrow(loc, bbi);
+      builder.createDeallocStack(loc, asi);
+    });
+    break;
+  }
+  case OwnershipKind::Unowned:
+  case OwnershipKind::Any:
+    llvm_unreachable("unexpected ownership kind!?");
   }
 }
 
@@ -3522,6 +3644,8 @@ static void rewriteFunction(AddressLoweringState &pass) {
   // projection operands.
   if (pass.function->getLoweredFunctionType()->hasIndirectFormalResults())
     ReturnRewriter(pass).rewriteReturns();
+  if (pass.function->getLoweredFunctionType()->hasIndirectFormalYields())
+    YieldRewriter(pass).rewriteYields();
 }
 
 // Given an array of terminator operand values, produce an array of
