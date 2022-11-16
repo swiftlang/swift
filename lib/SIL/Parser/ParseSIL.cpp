@@ -6118,6 +6118,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
       break;
     }
+    case SILInstructionKind::HasSymbolInst: {
+      llvm_unreachable("unimplemented"); // FIXME: implement SIL parsing
+      break;
+    }
 
     }
 

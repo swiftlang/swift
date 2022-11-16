@@ -2489,6 +2489,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(mangledKey));
     break;
   }
+  case SILInstructionKind::HasSymbolInst: {
+    llvm_unreachable("unimplemented"); // FIXME: implement serialization
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {

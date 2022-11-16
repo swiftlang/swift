@@ -4086,6 +4086,31 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+/// HasSymbolInst - Determines whether a weakly-imported declaration is
+/// available at runtime. Produces true if each of the underlying symbol
+/// addresses associated with a given declaration are non-null, false otherwise.
+class HasSymbolInst final : public LiteralInst {
+private:
+  friend SILBuilder;
+
+  ValueDecl *Decl;
+
+public:
+  HasSymbolInst(SILModule &M, SILDebugLocation Loc, ValueDecl *Decl)
+      : LiteralInst(SILInstructionKind::HasSymbolInst, Loc,
+                    SILType::getBuiltinIntegerType(1, Decl->getASTContext())),
+        Decl{Decl} {}
+
+  ValueDecl *getDecl() { return Decl; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(SILNodePointer node) {
+    return node->getKind() == SILNodeKind::HasSymbolInst;
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Memory instructions.
 //===----------------------------------------------------------------------===//

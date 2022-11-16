@@ -2991,6 +2991,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, witnessKind, witness, explicitFnTy);
     break;
   }
+  case SILInstructionKind::HasSymbolInst: {
+    llvm_unreachable("unimplemented"); // FIXME: implement deserialization
+    break;
+  }
   }
 
   for (auto result : ResultInst->getResults()) {
