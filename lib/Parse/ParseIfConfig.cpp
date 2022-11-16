@@ -23,15 +23,11 @@
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
-#include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
-using namespace swift::syntax;
 
 namespace {
 
@@ -779,10 +775,6 @@ Result Parser::parseIfConfigRaw(
       parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
   assert(Tok.is(tok::pound_if));
-  SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
-
-  Parser::StructureMarkerRAII ParsingDecl(
-      *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   // Find the region containing code completion token.
   SourceLoc codeCompletionClauseLoc;
@@ -817,9 +809,6 @@ Result Parser::parseIfConfigRaw(
   bool foundActive = false;
   bool isVersionCondition = false;
   while (1) {
-    SyntaxParsingContext ClauseContext(SyntaxContext,
-                                       SyntaxKind::IfConfigClause);
-
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
@@ -835,20 +824,6 @@ Result Parser::parseIfConfigRaw(
     // clause unless we're doing a parse-only pass.
     if (isElse) {
       isActive = !foundActive && shouldEvaluate;
-      if (SyntaxContext->isEnabled()) {
-        // Because we use the same libSyntax node for #elseif and #else, we need
-        // to disambiguate whether a postfix expression is the condition of
-        // #elseif or a postfix expression of the #else body.
-        // To do this, push three empty syntax nodes onto the stack.
-        //  - First one for unexpected nodes between the #else keyword and the
-        //    condition
-        //  - One for the condition itself (whcih doesn't exist)
-        //  - And finally one for the unexpected nodes between the condition and
-        //    the elements
-        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
-        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
-        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
-      }
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> result = parseExprSequence(diag::expected_expr,
@@ -900,12 +875,6 @@ Result Parser::parseIfConfigRaw(
     if (isActive || !isVersionCondition) {
       parseElements(
           ClauseLoc, Condition, isActive, IfConfigElementsRole::Normal);
-    } else if (SyntaxContext->isEnabled()) {
-      // We shouldn't skip code if we are building syntax tree.
-      // The parser will keep running and we just discard the AST part.
-      DiagnosticSuppression suppression(Context.Diags);
-      parseElements(
-          ClauseLoc, Condition, isActive, IfConfigElementsRole::SyntaxOnly);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
@@ -920,7 +889,6 @@ Result Parser::parseIfConfigRaw(
     if (isElse)
       diagnose(Tok, diag::expected_close_after_else_directive);
   }
-  SyntaxContext->collectNodesInPlace(SyntaxKind::IfConfigClauseList);
 
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);

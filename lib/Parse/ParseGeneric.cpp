@@ -19,12 +19,9 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Syntax/SyntaxBuilders.h"
-#include "swift/Syntax/SyntaxNodes.h"
+
 using namespace swift;
-using namespace swift::syntax;
 
 /// parseGenericParameters - Parse a sequence of generic parameters, e.g.,
 /// < T : Comparable, U : Container> along with an optional requires clause.
@@ -40,7 +37,6 @@ using namespace swift::syntax;
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
 ParserResult<GenericParamList> Parser::parseGenericParameters() {
-  SyntaxParsingContext GPSContext(SyntaxContext, SyntaxKind::GenericParameterClause);
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   return parseGenericParameters(consumeStartingLess());
@@ -50,10 +46,8 @@ ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
-  SyntaxParsingContext GPSContext(SyntaxContext, SyntaxKind::GenericParameterList);
   bool HasNextParam;
   do {
-    SyntaxParsingContext GParamContext(SyntaxContext, SyntaxKind::GenericParameter);
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                     StructureMarkerKind::Declaration);
@@ -260,20 +254,11 @@ ParserStatus Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc, SourceLoc &EndLoc,
                SmallVectorImpl<RequirementRepr> &Requirements,
                bool AllowLayoutConstraints) {
-  SyntaxParsingContext ClauseContext(SyntaxContext,
-                                     SyntaxKind::GenericWhereClause);
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  SyntaxParsingContext ReqListContext(SyntaxContext,
-                                      SyntaxKind::GenericRequirementList);
   bool HasNextReq;
   do {
-    SyntaxParsingContext ReqContext(SyntaxContext,
-                                    SyntaxKind::GenericRequirement);
-    Optional<SyntaxParsingContext> BodyContext;
-    BodyContext.emplace(SyntaxContext);
-
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeGenericRequirement();
@@ -287,12 +272,10 @@ ParserStatus Parser::parseGenericWhereClause(
     ParserResult<TypeRepr> FirstType = parseType();
 
     if (FirstType.hasCodeCompletion()) {
-      BodyContext->setTransparent();
       Status.setHasCodeCompletionAndIsError();
     }
 
     if (FirstType.isNull()) {
-      BodyContext->setTransparent();
       Status.setIsParseError();
       break;
     }
@@ -303,7 +286,6 @@ ParserStatus Parser::parseGenericWhereClause(
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
-        BodyContext->setCreateSyntax(SyntaxKind::LayoutRequirement);
 
         // Parse a layout constraint.
         Identifier LayoutName;
@@ -326,7 +308,6 @@ ParserStatus Parser::parseGenericWhereClause(
               LayoutConstraintLoc(Layout, LayoutLoc)));
         }
       } else {
-        BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
         // Parse the protocol or composition.
         ParserResult<TypeRepr> Protocol = parseType();
         Status |= Protocol;
@@ -339,7 +320,6 @@ ParserStatus Parser::parseGenericWhereClause(
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
-      BodyContext->setCreateSyntax(SyntaxKind::SameTypeRequirement);
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
@@ -376,12 +356,10 @@ ParserStatus Parser::parseGenericWhereClause(
       Requirements.push_back(RequirementRepr::getTypeConstraint(
           FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc)));
     } else {
-      BodyContext->setTransparent();
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();
       break;
     }
-    BodyContext.reset();
     HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
     // If there's a "&&", diagnose replace with a comma and keep parsing

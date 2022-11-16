@@ -356,22 +356,6 @@ public:
   };
   friend class StructureMarkerRAII;
 
-  /// A RAII object that tells the SyntaxParsingContext to defer Syntax nodes.
-  class DeferringContextRAII {
-    SyntaxParsingContext &Ctx;
-    bool WasDeferring;
-
-  public:
-    explicit DeferringContextRAII(SyntaxParsingContext &SPCtx)
-        : Ctx(SPCtx), WasDeferring(Ctx.shouldDefer()) {
-      Ctx.setShouldDefer();
-    }
-
-    ~DeferringContextRAII() {
-      Ctx.setShouldDefer(WasDeferring);
-    }
-  };
-
   /// The stack of structure markers indicating the locations of
   /// structural elements actively being parsed, including the start
   /// of declarations, statements, and opening operators of various
@@ -379,9 +363,6 @@ public:
   ///
   /// This vector is managed by \c StructureMarkerRAII objects.
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
-
-  /// Current syntax parsing context where call backs should be directed to.
-  SyntaxParsingContext *SyntaxContext;
 
   /// Maps of macro name and version to availability specifications.
   typedef llvm::DenseMap<llvm::VersionTuple,
