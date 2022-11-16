@@ -6803,6 +6803,10 @@ ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
 ERROR(runtime_discoverable_attrs_are_experimental,none,
       "runtime discoverable attributes are an experimental feature", ())
 
+ERROR(invalid_decl_for_runtime_discoverable_attr,none,
+      "@%0 can only be applied to non-generic types, methods, "
+      "instance properties, and global functions", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 

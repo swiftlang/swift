@@ -3629,6 +3629,73 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  if (nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>()) {
+    auto markInvalidApplication = [&]() {
+      diagnoseAndRemoveAttr(attr,
+                            diag::invalid_decl_for_runtime_discoverable_attr,
+                            nominal->getNameStr());
+    };
+
+    auto isGenericContext = [&](DeclContext *DC) {
+      return DC->isGenericContext() &&
+             !DC->getGenericSignatureOfContext()->areAllParamsConcrete();
+    };
+
+    // Any declaration in a local context is rejected.
+    if (dc->isLocalContext()) {
+      markInvalidApplication();
+      return;
+    }
+
+    switch (D->getKind()) {
+    case DeclKind::Class:
+    case DeclKind::Struct:
+    case DeclKind::Enum: {
+      // protocols are not accepted because they are
+      // generic over `Self`.
+
+      auto *NTD = cast<NominalTypeDecl>(D);
+
+      // Non-generic types only.
+      if (isGenericContext(NTD))
+        break;
+
+      return;
+    }
+
+    case DeclKind::Func: {
+      // Non-generic functions/methods only.
+      if (isGenericContext(cast<FuncDecl>(D)))
+        break;
+
+      // All non-generic and non-local functions are accepted.
+      return;
+    }
+
+    case DeclKind::Var: {
+      auto *var = cast<VarDecl>(D);
+
+      // `static` properties are not supported.
+      if (var->isStatic())
+        break;
+
+      // Instance properties of generic types are rejected.
+      if (isGenericContext(dc))
+        break;
+
+      return;
+    }
+
+    default:
+      // All other kinds of declarations i.e. subscripts, constructors etc.
+      // are unsupported.
+      break;
+    }
+
+    markInvalidApplication();
+    return;
+  }
+
   // If the nominal type is a result builder type, verify that D is a
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
