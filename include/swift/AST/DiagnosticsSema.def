@@ -6756,6 +6756,14 @@ ERROR(moveonly_cannot_conform_to_protocol, none,
 ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
      "move-only %0 %1 cannot conform to protocol %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+
+//------------------------------------------------------------------------------
+// MARK: Runtime discoverable attributes (@runtimeMetadata)
+//------------------------------------------------------------------------------
+
+ERROR(runtime_discoverable_attrs_are_experimental,none,
+      "runtime discoverable attributes are an experimental feature", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 
