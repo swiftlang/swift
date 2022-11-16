@@ -1070,14 +1070,14 @@ The minimal OS-version where the function is available.
 ::
 
   sil-function-attribute ::= '[' sil-function-inlining ']'
-  sil-function-inlining ::= 'never'
+  sil-function-inlining ::= 'noinline'
 
 The function is never inlined.
 ::
 
-  sil-function-inlining ::= 'always'
+  sil-function-inlining ::= 'always_inline'
 
-The function is always inlined, even in a ``Onone`` build.
+The function is always inlined.
 ::
 
   sil-function-attribute ::= '[' sil-function-optimization ']'
