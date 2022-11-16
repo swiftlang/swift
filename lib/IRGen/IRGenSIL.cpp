@@ -2614,7 +2614,12 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
 }
 
 void IRGenSILFunction::visitHasSymbolInst(HasSymbolInst *i) {
-  llvm_unreachable("unimplemented"); // FIXME: implement lowering
+  auto fn = IGM.emitHasSymbolFunction(i->getDecl());
+  llvm::CallInst *call = Builder.CreateCall(fn->getFunctionType(), fn, {});
+
+  Explosion e;
+  e.add(call);
+  setLoweredValue(i, e);
 }
 
 FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
