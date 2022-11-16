@@ -139,6 +139,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -419,6 +420,13 @@ struct AddressLoweringState {
   // parameters are rewritten.
   SmallBlotSetVector<FullApplySite, 16> indirectApplies;
 
+  // unconditional_checked_cast instructions of loadable type which need to be
+  // rewritten.
+  SmallVector<UnconditionalCheckedCastInst *, 2> nonopaqueResultUCCs;
+
+  // checked_cast_br instructions to loadable type which need to be rewritten.
+  SmallVector<CheckedCastBranchInst *, 2> nonopaqueResultCCBs;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
@@ -639,8 +647,31 @@ void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
 
 /// If `value` is address-only, add it to the `valueStorageMap`.
 void OpaqueValueVisitor::visitValue(SILValue value) {
-  if (!value->getType().isObject()
-      || !value->getType().isAddressOnly(*pass.function)) {
+  if (!value->getType().isObject())
+    return;
+  if (!value->getType().isAddressOnly(*pass.function)) {
+    if (auto *ucci = dyn_cast<UnconditionalCheckedCastInst>(value)) {
+      if (ucci->getSourceLoweredType().isAddressOnly(*pass.function))
+        return;
+      if (!canIRGenUseScalarCheckedCastInstructions(
+              pass.function->getModule(), ucci->getSourceFormalType(),
+              ucci->getTargetFormalType())) {
+        pass.nonopaqueResultUCCs.push_back(ucci);
+      }
+    } else if (auto *arg = dyn_cast<SILArgument>(value)) {
+      if (auto *ccbi = dyn_cast_or_null<CheckedCastBranchInst>(
+              arg->getTerminatorForResult())) {
+        if (ccbi->getSuccessBB() != arg->getParent())
+          return;
+        if (ccbi->getSourceLoweredType().isAddressOnly(*pass.function))
+          return;
+        if (!canIRGenUseScalarCheckedCastInstructions(
+                pass.function->getModule(), ccbi->getSourceFormalType(),
+                ccbi->getTargetFormalType())) {
+          pass.nonopaqueResultCCBs.push_back(ccbi);
+        }
+      }
+    }
     return;
   }
   if (pass.valueStorageMap.contains(value)) {
@@ -3354,6 +3385,39 @@ static void rewriteIndirectApply(FullApplySite apply,
   }
 }
 
+static void rewriteNonopaqueUnconditionalCheckedCast(
+    UnconditionalCheckedCastInst *uncondCheckedCast,
+    AddressLoweringState &pass) {
+  auto loc = uncondCheckedCast->getLoc();
+  SILValue srcVal = uncondCheckedCast->getOperand();
+  auto srcType = srcVal->getType();
+  auto destType = uncondCheckedCast->getType();
+  assert(srcType.isLoadable(*pass.function));
+  assert(!destType.isAddressOnly(*pass.function));
+
+  // Create a stack temporary to store the source
+  auto builder = pass.getBuilder(uncondCheckedCast->getIterator());
+  SILValue srcAddr = builder.createAllocStack(loc, srcType);
+  builder.createStore(loc, srcVal, srcAddr,
+                      srcType.isTrivial(*pass.function)
+                          ? StoreOwnershipQualifier::Trivial
+                          : StoreOwnershipQualifier::Init);
+  SILValue destAddr = builder.createAllocStack(loc, destType);
+  builder.createUnconditionalCheckedCastAddr(loc, srcAddr, srcType.getASTType(),
+                                             destAddr, destType.getASTType());
+
+  auto afterBuilder =
+      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
+  auto *load = afterBuilder.createLoad(loc, destAddr,
+                                       destType.isTrivial(*pass.function)
+                                           ? LoadOwnershipQualifier::Trivial
+                                           : LoadOwnershipQualifier::Take);
+  uncondCheckedCast->replaceAllUsesWith(load);
+  pass.deleter.forceDelete(uncondCheckedCast);
+  afterBuilder.createDeallocStack(loc, destAddr);
+  afterBuilder.createDeallocStack(loc, srcAddr);
+}
+
 static void rewriteFunction(AddressLoweringState &pass) {
   // During rewriting, storage references are stable.
   pass.valueStorageMap.setStable();
@@ -3400,6 +3464,14 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (optionalApply) {
       rewriteIndirectApply(optionalApply.getValue(), pass);
     }
+  }
+
+  for (auto *ucci : pass.nonopaqueResultUCCs) {
+    rewriteNonopaqueUnconditionalCheckedCast(ucci, pass);
+  }
+
+  for (auto *ccbi : pass.nonopaqueResultCCBs) {
+    CheckedCastBrRewriter(ccbi, pass).rewrite();
   }
 
   // Rewrite this function's return value now that all opaque values within the

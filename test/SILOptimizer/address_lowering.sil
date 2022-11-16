@@ -1614,7 +1614,7 @@ bb3:
 }
 
 // Test the result being stored into an @out enum.
-// CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>, [[INSTANCE:%[^,]+]] : @owned $TestGeneric<Element>):
 // CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Optional<T>
 // CHECK:         [[CAST_DEST_ADDR:%[^,]+]] = init_enum_data_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
@@ -1641,6 +1641,60 @@ bb2(%8 : @owned $TestGeneric<Element>):
 
 bb3(%12 : @owned $Optional<T>):
   return %12 : $Optional<T>
+}
+
+// Verify that checked_cast_br neither from nor to an address-only value but
+// whose operands require rewriting to checked_cast_addr_br gets rewritten.
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [init] [[SRC_ADDR]]
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         checked_cast_addr_br take_on_success AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[FAILURE]]:
+// CHECK:         load [take] [[SRC_ADDR]] : $*AnyObject
+// CHECK:       [[SUCCESS]]:
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_checked_cast_br5'
+sil [ossa] @test_checked_cast_br5 : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  checked_cast_br %instance : $AnyObject to any AnyObject.Type, success, failure
+
+success(%metatype : $@thick any AnyObject.Type):
+  br exit
+
+failure(%original : @owned $AnyObject):
+  destroy_value %original : $AnyObject
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that checked_cast_br which both has an address-only value and also
+// produces a value whose type would anyway require rewriting but is not
+// address-only gets lowered properly.
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br6 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type     
+// CHECK:         checked_cast_addr_br take_on_success T in [[SRC]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS]], [[FAILURE]] 
+// CHECK:       [[FAILURE]]:                                              
+// CHECK:         destroy_addr [[SRC]] : $*T                           
+// CHECK:       [[SUCCESS]]:                                              
+// CHECK:         [[REGISTER_3:%[^,]+]] = load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_checked_cast_br6'
+sil [ossa] @test_checked_cast_br6 : $@convention(thin) <T> (@in T) -> () {
+entry(%instance : @owned $T):
+  checked_cast_br %instance : $T to any AnyObject.Type, success, failure
+success(%metatype : $@thick any AnyObject.Type):
+  br exit
+failure(%original : @owned $T):
+  destroy_value %original : $T
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
@@ -1761,6 +1815,39 @@ bb0(%0 : @guaranteed $T):
   end_borrow %4 : $U
   destroy_value %3 : $U
   return %6 : $U
+}
+
+// Verify lowering of unconditional_checked_cast not involving address-only
+// values.
+// CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [init] [[SRC_ADDR]] : $*AnyObject
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast4'
+sil hidden [ossa] @test_unconditional_checked_cast4 : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  %casted = unconditional_checked_cast %instance : $AnyObject to any AnyObject.Type
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify lowering of unconditional_checked_cast that involves address-only
+// values and also non-address-only values which on its own requires lowering
+// to unconditional_checked_cast_addr.
+// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC_ADDR:%[^,]+]] :
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast5'
+sil [ossa] @test_unconditional_checked_cast5 : $@convention(thin) <T> (@in T) -> () {
+entry(%instance : @owned $T):
+  %casted = unconditional_checked_cast %instance : $T to any AnyObject.Type
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @yield_two : {{.*}} {
