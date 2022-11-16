@@ -832,6 +832,8 @@ ArgumentList *Expr::getArgs() const {
     return DSE->getArgs();
   if (auto *OLE = dyn_cast<ObjectLiteralExpr>(this))
     return OLE->getArgs();
+  if (auto *ME = dyn_cast<MacroExpansionExpr>(this))
+    return ME->getArgs();
   return nullptr;
 }
 

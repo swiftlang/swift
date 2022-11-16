@@ -5541,10 +5541,12 @@ bool ConstraintSystem::repairFailures(
 
       if (auto overload = findSelectedOverloadFor(calleeLocator)) {
         if (auto *decl = overload->choice.getDeclOrNull()) {
-          if (getParameterList(decl)->get(paramIdx)->getTypeOfDefaultExpr()) {
-            conversionsOrFixes.push_back(
-                IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
-            break;
+          if (auto paramList = getParameterList(decl)) {
+            if (paramList->get(paramIdx)->getTypeOfDefaultExpr()) {
+              conversionsOrFixes.push_back(
+                  IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
+              break;
+            }
           }
         }
       }
