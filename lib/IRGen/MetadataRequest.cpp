@@ -2052,6 +2052,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   accessor->addFnAttr(llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
   IGM.setHasNoFramePointer(accessor);
+  IGM.setColocateMetadataSection(accessor);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
@@ -2404,6 +2405,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
           generateThunkFn,
           /*noinline*/ true));
     }
+    IGM.setColocateMetadataSection(thunkFn);
 
     // Call out to the helper.
     auto arg0 = numArguments >= 1
@@ -2674,6 +2676,8 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   llvm::Function *accessor =
     IGM.getAddrOfGenericTypeMetadataAccessFunction(
         nominal, genericArgs.Types, shouldDefine);
+  if (shouldDefine)
+    IGM.setColocateMetadataSection(accessor);
 
   // If we're not supposed to define the accessor, or if we already
   // have defined it, just return the pointer.
@@ -2917,6 +2921,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     IGM.setHasNoFramePointer(subIGF.CurFn);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
+    IGM.setColocateMetadataSection(subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
     auto cache = params.claimNext();
