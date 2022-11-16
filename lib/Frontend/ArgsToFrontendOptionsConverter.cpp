@@ -488,8 +488,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpParse;
   if (Opt.matches(OPT_dump_ast))
     return FrontendOptions::ActionType::DumpAST;
-  if (Opt.matches(OPT_emit_syntax))
-    return FrontendOptions::ActionType::EmitSyntax;
   if (Opt.matches(OPT_merge_modules))
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))

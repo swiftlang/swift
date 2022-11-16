@@ -572,11 +572,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
 
-  if (Args.hasArg(OPT_verify_syntax_tree)) {
-    Opts.BuildSyntaxTree = true;
-    Opts.VerifySyntaxTree = true;
-  }
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
@@ -983,11 +978,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
     Opts.entryPointFunctionName = A->getValue();
-  }
-
-  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
-    Opts.BuildSyntaxTree = true;
-    Opts.VerifySyntaxTree = true;
   }
 
   // Configure lexing to parse and remember comments if:

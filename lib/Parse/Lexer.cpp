@@ -21,7 +21,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/RegexParserBridging.h"
-#include "swift/Syntax/Trivia.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"

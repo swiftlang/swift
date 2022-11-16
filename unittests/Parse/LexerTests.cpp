@@ -4,7 +4,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Syntax/Trivia.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
