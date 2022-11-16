@@ -206,6 +206,7 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   f->setAttributes(IGM.constructInitialAttributes());
   f->setDoesNotThrow();
   IGM.setHasNoFramePointer(f);
+  IGM.setColocateMetadataSection(f);
 
   IRGenFunction IGF(IGM, f);
 
@@ -2969,6 +2970,7 @@ namespace {
       f->setAttributes(IGM.constructInitialAttributes());
       f->setDoesNotThrow();
       IGM.setHasNoFramePointer(f);
+      IGM.setColocateMetadataSection(f);
 
       IRGenFunction IGF(IGM, f);
 
