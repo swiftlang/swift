@@ -50,7 +50,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/Syntax/SyntaxKind.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Comment.h"

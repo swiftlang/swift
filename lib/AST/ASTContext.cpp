@@ -57,10 +57,9 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -558,8 +557,6 @@ struct ASTContext::Implementation {
   
   llvm::FoldingSet<SILLayout> SILLayouts;
 
-  RC<syntax::SyntaxArena> TheSyntaxArena;
-
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
 
   Optional<ClangTypeConverter> Converter;
@@ -582,7 +579,6 @@ struct ASTContext::Implementation {
 
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
-      TheSyntaxArena(new syntax::SyntaxArena()),
       IntrinsicScratchContext(new llvm::LLVMContext())
       {}
 ASTContext::Implementation::~Implementation() {
@@ -748,10 +744,6 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   }
   evaluator.setStatsReporter(stats);
   Stats = stats;
-}
-
-RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
-  return getImpl().TheSyntaxArena;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the

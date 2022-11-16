@@ -144,10 +144,6 @@ namespace rewriting {
   class RewriteContext;
 }
 
-namespace syntax {
-  class SyntaxArena;
-}
-
 namespace ide {
   class TypeCheckCompletionCallback;
 }
@@ -497,9 +493,6 @@ public:
                                               arena),
                               setVector.size());
   }
-
-  /// Retrieve the syntax node memory manager for this context.
-  llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);

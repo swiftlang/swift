@@ -28,7 +28,6 @@
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
-#include "swift/Syntax/SyntaxKind.h"
 
 namespace swift {
 namespace ide {
