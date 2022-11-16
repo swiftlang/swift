@@ -34,6 +34,9 @@
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level other -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level ipi -module-name MainLib
 //--- PublicImports.swift
 import PublicSwift
 import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
@@ -70,7 +73,7 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 /// Test error message on an unknown library level name.
 // RUN: not %target-swift-frontend -typecheck %s -library-level ThatsNotALibraryLevel 2>&1 \
 // RUN:   | %FileCheck %s --check-prefix CHECK-ARG
-// CHECK-ARG: error: unknown library level 'ThatsNotALibraryLevel', expected one of 'api', 'spi' or 'other'
+// CHECK-ARG: error: unknown library level 'ThatsNotALibraryLevel', expected one of 'api', 'spi', 'ipi', or 'other'
 
 /// Expect no errors in swiftinterfaces.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \

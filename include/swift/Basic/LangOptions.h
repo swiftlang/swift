@@ -85,6 +85,10 @@ namespace swift {
     /// all decls in the module are considered to be SPI including public ones.
     SPI,
 
+    /// Internal Programming Interface that is not distributed and only usable
+    /// from within a project.
+    IPI,
+
     /// The library has some other undefined distribution.
     Other
   };
