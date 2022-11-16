@@ -907,24 +907,34 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
-    if (auto closure = cast<ClosureExpr>(context.getAsAbstractClosureExpr().getPtrOrNull()); context.getBody() == braceStmt) {
-      // If this closure has an empty body and no explicit result type
-      // let's bind result type to `Void` since that's the only type empty body
-      // can produce. Otherwise, if (multi-statement) closure doesn't have
-      // an explicit result (no `return` statements) let's default it to `Void`.
-      if (!constraints::hasExplicitResult(closure)) {
-        auto constraintKind =
-            (closure->hasEmptyBody() && !closure->hasExplicitResultType())
-                ? ConstraintKind::Bind
-                : ConstraintKind::Defaultable;
+    auto addResultDefault = [&](ClosureExpr *closure) {
+      if (context.getBody() == braceStmt) {
+        // If this closure has an empty body and no explicit result type
+        // let's bind result type to `Void` since that's the only type empty
+        // body can produce. Otherwise, if (multi-statement) closure doesn't
+        // have an explicit result (no `return` statements) let's default it to
+        // `Void`.
+        if (!constraints::hasExplicitResult(closure)) {
+          auto constraintKind =
+              (closure->hasEmptyBody() && !closure->hasExplicitResultType())
+                  ? ConstraintKind::Bind
+                  : ConstraintKind::Defaultable;
 
-        cs.addConstraint(
-            constraintKind, cs.getClosureType(closure)->getResult(),
-            ctx.TheEmptyTupleType,
-            cs.getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+          cs.addConstraint(constraintKind,
+                           cs.getClosureType(closure)->getResult(),
+                           ctx.TheEmptyTupleType,
+                           cs.getConstraintLocator(
+                               closure, ConstraintLocator::ClosureResult));
+        }
       }
-      if (!cs.participatesInInference(closure))
+    };
+
+    if (auto closure = cast<ClosureExpr>(
+            context.getAsAbstractClosureExpr().getPtrOrNull())) {
+      if (!cs.participatesInInference(closure)) {
+        addResultDefault(closure);
         return;
+      }
     }
 
     if (context.isSingleExpressionClosure(cs)) {
@@ -941,6 +951,10 @@ private:
           visitDecl(node.get<Decl *>());
         }
       }
+      if (!hadError)
+        addResultDefault(cast<ClosureExpr>(
+            context.getAsAbstractClosureExpr().getPtrOrNull()));
+
       return;
     }
 
@@ -973,6 +987,10 @@ private:
                           locator, LocatorPathElt::SyntacticElement(element)),
                       /*contextualInfo=*/{}, isDiscarded));
     }
+
+    if (!hadError)
+      addResultDefault(
+          cast<ClosureExpr>(context.getAsAbstractClosureExpr().getPtrOrNull()));
 
     createConjunction(cs, elements, locator);
   }
