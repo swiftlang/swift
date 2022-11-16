@@ -336,6 +336,8 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
+
+  void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
 };
 
 } // end anonymous namespace
@@ -6930,6 +6932,15 @@ void AttributeChecker::visitCompilerInitializedAttr(
   // focus just on the initialization in the init.
   if (!(var->getDeclContext()->getSelfClassDecl() && var->isInstanceMember())) {
     diagnose(attr->getLocation(), diag::instancemember_compilerinitialized);
+    return;
+  }
+}
+
+void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs)) {
+    diagnose(attr->getLocation(),
+             diag::runtime_discoverable_attrs_are_experimental);
+    attr->setInvalid();
     return;
   }
 }
