@@ -7815,7 +7815,7 @@ const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
   if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
-    return params->get(index);
+    return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
 }
