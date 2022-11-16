@@ -516,4 +516,8 @@ void TopLevelCodeDecl_dump(void *decl) {
 void Expr_dump(void *expr) { ((Expr *)expr)->dump(llvm::errs()); }
 void Decl_dump(void *expr) { ((Decl *)expr)->dump(llvm::errs()); }
 void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 void Type_dump(void *expr) { ((TypeRepr *)expr)->dump(); }
+#pragma clang diagnostic pop
