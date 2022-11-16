@@ -40,24 +40,6 @@
 #include "SwiftObject.h"
 #endif
 
-#if defined(_WIN32)
-#include <stdarg.h>
-
-namespace {
-char *strndup(const char *s, size_t n) {
-  size_t length = std::min(strlen(s), n);
-
-  char *buffer = reinterpret_cast<char *>(malloc(length + 1));
-  if (buffer == nullptr)
-    return buffer;
-
-  strncpy(buffer, s, length);
-  buffer[length] = '\0';
-  return buffer;
-}
-}
-#endif
-
 using namespace swift;
 
 namespace {
@@ -261,7 +243,12 @@ struct TupleImpl : ReflectionMirrorImpl {
 
       // If we have a label, create it.
       if (labels && space && labels != space) {
-        *outName = strndup(labels, space - labels);
+        size_t labelLen = space - labels;
+        char *label = (char *)malloc(labelLen + 1);
+        memcpy(label, labels, labelLen);
+        label[labelLen] = '\0'; // 0-terminate the string
+
+        *outName = label;
         hasLabel = true;
       }
     }
