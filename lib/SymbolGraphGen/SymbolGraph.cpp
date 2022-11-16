@@ -412,11 +412,21 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
 
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
-          // protocol.
+          // protocol or the respective extension block.
           if (!Walker.isOurModule(MemberVD->getModuleContext()) && VD->getDeclContext()) {
-            if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+            if (const auto *Extension =
+                    dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
+              if (this->Walker.shouldBeRecordedAsExtension(Extension)) {
+                recordEdge(Symbol(this, VD, nullptr),
+                           Symbol(this, Extension, nullptr),
+                           RelationshipKind::MemberOf());
+                continue;
+              }
+            }
+            if (auto *ExtendedProtocol =
+                    VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
-                         Symbol(this, ExP, nullptr),
+                         Symbol(this, ExtendedProtocol, nullptr),
                          RelationshipKind::MemberOf());
             }
           }
