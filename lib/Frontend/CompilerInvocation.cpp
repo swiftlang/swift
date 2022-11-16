@@ -1036,6 +1036,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.AnalyzeRequirementMachine = Args.hasArg(
       OPT_analyze_requirement_machine);
 
+  Opts.DumpMacroExpansions = Args.hasArg(
+      OPT_dump_macro_expansions);
+
   if (const Arg *A = Args.getLastArg(OPT_debug_requirement_machine))
     Opts.DebugRequirementMachine = A->getValue();
 
