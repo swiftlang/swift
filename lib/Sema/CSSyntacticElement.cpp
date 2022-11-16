@@ -383,6 +383,11 @@ struct SyntacticElementContext
     }
   }
 
+  NullablePtr<ClosureExpr> getAsClosureExpr() const {
+    return dyn_cast_or_null<ClosureExpr>(
+        this->dyn_cast<AbstractClosureExpr *>());
+  }
+
   NullablePtr<AbstractClosureExpr> getAsAbstractClosureExpr() const {
     return this->dyn_cast<AbstractClosureExpr *>();
   }
@@ -907,36 +912,6 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
-    auto addResultDefault = [&](ClosureExpr *closure) {
-      if (context.getBody() == braceStmt) {
-        // If this closure has an empty body and no explicit result type
-        // let's bind result type to `Void` since that's the only type empty
-        // body can produce. Otherwise, if (multi-statement) closure doesn't
-        // have an explicit result (no `return` statements) let's default it to
-        // `Void`.
-        if (!constraints::hasExplicitResult(closure)) {
-          auto constraintKind =
-              (closure->hasEmptyBody() && !closure->hasExplicitResultType())
-                  ? ConstraintKind::Bind
-                  : ConstraintKind::Defaultable;
-
-          cs.addConstraint(constraintKind,
-                           cs.getClosureType(closure)->getResult(),
-                           ctx.TheEmptyTupleType,
-                           cs.getConstraintLocator(
-                               closure, ConstraintLocator::ClosureResult));
-        }
-      }
-    };
-
-    if (auto closure = cast<ClosureExpr>(
-            context.getAsAbstractClosureExpr().getPtrOrNull())) {
-      if (!cs.participatesInInference(closure)) {
-        addResultDefault(closure);
-        return;
-      }
-    }
-
     if (context.isSingleExpressionClosure(cs)) {
       for (auto node : braceStmt->getElements()) {
         if (auto expr = node.dyn_cast<Expr *>()) {
@@ -951,11 +926,38 @@ private:
           visitDecl(node.get<Decl *>());
         }
       }
-      if (!hadError)
-        addResultDefault(cast<ClosureExpr>(
-            context.getAsAbstractClosureExpr().getPtrOrNull()));
-
       return;
+    }
+
+    // If this brace statement represents a body of an empty or
+    // multi-statement closure.
+    if (locator->directlyAt<ClosureExpr>()) {
+      auto *closure = context.getAsClosureExpr().get();
+      // If this closure has an empty body and no explicit result type
+      // let's bind result type to `Void` since that's the only type empty
+      // body can produce. Otherwise, if (multi-statement) closure doesn't
+      // have an explicit result (no `return` statements) let's default it to
+      // `Void`.
+      //
+      // Note that result builder bodies always have a `return` statement
+      // at the end, so they don't need to be defaulted.
+      if (!cs.getAppliedResultBuilderTransform({closure}) &&
+          !hasExplicitResult(closure)) {
+        auto constraintKind =
+            (closure->hasEmptyBody() && !closure->hasExplicitResultType())
+                ? ConstraintKind::Bind
+                : ConstraintKind::Defaultable;
+
+        cs.addConstraint(
+            constraintKind, cs.getClosureType(closure)->getResult(),
+            ctx.TheEmptyTupleType,
+            cs.getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+      }
+
+      // Let's not walk into the body if empty or multi-statement closure
+      // doesn't participate in inference.
+      if (!cs.participatesInInference(closure))
+        return;
     }
 
     if (isChildOf(StmtKind::Case)) {
@@ -987,10 +989,6 @@ private:
                           locator, LocatorPathElt::SyntacticElement(element)),
                       /*contextualInfo=*/{}, isDiscarded));
     }
-
-    if (!hadError)
-      addResultDefault(
-          cast<ClosureExpr>(context.getAsAbstractClosureExpr().getPtrOrNull()));
 
     createConjunction(cs, elements, locator);
   }
