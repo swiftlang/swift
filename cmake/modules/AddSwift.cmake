@@ -912,9 +912,9 @@ function(add_swift_host_tool executable)
   endif()
 
   if(SWIFT_SWIFT_PARSER)
-  set_property(
-    TARGET ${executable}
-    APPEND PROPERTY INSTALL_RPATH "@executable_path/../lib")
+    set_property(
+      TARGET ${executable}
+      APPEND PROPERTY INSTALL_RPATH "@executable_path/../lib")
   endif()
 
   if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
