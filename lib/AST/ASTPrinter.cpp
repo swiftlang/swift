@@ -5234,12 +5234,45 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
-  void printGenericArgs(ArrayRef<Type> Args) {
-    if (Args.empty())
+  void printGenericArgs(TypeArrayView<GenericTypeParamType> params,
+                        ArrayRef<Type> args) {
+    assert(params.size() == args.size());
+
+    if (args.empty())
       return;
 
+    // Unlike tuple elements and function type parameter lists, packs are not
+    // flattened in the arguments of a generic type, so we need to perform a
+    // transformation to print them in a form that will resolve back to the
+    // same type:
+    //
+    // VariadicType<Pack{T1, T2}> => VariadicType<T1, T2>
+    // VariadicType<T> => VariadicType<T...> where T is a type parameter pack
+    //
+    SmallVector<Type, 2> flatArgs;
+    for (unsigned i : indices(params)) {
+      auto param = params[i];
+      auto arg = args[i];
+      if (param->isParameterPack()) {
+        if (auto *packType = arg->getAs<PackType>()) {
+          flatArgs.append(packType->getElementTypes().begin(),
+                          packType->getElementTypes().end());
+        } else {
+          assert(arg->is<PackArchetypeType>() ||
+                 arg->is<TypeVariableType>() ||
+                 arg->isParameterPack());
+          flatArgs.push_back(PackExpansionType::get(arg, arg));
+        }
+      } else {
+        assert(!arg->is<PackType>());
+        flatArgs.push_back(arg);
+      }
+    }
+
     Printer << "<";
-    interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
+    interleave(flatArgs,
+               [&](Type arg) { visit(arg); },
+               [&] { Printer << ", "; });
     Printer << ">";
   }
 
@@ -5572,7 +5605,13 @@ public:
     }
 
     printQualifiedType(T);
-    printGenericArgs(T->getDirectGenericArgs());
+
+    auto *typeAliasDecl = T->getDecl();
+    if (typeAliasDecl->isGeneric()) {
+      auto genericSig = typeAliasDecl->getGenericSignature();
+      printGenericArgs(genericSig.getInnermostGenericParams(),
+                       T->getDirectGenericArgs());
+    }
   }
 
   void visitParenType(ParenType *T) {
@@ -5657,7 +5696,16 @@ public:
       }
     }
     printQualifiedType(T);
-    printGenericArgs(T->getGenericArgs());
+
+    // It would be nicer to use genericSig.getInnermostGenericParams() here,
+    // but that triggers a request cycle if we're in the middle of computing
+    // the generic signature already.
+    SmallVector<Type, 2> paramTypes;
+    for (auto *paramDecl : T->getDecl()->getGenericParams()->getParams()) {
+      paramTypes.push_back(paramDecl->getDeclaredInterfaceType());
+    }
+    printGenericArgs(TypeArrayView<GenericTypeParamType>(paramTypes),
+                     T->getGenericArgs());
   }
 
   void visitParentType(Type T) {
@@ -6474,6 +6522,10 @@ public:
       return false;
     };
 
+    auto *namingDecl = T->getDecl()->getNamingDecl();
+    auto genericSig = namingDecl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
       if (printNamedOpaque())
@@ -6491,8 +6543,6 @@ public:
 
       // Opaque archetype substitutions are always canonical, so re-sugar the
       // constraint type using the owning declaration's generic parameter names.
-      auto genericSig = T->getDecl()->getNamingDecl()->getInnermostDeclContext()
-          ->getGenericSignatureOfContext();
       if (genericSig)
         constraint = genericSig->getSugaredType(constraint);
 
@@ -6519,22 +6569,22 @@ public:
       // attribute to apply to, but the attribute alone references the opaque
       // type.
       Printer << ") __";
-      printGenericArgs(T->getSubstitutions().getReplacementTypes());
+
+      if (genericSig) {
+        printGenericArgs(genericSig.getGenericParams(),
+                         T->getSubstitutions().getReplacementTypes());
+      }
       return;
     }
     case PrintOptions::OpaqueReturnTypePrintingMode::Description: {
       // TODO(opaque): present opaque types with user-facing syntax. we should
       // probably print this as `some P` and record the fact that we printed that
       // so that diagnostics can add followup notes.
-      Printer << "(return type of " << T->getDecl()->getNamingDecl()->printRef();
+      Printer << "(return type of " << namingDecl->printRef();
       Printer << ')';
-      if (!T->getSubstitutions().empty()) {
-        Printer << '<';
-        auto replacements = T->getSubstitutions().getReplacementTypes();
-        llvm::interleave(
-            replacements.begin(), replacements.end(), [&](Type t) { visit(t); },
-            [&] { Printer << ", "; });
-        Printer << '>';
+      if (genericSig) {
+        printGenericArgs(genericSig.getGenericParams(),
+                         T->getSubstitutions().getReplacementTypes());
       }
       return;
     }
