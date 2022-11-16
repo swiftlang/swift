@@ -563,6 +563,20 @@ namespace {
       return nullptr;
     }
 
+    const clang::CXXConstructorDecl *findMoveConstructor() const {
+      const clang::CXXRecordDecl *cxxRecordDecl =
+          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      if (!cxxRecordDecl)
+        return nullptr;
+      for (auto method : cxxRecordDecl->methods()) {
+        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
+          if (ctor->isMoveConstructor())
+            return ctor;
+        }
+      }
+      return nullptr;
+    }
+
     CanSILFunctionType createCXXCopyConstructorFunctionType(IRGenFunction &IGF,
                                                             SILType T) const {
       // Create the following function type:
@@ -785,6 +799,13 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     src.getAddress(),
@@ -800,6 +821,13 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,

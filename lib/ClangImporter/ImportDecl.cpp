@@ -1966,6 +1966,13 @@ namespace {
       return semanticsKind == CxxRecordSemanticsKind::Reference;
     }
 
+    bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
+      auto semanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      return semanticsKind == CxxRecordSemanticsKind::MoveOnly;
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2117,6 +2124,20 @@ namespace {
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, AccessLevel::Public, loc, name, loc, None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+
+      if (recordHasMoveOnlySemantics(decl)) {
+        if (!Impl.SwiftContext.LangOpts.hasFeature(Feature::MoveOnly)) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(
+                        diag::move_only_requires_move_only,
+                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl->getLocation());
+          return nullptr;
+        }
+
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   MoveOnlyAttr(/*Implicit=*/true));
+      }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -2573,12 +2594,12 @@ namespace {
       // default). Make sure we only do this if the class has been fully defined
       // and we're not in a dependent context (this is equivalent to the logic
       // in CanDeclareSpecialMemberFunction in Clang's SemaLookup.cpp).
-      if (decl->getDefinition() && !decl->isBeingDefined() &&
-          !decl->isDependentContext()) {
+      // TODO: I suspect this if-statement does not need to be here.
+      if (!decl->isBeingDefined() && !decl->isDependentContext()) {
         if (decl->needsImplicitDefaultConstructor()) {
           clang::CXXConstructorDecl *ctor =
               clangSema.DeclareImplicitDefaultConstructor(
-                  const_cast<clang::CXXRecordDecl *>(decl->getDefinition()));
+                  const_cast<clang::CXXRecordDecl *>(decl));
           if (!ctor->isDeleted())
             clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
                                                        ctor);
@@ -2607,6 +2628,12 @@ namespace {
         if (copyCtor) {
           clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
                                                   copyCtor);
+        }
+
+        if (decl->needsImplicitDestructor()) {
+          auto dtor = clangSema.DeclareImplicitDestructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+          clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
         }
       }
 

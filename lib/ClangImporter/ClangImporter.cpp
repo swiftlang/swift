@@ -6479,13 +6479,7 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
 
 /// Checks if a record provides the required value type lifetime operations
 /// (copy and destroy).
-static bool hasRequiredValueTypeOperations(const clang::CXXRecordDecl *decl) {
-  if (auto dtor = decl->getDestructor()) {
-    if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-      return false;
-    }
-  }
-
+static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.
@@ -6495,7 +6489,34 @@ static bool hasRequiredValueTypeOperations(const clang::CXXRecordDecl *decl) {
       }))
     return false;
 
-  return true;
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor();
+  });
+}
+
+static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
+  // If we have no way of copying the type we can't import the class
+  // at all because we cannot express the correct semantics as a swift
+  // struct.
+  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+        return ctor->isMoveConstructor() &&
+               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+      }))
+    return false;
+
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isMoveConstructor();
+  });
+}
+
+static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (auto dtor = decl->getDestructor()) {
+    if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
@@ -6538,7 +6559,8 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
-  if (!hasRequiredValueTypeOperations(cxxDecl)) {
+  if (!hasDestroyTypeOperations(cxxDecl) ||
+      (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
     if (hasUnsafeAPIAttr(cxxDecl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                               "import_unsafe", decl->getNameAsString());
@@ -6564,6 +6586,14 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Iterator;
   }
 
+  if (hasCopyTypeOperations(cxxDecl)) {
+    return CxxRecordSemanticsKind::Owned;
+  }
+
+  if (hasMoveTypeOperations(cxxDecl)) {
+    return CxxRecordSemanticsKind::MoveOnly;
+  }
+
   if (hasPointerInSubobjects(cxxDecl)) {
     return CxxRecordSemanticsKind::UnsafePointerMember;
   }
@@ -6572,6 +6602,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Trivial;
   }
 
+  // How did we get here?
   return CxxRecordSemanticsKind::Owned;
 }
 
