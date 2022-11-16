@@ -30,6 +30,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -725,6 +726,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
+  auto genericArgs = generic->getGenericArgs();
+
   if (auto *protoType = type->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
 
@@ -739,8 +742,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       }
       return ErrorType::get(ctx);
     }
-
-    auto genericArgs = generic->getGenericArgs();
 
     if (genericArgs.size() != assocTypes.size()) {
       diags.diagnose(loc,
@@ -808,67 +809,25 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
-  //
-  // For generic types without type parameter packs, we require
-  // the number of declared generic parameters match the number of
-  // arguments.
-  //
-  // For generic types with type parameter packs, we only require
-  // that the number of arguments is enough to saturate the number of
-  // regular generic parameters. The parameter pack will absorb
-  // any excess parameters, or will have a substitution of `Void` if there
-  // is nothing to bind. This Void-binding behavior of parameter packs
-  // also explains the offset of one that isn't otherwise present in
-  // the plain generic parameter case.
-  //
-  // struct Foo<Prefix, T..., Suffix> {}
-  // typealias X = Foo<String, Int, Float, Double> // Prefix -> String, Suffix
-  // -> Double, T... -> (Int, Float) typealias X = Foo<String, Int> // Prefix ->
-  // String, Suffix -> Int, T... -> Void typealias Y = Foo<String> // error: Not
-  // enough arguments to bind Suffix.
-  //
-  // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context. The
-  // expression checker certainly only cares about the case where too many
-  // arguments are given.
-  auto genericArgs = generic->getGenericArgs();
   auto genericParams = decl->getGenericParams();
   auto hasParameterPack = llvm::any_of(
-      *genericParams, [](const auto *GPT) { return GPT->isParameterPack(); });
-  if ((!hasParameterPack && genericArgs.size() != genericParams->size()) ||
-      (hasParameterPack && genericArgs.size() < genericParams->size() - 1)) {
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags
-          .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                    genericParams->size() - (hasParameterPack ? 1 : 0),
-                    genericArgs.size(),
-                    genericArgs.size() < genericParams->size(), hasParameterPack)
-          .highlight(generic->getAngleBrackets());
-      decl->diagnose(diag::kind_declname_declared_here,
-                     DescriptiveDeclKind::GenericType, decl->getName());
-    }
-    return ErrorType::get(ctx);
-  }
-
-  // In SIL mode, Optional<T> interprets T as a SIL type.
-  if (options.contains(TypeResolutionFlags::SILType)) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nominal->isOptionalDecl()) {
-        // Validate the generic argument.
-        Type objectType = resolution.resolveType(genericArgs[0], silParams);
-        if (objectType->hasError()) {
-          return ErrorType::get(ctx);
-        }
-
-        return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
-      }
-    }  
-  }
+      *genericParams, [](auto *paramDecl) {
+          return paramDecl->isParameterPack();
+      });
 
   // Resolve the types of the generic arguments.
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::GenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
+
+  // In SIL mode, Optional<T> interprets T as a SIL type.
+  if (options.contains(TypeResolutionFlags::SILType)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      if (nominal->isOptionalDecl()) {
+        genericResolution = resolution;
+      }
+    }
+  }
 
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
@@ -878,6 +837,69 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
+  }
+
+  if (!hasParameterPack) {
+    // For generic types without type parameter packs, we require
+    // the number of declared generic parameters match the number of
+    // arguments.
+    if (genericArgs.size() != genericParams->size()) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+        diags
+            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                      genericParams->size(),
+                      genericArgs.size(),
+                      genericArgs.size() < genericParams->size(),
+                      /*hasParameterPack=*/0)
+            .highlight(generic->getAngleBrackets());
+        decl->diagnose(diag::kind_declname_declared_here,
+                       DescriptiveDeclKind::GenericType, decl->getName());
+      }
+      return ErrorType::get(ctx);
+    }
+  } else {
+    // For generic types with type parameter packs, we only require
+    // that the number of arguments is enough to saturate the number of
+    // regular generic parameters. The parameter pack will absorb
+    // zero or arguments.
+    SmallVector<Type, 2> params;
+    for (auto paramDecl : genericParams->getParams()) {
+      auto paramType = paramDecl->getDeclaredInterfaceType();
+      params.push_back(paramDecl->isParameterPack()
+                       ? PackExpansionType::get(paramType, paramType)
+                       : paramType);
+    }
+
+    PackMatcher matcher(params, args, ctx);
+    if (matcher.match()) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+        diags
+            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                      genericParams->size() - 1,
+                      genericArgs.size(),
+                      genericArgs.size() < genericParams->size(),
+                      /*hasParameterPack=*/1)
+            .highlight(generic->getAngleBrackets());
+        decl->diagnose(diag::kind_declname_declared_here,
+                       DescriptiveDeclKind::GenericType, decl->getName());
+      }
+      return ErrorType::get(ctx);
+    }
+
+    args.clear();
+    for (unsigned i : indices(params)) {
+      auto found = std::find_if(matcher.pairs.begin(),
+                                matcher.pairs.end(),
+                                [&](const MatchedPair &pair) -> bool {
+                                  return pair.idx == i;
+                                });
+      assert(found != matcher.pairs.end());
+
+      auto arg = found->rhs;
+      if (auto *expansionType = arg->getAs<PackExpansionType>())
+        arg = expansionType->getPatternType();
+      args.push_back(arg);
+    }
   }
 
   const auto result = resolution.applyUnboundGenericArguments(
@@ -940,15 +962,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
     ArrayRef<Type> genericArgs) const {
-  const bool hasParameterPack =
-      llvm::any_of(*decl->getGenericParams(),
-                   [](const auto *GPT) { return GPT->isParameterPack(); });
-  assert(
-      ((!hasParameterPack &&
-        genericArgs.size() == decl->getGenericParams()->size()) ||
-       (hasParameterPack &&
-        genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
-      "invalid arguments, use applyGenericArguments for diagnostic emitting");
+  assert(genericArgs.size() == decl->getGenericParams()->size() &&
+         "invalid arguments, use applyGenericArguments to emit diagnostics "
+         "and collect arguments to pack generic parameters");
 
   TypeSubstitutionMap subs;
 
@@ -985,6 +1001,10 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
 
     skipRequirementsCheck |= parentTy->hasTypeVariable();
+
+  // Fill in substitutions for outer generic parameters if we have a local
+  // type in generic context. This isn't actually supported all the way,
+  // but we have to put something here so we don't crash.
   } else if (auto parentSig =
                  decl->getDeclContext()->getGenericSignatureOfContext()) {
     for (auto gp : parentSig.getGenericParams()) {
@@ -999,58 +1019,13 @@ Type TypeResolution::applyUnboundGenericArguments(
     auto origTy = innerParams[i]->getDeclaredInterfaceType();
     auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
-    if (!origGP->isParameterPack()) {
-      auto substTy = genericArgs[i];
+    auto substTy = genericArgs[i];
 
-      // Enter a substitution.
-      subs[origGP] = substTy;
+    // Enter a substitution.
+    subs[origGP] = substTy;
 
-      skipRequirementsCheck |=
-          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-
-      continue;
-    }
-
-    // Scan backwards to find the bounds of the longest run of
-    // types we can bind to this parameter pack.
-    unsigned tail;
-    for (tail = 1; tail <= innerParams.size(); ++tail) {
-      auto tailTy = innerParams[innerParams.size() - tail]
-          ->getDeclaredInterfaceType();
-      auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
-      if (tailGP->isParameterPack()) {
-        assert(tailGP->isEqual(origGP) &&
-               "Found multiple type parameter packs!");
-
-        // Saturate the parameter pack. Take care that if the prefix and suffix
-        // have bound all available arguments that we bind the parameter
-        // pack to `Void`.
-        const size_t sequenceLength = tail + i <= genericArgs.size()
-                                          ? genericArgs.size() - tail - i + 1
-                                          : 0;
-
-        auto substTy = PackType::get(getASTContext(),
-                                     genericArgs.slice(i, sequenceLength));
-
-        // Enter a substitution.
-        subs[origGP] = substTy;
-
-        skipRequirementsCheck |=
-            substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-
-        break;
-      }
-
-      auto substTy = genericArgs[genericArgs.size() - tail];
-
-      // Enter a substitution.
-      subs[tailGP] = substTy;
-
-      skipRequirementsCheck |=
-          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-    }
-
-    break;
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
