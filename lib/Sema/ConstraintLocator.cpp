@@ -436,9 +436,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::ConstraintLocator::PackType:
-    out << "pack type";
+  case ConstraintLocator::ConstraintLocator::PackType: {
+    auto packElt = elt.castTo<LocatorPathElt::PackType>();
+    out << "pack type '" << packElt.getType()->getString(PO) << "'";
     break;
+  }
 
   case ConstraintLocator::PackElement: {
     auto packElt = elt.castTo<LocatorPathElt::PackElement>();
