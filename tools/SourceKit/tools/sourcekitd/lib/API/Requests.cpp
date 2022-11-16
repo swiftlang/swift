@@ -37,8 +37,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "swift/Syntax/Serialization/SyntaxSerialization.h"
-#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -87,7 +85,6 @@ struct SKEditorConsumerOptions {
   bool EnableSyntaxMap = false;
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
-  SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
   bool SyntacticOnly = false;
 };
 
@@ -329,19 +326,6 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
 
 static bool isSemanticEditorDisabled();
 static void enableCompileNotifications(bool value);
-
-static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
-  if (UID == nullptr) {
-    // Default is no syntax tree
-    return SyntaxTreeTransferMode::Off;
-  } else if (UID == KindSyntaxTreeOff) {
-    return SyntaxTreeTransferMode::Off;
-  } else if (UID == KindSyntaxTreeFull) {
-    return SyntaxTreeTransferMode::Full;
-  } else {
-    llvm_unreachable("Unexpected syntax tree transfer mode");
-  }
-}
 
 namespace {
 class SKOptionsDictionary : public OptionsDictionary {
@@ -666,7 +650,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
 
@@ -674,7 +657,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
     Opts.SyntacticOnly = SyntacticOnly;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args, std::move(vfsOptions)));
   }
@@ -708,13 +690,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
 
     SKEditorConsumerOptions Opts;
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
     Opts.SyntacticOnly = SyntacticOnly;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
@@ -2763,12 +2743,6 @@ public:
 
   void handleSourceText(StringRef Text) override;
 
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override;
-
-  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
-    return Opts.SyntaxTransferMode;
-  }
-
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
@@ -3109,37 +3083,6 @@ void SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
 
 void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-}
-
-void serializeSyntaxTreeAsJson(
-    const swift::syntax::SourceFileSyntax &SyntaxTree,
-    ResponseBuilder::Dictionary &Dict) {
-  auto StartClock = clock();
-  // 4096 is a heuristic buffer size that appears to usually be able to fit an
-  // incremental syntax tree
-  llvm::SmallString<4096> SyntaxTreeString;
-  {
-    llvm::raw_svector_ostream SyntaxTreeStream(SyntaxTreeString);
-    swift::json::Output::UserInfoMap JsonUserInfo;
-    swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
-                                         /*PrettyPrint=*/false);
-    SyntaxTreeOutput << *SyntaxTree.getRaw();
-  }
-  Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
-
-  auto EndClock = clock();
-  LOG_SECTION("incrParse Performance", InfoLowPrio) {
-    Log->getOS() << "Serialized " << SyntaxTreeString.size()
-                 << " bytes as JSON in ";
-    auto Seconds = (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC;
-    llvm::write_double(Log->getOS(), Seconds, llvm::FloatStyle::Fixed, 2);
-    Log->getOS() << "ms";
-  }
-}
-
-void SKEditorConsumer::handleSyntaxTree(
-    const swift::syntax::SourceFileSyntax &SyntaxTree) {
-  serializeSyntaxTreeAsJson(SyntaxTree, Dict);
 }
 
 static sourcekitd_response_t

@@ -15,12 +15,9 @@
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Syntax/SyntaxKind.h"
-#include "swift/Syntax/TokenKinds.h"
 
 using namespace swift;
 using namespace swift::ide;
-using swift::syntax::SyntaxKind;
 
 namespace {
 
@@ -3050,31 +3047,30 @@ void CompletionLookup::collectPrecedenceGroups() {
   }
 }
 
-void CompletionLookup::getPrecedenceGroupCompletions(SyntaxKind SK) {
+void CompletionLookup::getPrecedenceGroupCompletions(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   switch (SK) {
-  case SyntaxKind::PrecedenceGroupAssociativity:
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Associativity:
     addKeyword(getAssociativitySpelling(Associativity::None));
     addKeyword(getAssociativitySpelling(Associativity::Left));
     addKeyword(getAssociativitySpelling(Associativity::Right));
-    break;
-  case SyntaxKind::PrecedenceGroupAssignment:
+    return;
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Assignment:
     addKeyword(getTokenText(tok::kw_false), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_false);
     addKeyword(getTokenText(tok::kw_true), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_true);
-    break;
-  case SyntaxKind::PrecedenceGroupAttributeList:
+    return;
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::AttributeList:
     addKeyword("associativity");
     addKeyword("higherThan");
     addKeyword("lowerThan");
     addKeyword("assignment");
-    break;
-  case SyntaxKind::PrecedenceGroupRelation:
+    return;
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Relation:
     collectPrecedenceGroups();
-    break;
-  default:
-    llvm_unreachable("not a precedencegroup SyntaxKind");
+    return;
   }
+  llvm_unreachable("not a precedencegroup SyntaxKind");
 }
 
 void CompletionLookup::getPoundAvailablePlatformCompletions() {

@@ -75,13 +75,9 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class SyntaxParsingCache;
   class ASTScope;
   class SourceLookupCache;
 
-  namespace syntax {
-  class SourceFileSyntax;
-}
 namespace ast_scope {
 class ASTSourceFileScope;
 }

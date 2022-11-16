@@ -26,6 +26,7 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 
@@ -599,7 +600,7 @@ public:
 
   void collectPrecedenceGroups();
 
-  void getPrecedenceGroupCompletions(syntax::SyntaxKind SK);
+  void getPrecedenceGroupCompletions(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK);
 
   void getPoundAvailablePlatformCompletions();
 

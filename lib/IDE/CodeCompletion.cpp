@@ -123,7 +123,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  SyntaxKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -256,7 +256,7 @@ public:
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
-  void completeInPrecedenceGroup(SyntaxKind SK) override;
+  void completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -466,7 +466,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
   AttTargetIsIndependent = isIndependent;
 }
 
-void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
+void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -805,7 +805,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 
 #define DECL_KEYWORD(kw)                                                       \
   AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   // Manually add "actor" because it's a contextual keyword.
   AddDeclKeyword("actor", CodeCompletionKeywordKind::None, None);
 
@@ -842,7 +842,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     addKeyword(Sink, Name, Kind, "", flair);
   };
 #define STMT_KEYWORD(kw) AddStmtKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 }
 
 static void addCaseStmtKeywords(CodeCompletionResultSink &Sink) {
