@@ -461,6 +461,18 @@ func taskCreateFlags(
 }
 
 // ==== Task Creation ----------------------------------------------------------
+
+@available(SwiftStdlib 5.1, *)
+extension Task where Success == Never, Failure == Never {
+  @TaskLocal
+  public static var _taskName: String?
+
+  /// The name of this task, if set during its initialization.
+  public static var name: String? {
+    Task._taskName
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -468,6 +480,17 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model.")
+  }
+
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    name: String,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
   ) {
@@ -514,6 +537,47 @@ extension Task where Failure == Never {
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
+  /// Runs the given nonthrowing operation asynchronously
+  /// as part of a new top-level task on behalf of the current actor.
+  ///
+  /// Use this function when creating asynchronous work
+  /// that operates on behalf of the synchronous function that calls it.
+  /// Like `Task.detached(priority:operation:)`,
+  /// this function creates a separate, top-level task.
+  /// Unlike `Task.detached(priority:operation:)`,
+  /// the task created by `Task.init(priority:operation:)`
+  /// inherits the priority and actor context of the caller,
+  /// so the operation is treated more like an asynchronous extension
+  /// to the synchronous operation.
+  ///
+  /// You need to keep a reference to the task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the priority from `Task.currentPriority`.
+  ///   - operation: The operation to perform.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public init(
+    name: String,
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    self.init(priority: priority, operation: {
+      await Task<Never, Never>.$_taskName.withValue(name) {
+        await operation()
+      }
+    })
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -579,6 +643,57 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+
+  /// Runs the given throwing operation asynchronously
+  /// as part of a new top-level task on behalf of the current actor.
+  ///
+  /// Use this function when creating asynchronous work
+  /// that operates on behalf of the synchronous function that calls it.
+  /// Like `Task.detached(priority:operation:)`,
+  /// this function creates a separate, top-level task.
+  /// Unlike `detach(priority:operation:)`,
+  /// the task created by `Task.init(priority:operation:)`
+  /// inherits the priority and actor context of the caller,
+  /// so the operation is treated more like an asynchronous extension
+  /// to the synchronous operation.
+  ///
+  /// You need to keep a reference to the task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the priority from `Task.currentPriority`.
+  ///   - operation: The operation to perform.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public init(
+    name: String,
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
+  ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    // Set up the task flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
+
+    // Create the asynchronous task future.
+    let (task, _) = Builtin.createAsyncTask(flags, {
+      try await Task<Never, Never>.$_taskName.withValue(name) {
+        try await operation()
+      }
+    })
+
+    self._task = task
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
 #endif
 }
 
@@ -631,6 +746,53 @@ extension Task where Failure == Never {
 
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
+
+    return Task(task)
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
+  /// Runs the given nonthrowing operation asynchronously
+  /// as part of a new top-level task.
+  ///
+  /// Don't use a detached task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+  ///
+  /// You need to keep a reference to the detached task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the task.
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public static func detached(
+    name: String,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
+
+    // Create the asynchronous task future.
+    let (task, _) = Builtin.createAsyncTask(flags, {
+      await Task<Never, Never>.$_taskName.withValue(name) {
+        await operation()
+      }
+    })
 
     return Task(task)
 #else
@@ -691,6 +853,56 @@ extension Task where Failure == Error {
 
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
+
+    return Task(task)
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
+  /// Runs the given throwing operation asynchronously
+  /// as part of a new top-level task.
+  ///
+  /// If the operation throws an error, this method propagates that error.
+  ///
+  /// Don't use a detached task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+  ///
+  /// You need to keep a reference to the detached task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the task.
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public static func detached(
+    name: String,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
+
+    // Create the asynchronous task future.
+    let (task, _) = Builtin.createAsyncTask(flags, {
+      try await Task<Never, Never>.$_taskName.withValue(name) {
+        try await operation()
+      }
+    })
 
     return Task(task)
 #else

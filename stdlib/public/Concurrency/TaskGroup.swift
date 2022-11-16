@@ -234,6 +234,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func addTask(
+    name: String? = nil,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -253,7 +254,15 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #endif
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    if let name {
+      _ = Builtin.createAsyncTaskInGroup(flags, _group, {
+        await Task.$_taskName.withValue(name) {
+          await operation()
+        }
+      })
+    } else {
+      _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    }
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -296,6 +305,55 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+
+    return true
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    name: String,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false
+    )
+#else
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
+#endif
+
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, {
+      await Task<Never, Never>.$_taskName.withValue(name) {
+        await operation()
+      }
+    })
 
     return true
 #else
@@ -518,6 +576,39 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 #endif
   }
 
+  /// Adds a child task to the group.
+  ///
+  /// This method doesn't throw an error, even if the child task does.
+  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
+  ///
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  @_alwaysEmitIntoClient
+  public mutating func addTask(
+    name: String,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: true
+    )
+
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, {
+      try await Task<Never, Never>.$_taskName.withValue(name) {
+        try await operation()
+      }
+    })
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
   /// Adds a child task to the group, unless the group has been canceled.
   ///
   /// This method doesn't throw an error, even if the child task does.
@@ -551,6 +642,51 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+
+    return true
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }
+
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// This method doesn't throw an error, even if the child task does.
+  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    name: String,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
+
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, {
+      try await Task<Never, Never>.$_taskName.withValue(name) {
+        try await operation()
+      }
+    })
 
     return true
 #else
