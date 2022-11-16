@@ -665,7 +665,9 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   LAngleLoc = consumeStartingLess();
 
-  {
+  // Allow an empty generic parameter list, since this is meaningful with
+  // variadic generic types.
+  if (!startsWithGreater(Tok)) {
     SyntaxParsingContext ListContext(SyntaxContext,
         SyntaxKind::GenericArgumentList);
 
@@ -749,7 +751,9 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (Loc.isValid()) {
       SourceLoc LAngle, RAngle;
       SmallVector<TypeRepr*, 8> GenericArgs;
+      bool HasGenericArgs = false;
       if (startsWithLess(Tok)) {
+        HasGenericArgs = true;
         auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
         if (genericArgsStatus.isErrorOrHasCompletion())
           return genericArgsStatus;
@@ -757,11 +761,12 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       EndLoc = Loc.getEndLoc();
 
       ComponentIdentTypeRepr *CompT;
-      if (!GenericArgs.empty())
+      if (HasGenericArgs) {
         CompT = GenericIdentTypeRepr::create(Context, Loc, Name, GenericArgs,
                                              SourceRange(LAngle, RAngle));
-      else
+      } else {
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
+      }
       ComponentsR.push_back(CompT);
     }
     SyntaxContext->createNodeInPlace(ComponentsR.size() == 1
