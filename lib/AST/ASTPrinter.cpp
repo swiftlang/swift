@@ -5282,13 +5282,18 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
-  void printGenericArgs(ArrayRef<Type> Args) {
-    if (Args.empty())
-      return;
-
+  void printGenericArgs(PackType *flatArgs) {
     Printer << "<";
-    interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
+    interleave(flatArgs->getElementTypes(),
+               [&](Type arg) { visit(arg); },
+               [&] { Printer << ", "; });
     Printer << ">";
+  }
+
+  void printGenericArgs(ASTContext &ctx,
+                        TypeArrayView<GenericTypeParamType> params,
+                        ArrayRef<Type> args) {
+    printGenericArgs(PackType::get(ctx, params, args));
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -5626,7 +5631,11 @@ public:
     }
 
     printQualifiedType(T);
-    printGenericArgs(T->getDirectGenericArgs());
+
+    auto *typeAliasDecl = T->getDecl();
+    if (typeAliasDecl->isGeneric()) {
+      printGenericArgs(T->getExpandedGenericArgsPack());
+    }
   }
 
   void visitParenType(ParenType *T) {
@@ -5711,7 +5720,8 @@ public:
       }
     }
     printQualifiedType(T);
-    printGenericArgs(T->getGenericArgs());
+
+    printGenericArgs(T->getExpandedGenericArgsPack());
   }
 
   void visitParentType(Type T) {
@@ -6525,6 +6535,11 @@ public:
       return false;
     };
 
+    OpaqueTypeDecl *decl = T->getDecl();
+    auto *namingDecl = decl->getNamingDecl();
+    auto genericSig = namingDecl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
       if (printNamedOpaque())
@@ -6542,8 +6557,6 @@ public:
 
       // Opaque archetype substitutions are always canonical, so re-sugar the
       // constraint type using the owning declaration's generic parameter names.
-      auto genericSig = T->getDecl()->getNamingDecl()->getInnermostDeclContext()
-          ->getGenericSignatureOfContext();
       if (genericSig)
         constraint = genericSig->getSugaredType(constraint);
 
@@ -6556,7 +6569,6 @@ public:
       // turn this back into a reference to the naming decl for the opaque
       // type.
       Printer << "@_opaqueReturnTypeOf(";
-      OpaqueTypeDecl *decl = T->getDecl();
 
       Printer.printEscapedStringLiteral(
                                    decl->getOpaqueReturnTypeIdentifier().str());
@@ -6570,22 +6582,24 @@ public:
       // attribute to apply to, but the attribute alone references the opaque
       // type.
       Printer << ") __";
-      printGenericArgs(T->getSubstitutions().getReplacementTypes());
+
+      if (genericSig) {
+        printGenericArgs(decl->getASTContext(),
+                         genericSig.getGenericParams(),
+                         T->getSubstitutions().getReplacementTypes());
+      }
       return;
     }
     case PrintOptions::OpaqueReturnTypePrintingMode::Description: {
       // TODO(opaque): present opaque types with user-facing syntax. we should
       // probably print this as `some P` and record the fact that we printed that
       // so that diagnostics can add followup notes.
-      Printer << "(return type of " << T->getDecl()->getNamingDecl()->printRef();
+      Printer << "(return type of " << namingDecl->printRef();
       Printer << ')';
-      if (!T->getSubstitutions().empty()) {
-        Printer << '<';
-        auto replacements = T->getSubstitutions().getReplacementTypes();
-        llvm::interleave(
-            replacements.begin(), replacements.end(), [&](Type t) { visit(t); },
-            [&] { Printer << ", "; });
-        Printer << '>';
+      if (genericSig) {
+        printGenericArgs(decl->getASTContext(),
+                         genericSig.getGenericParams(),
+                         T->getSubstitutions().getReplacementTypes());
       }
       return;
     }
