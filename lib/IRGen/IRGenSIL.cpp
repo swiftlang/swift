@@ -915,6 +915,10 @@ public:
         Address = Builder.CreateElementBitCast(Address, Storage->getType());
     }
 
+    // This might happen because of non-loadable types.
+    if (Storage->stripPointerCasts()->getType() == Alloca.getElementType())
+      Storage = Storage->stripPointerCasts();
+
     assert(canAllocaStoreValue(Address, Storage, VarInfo, Scope) &&
            "bad scope?");
 
