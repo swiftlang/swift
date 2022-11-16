@@ -195,6 +195,8 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
 /// If \p pseudoResult represents multiple results and at least one result is
 /// used, then return the destructure.
 static DestructureTupleInst *getCallDestructure(FullApplySite apply) {
+  if (apply.getKind() == FullApplySiteKind::BeginApplyInst)
+    return nullptr;
   if (apply.getSubstCalleeConv().getNumDirectSILResults() == 1)
     return nullptr;
 
@@ -640,7 +642,8 @@ void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
     ++calleeArgIdx;
   }
 
-  if (applySite.getSubstCalleeType()->hasIndirectFormalResults()) {
+  if (applySite.getSubstCalleeType()->hasIndirectFormalResults() ||
+      applySite.getSubstCalleeType()->hasIndirectFormalYields()) {
     pass.indirectApplies.insert(applySite);
   }
 }
@@ -2120,7 +2123,16 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // will be deleted with its destructure_tuple.
 }
 
+/// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
+/// ending uses.
+static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
+
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
+  // Avoid revisiting this apply.
+  bool erased = pass.indirectApplies.erase(apply);
+  assert(erased && "all yields should be rewritten at the same time");
+  (void)erased;
+
   auto *origCall = cast<BeginApplyInst>(apply.getInstruction());
   SmallVector<SILValue, 4> opValues;
 
@@ -2140,11 +2152,33 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   auto newResults = newCall->getAllResultsBuffer();
   assert(oldResults.size() == newResults.size());
   for (auto i : indices(oldResults)) {
-    if (oldResults[i].getType().isAddressOnly(*pass.function)) {
-      pass.valueStorageMap.setStorageAddress(&oldResults[i], &newResults[i]);
-      pass.valueStorageMap.getStorage(&oldResults[i]).markRewritten();
+    auto &oldResult = oldResults[i];
+    auto &newResult = newResults[i];
+    if (oldResult.getType().isAddressOnly(*pass.function)) {
+      if (!oldResult.getType().isAddress()) {
+        pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
+        pass.valueStorageMap.getStorage(&oldResult).markRewritten();
+      } else {
+        oldResult.replaceAllUsesWith(&newResult);
+      }
     } else {
-      oldResults[i].replaceAllUsesWith(&newResults[i]);
+      if (oldResult.getType().isObject() && newResult.getType().isAddress()) {
+        if (oldResult.getOwnershipKind() == OwnershipKind::Guaranteed) {
+          SILValue load =
+              resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
+          oldResult.replaceAllUsesWith(load);
+          emitEndBorrows(load, pass);
+        } else {
+          auto *load = resultBuilder.createLoad(
+              callLoc, &newResult,
+              newResult.getType().isTrivial(*pass.function)
+                  ? LoadOwnershipQualifier::Trivial
+                  : LoadOwnershipQualifier::Take);
+          oldResult.replaceAllUsesWith(load);
+        }
+      } else {
+        oldResult.replaceAllUsesWith(&newResult);
+      }
     }
   }
 }
@@ -2762,10 +2796,6 @@ protected:
 
   void visitStoreInst(StoreInst *storeInst);
 
-  /// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
-  /// ending uses.
-  void emitEndBorrows(SILValue value);
-
   void emitExtract(SingleValueInstruction *extractInst);
 
   void visitSelectEnumInst(SelectEnumInst *sei) {
@@ -2832,7 +2862,7 @@ protected:
         builder.emitLoadBorrowOperation(uncheckedCastInst->getLoc(), destAddr);
     uncheckedCastInst->replaceAllUsesWith(load);
     pass.deleter.forceDelete(uncheckedCastInst);
-    emitEndBorrows(load);
+    emitEndBorrows(load, pass);
   }
 
   void visitUnconditionalCheckedCastInst(
@@ -2944,7 +2974,7 @@ void UseRewriter::visitStoreInst(StoreInst *storeInst) {
 
 /// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
 /// ending uses. This function inserts end_borrows on the lifetime boundary.
-void UseRewriter::emitEndBorrows(SILValue value) {
+static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
   assert(BorrowedValue(value));
 
   // Place end_borrows that cover the load_borrow uses. It is not necessary to
@@ -3002,7 +3032,7 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrows(loadElement);
+  emitEndBorrows(loadElement, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
@@ -3369,14 +3399,27 @@ static void rewriteIndirectApply(FullApplySite apply,
   // If all indirect args were loadable, then they still need to be rewritten.
   CallArgRewriter(apply, pass).rewriteArguments();
 
-  if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
-    return;
+  switch (apply.getKind()) {
+  case FullApplySiteKind::ApplyInst:
+  case FullApplySiteKind::TryApplyInst: {
+    if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
+      return;
+    }
+    // If the call has indirect results and wasn't already rewritten, rewrite it
+    // now. This handles try_apply, which is not rewritten when DefRewriter
+    // visits block arguments. It also handles apply with loadable indirect
+    // results.
+    ApplyRewriter(apply, pass).convertApplyWithIndirectResults();
+    break;
   }
-
-  // If the call has indirect results and wasn't already rewritten, rewrite it
-  // now. This handles try_apply, which is not rewritten when DefRewriter visits
-  // block arguments. It also handles apply with loadable indirect results.
-  ApplyRewriter(apply, pass).convertApplyWithIndirectResults();
+  case FullApplySiteKind::BeginApplyInst: {
+    if (!apply.getSubstCalleeType()->hasIndirectFormalYields()) {
+      return;
+    }
+    ApplyRewriter(apply, pass).convertBeginApplyWithOpaqueYield();
+    break;
+  }
+  }
 
   if (!apply.getInstruction()->isDeleted()) {
     assert(!getCallDestructure(apply)

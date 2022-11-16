@@ -27,6 +27,16 @@ protocol Error {}
 
 struct I {}
 
+class Klass {}
+
+struct LoadableTrivialExtractable {
+    var i: I
+}
+
+struct LoadableNontrivial {
+    var x: Klass
+}
+
 struct SI<T> {
   var element: T
   var index: I
@@ -1351,9 +1361,9 @@ entry(%instance : @owned $Pair<T>):
 // CHECK:       {{bb[0-9]+}}([[INDEX_OUT:%[^,]+]] : $*Self.Index, [[SELF:%[^,]+]] : $*Self):
 // CHECK:         [[MAYBE_INDEX_ADDR:%[^,]+]] = alloc_stack $Optional<Builtin.Int64>
 // CHECK:         try_apply {{%[^,]+}}<Self, Builtin.Int64>([[MAYBE_INDEX_ADDR]], [[SELF]]) : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error), normal [[YES_BLOCK:bb[0-9]+]], error [[NO_BLOCK:bb[0-9]+]]
-// CHECK:       [[NO_BLOCK]]([[REGISTER_16:%[^,]+]] : @owned $any Error):
+// CHECK:       [[NO_BLOCK]]([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK:         dealloc_stack [[MAYBE_INDEX_ADDR]]
-// CHECK:         br [[EXIT_ERROR:bb[0-9]+]]([[REGISTER_16]] : $any Error)
+// CHECK:         br [[EXIT_ERROR:bb[0-9]+]]([[ERROR]] : $any Error)
 // CHECK:       [[EXIT_ERROR]]([[ERROR_TO_THROW:%[^,]+]] : @owned $any Error):
 // CHECK:         throw [[ERROR_TO_THROW]]
 // CHECK:       [[YES_BLOCK]]
@@ -1417,7 +1427,7 @@ bb0:
   return %retval : $()
 } // end sil function '$ss17FixedWidthIntegerPsEyxSgSScfC'
 
-sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
+sil hidden [ossa] @testBeginApply1DeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
   %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1426,9 +1436,7 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
   return %10 : $()
 }
 
-class Klass {}
-
-// CHECK-LABEL: sil hidden [ossa] @testBeginApplyLoadableYieldWithIndirectConv :
+// CHECK-LABEL: sil hidden [ossa] @testBeginApply2LoadableYieldWithIndirectConv :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<Klass>):
 // CHECK:   [[STK:%.*]] = alloc_stack $Klass
 // CHECK:   [[METH:%.*]] = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1437,7 +1445,7 @@ class Klass {}
 // CHECK:   end_apply [[TOK]]
 // CHECK:   destroy_addr [[STK]] : $*Klass
 // CHECK-LABEL: }
-sil hidden [ossa] @testBeginApplyLoadableYieldWithIndirectConv : $@convention(thin) <Klass> (@guaranteed TestGeneric<Klass>) -> () {
+sil hidden [ossa] @testBeginApply2LoadableYieldWithIndirectConv : $@convention(thin) <Klass> (@guaranteed TestGeneric<Klass>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<Klass>):
   %2 = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <Klass> (TestGeneric<Klass>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<Klass>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1448,7 +1456,7 @@ bb0(%0 : @guaranteed $TestGeneric<Klass>):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @testBeginApplyOpaqueYield :
+// CHECK-LABEL: sil hidden [ossa] @testBeginApply3OpaqueYield :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[STK:%.*]] = alloc_stack $T
 // CHECK:   [[M:%.*]] = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1456,8 +1464,8 @@ bb0(%0 : @guaranteed $TestGeneric<Klass>):
 // CHECK:   copy_addr [[Y]] to [init] [[STK]] : $*T
 // CHECK:   end_apply [[TOK]]
 // CHECK:   destroy_addr [[STK]] : $*T
-// CHECK-LABEL: } // end sil function 'testBeginApplyOpaqueYield'
-sil hidden [ossa] @testBeginApplyOpaqueYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
+// CHECK-LABEL: } // end sil function 'testBeginApply3OpaqueYield'
+sil hidden [ossa] @testBeginApply3OpaqueYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
   %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1466,6 +1474,202 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
   destroy_value %5 : $T
   %10 = tuple ()
   return %10 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply4YieldLoadableTrivial : {{.*}} {
+// CHECK:         ([[ADDR:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE:%[^,]+]] = load [trivial] [[ADDR]]
+// CHECK:         struct_extract [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'testBeginApply4YieldLoadableTrivial'
+sil [ossa] @testBeginApply4YieldLoadableTrivial : $@convention(thin) () -> I {
+entry:
+  (%instance, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  end_apply %token
+  %extract = struct_extract %instance : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  return %extract : $I
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply5Yield2LoadableTrivial : {{.*}} {
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE_1:%[^,]+]] = load [trivial] [[ADDR_1]]
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [trivial] [[ADDR_2]]
+// CHECK:         struct_extract [[INSTANCE_1]]
+// CHECK:         struct_extract [[INSTANCE_2]]
+// CHECK-LABEL: } // end sil function 'testBeginApply5Yield2LoadableTrivial'
+sil [ossa] @testBeginApply5Yield2LoadableTrivial : $@convention(thin) () -> (I, I) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> (@yields @in_guaranteed U, @yields @in_guaranteed U)
+  end_apply %token
+  %i_1 = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  %i_2 = struct_extract %instance_2 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  %tuple = tuple (%i_1 : $I, %i_2 : $I)
+  return %tuple : $(I, I)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply6Yield1LoadableTrivial1OpaqueGuaranteed : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[TRIV_OUT:%[^,]+]] : $*I, [[OPAQUE_OUT:%[^,]+]] : $*T):
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE_1:%[^,]+]] = load [trivial] [[ADDR_1]]
+// CHECK:         copy_addr [[ADDR_2]] to [init] [[OPAQUE_OUT]]
+// CHECK:         [[EXTRACT:%[^,]+]]  = struct_extract [[INSTANCE_1]]
+// CHECK:         store [[EXTRACT]] to [trivial] [[TRIV_OUT]]
+// CHECK-LABEL: } // end sil function 'testBeginApply6Yield1LoadableTrivial1OpaqueGuaranteed'
+sil [ossa] @testBeginApply6Yield1LoadableTrivial1OpaqueGuaranteed : $@convention(thin) <T> () -> (@out I, @out T) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in_guaranteed U, @yields @in_guaranteed T)
+  %copy = copy_value %instance_2 : $T
+  end_apply %token
+  %i = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  %tuple = tuple (%i : $I, %copy : $T)
+  return %tuple : $(I, T)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply7YieldLoadableNontrivialGuaranteed : {{.*}} {
+// CHECK:         ([[ADDR:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[BORROW:%[^,]+]] = load_borrow [[ADDR]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK-LABEL: } // end sil function 'testBeginApply7YieldLoadableNontrivialGuaranteed'
+sil [ossa] @testBeginApply7YieldLoadableNontrivialGuaranteed : $@convention(thin) () -> @owned Klass {
+entry:
+  (%instance, %token) = begin_apply undef<LoadableNontrivial>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  %extract = struct_extract %instance : $LoadableNontrivial, #LoadableNontrivial.x
+  %retval = copy_value %extract : $Klass
+  end_apply %token
+  return %retval : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply8Yield2LoadableNontrivialGuaranteed : {{.*}} {
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE_1:%[^,]+]] = load_borrow [[ADDR_1]]
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load_borrow [[ADDR_2]]
+// CHECK:         struct_extract [[INSTANCE_1]]
+// CHECK:         struct_extract [[INSTANCE_2]]
+// CHECK:         end_borrow [[INSTANCE_1]]
+// CHECK:         end_borrow [[INSTANCE_2]]
+// CHECK-LABEL: } // end sil function 'testBeginApply8Yield2LoadableNontrivialGuaranteed'
+sil [ossa] @testBeginApply8Yield2LoadableNontrivialGuaranteed : $@convention(thin) () -> @owned (Klass, Klass) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial>() : $@yield_once @convention(thin) <U> () -> (@yields @in_guaranteed U, @yields @in_guaranteed U)
+  %extract_1 = struct_extract %instance_1 : $LoadableNontrivial, #LoadableNontrivial.x
+  %extract_2 = struct_extract %instance_2 : $LoadableNontrivial, #LoadableNontrivial.x
+  %copy_1 = copy_value %extract_1 : $Klass
+  %copy_2 = copy_value %extract_2 : $Klass
+  end_apply %token
+  %retval = tuple (%copy_1 : $Klass, %copy_2 : $Klass)
+  return %retval : $(Klass, Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApply9Yield1LoadableNontrivialGuaranteed1OpaqueGuaranteed : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Klass, [[OPAQUE_OUT:%[^,]+]] : $*T):
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[BORROW_1:%[^,]+]] = load_borrow [[ADDR_1]] : $*LoadableNontrivial
+// CHECK:         struct_extract [[BORROW_1]] : $LoadableNontrivial, #LoadableNontrivial.x
+// CHECK:         end_borrow [[BORROW_1]] : $LoadableNontrivial
+// CHECK:         copy_addr [[ADDR_2]] to [init] [[OPAQUE_OUT]] : $*T
+// CHECK-LABEL: } // end sil function 'testBeginApply9Yield1LoadableNontrivialGuaranteed1OpaqueGuaranteed'
+sil [ossa] @testBeginApply9Yield1LoadableNontrivialGuaranteed1OpaqueGuaranteed : $@convention(thin) <T> () -> (@out Klass, @out T) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in_guaranteed U, @yields @in_guaranteed T)
+  %extract_1 = struct_extract %instance_1 : $LoadableNontrivial, #LoadableNontrivial.x
+  %copy_1 = copy_value %extract_1 : $Klass
+  %copy_2 = copy_value %instance_2 : $T
+  end_apply %token
+  %retval = tuple (%copy_1 : $Klass, %copy_2 : $T)
+  return %retval : $(Klass, T)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApplyAYieldLoadableNontrivialOwned : {{.*}} {
+// CHECK:         ([[ADDR:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE:%[^,]+]] = load [take] [[ADDR]] : $*LoadableNontrivial
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[INSTANCE]] : $LoadableNontrivial
+// CHECK:         struct_extract [[BORROW]] : $LoadableNontrivial, #LoadableNontrivial.x
+// CHECK:         end_borrow [[BORROW]] : $LoadableNontrivial
+// CHECK-LABEL: } // end sil function 'testBeginApplyAYieldLoadableNontrivialOwned'
+sil [ossa] @testBeginApplyAYieldLoadableNontrivialOwned : $@convention(thin) () -> @owned Klass {
+entry:
+  (%instance, %token) = begin_apply undef<LoadableNontrivial>() : $@yield_once @convention(thin) <U> () -> @yields @in U
+  end_apply %token
+  %borrow = begin_borrow %instance : $LoadableNontrivial
+  %extract = struct_extract %borrow : $LoadableNontrivial, #LoadableNontrivial.x
+  %retval = copy_value %extract : $Klass
+  end_borrow %borrow : $LoadableNontrivial
+  destroy_value %instance : $LoadableNontrivial
+  return %retval : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApplyBYield2LoadableNontrivialOwned : {{.*}} {
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE_1:%[^,]+]] = load [take] [[ADDR_1]]
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [take] [[ADDR_2]]
+// CHECK:         begin_borrow [[INSTANCE_1]]
+// CHECK:         begin_borrow [[INSTANCE_2]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyBYield2LoadableNontrivialOwned'
+sil [ossa] @testBeginApplyBYield2LoadableNontrivialOwned : $@convention(thin) () -> @owned (Klass, Klass) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial>() : $@yield_once @convention(thin) <U> () -> (@yields @in U, @yields @in U)
+  end_apply %token
+  %borrow_1 = begin_borrow %instance_1 : $LoadableNontrivial
+  %extract_1 = struct_extract %borrow_1 : $LoadableNontrivial, #LoadableNontrivial.x
+  %copy_1 = copy_value %extract_1 : $Klass
+  end_borrow %borrow_1 : $LoadableNontrivial
+  destroy_value %instance_1 : $LoadableNontrivial
+  %borrow_2 = begin_borrow %instance_2 : $LoadableNontrivial
+  %extract_2 = struct_extract %borrow_2 : $LoadableNontrivial, #LoadableNontrivial.x
+  %copy_2 = copy_value %extract_2 : $Klass
+  end_borrow %borrow_2 : $LoadableNontrivial
+  destroy_value %instance_2 : $LoadableNontrivial
+  %retval = tuple (%copy_1 : $Klass, %copy_2 : $Klass)
+  return %retval : $(Klass, Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned : $@convention(thin) <T> () -> (@out Klass, @out T) {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Klass, [[OPAQUE_OUT:%[^,]+]] : $*T):
+// CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         [[INSTANCE_1:%[^,]+]] = load [take] [[ADDR_1]]
+// CHECK:         begin_borrow [[INSTANCE_1]]
+// CHECK:         copy_addr [take] [[ADDR_2]] to [init] [[OPAQUE_OUT]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned'
+sil [ossa] @testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned : $@convention(thin) <T> () -> (@out Klass, @out T) {
+entry:
+  (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in U, @yields @in T)
+  end_apply %token
+  %borrow_1 = begin_borrow %instance_1 : $LoadableNontrivial
+  %extract_1 = struct_extract %borrow_1 : $LoadableNontrivial, #LoadableNontrivial.x
+  %copy_1 = copy_value %extract_1 : $Klass
+  end_borrow %borrow_1 : $LoadableNontrivial
+  destroy_value %instance_1 : $LoadableNontrivial
+  %retval = tuple (%copy_1 : $Klass, %instance_2 : $T)
+  return %retval : $(Klass, T)
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApplyDYieldOpaqueInout : {{.*}} {
+// CHECK:         begin_apply undef<T>() : $@yield_once @convention(method) <τ_0_0> () -> @yields @inout τ_0_0
+// CHECK-LABEL: } // end sil function 'testBeginApplyDYieldOpaqueInout'
+sil [ossa] @testBeginApplyDYieldOpaqueInout : $@yield_once @convention(thin) <T> () -> () {
+entry:
+  (%addr, %token) = begin_apply undef<T>() : $@yield_once @convention(method) <U> () -> @yields @inout U
+  end_apply %token
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testBeginApplyEYieldOpaqueInoutAndYield : {{.*}}{
+// CHECK:         ([[REGISTER_0:%[^,]+]], {{%[^,]+}}) = begin_apply
+// CHECK:         yield [[REGISTER_0]] : $*T
+// CHECK-LABEL: } // end sil function 'testBeginApplyEYieldOpaqueInoutAndYield'
+sil [ossa] @testBeginApplyEYieldOpaqueInoutAndYield : $@yield_once @convention(thin) <T> () -> @yields @inout T {
+entry:
+  (%addr, %token) = begin_apply undef<T>() : $@yield_once @convention(method) <U> () -> @yields @inout U
+  yield %addr : $*T, resume bb1, unwind bb2
+
+bb1:
+  end_apply %token
+  %8 = tuple ()
+  return %8 : $()
+
+bb2:
+  abort_apply %token
+  unwind
 }
 
 // CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :
@@ -1682,7 +1886,7 @@ exit:
 // CHECK:       [[FAILURE]]:                                              
 // CHECK:         destroy_addr [[SRC]] : $*T                           
 // CHECK:       [[SUCCESS]]:                                              
-// CHECK:         [[REGISTER_3:%[^,]+]] = load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br6'
 sil [ossa] @test_checked_cast_br6 : $@convention(thin) <T> (@in T) -> () {
 entry(%instance : @owned $T):
