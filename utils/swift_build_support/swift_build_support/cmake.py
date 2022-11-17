@@ -47,6 +47,13 @@ class CMakeOptions(object):
                              (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
 
+    def undefine(self, var):
+        """Utility to undefine cmake options in this object.
+
+        opts.undefine("FOO")       # -> -UFOO
+        """
+        self._options.append('-U%s' % var)
+
     def extend(self, tuples_or_options):
         if isinstance(tuples_or_options, CMakeOptions):
             self += tuples_or_options
