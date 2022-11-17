@@ -1901,6 +1901,36 @@ exit:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
+// CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
+// CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
+// CHECK:         end_borrow [[KLASS]]
+// CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
+// CHECK:         apply undef<Any>([[ANY_ADDR]])
+// CHECK:         destroy_addr [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_1_guaranteed'
+sil [ossa] @test_destructure_tuple_1_guaranteed : $@convention(thin) () -> () {
+bb0:
+  %maybe = apply undef<(Klass?, Any)>() : $@convention(method) <τ_0_0> () -> @out Optional<τ_0_0>
+  switch_enum %maybe : $Optional<(Optional<Klass>, Any)>, case #Optional.some!enumelt: success, case #Optional.none!enumelt: failure
+success(%instance : @owned $(Optional<Klass>, Any)):
+  %borrow = begin_borrow [lexical] %instance : $(Optional<Klass>, Any)
+  (%klass, %any) = destructure_tuple %borrow : $(Optional<Klass>, Any)
+  apply undef<Any>(%any) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %borrow : $(Optional<Klass>, Any)
+  destroy_value %instance : $(Optional<Klass>, Any)
+  br exit
+
+failure:
+  br exit
+
+exit:
+  %505 = tuple ()
+  return %505 : $()
+}
+
+
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
 // CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
