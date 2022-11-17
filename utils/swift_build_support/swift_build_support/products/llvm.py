@@ -202,6 +202,7 @@ class LLVM(cmake_product.CMakeProduct):
         (platform, arch) = host_target.split('-')
 
         llvm_cmake_options = self.host_cmake_options(host_target)[0]
+        llvm_cmake_options.extend_raw(self.args.llvm_cmake_options)
 
         # TODO: handle cross compilation
         llvm_cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', self.args.install_prefix)
