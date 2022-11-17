@@ -25,6 +25,45 @@ public struct _CompilerPluginKind {
   }
 }
 
+// Do not modify without modifying swift::CompilerPlugin::DiagnosticSeverity in
+// include/swift/AST/CompilerPlugin.h.
+@frozen
+public struct _DiagnosticSeverity {
+  @usableFromInline
+  enum RawValue: UInt8 {
+    case note = 0
+    case warning = 1
+    case error = 2
+  }
+  @usableFromInline var rawValue: RawValue
+
+  public static var note: Self { Self(rawValue: .note) }
+  public static var warning: Self { Self(rawValue: .warning) }
+  public static var error: Self { Self(rawValue: .error) }
+}
+
+public typealias _Diagnostic = (
+  message: UnsafePointer<UInt8>,
+  count: Int,
+  position: Int,
+  severity: _DiagnosticSeverity
+)
+
+public func _makeDiagnostic(
+  message: String, position: Int, severity: _DiagnosticSeverity
+) -> _Diagnostic {
+  var message = message
+  return message.withUTF8 { buffer in
+    let resultBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(
+      capacity: buffer.count)
+    _ = resultBuffer.initialize(from: buffer)
+    return (
+      message: UnsafePointer(resultBuffer.baseAddress!),
+      count: resultBuffer.count, position: position, severity: severity
+    )
+  }
+}
+
 /// A compiler plugin that can be loaded by the Swift compiler for code rewrite
 /// and custom compilation.
 public protocol _CompilerPlugin {
@@ -56,7 +95,9 @@ public protocol _CompilerPlugin {
     sourceFileTextCount: Int,
     localSourceText: UnsafePointer<UInt8>,
     localSourceTextCount: Int
-  ) -> (UnsafePointer<UInt8>?, count: Int)
+  ) -> (code: UnsafePointer<UInt8>?, codeLength: Int,
+        diagnostics: UnsafePointer<_Diagnostic>?,
+        diagnosticCount: Int)
 
   /// Returns the generic signature of the plugin.
   ///

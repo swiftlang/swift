@@ -395,13 +395,37 @@ Expr *swift::expandMacroExpr(
       auto *plugin = (CompilerPlugin *)macro->opaqueHandle;
       auto bufferID = sourceFile->getBufferID();
       auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
+      SmallVector<CompilerPlugin::Diagnostic, 8> pluginDiags;
+      SWIFT_DEFER {
+        for (auto &diag : pluginDiags)
+          free((void*)diag.message.data());
+      };
       auto evaluated = plugin->invokeRewrite(
          /*targetModuleName*/ dc->getParentModule()->getName().str(),
          /*filePath*/ sourceFile->getFilename(),
          /*sourceFileText*/ sourceFileText,
          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
-             sourceMgr, expr->getSourceRange()),
-         ctx);
+             sourceMgr, expr->getSourceRange()), ctx, pluginDiags);
+      for (auto &diag : pluginDiags) {
+        auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
+        switch (diag.severity) {
+        case CompilerPlugin::DiagnosticSeverity::Note:
+          ctx.Diags.diagnose(loc, diag::macro_note,
+              ctx.getIdentifier(plugin->getName()),
+              diag.message);
+          break;
+        case CompilerPlugin::DiagnosticSeverity::Warning:
+          ctx.Diags.diagnose(loc, diag::macro_warning,
+              ctx.getIdentifier(plugin->getName()),
+              diag.message);
+          break;
+        case CompilerPlugin::DiagnosticSeverity::Error:
+          ctx.Diags.diagnose(loc, diag::macro_error,
+              ctx.getIdentifier(plugin->getName()),
+              diag.message);
+          break;
+        }
+      }
       if (evaluated)
         evaluatedSource = *evaluated;
       else

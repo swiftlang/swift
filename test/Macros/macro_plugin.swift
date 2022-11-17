@@ -28,7 +28,9 @@ let _ = #customStringify(1.0.truncatingRemainder(dividingBy: 1.0) + 3.0)
 // CHECK:     (binary_expr type='Double'
 // CHECK:     (string_literal_expr type='String'
 
-let _ = #customStringify(["a", "b", "c"] + ["d", "e", "f"])
+let _ = #customStringify(
+  ["a", "b", "c"] +
+  ["d", "e", "f"])
 
 // CHECK: (macro_expansion_expr type='([String], String)' {{.*}} name=customStringify
 // CHECK:   (argument_list
