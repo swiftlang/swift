@@ -27,8 +27,9 @@ namespace swift {
 
 class ASTContext;
 
-/// The result of a match. If one of lhs or rhs is a pack expansion type,
-/// the other one is a pack type.
+/// The result of a match. An important invariant is that either both types
+/// are PackExpansionTypes, or both types are scalars. In particular, any
+/// PackTypes are always wrapped in a PackExpansionType.
 struct MatchedPair {
   Type lhs;
   Type rhs;
