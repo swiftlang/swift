@@ -11,7 +11,19 @@
 
 // CHECK: <unknown>:{{.*}}: warning: compiler plugin module 'MacroDefinitionMissingAllMacros' (in {{.*}}/libMacroDefinitionMissingAllMacros.dylib) is missing a top-level computed property 'public var allMacros: [Any.Type]' to declare all macros; undeclared macros will be ignored
 
+// expected-note @+2 {{test note}}
+// expected-warning @+1 {{test warning}}
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))
+
+// expected-note @+2 {{test note}}
+// expected-warning @+1 {{test warning}}
+let _ = #customStringify(1.0.truncatingRemainder(dividingBy: 1.0) + 3.0)
+
+// expected-note @+1 {{test note}}
+let _ = #customStringify(
+  ["a", "b", "c"] +
+// expected-warning @+1 {{test warning}}
+  ["d", "e", "f"])
 
 // expected-error @+1 {{macro 'notDefined' is undefined; use `-load-plugin-library` to specify dynamic libraries that contain this macro}}
 let _ = #notDefined

@@ -37,6 +37,18 @@ public:
     ExpressionMacro,
   };
 
+  enum class DiagnosticSeverity: uint8_t {
+    Note = 0,
+    Warning = 1,
+    Error = 2,
+  };
+
+  struct Diagnostic {
+    StringRef message;
+    unsigned position;
+    DiagnosticSeverity severity;
+  };
+
 private:
   // Must be modified together with `_CompilerPlugin` in
   // stdlib/toolchain/CompilerPluginSupport.swift.
@@ -92,10 +104,11 @@ public:
   CompilerPlugin(CompilerPlugin &&) = default;
 
   /// Invoke the `_rewrite` method. The caller assumes ownership of the result
-  /// string buffer.
+  /// string buffer and diagnostic buffers.
   Optional<NullTerminatedStringRef> invokeRewrite(
       StringRef targetModuleName, StringRef filePath, StringRef sourceFileText,
-      CharSourceRange range,  ASTContext &ctx) const;
+      CharSourceRange range, ASTContext &ctx,
+      SmallVectorImpl<Diagnostic> &diagnostics) const;
 
   /// Invoke the `_genericSignature` method. The caller assumes ownership of the
   /// result string buffer.
