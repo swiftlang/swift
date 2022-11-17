@@ -339,35 +339,43 @@ public func classAssignToVar5Arg2(_ x: Klass, _ x2: inout Klass) { // expected-e
 
 public func classAccessAccessField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use}}
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessAccessFieldArg(_ x2: inout Klass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use}}
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessConsumeFieldArg(_ x2: inout Klass) {
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
@@ -628,34 +636,42 @@ public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) { // expected-erro
 
 public func finalClassAccessField() {
     var x2 = FinalKlass()
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassAccessFieldArg(_ x2: inout FinalKlass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassConsumeField() {
     var x2 = FinalKlass()
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
 
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
-    classConsume(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
