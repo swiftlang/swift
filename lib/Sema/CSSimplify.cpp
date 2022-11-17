@@ -2423,14 +2423,17 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
       // wrapping a pack type variable. Otherwise, create a new scalar
       // type variable.
       //
-      // FIXME: Locator for diagnostics
       // FIXME: Other TVO_* flags for type variables?
+      auto elementLoc = cs.getConstraintLocator(loc,
+          LocatorPathElt::PackElement(freshTypeVars.size()));
       if (packExpansionElt != nullptr) {
-        auto *freshTypeVar = cs.createTypeVariable(loc, TVO_CanBindToPack);
+        auto *freshTypeVar =
+            cs.createTypeVariable(elementLoc, TVO_CanBindToPack);
         freshTypeVars.push_back(PackExpansionType::get(
             freshTypeVar, packExpansionElt->getCountType()));
       } else {
-        freshTypeVars.push_back(cs.createTypeVariable(loc, /*options=*/0));
+        freshTypeVars.push_back(
+            cs.createTypeVariable(elementLoc, /*options=*/0));
       }
     }
   }
@@ -2483,7 +2486,6 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
   // Bind each pack type variable occurring in the pattern type to its
   // binding pack that was constructed above.
   for (const auto &pair : typeVars) {
-    // FIXME: Locator for diagnostics
     cs.addConstraint(ConstraintKind::Bind,
                      pair.first, PackType::get(ctx, pair.second), locator);
   }
@@ -2498,10 +2500,9 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   // The count types of two pack expansion types must have the same shape.
-  //
-  // FIXME: Locator for diagnostics.
-  auto *loc = getConstraintLocator(locator);
-  auto *shapeTypeVar = createTypeVariable(loc, TVO_CanBindToPack);
+  auto *shapeLoc = getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::PackShape));
+  auto *shapeTypeVar = createTypeVariable(shapeLoc, TVO_CanBindToPack);
   addConstraint(ConstraintKind::ShapeOf,
                 expansion1->getCountType(), shapeTypeVar, locator);
   addConstraint(ConstraintKind::ShapeOf,
@@ -2522,7 +2523,6 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
     if (auto *pack2 = pattern2->getAs<PackType>()) {
       if (auto *pack1 = replaceTypeVariablesWithFreshPacks(
              *this, pattern1, pack2, locator)) {
-        // FIXME: Locator for diagnostics.
         addConstraint(kind, pack1, pack2, locator);
         return getTypeMatchSuccess();
       }
@@ -2538,7 +2538,6 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
     if (auto *pack1 = pattern1->getAs<PackType>()) {
       if (auto *pack2 = replaceTypeVariablesWithFreshPacks(
               *this, pattern2, pack1, locator)) {
-        // FIXME: Locator for diagnostics.
         addConstraint(kind, pack1, pack2, locator);
         return getTypeMatchSuccess();
       }
@@ -6852,8 +6851,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             kind, subflags, packLoc);
     }
     case TypeKind::PackExpansion: {
-      // FIXME: Need a new locator element
-
       auto expansion1 = cast<PackExpansionType>(desugar1);
       auto expansion2 = cast<PackExpansionType>(desugar2);
 
@@ -7562,9 +7559,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::SubclassOf, packExpansionType->getPatternType(),
-                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      classType, patternLoc);
       } else {
         addConstraint(ConstraintKind::SubclassOf, eltType,
                       classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
@@ -7680,11 +7678,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::ConformsTo,
                       packExpansionType->getPatternType(),
                       protocol->getDeclaredInterfaceType(),
-                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      patternLoc);
       } else {
         addConstraint(ConstraintKind::ConformsTo, eltType,
                       protocol->getDeclaredInterfaceType(),
@@ -14158,8 +14157,9 @@ void ConstraintSystem::addConstraint(Requirement req,
     auto type1 = req.getFirstType();
     auto type2 = req.getSecondType();
 
-    // FIXME: Locator for diagnostics
-    auto typeVar = createTypeVariable(getConstraintLocator(locator),
+    auto *shapeLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::PackShape));
+    auto typeVar = createTypeVariable(shapeLoc,
                                       TVO_CanBindToPack);
 
     addConstraint(ConstraintKind::ShapeOf, type1, typeVar, locator);
