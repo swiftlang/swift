@@ -3088,9 +3088,7 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
 }
 
 TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
-  TypeRepr *returnRepr = nullptr;
-
-  returnRepr = this->getResultTypeRepr();
+  auto *returnRepr = this->getResultTypeRepr();
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
