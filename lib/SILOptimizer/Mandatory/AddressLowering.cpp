@@ -3004,10 +3004,21 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
       markRewritten(result, extractAddr);
     } else {
       assert(!pass.valueStorageMap.contains(result));
-      SILValue loadElement = builder.createTrivialLoadOr(
-          destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
-
+      auto guaranteed = !result->getType().isTrivial(*pass.function) &&
+                        destructure->getOperand(0)->getOwnershipKind() ==
+                            OwnershipKind::Guaranteed;
+      SILValue loadElement;
+      if (guaranteed) {
+        loadElement =
+            builder.emitLoadBorrowOperation(destructure->getLoc(), extractAddr);
+      } else {
+        loadElement = builder.createTrivialLoadOr(
+            destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
+      }
       result->replaceAllUsesWith(loadElement);
+      if (guaranteed) {
+        emitEndBorrows(loadElement, pass);
+      }
     }
   }
 }
@@ -3076,7 +3087,9 @@ void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
       isTake = IsNotTake;
     }
   }
-  builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  SILBuilderWithScope::insertAfter(storeInst, [&](auto &builder) {
+    builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  });
   pass.deleter.forceDelete(storeInst);
 }
 
@@ -3296,7 +3309,7 @@ void UseRewriter::visitUnconditionalCheckedCastInst(
       uncondCheckedCast->getLoc(), destAddr,
       destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
           ? LoadOwnershipQualifier::Trivial
-          : LoadOwnershipQualifier::Copy);
+          : LoadOwnershipQualifier::Take);
   nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
   uncondCheckedCast->replaceAllUsesWith(dest);
 }
