@@ -72,7 +72,7 @@ if(SWIFT_SWIFT_PARSER)
     RESULT_VARIABLE
       SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
   if(NOT SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
-    add_compile_options(
+    target_compile_options("${library_name}" PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
       $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
   endif()
