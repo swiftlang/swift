@@ -553,6 +553,12 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
   auto *declCtx = pass.function->getDeclContext();
+  if (!declCtx) {
+    // Fall back to using the module as the decl context if the function
+    // doesn't have one.  The can happen with default argument getters, for
+    // example.
+    declCtx = pass.function->getModule().getSwiftModule();
+  }
 
   unsigned argIdx = 0;
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
