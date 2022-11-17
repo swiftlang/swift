@@ -361,7 +361,8 @@ bool ConstraintSystem::simplify() {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent());
       log << "(considering -> ";
-      constraint->print(log, &getASTContext().SourceMgr);
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent());
       log << "\n";
 
       // {Dis, Con}junction are returned unsolved in \c simplifyConstraint() and
@@ -498,7 +499,8 @@ ConstraintSystem::SolverState::SolverState(
   if (tyOpts.DebugConstraintSolverAttempt &&
       tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options |= ConstraintSystemFlags::DebugConstraints;
-    llvm::errs() << "---Constraint system #" << SolutionAttempt << "---\n";
+    llvm::errs().indent(CS.solverState->getCurrentIndent())
+        << "---Constraint system #" << SolutionAttempt << "---\n";
     CS.print(llvm::errs());
   }
 }
@@ -802,7 +804,8 @@ bool ConstraintSystem::Candidate::solve(
   auto &ctx = cs.getASTContext();
   if (cs.isDebugMode()) {
     auto &log = llvm::errs();
-    log << "--- Solving candidate for shrinking at ";
+    auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
+    log.indent(indent) << "--- Solving candidate for shrinking at ";
     auto R = E->getSourceRange();
     if (R.isValid()) {
       R.print(log, ctx.SourceMgr, /*PrintText=*/ false);
@@ -811,7 +814,7 @@ bool ConstraintSystem::Candidate::solve(
     }
     log << " ---\n";
 
-    E->dump(log);
+    E->dump(log, indent);
     log << '\n';
     cs.print(log);
   }
@@ -839,14 +842,18 @@ bool ConstraintSystem::Candidate::solve(
 
   if (cs.isDebugMode()) {
     auto &log = llvm::errs();
+    auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
     if (solutions.empty()) {
-      log << "--- No Solutions ---\n";
+      log << "\n";
+      log.indent(indent) << "--- No Solutions ---\n";
     } else {
-      log << "--- Solutions ---\n";
+      log << "\n";
+      log.indent(indent) << "--- Solutions ---\n";
       for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
         auto &solution = solutions[i];
-        log << "\n--- Solution #" << i << " ---\n";
-        solution.dump(log);
+        log << "\n";
+        log.indent(indent) << "--- Solution #" << i << " ---\n";
+        solution.dump(log, indent);
       }
     }
   }
@@ -1329,14 +1336,18 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
   auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
     if (isDebugMode()) {
+      auto &log = llvm::errs();
+      auto indent = solverState ? solverState->getCurrentIndent() : 0;
       if (result.getKind() == SolutionResult::Success) {
-        llvm::errs() << "\n---Solution---\n";
-        result.getSolution().dump(llvm::errs());
+        log << "\n";
+        log.indent(indent) << "---Solution---\n";
+        result.getSolution().dump(llvm::errs(), indent);
       } else if (result.getKind() == SolutionResult::Ambiguous) {
         auto solutions = result.getAmbiguousSolutions();
         for (unsigned i : indices(solutions)) {
-          llvm::errs() << "\n--- Solution #" << i << " ---\n";
-          solutions[i].dump(llvm::errs());
+          log << "\n";
+          log.indent(indent) << "--- Solution #" << i << " ---\n";
+          solutions[i].dump(llvm::errs(), indent);
         }
       }
     }
@@ -1605,10 +1616,12 @@ void ConstraintSystem::solveForCodeCompletion(
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "--- Discovered " << solutions.size() << " solutions ---\n";
+    auto indent = solverState ? solverState->getCurrentIndent() : 0;
+    log.indent(indent) << "--- Discovered " << solutions.size()
+                       << " solutions ---\n";
     for (const auto &solution : solutions) {
-      log << "--- Solution ---\n";
-      solution.dump(log);
+      log.indent(indent) << "--- Solution ---\n";
+      solution.dump(log, indent);
     }
   }
 
@@ -1630,7 +1643,8 @@ bool ConstraintSystem::solveForCodeCompletion(
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "--- Code Completion ---\n";
+    log.indent(solverState ? solverState->getCurrentIndent() : 0)
+        << "--- Code Completion ---\n";
   }
 
   if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
@@ -1674,10 +1688,10 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 0)
-        << "(disabled disjunction term ";
-      constraint->print(llvm::errs(), &ctx.SourceMgr);
-      llvm::errs() << ")\n";
+      auto indent = (solverState ? solverState->getCurrentIndent() : 0) + 4;
+      llvm::errs().indent(indent) << "(disabled disjunction term ";
+      constraint->print(llvm::errs(), &ctx.SourceMgr, indent);
+      llvm::errs().indent(indent) << ")\n";
     }
 
     if (restoreOnFail)
@@ -1733,10 +1747,11 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->getCurrentIndent(): 0)
-        << "(introducing single enabled disjunction term ";
-      choice->print(llvm::errs(), &ctx.SourceMgr);
-      llvm::errs() << ")\n";
+      auto indent = (solverState ? solverState->getCurrentIndent() : 0) + 4;
+      llvm::errs().indent(indent)
+          << "(introducing single enabled disjunction term ";
+      choice->print(llvm::errs(), &ctx.SourceMgr, indent);
+      llvm::errs().indent(indent) << ")\n";
     }
 
     simplifyDisjunctionChoice(choice);

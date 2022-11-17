@@ -55,8 +55,8 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->getCurrentIndent());
-    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "  << value 
-                 << ")\n";
+    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "
+                 << value << ")\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);
@@ -73,7 +73,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
 
   if (isDebugMode()) {
     llvm::errs().indent(solverState->getCurrentIndent())
-      << "(solution is worse than the best solution)\n";
+        << "(solution is worse than the best solution)\n";
   }
 
   return true;
@@ -804,7 +804,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
     llvm::errs().indent(cs.solverState->getCurrentIndent())
-      << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
+        << "comparing solutions " << idx1 << " and " << idx2 << "\n";
   }
 
   // Whether the solutions are identical.
@@ -1360,13 +1360,15 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->getCurrentIndent())
-        << "Comparing " << viable.size() << " viable solutions\n";
+    auto indent = solverState->getCurrentIndent();
+    auto &log = llvm::errs();
 
+    log.indent(indent) << "Comparing " << viable.size()
+                       << " viable solutions\n";
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      llvm::errs().indent(solverState->getCurrentIndent())
-          << "\n--- Solution #" << i << " ---\n";
-      viable[i].dump(llvm::errs().indent(solverState->getCurrentIndent()));
+      log << "\n";
+      log.indent(indent) << "--- Solution #" << i << " ---\n";
+      viable[i].dump(llvm::errs(), indent);
     }
   }
 

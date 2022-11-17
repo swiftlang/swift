@@ -105,13 +105,14 @@ void SplitterStep::computeFollowupSteps(
 
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
+    auto indent = CS.solverState->getCurrentIndent();
     // Verify that the constraint graph is valid.
     CG.verify();
 
-    log << "---Constraint graph---\n";
+    log.indent(indent) << "---Constraint graph---\n";
     CG.print(CS.getTypeVariables(), log);
 
-    log << "---Connected components---\n";
+    log.indent(indent) << "---Connected components---\n";
     CG.printConnectedComponents(CS.getTypeVariables(), log);
   }
 
@@ -382,7 +383,7 @@ StepResult ComponentStep::take(bool prevFailed) {
 
     if (!overloadDisjunctions.empty()) {
       auto &log = getDebugLogger();
-      log.indent(2);
+      log.indent(CS.solverState->getCurrentIndent() + 2);
       log << "Disjunction(s) = [";
       interleave(overloadDisjunctions, log, ", ");
       log << "]\n";
@@ -429,7 +430,9 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto printConstraints = [&](const ConstraintList &constraints) {
     for (auto &constraint : constraints)
-      constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
+      constraint.print(
+          getDebugLogger().indent(CS.solverState->getCurrentIndent()),
+          &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
   };
 
   // If we don't have any disjunction or type variable choices left, we're done
@@ -671,7 +674,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping " + reason + " ";
-      choice.print(log, &ctx.SourceMgr);
+      choice.print(log, &ctx.SourceMgr, CS.solverState->getCurrentIndent());
       log << ")\n";
     }
 
