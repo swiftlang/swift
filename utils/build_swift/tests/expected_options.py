@@ -201,6 +201,7 @@ EXPECTED_DEFAULTS = {
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
+    'llvm_cmake_options': [],
     'llvm_enable_modules': False,
     'llvm_include_tests': True,
     'llvm_ninja_targets': [],
@@ -758,6 +759,7 @@ EXPECTED_OPTIONS = [
     AppendOption('--test-paths'),
     AppendOption('--llvm-ninja-targets'),
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
+    AppendOption('--llvm-cmake-options'),
     AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),
