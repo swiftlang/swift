@@ -361,12 +361,6 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
 
   if (CS.isDebugMode()) {
-    if (!potentialBindings.empty()) {
-      auto &log = getDebugLogger();
-      log << "(Potential Binding(s): " << '\n';
-      log << potentialBindings;
-    }
-
     SmallVector<Constraint *, 4> disjunctions;
     CS.collectDisjunctions(disjunctions);
     std::vector<std::string> overloadDisjunctions;
@@ -379,17 +373,24 @@ StepResult ComponentStep::take(bool prevFailed) {
         overloadDisjunctions.push_back(
             constraints[0]->getFirstType()->getString(PO));
     }
+
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << "(Potential Binding(s): " << '\n';
+      log << potentialBindings;
+    }
+
     if (!overloadDisjunctions.empty()) {
       auto &log = getDebugLogger();
       log.indent(2);
       log << "Disjunction(s) = [";
       interleave(overloadDisjunctions, log, ", ");
       log << "]\n";
+    }
 
-      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-        auto &log = getDebugLogger();
-        log << ")\n";
-      }
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << ")\n";
     }
   }
 
@@ -671,7 +672,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
       auto &log = getDebugLogger();
       log << "(skipping " + reason + " ";
       choice.print(log, &ctx.SourceMgr);
-      log << '\n';
+      log << ")\n";
     }
 
     return true;
