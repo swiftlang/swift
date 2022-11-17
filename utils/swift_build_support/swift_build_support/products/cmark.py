@@ -74,6 +74,14 @@ class CMark(cmake_product.CMakeProduct):
             if toolchain_file:
                 self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
 
+        # cmark_cmake_options=(
+        #     -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+        #     -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+        #     -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
+        #     -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
+        #     -DCMAKE_OSX_ARCHITECTURES="${architecture}"
+        # )
+
         self.build_with_cmake(["all"], self.args.cmark_build_variant, [])
 
     def should_test(self, host_target):

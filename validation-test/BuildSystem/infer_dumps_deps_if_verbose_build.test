@@ -9,9 +9,10 @@
 # CHECK: -- Build Graph Inference --
 # CHECK: Initial Product List:
 # CHECK:     earlyswiftdriver
+# CHECK:     cmark
+# CHECK:     llvm
 # CHECK: -- Build Graph Inference --
 # CHECK-NEXT: Initial Product List:
-# CHECK:     llvm
 # CHECK:     swift
 # CHECK-NOT: llbuild
 # CHECK: -- Build Graph Inference --
@@ -22,6 +23,7 @@
 # CHECK:     earlyswiftdriver
 # CHECK:     cmark
 # CHECK:     llvm
+# CHECK:     libcxx
 # CHECK:     swift
 # CHECK:     llbuild
 # CHECK:     swiftpm
