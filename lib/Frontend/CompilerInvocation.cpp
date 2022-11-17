@@ -720,17 +720,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.LibraryLevel = LibraryLevel::API;
     } else if (contents == "spi") {
       Opts.LibraryLevel = LibraryLevel::SPI;
+    } else if (contents == "ipi") {
+      Opts.LibraryLevel = LibraryLevel::IPI;
     } else {
       Opts.LibraryLevel = LibraryLevel::Other;
       if (contents != "other") {
         // Error on unknown library levels.
-        auto inFlight = Diags.diagnose(SourceLoc(),
-                                       diag::error_unknown_library_level,
-                                       contents);
-
-        // Only warn for "ipi" as we may use it in the future.
-        if (contents == "ipi")
-          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        Diags.diagnose(SourceLoc(),
+                       diag::error_unknown_library_level,
+                       contents);
       }
     }
   }
