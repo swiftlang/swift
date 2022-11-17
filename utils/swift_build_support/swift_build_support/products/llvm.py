@@ -345,6 +345,18 @@ class LLVM(cmake_product.CMakeProduct):
         self.cmake_options.extend(host_config.cmake_options)
         self.cmake_options.extend(llvm_cmake_options)
 
+        self._handle_cxx_headers(host_target, platform)
+
+        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [])
+
+        # copy over the compiler-rt builtins for iOS/tvOS/watchOS to ensure
+        # that Swift's stdlib can use compiler-rt builtins when targeting
+        # iOS/tvOS/watchOS.
+        if self.args.build_llvm and system() == 'Darwin':
+            self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(
+                self.build_dir)
+
+    def _handle_cxx_headers(self, host_target, platform):
         # When we are building LLVM create symlinks to the c++ headers. We need
         # to do this before building LLVM since compiler-rt depends on being
         # built with the just built clang compiler. These are normally put into
@@ -385,15 +397,6 @@ class LLVM(cmake_product.CMakeProduct):
               'clang build directory ({}).'.format(
                   host_cxx_headers_dir, built_cxx_include_dir))
         shell.call(['ln', '-s', '-f', host_cxx_headers_dir, built_cxx_include_dir])
-
-        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [])
-
-        # copy over the compiler-rt builtins for iOS/tvOS/watchOS to ensure
-        # that Swift's stdlib can use compiler-rt builtins when targeting
-        # iOS/tvOS/watchOS.
-        if self.args.build_llvm and system() == 'Darwin':
-            self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(
-                self.build_dir)
 
     def should_test(self, host_target):
         """should_test() -> Bool
