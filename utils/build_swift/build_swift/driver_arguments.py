@@ -1250,6 +1250,12 @@ def create_argument_parser():
     option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
            help='do not generate testing targets for LLVM')
 
+    option('--llvm-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='CMake options used for llvm in the form of comma '
+                'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can '
+                'be called multiple times to add multiple such options.')
+
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
 

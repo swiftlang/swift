@@ -61,6 +61,9 @@ class CMakeOptions(object):
             for (variable, value) in tuples_or_options:
                 self.define(variable, value)
 
+    def extend_raw(self, option_strings):
+        self._options.extend(option_strings)
+
     @staticmethod
     def true_false(value):
         if hasattr(value, 'lower'):
