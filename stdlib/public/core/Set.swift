@@ -671,13 +671,12 @@ extension Set: SetAlgebra {
   @inlinable
   public init<Source: Sequence>(_ sequence: __owned Source)
   where Source.Element == Element {
-    self.init(minimumCapacity: sequence.underestimatedCount)
     if let s = sequence as? Set<Element> {
-      // If this sequence is actually a native `Set`, then we can quickly
-      // adopt its native buffer and let COW handle uniquing only
-      // if necessary.
-      self._variant = s._variant
+      // If this sequence is actually a `Set`, then we can quickly
+      // adopt its storage and let COW handle uniquing only if necessary.
+      self = s
     } else {
+      self.init(minimumCapacity: sequence.underestimatedCount)
       for item in sequence {
         insert(item)
       }
