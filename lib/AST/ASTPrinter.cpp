@@ -6411,8 +6411,6 @@ public:
   void visitElementArchetypeType(ElementArchetypeType *T) {
     if (Options.PrintForSIL) {
       Printer << "@element(\"" << T->getOpenedElementID() << ") ";
-      visit(T->getGenericEnvironment()->getOpenedExistentialType());
-      Printer << ") ";
 
       auto interfaceTy = T->getInterfaceType();
       visit(interfaceTy);
