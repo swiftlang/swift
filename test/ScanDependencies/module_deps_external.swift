@@ -82,14 +82,14 @@ import SomeExternalModule
 // CHECK-NEXT: ]
 
 /// --------Swift external module SomeExternalModule
-// CHECK-LABEL: "modulePath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SomeExternalModule.swiftmodule",
 // CHECK-NEXT: "details": {
 // CHECK-NEXT: "swiftPlaceholder": {
 // CHECK-NEXT: "moduleDocPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
 // CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo"
 
 /// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "Swift.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
