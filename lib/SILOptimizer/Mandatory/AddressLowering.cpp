@@ -3076,7 +3076,9 @@ void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
       isTake = IsNotTake;
     }
   }
-  builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  SILBuilderWithScope::insertAfter(storeInst, [&](auto &builder) {
+    builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  });
   pass.deleter.forceDelete(storeInst);
 }
 
