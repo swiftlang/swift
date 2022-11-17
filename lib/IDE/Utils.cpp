@@ -769,7 +769,7 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   // If it has a Clang node (directly),
   if (ext->hasClangNode()) return ext->getClangNode();
 
-  // Check whether it was syntheszed into a module-scope context.
+  // Check whether it was synthesized into a module-scope context.
   if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
     return ClangNode();
 
@@ -890,7 +890,7 @@ bool swift::ide::isDeclOverridable(ValueDecl *D) {
   if (!NTD)
     return false;
 
-  // Only classes and protocols support overridding by subtypes.
+  // Only classes and protocols support overriding by subtypes.
   if (!(isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)))
     return false;
 

@@ -1219,10 +1219,10 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  UnresolvedLoc UnresoledName{NameLoc, true};
+  UnresolvedLoc UnresolvedName{NameLoc, true};
 
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved = Matcher.resolve(llvm::makeArrayRef(UnresoledName), None);
+  auto Resolved = Matcher.resolve(llvm::makeArrayRef(UnresolvedName), None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {
@@ -1266,7 +1266,7 @@ bool RefactoringActionExtractFunction::performChange() {
   // Correct the given name if collision happens.
   PreferredName = correctNewDeclName(InsertToDC, PreferredName);
 
-  // Collect the paramters to pass down to the new function.
+  // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;
   for (auto &RD: RangeInfo.ReferencedDecls) {
     // If the referenced decl is declared elsewhere, no need to pass as parameter
@@ -2853,7 +2853,7 @@ class FillProtocolStubContext {
   getUnsatisfiedRequirements(const IterableDeclContext *IDC);
 
   /// Context in which the content should be filled; this could be either a
-  /// nominal type declaraion or an extension declaration.
+  /// nominal type declaration or an extension declaration.
   DeclContext *DC;
 
   /// The type that adopts the required protocol stubs. For nominal type decl, this
@@ -3906,7 +3906,7 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
 static CallExpr *findTrailingClosureTarget(
     SourceManager &SM, const ResolvedCursorInfo &CursorInfo) {
   if (CursorInfo.Kind == CursorInfoKind::StmtStart)
-    // StmtStart postion can't be a part of CallExpr.
+    // StmtStart position can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr
@@ -4041,10 +4041,10 @@ isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   
   // 'lazy' must not be used on a computed property
   // NSCopying and IBOutlet attribute requires property to be mutable
-  auto Attributies = SV->getAttrs();
-  if (Attributies.hasAttribute<LazyAttr>() ||
-      Attributies.hasAttribute<NSCopyingAttr>() ||
-      Attributies.hasAttribute<IBOutletAttr>()) {
+  auto Attributes = SV->getAttrs();
+  if (Attributes.hasAttribute<LazyAttr>() ||
+      Attributes.hasAttribute<NSCopyingAttr>() ||
+      Attributes.hasAttribute<IBOutletAttr>()) {
     return false;
   }
 
@@ -4819,7 +4819,7 @@ struct CallbackCondition {
     }
   }
 
-  /// Initializes a `CallbackCondtion` from a case statement inside a switch
+  /// Initializes a `CallbackCondition` from a case statement inside a switch
   /// on `Subject` with `Result` type, ie.
   /// ```
   /// switch <Subject> {
@@ -5287,7 +5287,7 @@ struct ClassifiedBlocks {
   ClassifiedBlock ErrorBlock;
 };
 
-/// Classifer of callback closure statements that that have either multiple
+/// Classifier of callback closure statements that have either multiple
 /// non-Result parameters or a single Result parameter and return Void.
 ///
 /// It performs a (possibly incorrect) best effort and may give up in certain
@@ -5876,7 +5876,7 @@ public:
   /// references that we don't want to shadow with hoisted declarations.
   ///
   /// Also collect all declarations that are \c DeclContexts, which is an
-  /// over-appoximation but let's us ignore them elsewhere.
+  /// over-approximation but let's us ignore them elsewhere.
   static void collect(ASTNode Target, BraceStmt *Scope, SourceFile &SF,
                       llvm::DenseSet<const Decl *> &Decls) {
     ReferenceCollector Collector(Target, &SF.getASTContext().SourceMgr,
@@ -6091,7 +6091,7 @@ public:
 ///
 /// Calls to functions with an async alternative will be replaced with a call
 /// to the alternative, possibly wrapped in a do/catch. The do/catch is skipped
-/// if the the closure either:
+/// if the closure either:
 ///   1. Has no error
 ///   2. Has an error but no error handling (eg. just ignores)
 ///   3. Has error handling that only calls the containing function's handler
@@ -6122,7 +6122,7 @@ class AsyncConverter : private SourceEntityWalker {
         : Names(), ContinuationName(ContinuationName) {}
 
     /// Whether this scope is wrapped in a \c withChecked(Throwing)Continuation.
-    bool isWrappedInContination() const { return !ContinuationName.empty(); }
+    bool isWrappedInContinuation() const { return !ContinuationName.empty(); }
   };
   SourceFile *SF;
   SourceManager &SM;
@@ -6149,7 +6149,7 @@ class AsyncConverter : private SourceEntityWalker {
   llvm::DenseSet<const Decl *> Placeholders;
 
   // Mapping from decl -> name, used as the name of possible new local
-  // declarations of old completion handler parametes, as well as the
+  // declarations of old completion handler parameters, as well as the
   // replacement for other hoisted declarations and their references
   llvm::DenseMap<const Decl *, Identifier> Names;
 
@@ -6573,12 +6573,12 @@ private:
   ///    have an async alternative by our heuristics (e.g. because of a
   ///    completion handler name mismatch or because it also returns a value
   ///    synchronously).
-  void wrapScopeInContinationIfNecessary(ASTNode Node) {
+  void wrapScopeInContinuationIfNecessary(ASTNode Node) {
     if (NestedExprCount != 0) {
       // We can't start a continuation in the middle of an expression
       return;
     }
-    if (Scopes.back().isWrappedInContination()) {
+    if (Scopes.back().isWrappedInContinuation()) {
       // We are already in a continuation. No need to add another one.
       return;
     }
@@ -6631,7 +6631,7 @@ private:
     if (isa<PatternBindingDecl>(D)) {
       // We can't hoist a closure inside a PatternBindingDecl. If it contains
       // a call to the completion handler, wrap it in a continuation.
-      wrapScopeInContinationIfNecessary(D);
+      wrapScopeInContinuationIfNecessary(D);
       NestedExprCount++;
       return true;
     }
@@ -6705,7 +6705,7 @@ private:
                            [&]() { OS << newNameFor(D, true); });
       }
     } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
-      if (Scopes.back().isWrappedInContination()) {
+      if (Scopes.back().isWrappedInContinuation()) {
         return addCustom(E->getSourceRange(),
                          [&]() { convertHandlerToContinuationResume(CE); });
       } else if (NestedExprCount == 0) {
@@ -6718,7 +6718,7 @@ private:
       //    middle of an expression)
       //  - the current scope is wrapped in a continuation (we can't have await
       //    calls in the continuation block)
-      if (NestedExprCount == 0 && !Scopes.back().isWrappedInContination()) {
+      if (NestedExprCount == 0 && !Scopes.back().isWrappedInContinuation()) {
         // If the refactoring is on the call itself, do not require the callee
         // to have the @available attribute or a completion-like name.
         auto HandlerDesc = AsyncHandlerParamDesc::find(
@@ -6733,7 +6733,7 @@ private:
 
     // We didn't do any special conversion for this expression. If needed, wrap
     // it in a continuation.
-    wrapScopeInContinationIfNecessary(E);
+    wrapScopeInContinuationIfNecessary(E);
 
     NestedExprCount++;
     return true;
@@ -6800,12 +6800,12 @@ private:
   bool walkToStmtPost(Stmt *S) override {
     if (startsNewScope(S)) {
       bool ClosedScopeWasWrappedInContinuation =
-          Scopes.back().isWrappedInContination();
+          Scopes.back().isWrappedInContinuation();
       Scopes.pop_back();
       if (ClosedScopeWasWrappedInContinuation &&
-          !Scopes.back().isWrappedInContination()) {
+          !Scopes.back().isWrappedInContinuation()) {
         // The nested scope was wrapped in a continuation but the current one
-        // isn't anymore. Add the '}' that corresponds to the the call to
+        // isn't anymore. Add the '}' that corresponds to the call to
         // withChecked(Throwing)Continuation.
         insertCustom(S->getEndLoc(), [&]() { OS << tok::r_brace << '\n'; });
       }
@@ -7033,7 +7033,7 @@ private:
   /// depending on it.
   /// \p AddConvertedHandlerCall needs to add the converted version of the
   /// completion handler. Depending on the given \c HandlerResult, it must be
-  /// intepreted as a success or error call.
+  /// interpreted as a success or error call.
   /// \p AddConvertedErrorCall must add the converted equivalent of returning an
   /// error. The passed \c StringRef contains the name of a variable that is of
   /// type 'Error'.
@@ -7195,7 +7195,7 @@ private:
   /// or error call.
   void convertHandlerToContinuationResumeImpl(const CallExpr *CE,
                                               HandlerResult Result) {
-    assert(Scopes.back().isWrappedInContination());
+    assert(Scopes.back().isWrappedInContinuation());
 
     std::vector<Argument> Args;
     StringRef ResumeArgumentLabel;
@@ -7240,7 +7240,7 @@ private:
         }
       }
       if (Args.size() == 1) {
-        // We only have a single result. 'result' seems a resonable name.
+        // We only have a single result. 'result' seems a reasonable name.
         return createUniqueName("result");
       } else {
         // We are returning a tuple. Name the result elements 'result' +

@@ -56,7 +56,7 @@ struct ConcreteMyProtocol : MyProtocol {
 // BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
 // BEGINNING_WITHOUT_SOME: End completions
 
-func gloabalFunc() -> #^GLOBAL_FUNC^#
+func globalFunc() -> #^GLOBAL_FUNC^#
 var globalVar: #^GLOBAL_VAR^#
 
 protocol SomeProto {
@@ -170,7 +170,7 @@ class HasTypealias : HasAssocWithConformanceConstraint {
 // OVERRIDE_HasTypealias: End completions
 }
 
-// MARK: Postfix expession for opaque result types.
+// MARK: Postfix expression for opaque result types.
 
 protocol TestProtocol {
   associatedtype Assoc1

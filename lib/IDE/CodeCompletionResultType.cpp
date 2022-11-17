@@ -349,7 +349,7 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
       ExpectedTy->is<ErrorType>())
     return TypeRelation::Unrelated;
 
-  /// Computing type relations to 'Any' is not very enlightning because
+  /// Computing type relations to 'Any' is not very enlightening because
   /// everything would be convertible to it. If the contextual type is 'Any',
   /// just report all type relations as 'Unknown'.
   if (isEssentiallyAnyType(ExpectedTy)) {

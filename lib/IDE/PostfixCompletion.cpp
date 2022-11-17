@@ -38,7 +38,7 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
   SolutionApplicationTarget completionTarget(fallbackExpr, fallbackDC,
                                              CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+                                             /*isDiscarded=*/true);
 
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
                              [&](const Solution &S) { sawSolution(S); });

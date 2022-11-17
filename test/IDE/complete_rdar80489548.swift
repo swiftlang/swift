@@ -7,7 +7,7 @@
 func test(value: [Int]) {
   value.map { #^NOIN_IMMEDIATE?check=KW_IN^# }
 
-  value.map { value#^NOIN_AFTER_EXPR_NOSPCACE?check=KW_NO_IN^# }
+  value.map { value#^NOIN_AFTER_EXPR_NOSPACE?check=KW_NO_IN^# }
   value.map { value #^NOIN_AFTER_EXPR?check=KW_IN^# }
   value.map { value
     #^NOIN_NEWLINE?check=KW_IN^#

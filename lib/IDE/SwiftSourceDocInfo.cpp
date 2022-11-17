@@ -104,7 +104,7 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
   // handle any unresolved locs past the end of the last AST node or comment
   std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(), {
     ASTWalker::ParentTy(), CharSourceRange(), {}, None, LabelRangeType::None,
-    /*isActice*/true, /*isInSelector*/false});
+    /*isActive*/true, /*isInSelector*/false});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
   // return in the original order
@@ -382,7 +382,7 @@ ASTWalker::PreWalkResult<Expr *> NameMatcher::walkToExprPre(Expr *E) {
         break;
       }
       case ExprKind::StringLiteral:
-        // Handle multple locations in a single string literal
+        // Handle multiple locations in a single string literal
         do {
           tryResolve(ASTWalker::ParentTy(E), nextLoc());
         } while (!shouldSkip(E));
@@ -548,12 +548,12 @@ bool NameMatcher::shouldSkip(Expr *E) {
     // instead.
 
     auto ExprStart = E->getStartLoc();
-    auto RemaingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
+    auto RemainingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
       return getSourceMgr().isBeforeInBuffer(tok.getRange().getStart(), ExprStart);
     });
 
-    if (!RemaingTokens.empty() && RemaingTokens.front().getLoc() == ExprStart)
-      return shouldSkip(RemaingTokens.front().getRange());
+    if (!RemainingTokens.empty() && RemainingTokens.front().getLoc() == ExprStart)
+      return shouldSkip(RemainingTokens.front().getRange());
   }
   return shouldSkip(E->getSourceRange());
 }

@@ -761,24 +761,24 @@ func testTypecheckedTypeExpr() {
 // TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=:
 // TYPECHECKED_TYPEEXPR: End completions
 
-func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
+func testParameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
   var intVal = 1
-  testPamrameterFlags(intVal, #^ARG_PARAMFLAG_INOUT^#)
+  testParameterFlags(intVal, #^ARG_PARAMFLAG_INOUT^#)
 // ARG_PARAMFLAG_INOUT: Begin completions, 1 items
 // ARG_PARAMFLAG_INOUT-DAG: Pattern/Local/Flair[ArgLabels]: {#inoutArg: &Int#}[#inout Int#]; name=inoutArg:
 // ARG_PARAMFLAG_INOUT: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, #^ARG_PARAMFLAG_AUTOCLOSURE^#)
+  testParameterFlags(intVal, inoutArg: &intVal, #^ARG_PARAMFLAG_AUTOCLOSURE^#)
 // ARG_PARAMFLAG_AUTOCLOSURE: Begin completions, 1 items
 // ARG_PARAMFLAG_AUTOCLOSURE-DAG: Pattern/Local/Flair[ArgLabels]: {#autoclosureArg: Int#}[#Int#];
 // ARG_PARAMFLAG_AUTOCLOSURE: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, #^ARG_PARAMFLAG_IUO^#)
+  testParameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, #^ARG_PARAMFLAG_IUO^#)
 // ARG_PARAMFLAG_IUO: Begin completions, 1 items
 // ARG_PARAMFLAG_IUO-DAG: Pattern/Local/Flair[ArgLabels]: {#iuoArg: Int?#}[#Int?#];
 // ARG_PARAMFLAG_IUO: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, iuoArg: intVal, #^ARG_PARAMFLAG_VARIADIC^#)
+  testParameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, iuoArg: intVal, #^ARG_PARAMFLAG_VARIADIC^#)
 // ARG_PARAMFLAG_VARIADIC: Begin completions, 1 items
 // ARG_PARAMFLAG_VARIADIC-DAG: Pattern/Local/Flair[ArgLabels]: {#variadicArg: Int...#}[#Int#];
 // ARG_PARAMFLAG_VARIADIC: End completions
@@ -866,7 +866,7 @@ func testAfterVariadic() {
   }
 }
 
-func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSiganture() {
+func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSignature() {
   func sort(callback: (_ left: Int, _ right: Int) -> Bool) {}
   sort(#^CLOSURE_PARAM_WITH_INTERNAL_NAME^#)
 // CLOSURE_PARAM_WITH_INTERNAL_NAME: Begin completions, 1 item
@@ -1190,15 +1190,15 @@ func testArgsAfterCompletion() {
 
   overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), zz: MissingConformance())
   overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_INDIRECT?check=INVALID_MISSINGCONFORMANCE^#, z: [MissingConformance()], zz: [MissingConformance()])
-  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT?check=INVALID_MISSINGCONFORMANCE_CONSTAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")])
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT?check=INVALID_MISSINGCONFORMANCE_CONSTRAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")])
   SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA_SUB?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), zz: MissingConformance()]
   SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_INDIRECT_SUB?check=INVALID_MISSINGCONFORMANCE^#, z: [MissingConformance()], zz: [MissingConformance()]]
-  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT_SUB?check=INVALID_MISSINGCONFORMANCE_CONSTAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")]]
+  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT_SUB?check=INVALID_MISSINGCONFORMANCE_CONSTRAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")]]
 
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT: Begin completions, 2 items
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT: End completions
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT: Begin completions, 2 items
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT: End completions
 }
 
 func testFuncTyVars(param: (Int, String, Double) -> ()) {

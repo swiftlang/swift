@@ -160,13 +160,13 @@ public:
   class ContextualType {
     /// The types that the result type must be identical/convertible to to
     /// compute the type relation. Needs to be a vector because for the
-    /// conextual type `some MyProto & MyOtherProto`, the return type must be
+    /// contextual type `some MyProto & MyOtherProto`, the return type must be
     /// convertible to both \c MyProto and \c MyOtherProto to be considered
     /// convertible.
     llvm::SmallVector<const USRBasedType *, 1> Types;
 
   public:
-    /// Compute the type relation of \p ResultType to this conextual type.
+    /// Compute the type relation of \p ResultType to this contextual type.
     CodeCompletionResultTypeRelation
     typeRelation(const USRBasedType *ResultType,
                  const USRBasedType *VoidType) const;
@@ -227,7 +227,7 @@ class USRBasedType {
       : USR(USR), Supertypes(Supertypes),
         CustomAttributeKinds(CustomAttributeKinds) {}
 
-  /// Implementation of \c typeRelation. \p VisistedTypes keeps track which
+  /// Implementation of \c typeRelation. \p VisitedTypes keeps track which
   /// types have already been visited.
   CodeCompletionResultTypeRelation
   typeRelationImpl(const USRBasedType *ResultType, const USRBasedType *VoidType,
@@ -286,7 +286,7 @@ class CodeCompletionResultType {
   ///    It would be nice if we could use a SmallVector to store those types
   ///    instead but \c CodeCompletionResultType is allocated in a bump
   ///    allocator and freeing the bump allocator does not call the
-  ///    SmallVecotor's destructor, leaking potential heap memory. Since we only
+  ///    SmallVector's destructor, leaking potential heap memory. Since we only
   ///    need two result types at the moment, I decided to implement it in a
   ///    hacky way with two pointers.
   /// The \c getResultTypes and \c isApplicable methods mask away this

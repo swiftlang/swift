@@ -233,14 +233,14 @@ bool CompletionInstance::performCachedOperationIfPossible(
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
   LangOptions langOpts = CachedCI->getASTContext().LangOpts;
-  TypeCheckerOptions typeckOpts = CachedCI->getASTContext().TypeCheckerOpts;
+  TypeCheckerOptions typecheckOpts = CachedCI->getASTContext().TypeCheckerOpts;
   SILOptions silOpts = CachedCI->getASTContext().SILOpts;
   SearchPathOptions searchPathOpts = CachedCI->getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+      ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
@@ -270,7 +270,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
-    // See if the inteface of the function and types visible from a function
+    // See if the interface of the function and types visible from a function
     // body has changed since the last completion. If they haven't changed,
     // completion can reuse the existing AST of the source file.
     // \c getInterfaceHash() is not enough because it doesn't take the interface
@@ -489,7 +489,7 @@ void CompletionInstance::performNewOperation(
       ShouldCacheCompilerInstance = false;
     } else {
       Callback(CancellableResult<CompletionInstanceResult>::success(
-          {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+          {CI, /*ReusingASTContext=*/false, DidFindCodeCompletionToken}));
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
         ShouldCacheCompilerInstance = false;
@@ -498,7 +498,7 @@ void CompletionInstance::performNewOperation(
   }
 
   // Cache the compiler instance if fast completion is enabled.
-  // If we didn't find a code compleiton token, we can't cache the instance
+  // If we didn't find a code completion token, we can't cache the instance
   // because performCachedOperationIfPossible wouldn't have an old code
   // completion state to compare the new one to.
   if (ShouldCacheCompilerInstance)

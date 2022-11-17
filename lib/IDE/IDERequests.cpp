@@ -52,7 +52,7 @@ void swift::registerIDERequestFunctions(Evaluator &evaluator) {
 }
 
 //----------------------------------------------------------------------------//
-// Cusor info resolver
+// Cursor info resolver
 //----------------------------------------------------------------------------//
 
 class CursorInfoResolver : public SourceEntityWalker {
@@ -941,7 +941,7 @@ public:
                 TokensInRange,
                 getImmediateContext(),
                 /*Common Parent Expr*/ nullptr,
-                /*SinleEntry*/ true,
+                /*SingleEntry*/ true,
                 getUnhandledEffects(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
@@ -1212,7 +1212,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
 //----------------------------------------------------------------------------//
 ArrayRef<ValueDecl *>
 CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
-                                        OverridenDeclsOwner Owner) const {
+                                        OverriddenDeclsOwner Owner) const {
   std::vector<ValueDecl*> results;
   auto *VD = Owner.VD;
   if (auto Overridden = VD->getOverriddenDecl()) {

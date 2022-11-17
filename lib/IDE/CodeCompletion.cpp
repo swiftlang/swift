@@ -124,7 +124,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  SyntaxKind SyntxKind;
+  SyntaxKind SyntaxKind_;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -470,7 +470,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
-  SyntxKind = SK;
+  SyntaxKind_ = SK;
   Kind = CompletionKind::PrecedenceGroup;
   CurDeclContext = P.CurDeclContext;
 }
@@ -597,7 +597,7 @@ void CodeCompletionCallbacksImpl::completeAfterPoundDirective() {
 
 void CodeCompletionCallbacksImpl::completePlatformCondition() {
   CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::PlatformConditon;
+  Kind = CompletionKind::PlatformCondition;
 }
 
 void CodeCompletionCallbacksImpl::completeAfterIfStmtElse() {
@@ -945,7 +945,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::LabeledTrailingClosure:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
-  case CompletionKind::PlatformConditon:
+  case CompletionKind::PlatformCondition:
   case CompletionKind::GenericRequirement:
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
@@ -964,7 +964,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   }
 
   case CompletionKind::AccessorBeginning: {
-    // TODO: Omit already declared or mutally exclusive accessors.
+    // TODO: Omit already declared or mutually exclusive accessors.
     //       E.g. If 'get' is already declared, emit 'set' only.
     addAccessorKeywords(Sink);
 
@@ -1258,7 +1258,7 @@ void swift::ide::deliverCompletionResults(
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
 
-  SmallPtrSet<ModuleDecl *, 4> explictlyImportedModules;
+  SmallPtrSet<ModuleDecl *, 4> explicitlyImportedModules;
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
@@ -1266,15 +1266,15 @@ void swift::ide::deliverCompletionResults(
                           {ModuleDecl::ImportFilterKind::Default,
                            ModuleDecl::ImportFilterKind::ImplementationOnly});
     for (auto import : directImport)
-      explictlyImportedModules.insert(import.importedModule);
+      explicitlyImportedModules.insert(import.importedModule);
 
     // Exclude modules implicitly imported in the current module.
     auto implicitImports = SF.getParentModule()->getImplicitImports();
     for (auto import : implicitImports.imports)
-      explictlyImportedModules.erase(import.module.importedModule);
+      explicitlyImportedModules.erase(import.module.importedModule);
 
     // Consider the current module "explicit".
-    explictlyImportedModules.insert(SF.getParentModule());
+    explicitlyImportedModules.insert(SF.getParentModule());
   }
 
   for (auto &Request: Lookup.RequestedCachedResults) {
@@ -1338,7 +1338,7 @@ void swift::ide::deliverCompletionResults(
         auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
             (!Lookup.isHiddenModuleName(TheModuleName) ||
-             explictlyImportedModules.contains(TheModule)) &&
+             explicitlyImportedModules.contains(TheModule)) &&
             seenModuleNames.insert(TheModuleName).second)
           Lookup.addModuleName(TheModule);
       }
@@ -1654,7 +1654,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     /// We set the type of ParsedExpr explicitly above. But we don't want an
     /// unresolved type in our AST when we type check again for operator
     /// completions. Remove the type of the ParsedExpr and see if we can come up
-    /// with something more useful based on the the full sequence expression.
+    /// with something more useful based on the full sequence expression.
     if (ParsedExpr->getType()->is<UnresolvedType>()) {
       ParsedExpr->setType(nullptr);
     }
@@ -1945,7 +1945,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::PlatformConditon: {
+  case CompletionKind::PlatformCondition: {
     addPlatformConditions(CompletionContext.getResultSink());
     addConditionalCompilationFlags(CurDeclContext->getASTContext(),
                                    CompletionContext.getResultSink());
@@ -1958,7 +1958,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::PrecedenceGroup:
-    Lookup.getPrecedenceGroupCompletions(SyntxKind);
+    Lookup.getPrecedenceGroupCompletions(SyntaxKind_);
     break;
   case CompletionKind::StmtLabel: {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();

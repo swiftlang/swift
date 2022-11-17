@@ -25,7 +25,7 @@
 
 namespace swift {
 //----------------------------------------------------------------------------//
-// Cusor info
+// Cursor info
 //----------------------------------------------------------------------------//
 
 // Input for CursorInfoRequest.
@@ -171,36 +171,36 @@ public:
 //----------------------------------------------------------------------------//
 // CollectOverriddenDeclsRequest
 //----------------------------------------------------------------------------//
-struct OverridenDeclsOwner {
+struct OverriddenDeclsOwner {
   ValueDecl *VD;
   bool IncludeProtocolRequirements;
   bool Transitive;
 
-  OverridenDeclsOwner(ValueDecl *VD, bool IncludeProtocolRequirements,
+  OverriddenDeclsOwner(ValueDecl *VD, bool IncludeProtocolRequirements,
     bool Transitive): VD(VD),
       IncludeProtocolRequirements(IncludeProtocolRequirements),
       Transitive(Transitive) {}
 
-  friend llvm::hash_code hash_value(const OverridenDeclsOwner &CI) {
+  friend llvm::hash_code hash_value(const OverriddenDeclsOwner &CI) {
     return llvm::hash_combine(CI.VD,
                               CI.IncludeProtocolRequirements,
                               CI.Transitive);
   }
 
-  friend bool operator==(const OverridenDeclsOwner &lhs,
-                         const OverridenDeclsOwner &rhs) {
+  friend bool operator==(const OverriddenDeclsOwner &lhs,
+                         const OverriddenDeclsOwner &rhs) {
     return lhs.VD == rhs.VD &&
       lhs.IncludeProtocolRequirements == rhs.IncludeProtocolRequirements &&
       lhs.Transitive == rhs.Transitive;
   }
 
-  friend bool operator!=(const OverridenDeclsOwner &lhs,
-                         const OverridenDeclsOwner &rhs) {
+  friend bool operator!=(const OverriddenDeclsOwner &lhs,
+                         const OverriddenDeclsOwner &rhs) {
     return !(lhs == rhs);
   }
 
   friend void simple_display(llvm::raw_ostream &out,
-                             const OverridenDeclsOwner &owner) {
+                             const OverriddenDeclsOwner &owner) {
     simple_display(out, owner.VD);
   }
 };
@@ -210,7 +210,7 @@ struct OverridenDeclsOwner {
 ///   requirements it satisfies in a conforming class
 class CollectOverriddenDeclsRequest:
     public SimpleRequest<CollectOverriddenDeclsRequest,
-                         ArrayRef<ValueDecl*>(OverridenDeclsOwner),
+                         ArrayRef<ValueDecl*>(OverriddenDeclsOwner),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -220,7 +220,7 @@ private:
 
   // Evaluation.
   ArrayRef<ValueDecl*> evaluate(Evaluator &evaluator,
-                                OverridenDeclsOwner Owner) const;
+                                OverriddenDeclsOwner Owner) const;
 
 public:
   // Caching

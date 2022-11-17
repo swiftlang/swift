@@ -31,7 +31,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
     }
   }
   assert(ComponentIndex < KeyPath->getComponents().size() &&
-         "Didn't find a code compleiton component?");
+         "Didn't find a code completion component?");
 
   Type BaseType;
   if (ComponentIndex == 0) {

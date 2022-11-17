@@ -53,8 +53,8 @@
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
 // FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=AMBIGOUS_RESULT_BUILER > %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=AMBIGOUS_RESULT_BUILER < %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=AMBIGUOUS_RESULT_BUILDER > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=AMBIGUOUS_RESULT_BUILDER < %t.compl.txt
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -166,7 +166,7 @@ func foo() -> foo_swift_module.#^MODULE_TYPE_QUALIFIED^# {}
 // MODULE_TYPE_QUALIFIED: End completions
 
 // rdar://92048610
-func testAmbiguousResultBuilder() {
+func testAMBIGUOUSResultBuilder() {
   @resultBuilder
   struct MyBuilder {
     static func buildBlock(_ x: Int) -> Int {}
@@ -179,13 +179,13 @@ func testAmbiguousResultBuilder() {
 
   func test() {
     Foo {
-      #^AMBIGOUS_RESULT_BUILER^#
+      #^AMBIGUOUS_RESULT_BUILDER^#
     }
     // Results should only contain globalVar once
-    // AMBIGOUS_RESULT_BUILER: Begin completions
-    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
-    // AMBIGOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]: globalVar[#Int#]; name=globalVar
-    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
-    // AMBIGOUS_RESULT_BUILER: End completions
+    // AMBIGUOUS_RESULT_BUILDER: Begin completions
+    // AMBIGUOUS_RESULT_BUILDER-NOT: globalVar
+    // AMBIGUOUS_RESULT_BUILDER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]: globalVar[#Int#]; name=globalVar
+    // AMBIGUOUS_RESULT_BUILDER-NOT: globalVar
+    // AMBIGUOUS_RESULT_BUILDER: End completions
   }
 }

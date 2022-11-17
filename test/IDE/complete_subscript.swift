@@ -154,7 +154,7 @@ func testSubscriptCallSig<T>(val: MyStruct1<T>) {
 // LABELED_SUBSCRIPT: End completions
 }
 
-func testSubcscriptTuple(val: (x: Int, String)) {
+func testSubscriptTuple(val: (x: Int, String)) {
   val[#^TUPLE^#]
 // TUPLE: Begin completions, 1 items
 // TUPLE-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                 ['[']{#keyPath: KeyPath<(x: Int, String), Value>#}[']'][#Value#];

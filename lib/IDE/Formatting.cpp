@@ -166,7 +166,7 @@ struct IndentContext {
   /// The location to indent relative to.
   SourceLoc ContextLoc;
 
-  /// Indicates whether to indent relative to the extact column of ContextLoc
+  /// Indicates whether to indent relative to the extract column of ContextLoc
   /// (Exact) or to the start of the content of the line it appears on (LineStart).
   ContextKind Kind;
 
@@ -1462,7 +1462,7 @@ private:
         ISL->forEachSegment(SF.getASTContext(),
                             [&](bool IsInterpolation, CallExpr *CE) {
           if (IsInterpolation) {
-            // Handle the preceeding string segment.
+            // Handle the preceding string segment.
             CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
             if (StringRange.contains(TargetLocation)) {
               StringLiteralRange =

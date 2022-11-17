@@ -106,7 +106,7 @@ class AnnotatingResultPrinter {
 
   /// Print \p content enclosing with \p tag.
   void printWithTag(StringRef tag, StringRef content) {
-    // Trim whitepsaces around the non-whitespace characters.
+    // Trim whitespaces around the non-whitespace characters.
     // (i.e. "  something   " -> "  <tag>something</tag>   ".
     auto ltrimIdx = content.find_first_not_of(' ');
     auto rtrimIdx = content.find_last_not_of(' ') + 1;

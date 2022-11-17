@@ -48,7 +48,7 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
     }
   }
 
-  // Check other non-system depenencies (e.g. modules, headers).
+  // Check other non-system dependencies (e.g. modules, headers).
   for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
     if (callback(dep))
       return true;
@@ -74,7 +74,7 @@ static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
     if (!stat)
       return false;
 
-    // We will check the hash only if the modification time of the dependecy
+    // We will check the hash only if the modification time of the dependency
     // is zero. See 'areAnyDependentFilesInvalidated() below'.
     if (stat->getLastModificationTime() != llvm::sys::TimePoint<>())
       return false;
@@ -118,7 +118,7 @@ areAnyDependentFilesInvalidated(CompilerInstance &CI, llvm::vfs::FileSystem &FS,
           // Calculate the hash code of the current content.
           auto newContent = FS.getBufferForFile(filePath);
           if (!newContent)
-            // Unreachable? stat succeeded, but coundn't get the content.
+            // Unreachable? stat succeeded, but couldn't get the content.
             return true;
 
           auto newHash = llvm::hash_value(newContent.get()->getBuffer());

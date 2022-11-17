@@ -371,7 +371,7 @@ struct ResolvedRangeInfo {
                       CommonExprParent(CommonExprParent) {}
   ResolvedRangeInfo(ArrayRef<Token> TokensInRange) :
   ResolvedRangeInfo(RangeKind::Invalid, {nullptr, ExitState::Unsure},
-                    TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
+                    TokensInRange, nullptr, /*Common Expr Parent*/nullptr,
                     /*Single entry*/true, /*UnhandledEffects*/{},
                     OrphanKind::None, {}, {}, {}) {}
   ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
@@ -602,7 +602,7 @@ bool isDeclOverridable(ValueDecl *D);
 
 /// Given a reference to a member \p D and its \p Base expression, return
 /// whether that declaration could be dynamic, ie. may resolve to some other
-/// declaration. Note that while the decl itself itself may be overridable, a
+/// declaration. Note that while the decl itself may be overridable, a
 /// reference to it is not necessarily "dynamic". Furthermore,  is *not* the
 /// `dynamic` keyword.
 ///

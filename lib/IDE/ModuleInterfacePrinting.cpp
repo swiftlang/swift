@@ -666,7 +666,7 @@ void swift::ide::printModuleInterface(
         // An imported namespace decl will contain members from all redecls, so
         // make sure we add all the redecls.
         for (auto redecl : namespaceDecl->redecls()) {
-          // Namespace redecls may exist across mutliple modules. We want to
+          // Namespace redecls may exist across multiple modules. We want to
           // add the decl "D" to every module that has a redecl. But we only
           // want to add "D" once to prevent duplicate printing.
           clang::SourceLocation loc = redecl->getLocation();
@@ -1106,11 +1106,11 @@ bool ClangCommentPrinter::shouldPrintNewLineBefore(ClangNode Node) const {
   if (FID.isInvalid())
     return false;
 
-  unsigned LastEntiyLine = 0;
+  unsigned LastEntityLine = 0;
   auto It = LastEntityLines.find(FID);
   if (It != LastEntityLines.end())
-    LastEntiyLine = It->second;
-  return (NodeLineNo > LastEntiyLine) && NodeLineNo - LastEntiyLine > 1;
+    LastEntityLine = It->second;
+  return (NodeLineNo > LastEntityLine) && NodeLineNo - LastEntityLine > 1;
 }
 
 void ClangCommentPrinter::updateLastEntityLine(clang::SourceLocation Loc) {
@@ -1131,7 +1131,7 @@ void ClangCommentPrinter::updateLastEntityLine(clang::SourceLocation Loc) {
 void ClangCommentPrinter::updateLastEntityLine(clang::FileID FID,
                                                unsigned LineNo) {
   assert(!FID.isInvalid());
-  unsigned &LastEntiyLine = LastEntityLines[FID];
-  if (LineNo > LastEntiyLine)
-    LastEntiyLine = LineNo;
+  unsigned &LastEntityLine = LastEntityLines[FID];
+  if (LineNo > LastEntityLine)
+    LastEntityLine = LineNo;
 }

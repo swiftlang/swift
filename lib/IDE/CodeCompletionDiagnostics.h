@@ -22,7 +22,7 @@ class ValueDecl;
 namespace ide {
 
 /// Populate \p severity and \p Out with the context-free diagnostics for \p D.
-/// See \c NotRecommendedReason for an explaination of context-free vs.
+/// See \c NotRecommendedReason for an explanation of context-free vs.
 /// contextual diagnostics.
 /// Returns \c true if it fails to generate the diagnostics.
 bool getContextFreeCompletionDiagnostics(
@@ -33,7 +33,7 @@ bool getContextFreeCompletionDiagnostics(
 /// \p NameForDiagnostic is the name of the decl that produced this diagnostic.
 /// \p Ctx is a context that's purely used to have a reference to a diagnostic
 /// engine.
-/// See \c NotRecommendedReason for an explaination of context-free vs.
+/// See \c NotRecommendedReason for an explanation of context-free vs.
 /// contextual diagnostics.
 /// Returns \c true if it fails to generate the diagnostics.
 bool getContextualCompletionDiagnostics(

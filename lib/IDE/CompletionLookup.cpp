@@ -447,7 +447,7 @@ bool CompletionLookup::isUnresolvedMemberIdealType(Type Ty) {
   if (!idealTy)
     return false;
   /// Consider optional object type is the ideal.
-  /// For exmaple:
+  /// For example:
   ///   enum MyEnum { case foo, bar }
   ///   func foo(_: MyEnum?)
   ///   fooo(.<HERE>)
@@ -469,7 +469,7 @@ void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
     // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
     shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
   } else {
-    // As primary expresson. We have to escape almost every keywords except
+    // As primary expression. We have to escape almost every keywords except
     // for 'self' and 'Self'.
     shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
   }
@@ -925,7 +925,7 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
 ///   -(void)performWithOptions:(NSDictionary *) opts;
 ///
 /// This doesn't match the condition because the base name of the function in
-/// Swift is 'peform':
+/// Swift is 'perform':
 ///
 ///   func perform(options opts: [AnyHashable:Any] = [:])
 ///
@@ -1351,8 +1351,8 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
   Optional<ContextualNotRecommendedReason> NotRecommended;
-  bool implictlyAsync = false;
-  analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
+  bool implicitlyAsync = false;
+  analyzeActorIsolation(FD, AFT, implicitlyAsync, NotRecommended);
 
   // Add the method, possibly including any default arguments.
   auto addMethodImpl = [&](bool includeDefaultArgs = true,
@@ -1360,7 +1360,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResultKind::Declaration,
         getSemanticContext(FD, Reason, dynamicLookupInfo));
-    Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
+    Builder.setIsAsync(implicitlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
     Builder.setHasAsyncAlternative(
         FD->getAsyncAlternative() &&
         !FD->getAsyncAlternative()->shouldHideFromEditor());
@@ -1394,14 +1394,14 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       Builder.addRightParen();
     } else if (trivialTrailingClosure) {
       Builder.addBraceStmtWithCursor(" { code }");
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      addEffectsSpecifiers(Builder, AFT, FD, implicitlyAsync);
     } else {
       Builder.addLeftParen();
       addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                               FD->getGenericSignatureOfContext(),
                               includeDefaultArgs);
       Builder.addRightParen();
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      addEffectsSpecifiers(Builder, AFT, FD, implicitlyAsync);
     }
 
     // Build type annotation.
@@ -1611,13 +1611,13 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
     return;
 
   Optional<ContextualNotRecommendedReason> NotRecommended;
-  bool implictlyAsync = false;
-  analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
+  bool implicitlyAsync = false;
+  analyzeActorIsolation(SD, subscriptType, implicitlyAsync, NotRecommended);
 
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(SD, Reason, dynamicLookupInfo));
-  Builder.setIsAsync(implictlyAsync);
+  Builder.setIsAsync(implicitlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
 
@@ -1646,7 +1646,7 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
     resultTy = OptionalType::get(resultTy);
   }
 
-  if (implictlyAsync)
+  if (implicitlyAsync)
     Builder.addAnnotatedAsync();
 
   addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());

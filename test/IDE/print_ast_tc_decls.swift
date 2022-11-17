@@ -1272,7 +1272,7 @@ struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtoco
 // PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
 
 //===---
-//===--- Tupe sugar for library types.
+//===--- Type sugar for library types.
 //===---
 
 struct d2900_TypeSugar1 {
@@ -1359,7 +1359,7 @@ public func ParamAttrs5(a : (@escaping () -> ()) -> ()) {
 // PASS_PRINT_AST: public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 
-// The following type only has the internal paramter name inferred from the
+// The following type only has the internal parameter name inferred from the
 // closure on the right-hand side of `=`. Thus, it is only part of the `Type`
 // and not part of the `TypeRepr`.
 // PASS_PRINT_AST_TYPE: public var ParamAttrs7: (_ f: @escaping () -> ()) -> ()

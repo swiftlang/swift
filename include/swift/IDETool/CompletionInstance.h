@@ -117,7 +117,7 @@ class CompletionInstance {
           Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
-  /// request. The \c CompilerInstace passed to the callback already performed
+  /// request. The \c CompilerInstance passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
   void performNewOperation(
@@ -131,7 +131,7 @@ class CompletionInstance {
           Callback);
 
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
-  /// second pass. \p Callback is resposible to perform the second pass on it.
+  /// second pass. \p Callback is responsible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
   /// and may be cached for the next completion.
   /// In case of failure or cancellation, the callback receives the
@@ -145,7 +145,7 @@ class CompletionInstance {
   /// interpreting the results, since invalid results may be returned in case
   /// of cancellation.
   ///
-  /// NOTE: \p Args is only used for checking the equaity of the invocation.
+  /// NOTE: \p Args is only used for checking the equality of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
   void performOperation(

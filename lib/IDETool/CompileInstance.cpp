@@ -53,14 +53,14 @@ struct ModInfo {
 static bool collectModifiedFunctions(ArrayRef<Decl *> r1, ArrayRef<Decl *> r2,
                                      llvm::SmallVectorImpl<ModInfo> &result) {
   assert(r1.size() == r2.size() &&
-         "interface fingerprint matches but diffrent number of children");
+         "interface fingerprint matches but different number of children");
 
   for (auto i1 = r1.begin(), i2 = r2.begin(), e1 = r1.end(), e2 = r2.end();
        i1 != e1 && i2 != e2; ++i1, ++i2) {
     auto &d1 = *i1, &d2 = *i2;
 
     assert(d1->getKind() == d2->getKind() &&
-           "interface fingerprint matches but diffrent structure");
+           "interface fingerprint matches but different structure");
 
     /// FIXME: Nested types.
     ///   func foo() {
@@ -120,14 +120,14 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   // Parse the new buffer into temporary SourceFile.
 
   LangOptions langOpts = ctx.LangOpts;
-  TypeCheckerOptions typeckOpts = ctx.TypeCheckerOpts;
+  TypeCheckerOptions typecheckOpts = ctx.TypeCheckerOpts;
   SearchPathOptions searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions clangOpts = ctx.ClangImporterOpts;
   SILOptions silOpts = ctx.SILOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+  auto &tmpCtx = *ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                   clangOpts, symbolOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
@@ -219,10 +219,10 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
 
   // Collect modified function body.
   SmallVector<ModInfo, 2> modifiedFuncDecls;
-  bool isNotResuable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
+  bool isNotReusable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
     return getModifiedFunctionDeclList(oldSF, tmpSM, modifiedFuncDecls);
   });
-  if (isNotResuable)
+  if (isNotReusable)
     return true;
 
   // OK, we can reuse the AST.
@@ -279,7 +279,7 @@ bool CompileInstance::setupCI(
   /// Declare the frontend to be used for multiple compilations.
   invocation.getFrontendOptions().ReuseFrontendForMultipleCompilations = true;
 
-  // Enable dependency trakcing (excluding system modules) to invalidate the
+  // Enable dependency tracking (excluding system modules) to invalidate the
   // compiler instance if any dependent files are modified.
   invocation.getFrontendOptions().IntermoduleDependencyTracking =
       IntermoduleDepTrackingMode::ExcludeSystem;
@@ -308,7 +308,7 @@ bool CompileInstance::performSema(
       CachedReuseCount < Opts.MaxASTReuseCount) {
     CI->getASTContext().CancellationFlag = CancellationFlag;
     if (!performCachedSemaIfPossible(DiagC)) {
-      // If we compileted cacehd Sema operation. We're done.
+      // If we completed cached Sema operation. We're done.
       ++CachedReuseCount;
       return CI->getDiags().hadAnyError();
     }

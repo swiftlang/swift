@@ -187,7 +187,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
-    bool Unmergable;
+    bool Unmergeable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(swift::Requirement Req) {
@@ -200,14 +200,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
-      if (Unmergable || Another.Unmergable)
+      if (Unmergeable || Another.Unmergeable)
         return false;
       if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
     bool isMergeableWithTypeDef() {
-      return !Unmergable && InheritsCount == 0 && Requirements.empty();
+      return !Unmergeable && InheritsCount == 0 && Requirements.empty();
     }
   };
 
@@ -285,7 +285,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                ExtensionDecl *EnablingExt, NormalProtocolConformance *Conf) {
     SynthesizedExtensionInfo Result(IsSynthesized, EnablingExt);
     ExtensionMergeInfo MergeInfo;
-    MergeInfo.Unmergable = !Ext->getRawComment(/*SerializedOK=*/false).isEmpty() || // With comments
+    MergeInfo.Unmergeable = !Ext->getRawComment(/*SerializedOK=*/false).isEmpty() || // With comments
                            Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
     MergeInfo.InheritsCount = countInherits(Ext);
 
@@ -880,7 +880,7 @@ ArrayRef<ValueDecl*> swift::
 collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
                           bool Transitive) {
   return evaluateOrDefault(VD->getASTContext().evaluator,
-    CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
+    CollectOverriddenDeclsRequest(OverriddenDeclsOwner(VD,
       IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
 }
 

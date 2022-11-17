@@ -428,7 +428,7 @@ func testInStringInterpolation() {
   enum MyEnum { case foo, bar }
   func takeEnum(_ e: MyEnum) -> MyEnum { return e }
   let x = "enum: \(takeEnum(.#^STRING_INTERPOLATION_1^#))"
-  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID?check=NOCRASH^#)" // Dont'crash.
+  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID?check=NOCRASH^#)" // Don't crash.
 }
 // STRING_INTERPOLATION_1: Begin completions
 // STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: foo[#MyEnum#];
@@ -505,7 +505,7 @@ func testHasStaticClosure() {
 }
 // STATIC_CLOSURE_1: Begin completions, 3 items
 // STATIC_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#HasCreator#];
-// FIXME: Suggest 'create()[#HasCreateor#]', not 'create'.
+// FIXME: Suggest 'create()[#HasCreator#]', not 'create'.
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create_curried[#() -> () -> HasCreator#];
 // STATIC_CLOSURE_1: End completions
@@ -627,7 +627,7 @@ struct TestingStruct {
 }
 
 func testDefaultArgument(arg: SomeEnum1 = .#^DEFAULT_ARG_1?check=UNRESOLVED_3^#) {}
-class TestDefalutArg {
+class TestDefaultArg {
   func method(arg: SomeEnum1 = .#^DEFAULT_ARG_2?check=UNRESOLVED_3^#) {}
   init(arg: SomeEnum1 = .#^DEFAULT_ARG_3?check=UNRESOLVED_3^#) {}
 }
@@ -694,14 +694,14 @@ func testClosureReturnTypeForOverloaded() {
 
 func receiveAutoclosure(_: @autoclosure () -> SomeEnum1) {}
 func receiveAutoclosureOpt(_: @autoclosure () -> SomeEnum1?) {}
-func testAutoclosre() {
+func testAutoclosure() {
   receiveAutoclosure(.#^AUTOCLOSURE?check=UNRESOLVED_3^#)
   // Same as UNRESOLVED_3
 
   receiveAutoclosureOpt(.#^AUTOCLOSURE_OPT?check=UNRESOLVED_3_OPT^#)
   // Same as UNRESOLVED_3_OPT
 }
-func testAutoclosreFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
+func testAutoclosureFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
   fn(.#^AUTOCLOSURE_FUNCTY?check=UNRESOLVED_3^#)
   // Same as UNRESOLVED_3
   fnOpt(.#^AUTOCLOSURE_FUNCTY_OPT?check=UNRESOLVED_3_OPT^#)

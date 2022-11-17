@@ -485,8 +485,8 @@ func foo() -> some P {}
 // CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
 func foo() -> some P & Q {}
 
-// CHECK: <kw>class</kw> PropertyDelgate {
-class PropertyDelgate {
+// CHECK: <kw>class</kw> PropertyDelegate {
+class PropertyDelegate {
   // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
   @MyDelegate(1, receiveClosure {
     // CHECK: <kw>var</kw> x = <int>1</int>; x

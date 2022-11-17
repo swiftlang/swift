@@ -1251,7 +1251,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
           return false;
       } else {
-        // Only mispelled attributes, corrected in the AST but not
+        // Only misspelled attributes, corrected in the AST but not
         // recognised or present in TokenNodes should get us here.
         // E.g. @availability(...) comes through as if @available(...) was
         // specified, but there's no TokenNode because we don't highlight them
