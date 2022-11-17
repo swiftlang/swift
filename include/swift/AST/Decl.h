@@ -6769,8 +6769,7 @@ public:
     // FIXME: Remove 'Parsed' from this list once we can always delay
     //        parsing bodies. The -experimental-skip-*-function-bodies options
     //        do currently skip parsing, unless disabled through other means in
-    //        SourceFile::hasDelayedBodyParsing (eg. needing to build the full
-    //        syntax tree due to -verify-syntax-tree).
+    //        SourceFile::hasDelayedBodyParsing.
     assert(getBodyKind() == BodyKind::None ||
            getBodyKind() == BodyKind::Unparsed ||
            getBodyKind() == BodyKind::Parsed);

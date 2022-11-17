@@ -68,8 +68,6 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "swift/Syntax/Serialization/SyntaxSerialization.h"
-#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -137,18 +135,6 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
     return nullptr;
   }
   return os;
-}
-
-/// Writes the Syntax tree to the given file
-static bool emitSyntax(const SourceFile &SF, StringRef OutputFilename) {
-  auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
-  if (!os) return true;
-
-  json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-  auto Root = SF.getSyntaxRoot().getRaw();
-  jsonOut << *Root;
-  *os << "\n";
-  return false;
 }
 
 /// Writes SIL out to the given file.
@@ -1344,9 +1330,6 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();
-  case FrontendOptions::ActionType::EmitSyntax:
-    return emitSyntax(getPrimaryOrMainSourceFile(Instance),
-                      opts.InputsAndOutputs.getSingleOutputFilename());
   case FrontendOptions::ActionType::EmitImportedModules:
     return emitImportedModules(Instance.getMainModule(), opts);
 

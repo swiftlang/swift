@@ -2229,6 +2229,22 @@ void ConjunctionElement::findReferencedVariables(
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
 
+  // If this is a pattern of `for-in` statement, let's walk into `for-in`
+  // sequence expression because both elements are type-checked together.
+  //
+  // Correct expressions wouldn't have any type variables in sequence but
+  // they could appear due to circular references or other incorrect syntax.
+  if (element.is<Pattern *>()) {
+    if (auto parent =
+            locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
+      if (auto *forEach = getAsStmt<ForEachStmt>(parent->getElement())) {
+        if (auto *sequence = forEach->getParsedSequence())
+          sequence->walk(refFinder);
+        return;
+      }
+    }
+  }
+
   if (auto *patternBinding =
           dyn_cast_or_null<PatternBindingDecl>(element.dyn_cast<Decl *>())) {
     // Let's not walk into placeholder variable initializers, since they

@@ -27,6 +27,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
