@@ -989,8 +989,9 @@ REMARK(cross_import_added,none,
        (Identifier, Identifier, Identifier))
 
 REMARK(module_loaded,none,
-       "loaded module at %0",
-       (StringRef))
+       "loaded module at %0"
+       "%select{|; overlay for a clang dependency}1",
+       (StringRef, unsigned))
        
 REMARK(explicit_interface_build_skipped,none,
        "Skipped rebuilding module at %0 - up-to-date",
