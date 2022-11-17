@@ -2750,7 +2750,7 @@ struct GetClosureType {
   Type operator()(const AbstractClosureExpr *expr) const;
 };
 
-/// Retrieve the closure type from the constraint system.
+/// Retrieve the closure's preconcurrency status from the constraint system.
 struct ClosureIsolatedByPreconcurrency {
   ConstraintSystem &cs;
 
