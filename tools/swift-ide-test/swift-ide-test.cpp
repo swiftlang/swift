@@ -52,7 +52,6 @@
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -1928,7 +1927,6 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
   Invocation.getLangOptions().Playground = Playground;
   Invocation.getLangOptions().CollectParsedToken = true;
-  Invocation.getLangOptions().BuildSyntaxTree = true;
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -1969,17 +1967,10 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     SourceManager SM;
     unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
-    RC<SyntaxArena> syntaxArena{new syntax::SyntaxArena()};
-    std::shared_ptr<SyntaxTreeCreator> SynTreeCreator =
-        std::make_shared<SyntaxTreeCreator>(
-            SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
-            syntaxArena);
-
     ParserUnit Parser(
         SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
         Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
-        Invocation.getModuleName(), SynTreeCreator,
-        Invocation.getMainFileSyntaxParsingCache());
+        Invocation.getModuleName());
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
@@ -2194,7 +2185,6 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
     return 1;
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
@@ -2206,17 +2196,10 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   SourceManager SM;
   unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
-  RC<SyntaxArena> syntaxArena{new syntax::SyntaxArena()};
-  std::shared_ptr<SyntaxTreeCreator> SynTreeCreator =
-      std::make_shared<SyntaxTreeCreator>(
-          SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
-          syntaxArena);
-
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
                     Invocation.getLangOptions(),
                     Invocation.getTypeCheckerOptions(),
-                    Invocation.getSILOptions(), Invocation.getModuleName(),
-                    SynTreeCreator, Invocation.getMainFileSyntaxParsingCache());
+                    Invocation.getSILOptions(), Invocation.getModuleName());
 
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
@@ -3939,7 +3922,6 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().CollectParsedToken = true;
 
   CompilerInstance CI;
@@ -4316,7 +4298,6 @@ int main(int argc, char *argv[]) {
       .addMapping(SplitMap.first, SplitMap.second);
   }
   InitInvok.getLangOptions().CollectParsedToken = true;
-  InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
     options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {

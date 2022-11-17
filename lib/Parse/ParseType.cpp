@@ -22,9 +22,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Parse/ParsedSyntaxBuilders.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -32,7 +29,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
-using namespace swift::syntax;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
@@ -230,7 +226,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         SourceLoc metatypeLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
-        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
         continue;
       }
       if (peekToken().isContextualKeyword("Protocol")) {
@@ -238,7 +233,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         SourceLoc protocolLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
-        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
         continue;
       }
     }
@@ -344,9 +338,6 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
   // Start a context for creating type syntax.
-  SyntaxParsingContext TypeParsingContext(SyntaxContext,
-                                          SyntaxContextKind::Type);
-
   ParserStatus status;
 
   // Parse attributes.
@@ -416,33 +407,6 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     if (SecondHalf.isNull()) {
       status.setIsParseError();
       return status;
-    }
-
-    if (SyntaxContext->isEnabled()) {
-      ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
-      Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      Builder.useArrow(SyntaxContext->popToken());
-      if (throwsLoc.isValid())
-        Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
-      if (asyncLoc.isValid())
-        Builder.useAsyncKeyword(SyntaxContext->popToken());
-
-      auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      if (InputNode.is<ParsedTupleTypeSyntax>()) {
-        auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
-        // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode.getDeferredLeftParen(SyntaxContext);
-        auto Arguments = TupleTypeNode.getDeferredElements(SyntaxContext);
-        auto RightParen = TupleTypeNode.getDeferredRightParen(SyntaxContext);
-        Builder
-          .useLeftParen(std::move(LeftParen))
-          .useArguments(std::move(Arguments))
-          .useRightParen(std::move(RightParen));
-      } else {
-        Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
-            std::move(InputNode), /*TrailingComma=*/None, *SyntaxContext));
-      }
-      SyntaxContext->addSyntax(Builder.build());
     }
 
     TupleTypeRepr *argsTyR = nullptr;
@@ -554,9 +518,6 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty() ||
-      constLoc.isValid())
-    SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
   return makeParserResult(
       status,
@@ -584,7 +545,6 @@ ParserResult<TypeRepr> Parser::parseType(
     SourceLoc ellipsisLoc = consumeToken();
     ty = makeParserResult(ty,
         new (Context) PackExpansionTypeRepr(ty.get(), ellipsisLoc));
-    SyntaxContext->createNodeInPlace(SyntaxKind::PackExpansionType);
   }
 
   return ty;
@@ -658,20 +618,12 @@ SourceLoc Parser::getTypeErrorLoc() const {
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
                                            SourceLoc &LAngleLoc,
                                            SourceLoc &RAngleLoc) {
-  SyntaxParsingContext GenericArgumentsContext(
-      SyntaxContext, SyntaxKind::GenericArgumentClause);
-
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   LAngleLoc = consumeStartingLess();
 
   {
-    SyntaxParsingContext ListContext(SyntaxContext,
-        SyntaxKind::GenericArgumentList);
-
     while (true) {
-      SyntaxParsingContext ElementContext(SyntaxContext,
-                                          SyntaxKind::GenericArgument);
       ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
@@ -734,8 +686,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
     return nullptr;
   }
-  SyntaxParsingContext IdentTypeCtxt(SyntaxContext, SyntaxContextKind::Type);
-
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
@@ -764,9 +714,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
       ComponentsR.push_back(CompT);
     }
-    SyntaxContext->createNodeInPlace(ComponentsR.size() == 1
-                                         ? SyntaxKind::SimpleTypeIdentifier
-                                         : SyntaxKind::MemberTypeIdentifier);
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type'.
@@ -828,8 +775,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
-  SyntaxParsingContext ConstrainedSugarTypeContext(
-      SyntaxContext, SyntaxKind::ConstrainedSugarType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -843,11 +788,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // Treat any as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     anyLoc = consumeToken();
-  } else {
-    // This isn't a some type.
-    ConstrainedSugarTypeContext.setTransparent();
   }
-  
+
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
     if (opaqueLoc.isValid() &&
         (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
@@ -858,7 +800,6 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     return type;
   };
   
-  SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
@@ -886,24 +827,10 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   };
 
   addType(FirstType.get());
-  SyntaxContext->setCreateSyntax(SyntaxKind::CompositionType);
   assert(Tok.isContextualPunctuator("&"));
   do {
-    if (SyntaxContext->isEnabled()) {
-      auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
-      consumeToken(); // consume '&'
-      if (Type) {
-        ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
-        auto Ampersand = SyntaxContext->popToken();
-        Builder
-          .useAmpersand(std::move(Ampersand))
-          .useType(std::move(*Type));
-        SyntaxContext->addSyntax(Builder.build());
-      }
-    } else {
-      consumeToken(); // consume '&'
-    }
-    
+    consumeToken(); // consume '&'
+
     // Diagnose invalid `some` or `any` after an ampersand.
     if (Tok.isContextualKeyword("some") ||
         Tok.isContextualKeyword("any")) {
@@ -941,25 +868,11 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     addType(ty.getPtrOrNull());
   } while (Tok.isContextualPunctuator("&"));
 
-  if (SyntaxContext->isEnabled()) {
-    if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
-      auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-          /*UnexpectedNodes=*/None,
-          /*Type=*/std::move(*synType),
-          /*UnexpectedNodes=*/None,
-          /*Ampersand=*/None, /*UnexpectedNodes=*/None, *SyntaxContext);
-      SyntaxContext->addSyntax(std::move(LastNode));
-    }
-  }
-  SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
-  
   return makeParserResult(Status, applyOpaque(CompositionTypeRepr::create(
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc})));
 }
 
 ParserResult<TypeRepr> Parser::parseAnyType() {
-  SyntaxParsingContext IdentTypeCtxt(SyntaxContext,
-                                     SyntaxKind::SimpleTypeIdentifier);
   auto Loc = consumeToken(tok::kw_Any);
   auto TyR = CompositionTypeRepr::createEmptyComposition(Context, Loc);
   return makeParserResult(TyR);
@@ -975,10 +888,6 @@ ParserResult<TypeRepr> Parser::parseAnyType() {
 ///     type-composition-list-deprecated ',' type-identifier
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
-
-  // Start a context for creating type syntax.
-  SyntaxParsingContext TypeParsingContext(SyntaxContext,
-                                          SyntaxContextKind::Type);
 
   SourceLoc ProtocolLoc = consumeToken();
   SourceLoc LAngleLoc = consumeStartingLess();
@@ -1082,11 +991,6 @@ static bool isMacroSignatureFile(SourceFile &sf) {
 ///     identifier? identifier ':' type
 ///     type
 ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
-  // Force the context to create deferred nodes, as we might need to
-  // de-structure the tuple type to create a function type.
-  DeferringContextRAII Deferring(*SyntaxContext);
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
-  TypeContext.setCreateSyntax(SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
 
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
@@ -1095,7 +999,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
-                                  SyntaxKind::TupleTypeElementList,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
 
@@ -1172,8 +1075,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
-      SyntaxParsingContext InitContext(SyntaxContext,
-                                       SyntaxKind::InitializerClause);
       SourceLoc equalLoc = consumeToken(tok::equal);
       auto init = parseExpr(diag::expected_init_value);
       auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
@@ -1288,7 +1189,6 @@ ParserResult<TypeRepr> Parser::parseTypeArray(ParserResult<TypeRepr> Base) {
 }
 
 ParserResult<TypeRepr> Parser::parseTypeCollection() {
-  SyntaxParsingContext CollectionCtx(SyntaxContext, SyntaxContextKind::Type);
   ParserStatus Status;
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
@@ -1327,18 +1227,15 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
     return makeParserError();
 
   TypeRepr *TyR;
-  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
 
   SourceRange brackets(lsquareLoc, rsquareLoc);
   if (colonLoc.isValid()) {
     // Form the dictionary type.
     TyR = new (Context)
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
-    SyntaxContext->setCreateSyntax(SyntaxKind::DictionaryType);
   } else {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
-    SyntaxContext->setCreateSyntax(SyntaxKind::ArrayType);
   }
     
   return makeParserResult(Status, TyR);
@@ -1392,7 +1289,6 @@ ParserResult<TypeRepr>
 Parser::parseTypeOptional(ParserResult<TypeRepr> base) {
   SourceLoc questionLoc = consumeOptionalToken();
   auto TyR = new (Context) OptionalTypeRepr(base.get(), questionLoc);
-  SyntaxContext->createNodeInPlace(SyntaxKind::OptionalType);
   return makeParserResult(ParserStatus(base), TyR);
 }
 
@@ -1403,7 +1299,6 @@ Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   auto TyR =
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base.get(), exclamationLoc);
-  SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitlyUnwrappedOptionalType);
   return makeParserResult(ParserStatus(base), TyR);
 }
 

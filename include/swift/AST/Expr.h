@@ -1108,7 +1108,7 @@ public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   };
 
 private:

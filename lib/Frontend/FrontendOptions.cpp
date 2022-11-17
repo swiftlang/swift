@@ -36,7 +36,6 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
@@ -77,7 +76,6 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   switch (action) {
   case ActionType::Parse:
   case ActionType::DumpParse:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
@@ -94,7 +92,6 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::DumpParse:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
@@ -143,7 +140,6 @@ bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   case ActionType::REPL:
   case ActionType::Parse:
   case ActionType::DumpParse:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
@@ -189,7 +185,6 @@ bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
   case ActionType::REPL:
   case ActionType::Parse:
   case ActionType::DumpParse:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
@@ -256,7 +251,6 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -325,7 +319,6 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -369,7 +362,6 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -412,7 +404,6 @@ bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::EmitImportedModules:
@@ -455,7 +446,6 @@ bool FrontendOptions::canActionEmitClangHeader(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::EmitPCH:
@@ -497,7 +487,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -546,7 +535,6 @@ bool FrontendOptions::canActionEmitModuleSemanticInfo(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::EmitPCH:
@@ -590,7 +578,6 @@ bool FrontendOptions::canActionEmitConstValues(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -633,7 +620,6 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::EmitPCH:
@@ -679,7 +665,6 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::EmitImportedModules:
@@ -721,7 +706,6 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::DumpInterfaceHash:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
@@ -781,7 +765,6 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
@@ -810,7 +793,6 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
-  case ActionType::EmitSyntax:
   case ActionType::DumpAST:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
@@ -852,7 +834,6 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
   case ActionType::PrintAST:
   case ActionType::PrintASTDecl:
   case ActionType::DumpScopeMaps:
