@@ -361,6 +361,19 @@ struct SimplifyCFGSimplifyTermWithIdenticalDestBlocks : UnitTest {
   }
 };
 
+struct SimplifyCFGTryJumpThreading : UnitTest {
+  SimplifyCFGTryJumpThreading(UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .tryJumpThreading(cast<BranchInst>(arguments.takeInstruction()));
+  }
+};
+
 // Arguments:
 // - string: list of characters, each of which specifies subsequent arguments
 //           - A: (block) argument
@@ -534,6 +547,9 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS(
         "simplify-cfg-simplify-term-with-identical-dest-blocks",
         SimplifyCFGSimplifyTermWithIdenticalDestBlocks)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-try-jump-threading",
+        SimplifyCFGTryJumpThreading)
 
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)

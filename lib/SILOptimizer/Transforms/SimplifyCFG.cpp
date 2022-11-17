@@ -924,6 +924,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (destTerminator->isFunctionExiting())
     return false;
 
+  // There is no benefit duplicating such a destination.
+  if (DestBB->getSinglePredecessorBlock() != nullptr) {
+    return false;
+  }
+
   // Jump threading only makes sense if there is an argument on the branch
   // (which is reacted on in the DestBB), or if this goes through a memory
   // location (switch_enum_addr is the only address-instruction which we
@@ -942,6 +947,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
 
+    // TODO: Verify if we need to jump thread to remove releases in OSSA.
     // If the value being substituted on is release there is a chance we could
     // remove the release after jump threading.
     if (!Arg->getType().isTrivial(*SrcBB->getParent()) &&

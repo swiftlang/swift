@@ -751,17 +751,14 @@ enum ThreeWay {
 // CHECK:   switch_enum undef : $ThreeWay, case #ThreeWay.one!enumelt: bb4, case #ThreeWay.two!enumelt: bb2, case #ThreeWay.three!enumelt: bb3
 // CHECK: bb2:
 // CHECK:   [[P2:%.*]] = load %{{.*}} : $*Payload
-// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P2]] : $Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
 // CHECK:   br bb1(undef : $Builtin.Int64, [[P2]] : $Payload)
 // CHECK: bb3:
 // CHECK:   [[P3:%.*]] = load %{{.*}} : $*Payload
-// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P3]] : $Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
 // CHECK:   br bb7
 // CHECK: bb4:
 // CHECK:   [[P4:%.*]] = load %{{.*}} : $*Payload
-// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P4]] : $Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
 // CHECK:   cond_br undef, bb5, bb6
 // CHECK: bb5:
