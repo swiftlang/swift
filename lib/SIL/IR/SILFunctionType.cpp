@@ -263,6 +263,35 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 
+CanSILFunctionType SILFunctionType::getDifferentiableComponentType(
+    NormalDifferentiableFunctionTypeComponent component, SILModule &module) {
+  assert(getDifferentiabilityKind() == DifferentiabilityKind::Reverse &&
+         "Must be a `@differentiable(reverse)` function");
+  auto originalFnTy = getWithoutDifferentiability();
+  if (auto derivativeKind = component.getAsDerivativeFunctionKind()) {
+    return originalFnTy->getAutoDiffDerivativeFunctionType(
+        getDifferentiabilityParameterIndices(),
+        getDifferentiabilityResultIndices(), *derivativeKind, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  }
+  return originalFnTy;
+}
+
+CanSILFunctionType SILFunctionType::getLinearComponentType(
+    LinearDifferentiableFunctionTypeComponent component, SILModule &module) {
+  assert(getDifferentiabilityKind() == DifferentiabilityKind::Linear &&
+         "Must be a `@differentiable(linear)` function");
+  auto originalFnTy = getWithoutDifferentiability();
+  switch (component) {
+  case LinearDifferentiableFunctionTypeComponent::Original:
+    return originalFnTy;
+  case LinearDifferentiableFunctionTypeComponent::Transpose:
+    return originalFnTy->getAutoDiffTransposeFunctionType(
+        getDifferentiabilityParameterIndices(), module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  }
+}
+
 CanSILFunctionType
 SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
                                           IndexSubset *parameterIndices,

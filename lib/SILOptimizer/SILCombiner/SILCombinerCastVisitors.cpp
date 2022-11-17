@@ -1065,16 +1065,94 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
 
 SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Cvt) {
-  auto *OrigThinToThick =
-      dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
-  if (!OrigThinToThick)
-    return nullptr;
-  auto origFunType = OrigThinToThick->getType().getAs<SILFunctionType>();
-  auto NewTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
+  // Rewrite conversion of `convert_function` of `thin_to_thick_function` as
+  // conversion of `thin_to_thick_function` of `convert_function`.
+  //
+  // (convert_escape_to_noescape (convert_function (thin_to_thick_function x)))
+  // =>
+  // (convert_escape_to_noescape (thin_to_thick_function (convert_function x)))
+  //
+  // This unblocks the `thin_to_thick_function` peephole optimization below.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(Cvt->getConverted())) {
+    if (CFI->getSingleUse()) {
+      if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+        if (TTTFI->getSingleUse()) {
+          auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
+          auto convertedThinType = convertedThickType->getWithRepresentation(
+            SILFunctionTypeRepresentation::Thin);
+          auto *newCFI = Builder.createConvertFunction(
+            CFI->getLoc(), TTTFI->getConverted(),
+            SILType::getPrimitiveObjectType(convertedThinType),
+            CFI->withoutActuallyEscaping());
+          auto *newTTTFI = Builder.createThinToThickFunction(
+            TTTFI->getLoc(), newCFI, CFI->getType());
+          replaceInstUsesWith(*CFI, newTTTFI);
+        }
+      }
+    }
+  }
 
-  return Builder.createThinToThickFunction(
+  // Rewrite conversion of `thin_to_thick_function` as `thin_to_thick_function`
+  // with a noescape function type.
+  //
+  // (convert_escape_to_noescape (thin_to_thick_function x)) =>
+  // (thin_to_thick_function [noescape] x)
+  if (auto *OrigThinToThick = dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted())) {
+    auto origFunType = OrigThinToThick->getType().getAs<SILFunctionType>();
+    auto NewTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
+
+    return Builder.createThinToThickFunction(
       OrigThinToThick->getLoc(), OrigThinToThick->getOperand(),
       SILType::getPrimitiveObjectType(NewTy));
+  }
+
+  // Push conversion instructions inside `differentiable_function`. This
+  // unblocks more optimizations.
+  //
+  // Before:
+  // %x = differentiable_function(%orig, %jvp, %vjp)
+  // %y = convert_escape_to_noescape %x
+  //
+  // After:
+  // %orig' = convert_escape_to_noescape %orig
+  // %jvp' = convert_escape_to_noescape %jvp
+  // %vjp' = convert_escape_to_noescape %vjp
+  // %y = differentiable_function(%orig', %jvp', %vjp')
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getConverted())) {
+    auto createConvertEscapeToNoEscape = [&](NormalDifferentiableFunctionTypeComponent extractee) {
+      if (!DFI->hasExtractee(extractee))
+        return SILValue();
+        
+      auto operand = DFI->getExtractee(extractee);
+      auto fnType = operand->getType().castTo<SILFunctionType>();
+      auto noEscapeFnType =
+        fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
+      auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
+      return Builder.createConvertEscapeToNoEscape(
+        operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
+    };
+    
+    SILValue originalNoEscape =
+      createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
+    SILValue convertedJVP = createConvertEscapeToNoEscape(
+      NormalDifferentiableFunctionTypeComponent::JVP);
+    SILValue convertedVJP = createConvertEscapeToNoEscape(
+      NormalDifferentiableFunctionTypeComponent::VJP);
+
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+    if (convertedJVP && convertedVJP)
+      derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
+
+    auto *newDFI = Builder.createDifferentiableFunction(
+      DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+      originalNoEscape, derivativeFunctions);
+    assert(newDFI->getType() == Cvt->getType() &&
+           "New `@differentiable` function instruction should have same type "
+           "as the old `convert_escape_to_no_escape` instruction");
+    return newDFI;
+  }  
+  
+  return nullptr;
 }
 
 SILInstruction *
@@ -1207,6 +1285,54 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       return std::move(folder).optimizeWithSetValue(subCFI->getConverted());
   }
 
+  // Push conversion instructions inside `differentiable_function`. This
+  // unblocks more optimizations.
+  //
+  // Before:
+  // %x = differentiable_function(%orig, %jvp, %vjp)
+  // %y = convert_function %x
+  //
+  // After:
+  // %orig' = convert_function %orig
+  // %jvp' = convert_function %jvp
+  // %vjp' = convert_function %vjp
+  // %y = differentiable_function(%orig', %jvp', %vjp')
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(cfi->getConverted())) {
+    auto createConvertFunctionOfComponent =
+      [&](NormalDifferentiableFunctionTypeComponent extractee) {
+        if (!DFI->hasExtractee(extractee))
+          return SILValue();
+        
+        auto operand = DFI->getExtractee(extractee);
+        auto convertInstType =
+            cfi->getType().castTo<SILFunctionType>();
+        auto convertedComponentFnType =
+            convertInstType->getDifferentiableComponentType(
+                extractee, Builder.getModule());
+        auto convertedComponentType =
+        SILType::getPrimitiveObjectType(convertedComponentFnType);
+        return Builder.createConvertFunction(
+            operand.getLoc(), operand, convertedComponentType,
+            cfi->withoutActuallyEscaping())->getResult(0);
+      };
+      SILValue convertedOriginal = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::Original);
+      SILValue convertedJVP = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::JVP);
+      SILValue convertedVJP = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::VJP);
+      Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      if (convertedJVP && convertedVJP)
+        derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
+      auto *newDFI = Builder.createDifferentiableFunction(
+          DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+          convertedOriginal, derivativeFunctions);
+      assert(newDFI->getType() == cfi->getType() &&
+             "New `@differentiable` function instruction should have same type "
+             "as the old `convert_function` instruction");
+      return newDFI;
+  }
+  
   // Replace a convert_function that only has refcounting uses with its
   // operand.
   tryEliminateOnlyOwnershipUsedForwardingInst(cfi, getInstModCallbacks());
