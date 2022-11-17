@@ -132,7 +132,10 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs,
-                                                   bool aliasModuleNames) {
+                                                   bool aliasModuleNames,
+                                                   llvm::SmallSet<StringRef, 4>
+                                                     *aliasModuleNamesTargets
+                                                   ) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -154,6 +157,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
+  result.AliasModuleNamesTargets = aliasModuleNamesTargets;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -367,11 +371,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
   printName(Name, Context);
 }
 
-void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
-                                const PrintOptions &Options) {
-  if (Options.AliasModuleNames)
-    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
-
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
@@ -2507,7 +2507,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                              Name = Declaring->getRealName();
                          }
                        }
-                       Printer.printModuleRef(Mods.front(), Name, Options);
+                       Printer.printModuleRef(Mods.front(), Name);
                        Mods = Mods.slice(1);
                      } else {
                        Printer << Elem.Item.str();
@@ -5403,7 +5403,13 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    Printer.printModuleRef(Mod, Name, Options);
+    if (Options.AliasModuleNames && Options.AliasModuleNamesTargets &&
+        Options.AliasModuleNamesTargets->contains(Name.str())) {
+      auto nameTwine = MODULE_DISAMBIGUATING_PREFIX + Name.str();
+      Name = Mod->getASTContext().getIdentifier(nameTwine.str());
+    }
+
+    Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
 
@@ -5750,8 +5756,7 @@ public:
     Printer << "module<";
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
-    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName(),
-                           Options);
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
     Printer << ">";
   }
 
