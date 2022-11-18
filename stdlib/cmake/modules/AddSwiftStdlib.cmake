@@ -93,6 +93,11 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result "--sysroot=${_sysroot}")
   endif()
 
+  # On Darwin, make sure we can find the libc++ ABI headers.
+  if(CFLAGS_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    list(APPEND result -idirafter "${_sysroot}/usr/include/c++/v1")
+  endif()
+
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # Make sure the Android NDK lld is used.
     swift_android_tools_path(${CFLAGS_ARCH} tools_path)
