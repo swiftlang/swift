@@ -6016,16 +6016,24 @@ private:
   SourceLoc PoundLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Expr *Rewritten;
 
 public:
   explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
+                              SourceLoc leftAngleLoc,
+                              ArrayRef<TypeRepr *> genericArgs,
+                              SourceLoc rightAngleLoc,
                               ArgumentList *argList, bool isImplicit = false,
                               Type ty = Type())
       : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
-        MacroName(macroName), MacroNameLoc(macroNameLoc), ArgList(argList),
+        MacroName(macroName), MacroNameLoc(macroNameLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs),
+        ArgList(argList),
         Rewritten(nullptr) { }
 
   DeclNameRef getMacroName() const { return MacroName; }
@@ -6034,15 +6042,18 @@ public:
   Expr *getRewritten() const { return Rewritten; }
   void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
 
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
+
   ArgumentList *getArgs() const { return ArgList; }
   void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
   SourceLoc getLoc() const { return PoundLoc; }
 
-  SourceRange getSourceRange() const {
-    return SourceRange(
-        PoundLoc, ArgList ? ArgList->getEndLoc() : MacroNameLoc.getEndLoc());
-  }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MacroExpansion;

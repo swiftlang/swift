@@ -2470,6 +2470,18 @@ TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
   return new (mem) TypeJoinExpr(var, elements);
 }
 
+SourceRange MacroExpansionExpr::getSourceRange() const {
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroNameLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
   if (!CE) {
     out << "(null)";
