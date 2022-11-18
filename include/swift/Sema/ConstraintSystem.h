@@ -5611,6 +5611,13 @@ private:
       Type type1, Type type2, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
+  /// Simplify an explicit generic argument constraint by equating the
+  /// opened generic types of the bound left-hand type variable to the
+  /// pack type on the right-hand side.
+  SolutionKind simplifyExplicitGenericArgumentsConstraint(
+      Type type1, Type type2, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,

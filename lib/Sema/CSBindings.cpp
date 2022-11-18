@@ -1406,6 +1406,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     // Constraints from which we can't do anything.
     break;
 

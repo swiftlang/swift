@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -100,7 +101,7 @@ getMacroSignatureContextBuffer(
 
 /// Compute the macro signature for a macro given the source code for its
 /// generic signature and type signature.
-static Optional<std::pair<GenericSignature, Type>>
+static Optional<std::tuple<GenericParamList *, GenericSignature, Type>>
 getMacroSignature(
     ModuleDecl *mod, Identifier macroName,
     Optional<StringRef> genericSignature,
@@ -161,8 +162,9 @@ getMacroSignature(
   performImportResolution(*macroSourceFile);
 
   auto typealias = cast<TypeAliasDecl>(decl);
-  return std::make_pair(
-      typealias->getGenericSignature(), typealias->getUnderlyingType());
+  return std::make_tuple(
+      typealias->getGenericParams(), typealias->getGenericSignature(),
+      typealias->getUnderlyingType());
 }
 
 /// Create a macro.
@@ -212,8 +214,9 @@ static MacroDecl *createMacro(
       opaqueHandle);
 
   // FIXME: Make these lazily computed.
-  macro->setGenericSignature(signature->first);
-  macro->setInterfaceType(signature->second);
+  GenericParamListRequest{macro}.cacheResult(std::get<0>(*signature));
+  macro->setGenericSignature(std::get<1>(*signature));
+  macro->setInterfaceType(std::get<2>(*signature));
 
   return macro;
 }

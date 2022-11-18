@@ -1642,6 +1642,30 @@ namespace {
                                      expr->getOuterAlternatives());
     }
 
+    /// Given a set of specialization arguments, resolve those arguments and
+    /// introduce them as an explicit generic arguments constraint.
+    void addSpecializationConstraint(
+        ConstraintLocator *locator, Type boundType,
+        ArrayRef<TypeRepr *> specializationArgs) {
+      // Resolve each type.
+      SmallVector<Type, 2> specializationArgTypes;
+      const auto options =
+          TypeResolutionOptions(TypeResolverContext::InExpression);
+      for (auto specializationArg : specializationArgs) {
+        const auto result = TypeResolution::resolveContextualType(
+            specializationArg, CurDC, options,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(CS, locator),
+            HandlePlaceholderType(CS, locator));
+        specializationArgTypes.push_back(result);
+      }
+
+      CS.addConstraint(
+          ConstraintKind::ExplicitGenericArguments, boundType,
+          PackType::get(CS.getASTContext(), specializationArgTypes),
+          locator);
+    }
+
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
 
@@ -3674,6 +3698,13 @@ namespace {
         auto locator = CS.getConstraintLocator(expr);
         auto macroRefType = Type(CS.createTypeVariable(locator, 0));
         CS.addOverloadSet(macroRefType, macros, CurDC, locator);
+
+        // Add explicit generic arguments, if there were any.
+        if (expr->getGenericArgsRange().isValid()) {
+          addSpecializationConstraint(
+              CS.getConstraintLocator(expr), macroRefType,
+              expr->getGenericArgs());
+        }
 
         // For non-calls, the type variable is the result.
         if (!isCall)
