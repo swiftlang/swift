@@ -4515,21 +4515,6 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
     return true;
   }
 
-  auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
-    // #_hasSymbol cannot be used in inlinable code because of limitations of
-    // the current implementation strategy. It relies on recording the
-    // referenced ValueDecl, mangling a helper function name using that
-    // ValueDecl, and then passing the responsibility of generating the
-    // definition for that helper function to IRGen. In order to lift this
-    // restriction, we will need teach SIL to encode the ValueDecl, or take
-    // another approach entirely.
-    ctx.Diags.diagnose(info->getStartLoc(),
-                       diag::has_symbol_condition_in_inlinable,
-                       fragileKind.getSelector());
-    return true;
-  }
-
   auto decl = info->getReferencedDecl().getDecl();
   if (!decl) {
     // Diagnose because we weren't able to interpret the expression as one
@@ -4538,7 +4523,8 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
     return true;
   }
 
-  if (!decl->isWeakImported(DC->getParentModule())) {
+  if (DC->getFragileFunctionKind().kind == FragileFunctionKind::None &&
+      !decl->isWeakImported(DC->getParentModule())) {
     // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
     // and may indicate the developer has mis-identified the declaration
     // they want to check (or forgot to import the module weakly).
