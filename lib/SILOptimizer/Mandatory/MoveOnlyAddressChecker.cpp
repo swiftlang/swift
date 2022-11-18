@@ -125,7 +125,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -139,7 +138,6 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
-#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -724,21 +722,13 @@ struct MoveOnlyChecker {
   /// Per mark must check address use state.
   UseState addressUseState;
 
-  /// Post order analysis used to lazily initialize post order function info
-  /// only if we need it.
-  PostOrderAnalysis *poa;
-
-  /// Lazy function info, do not use directly. Use getPostOrderInfo() instead
-  /// which will initialize this.
-  PostOrderFunctionInfo *lazyPOI;
-
   /// Diagnostic emission routines wrapped around a consuming use cache. This
   /// ensures that we only emit a single error per use per marked value.
   DiagnosticEmitter diagnosticEmitter;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
                   NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                  DominanceInfo *domTree, PostOrderAnalysis *poa)
+                  DominanceInfo *domTree)
       : fn(fn),
         deleter(InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -767,12 +757,6 @@ struct MoveOnlyChecker {
   bool performSingleCheck(MarkMustCheckInst *markedValue);
 
   bool check();
-
-  PostOrderFunctionInfo *getPostOrderInfo() {
-    if (!lazyPOI)
-      lazyPOI = poa->get(fn);
-    return lazyPOI;
-  }
 };
 
 } // namespace
@@ -1743,12 +1727,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
                             << fn->getName() << '\n');
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree,
-                        postOrderAnalysis)
+    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree)
             .check()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
