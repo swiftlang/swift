@@ -6,7 +6,7 @@ enum Either<T,U> {
 }
 
 @resultBuilder
-struct TupleBuilder { // expected-note 3 {{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note {{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -99,15 +99,13 @@ func testDiags() {
   tuplify(true) { _ in
     17
     let x = 17
-    let y: Int // expected-error{{local variable 'y' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{15-15= = <#value#>}}
+    let y: Int // Ok
     x + 25
   }
 
   tuplify(true) { _ in
     17
-    let y: Int, z: String
-    // expected-error@-1 {{local variable 'y' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{15-15= = <#value#>}}
-    // expected-error@-2 {{local variable 'z' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{26-26= = <#value#>}}
+    let y: Int, z: String // Ok
     y + 25
   }
 
