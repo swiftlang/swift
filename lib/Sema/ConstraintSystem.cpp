@@ -5327,7 +5327,16 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
 
     case ConstraintLocator::PackElement:
+    case ConstraintLocator::PackShape:
       break;
+
+    case ConstraintLocator::PackExpansionPattern: {
+      if (auto *expansion = getAsExpr<PackExpansionExpr>(anchor))
+        anchor = expansion->getPatternExpr();
+
+      path = path.slice(1);
+      break;
+    }
 
     case ConstraintLocator::PatternBindingElement: {
       auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();

@@ -481,8 +481,8 @@ bb3(%phi : @owned $T):
 // CHECK:         [[VAR:%[^,]+]] = alloc_stack [lexical] $Value, var, name "value"
 // CHECK:         cond_br undef, bb2, bb1
 // CHECK:       bb3:
-// CHECK:         copy_addr [take] [[TEMP]] to [init] [[VAR]]
 // CHECK:         debug_value [[TEMP]] : $*Value, var, name "value"
+// CHECK:         copy_addr [take] [[TEMP]] to [init] [[VAR]]
 // CHECK-LABEL: } // end sil function 'f100_store_phi'
 sil [ossa] @f100_store_phi : $@convention(thin) <Value> (@in Value) -> () {
 entry(%instance : @owned $Value):

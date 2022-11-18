@@ -6029,9 +6029,6 @@ ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
 
-ERROR(has_symbol_condition_in_inlinable, none,
-      "'#_hasSymbol' cannot be used in " FRAGILE_FUNC_KIND "0", (unsigned))
-
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
@@ -6739,6 +6736,12 @@ ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
 ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
+NOTE(macro_note, none,
+     "macro %0: %1", (Identifier, StringRef))
+WARNING(macro_warning, none,
+        "macro %0: %1", (Identifier, StringRef))
+ERROR(macro_error, none,
+      "macro %0: %1", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

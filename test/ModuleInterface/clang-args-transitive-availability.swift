@@ -25,7 +25,7 @@ import ImportsMacroSpecificClangModule
 //CHECK:      "swift": "ImportsMacroSpecificClangModule"
 //CHECK-NEXT:    },
 //CHECK-NEXT:    {
-//CHECK-NEXT:      "modulePath": "ImportsMacroSpecificClangModule.swiftmodule",
+//CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}ImportsMacroSpecificClangModule-{{.*}}.swiftmodule",
 //CHECK-NEXT:      "sourceFiles": [
 //CHECK-NEXT:      ],
 //CHECK-NEXT:      "directDependencies": [

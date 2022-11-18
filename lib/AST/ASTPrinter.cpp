@@ -132,7 +132,10 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs,
-                                                   bool aliasModuleNames) {
+                                                   bool aliasModuleNames,
+                                                   llvm::SmallSet<StringRef, 4>
+                                                     *aliasModuleNamesTargets
+                                                   ) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -154,6 +157,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
+  result.AliasModuleNamesTargets = aliasModuleNamesTargets;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -367,11 +371,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
   printName(Name, Context);
 }
 
-void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
-                                const PrintOptions &Options) {
-  if (Options.AliasModuleNames)
-    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
-
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
@@ -438,7 +438,7 @@ operator<<(llvm::raw_ostream &OS, tok keyword) {
 #define KEYWORD(KW) case tok::kw_##KW: OS << #KW; break;
 #define POUND_KEYWORD(KW) case tok::pound_##KW: OS << "#"#KW; break;
 #define PUNCTUATOR(PUN, TEXT) case tok::PUN: OS << TEXT; break;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   default:
     llvm_unreachable("unexpected keyword or punctuator kind");
   }
@@ -450,7 +450,7 @@ uint8_t swift::getKeywordLen(tok keyword) {
 #define KEYWORD(KW) case tok::kw_##KW: return StringRef(#KW).size();
 #define POUND_KEYWORD(KW) case tok::pound_##KW: return StringRef("#"#KW).size();
 #define PUNCTUATOR(PUN, TEXT) case tok::PUN: return StringRef(TEXT).size();
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   default:
     llvm_unreachable("unexpected keyword or punctuator kind");
   }
@@ -472,7 +472,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   bool isKeyword = llvm::StringSwitch<bool>(keyword)
 #define KEYWORD(KW) \
       .Case(#KW, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
       .Default(false);
 
   switch (context) {
@@ -2507,7 +2507,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                              Name = Declaring->getRealName();
                          }
                        }
-                       Printer.printModuleRef(Mods.front(), Name, Options);
+                       Printer.printModuleRef(Mods.front(), Name);
                        Mods = Mods.slice(1);
                      } else {
                        Printer << Elem.Item.str();
@@ -5403,7 +5403,13 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    Printer.printModuleRef(Mod, Name, Options);
+    if (Options.AliasModuleNames && Options.AliasModuleNamesTargets &&
+        Options.AliasModuleNamesTargets->contains(Name.str())) {
+      auto nameTwine = MODULE_DISAMBIGUATING_PREFIX + Name.str();
+      Name = Mod->getASTContext().getIdentifier(nameTwine.str());
+    }
+
+    Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
 
@@ -5750,8 +5756,7 @@ public:
     Printer << "module<";
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
-    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName(),
-                           Options);
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
     Printer << ">";
   }
 
@@ -6411,8 +6416,6 @@ public:
   void visitElementArchetypeType(ElementArchetypeType *T) {
     if (Options.PrintForSIL) {
       Printer << "@element(\"" << T->getOpenedElementID() << ") ";
-      visit(T->getGenericEnvironment()->getOpenedExistentialType());
-      Printer << ") ";
 
       auto interfaceTy = T->getInterfaceType();
       visit(interfaceTy);

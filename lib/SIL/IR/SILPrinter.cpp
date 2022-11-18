@@ -261,7 +261,7 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
             .Case("init", false)
 #define KEYWORD(kw) \
             .Case(#kw, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
             .Default(false);
 
     if (shouldEscape) {
@@ -2859,6 +2859,11 @@ public:
       *this << " as ";
       *this << dwfi->getType();
     }
+  }
+
+  void visitHasSymbolInst(HasSymbolInst *hsi) {
+    *this << "#";
+    printValueDecl(hsi->getDecl(), PrintState.OS);
   }
 };
 

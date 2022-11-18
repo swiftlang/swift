@@ -950,8 +950,8 @@ bb0(%0 : @owned $P):
 // CHECK-LABEL: sil [ossa] @f161_testOpenedArchetype : $@convention(thin) (@in any P) -> () {
 // CHECK: bb0(%0 : $*any P):
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P, var, name "q"
-// CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
 // CHECK:   debug_value %0 : $*any P, var, name "q"
+// CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
 // CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
@@ -1901,6 +1901,59 @@ exit:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
+// CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
+// CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
+// CHECK:         end_borrow [[KLASS]]
+// CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
+// CHECK:         apply undef<Any>([[ANY_ADDR]])
+// CHECK:         destroy_addr [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_1_guaranteed'
+sil [ossa] @test_destructure_tuple_1_guaranteed : $@convention(thin) () -> () {
+bb0:
+  %maybe = apply undef<(Klass?, Any)>() : $@convention(method) <τ_0_0> () -> @out Optional<τ_0_0>
+  switch_enum %maybe : $Optional<(Optional<Klass>, Any)>, case #Optional.some!enumelt: success, case #Optional.none!enumelt: failure
+success(%instance : @owned $(Optional<Klass>, Any)):
+  %borrow = begin_borrow [lexical] %instance : $(Optional<Klass>, Any)
+  (%klass, %any) = destructure_tuple %borrow : $(Optional<Klass>, Any)
+  apply undef<Any>(%any) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %borrow : $(Optional<Klass>, Any)
+  destroy_value %instance : $(Optional<Klass>, Any)
+  br exit
+
+failure:
+  br exit
+
+exit:
+  %505 = tuple ()
+  return %505 : $()
+}
+
+
+// CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
+// CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
+// CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Self, var, name "self"
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[MAYBE_ADDR]] : $*Optional<Self>, #Optional.some!enumelt
+// CHECK:         debug_value [[INSTANCE_ADDR]] : $*Self, var, name "self", expr op_deref
+// CHECK:         copy_addr [take] [[INSTANCE_ADDR]] to [init] [[ADDR]]
+// CHECK:         copy_addr [[ADDR]] to [init] [[LOAD_ADDR]]
+// CHECK-LABEL: } // end sil function 'test_store_1'
+sil hidden [ossa] @test_store_1 : $@convention(thin) <Self> () -> () {
+bb0:
+  %addr = alloc_stack $Self, var, name "self"
+  %maybe = apply undef<Self>() : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %instance = unchecked_enum_data %maybe : $Optional<Self>, #Optional.some!enumelt
+  store %instance to [init] %addr : $*Self
+  %load = load [copy] %addr : $*Self
+  destroy_addr %addr : $*Self
+  dealloc_stack %addr : $*Self
+  destroy_value %load : $Self
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
 // CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
 // CHECK:   [[STK:%.*]] = alloc_stack $T
@@ -2054,6 +2107,20 @@ entry(%instance : @owned $T):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast6 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Klass
+// CHECK:         unconditional_checked_cast_addr T in [[INSTANCE]]
+// CHECK:         [[KLASS:%[^,]+]] = load [take] [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast6'
+sil [ossa] @test_unconditional_checked_cast6 : $@convention(method) <T> (@in T) -> () {
+bb0(%instance : @owned $T):
+  %klass = unconditional_checked_cast %instance : $T to Klass
+  destroy_value %klass : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
 // CHECK-LABEL: sil [ossa] @test_yield_1_two_values : {{.*}} {
 // CHECK:         tuple_element_addr
 // CHECK:         tuple_element_addr

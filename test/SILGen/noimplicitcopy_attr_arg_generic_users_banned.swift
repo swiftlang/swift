@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify-syntax-tree -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify %s
 
 import Swift
 

@@ -572,11 +572,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
 
-  if (Args.hasArg(OPT_verify_syntax_tree)) {
-    Opts.BuildSyntaxTree = true;
-    Opts.VerifySyntaxTree = true;
-  }
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
@@ -725,17 +720,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.LibraryLevel = LibraryLevel::API;
     } else if (contents == "spi") {
       Opts.LibraryLevel = LibraryLevel::SPI;
+    } else if (contents == "ipi") {
+      Opts.LibraryLevel = LibraryLevel::IPI;
     } else {
       Opts.LibraryLevel = LibraryLevel::Other;
       if (contents != "other") {
         // Error on unknown library levels.
-        auto inFlight = Diags.diagnose(SourceLoc(),
-                                       diag::error_unknown_library_level,
-                                       contents);
-
-        // Only warn for "ipi" as we may use it in the future.
-        if (contents == "ipi")
-          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        Diags.diagnose(SourceLoc(),
+                       diag::error_unknown_library_level,
+                       contents);
       }
     }
   }
@@ -983,11 +976,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
     Opts.entryPointFunctionName = A->getValue();
-  }
-
-  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
-    Opts.BuildSyntaxTree = true;
-    Opts.VerifySyntaxTree = true;
   }
 
   // Configure lexing to parse and remember comments if:

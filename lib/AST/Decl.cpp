@@ -3058,7 +3058,8 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+// To-Do: Replce calls to getOpaqueResultTypeRepr with getResultTypeRepr()
+TypeRepr *ValueDecl::getResultTypeRepr() const {
   TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
@@ -3069,7 +3070,7 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
         P = P->getSemanticsProvidingPattern();
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           assert(NP->getDecl() == VD);
-          (void) NP;
+          (void)NP;
 
           returnRepr = TP->getTypeRepr();
         }
@@ -3082,6 +3083,12 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     returnRepr = SD->getElementTypeRepr();
   }
+
+  return returnRepr;
+}
+
+TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+  auto *returnRepr = this->getResultTypeRepr();
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
@@ -9637,6 +9644,13 @@ SourceRange MacroDecl::getSourceRange() const {
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
-  return SourceRange(PoundLoc,
-                     ArgList ? ArgList->getEndLoc() : MacroLoc.getEndLoc());
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
 }

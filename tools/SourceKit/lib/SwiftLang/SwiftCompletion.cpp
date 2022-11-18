@@ -585,7 +585,7 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
   if (uid == Keyword##kw##UID) { \
     return CodeCompletionKeywordKind::kw_##kw; \
   }
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 
   // FIXME: should warn about unexpected keyword kind.
   return CodeCompletionKeywordKind::None;

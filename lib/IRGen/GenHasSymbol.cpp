@@ -86,48 +86,43 @@ public:
   }
 };
 
-void IRGenModule::emitHasSymbolFunctions() {
-  SILSymbolVisitorOptions opts;
-  opts.VisitMembers = false;
-  auto silCtx = SILSymbolVisitorContext(getSwiftModule(), opts);
-  auto linkInfo = UniversalLinkageInfo(*this);
-  auto symbolVisitorCtx = IRSymbolVisitorContext(linkInfo, silCtx);
+llvm::Function *IRGenModule::emitHasSymbolFunction(ValueDecl *decl) {
 
-  for (ValueDecl *decl : getSILModule().getHasSymbolDecls()) {
-    PrettyStackTraceDecl trace("emitting #_hasSymbol query for", decl);
-    Mangle::ASTMangler mangler;
+  PrettyStackTraceDecl trace("emitting #_hasSymbol query for", decl);
+  Mangle::ASTMangler mangler;
 
-    auto func = cast<llvm::Function>(getOrCreateHelperFunction(
-        mangler.mangleHasSymbolQuery(decl), Int1Ty, {},
-        [decl, this, symbolVisitorCtx](IRGenFunction &IGF) {
-          auto &Builder = IGF.Builder;
-          llvm::SmallVector<llvm::Constant *, 4> addrs;
-          HasSymbolIRGenVisitor(*this, addrs).visit(decl, symbolVisitorCtx);
+  auto func = cast<llvm::Function>(getOrCreateHelperFunction(
+      mangler.mangleHasSymbolQuery(decl), Int1Ty, {},
+      [decl, this](IRGenFunction &IGF) {
+        SILSymbolVisitorOptions opts;
+        opts.VisitMembers = false;
+        auto silCtx = SILSymbolVisitorContext(getSwiftModule(), opts);
+        auto linkInfo = UniversalLinkageInfo(*this);
+        auto symbolVisitorCtx = IRSymbolVisitorContext(linkInfo, silCtx);
+        auto &Builder = IGF.Builder;
+        llvm::SmallVector<llvm::Constant *, 4> addrs;
+        HasSymbolIRGenVisitor(*this, addrs).visit(decl, symbolVisitorCtx);
 
-          llvm::Value *ret = nullptr;
-          for (llvm::Constant *addr : addrs) {
-            assert(cast<llvm::GlobalValue>(addr)->hasExternalWeakLinkage());
+        llvm::Value *ret = nullptr;
+        for (llvm::Constant *addr : addrs) {
+          assert(cast<llvm::GlobalValue>(addr)->hasExternalWeakLinkage());
 
-            auto isNonNull = IGF.Builder.CreateIsNotNull(addr);
-            ret = (ret) ? IGF.Builder.CreateAnd(ret, isNonNull) : isNonNull;
-          }
+          auto isNonNull = IGF.Builder.CreateIsNotNull(addr);
+          ret = (ret) ? IGF.Builder.CreateAnd(ret, isNonNull) : isNonNull;
+        }
 
-          if (ret) {
-            Builder.CreateRet(ret);
-          } else {
-            // There were no addresses produced by the visitor, return true.
-            Builder.CreateRet(llvm::ConstantInt::get(Int1Ty, 1));
-          }
-        },
-        /*IsNoInline*/ false));
+        if (ret) {
+          Builder.CreateRet(ret);
+        } else {
+          // There were no addresses produced by the visitor, return true.
+          Builder.CreateRet(llvm::ConstantInt::get(Int1Ty, 1));
+        }
+      },
+      /*IsNoInline*/ false));
 
-    func->setDoesNotThrow();
-    func->setCallingConv(SwiftCC);
-    func->addFnAttr(llvm::Attribute::ReadOnly);
-  }
-}
+  func->setDoesNotThrow();
+  func->setCallingConv(DefaultCC);
+  func->addFnAttr(llvm::Attribute::ReadOnly);
 
-void IRGenerator::emitHasSymbolFunctions() {
-  for (auto &IGM : *this)
-    IGM.second->emitHasSymbolFunctions();
+  return func;
 }

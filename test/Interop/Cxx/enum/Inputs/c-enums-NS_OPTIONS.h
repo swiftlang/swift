@@ -40,22 +40,3 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
     NS_REFINED_FOR_SWIFT;
 @end
 }
-
-typedef NS_OPTIONS(NSUInteger, Foo) {
-  NS_SWIFT_NAMED_OptionOne __attribute__((swift_name("SwiftOptionOne"))) = 0,
-  NS_SWIFT_NAMED_OptionTwo __attribute__((swift_name("SwiftOptionTwo"))) = 1
-                                                                           << 0,
-  NS_SWIFT_NAMED_OptionThree
-  __attribute__((swift_name("SwiftOptionThree"))) = 1 << 1,
-  NS_SWIFT_NAMED_OptionFour
-  __attribute__((swift_name("SwiftOptionFour"))) = NS_SWIFT_NAMED_OptionOne |
-                                                   NS_SWIFT_NAMED_OptionTwo
-};
-
-typedef NS_OPTIONS(NSUInteger, Bar) {
-  API_NOTES_NAMED_OptionOne = 0,
-  API_NOTES_NAMED_OptionTwo = 1 << 0,
-  API_NOTES_NAMED_OptionThree = 1 << 1,
-  API_NOTES_NAMED_OptionFour = API_NOTES_NAMED_OptionOne |
-                               API_NOTES_NAMED_OptionTwo
-};

@@ -227,16 +227,19 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
         llvm::report_fatal_error(
             "Unexpected SWIFT_TEXTUAL_MODULE_DETAILS_NODE record");
       cache.configureForTriple(getTriple());
-      unsigned interfaceFileID, compiledModuleCandidatesArrayID,
+      unsigned outputPathFileID, interfaceFileID, compiledModuleCandidatesArrayID,
           buildCommandLineArrayID, extraPCMArgsArrayID, contextHashID,
           isFramework, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID;
       SwiftInterfaceModuleDetailsLayout::readRecord(
-          Scratch, interfaceFileID, compiledModuleCandidatesArrayID,
+          Scratch, outputPathFileID, interfaceFileID, compiledModuleCandidatesArrayID,
           buildCommandLineArrayID, extraPCMArgsArrayID, contextHashID,
           isFramework, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID);
 
+      auto outputModulePath = getIdentifier(outputPathFileID);
+      if (!outputModulePath)
+         llvm::report_fatal_error("Bad .swiftmodule output path");
       Optional<std::string> optionalSwiftInterfaceFile;
       if (interfaceFileID != 0) {
         auto swiftInterfaceFile = getIdentifier(interfaceFileID);
@@ -267,6 +270,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencies::forSwiftInterfaceModule(
+          outputModulePath.value(),
           optionalSwiftInterfaceFile.value(), *compiledModuleCandidates,
           buildCommandRefs, extraPCMRefs, *contextHash, isFramework);
 
@@ -782,6 +786,8 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
     auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
+    unsigned outputModulePathFileId =
+        getIdentifier(swiftTextDeps->moduleOutputPath);
     unsigned swiftInterfaceFileId =
         getIdentifier(swiftTextDeps->swiftInterfaceFile);
     unsigned bridgingHeaderFileId =
@@ -791,6 +797,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
             : 0;
     SwiftInterfaceModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[SwiftInterfaceModuleDetailsLayout::Code],
+        outputModulePathFileId,
         swiftInterfaceFileId,
         getArray(moduleID, ModuleIdentifierArrayKind::CompiledModuleCandidates),
         getArray(moduleID, ModuleIdentifierArrayKind::BuildCommandLine),
@@ -981,6 +988,7 @@ void Serializer::collectStringsAndArrays(
         case swift::ModuleDependenciesKind::SwiftInterface: {
           auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
           assert(swiftTextDeps);
+          addIdentifier(swiftTextDeps->moduleOutputPath);
           addIdentifier(swiftTextDeps->swiftInterfaceFile);
           addArray(moduleID,
                    ModuleIdentifierArrayKind::CompiledModuleCandidates,

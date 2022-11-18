@@ -350,7 +350,7 @@ while retaining the option of building with Ninja on the command line.
 
 Assuming that you have already [built the toolchain via Ninja](#the-actual-build),
 several more steps are necessary to set up this environment:
-* Generate Xcode projects with `utils/build-script --xcode --swift-darwin-supported-archs "$(uname -m)"`.
+* Generate Xcode projects with `utils/build-script --release --swift-darwin-supported-archs "$(uname -m)" --xcode`.
   This will first build a few LLVM files that are needed to configure the
   projects.
 * Create a new Xcode workspace.

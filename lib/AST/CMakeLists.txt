@@ -161,7 +161,7 @@ endif()
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
-  PRIVATE swiftSyntax swiftMarkup)
+  PRIVATE swiftMarkup)
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftAST depends on these

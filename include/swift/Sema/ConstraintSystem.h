@@ -5042,15 +5042,7 @@ public:
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
-  /// Generate constraints for the body of the given closure.
-  ///
-  /// \param closure the closure expression
-  ///
-  /// \returns \c true if constraint generation failed, \c false otherwise
-  [[nodiscard]]
-  bool generateConstraints(ClosureExpr *closure);
-
-  /// Generate constraints for the body of the given function.
+  /// Generate constraints for the body of the given function or closure.
   ///
   /// \param fn The function or closure expression
   /// \param body The body of the given function that should be

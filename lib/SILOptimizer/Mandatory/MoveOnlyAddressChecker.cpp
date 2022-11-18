@@ -125,7 +125,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -139,7 +138,6 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
-#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -148,6 +146,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -206,9 +205,30 @@ struct DiagnosticEmitter {
                                         SILInstruction *violatingUse);
   void emitAddressDiagnosticNoCopy(MarkMustCheckInst *markedValue,
                                    SILInstruction *consumingUse);
+  void emitExclusivityHazardDiagnostic(MarkMustCheckInst *markedValue,
+                                       SILInstruction *consumingUse);
 };
 
 } // namespace
+
+void DiagnosticEmitter::emitExclusivityHazardDiagnostic(
+    MarkMustCheckInst *markedValue, SILInstruction *consumingUse) {
+  if (!useWithDiagnostic.insert(consumingUse).second)
+    return;
+
+  auto &astContext = markedValue->getFunction()->getASTContext();
+  StringRef varName = getVariableNameForValue(markedValue);
+
+  LLVM_DEBUG(llvm::dbgs() << "Emitting error for exclusivity!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    Consuming use: " << *consumingUse);
+
+  diagnose(astContext,
+           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_exclusivity_violation, varName);
+  diagnose(astContext, consumingUse->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_consuming_use_here);
+}
 
 void DiagnosticEmitter::emitAddressDiagnostic(
     MarkMustCheckInst *markedValue, SILInstruction *lastLiveUse,
@@ -724,21 +744,13 @@ struct MoveOnlyChecker {
   /// Per mark must check address use state.
   UseState addressUseState;
 
-  /// Post order analysis used to lazily initialize post order function info
-  /// only if we need it.
-  PostOrderAnalysis *poa;
-
-  /// Lazy function info, do not use directly. Use getPostOrderInfo() instead
-  /// which will initialize this.
-  PostOrderFunctionInfo *lazyPOI;
-
   /// Diagnostic emission routines wrapped around a consuming use cache. This
   /// ensures that we only emit a single error per use per marked value.
   DiagnosticEmitter diagnosticEmitter;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
                   NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                  DominanceInfo *domTree, PostOrderAnalysis *poa)
+                  DominanceInfo *domTree)
       : fn(fn),
         deleter(InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -767,12 +779,6 @@ struct MoveOnlyChecker {
   bool performSingleCheck(MarkMustCheckInst *markedValue);
 
   bool check();
-
-  PostOrderFunctionInfo *getPostOrderInfo() {
-    if (!lazyPOI)
-      lazyPOI = poa->get(fn);
-    return lazyPOI;
-  }
 };
 
 } // namespace
@@ -791,13 +797,18 @@ struct GatherUsesVisitor : public AccessUseVisitor {
   bool emittedEarlyDiagnostic = false;
   DiagnosticEmitter &diagnosticEmitter;
 
+  // Pruned liveness used to validate that load [take]/load [copy] can be
+  // converted to load_borrow without violating exclusivity.
+  SSAPrunedLiveness &liveness;
+
   GatherUsesVisitor(MoveOnlyChecker &moveChecker, UseState &useState,
                     MarkMustCheckInst *markedValue,
-                    DiagnosticEmitter &diagnosticEmitter)
+                    DiagnosticEmitter &diagnosticEmitter,
+                    SSAPrunedLiveness &gatherUsesLiveness)
       : AccessUseVisitor(AccessUseType::Overlapping,
                          NestedAccessType::IgnoreAccessBegin),
         moveChecker(moveChecker), useState(useState), markedValue(markedValue),
-        diagnosticEmitter(diagnosticEmitter) {}
+        diagnosticEmitter(diagnosticEmitter), liveness(gatherUsesLiveness) {}
 
   bool visitUse(Operand *op, AccessUseType useTy) override;
   void reset(SILValue address) { useState.address = address; }
@@ -811,6 +822,41 @@ struct GatherUsesVisitor : public AccessUseVisitor {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
+
+  /// Returns true if we emitted an error.
+  bool checkForExclusivityHazards(LoadInst *li) {
+    SWIFT_DEFER { liveness.clear(); };
+
+    LLVM_DEBUG(llvm::dbgs() << "Checking for exclusivity hazards for: " << *li);
+
+    // Grab our access path with in scope. We want to find the inner most access
+    // scope.
+    auto accessPathWithBase =
+        AccessPathWithBase::computeInScope(li->getOperand());
+    auto accessPath = accessPathWithBase.accessPath;
+    // TODO: Make this a we don't understand error.
+    assert(accessPath.isValid() && "Invalid access path?!");
+
+    auto *bai = dyn_cast<BeginAccessInst>(accessPathWithBase.base);
+
+    if (!bai) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    No begin access... so no exclusivity violation!\n");
+      return false;
+    }
+
+    bool emittedError = false;
+    liveness.initializeDef(bai);
+    liveness.computeSimple();
+    for (auto *consumingUse : li->getConsumingUses()) {
+      if (!liveness.isWithinBoundary(consumingUse->getUser())) {
+        diagnosticEmitter.emitExclusivityHazardDiagnostic(
+            markedValue, consumingUse->getUser());
+        emittedError = true;
+      }
+    }
+    return emittedError;
+  }
 };
 
 } // end anonymous namespace
@@ -950,6 +996,14 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
           return false;
 
         LLVM_DEBUG(llvm::dbgs() << "Found potential borrow: " << *user);
+
+        if (checkForExclusivityHazards(li)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
+          emittedEarlyDiagnostic = true;
+          moveChecker.valuesWithDiagnostics.insert(markedValue);
+          return true;
+        }
+
         useState.borrows.insert({user, *leafRange});
         return true;
       }
@@ -981,7 +1035,14 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
         return false;
 
       if (moveChecker.finalConsumingUses.empty()) {
-        LLVM_DEBUG(llvm::dbgs() << "Found borrow inst: " << *user);
+        LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
+        if (checkForExclusivityHazards(li)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
+          emittedEarlyDiagnostic = true;
+          moveChecker.valuesWithDiagnostics.insert(markedValue);
+          return true;
+        }
+
         useState.borrows.insert({user, *leafRange});
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
@@ -1171,8 +1232,10 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   // Then gather all uses of our address by walking from def->uses. We use this
   // to categorize the uses of this address into their ownership behavior (e.x.:
   // init, reinit, take, destroy, etc.).
+  SmallVector<SILBasicBlock *, 32> gatherUsesDiscoveredBlocks;
+  SSAPrunedLiveness gatherUsesLiveness(&gatherUsesDiscoveredBlocks);
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
-                            diagnosticEmitter);
+                            diagnosticEmitter, gatherUsesLiveness);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(markedAddress);
   if (!visitAccessPathUses(visitor, accessPath, fn)) {
@@ -1483,13 +1546,6 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
     }
   }
 
-  // Now before we do anything more, just exit and say we errored. This will not
-  // actually make us fail and will cause code later in the checker to rewrite
-  // all non-explicit copy instructions to their explicit variant. I did this
-  // for testing purposes only.
-  valuesWithDiagnostics.insert(markedAddress);
-  return true;
-
   // Ok, we not have emitted our main errors. Now we begin the
   // transformation. We begin by processing borrows. We can also emit errors
   // here if we find that we can not expand the borrow scope of the load [copy]
@@ -1503,48 +1559,14 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
         // must have been destroy_value. So we can just gather up those
         // destroy_value and use then to create a new load_borrow scope.
         SILBuilderWithScope builder(li);
-        SILValue base = stripAccessMarkers(li->getOperand());
-        bool foundAccess = base != li->getOperand();
-
-        // Insert a new access scope.
-        SILValue newBase = base;
-        if (foundAccess) {
-          newBase = builder.createBeginAccess(
-              li->getLoc(), base, SILAccessKind::Read,
-              SILAccessEnforcement::Static, false /*no nested conflict*/,
-              false /*is from builtin*/);
-        }
-        auto *lbi = builder.createLoadBorrow(li->getLoc(), newBase);
+        auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
 
         for (auto *consumeUse : li->getConsumingUses()) {
           auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
           SILBuilderWithScope destroyBuilder(dvi);
           destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
-          if (foundAccess)
-            destroyBuilder.createEndAccess(dvi->getLoc(), newBase,
-                                           false /*aborted*/);
           destroys.push_back(dvi);
           changed = true;
-        }
-
-        // TODO: We need to check if this is the only use.
-        if (auto *access = dyn_cast<BeginAccessInst>(li->getOperand())) {
-          bool foundUnknownUse = false;
-          for (auto *accUse : access->getUses()) {
-            if (accUse->getUser() == li)
-              continue;
-            if (auto *ea = dyn_cast<EndAccessInst>(accUse->getUser())) {
-              endAccesses.push_back(ea);
-              continue;
-            }
-            foundUnknownUse = true;
-          }
-          if (!foundUnknownUse) {
-            for (auto *end : endAccesses)
-              end->eraseFromParent();
-            access->replaceAllUsesWithUndef();
-            access->eraseFromParent();
-          }
         }
 
         for (auto *d : destroys)
@@ -1555,6 +1577,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       }
     }
 
+    llvm::dbgs() << "Borrow: " << *pair.first;
     llvm_unreachable("Unhandled case?!");
   }
 
@@ -1579,6 +1602,16 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
             if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
               // If we have a copy in the single block case, erase the destroy
               // and visit the next one.
+              destroy->eraseFromParent();
+              changed = true;
+              foundSingleBlockCase = true;
+              break;
+            }
+            llvm_unreachable("Error?! This is a double destroy?!");
+          }
+
+          if (auto *copyAddr = dyn_cast<CopyAddrInst>(&*ii)) {
+            if (!copyAddr->isTakeOfSrc()) {
               destroy->eraseFromParent();
               changed = true;
               foundSingleBlockCase = true;
@@ -1622,6 +1655,17 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       }
     }
 
+    if (auto *copy = dyn_cast<CopyAddrInst>(take.first)) {
+      if (copy->isTakeOfSrc())
+        continue;
+      // Convert this to its take form.
+      if (auto *access = dyn_cast<BeginAccessInst>(copy->getSrc()))
+        access->setAccessKind(SILAccessKind::Modify);
+      copy->setIsTakeOfSrc(IsTake);
+      continue;
+    }
+
+    llvm::dbgs() << "Take User: " << *take.first;
     llvm_unreachable("Unhandled case?!");
   }
 
@@ -1743,12 +1787,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
                             << fn->getName() << '\n');
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree,
-                        postOrderAnalysis)
+    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree)
             .check()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

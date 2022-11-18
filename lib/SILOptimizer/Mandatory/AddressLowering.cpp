@@ -135,6 +135,7 @@
 #define DEBUG_TYPE "address-lowering"
 
 #include "PhiStorageOptimizer.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -552,6 +553,12 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
   auto *declCtx = pass.function->getDeclContext();
+  if (!declCtx) {
+    // Fall back to using the module as the decl context if the function
+    // doesn't have one.  The can happen with default argument getters, for
+    // example.
+    declCtx = pass.function->getModule().getSwiftModule();
+  }
 
   unsigned argIdx = 0;
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
@@ -559,6 +566,7 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
     auto var = new (astCtx) ParamDecl(
         SourceLoc(), SourceLoc(), astCtx.getIdentifier("$return_value"),
         SourceLoc(), astCtx.getIdentifier("$return_value"), declCtx);
+    var->setSpecifier(ParamSpecifier::InOut);
 
     SILFunctionArgument *funcArg =
         pass.function->begin()->insertFunctionArgument(
@@ -3004,10 +3012,21 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
       markRewritten(result, extractAddr);
     } else {
       assert(!pass.valueStorageMap.contains(result));
-      SILValue loadElement = builder.createTrivialLoadOr(
-          destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
-
+      auto guaranteed = !result->getType().isTrivial(*pass.function) &&
+                        destructure->getOperand(0)->getOwnershipKind() ==
+                            OwnershipKind::Guaranteed;
+      SILValue loadElement;
+      if (guaranteed) {
+        loadElement =
+            builder.emitLoadBorrowOperation(destructure->getLoc(), extractAddr);
+      } else {
+        loadElement = builder.createTrivialLoadOr(
+            destructure->getLoc(), extractAddr, LoadOwnershipQualifier::Take);
+      }
       result->replaceAllUsesWith(loadElement);
+      if (guaranteed) {
+        emitEndBorrows(loadElement, pass);
+      }
     }
   }
 }
@@ -3076,7 +3095,9 @@ void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
       isTake = IsNotTake;
     }
   }
-  builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  SILBuilderWithScope::insertAfter(storeInst, [&](auto &builder) {
+    builder.createCopyAddr(loc, srcAddr, destAddr, isTake, isInit);
+  });
   pass.deleter.forceDelete(storeInst);
 }
 
@@ -3296,7 +3317,7 @@ void UseRewriter::visitUnconditionalCheckedCastInst(
       uncondCheckedCast->getLoc(), destAddr,
       destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
           ? LoadOwnershipQualifier::Trivial
-          : LoadOwnershipQualifier::Copy);
+          : LoadOwnershipQualifier::Take);
   nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
   uncondCheckedCast->replaceAllUsesWith(dest);
 }

@@ -39,8 +39,7 @@ struct PackTypeParameterCollector: TypeWalker {
       if (paramTy->isParameterPack())
         typeParams.insert(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      if (archetypeTy->isRoot())
-        typeParams.insert(paramTy);
+      typeParams.insert(archetypeTy->getRoot());
     }
 
     return Action::Continue;
@@ -315,13 +314,19 @@ CanPackType PackType::getReducedShape() {
 
 CanType TypeBase::getReducedShape() {
   if (auto *packArchetype = getAs<PackArchetypeType>())
-    return packArchetype->getReducedShape();
+     return packArchetype->getReducedShape();
 
   if (auto *packType = getAs<PackType>())
     return packType->getReducedShape();
 
   if (auto *expansionType = getAs<PackExpansionType>())
     return expansionType->getReducedShape();
+
+  SmallVector<Type, 2> rootParameterPacks;
+  getTypeParameterPacks(rootParameterPacks);
+
+  if (!rootParameterPacks.empty())
+    return rootParameterPacks.front()->getReducedShape();
 
   assert(!isTypeVariableOrMember());
   assert(!hasTypeParameter());

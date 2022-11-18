@@ -2767,6 +2767,9 @@ public:
   /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
   TypeRepr *getOpaqueResultTypeRepr() const;
 
+  /// Get the representative for this value's result type, if it has one.
+  TypeRepr *getResultTypeRepr() const;
+
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
   CustomAttr *getAttachedResultBuilder() const;
@@ -2790,11 +2793,6 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
-
-  /// Returns a synthesized declaration for a query function that provides
-  /// the boolean value for a `if #_hasSymbol(...)` condition. The interface
-  /// type of the function is `() -> Builtin.Int1`.
-  FuncDecl *getHasSymbolQueryDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -6769,8 +6767,7 @@ public:
     // FIXME: Remove 'Parsed' from this list once we can always delay
     //        parsing bodies. The -experimental-skip-*-function-bodies options
     //        do currently skip parsing, unless disabled through other means in
-    //        SourceFile::hasDelayedBodyParsing (eg. needing to build the full
-    //        syntax tree due to -verify-syntax-tree).
+    //        SourceFile::hasDelayedBodyParsing.
     assert(getBodyKind() == BodyKind::None ||
            getBodyKind() == BodyKind::Unparsed ||
            getBodyKind() == BodyKind::Parsed);
@@ -8338,14 +8335,28 @@ class MacroExpansionDecl : public Decl {
   SourceLoc PoundLoc;
   DeclNameRef Macro;
   DeclNameLoc MacroLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Decl *Rewritten;
 
 public:
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
-                     DeclNameLoc macroLoc, ArgumentList *args)
+                     DeclNameLoc macroLoc,
+                     SourceLoc leftAngleLoc,
+                     ArrayRef<TypeRepr *> genericArgs,
+                     SourceLoc rightAngleLoc,
+                     ArgumentList *args)
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
-        Macro(macro), MacroLoc(macroLoc), ArgList(args), Rewritten(nullptr) {}
+        Macro(macro), MacroLoc(macroLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs), ArgList(args), Rewritten(nullptr) {}
+
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
 
   SourceRange getSourceRange() const;
   SourceLoc getLocFromSource() const { return PoundLoc; }

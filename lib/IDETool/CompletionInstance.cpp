@@ -567,10 +567,6 @@ void swift::ide::CompletionInstance::performOperation(
   // because they're somewhat heavy operations and aren't needed for completion.
   Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
-  // Disable to build syntax tree because code-completion skips some portion of
-  // source text. That breaks an invariant of syntax tree building.
-  Invocation.getLangOptions().BuildSyntaxTree = false;
-
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 

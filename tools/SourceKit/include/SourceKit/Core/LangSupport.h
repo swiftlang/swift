@@ -31,12 +31,6 @@ namespace llvm {
   class MemoryBuffer;
 }
 
-namespace swift {
-namespace syntax {
-class SourceFileSyntax;
-} // namespace syntax
-} // namespace swift
-
 namespace SourceKit {
 class GlobalConfig;
 
@@ -252,13 +246,6 @@ struct SourceFileRange {
   uintptr_t End;
 };
 
-enum class SyntaxTreeTransferMode {
-  /// Don't transfer the syntax tree
-  Off,
-  /// Transfer the entire syntax tree
-  Full
-};
-
 class EditorConsumer {
   virtual void anchor();
 public:
@@ -311,13 +298,6 @@ public:
                                 UIdent DiagStage) = 0;
 
   virtual void handleSourceText(StringRef Text) = 0;
-
-  virtual void
-  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) = 0;
-  virtual bool syntaxTreeEnabled() {
-    return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
-  }
-  virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
 
   virtual void finished() {}
 };

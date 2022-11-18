@@ -1288,9 +1288,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   auto *inputFile = new (*Context)
       SourceFile(*mod, fileKind, bufferID, opts, isPrimary);
 
-  if (isMainBuffer)
-    inputFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-
   return inputFile;
 }
 

@@ -61,6 +61,7 @@ _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
 _register("lipo", "lipo")
 _register("libtool", "libtool")
+_register("ld", "ld")
 if 'ANDROID_DATA' in os.environ:
     _register("ranlib", "llvm-ranlib")
     _register("ar", "llvm-ar")

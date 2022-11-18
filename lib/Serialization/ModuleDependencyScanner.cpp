@@ -118,12 +118,15 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, realModuleName.str(),
                                                     InPath);
-    Result = ModuleDependencies::forSwiftInterfaceModule(InPath,
-                                                   compiledCandidates,
-                                                   Args,
-                                                   PCMArgs,
-                                                   Hash,
-                                                   isFramework);
+
+    SmallString<128> outputPathBase(moduleCachePath);
+    llvm::sys::path::append(
+        outputPathBase,
+        moduleName.str() + "-" + Hash + "." +
+            file_types::getExtension(file_types::TY_SwiftModuleFile));
+    Result = ModuleDependencies::forSwiftInterfaceModule(
+        outputPathBase.str().str(), InPath, compiledCandidates, Args, PCMArgs,
+        Hash, isFramework);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
