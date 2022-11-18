@@ -226,6 +226,13 @@ enum class ConstraintKind : char {
   BindTupleOfFunctionParams,
   /// The first type is a type pack, and the second type is its reduced shape.
   ShapeOf,
+  /// Represents explicit generic arguments provided for a reference to
+  /// a declaration.
+  ///
+  /// The first type is the type variable describing the bound type of
+  /// an overload. The second type is a PackType containing the explicit
+  /// generic arguments.
+  ExplicitGenericArguments,
 };
 
 /// Classification of the different kinds of constraints.
@@ -708,6 +715,7 @@ public:
     case ConstraintKind::Defaultable:
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::ShapeOf:
+    case ConstraintKind::ExplicitGenericArguments:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
