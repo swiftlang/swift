@@ -56,7 +56,7 @@ int main() {
 
   // Test Reference to T's members
   if (*testIntValue == 42)
-    printf("Test Reference to T's members (const)\n");
+    printf("Test Reference to T's members\n");
 
   // Test bool operator
   if (testIntValue) {
@@ -103,7 +103,7 @@ int main() {
 // CHECK: Test Access to T's members (const)
 // CHECK-NEXT: Test Access to T's members
 // CHECK-NEXT: Test Reference to T's members (const)
-// CHECK-NEXT: Test Reference to T's members (const)
+// CHECK-NEXT: Test Reference to T's members
 // CHECK-NEXT: Test operator bool
 // CHECK-NEXT: Test get T's Value (const)
 // CHECK-NEXT: Test get T's Value

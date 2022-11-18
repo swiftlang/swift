@@ -195,16 +195,28 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
 
 } // namespace _impl
 
+constexpr static std::size_t max(std::size_t a, std::size_t b) {
+  return a > b ? a : b;
+}
+
 /// The Expected class has either an error or an value.
 template<class T>
 class Expected {
 public:
 
   /// Default
-  constexpr Expected() { has_val = false; }
-  constexpr Expected(const swift::Error& error_val) : err(error_val) { has_val = false; }
-  constexpr Expected(T buf) {
-    new (&buffer) T(buf);
+  constexpr Expected() noexcept {
+    new (&buffer) Error();
+    has_val = false;
+  }
+
+  constexpr Expected(const swift::Error& error_val) noexcept {
+    new (&buffer) Error(error_val);
+    has_val = false;
+  }
+
+  constexpr Expected(const T &val) noexcept {
+    new (&buffer) T(val);
     has_val = true;
   }
 
@@ -213,38 +225,55 @@ public:
     if (other.has_value())
       new (&buffer) T(other.value());
     else
-      new (&err) Error(other.error());
+      new (&buffer) Error(other.error());
 
     has_val = other.has_value();
   }
+
   /// Move
   // FIXME: Implement move semantics when move Swift values is possible
   constexpr Expected(Expected&&) noexcept { abort(); }
 
-  ~Expected() noexcept { }
+  ~Expected() noexcept {
+    if (has_value())
+      reinterpret_cast<const T *>(buffer)->~T();
+    else
+      reinterpret_cast<swift::Error *>(buffer)->~Error();
+  }
 
   /// assignment
-  constexpr auto operator=(Expected&& other) noexcept { auto temp = buffer; buffer = other.buffer; other.buffer = temp; }
+  constexpr auto operator=(Expected&& other) noexcept = delete;
   constexpr auto operator=(Expected&) noexcept = delete;
 
   /// For accessing T's members
-  // precondition: has_value() == true
-  constexpr T const *_Nonnull operator->() const noexcept { return reinterpret_cast<const T *>(buffer); }
+  constexpr T const *_Nonnull operator->() const noexcept {
+    if (!has_value())
+      abort();
+    return reinterpret_cast<const T *>(buffer);
+  }
 
-  // precondition: has_value() == true
-  constexpr T *_Nonnull operator->() noexcept { return reinterpret_cast<T *>(buffer); }
+  constexpr T *_Nonnull operator->() noexcept {
+    if (!has_value())
+      abort();
+    return reinterpret_cast<T *>(buffer);
+  }
 
   /// Getting reference to T
-  // precondition: has_value() == true
-  constexpr T const &operator*() const & noexcept { return reinterpret_cast<const T &>(buffer); }
+  constexpr T const &operator*() const & noexcept {
+    if (!has_value())
+      abort();
+    return reinterpret_cast<const T &>(buffer);
+  }
 
-  // precondition: has_value() == true
-  constexpr T &operator*() & noexcept { return reinterpret_cast<T &>(buffer); }
+  constexpr T &operator*() & noexcept {
+    if (!has_value())
+      abort();
+    return reinterpret_cast<T &>(buffer);
+  }
 
   constexpr explicit operator bool() const noexcept { return has_value(); }
 
   // Get value, if not exists abort
-  // FIXME: throw exception instead of abort?
   constexpr T const& value() const& {
     if (!has_value())
       abort();
@@ -261,19 +290,19 @@ public:
   constexpr swift::Error const& error() const& {
     if (has_value())
       abort();
-    return err;
+    return reinterpret_cast<const swift::Error&>(buffer);
   }
+
   constexpr swift::Error& error() & {
     if (has_value())
       abort();
-    return err;
+    return reinterpret_cast<swift::Error&>(buffer);
   }
 
   constexpr bool has_value() const noexcept { return has_val; }
 
 private:
-  alignas(alignof(T)) char buffer[sizeof(T)];
-  swift::Error err;
+  alignas(max(alignof(T), alignof(swift::Error))) char buffer[max(sizeof(T), sizeof(swift::Error))];
   bool has_val;
 };
 
