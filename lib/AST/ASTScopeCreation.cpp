@@ -893,7 +893,7 @@ namespace {
   /// Retrieve the opaque generic parameter list if present, otherwise the normal generic parameter list.
   template<typename T>
   GenericParamList *getPotentiallyOpaqueGenericParams(T *decl) {
-    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
+    if (auto opaqueRepr = decl->getResultTypeRepr()) {
       if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
         return namedOpaque->getGenericParams();
       }

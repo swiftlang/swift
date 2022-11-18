@@ -2767,6 +2767,9 @@ public:
   /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
   TypeRepr *getOpaqueResultTypeRepr() const;
 
+  /// Get the representative for this value's result type, if it has one.
+  TypeRepr *getResultTypeRepr() const;
+
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
   CustomAttr *getAttachedResultBuilder() const;
