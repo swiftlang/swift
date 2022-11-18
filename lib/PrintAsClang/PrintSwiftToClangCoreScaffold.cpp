@@ -156,26 +156,6 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
-void printCxxNaiveException(raw_ostream &os) {
-  os << "/// Naive exception class that should be thrown\n";
-  os << "class NaiveException : public swift::Error {\n";
-  os << "public:\n";
-  os << "  inline NaiveException(const char * _Nonnull msg) noexcept : "
-     << "msg_(msg) { }\n";
-  os << "  inline NaiveException(NaiveException&& other) noexcept : "
-        "msg_(other.msg_) { other.msg_ = nullptr; }\n";
-  os << "  inline ~NaiveException() noexcept { }\n";
-  os << "  void operator =(NaiveException&& other) noexcept { auto temp = msg_;"
-     << " msg_ = other.msg_; other.msg_ = temp; }\n";
-  os << "  void operator =(const NaiveException&) noexcept = delete;";
-  os << "\n";
-  os << "  inline const char * _Nonnull getMessage() const noexcept { "
-     << "return(msg_); }\n";
-  os << "private:\n";
-  os << "  const char * _Nonnull msg_;\n";
-  os << "};\n";
-}
-
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
                                      bool isCForwardDefinition) {
@@ -239,7 +219,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                             /*isCForwardDefinition=*/true);
           });
           os << "\n";
-          printCxxNaiveException(os);
+          //printCxxNaiveException(os);
         });
     os << "\n";
     // C++ only supports inline variables from C++17.
