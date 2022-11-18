@@ -1032,7 +1032,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all.
+  // As a special case, Clang functions and globals don't get mangled at all
+  // - except \c objc_direct decls.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
@@ -1050,7 +1051,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           }
           return namedClangDecl->getName().str();
         } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-          if (objcDecl->isDirectMethod()) {
+          if (objcDecl->isDirectMethod() && isForeign) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
             clang::ASTContext &ctx = clangDecl->getASTContext();
