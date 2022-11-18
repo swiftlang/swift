@@ -182,6 +182,37 @@ bool isFunctionSelectedForPrinting(SILFunction *F) {
   return true;
 }
 
+void printInliningDetails(StringRef passName, SILFunction *caller,
+                          SILFunction *callee, bool isCaller,
+                          bool alreadyInlined) {
+  if (!isFunctionSelectedForPrinting(caller))
+    return;
+  llvm::dbgs() << "  " << passName
+               << (alreadyInlined ? " has inlined " : " will inline ")
+               << callee->getName() << " into " << caller->getName() << ".\n";
+  auto *printee = isCaller ? caller : callee;
+  printee->dump(caller->getModule().getOptions().EmitVerboseSIL);
+  llvm::dbgs() << '\n';
+}
+
+void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/false,
+                       /*alreadyInlined=*/false);
+}
+
+void printInliningDetailsCallerBefore(StringRef passName, SILFunction *caller,
+                                      SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/false);
+}
+
+void printInliningDetailsCallerAfter(StringRef passName, SILFunction *caller,
+                                     SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/true);
+}
+
 static bool functionSelectionEmpty() {
   return SILPrintFunction.empty() && SILPrintFunctions.empty();
 }
