@@ -339,35 +339,43 @@ public func classAssignToVar5Arg2(_ x: Klass, _ x2: inout Klass) { // expected-e
 
 public func classAccessAccessField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use}}
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessAccessFieldArg(_ x2: inout Klass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use}}
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func classAccessConsumeFieldArg(_ x2: inout Klass) {
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
@@ -628,34 +636,42 @@ public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) { // expected-erro
 
 public func finalClassAccessField() {
     var x2 = FinalKlass()
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassAccessFieldArg(_ x2: inout FinalKlass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassConsumeField() {
     var x2 = FinalKlass()
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
 
-    classConsume(x2.k!)
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
-    classConsume(x2.k!)
+    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+    classConsume(x2.k!) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k!) // expected-note {{consuming use}}
     }
 }
 
@@ -2067,10 +2083,18 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 /////////////////////////////
 
 func moveOperatorTest(_ k: __owned Klass) {
-    var k2 = k // expected-error {{'k2' consumed more than once}}
+    var k2 = k
+    // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
     k2 = Klass()
     let k3 = _move k2 // expected-note {{consuming use}}
     let _ = _move k2 // expected-note {{consuming use}}
+    _ = k2 // expected-note {{consuming use}}
+    let _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
+    // expected-note @-3 {{consuming use}}
     let _ = k3
 }
 
@@ -2078,13 +2102,22 @@ func moveOperatorTest(_ k: __owned Klass) {
 // Black hole initialization test case//
 /////////////////////////////////////////
 
-func blackHoleTestCase(_ k: __owned Klass) {
-    var k2 = k // expected-error {{'k2' consumed more than once}}
+func blackHoleKlassTestCase(_ k: __owned Klass) {
+    var k2 = k
     // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
+    // expected-error @-4 {{'k2' consumed more than once}}
     let _ = k2 // expected-note {{consuming use}}
     let _ = k2 // expected-note {{consuming use}}
 
     k2 = Klass()
     var _ = k2 // expected-note {{consuming use}}
     var _ = k2 // expected-note {{consuming use}}
+
+    _ = k2 // expected-note {{consuming use}}
+    _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
+    // expected-note @-3 {{consuming use}}
 }
