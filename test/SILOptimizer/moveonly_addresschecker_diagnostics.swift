@@ -2067,10 +2067,18 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 /////////////////////////////
 
 func moveOperatorTest(_ k: __owned Klass) {
-    var k2 = k // expected-error {{'k2' consumed more than once}}
+    var k2 = k
+    // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
     k2 = Klass()
     let k3 = _move k2 // expected-note {{consuming use}}
     let _ = _move k2 // expected-note {{consuming use}}
+    _ = k2 // expected-note {{consuming use}}
+    let _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
+    // expected-note @-3 {{consuming use}}
     let _ = k3
 }
 
@@ -2078,13 +2086,22 @@ func moveOperatorTest(_ k: __owned Klass) {
 // Black hole initialization test case//
 /////////////////////////////////////////
 
-func blackHoleTestCase(_ k: __owned Klass) {
-    var k2 = k // expected-error {{'k2' consumed more than once}}
+func blackHoleKlassTestCase(_ k: __owned Klass) {
+    var k2 = k
     // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
+    // expected-error @-4 {{'k2' consumed more than once}}
     let _ = k2 // expected-note {{consuming use}}
     let _ = k2 // expected-note {{consuming use}}
 
     k2 = Klass()
     var _ = k2 // expected-note {{consuming use}}
     var _ = k2 // expected-note {{consuming use}}
+
+    _ = k2 // expected-note {{consuming use}}
+    _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
+    // expected-note @-3 {{consuming use}}
 }
