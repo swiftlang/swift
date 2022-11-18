@@ -1340,6 +1340,10 @@ def user_module_version : Separate<["-"], "user-module-version">,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
+def allowable_client : Separate<["-"], "allowable-client">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
+  HelpText<"Module names that are allowed to import this module">,
+  MetaVarName<"<vers>">;
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
