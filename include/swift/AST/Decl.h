@@ -8340,14 +8340,28 @@ class MacroExpansionDecl : public Decl {
   SourceLoc PoundLoc;
   DeclNameRef Macro;
   DeclNameLoc MacroLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Decl *Rewritten;
 
 public:
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
-                     DeclNameLoc macroLoc, ArgumentList *args)
+                     DeclNameLoc macroLoc,
+                     SourceLoc leftAngleLoc,
+                     ArrayRef<TypeRepr *> genericArgs,
+                     SourceLoc rightAngleLoc,
+                     ArgumentList *args)
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
-        Macro(macro), MacroLoc(macroLoc), ArgList(args), Rewritten(nullptr) {}
+        Macro(macro), MacroLoc(macroLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs), ArgList(args), Rewritten(nullptr) {}
+
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
 
   SourceRange getSourceRange() const;
   SourceLoc getLocFromSource() const { return PoundLoc; }

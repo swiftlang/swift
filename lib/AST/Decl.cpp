@@ -9644,6 +9644,13 @@ SourceRange MacroDecl::getSourceRange() const {
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
-  return SourceRange(PoundLoc,
-                     ArgList ? ArgList->getEndLoc() : MacroLoc.getEndLoc());
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
 }
