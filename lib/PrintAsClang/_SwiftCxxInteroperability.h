@@ -199,6 +199,8 @@ constexpr static std::size_t max(std::size_t a, std::size_t b) {
   return a > b ? a : b;
 }
 
+} // namespace _impl
+
 /// The Expected class has either an error or an value.
 template<class T>
 class Expected {
@@ -302,7 +304,7 @@ public:
   constexpr bool has_value() const noexcept { return has_val; }
 
 private:
-  alignas(max(alignof(T), alignof(swift::Error))) char buffer[max(sizeof(T), sizeof(swift::Error))];
+  alignas(_impl::max(alignof(T), alignof(swift::Error))) char buffer[_impl::max(sizeof(T), sizeof(swift::Error))];
   bool has_val;
 };
 

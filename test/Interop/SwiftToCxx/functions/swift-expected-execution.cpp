@@ -9,6 +9,7 @@
 // RUN: %target-run %t/swift-expected-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc
 
 #include <cstdio>
 #include "functions.h"
