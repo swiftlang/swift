@@ -107,33 +107,25 @@ It may be convient for Swift to assume that all projects follow one, unique patt
 
  ### Iterators
 
-* Swift has a broad array of anaologous APIs to C++'s algorithms and ranges library. 
-* These APIs are better, especially in the context of Swift goals: safety + expressivity
-* C++ iterators can be bridged to Swift iterators (somehow)
-* C++ iterators should be used through this Swift interface. 
-* Using Swift interface fits with the language and existing APIs. You can side-step most or all of the issues above, and other issues such as exclusivity. 
-
-Despite being an un-opinionated, multi-paradigm language, designed to fit many use cases, iterators are specific pattern.
-
-Thesis: C++ iterators and ranges can and should be mapped to Swift iterators and sequences. These Swift APIs should be prefered. (Then get into the "why," last bullet.) 
-
-Both Swift and C++ have powerful libraries for algorithms and iterators. The standard C++ iterator API interface lends itself to the Swift model, allowing C++ iterators and ranges to be mapped to Swift iterators and sequences with relative ease. These mapped APIs are idomatic, native Swift iterators and sequences; their semantics match the rest of the Swift language and Swift APIs compose around them nicely. By taking on Swift iterator semantics, iterators that are imported in this (XXX: explain this) way are able to side-step most or all of the issues that other projects have (described above). 
+Both Swift and C++ have powerful libraries for algorithms and iterators. The standard C++ iterator API interface lends itself to the Swift model, allowing C++ iterators and ranges to be mapped to Swift iterators and sequences with relative ease. These mapped APIs are idomatic, native Swift iterators and sequences; their semantics match the rest of the Swift language and Swift APIs compose around them nicely. By taking on Swift iterator semantics, iterators that are imported in this way are able to side-step most or all of the issues that other projects have (described above). 
 
 Swift's powerful suite of algorithms match and go beyond the standard library algorithms provided by C++. These algorithms compose on top of protocols such as Sequence, which C++ ranges should automatically conform to. These Swift APIS and algorithms that operate on Swift iterators and sequences should be prefered to their C++ analogous, as they fit into the rest of the language natrually. However, algorithms are not the only API which operate on iterators and sequences and other C++ APIs must still be useable from Swift. The best way to represent C++ APIs that take one or many iterators (potentially pointing at the same range) is not clear and will need to be explored during the evolution processes.   
 
-### Generic APIs
+### Templates and generic APIs
 
-C++ provides a couple of tools for writing generic APIs: templates, concepts, virtual classes (inheritance), and various combinations and permutations of these. Templates are likely the most common tool for creating generic APIs. Unfortunately, as outlined in [this forum post](https://forums.swift.org/t/bridging-c-templates-with-interop/55003) (Bridging C++ Templates with Interop), C++ templates do not map cleanly to Swift generics, making interoperability between these generic APIs extremely difficult. Despite this, the linked forum post proposes various strategies for importing C++ templates derived from goals similar to the ones outlines in this document. These proposals should probably be factored into this section at some point in the future.
+C++ and Swift completely different models for generic programming. C++ templates provide textual specializations of functions and classes that are type checked after being specialized while Swift generics are type checked ahead of time, or separately, and based around APIs rather than textual substituion. The difference makes using generic C++ APIs in Swift difficult. Bridging C++ templates to the Swift model would require substantial engineering effort and the user's guidance. Even if this work was done and users were willing to annotate their C++ libraries sufficently, the Swift model may cause tention with C++ APIs that were designed with specific performance semantics in mind (for example, unboxing every element of a `vector` when performing a copy).
 
-* Talk a bit about the difference in semantics and how this make it hard.
-* There is a tradeoff between API usability and a bad user expereience. 
-* Technically a very challenging thing to do, might not be worth it. 
+Swift protocols allow C++ types to be used in a generic context in Swift. Users can extend concrete C++ types, or concrete specializations of C++ class templates to conform to a protocol. Swift could provide a tool (likely in the form of an annotation) that allows users to even conform un-specialized templates to Swift protocols. This level of generic programming may be sufficent for most C++ interop users and would allow the Swift compiler to side-step one of the most difficult and complicated parts of C++ interoperability. 
+
+[This forum post](https://forums.swift.org/t/bridging-c-templates-with-interop/55003) (Bridging C++ Templates with Interop) goes into depth on the issue of importing C++ templates into Swift.
 
 ## Evolution process
 
 Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this document. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified.
 
 This document allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
+
+C++ interoperability is currently an expiremental language feature. Imported C++ APIs are not source or ABI stable until they have gone through evolution. The evolution posts for individual API patterns will need to address both source and ABI stability. 
 
 ## The Swift ecosystem
 
@@ -145,7 +137,11 @@ This document outlines a strategy for importing APIs that relies on semantic inf
 
 ### The standard library
 
-Egor Zhdan will discuss importing the standard library, the Swift C++ standard library overlay, etc. :)
+The Swift standard library should provide an overlay for the C++ standard library to assist in the import of commonly used APIs (such as containers). This overlay should also provide helpful bridging utilites such as protocols that map imported ranges and iterators and explicit conversions from C++ types to standard Swift types.
+
+C++ aims to provide sufficent tools to implement many features in The Standard Library rather than the compiler. While the Swift compiler also attempts to do this, it is not a goal in and of itself, resulting in many of C++'s analogus features being implemented in the compiler: tuples, pairs, reference counting, ownership, casting support, optionals, and so on. In these cases the Swift compiler will need to work with both the C++ standard library and the Swift overlay for the C++ standard library to import these APIs correctly.
+
+As with the rest of the Swift standard library, changes to the overlay will need to go through evolution.
 
 ## Appendix 1: Examples and Definitions
 
