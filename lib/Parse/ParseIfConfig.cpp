@@ -776,6 +776,9 @@ Result Parser::parseIfConfigRaw(
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
   assert(Tok.is(tok::pound_if));
 
+  Parser::StructureMarkerRAII ParsingDecl(
+      *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
+
   // Find the region containing code completion token.
   SourceLoc codeCompletionClauseLoc;
   if (SourceMgr.hasCodeCompletionBuffer() &&

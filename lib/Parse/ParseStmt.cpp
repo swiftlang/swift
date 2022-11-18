@@ -511,6 +511,10 @@ ParserResult<Stmt> Parser::parseStmt() {
     consumeToken(tok::colon);
   }
 
+  // Note that we're parsing a statement.
+  StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
+                                  StructureMarkerKind::Statement);
+
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
 
