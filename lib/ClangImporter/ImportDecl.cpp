@@ -5659,6 +5659,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(propertyType))
+    propertyType = elaborated->desugar();
 
   // If there is a setter, check that the property it implies
   // matches that of the getter.
@@ -7133,6 +7135,8 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
     return nullptr;
 
   clang::QualType UnderlyingType = ClangTypedef->getUnderlyingType();
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(UnderlyingType))
+    UnderlyingType = elaborated->desugar();
 
   // A typedef to a typedef should get imported as a typealias.
   auto *TypedefT = UnderlyingType->getAs<clang::TypedefType>();
@@ -8456,6 +8460,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
+      if (auto elaborated = dyn_cast<clang::ElaboratedType>(baseType))
+        baseType = elaborated->desugar();
       if (!isa<clang::RecordType>(baseType))
         continue;
 

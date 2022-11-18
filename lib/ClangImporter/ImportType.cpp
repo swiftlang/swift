@@ -2086,10 +2086,14 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
 
+  clang::QualType returnType = clangDecl->getReturnType();
+  if (auto elaborated =
+          dyn_cast<clang::ElaboratedType>(returnType))
+    returnType = elaborated->desugar();
+
   // Specialized templates need to match the args/result exactly (i.e.,
   // ptr -> ptr not ptr -> Optional<ptr>).
-  if (clangDecl->getReturnType()->isPointerType() &&
-      clangDecl->getPrimaryTemplate() &&
+  if (returnType->isPointerType() && clangDecl->getPrimaryTemplate() &&
       clangDecl
           ->getPrimaryTemplate()
           ->getAsFunction()
@@ -2097,7 +2101,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
           ->isTemplateTypeParmType())
     OptionalityOfReturn = OTK_None;
 
-  if (auto typedefType = dyn_cast<clang::TypedefType>(clangDecl->getReturnType().getTypePtr())) {
+  if (auto typedefType = dyn_cast<clang::TypedefType>(returnType)) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
@@ -2112,7 +2116,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   }
 
   // Import the result type.
-  return importType(clangDecl->getReturnType(),
+  return importType(returnType,
                     (isAuditedResult ? ImportTypeKind::AuditedResult
                                      : ImportTypeKind::Result),
                     ImportDiagnosticAdder(*this, clangDecl,
@@ -2159,7 +2163,11 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   ImportedType importedType;
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
-  if (auto typedefType = dyn_cast<clang::TypedefType>(clangDecl->getReturnType().getTypePtr())) {
+  clang::QualType returnType = clangDecl->getReturnType();
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(returnType))
+    returnType = elaborated->desugar();
+
+  if (auto typedefType = dyn_cast<clang::TypedefType>(returnType)) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
@@ -2174,15 +2182,15 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   }
 
   if (auto templateType =
-          dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
+          dyn_cast<clang::TemplateTypeParmType>(returnType)) {
     importedType = {findGenericTypeInGenericDecls(
                         *this, templateType, genericParams,
                         getImportTypeAttrs(clangDecl), addDiag),
                     false};
-  } else if ((isa<clang::PointerType>(clangDecl->getReturnType()) ||
-          isa<clang::ReferenceType>(clangDecl->getReturnType())) &&
-         isa<clang::TemplateTypeParmType>(clangDecl->getReturnType()->getPointeeType())) {
-    auto pointeeType = clangDecl->getReturnType()->getPointeeType();
+  } else if ((isa<clang::PointerType>(returnType) ||
+          isa<clang::ReferenceType>(returnType)) &&
+         isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
+    auto pointeeType = returnType->getPointeeType();
     auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
     PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
                                       ? PTK_UnsafePointer
@@ -2191,13 +2199,13 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
         findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
                                       getImportTypeAttrs(clangDecl), addDiag);
     importedType = {genericType->wrapInPointer(pointerKind), false};
-  } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
-               isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
+  } else if (!(isa<clang::RecordType>(returnType) ||
+               isa<clang::TemplateSpecializationType>(returnType)) ||
              // TODO: we currently don't lazily load operator return types, but
              // this should be trivial to add.
              clangDecl->isOverloadedOperator() ||
              // Dependant types are trivially mapped as Any.
-             clangDecl->getReturnType()->isDependentType()) {
+             returnType->isDependentType()) {
     // If importedType is already initialized, it means we found the enum that
     // was supposed to be used (instead of the typedef type).
     if (!importedType) {
@@ -2244,6 +2252,8 @@ ClangImporter::Implementation::importParameterType(
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
   auto paramTy = param->getType();
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(paramTy))
+    paramTy = elaborated->desugar();
 
   ImportTypeKind importKind = getImportTypeKindForParam(param);
 
@@ -2845,7 +2855,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   ImportDiagnosticAdder addImportDiag(*this, clangDecl,
                                       clangDecl->getLocation());
   clang::QualType resultType = clangDecl->getReturnType();
-
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(resultType))
+    resultType = elaborated->desugar();
 
   ImportedType importedType;
   if (auto typedefType = dyn_cast<clang::TypedefType>(resultType.getTypePtr())) {
