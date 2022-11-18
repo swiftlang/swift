@@ -32,12 +32,11 @@ enum MoveOnlyEnum {
     deinit { // expected-error {{'self' consumed more than once}}
         let x = self // expected-note {{consuming use}}
         _ = x
-        var y = MoveOnlyEnum.lhs(Klass()) // expected-error {{'y' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
+        var y = MoveOnlyEnum.lhs(Klass())
         y = self // expected-note {{consuming use}}
         // We get an infinite recursion since we are going to call our own
         // deinit here. We are just testing diagnostics here though.
         _ = y // expected-warning {{function call causes an infinite recursion}}
-        // expected-note @-1 {{consuming use}}
         globalMoveOnlyEnum = self // expected-note {{consuming use}}
     } // expected-note {{consuming use}}
 }
