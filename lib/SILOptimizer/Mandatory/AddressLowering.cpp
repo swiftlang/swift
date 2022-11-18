@@ -2483,6 +2483,74 @@ private:
 };
 
 //===----------------------------------------------------------------------===//
+//                 unconditional_checked_cast rewriting
+//
+//      Rewrites an unconditional_checked_cast to an address instruction.
+//===----------------------------------------------------------------------===//
+
+static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
+    UnconditionalCheckedCastInst *uncondCheckedCast, AddressLoweringState &pass,
+    AddressMaterialization *addrMat) {
+  auto srcVal = uncondCheckedCast->getOperand();
+  auto destVal = SILValue(uncondCheckedCast);
+  auto srcType = srcVal->getType();
+  auto destType = destVal->getType();
+  // There are four cases to handle:
+  // - source address-only, target address-only
+  // - source address-only, target loadable
+  // - source loadable,     target address-only
+  // - source loadable,     target loadable
+  auto srcAddrOnly = srcType.isAddressOnly(*pass.function);
+  auto destAddrOnly = destType.isAddressOnly(*pass.function);
+  SILValue srcAddr;
+
+  auto loc = uncondCheckedCast->getLoc();
+
+  auto builder = pass.getBuilder(uncondCheckedCast->getIterator());
+  if (srcAddrOnly) {
+    srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+  } else {
+    srcAddr = builder.createAllocStack(loc, srcType);
+    builder.createStore(loc, srcVal, srcAddr,
+                        srcType.isTrivial(*pass.function)
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Init);
+  }
+  assert(srcAddr);
+  SILValue destAddr;
+  if (destAddrOnly) {
+    destAddr = addrMat->materializeAddress(destVal);
+  } else {
+    destAddr = builder.createAllocStack(loc, destType);
+  }
+  assert(destAddr);
+  auto *uccai = builder.createUnconditionalCheckedCastAddr(
+      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      destAddr, destAddr->getType().getASTType());
+  auto afterBuilder =
+      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
+  if (srcAddrOnly) {
+    // No cleanup to do.
+  } else {
+    afterBuilder.createDeallocStack(loc, srcAddr);
+  }
+  if (destAddrOnly) {
+    // No cleanup to do.
+  } else {
+    auto *load = afterBuilder.createLoad(loc, destAddr,
+                                         destType.isTrivial(*pass.function)
+                                             ? LoadOwnershipQualifier::Trivial
+                                             : LoadOwnershipQualifier::Take);
+    destVal->replaceAllUsesWith(load);
+    afterBuilder.createDeallocStack(loc, destAddr);
+  }
+  if (!srcAddrOnly && !destAddrOnly) {
+    pass.deleter.forceDelete(uncondCheckedCast);
+  }
+  return uccai;
+}
+
+//===----------------------------------------------------------------------===//
 //                               ReturnRewriter
 //
 //             Rewrite return instructions for indirect results.
@@ -2721,6 +2789,8 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   }
 }
 
+//
+
 //===----------------------------------------------------------------------===//
 //                                UseRewriter
 //
@@ -2728,6 +2798,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class UseRewriter : SILInstructionVisitor<UseRewriter> {
   friend SILVisitorBase<UseRewriter>;
   friend SILInstructionVisitor<UseRewriter>;
@@ -2996,7 +3067,15 @@ protected:
   }
 
   void visitUnconditionalCheckedCastInst(
-      UnconditionalCheckedCastInst *uncondCheckedCast);
+      UnconditionalCheckedCastInst *uncondCheckedCast) {
+    assert(uncondCheckedCast->getOperand()->getType().isAddressOnly(
+        *pass.function));
+    auto *uccai =
+        rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass, &addrMat);
+    if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
+      markRewritten(uncondCheckedCast, uccai->getDest());
+    }
+  }
 
   void visitCheckedCastBranchInst(CheckedCastBranchInst *checkedCastBranch);
 
@@ -3290,38 +3369,6 @@ void UseRewriter::visitUncheckedEnumDataInst(
   markRewritten(enumDataInst, enumAddrInst);
 }
 
-void UseRewriter::visitUnconditionalCheckedCastInst(
-    UnconditionalCheckedCastInst *uncondCheckedCast) {
-  SILValue srcVal = uncondCheckedCast->getOperand();
-  assert(srcVal->getType().isAddressOnly(*pass.function));
-  SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-
-  if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
-    // When cast destination has address only type, use the storage address
-    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
-    markRewritten(uncondCheckedCast, destAddr);
-    builder.createUnconditionalCheckedCastAddr(
-        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
-        destAddr, destAddr->getType().getASTType());
-    return;
-  }
-  // For loadable cast destination type, create a stack temporary
-  SILValue destAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
-                                               uncondCheckedCast->getType());
-  builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
-      destAddr, destAddr->getType().getASTType());
-  auto nextBuilder =
-      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
-  auto dest = nextBuilder.createLoad(
-      uncondCheckedCast->getLoc(), destAddr,
-      destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
-          ? LoadOwnershipQualifier::Trivial
-          : LoadOwnershipQualifier::Take);
-  nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
-  uncondCheckedCast->replaceAllUsesWith(dest);
-}
-
 //===----------------------------------------------------------------------===//
 //                                DefRewriter
 //
@@ -3508,25 +3555,11 @@ protected:
 
   void visitUnconditionalCheckedCastInst(
       UnconditionalCheckedCastInst *uncondCheckedCast) {
-    SILValue srcVal = uncondCheckedCast->getOperand();
-    assert(srcVal->getType().isLoadable(*pass.function));
+    assert(!uncondCheckedCast->getOperand()->getType().isAddressOnly(
+        *pass.function));
     assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
 
-    // Create a stack temporary to store the srcVal
-    SILValue srcAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
-                                                srcVal->getType());
-    builder.createStore(uncondCheckedCast->getLoc(), srcVal, srcAddr,
-                        srcVal->getType().isTrivial(*srcVal->getFunction())
-                            ? StoreOwnershipQualifier::Trivial
-                            : StoreOwnershipQualifier::Init);
-    // Use the storage address as destination
-    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
-    builder.createUnconditionalCheckedCastAddr(
-        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
-        destAddr, destAddr->getType().getASTType());
-
-    pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator())
-        .createDeallocStack(uncondCheckedCast->getLoc(), srcAddr);
+    rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass, &addrMat);
   }
 };
 } // end anonymous namespace
@@ -3574,34 +3607,11 @@ static void rewriteIndirectApply(FullApplySite apply,
 static void rewriteNonopaqueUnconditionalCheckedCast(
     UnconditionalCheckedCastInst *uncondCheckedCast,
     AddressLoweringState &pass) {
-  auto loc = uncondCheckedCast->getLoc();
-  SILValue srcVal = uncondCheckedCast->getOperand();
-  auto srcType = srcVal->getType();
-  auto destType = uncondCheckedCast->getType();
-  assert(srcType.isLoadable(*pass.function));
-  assert(!destType.isAddressOnly(*pass.function));
+  assert(uncondCheckedCast->getOperand()->getType().isLoadable(*pass.function));
+  assert(uncondCheckedCast->getType().isLoadable(*pass.function));
 
-  // Create a stack temporary to store the source
-  auto builder = pass.getBuilder(uncondCheckedCast->getIterator());
-  SILValue srcAddr = builder.createAllocStack(loc, srcType);
-  builder.createStore(loc, srcVal, srcAddr,
-                      srcType.isTrivial(*pass.function)
-                          ? StoreOwnershipQualifier::Trivial
-                          : StoreOwnershipQualifier::Init);
-  SILValue destAddr = builder.createAllocStack(loc, destType);
-  builder.createUnconditionalCheckedCastAddr(loc, srcAddr, srcType.getASTType(),
-                                             destAddr, destType.getASTType());
-
-  auto afterBuilder =
-      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
-  auto *load = afterBuilder.createLoad(loc, destAddr,
-                                       destType.isTrivial(*pass.function)
-                                           ? LoadOwnershipQualifier::Trivial
-                                           : LoadOwnershipQualifier::Take);
-  uncondCheckedCast->replaceAllUsesWith(load);
-  pass.deleter.forceDelete(uncondCheckedCast);
-  afterBuilder.createDeallocStack(loc, destAddr);
-  afterBuilder.createDeallocStack(loc, srcAddr);
+  rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass,
+                                      /*addrMat=*/nullptr);
 }
 
 static void rewriteFunction(AddressLoweringState &pass) {
