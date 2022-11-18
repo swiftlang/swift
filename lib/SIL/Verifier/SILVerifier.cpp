@@ -5824,14 +5824,12 @@ public:
       // the scope is an ancestor of the scope we're currently leaving.
       auto isAncestorScope = [](const SILDebugScope *Cur,
                                 const SILDebugScope *Previous) {
+        assert(Cur && "null current scope queried");
+        assert(Previous && "null previous scope queried");
         const SILDebugScope *Tmp = Previous;
-        assert(Tmp && "scope can't be null");
         while (Tmp) {
-          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
-              Tmp->Parent;
+          auto Parent = Tmp->Parent;
           auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
-          if (!ParentScope)
-            break;
           if (ParentScope == Cur)
             return true;
           Tmp = ParentScope;
