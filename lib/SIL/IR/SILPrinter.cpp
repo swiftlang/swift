@@ -2860,6 +2860,11 @@ public:
       *this << dwfi->getType();
     }
   }
+
+  void visitHasSymbolInst(HasSymbolInst *hsi) {
+    *this << "#";
+    printValueDecl(hsi->getDecl(), PrintState.OS);
+  }
 };
 
 } // namespace swift

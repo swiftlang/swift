@@ -23,13 +23,11 @@ public func bar(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 
 // CHECK: sil hidden [ossa] @$s4test0A15GlobalFunctionsyyF : $@convention(thin) () -> ()
 func testGlobalFunctions() {
-  // CHECK: [[QUERY:%[0-9]+]] = function_ref @$s7Library3fooyS2fFTwS : $@convention(thin) () -> Builtin.Int1
-  // CHECK: [[RES:%[0-9]+]] = apply [[QUERY]]() : $@convention(thin) () -> Builtin.Int1
+  // CHECK: [[RES:%[0-9]+]] = has_symbol #foo
   // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
   if #_hasSymbol(foo(_:)) {}
 
-  // CHECK: [[QUERY:%[0-9]+]] = function_ref @$s7Library3barySf5value_S2fc8pullbacktSfFTwS : $@convention(thin) () -> Builtin.Int1
-  // CHECK: [[RES:%[0-9]+]] = apply [[QUERY]]() : $@convention(thin) () -> Builtin.Int1
+  // CHECK: [[RES:%[0-9]+]] = has_symbol #bar
   // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
   if #_hasSymbol(bar(_:)) {}
 }
@@ -41,6 +39,5 @@ func testGlobalFunctions() {
 // FIXME: missing reverse-mode differentiability witness for foo(_:)
 
 // --- bar(_:) ---
-// CHECK: sil hidden_external @$s7Library3barySf5value_S2fc8pullbacktSfFTwS : $@convention(thin) () -> Builtin.Int1
 // CHECK: sil @$s7Library3barySf5value_S2fc8pullbacktSfF : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // FIXME: missing reverse-mode differentiability witness for foo(_:)

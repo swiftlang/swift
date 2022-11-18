@@ -1395,6 +1395,8 @@ public:
     llvm_unreachable("test-only instruction in Lowered SIL?!");
   }
 
+  void visitHasSymbolInst(HasSymbolInst *i);
+
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
   void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
@@ -2613,6 +2615,15 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
 
   setLoweredFunctionPointer(
       i, FunctionPointer::createUnsigned(fnType, diffWitness, signature, true));
+}
+
+void IRGenSILFunction::visitHasSymbolInst(HasSymbolInst *i) {
+  auto fn = IGM.emitHasSymbolFunction(i->getDecl());
+  llvm::CallInst *call = Builder.CreateCall(fn->getFunctionType(), fn, {});
+
+  Explosion e;
+  e.add(call);
+  setLoweredValue(i, e);
 }
 
 FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
