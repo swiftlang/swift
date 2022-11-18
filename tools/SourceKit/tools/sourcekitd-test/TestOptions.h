@@ -61,7 +61,6 @@ enum class SourceKitRequest {
   NameTranslation,
   MarkupToXML,
   Statistics,
-  SyntaxTree,
   EnableCompileNotifications,
   CollectExpressionType,
   CollectVariableType,

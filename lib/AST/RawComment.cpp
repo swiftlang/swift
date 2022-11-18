@@ -83,7 +83,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   LangOptions FakeLangOpts;
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
-          TriviaRetentionMode::WithoutTrivia, Offset, EndOffset);
+          Offset, EndOffset);
 
   SmallVector<SingleRawComment, 16> Comments;
   Token Tok;

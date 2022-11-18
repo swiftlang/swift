@@ -883,8 +883,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -893,8 +891,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, true);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -903,8 +899,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -927,16 +921,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
       sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     }
-    break;
-
-  case SourceKitRequest::SyntaxTree:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeFull);
-    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, true);
     break;
 
   case SourceKitRequest::DocInfo:
@@ -1408,13 +1392,6 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printFoundUSR(Info, SourceBuf.get(), llvm::outs());
       break;
 
-    case SourceKitRequest::SyntaxTree: {
-      // Print only the serialized syntax tree.
-      llvm::outs() << sourcekitd_variant_dictionary_get_string(
-        sourcekitd_response_get_value(Resp), KeySerializedSyntaxTree);
-      llvm::outs() << '\n';
-      break;
-    }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       printRawResponse(Resp);

@@ -24,6 +24,10 @@ def is_release_variant(build_variant):
     return build_variant in ['Release', 'RelWithDebInfo']
 
 
+def is_debug_info_variant(build_variant):
+    return build_variant in ['Debug', 'RelWithDebInfo']
+
+
 class Product(object):
     @classmethod
     def product_name(cls):
@@ -191,6 +195,13 @@ class Product(object):
         """
         return is_release_variant(self.args.build_variant)
 
+    def is_debug_info(self):
+        """is_debug_info() -> Bool
+
+        Whether or not this target is built with debug info
+        """
+        return is_debug_info_variant(self.args.build_variant)
+
     def install_toolchain_path(self, host_target):
         """toolchain_path() -> string
 
@@ -247,42 +258,55 @@ class Product(object):
     def has_cross_compile_hosts(self):
         return self.args.cross_compile_hosts
 
+    def target_for_platform(self, platform, arch, include_version=True):
+        target = None
+        if platform == 'macosx':
+            target = '{}-apple-macosx{}'.format(
+                arch,
+                self.args.darwin_deployment_version_osx if include_version else "")
+        elif platform == 'iphonesimulator':
+            target = '{}-apple-ios{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_ios if include_version else "")
+        elif platform == 'iphoneos':
+            target = '{}-apple-ios{}'.format(
+                arch,
+                self.args.darwin_deployment_version_ios if include_version else "")
+        elif platform == 'appletvsimulator':
+            target = '{}-apple-tvos{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_tvos if include_version else "")
+        elif platform == 'appletvos':
+            target = '{}-apple-tvos{}'.format(
+                arch,
+                self.args.darwin_deployment_version_tvos if include_version else "")
+        elif platform == 'watchsimulator':
+            target = '{}-apple-watchos{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_watchos if include_version else "")
+        elif platform == 'watchos':
+            target = '{}-apple-watchos{}'.format(
+                arch,
+                self.args.darwin_deployment_version_watchos if include_version else "")
+        return target
+
     def generate_darwin_toolchain_file(self, platform, arch):
         shell.makedirs(self.build_dir)
         toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
         cmake_osx_sysroot = xcrun.sdk_path(platform)
 
-        target = None
-        if platform == 'macosx':
-            target = '{}-apple-macosx{}'.format(
-                arch, self.args.darwin_deployment_version_osx)
-        elif platform == 'iphonesimulator':
-            target = '{}-apple-ios{}'.format(
-                arch, self.args.darwin_deployment_version_ios)
-        elif platform == 'iphoneos':
-            target = '{}-apple-ios{}'.format(
-                arch, self.args.darwin_deployment_version_ios)
-        elif platform == 'appletvsimulator':
-            target = '{}-apple-tvos{}'.format(
-                arch, self.args.darwin_deployment_version_tvos)
-        elif platform == 'appletvos':
-            target = '{}-apple-tvos{}'.format(
-                arch, self.args.darwin_deployment_version_tvos)
-        elif platform == 'watchsimulator':
-            target = '{}-apple-watchos{}'.format(
-                arch, self.args.darwin_deployment_version_watchos)
-        elif platform == 'watchos':
-            target = '{}-apple-watchos{}'.format(
-                arch, self.args.darwin_deployment_version_watchos)
-        else:
-            raise RuntimeError("Unhandled platform?!")
+        target = self.target_for_platform(platform, arch)
+        if not target:
+            raise RuntimeError('Unhandled platform {}?!'.format(platform))
 
         toolchain_args = {}
 
         toolchain_args['CMAKE_SYSTEM_NAME'] = 'Darwin'
         toolchain_args['CMAKE_OSX_SYSROOT'] = cmake_osx_sysroot
         toolchain_args['CMAKE_OSX_ARCHITECTURES'] = arch
+        toolchain_args['CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG'] = '\"-Wl,-rpath,\"'
+        toolchain_args['CMAKE_SYSTEM_VERSION'] = self.args.darwin_deployment_version_osx
 
         if self.toolchain.cc.endswith('clang'):
             toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
@@ -290,6 +314,13 @@ class Product(object):
             toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
         # Swift always supports cross compiling.
         toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+
+        toolchain_args['CMAKE_LINKER'] = self.toolchain.ld
+        toolchain_args['CMAKE_CC'] = self.toolchain.cc
+        toolchain_args['CMAKE_CXX'] = self.toolchain.cxx
+        toolchain_args['CMAKE_ASM_COMPILER_AR'] = self.toolchain.ar
+        toolchain_args['CMAKE_ASM_COMPILER_RANLIB'] = self.toolchain.ranlib
+        toolchain_args['CMAKE_LINKER'] = self.toolchain.ld
 
         # Sort by the key so that we always produce the same toolchain file
         data = sorted(toolchain_args.items(), key=lambda x: x[0])
@@ -369,8 +400,13 @@ class Product(object):
     def get_openbsd_toolchain_file(self):
         return os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
 
-    def common_cross_c_flags(self, platform, arch):
+    def common_cross_c_flags(self, platform, arch, include_arch=False):
         cross_flags = []
+
+        target = self.target_for_platform(platform, arch, include_version=False)
+        if include_arch and target:
+            cross_flags.append('-arch {}'.format(arch))
+            cross_flags.append('-target {}'.format(target))
 
         if self.is_release():
             cross_flags.append('-fno-stack-protector')

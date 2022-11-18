@@ -3715,24 +3715,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Synthesizes and returns a `#_hasSymbol` query function for the given
-/// `ValueDecl`. The function has an interface type of `() -> Builtin.Int1`.
-class SynthesizeHasSymbolQueryRequest
-    : public SimpleRequest<SynthesizeHasSymbolQueryRequest,
-                           FuncDecl *(const ValueDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  FuncDecl *evaluate(Evaluator &evaluator, const ValueDecl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Lookup all macros with the given name that are visible from the given
 /// module.
 class MacroLookupRequest

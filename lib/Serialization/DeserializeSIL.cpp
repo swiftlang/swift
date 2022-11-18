@@ -1280,6 +1280,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                                       Attr, Attr2);
     RawOpCode = (unsigned)SILInstructionKind::IncrementProfilerCounterInst;
     break;
+  case SIL_INST_HAS_SYMBOL:
+    SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
+    break;
   }
 
   // FIXME: validate
@@ -2989,6 +2993,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       explicitFnTy = getSILType(astTy, SILValueCategory::Object, Fn);
     ResultInst = Builder.createDifferentiabilityWitnessFunction(
         Loc, witnessKind, witness, explicitFnTy);
+    break;
+  }
+  case SILInstructionKind::HasSymbolInst: {
+    ValueDecl *decl = cast<ValueDecl>(MF->getDecl(ValID));
+    ResultInst = Builder.createHasSymbol(Loc, decl);
+    // Deserialize the functions that are implicitly referenced by the
+    // instruction.
+    for (auto fnID : ListOfValues) {
+      (void)getFuncForReference(MF->getIdentifierText(fnID));
+    }
     break;
   }
   }

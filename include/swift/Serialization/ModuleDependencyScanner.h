@@ -37,16 +37,21 @@ namespace swift {
           Twine moduleInterfacePath, bool isFramework);
 
       InterfaceSubContextDelegate &astDelegate;
+
+      /// Location where pre-built moduels are to be built into.
+      std::string moduleCachePath;
     public:
       Optional<ModuleDependencies> dependencies;
 
-      ModuleDependencyScanner(
-          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
-          InterfaceSubContextDelegate &astDelegate,
-          ScannerKind kind = MDS_plain)
+      ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                              Identifier moduleName,
+                              InterfaceSubContextDelegate &astDelegate,
+                              ScannerKind kind = MDS_plain)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
-            kind(kind), moduleName(moduleName), astDelegate(astDelegate) {}
+            kind(kind), moduleName(moduleName), astDelegate(astDelegate),
+            moduleCachePath(getModuleCachePathFromClang(
+                ctx.getClangModuleLoader()->getClangInstance())) {}
 
       std::error_code findModuleFilesInDirectory(
           ImportPath::Element ModuleID,

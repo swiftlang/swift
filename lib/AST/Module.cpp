@@ -46,7 +46,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
-#include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -59,6 +58,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 
@@ -1698,14 +1698,6 @@ Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
   return Fingerprint{std::move(hash)};
 }
 
-syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
-  auto &eval = getASTContext().evaluator;
-  auto *mutableThis = const_cast<SourceFile *>(this);
-  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-              .SyntaxRoot;
-}
-
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     const TinyPtrVector<OperatorDecl *> &ops) const {
@@ -3250,8 +3242,6 @@ SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
   ParsingOptions opts;
   if (langOpts.DisablePoundIfEvaluation)
     opts |= ParsingFlags::DisablePoundIfEvaluation;
-  if (langOpts.BuildSyntaxTree)
-    opts |= ParsingFlags::BuildSyntaxTree;
   if (langOpts.CollectParsedToken)
     opts |= ParsingFlags::CollectParsedTokens;
   return opts;
@@ -3270,11 +3260,6 @@ bool SourceFile::shouldCollectTokens() const {
          ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
-bool SourceFile::shouldBuildSyntaxTree() const {
-  return Kind != SourceFileKind::SIL &&
-         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
-}
-
 bool SourceFile::hasDelayedBodyParsing() const {
   if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
     return false;
@@ -3283,8 +3268,6 @@ bool SourceFile::hasDelayedBodyParsing() const {
   if (Kind == SourceFileKind::SIL)
     return false;
   if (shouldCollectTokens())
-    return false;
-  if (shouldBuildSyntaxTree())
     return false;
 
   return true;

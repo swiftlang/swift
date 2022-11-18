@@ -2726,6 +2726,14 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Weak linking support
+  //===--------------------------------------------------------------------===//
+  HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
+    return insert(new (getModule()) HasSymbolInst(
+        getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//
 

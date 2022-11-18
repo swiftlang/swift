@@ -115,3 +115,13 @@ struct S: P {
 
   var asExistential: any P { self }
 }
+
+enum E {
+    func f() -> Int {
+        1
+    }
+}
+
+protocol Q {
+    func f() -> Int
+}

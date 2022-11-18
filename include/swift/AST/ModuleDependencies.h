@@ -125,6 +125,9 @@ struct CommonSwiftTextualModuleDependencyDetails {
 class SwiftInterfaceModuleDependenciesStorage :
   public ModuleDependenciesStorageBase {
 public:
+  /// Destination output path
+  const std::string moduleOutputPath;
+
   /// The Swift interface file to be used to generate the module file.
   const std::string swiftInterfaceFile;
 
@@ -145,6 +148,7 @@ public:
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
   SwiftInterfaceModuleDependenciesStorage(
+      const std::string moduleOutputPath,
       const std::string swiftInterfaceFile,
       ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
@@ -152,6 +156,7 @@ public:
       StringRef contextHash,
       bool isFramework
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftInterface),
+      moduleOutputPath(moduleOutputPath),
       swiftInterfaceFile(swiftInterfaceFile),
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
@@ -340,7 +345,8 @@ public:
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterfaceModule(
-      std::string swiftInterfaceFile,
+      const std::string &moduleOutputPath,
+      const std::string &swiftInterfaceFile,
       ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
@@ -348,7 +354,7 @@ public:
       bool isFramework) {
     return ModuleDependencies(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
-          swiftInterfaceFile, compiledCandidates, buildCommands,
+          moduleOutputPath, swiftInterfaceFile, compiledCandidates, buildCommands,
           extraPCMArgs, contextHash, isFramework));
   }
 

@@ -2489,6 +2489,23 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(mangledKey));
     break;
   }
+  case SILInstructionKind::HasSymbolInst: {
+    auto *hsi = cast<HasSymbolInst>(&SI);
+    auto *decl = hsi->getDecl();
+    // Although the instruction doesn't have them as members, we need to
+    // ensure that any SILFunctions that are technically referenced by the
+    // instruction get serialized.
+    SmallVector<SILFunction *, 4> fns;
+    hsi->getReferencedFunctions(fns);
+    SmallVector<IdentifierID, 4> functionRefs;
+    for (auto fn : fns) {
+      functionRefs.push_back(addSILFunctionRef(fn));
+    }
+    SILInstHasSymbolLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstHasSymbolLayout::Code],
+        S.addDeclRef(decl), functionRefs);
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2927,6 +2944,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
+  registerSILAbbr<SILInstHasSymbolLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

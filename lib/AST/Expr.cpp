@@ -1187,7 +1187,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1195,7 +1195,7 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -2468,6 +2468,18 @@ TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
   size_t size = totalSizeToAlloc<Expr *>(elements.size());
   void *mem = ctx.Allocate(size, alignof(TypeJoinExpr));
   return new (mem) TypeJoinExpr(var, elements);
+}
+
+SourceRange MacroExpansionExpr::getSourceRange() const {
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroNameLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

@@ -2918,27 +2918,24 @@ namespace {
         CS.setType(binding, type);
       }
 
-      auto elementResultType = CS.getType(expr->getPatternExpr());
-      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto *patternLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
+      auto patternTy = CS.createTypeVariable(patternLoc,
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
+      auto elementResultType = CS.getType(expr->getPatternExpr());
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
 
-      // FIXME: Use a ShapeOf constraint here.
-      Type shapeType;
-      auto *binding = expr->getBindings().front();
-      auto type = CS.simplifyType(CS.getType(binding));
-      type.visit([&](Type type) {
-        if (shapeType)
-          return;
+      auto *shapeLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
+      auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
+                                                 TVO_CanBindToPack |
+                                                 TVO_CanBindToHole);
+      CS.addConstraint(ConstraintKind::ShapeOf, patternTy, shapeTypeVar,
+                       CS.getConstraintLocator(expr));
 
-        if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = archetype->getReducedShape();
-        }
-      });
-
-      return PackExpansionType::get(patternTy, shapeType);
+      return PackExpansionType::get(patternTy, shapeTypeVar);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {

@@ -16,7 +16,7 @@
 
 import A
 
-// CHECK-INITIAL-SCAN:           "modulePath": "A.swiftmodule",
+// CHECK-INITIAL-SCAN:           "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
 // CHECK-INITIAL-SCAN-NEXT:      "sourceFiles": [
 // CHECK-INITIAL-SCAN-NEXT:      ],
 // CHECK-INITIAL-SCAN-NEXT:      "directDependencies": [
@@ -34,7 +34,7 @@ import A
 // CHECK-INITIAL-SCAN-NEXT:        "swift": {
 // CHECK-INITIAL-SCAN-NEXT:          "moduleInterfacePath": "{{.*}}/Swift/A.swiftinterface",
 
-// CHECK-DIFFERENT:           "modulePath": "A.swiftmodule",
+// CHECK-DIFFERENT:           "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
 // CHECK-DIFFERENT-NEXT:      "sourceFiles": [
 // CHECK-DIFFERENT-NEXT:      ],
 // CHECK-DIFFERENT-NEXT:      "directDependencies": [

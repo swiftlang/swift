@@ -49,7 +49,9 @@ version::Version swift::InterfaceFormatVersion({1, 0});
 /// construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ModuleInterfaceOptions const &Opts,
-                                            ModuleDecl *M) {
+                                            ModuleDecl *M,
+                                            llvm::SmallSet<StringRef, 4>
+                                              &AliasModuleNamesTargets) {
   auto &Ctx = M->getASTContext();
   auto ToolsVersion =
       getSwiftInterfaceCompilerVersionForCurrentCompiler(Ctx);
@@ -62,9 +64,8 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
 
   // Insert additional -module-alias flags
   if (Opts.AliasModuleNames) {
-    llvm::SmallSet<StringRef, 2> aliasTargets;
     StringRef moduleName = M->getNameStr();
-    aliasTargets.insert(M->getNameStr());
+    AliasModuleNamesTargets.insert(M->getNameStr());
     out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
            moduleName << "=" << moduleName;
 
@@ -74,9 +75,10 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                            ModuleDecl::ImportFilterKind::Exported,
                            ModuleDecl::ImportFilterKind::SPIOnly,
                            ModuleDecl::ImportFilterKind::SPIAccessControl});
+    M->getMissingImportedModules(imports);
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
-      if (aliasTargets.insert(importedName).second) {
+      if (AliasModuleNamesTargets.insert(importedName).second) {
         out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
                importedName << "=" << importedName;
       }
@@ -781,12 +783,14 @@ bool swift::emitSwiftInterface(raw_ostream &out,
                                ModuleDecl *M) {
   assert(M);
 
-  printToolVersionAndFlagsComment(out, Opts, M);
+  llvm::SmallSet<StringRef, 4> aliasModuleNamesTargets;
+  printToolVersionAndFlagsComment(out, Opts, M, aliasModuleNamesTargets);
+
   printImports(out, Opts, M);
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs,
-      Opts.AliasModuleNames);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

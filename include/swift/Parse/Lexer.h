@@ -22,7 +22,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
-#include "swift/Parse/ParsedTrivia.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -43,11 +42,6 @@ enum class CommentRetentionMode {
   None,
   AttachToNextToken,
   ReturnAsTokens,
-};
-
-enum class TriviaRetentionMode {
-  WithoutTrivia,
-  WithTrivia,
 };
 
 enum class HashbangMode : bool {
@@ -131,20 +125,9 @@ class Lexer {
 
   const CommentRetentionMode RetainComments;
 
-  const TriviaRetentionMode TriviaRetention;
-
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
-
-  /// The current leading trivia for the next token.
-  ///
-  /// The StringRef points into the source buffer that is currently being lexed.
-  StringRef LeadingTrivia;
-
-  /// The current trailing trivia for the next token.
-  /// The StringRef points into the source buffer that is currently being lexed.
-  StringRef TrailingTrivia;
 
   /// The location at which the comment of the next token starts. \c nullptr if
   /// the next token doesn't have a comment.
@@ -166,8 +149,8 @@ class Lexer {
   Lexer(const PrincipalTag &, const LangOptions &LangOpts,
         const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, LexerMode LexMode,
-        HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
-        TriviaRetentionMode TriviaRetention);
+        HashbangMode HashbangAllowed,
+        CommentRetentionMode RetainComments);
 
   void initialize(unsigned Offset, unsigned EndOffset);
 
@@ -202,14 +185,13 @@ public:
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
-      CommentRetentionMode RetainComments = CommentRetentionMode::None,
-      TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
+      CommentRetentionMode RetainComments = CommentRetentionMode::None);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
         unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
         HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
-        TriviaRetentionMode TriviaRetention, unsigned Offset,
+        unsigned Offset,
         unsigned EndOffset);
 
   /// Create a sub-lexer that lexes from the same buffer, but scans
@@ -233,26 +215,15 @@ public:
     return LexMode == LexerMode::SwiftInterface;
   }
 
-  /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
-  /// to trivia are populated.
-  void lex(Token &Result, StringRef &LeadingTriviaResult,
-           StringRef &TrailingTriviaResult) {
+  /// Lex a token.
+  void lex(Token &Result) {
     Result = NextToken;
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-      LeadingTriviaResult = LeadingTrivia;
-      TrailingTriviaResult = TrailingTrivia;
-    }
     // Emit any diagnostics recorded for this token.
     if (DiagQueue)
       DiagQueue->emit();
 
     if (Result.isNot(tok::eof))
       lexImpl();
-  }
-
-  void lex(Token &Result) {
-    StringRef LeadingTrivia, TrailingTrivia;
-    lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
   /// Reset the lexer's buffer pointer to \p Offset bytes after the buffer
@@ -304,8 +275,7 @@ public:
   /// Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from
   /// there.
-  State getStateForBeginningOfToken(const Token &Tok,
-                                    const StringRef &LeadingTrivia = {}) const {
+  State getStateForBeginningOfToken(const Token &Tok) const {
 
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
@@ -314,11 +284,6 @@ public:
     if (TokStart.isInvalid())
       TokStart = Tok.getLoc();
     auto S = getStateForBeginningOfTokenLoc(TokStart);
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-      S.LeadingTrivia = LeadingTrivia;
-    } else {
-      S.LeadingTrivia = StringRef();
-    }
     return S;
   }
 
@@ -340,10 +305,6 @@ public:
     // Don't re-emit diagnostics from readvancing the lexer.
     if (DiagQueue && !enableDiagnostics)
       DiagQueue->clear();
-
-    // Restore Trivia.
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
-      LeadingTrivia = S.LeadingTrivia;
   }
 
   /// Restore the lexer state to a given state that is located before
@@ -679,13 +640,6 @@ private:
   void diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                         const char *TokEnd);
 
-};
-
-/// A lexer that can lex trivia into its pieces
-class TriviaLexer {
-public:
-  /// Decompose the trivia in \p TriviaStr into their pieces.
-  static ParsedTrivia lexTrivia(StringRef TriviaStr);
 };
 
 /// Given an ordered token \param Array , get the iterator pointing to the first

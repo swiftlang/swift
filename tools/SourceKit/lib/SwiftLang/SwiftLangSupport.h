@@ -49,10 +49,6 @@ namespace swift {
   class GenericSignature;
   enum class AccessorKind;
 
-namespace syntax {
-  class SourceFileSyntax;
-}
-
 namespace ide {
   class CodeCompletionCache;
   class CompletionInstance;
@@ -112,8 +108,7 @@ public:
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
   void resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
-                       SwiftLangSupport &Lang, bool BuildSyntaxTree,
-                       swift::SyntaxParsingCache *SyntaxCache = nullptr);
+                       SwiftLangSupport &Lang);
   void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -127,14 +122,8 @@ public:
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
 
-  const llvm::Optional<swift::syntax::SourceFileSyntax> &getSyntaxTree() const;
-
   std::string getFilePath() const;
-
-  /// Whether or not the AST stored for this document is up-to-date or just an
-  /// artifact of incremental syntax parsing
-  bool isIncrementalParsingEnabled() const;
-
+      
   /// Returns the virtual filesystem associated with this document.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
 };

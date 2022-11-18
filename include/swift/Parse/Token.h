@@ -19,12 +19,22 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Syntax/TokenKinds.h"
+#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 
 namespace swift {
+
+enum class tok : uint8_t {
+#define TOKEN(X) X,
+#include "swift/AST/TokenKinds.def"
+
+  NUM_TOKENS
+};
+
+/// If a token kind has determined text, return the text; otherwise assert.
+StringRef getTokenText(tok kind);
 
 /// Token - This structure provides full information about a lexed token.
 /// It is not intended to be space efficient, it is intended to return as much
@@ -200,7 +210,7 @@ public:
   bool isKeyword() const {
     switch (Kind) {
 #define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
     default: return false;
     }
   }
@@ -220,7 +230,7 @@ public:
   bool isPunctuation() const {
     switch (Kind) {
 #define PUNCTUATOR(Name, Str) case tok::Name: return true;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
     default: return false;
     }
   }
