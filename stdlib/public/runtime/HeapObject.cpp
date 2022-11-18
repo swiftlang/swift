@@ -710,6 +710,13 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
+  size_t retainCount = swift_retainCount(object);
+  if (SWIFT_UNLIKELY(retainCount > 1))
+    swift::fatalError(0,
+                      "Object %p deallocated with retain count %zd, reference "
+                      "may have escaped from deinit.\n",
+                      object, retainCount);
+
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
@@ -718,6 +725,7 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #else
   const bool fastDeallocSupported = true;
 #endif
+
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
     objc_destructInstance((id)object);
   }
