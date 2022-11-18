@@ -735,6 +735,8 @@ ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
       "'%0' consumed but not reinitialized before end of function", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
+ERROR(sil_moveonlychecker_exclusivity_violation, none,
+      "'%0' has consuming use that cannot be eliminated due to a tight exclusivity scope", (StringRef))
 
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
