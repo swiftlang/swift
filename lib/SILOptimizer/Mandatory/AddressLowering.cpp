@@ -135,6 +135,7 @@
 #define DEBUG_TYPE "address-lowering"
 
 #include "PhiStorageOptimizer.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -552,6 +553,12 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
   auto *declCtx = pass.function->getDeclContext();
+  if (!declCtx) {
+    // Fall back to using the module as the decl context if the function
+    // doesn't have one.  The can happen with default argument getters, for
+    // example.
+    declCtx = pass.function->getModule().getSwiftModule();
+  }
 
   unsigned argIdx = 0;
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
@@ -559,6 +566,7 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
     auto var = new (astCtx) ParamDecl(
         SourceLoc(), SourceLoc(), astCtx.getIdentifier("$return_value"),
         SourceLoc(), astCtx.getIdentifier("$return_value"), declCtx);
+    var->setSpecifier(ParamSpecifier::InOut);
 
     SILFunctionArgument *funcArg =
         pass.function->begin()->insertFunctionArgument(
