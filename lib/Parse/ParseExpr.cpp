@@ -3411,31 +3411,45 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   if (!macroNameRef)
     return makeParserError();
 
+  ParserStatus status;
+  SourceLoc leftAngleLoc, rightAngleLoc;
+  SmallVector<TypeRepr *, 8> genericArgs;
+  if (canParseAsGenericArgumentList()) {
+    auto genericArgsStatus = parseGenericArguments(
+        genericArgs, leftAngleLoc, rightAngleLoc);
+    status |= genericArgsStatus;
+    if (genericArgsStatus.isErrorOrHasCompletion())
+      diagnose(leftAngleLoc, diag::while_parsing_as_left_angle_bracket);
+  }
+
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen()) {
     auto result = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic,
                                 /*allowTrailingClosure*/ true);
     if (result.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
-    if (result.isParseError())
-      return makeParserError();
-    argList = result.get();
+    argList = result.getPtrOrNull();
+    status |= result;
   } else if (Tok.is(tok::l_brace) &&
              isValidTrailingClosure(isExprBasic, *this)) {
     SmallVector<Argument, 2> trailingClosures;
-    auto status = parseTrailingClosures(isExprBasic,
-                                        macroNameLoc.getSourceRange(),
-                                        trailingClosures);
-    if (status.isError() || trailingClosures.empty())
-      return makeParserError();
-    argList = ArgumentList::createParsed(Context, SourceLoc(),
-                                         trailingClosures, SourceLoc(),
-                                         /*trailingClosureIdx*/ 0);
+    auto closureStatus = parseTrailingClosures(isExprBasic,
+                                               macroNameLoc.getSourceRange(),
+                                               trailingClosures);
+    status |= closureStatus;
+
+    if (!trailingClosures.empty()) {
+      argList = ArgumentList::createParsed(Context, SourceLoc(),
+                                           trailingClosures, SourceLoc(),
+                                           /*trailingClosureIdx*/ 0);
+    }
   }
 
   return makeParserResult(
+      status,
       new (Context) MacroExpansionExpr(
-          poundLoc, macroNameRef, macroNameLoc, argList));
+          poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+          Context.AllocateCopy(genericArgs), rightAngleLoc, argList));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
