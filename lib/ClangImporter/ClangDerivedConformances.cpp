@@ -27,7 +27,7 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
       decl->getASTContext().evaluator, ClangRecordMemberLookup({decl, id}), {});
 
   // Check if there are any synthesized Swift members that match the name.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
+  for (auto member : decl->getMembers()) {
     if (auto namedMember = dyn_cast<ValueDecl>(member)) {
       if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
           namedMember->getName().getBaseIdentifier().is(id.str()) &&
