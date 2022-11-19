@@ -403,7 +403,7 @@ class Product(object):
     def common_cross_c_flags(self, platform, arch, include_arch=False):
         cross_flags = []
 
-        target = self.target_for_platform(platform, arch, include_version=False)
+        target = self.target_for_platform(platform, arch, include_version=True)
         if include_arch and target:
             cross_flags.append('-arch {}'.format(arch))
             cross_flags.append('-target {}'.format(target))
