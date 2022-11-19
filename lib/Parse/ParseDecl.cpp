@@ -9014,10 +9014,11 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
   }
 
   // Parse the macro signature.
-  TypeRepr *resultType = nullptr;
   ParameterList *parameterList = nullptr;
+  SourceLoc arrowOrColonLoc;
+  TypeRepr *resultType = nullptr;
   DeclName macroFullName;
-  if (consumeIf(tok::colon)) {
+  if (consumeIf(tok::colon, arrowOrColonLoc)) {
     // Value-like macros.
     auto type = parseType(diag::expected_macro_value_type);
     status |= type;
@@ -9036,18 +9037,15 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
     parameterList = parameterResult.getPtrOrNull();
 
     // ->
-    SourceLoc arrowLoc;
-    if (!consumeIf(tok::arrow, arrowLoc)) {
-      diagnose(Tok, diag::macro_decl_expected_arrow);
+    if (consumeIf(tok::arrow, arrowOrColonLoc)) {
+      // Result type.
+      auto parsedResultType =
+          parseDeclResultType(diag::expected_type_macro_result);
+      resultType = parsedResultType.getPtrOrNull();
+      status |= parsedResultType;
+      if (status.isErrorOrHasCompletion())
+        return status;
     }
-
-    // Result type.
-    auto parsedResultType =
-        parseDeclResultType(diag::expected_type_macro_result);
-    resultType = parsedResultType.getPtrOrNull();
-    status |= parsedResultType;
-    if (status.isErrorOrHasCompletion())
-      return status;
 
     macroFullName = DeclName(Context, macroName, namePieces);
   }
@@ -9060,14 +9058,13 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
   // ModuleName
   Identifier externalMacroModule;
   SourceLoc externalMacroModuleLoc;
-  status |= parseIdentifierDeclName(
-      *this, externalMacroModule, externalMacroModuleLoc,
-      "external macro module",
-      [&](const Token &next) {
-        return next.is(tok::period);
-      });
-  if (status.isErrorOrHasCompletion())
-    return status;
+  if (Tok.is(tok::identifier)) {
+    externalMacroModuleLoc = consumeIdentifier(externalMacroModule, true);
+  } else {
+    diagnose(Tok, diag::macro_decl_expected_macro_module);
+    status.setIsParseError();
+    externalMacroModuleLoc = Tok.getLoc();
+  }
 
   // '.'
   if (!consumeIf(tok::period)) {
@@ -9077,22 +9074,20 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
   // MacroTypeName
   Identifier externalMacroTypeName;
   SourceLoc externalMacroTypeNameLoc;
-  status |= parseIdentifierDeclName(
-      *this, externalMacroTypeName, externalMacroTypeNameLoc,
-      "external macro type name",
-      [&](const Token &next) {
-        return true;
-      });
-  if (status.isErrorOrHasCompletion())
-    return status;
+  if (Tok.is(tok::identifier)) {
+    externalMacroTypeNameLoc = consumeIdentifier(
+        externalMacroTypeName, true);
+  } else {
+    diagnose(Tok, diag::macro_decl_expected_macro_type);
+    status.setIsParseError();
+    externalMacroTypeNameLoc = Tok.getLoc();
+  }
 
   // Create the macro declaration.
   auto *macro = new (Context) MacroDecl(
-      MacroDecl::Kind::Expression, MacroDecl::ImplementationKind::Builtin,
-      macroName, CurDeclContext->getParentModule(), { }, nullptr);
-
-  // FIXME: Egregious hack.
-  macro->setImplicit();
+      macroLoc, macroFullName, macroNameLoc, genericParams, parameterList,
+      arrowOrColonLoc, resultType, externalMacroModule, externalMacroModuleLoc,
+      externalMacroTypeName, externalMacroTypeNameLoc, CurDeclContext);
 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {

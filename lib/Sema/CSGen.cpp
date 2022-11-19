@@ -1201,7 +1201,8 @@ namespace {
           return Type();
 
         auto macroIdent = ctx.getIdentifier(kind);
-        auto macros = lookupMacros(macroIdent, FunctionRefKind::Unapplied);
+        auto macros = lookupMacros(
+            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -3661,22 +3662,24 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
-    lookupMacros(Identifier macroName, FunctionRefKind functionRefKind) {
-      auto req = MacroLookupRequest{macroName, CS.DC->getParentModule()};
-      auto macros = evaluateOrDefault(
-          CS.getASTContext().evaluator, req, { });
-      if (macros.empty())
-        return { };
+    lookupMacros(
+        Identifier macroName, SourceLoc loc, FunctionRefKind functionRefKind
+    ) {
+      auto result = TypeChecker::lookupUnqualified(
+          CurDC, DeclNameRef(macroName), loc,
+          defaultUnqualifiedLookupOptions);
+
+      SmallVector<OverloadChoice, 1> choices;
+      for (const auto &found : result) {
+        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+          OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
+          choices.push_back(choice);
+        }
+      }
 
       // FIXME: At some point, we need to check for function-like macros without
       // arguments and vice-versa.
 
-
-      SmallVector<OverloadChoice, 1> choices;
-      for (auto macro : macros) {
-        OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
-        choices.push_back(choice);
-      }
       return choices;
     }
 
@@ -3689,7 +3692,9 @@ namespace {
         bool isCall = expr->getArgs() != nullptr;
         FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
                                                  : FunctionRefKind::Unapplied;
-        auto macros = lookupMacros(macroIdent, functionRefKind);
+        auto macros = lookupMacros(
+            macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
+            functionRefKind);
         if (macros.empty()) {
           ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                              macroIdent)

@@ -7,6 +7,8 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+macro customStringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+
 print(#customStringify(3 + 2 - 1))
 // CHECK: (4, "3 + 2 - 1")
 

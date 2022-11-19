@@ -11,6 +11,8 @@
 
 // CHECK: <unknown>:{{.*}}: warning: compiler plugin module 'MacroDefinitionMissingAllMacros' (in {{.*}}/libMacroDefinitionMissingAllMacros.dylib) is missing a top-level computed property 'public var allMacros: [Any.Type]' to declare all macros; undeclared macros will be ignored
 
+macro customStringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+
 // expected-note @+2 {{test note}}
 // expected-warning @+1 {{test warning}}
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))

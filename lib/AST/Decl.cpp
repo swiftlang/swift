@@ -3031,7 +3031,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
         ->getCanonicalType();
   }
 
-  if (isa<EnumElementDecl>(this)) {
+  if (isa<EnumElementDecl>(this) || isa<MacroDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
@@ -7791,6 +7791,8 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
     return EED->getParameterList();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
     return SD->getIndices();
+  } else if (auto *MD = dyn_cast<MacroDecl>(source)) {
+    return MD->parameterList;
   }
 
   return nullptr;
@@ -9628,19 +9630,32 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
 MacroDecl::MacroDecl(
-  Kind kind, ImplementationKind implementationKind, Identifier name,
-  ModuleDecl *owningModule,
-  ArrayRef<ModuleDecl *> supplementalSignatureModules,
-  void *opaqueHandle
-) : GenericContext(DeclContextKind::MacroDecl, owningModule, nullptr),
-    ValueDecl(DeclKind::Macro, owningModule, name, SourceLoc()),
-    kind(kind), implementationKind(implementationKind),
-    supplementalSignatureModules(supplementalSignatureModules),
-    opaqueHandle(opaqueHandle) {
+    SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
+    GenericParamList *genericParams,
+    ParameterList *parameterList,
+    SourceLoc arrowOrColonLoc,
+    TypeRepr *resultType,
+    Identifier externalModuleName,
+    SourceLoc externalModuleNameLoc,
+    Identifier externalMacroTypeName,
+    SourceLoc externalMacroTypeNameLoc,
+    DeclContext *parent
+) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
+    ValueDecl(DeclKind::Macro, parent, name, nameLoc),
+    macroLoc(macroLoc), parameterList(parameterList),
+    arrowOrColonLoc(arrowOrColonLoc),
+    resultType(resultType),
+    externalModuleName(externalModuleName),
+    externalModuleNameLoc(externalModuleNameLoc),
+    externalMacroTypeName(externalMacroTypeName),
+    externalMacroTypeNameLoc(externalMacroTypeNameLoc) {
+
+  if (parameterList)
+    parameterList->setDeclContextOfParamDecls(this);
 }
 
 SourceRange MacroDecl::getSourceRange() const {
-  return SourceRange();
+  return SourceRange(macroLoc, externalMacroTypeNameLoc);
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {

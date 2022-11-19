@@ -2006,15 +2006,17 @@ ERROR(expected_macro_value_type,PointsToFirstBadToken,
 ERROR(no_default_arg_macro,none,
       "default arguments are not allowed in macros", ())
 ERROR(expected_lparen_macro,PointsToFirstBadToken,
-      "expected '(' for macro parameters or ':' for a value-like macro''", ())
-ERROR(macro_decl_expected_arrow,none,
-      "expected '->' after macro parameter list", ())
+      "expected '(' for macro parameters or ':' for a value-like macro", ())
 ERROR(expected_type_macro_result,PointsToFirstBadToken,
       "expected macro result type", ())
-ERROR(macro_decl_expected_equal,none,
+ERROR(macro_decl_expected_equal,PointsToFirstBadToken,
       "expected '=' to introduce external macro name", ())
-ERROR(macro_decl_expected_period,none,
+ERROR(macro_decl_expected_macro_module,PointsToFirstBadToken,
+      "expected external macro name", ())
+ERROR(macro_decl_expected_period,PointsToFirstBadToken,
       "expected '.' between external macro module and type name", ())
+ERROR(macro_decl_expected_macro_type,PointsToFirstBadToken,
+      "expected external macro type name", ())
 
 ERROR(macro_expansion_expr_expected_macro_identifier,none,
       "expected a macro identifier for a pound literal expression", ())

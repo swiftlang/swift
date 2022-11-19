@@ -122,6 +122,11 @@ SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
   return decl->getSourceRangeIncludingAttrs();
 }
 
+SourceRange MacroDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getSourceRangeIncludingAttrs();
+}
+
 SourceRange
 EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();

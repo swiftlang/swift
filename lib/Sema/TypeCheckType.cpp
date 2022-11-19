@@ -153,6 +153,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::FunctionResult:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::EnumElementDecl:
+  case TypeResolverContext::MacroDecl:
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::ImmediateOptionalTypeArgument:
@@ -4132,6 +4133,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::ExplicitCastExpr:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::EnumElementDecl:
+  case TypeResolverContext::MacroDecl:
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
