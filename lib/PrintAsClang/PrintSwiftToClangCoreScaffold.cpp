@@ -219,7 +219,6 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                             /*isCForwardDefinition=*/true);
           });
           os << "\n";
-          //printCxxNaiveException(os);
         });
     os << "\n";
     // C++ only supports inline variables from C++17.
