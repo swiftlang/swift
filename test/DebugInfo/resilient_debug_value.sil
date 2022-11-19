@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -g -I %t -emit-ir %s  -o - | %FileCheck %s
 
 // REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: rdar102535969
 
 import resilient_struct
 
