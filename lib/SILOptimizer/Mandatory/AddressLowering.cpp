@@ -2171,31 +2171,34 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   for (auto i : indices(oldResults)) {
     auto &oldResult = oldResults[i];
     auto &newResult = newResults[i];
+    if (oldResult.getType().isObject() && newResult.getType().isObject()) {
+      // Handle direct conventions.
+      oldResult.replaceAllUsesWith(&newResult);
+      continue;
+    }
+    if (oldResult.getType().isAddress()) {
+      // Handle inout convention.
+      assert(newResult.getType().isAddress());
+      oldResult.replaceAllUsesWith(&newResult);
+      continue;
+    }
     if (oldResult.getType().isAddressOnly(*pass.function)) {
-      if (!oldResult.getType().isAddress()) {
-        pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
-        pass.valueStorageMap.getStorage(&oldResult).markRewritten();
-      } else {
-        oldResult.replaceAllUsesWith(&newResult);
-      }
+      // Remap storage when an address-only type is yielded as an opaque value.
+      pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
+      pass.valueStorageMap.getStorage(&oldResult).markRewritten();
+      continue;
+    }
+    assert(oldResult.getType().isObject());
+    assert(newResult.getType().isAddress());
+    if (oldResult.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      SILValue load =
+          resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
+      oldResult.replaceAllUsesWith(load);
+      emitEndBorrows(load, pass);
     } else {
-      if (oldResult.getType().isObject() && newResult.getType().isAddress()) {
-        if (oldResult.getOwnershipKind() == OwnershipKind::Guaranteed) {
-          SILValue load =
-              resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
-          oldResult.replaceAllUsesWith(load);
-          emitEndBorrows(load, pass);
-        } else {
-          auto *load = resultBuilder.createLoad(
-              callLoc, &newResult,
-              newResult.getType().isTrivial(*pass.function)
-                  ? LoadOwnershipQualifier::Trivial
-                  : LoadOwnershipQualifier::Take);
-          oldResult.replaceAllUsesWith(load);
-        }
-      } else {
-        oldResult.replaceAllUsesWith(&newResult);
-      }
+      auto *load = resultBuilder.createTrivialLoadOr(
+          callLoc, &newResult, LoadOwnershipQualifier::Take);
+      oldResult.replaceAllUsesWith(load);
     }
   }
 }
