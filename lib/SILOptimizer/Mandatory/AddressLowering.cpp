@@ -515,12 +515,14 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       auto loc = SILValue(arg).getLoc();
       SILValue undefAddress = SILUndef::get(addrType, *pass.function);
       SingleValueInstruction *load;
-      if (param.isConsumed()) {
-        load = argBuilder.createTrivialLoadOr(loc, undefAddress,
-                                              LoadOwnershipQualifier::Take);
+      if (addrType.isTrivial(*pass.function)) {
+        load = argBuilder.createLoad(loc, undefAddress,
+                                     LoadOwnershipQualifier::Trivial);
+      } else if (param.isConsumed()) {
+        load = argBuilder.createLoad(loc, undefAddress,
+                                     LoadOwnershipQualifier::Take);
       } else {
-        load = cast<SingleValueInstruction>(
-            argBuilder.emitLoadBorrowOperation(loc, undefAddress));
+        load = argBuilder.createLoadBorrow(loc, undefAddress);
         for (SILInstruction *termInst : pass.exitingInsts) {
           pass.getBuilder(termInst->getIterator())
               .createEndBorrow(pass.genLoc(), load);
