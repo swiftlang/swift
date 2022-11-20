@@ -72,3 +72,24 @@ utils/*windows*       @compnerd
 /lib/AST/*Substitution            @slavapestov
 /unittests/AST/                   @hborla @slavapestov @xedin
 /unittests/AST/*Evaluator*        @CodaFi @slavapestov
+
+# Sema
+/include/swift/Sema/            @hborla @slavapestov @xedin
+/include/swift/Sema/Constraint* @hborla @xedin
+/include/swift/Sema/CS*         @hborla @xedin
+/lib/Sema/                      @hborla @slavapestov @xedin
+/lib/Sema/Constraint*           @hborla @xedin
+/lib/Sema/CS*                   @hborla @xedin
+/lib/Sema/DerivedConformance*   @slavapestov
+/lib/Sema/TypeCheckType*        @AnthonyLatsis @hborla @slavapestov @xedin
+/lib/Sema/TypeCheckProtocol*    @AnthonyLatsis @hborla @slavapestov
+/test/Constraints/              @hborla @xedin
+/test/decl/                     @hborla @slavapestov
+/test/decl/protocol/            @AnthonyLatsis @hborla @slavapestov
+/test/expr/                     @hborla @slavapestov @xedin
+/test/Generics/                 @hborla @slavapestov
+/test/Sema/                     @hborla @slavapestov @xedin
+/test/stmt/                     @hborla @xedin
+/test/type/                     @hborla @slavapestov @xedin
+/validation-test/Sema/          @hborla @slavapestov @xedin
+/unittests/Sema/                @hborla @xedin
