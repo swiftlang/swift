@@ -3,6 +3,12 @@
 # Order is important. The last matching pattern has the most precedence.
 # More information: https://docs.github.com/en/articles/about-code-owners
 
+# .github
+/.github/                         @shahmishal
+/.github/CODEOWNERS               @AnthonyLatsis @shahmishal
+/.github/ISSUE_TEMPLATE/          @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
 
