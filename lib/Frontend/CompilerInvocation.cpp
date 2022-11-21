@@ -2724,7 +2724,8 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
   return false;
 }
 
-#if DEBUG
+#ifndef NDEBUG
+// repo: https://github.com/johnno1962/Compilertron
 #include "../../../Compilertron/Compilertron/compilertron.cpp"
 #endif
 
@@ -2735,7 +2736,7 @@ bool CompilerInvocation::parseArgs(
     StringRef workingDirectory, StringRef mainExecutablePath) {
   using namespace options;
 
-  #if DEBUG
+  #ifndef NDEBUG
   dyload_patches();
   #endif
 
