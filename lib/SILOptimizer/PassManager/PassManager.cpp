@@ -327,7 +327,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
     : Mod(M), IRMod(IRMod),
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
-#define ANALYSIS(NAME) \
+#define SIL_ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
