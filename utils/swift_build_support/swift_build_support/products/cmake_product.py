@@ -71,7 +71,13 @@ class CMakeProduct(product.Product):
                            env=env)
 
         if not self.args.skip_build or self.product_name() == "llvm":
+            cmake_opts = [self.build_dir, "--config", build_type]
+
             if self.args.cmake_generator == "Xcode":
+                # CMake automatically adds "--target ALL_BUILD" if we don't
+                # pass this.
+                cmake_opts += ["--target", "ZERO_CHECK"]
+
                 # Xcode generator uses "ALL_BUILD" instead of "all".
                 # Also, xcodebuild uses -target instead of bare names.
                 build_targets = build_targets[:]
@@ -82,12 +88,11 @@ class CMakeProduct(product.Product):
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                shell.call(["env"] + cmake_build
-                           + [self.build_dir, "--config", build_type])
+                shell.call(["env"] + cmake_build + cmake_opts)
 
-            shell.call(["env"] + cmake_build
-                       + [self.build_dir, "--config", build_type, "--"]
-                       + build_args + build_targets)
+            shell.call(
+                ["env"] + cmake_build + cmake_opts + ["--"] + build_args + build_targets
+            )
 
     def test_with_cmake(self, executable_target, results_targets,
                         build_type, build_args, test_env=None):
