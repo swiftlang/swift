@@ -807,7 +807,7 @@ public:
   void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
            ManagedValue base) &&
       override {
-    if (isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
+    if (isa_and_nonnull<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
         Field->hasAttachedPropertyWrapper() && Field->isLet()) {
       auto backingVar = Field->getPropertyWrapperBackingProperty();
       auto ValType = backingVar->getValueInterfaceType();
@@ -928,7 +928,7 @@ public:
     void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
              ManagedValue base) &&
         override {
-      if (isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
+      if (isa_and_nonnull<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
           Field->hasAttachedPropertyWrapper() && Field->isLet()) {
         auto backingVar = Field->getPropertyWrapperBackingProperty();
         auto ValType = backingVar->getValueInterfaceType();
