@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
+import Darwin
 
 // ==== TaskGroup --------------------------------------------------------------
 
@@ -76,6 +78,32 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 
   let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = TaskGroup<ChildTaskResult>(group: _group)
+
+  // Run the withTaskGroup body.
+  let result = await body(&group)
+
+  await group.awaitAllRemainingTasks()
+
+  Builtin.destroyTaskGroup(_group)
+  return result
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+@available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor
+@inlinable
+public func withTaskGroupSuper<GroupResult>(
+  of childTaskResultType: Void.Type = Void.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: (inout TaskGroup<Void>) async -> GroupResult
+) async -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(Void.self)
+  var group = TaskGroup<Void>(group: _group)
 
   // Run the withTaskGroup body.
   let result = await body(&group)
@@ -556,7 +584,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @usableFromInline
   internal mutating func _waitForAll() async throws {
-    while let _ = try await next() { }
+    while let _ = try? await next() { }
   }
 
   /// Wait for all of the group's remaining tasks to complete.
