@@ -19,3 +19,9 @@ lib/ClangImporter           @zoecarver @hyp @egorzhdan
 lib/PrintAsClang            @zoecarver @hyp @egorzhdan
 stdlib/public/Cxx           @zoecarver @hyp @egorzhdan
 test/Interop                @zoecarver @hyp @egorzhdan
+
+# Windows support
+cmake/**/*Windows*    @compnerd
+lib/Basic/Windows     @compnerd
+stdlib/public/Windows @compnerd
+utils/*windows*       @compnerd
