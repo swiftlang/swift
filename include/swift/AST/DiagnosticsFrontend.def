@@ -478,10 +478,6 @@ REMARK(warning_in_access_notes_file,none,
 
 WARNING(compiler_plugin_not_loaded,none,
         "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
-WARNING(compiler_plugin_missing_macro_declaration,none,
-        "compiler plugin module '%0' (in %1) is missing a top-level computed "
-        "property 'public var %2: [Any.Type]' to declare all macros; "
-        "undeclared macros will be ignored", (StringRef, StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

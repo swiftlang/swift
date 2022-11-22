@@ -73,8 +73,6 @@ public protocol _CompilerPlugin {
   // - Use C-compatible types and tuples thereof to ensure that we can invoke
   //   these methods from C.
 
-  static func _name() -> (UnsafePointer<UInt8>, count: Int)
-
   static func _kind() -> _CompilerPluginKind
 
   /// Returns new source code by transforming the given source code, or nil if
@@ -98,32 +96,4 @@ public protocol _CompilerPlugin {
   ) -> (code: UnsafePointer<UInt8>?, codeLength: Int,
         diagnostics: UnsafePointer<_Diagnostic>?,
         diagnosticCount: Int)
-
-  /// Returns the generic signature of the plugin.
-  ///
-  /// - Returns: A newly allocated buffer containing the generic signature.
-  ///   The caller is responsible for managing the memory.
-  static func _genericSignature() -> (UnsafePointer<UInt8>?, count: Int)
-
-  /// Returns the type signature of the plugin.
-  ///
-  /// - Returns: A newly allocated buffer containing the type signature. The
-  ///   caller is responsible for managing the memory.
-  static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int)
-
-
-  /// Returns the module that owns this macro.
-  ///
-  /// - Returns: A newly allocated buffer containing the owning module name. The
-  ///   caller is responsible for managing the memory.
-  static func _owningModule() -> (UnsafePointer<UInt8>, count: Int)
-
-  /// Returns the set of modules that are needed (beyond the owning module) to
-  /// process the module signature.
-  ///
-  /// - Returns: A newly allocated buffer containing a string with all of the
-  /// supplemental signature module names, separated by semicolons. The caller
-  /// is responsible for managing the memory.
-  static func _supplementalSignatureModules()
-      -> (UnsafePointer<UInt8>, count: Int)
 }

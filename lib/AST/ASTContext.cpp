@@ -22,6 +22,7 @@
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -514,11 +515,8 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
-  /// Cache of compiler plugins keyed by their name.
-  ///
-  /// Names can be overloaded, so there can be multiple plugins with the same
-  /// name.
-  llvm::StringMap<TinyPtrVector<CompilerPlugin*>> LoadedPlugins;
+  /// Record of loaded plugin modules.
+  std::vector<std::pair<std::string, void *>> LoadedPluginPaths;
 
   /// Cache of loaded symbols.
   llvm::StringMap<void *> LoadedSymbols;
@@ -584,12 +582,6 @@ ASTContext::Implementation::Implementation()
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
-
-  for (const auto &pluginsByName : LoadedPlugins) {
-    for (auto plugin : pluginsByName.second) {
-      delete plugin;
-    }
-  }
 }
 
 ConstraintCheckerArenaRAII::
@@ -6103,16 +6095,24 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
-TinyPtrVector<CompilerPlugin *> ASTContext::getLoadedPlugins(StringRef name) {
-  auto &loadedPlugins = getImpl().LoadedPlugins;
-  auto lookup = loadedPlugins.find(name);
-  if (lookup == loadedPlugins.end())
-    return { };
-  return lookup->second;
-}
+void ASTContext::loadCompilerPlugins() {
+  for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    void *lib = nullptr;
+#if !defined(_WIN32)
+    lib = dlopen(path.c_str(), RTLD_LAZY|RTLD_LOCAL);
+#endif
+    if (!lib) {
+      const char *errorMsg = "Unsupported platform";
+#if !defined(_WIN32)
+      errorMsg = dlerror();
+#endif
+      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                     errorMsg);
+      continue;
+    }
 
-void ASTContext::addLoadedPlugin(StringRef name, CompilerPlugin *plugin) {
-  getImpl().LoadedPlugins[name].push_back(plugin);
+    getImpl().LoadedPluginPaths.push_back({path, lib});
+  }
 }
 
 void *ASTContext::getAddressOfSymbol(const char *name,
@@ -6123,6 +6123,15 @@ void *ASTContext::getAddressOfSymbol(const char *name,
   if (lookup.second) {
     auto *handle = libraryHandleHint ? libraryHandleHint : RTLD_DEFAULT;
     address = dlsym(handle, name);
+
+    // If we didn't know where to look, look specifically in each plugin.
+    if (!address && !libraryHandleHint) {
+      for (const auto &plugin: getImpl().LoadedPluginPaths) {
+        address = dlsym(plugin.second, name);
+        if (address)
+          break;
+      }
+    }
   }
 #endif
   return address;

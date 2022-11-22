@@ -16,6 +16,7 @@
 
 #include "TypeCheckMacros.h"
 #include "TypeChecker.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/Expr.h"
@@ -27,6 +28,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
@@ -40,6 +42,58 @@ extern "C" void swift_ASTGen_destroyMacro(void *macro);
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     void *sourceFile, const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
+
+/// Produce the mangled name for the nominal type descriptor of a type
+/// referenced by its module and type name.
+static std::string mangledNameForTypeMetadataAccessor(
+    StringRef moduleName, StringRef typeName) {
+  using namespace Demangle;
+
+  //  kind=Global
+  //    kind=NominalTypeDescriptor
+  //      kind=Type
+  //        kind=Structure
+  //          kind=Module, text=moduleName
+  //          kind=Identifier, text=typeName
+  Demangle::Demangler D;
+  auto *global = D.createNode(Node::Kind::Global);
+  {
+    auto *nominalDescriptor =
+        D.createNode(Node::Kind::TypeMetadataAccessFunction);
+    {
+      auto *type = D.createNode(Node::Kind::Type);
+      {
+        auto *module = D.createNode(Node::Kind::Module, moduleName);
+        auto *identifier = D.createNode(Node::Kind::Identifier, typeName);
+        auto *structNode = D.createNode(Node::Kind::Structure);
+        structNode->addChild(module, D);
+        structNode->addChild(identifier, D);
+        type->addChild(structNode, D);
+      }
+      nominalDescriptor->addChild(type, D);
+    }
+    global->addChild(nominalDescriptor, D);
+  }
+
+  auto mangleResult = mangleNode(global);
+  assert(mangleResult.isSuccess());
+  return mangleResult.result();
+}
+
+/// Look for macro's type metadata given its external module and type name.
+static void const *lookupMacroTypeMetadataByExternalName(
+    ASTContext &ctx, StringRef moduleName, StringRef typeName) {
+  // Look up the type metadata accessor.
+  auto symbolName = mangledNameForTypeMetadataAccessor(moduleName, typeName);
+  auto accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str());
+  if (!accessorAddr)
+    return nullptr;
+
+  // Call the accessor to form type metadata.
+  using MetadataAccessFunc = const void *(MetadataRequest);
+  auto accessor = reinterpret_cast<MetadataAccessFunc*>(accessorAddr);
+  return accessor(MetadataRequest(MetadataState::Complete));
+}
 
 MacroDefinition MacroDefinitionRequest::evaluate(
     Evaluator &evaluator, MacroDecl *macro
@@ -62,18 +116,26 @@ MacroDefinition MacroDefinitionRequest::evaluate(
         MacroDefinition::Expression, builtinHandle);
   }
 
-  // Look for a plugin macro with this name.
-  // NOTE: We really need to index based on the type name, which should be
-  // unique.
-  for (auto plugin : ctx.getLoadedPlugins(macroName)) {
+  /// Look for the type metadata given the external module and type names.
+  auto macroMetatype = lookupMacroTypeMetadataByExternalName(
+      ctx, macro->externalModuleName.str(),
+      macro->externalMacroTypeName.str());
+  if (macroMetatype) {
+    auto plugin = new CompilerPlugin(macroMetatype, nullptr, ctx);
+    ctx.addCleanup([plugin] { delete plugin; });
     // FIXME: Handle other kinds of macros.
     return MacroDefinition::forCompilerPlugin(
         MacroDefinition::Expression, plugin);
   }
+
+
 #endif
 
-  // FIXME: Diagnose the lack of a macro implementation. This macro cannot be
-  // expanded.
+  ctx.Diags.diagnose(
+      macro, diag::external_macro_not_found, macro->externalModuleName.str(),
+      macro->externalMacroTypeName.str(), macro->getName());
+  // FIXME: Can we give more actionable advice?
+
   return MacroDefinition::forInvalid();
 }
 
@@ -144,24 +206,22 @@ Expr *swift::expandMacroExpr(
          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
              sourceMgr, expr->getSourceRange()), ctx, pluginDiags);
       for (auto &diag : pluginDiags) {
+        // FIXME: Switch to DeclName in the diagnostics.
         auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
+        Diag<DeclName, StringRef> diagID;
         switch (diag.severity) {
         case CompilerPlugin::DiagnosticSeverity::Note:
-          ctx.Diags.diagnose(loc, diag::macro_note,
-              ctx.getIdentifier(plugin->getName()),
-              diag.message);
+          diagID = diag::macro_note;
           break;
         case CompilerPlugin::DiagnosticSeverity::Warning:
-          ctx.Diags.diagnose(loc, diag::macro_warning,
-              ctx.getIdentifier(plugin->getName()),
-              diag.message);
+          diagID = diag::macro_warning;
           break;
         case CompilerPlugin::DiagnosticSeverity::Error:
-          ctx.Diags.diagnose(loc, diag::macro_error,
-              ctx.getIdentifier(plugin->getName()),
-              diag.message);
+          diagID = diag::macro_error;
           break;
         }
+
+        ctx.Diags.diagnose(loc, diagID, macro->getName(), diag.message);
       }
       if (evaluated)
         evaluatedSource = *evaluated;
