@@ -85,6 +85,7 @@ private func allocateUTF8String(
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
+  macroPtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafePointer<UInt8>,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
@@ -117,13 +118,12 @@ func evaluateMacro(
     }
 
     guard let parentSyntax = token.parent,
-      parentSyntax.is(MacroExpansionExprSyntax.self)
+          let parentExpansion = parentSyntax.as(MacroExpansionExprSyntax.self)
     else {
       print("not on a macro expansion node: \(token.recursiveDescription)")
       return -1
     }
 
-    let macroSystem = MacroSystem.exampleSystem
     let converter = SourceLocationConverter(
       file: sourceFile.pointee.fileName, tree: sf
     )
@@ -132,10 +132,15 @@ func evaluateMacro(
       sourceLocationConverter: converter
     )
 
-    let evaluatedSyntax = parentSyntax.evaluateMacro(
-      with: macroSystem, context: context
-    ) { error in
-      /* TODO: Report errors */
+    let evaluatedSyntax: ExprSyntax = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+      guard let exprMacro = macro.pointee.macro as? ExpressionMacro.Type else {
+        print("not an expression macro")
+        return ExprSyntax(parentExpansion)
+      }
+
+      let expansion = exprMacro.apply(parentExpansion, in: context)
+      // FIXME: Produce diagnostics.
+      return expansion.rewritten
     }
 
     var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description

@@ -40,7 +40,7 @@ extern "C" void *swift_ASTGen_lookupMacro(const char *macroName);
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
-    void *sourceFile, const void *sourceLocation,
+    void *macro, void *sourceFile, const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 /// Produce the mangled name for the nominal type descriptor of a type
@@ -177,10 +177,10 @@ Expr *swift::expandMacroExpr(
       if (!astGenSourceFile)
         return nullptr;
 
-      // FIXME: Tell ASTGen which macro to use.
       const char *evaluatedSourceAddress;
       ptrdiff_t evaluatedSourceLength;
       swift_ASTGen_evaluateMacro(
+          macroDef.getAsBuiltin(),
           astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
           &evaluatedSourceAddress, &evaluatedSourceLength);
       if (!evaluatedSourceAddress)
@@ -206,8 +206,7 @@ Expr *swift::expandMacroExpr(
          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
              sourceMgr, expr->getSourceRange()), ctx, pluginDiags);
       for (auto &diag : pluginDiags) {
-        // FIXME: Switch to DeclName in the diagnostics.
-        auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
+\        auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
         Diag<DeclName, StringRef> diagID;
         switch (diag.severity) {
         case CompilerPlugin::DiagnosticSeverity::Note:
