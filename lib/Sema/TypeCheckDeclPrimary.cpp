@@ -1212,7 +1212,7 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
       if (auto sourceFile = nominal->getParentSourceFile()) {
         switch (sourceFile->Kind) {
         case SourceFileKind::Interface:
-          // Interfaces have explicitly called-out Sendable conformances.
+          // Interfaces have explicitly called-out Reflectable conformances.
           return nullptr;
 
         case SourceFileKind::Library:
@@ -1227,7 +1227,7 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
     case FileUnitKind::Builtin:
     case FileUnitKind::SerializedAST:
     case FileUnitKind::Synthesized:
-      // Explicitly-handled modules don't infer Sendable conformances.
+      // Explicitly-handled modules don't infer Reflectable conformances.
       return nullptr;
 
     case FileUnitKind::ClangModule:
@@ -1240,7 +1240,7 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
   }
 
   // Local function to form the implicit conformance.
-  auto formConformance = [&](const DeclAttribute *attrMakingUnavailable)
+  auto formConformance = [&]()
         -> NormalProtocolConformance * {
     DeclContext *conformanceDC = nominal;
     auto conformance = ctx.getConformance(
@@ -1253,8 +1253,8 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
     return conformance;
   };
 
-//   // If this is a class, check the superclass. If it's already Sendable,
-//   // form an inherited conformance.
+   // If this is a class, check the superclass. If it's already Reflectable,
+   // form an inherited conformance.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
@@ -1277,11 +1277,11 @@ ProtocolConformance *GetImplicitReflectableRequest::evaluate(
     }
   }
 
-  // Only structs and enums can get implicit Reflectable.
-  if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
+  // Only structs, classes and enums can get implicit Reflectable.
+  if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal) && !isa<ClassDecl>(nominal))
     return nullptr;
 
-  return formConformance(nullptr);
+  return formConformance();
 }
 
 /// Check the requirements in the where clause of the given \c atd

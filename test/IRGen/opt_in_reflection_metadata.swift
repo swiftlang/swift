@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-upcoming-feature OptInReflection -emit-ir %s | %FileCheck %s --check-prefix=CHECK-REL
 // RUN: %target-swift-frontend -g -enable-upcoming-feature OptInReflection -emit-ir %s | %FileCheck %s --check-prefix=CHECK-DEB
+// RUN: %target-swift-frontend -enable-full-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=CHECK-FULL
 
 // reflection metadata field descriptor opt_in_reflection_metadata.RefProtocol
 // CHECK-REL-DAG: @"$s26opt_in_reflection_metadata11RefProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
@@ -70,6 +71,7 @@ public class RefGenericClass<T>: RefProtocol2 {
 
 // reflection metadata field descriptor opt_in_reflection_metadata.NonRefProtocol
 // CHECK-REL-NOT: @"$s26opt_in_reflection_metadata14NonRefProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-FULL-DAG: @"$s26opt_in_reflection_metadata14NonRefProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 // CHECK-DEB-DAG: @"$s26opt_in_reflection_metadata14NonRefProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 public protocol NonRefProtocol {
   associatedtype NonRefInner
@@ -80,10 +82,16 @@ public protocol RefProtocol3: Reflectable {}
 
 // reflection metadata field descriptor opt_in_reflection_metadata.NonRefStruct
 // CHECK-REL-NOT: @"$s26opt_in_reflection_metadata12NonRefStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-FULL-DAG: @"$s26opt_in_reflection_metadata12NonRefStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 // CHECK-DEB-DAG: @"$s26opt_in_reflection_metadata12NonRefStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 public struct NonRefStruct {
   let i: Int
   let y: RefProtocol3
+}
+
+// CHECK-FULL-DAG: @"$s26opt_in_reflection_metadata11NonRefClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+public class NonRefClass {
+  public let a = 123
 }
 
 // reflection metadata field descriptor opt_in_reflection_metadata.NonRefGenericStruct

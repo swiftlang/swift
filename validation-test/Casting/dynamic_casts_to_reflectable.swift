@@ -4,7 +4,7 @@
 // RUN: %target-codesign %t/opt_in.out
 // RUN: %target-run %t/opt_in.out | %FileCheck %s --check-prefix=CHECK-OPT-IN
 
-// RUN: %target-build-swift -target %target-cpu-apple-macosx99.99 -DFULL %s -o %t/full.out
+// RUN: %target-build-swift -enable-full-reflection-metadata -target %target-cpu-apple-macosx99.99 -DFULL %s -o %t/full.out
 // RUN: %target-codesign %t/full.out
 // RUN: %target-run %t/full.out | %FileCheck %s --check-prefix=CHECK-FULL
 
