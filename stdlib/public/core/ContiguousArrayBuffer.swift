@@ -68,6 +68,49 @@ public var _swiftEmptyArrayStorage: (Int, Int, Int, Int) =
     (/*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1)
 #endif
 
+/// The storage for static read-only arrays.
+///
+/// In contrast to `_ContiguousArrayStorage` this class is _not_ generic over
+/// the element type, because the metatype for static read-only arrays cannot
+/// be instantiated at runtime.
+///
+/// Static read-only arrays can only contain non-verbatim bridged element types.
+@_fixed_layout
+@usableFromInline
+@_objc_non_lazy_realization
+internal final class __StaticArrayStorage
+  : __ContiguousArrayStorageBase {
+
+  @inlinable
+  @nonobjc
+  internal init(_doNotCallMe: ()) {
+    _internalInvariantFailure("creating instance of __StaticArrayStorage")
+  }
+
+#if _runtime(_ObjC)
+  override internal func _withVerbatimBridgedUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }
+
+  override internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
+    fatalError("__StaticArrayStorage._withVerbatimBridgedUnsafeBuffer must not be called")
+  }
+#endif
+
+  @inlinable
+  override internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
+    return false
+  }
+
+  @inlinable
+  @_unavailableInEmbedded
+  override internal var staticElementType: Any.Type {
+    fatalError("__StaticArrayStorage.staticElementType must not be called")
+  }
+}
+
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
 @inlinable
@@ -848,6 +891,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
                                     onObject: _storage)
       }
       return _storage
+    }
+    if _storage is __StaticArrayStorage {
+      return __SwiftDeferredStaticNSArray<Element>(_nativeStorage: _storage)
     }
     return __SwiftDeferredNSArray(_nativeStorage: _storage)
   }

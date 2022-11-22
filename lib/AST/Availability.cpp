@@ -567,10 +567,8 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
 }
 
 AvailabilityContext
-ASTContext::getImmortalRefCountSymbolsAvailability() {
-  // TODO: replace this with a concrete swift version once we have it.
-  // rdar://94185998
-  return getSwiftFutureAvailability();
+ASTContext::getStaticReadOnlyArraysAvailability() {
+  return getSwift511Availability();
 }
 
 AvailabilityContext

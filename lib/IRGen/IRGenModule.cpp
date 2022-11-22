@@ -2038,13 +2038,6 @@ bool IRGenModule::canUseObjCSymbolicReferences() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
-  // Unconditionally disable this until we can fix the metadata.
-  // The trick of using the Empty array metadata for static arrays
-  // breaks Obj-C interop quite badly.
-  // rdar://101126543
-  return false;
-
-#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -2054,8 +2047,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
     return false;
 
   return getAvailabilityContext().isContainedIn(
-          Context.getImmortalRefCountSymbolsAvailability());
-#endif
+          Context.getStaticReadOnlyArraysAvailability());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
