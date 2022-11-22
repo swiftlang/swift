@@ -137,6 +137,15 @@ public:
         /*task*/ asyncTask
       };
     }
+
+    static PollResult getVoid() {
+      return PollResult{
+          /*status*/ PollStatus::Empty,
+          /*storage*/ nullptr,
+          /*successType*/nullptr, // TODO: Void.self
+          /*task*/ nullptr
+      };
+    }
   };
 
   /// An item within the message queue of a group.
@@ -323,11 +332,14 @@ private:
   friend class ::swift::AsyncTask;
 
 public:
-  explicit TaskGroupImpl(const Metadata *T)
+  const bool eagerlyReleaseCompleteTasks;
+  explicit TaskGroupImpl(const Metadata *T, bool eagerlyReleaseCompleteTasks)
     : TaskGroupTaskStatusRecord(),
       status(GroupStatus::initial().status),
       readyQueue(),
-      waitQueue(nullptr), successType(T) {}
+      waitQueue(nullptr),
+      successType(T),
+      eagerlyReleaseCompleteTasks(eagerlyReleaseCompleteTasks) {}
 
   TaskGroupTaskStatusRecord *getTaskRecord() {
     return reinterpret_cast<TaskGroupTaskStatusRecord *>(this);
@@ -489,7 +501,7 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T, /*eagerlyReleaseCompleteTasks=*/true);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
@@ -545,6 +557,12 @@ static void swift_taskGroup_destroyImpl(TaskGroup *group) {
 
 void TaskGroupImpl::destroy() {
   SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
+  if (!this->isEmpty()) {
+    auto status = this->statusLoadRelaxed();
+    SWIFT_TASK_DEBUG_LOG("destroying task group = %p, tasks .ready = %d, .pending = %d",
+                         this, status.readyTasks(), status.pendingTasks());
+  }
+  assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
 
   // First, remove the group from the task and deallocate the record
   removeStatusRecord(getTaskRecord());
@@ -585,6 +603,29 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     // Initialize the result as an Optional<Success>.
     const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
+    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    return;
+  }
+  }
+}
+
+static void fillGroupNextVoidResult(TaskFutureWaitAsyncContext *context,
+                                    PollResult result) {
+  /// Fill in the result value
+  switch (result.status) {
+  case PollStatus::MustWait:
+    assert(false && "filling a waiting status?");
+    return;
+
+  case PollStatus::Error: {
+    assert(false && "cannot have errors");
+    return;
+  }
+
+  case PollStatus::Success: {
+    // Initialize the result as an Optional<Void>.
+    const Metadata *successType = result.successType;
+    OpaqueValue *destPtr = context->successResultPointer;
     // TODO: figure out a way to try to optimistically take the
     // value out of the finished task's future, if there are no
     // remaining references to it.
@@ -605,6 +646,16 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
 // TaskGroup is locked upon entry and exit
 void TaskGroupImpl::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
+  if (this->eagerlyReleaseCompleteTasks) {
+    SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, eager release mode; release result task = %p",
+                         completedTask);
+    // DO NOT RETAIN THE TASK.
+    // We know it is Void, so we don't need to store the result;
+    // By releasing tasks eagerly we're able to keep "infinite" task groups,
+    // running, that never consume their values. Even more-so,
+    return;
+  }
+
   // Retain the task while it is in the queue; it must remain alive until
   // it is found by poll.  This retain will balanced by the release in poll.
   swift_retain(completedTask);
@@ -645,6 +696,9 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   //   W:n R:0 P:1 -> W:y R:1 P:1 // complete immediately
   //   W:n R:0 P:1 -> W:y R:1 P:3 // complete immediately, 2 more pending tasks
   auto assumed = statusAddReadyAssumeAcquire();
+
+  SWIFT_TASK_DEBUG_LOG("group %p, ready: %d, pending: %d",
+                       this, assumed.readyTasks(), assumed.pendingTasks());
 
   auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
       reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
@@ -732,8 +786,6 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     // ready for it, and will process it immediately without suspending.
     assert(!waitQueue.load(std::memory_order_relaxed));
 
-    SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, RETAIN and store ready task = %p",
-                         completedTask);
     enqueueCompletedTask(completedTask, hadErrorResult);
     unlock(); // TODO: remove fragment lock, and use status for synchronization
   }
@@ -810,7 +862,11 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::Success:
     SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
                          group, waitingTask, polled.retainedTask);
-    fillGroupNextResult(context, polled);
+    if (group->eagerlyReleaseCompleteTasks) {
+      fillGroupNextVoidResult(context, polled);
+    } else {
+      fillGroupNextResult(context, polled);
+    }
     if (auto completedTask = polled.retainedTask) {
       // Remove the child from the task group's running tasks list.
       _swift_taskGroup_detachChild(asAbstract(group), completedTask);
@@ -859,8 +915,8 @@ reevaluate_if_taskgroup_has_results:;
 
   // ==== 2) Ready task was polled, return with it immediately -----------------
   if (assumed.readyTasks()) {
-    SWIFT_TASK_DEBUG_LOG("poll group = %p, group has ready tasks = %d",
-                         this, assumed.readyTasks());
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, tasks .ready = %d, .pending = %d",
+                         this, assumed.readyTasks(), assumed.pendingTasks());
 
     auto assumedStatus = assumed.status;
     auto newStatus = TaskGroupImpl::GroupStatus{assumedStatus};
@@ -877,6 +933,17 @@ reevaluate_if_taskgroup_has_results:;
 
       // Success! We are allowed to poll.
       ReadyQueueItem item;
+      if (this->eagerlyReleaseCompleteTasks) {
+        SWIFT_TASK_DEBUG_LOG("poll group = %p; polled in eager-release mode; make up Void value to yield",
+                             this, assumed.readyTasks(), assumed.pendingTasks());
+        result.status = PollStatus::Success;
+        result.storage = nullptr;
+        result.retainedTask = nullptr;
+        result.successType = this->successType;
+        unlock(); // TODO: remove fragment lock, and use status for synchronization
+        return result;
+      }
+
       bool taskDequeued = readyQueue.dequeue(item);
       assert(taskDequeued); (void) taskDequeued;
 
@@ -1035,10 +1102,14 @@ void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
 
 // =============================================================================
 // ==== addPending -------------------------------------------------------------
+
 SWIFT_CC(swift)
 static bool swift_taskGroup_addPendingImpl(TaskGroup *group, bool unconditionally) {
-  auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed(unconditionally);
-  return !assumedStatus.isCancelled();
+  auto assumed = asImpl(group)->statusAddPendingTaskRelaxed(unconditionally);
+  SWIFT_TASK_DEBUG_LOG("add pending %s to group %p, tasks pending = %d",
+                       unconditionally ? "unconditionally" : "",
+                       group, assumed.pendingTasks());
+  return !assumed.isCancelled();
 }
 
 #define OVERRIDE_TASK_GROUP COMPATIBILITY_OVERRIDE
