@@ -82,6 +82,11 @@ public:
     return true;
   }
 
+  bool VisitCXXNewExpr(clang::CXXNewExpr *NE) {
+    callback(NE->getOperatorNew());
+    return true;
+  }
+
   // Do not traverse unevaluated expressions. Doing to might result in compile
   // errors if we try to instantiate an un-instantiatable template.
 
