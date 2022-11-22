@@ -793,6 +793,10 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 BUILTIN_MISC_OPERATION(CreateTaskGroup,
                        "createTaskGroup", "", Special)
 
+/// Create a task group, with options.
+BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
+                       "createTaskGroupWithFlags", "", Special)
+
 /// Destroy a task group.
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
