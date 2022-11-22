@@ -460,6 +460,13 @@ module WinSDK [system] {
     export *
   }
 
+  module WinCred {
+    header "wincred.h"
+    export *
+
+    link "AdvAPI32.lib"
+  }
+
   module WinDNS {
     header "WinDNS.h"
     export *
