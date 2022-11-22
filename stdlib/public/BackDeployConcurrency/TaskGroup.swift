@@ -462,6 +462,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     }
   }
 
+  // TODO(ktoso): doesn't seem to be used?
   @usableFromInline
   internal mutating func _waitForAll() async throws {
     while let _ = try await next() { }
