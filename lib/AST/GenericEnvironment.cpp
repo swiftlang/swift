@@ -500,8 +500,23 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   assert(!type->hasArchetype());
 
   auto sig = getGenericSignature();
-  ASTContext &ctx = sig->getASTContext();
   QueryInterfaceTypeSubstitutions substitutions(this);
+
+  llvm::SmallDenseMap<GenericParamKey,
+                      GenericTypeParamType *> elementParamForPack;
+  auto packElements = sig.getInnermostGenericParams();
+  auto elementDepth = packElements.front()->getDepth();
+
+  for (auto *genericParam : sig.getGenericParams()) {
+    if (genericParam->getDepth() == elementDepth)
+      break;
+
+    if (!genericParam->isParameterPack())
+      continue;
+
+    auto elementIndex = elementParamForPack.size();
+    elementParamForPack[{genericParam}] = packElements[elementIndex];
+  }
 
   // Map the interface type to the element type by stripping
   // away the isParameterPack bit before mapping type parameters
@@ -511,7 +526,10 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
     if (!genericParam)
       return Type();
 
-    return substitutions(genericParam->asScalar(ctx));
+    if (auto *elementParam = elementParamForPack[{genericParam}])
+      return substitutions(elementParam);
+
+    return substitutions(genericParam);
   }, LookUpConformanceInSignature(sig.getPointer()));
 }
 
@@ -521,8 +539,22 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   assert(!type->hasArchetype());
 
   auto sig = getGenericSignature();
-  ASTContext &ctx = sig->getASTContext();
   QueryInterfaceTypeSubstitutions substitutions(this);
+
+  llvm::SmallDenseMap<GenericParamKey, GenericTypeParamType *>
+      packParamForElement;
+  auto elementDepth =
+      sig.getInnermostGenericParams().front()->getDepth() + 1;
+
+  for (auto *genericParam : sig.getGenericParams()) {
+    if (!genericParam->isParameterPack())
+      continue;
+
+    GenericParamKey elementKey(/*isParameterPack*/false,
+                               /*depth*/elementDepth,
+                               /*index*/packParamForElement.size());
+    packParamForElement[elementKey] = genericParam;
+  }
 
   // Map element archetypes to the pack archetypes by converting
   // element types to interface types and adding the isParameterPack
@@ -532,7 +564,10 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     if (!genericParam)
       return Type();
 
-    return substitutions(genericParam->asParameterPack(ctx));
+    if (auto *packParam = packParamForElement[{genericParam}])
+      return substitutions(packParam);
+
+    return substitutions(genericParam);
   }, LookUpConformanceInSignature(sig.getPointer()));
 }
 
