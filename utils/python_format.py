@@ -137,7 +137,7 @@ def main():
         "-m",
         "black",
         "--target-version",
-        "py27",
+        "py38",
     ]
 
     if args.check:
