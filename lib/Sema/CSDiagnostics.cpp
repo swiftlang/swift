@@ -8462,7 +8462,6 @@ bool ConflictingPatternVariables::diagnoseAsError() {
 }
 
 bool ImplicitReflectableConversion::diagnoseAsError() {
-  // Diagnose use of AnyObject as root for a keypath
   emitDiagnostic(diag::implicit_reflectable_conversion)
       .highlight(getSourceRange());
   return true;

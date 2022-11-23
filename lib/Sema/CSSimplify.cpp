@@ -6307,8 +6307,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     Type unwrappedType2 = type2->lookThroughAllOptionalTypes();
 
     if (unwrappedTypeVar1 && unwrappedType2) {
-      auto *PD = dyn_cast_or_null<ProtocolDecl>(unwrappedType2->getAnyNominal());
-      if (PD && PD->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+      if (unwrappedType2->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable)) {
         auto anchor = locator.getAnchor();
         if (anchor && isExpr<Expr>(anchor)) {
           auto E = getAsExpr(anchor);
@@ -8169,9 +8168,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
 
   // Do not emit diagnostics if casting to Reflectable,
   // since it will be resolved through runtime in all cases.
-  if (auto *protocol = dyn_cast_or_null<ProtocolDecl>(toType->getAnyNominal()))
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable))
-      return nullptr;
+  if (toType->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable))
+    return nullptr;
 
   // "from" could be less optional than "to" e.g. `0 as Any?`, so
   // we need to store the difference as a signed integer.

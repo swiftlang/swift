@@ -2,7 +2,9 @@
 
 // The compiler shouldn't emit any diagnostics even if conformance to Reflectable is visible.
 
-public enum Foo: Reflectable {
+public protocol Bar {}
+
+public enum Foo: Reflectable, Bar {
 	case A(Int)
 	case B
 }
@@ -13,3 +15,8 @@ public func consumeOptional<T: Reflectable>(_ t: T?) { }
 consume(Foo.A(123) as! Reflectable)
 consumeOptional(Foo.A(123) as? Reflectable)
 print(Foo.A(123) is Reflectable)
+
+// Casts to a protocol composition
+consume(Foo.A(123) as! Reflectable & Bar)
+consumeOptional(Foo.A(123) as? Reflectable & Bar)
+print(Foo.A(123) is Reflectable & Bar)

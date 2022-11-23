@@ -374,3 +374,4 @@ add_swift_target_library(swiftCore
                     ${swiftCore_common_dependencies}
                   INSTALL_IN_COMPONENT
                     stdlib)
+                    

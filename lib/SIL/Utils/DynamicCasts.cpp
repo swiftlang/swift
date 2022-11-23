@@ -113,7 +113,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // The compiler can't know statically
   // if reflection metadata is present at runtime.
-  if (TargetProtocol->isSpecificProtocol(KnownProtocolKind::Reflectable))
+  if (target->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable))
     return DynamicCastFeasibility::MaySucceed;
 
   // If conformsToProtocol returns a valid conformance, then all requirements

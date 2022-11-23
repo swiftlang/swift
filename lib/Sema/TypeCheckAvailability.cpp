@@ -3286,8 +3286,7 @@ public:
     if (auto *CC = dyn_cast<CheckedCastExpr>(E)) {
       auto toType = CC->getCastType();
       auto &ctx = DC->getASTContext();
-      auto *protocol = dyn_cast_or_null<ProtocolDecl>(toType->lookThroughAllOptionalTypes()->getAnyNominal());
-      if (protocol && protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+      if (toType->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable)) {
         auto availability = ctx.getReflectableCastRuntimeAvailability();
         const bool hasReflectableCastSupport =
         AvailabilityContext::forDeploymentTarget(ctx).isContainedIn(availability);

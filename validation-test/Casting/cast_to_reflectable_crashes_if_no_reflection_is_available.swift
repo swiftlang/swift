@@ -12,28 +12,36 @@ defer {
   runAllTests()
 }
 
-public struct Bar {
+public protocol Foo {}
+
+public struct Bar: Foo {
 	let a: Int
 	let b: String
 }
 
 let bar = Bar(a: 999, b: "bar")
 
-Tests.test("Forced Cast to Reflectable") {
+Tests.test("Reflectable Cast") {
   do {
     let bar1 = bar as? Reflectable
     expectNil(bar1)
 
     let bar2 = bar as? Reflectable????
     expectNil(bar2)
+
+    let bar3 = bar as? Reflectable & Foo
+    expectNil(bar3)
+
+    let bar4 = bar as? (Reflectable & Foo)????
+    expectNil(bar4)
   }
   
-  // CHECK-LABEL: [ RUN      ] Reflectable casting.Forced Cast to Reflectable
+  // CHECK-LABEL: [ RUN      ] Reflectable casting.Reflectable Cast
   // CHECK: stderr>>> Could not cast value of type 'main.Bar' ({{.*}}) to 'Reflectable', reflection metadata isn't available at runtime for this type.
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
-  // CHECK: [       OK ] Reflectable casting.Forced Cast to Reflectable
+  // CHECK: [       OK ] Reflectable casting.Reflectable Cast
   expectCrashLater()
   do {
-    debugPrint(bar as! Reflectable)
+    debugPrint(bar as! Reflectable & Foo)
   }
 }

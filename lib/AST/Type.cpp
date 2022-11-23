@@ -3183,6 +3183,19 @@ TypeBase::getForeignRepresentableIn(ForeignLanguage language,
   return getForeignRepresentable(Type(this), language, dc);
 }
 
+bool TypeBase::hasKnownProtocolInLayout(KnownProtocolKind kind) {
+  auto unwrappedType = this->lookThroughAllOptionalTypes();
+  if (!unwrappedType->isExistentialType())
+    return false;
+
+  auto layout = unwrappedType->getExistentialLayout();
+  for (auto proto : layout.getProtocols()) {
+    if (proto->isSpecificProtocol(kind))
+      return true;
+  }
+  return false;
+}
+
 bool TypeBase::isRepresentableIn(ForeignLanguage language,
                                  const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
