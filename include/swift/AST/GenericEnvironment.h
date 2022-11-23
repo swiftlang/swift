@@ -190,6 +190,16 @@ public:
   /// Retrieve the UUID for an opened element environment.
   UUID getOpenedElementUUID() const;
 
+  using PackElementBinding =
+      std::pair<ElementArchetypeType *, PackArchetypeType *>;
+
+  /// Retrieve the bindings for the opened pack element archetypes in this
+  /// generic environment to the pack archetypes that contain them.
+  ///
+  /// \param bindings The vector to populate with the pack element bindings.
+  void getPackElementBindings(
+      SmallVectorImpl<PackElementBinding> &bindings) const;
+
   /// Create a new, primary generic environment.
   static GenericEnvironment *forPrimary(GenericSignature signature);
 

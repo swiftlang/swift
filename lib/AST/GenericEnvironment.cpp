@@ -125,6 +125,33 @@ UUID GenericEnvironment::getOpenedElementUUID() const {
   return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
 }
 
+void GenericEnvironment::getPackElementBindings(
+    SmallVectorImpl<PackElementBinding> &bindings) const {
+  auto packElements = getGenericSignature().getInnermostGenericParams();
+  auto packElementDepth = packElements.front()->getDepth();
+  auto elementIt = packElements.begin();
+
+  // Each parameter pack in the outer generic parameters has
+  // a corresponding pack element parameter at the innermost
+  // depth.
+  for (auto *genericParam : getGenericParams()) {
+    if (genericParam->getDepth() == packElementDepth)
+      break;
+
+    if (!genericParam->isParameterPack())
+      continue;
+
+    assert(elementIt != packElements.end());
+    auto *elementArchetype =
+        mapTypeIntoContext(*elementIt++)->getAs<ElementArchetypeType>();
+    auto *packArchetype =
+        mapTypeIntoContext(genericParam)->getAs<PackArchetypeType>();
+
+    assert(elementArchetype && packArchetype);
+    bindings.emplace_back(elementArchetype, packArchetype);
+  }
+}
+
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
   : SignatureAndKind(signature, Kind::Primary)
 {
