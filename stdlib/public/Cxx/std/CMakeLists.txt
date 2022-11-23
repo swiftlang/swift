@@ -22,6 +22,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_WATCHOS ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -Xfrontend -enable-experimental-cxx-interop
@@ -31,7 +32,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX
+    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED
     DEPENDS libstdcxx-modulemap libcxxshim_modulemap)
