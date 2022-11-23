@@ -15,16 +15,38 @@
 //===----------------------------------------------------------------------===//
 // Standardized uninhabited type
 //===----------------------------------------------------------------------===//
-/// The return type of functions that do not return normally, that is, a type
-/// with no values.
+/// A standard _uninhabited_ type---that is, a type which has no values,
+/// and cannot be constructed.
 ///
-/// Use `Never` as the return type when declaring a closure, function, or
-/// method that unconditionally throws an error, traps, or otherwise does
-/// not terminate.
+/// Use `Never` as the return type of a _nonreturning_ function (or closure,
+/// method, computed property, or subscript) which unconditionally throws an
+/// error, traps, or otherwise does not terminate.
 ///
+///     // An infinite loop will never return.
+///     func forever() -> Never {
+///         while true {
+///             print("I will print forever.")
+///         }
+///     }
+///
+///     // Calling `fatalError` will unconditionally terminate
+///     // the program.
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
+///
+/// As an uninhabited type, `Never` allows you to represent a state in your 
+/// program that is impossible to reach during its execution. Swift's type
+/// system can use this information to simplify control statements in cases
+/// known to be unreachable.
+///
+///     // The `.failure` case can never be reached.
+///     let favoriteNumber: Result<Int, Never> = .success(42)
+///     switch favoriteNumber {
+///     case .success(let value):
+///         print("My favorite number is", value)
+///     }
+///
 @frozen
 public enum Never {}
 
