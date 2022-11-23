@@ -57,24 +57,37 @@ using WitnessTableLookupFn = const void *(const void *type,
 extern "C" WitnessTableLookupFn swift_conformsToProtocol;
 #endif
 
-CompilerPlugin::CompilerPlugin(const void *metadata, void *parentLibrary,
-                               ASTContext &ctx)
-   : metadata(metadata), parentLibrary(parentLibrary)
+CompilerPlugin::CompilerPlugin(
+    const void *metadata, void *parentLibrary, const void *witnessTable)
+   : metadata(metadata), parentLibrary(parentLibrary),
+     witnessTable(witnessTable)
 {
+  assert(witnessTable && "Type does not conform to _CompilerPlugin");
+  kind = invokeKind();
+}
+
+CompilerPlugin::~CompilerPlugin() { }
+
+CompilerPlugin *CompilerPlugin::fromMetatype(
+    const void *metadata, ASTContext &ctx
+) {
 #if !SWIFT_SWIFT_PARSER
   auto *swift_conformsToProtocol = reinterpret_cast<WitnessTableLookupFn *>(
       ctx.getAddressOfSymbol("swift_conformsToProtocol"));
 #endif
   void *protocolDescriptor =
       ctx.getAddressOfSymbol(COMPILER_PLUGIN_PROTOCOL_DESCRIPTOR);
-  assert(swift_conformsToProtocol);
-  assert(protocolDescriptor);
-  witnessTable = swift_conformsToProtocol(metadata, protocolDescriptor);
-  assert(witnessTable && "Type does not conform to _CompilerPlugin");
-  kind = invokeKind();
-}
+  if ((&swift_conformsToProtocol == nullptr) || !protocolDescriptor)
+    return nullptr;
 
-CompilerPlugin::~CompilerPlugin() { }
+  auto witnessTable = swift_conformsToProtocol(metadata, protocolDescriptor);
+  if (!witnessTable)
+    return nullptr;
+
+  auto plugin = new CompilerPlugin(metadata, nullptr, witnessTable);
+  ctx.addCleanup([plugin] { delete plugin; });
+  return plugin;
+}
 
 namespace {
 // Corresponds to Swift type `(UnsafePointer<UInt8>, Int)`.

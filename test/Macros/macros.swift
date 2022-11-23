@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Macros -dump-ast %s -module-name MacrosTest 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
 
-macro stringify<T>(_ value: T) -> (T, String) = BuiltinMacros.StringifyMacro
+macro stringify<T>(_ value: T) -> (T, String) = _SwiftSyntaxMacros.StringifyMacro
 
 func test(a: Int, b: Int) {
   let s = #stringify(a + b)

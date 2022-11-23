@@ -74,8 +74,8 @@ private:
     return reinterpret_cast<const Func *const *>(witnessTable)[(unsigned)entry];
   }
 
-public:
-  CompilerPlugin(const void *metadata, void *parentLibrary, ASTContext &ctx);
+  CompilerPlugin(
+      const void *metadata, void *parentLibrary, const void *witnessTable);
 
 private:
   /// Invoke the `_kind` method.
@@ -85,6 +85,9 @@ public:
   ~CompilerPlugin();
   CompilerPlugin(const CompilerPlugin &) = delete;
   CompilerPlugin(CompilerPlugin &&) = default;
+
+  /// Try to resolve a compiler plugin given the metadata point.
+  static CompilerPlugin *fromMetatype(const void *metadata, ASTContext &ctx);
 
   /// Invoke the `_rewrite` method. The caller assumes ownership of the result
   /// string buffer and diagnostic buffers.

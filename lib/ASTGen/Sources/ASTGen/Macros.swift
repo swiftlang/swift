@@ -27,20 +27,20 @@ struct ExportedMacro {
   var macro: Macro.Type
 }
 
-/// Look up a macro with the given name.
+/// Resolve a reference to type metadata into a macro, if posible.
 ///
 /// Returns an unmanaged pointer to an ExportedMacro instance that describes
 /// the specified macro. If there is no macro with the given name, produces
 /// nil.
-@_cdecl("swift_ASTGen_lookupMacro")
-public func lookupMacro(
-  macroNamePtr: UnsafePointer<UInt8>
+@_cdecl("swift_ASTGen_resolveMacroType")
+public func resolveMacroType(
+  macroTypePtr: UnsafePointer<UInt8>
 ) -> UnsafeRawPointer? {
-  let macroSystem = MacroSystem.exampleSystem
+  let macroType = unsafeBitCast(macroTypePtr, to: Any.Type.self)
 
-  // Look for a macro with this name.
-  let macroName = String(cString: macroNamePtr)
-  guard let macro = macroSystem.lookup(macroName) else { return nil }
+  guard let macro = macroType as? Macro.Type else {
+    return nil
+  }
 
   // Allocate and initialize the exported macro.
   let exportedPtr = UnsafeMutablePointer<ExportedMacro>.allocate(capacity: 1)
@@ -158,3 +158,16 @@ func evaluateMacro(
     return 0
   }
 }
+
+// Makes sure that the type metadata for these macros can be found.
+public var allBuiltinMacros: [Any.Type] = [
+  ColorLiteralMacro.self,
+  ColumnMacro.self,
+  FileIDMacro.self,
+  FileLiteralMacro.self,
+  FilePathMacro.self,
+  FunctionMacro.self,
+  ImageLiteralMacro.self,
+  LineMacro.self,
+  StringifyMacro.self
+]

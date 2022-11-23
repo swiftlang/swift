@@ -35,7 +35,7 @@
 
 using namespace swift;
 
-extern "C" void *swift_ASTGen_lookupMacro(const char *macroName);
+extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
 
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
@@ -101,34 +101,30 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 #if SWIFT_SWIFT_PARSER
   ASTContext &ctx = macro->getASTContext();
 
-  // FIXME: We need to perform lookups by resolving the external module name.
-
-  StringRef macroName = macro->getName().getBaseName().userFacingName();
-  // Look for a builtin macro with this name.
-  if (auto *builtinHandle = swift_ASTGen_lookupMacro(
-          macroName.str().c_str())) {
-    // Make sure we clean up after the macro.
-    ctx.addCleanup([builtinHandle]() {
-      swift_ASTGen_destroyMacro(builtinHandle);
-    });
-
-    return MacroDefinition::forBuiltin(
-        MacroDefinition::Expression, builtinHandle);
-  }
-
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
       ctx, macro->externalModuleName.str(),
       macro->externalMacroTypeName.str());
   if (macroMetatype) {
-    auto plugin = new CompilerPlugin(macroMetatype, nullptr, ctx);
-    ctx.addCleanup([plugin] { delete plugin; });
-    // FIXME: Handle other kinds of macros.
-    return MacroDefinition::forCompilerPlugin(
-        MacroDefinition::Expression, plugin);
+    // Check whether the macro metatype can be handled as a compiler plugin.
+    // We look here first, because compiler plugins are meant to be resilient.
+    if (auto plugin = CompilerPlugin::fromMetatype(macroMetatype, ctx)) {
+      // FIXME: Handle other kinds of macros.
+      return MacroDefinition::forCompilerPlugin(
+          MacroDefinition::Expression, plugin);
+    }
+
+    // Otherwise, check whether the macro metatype can be handled as a builtin.
+    if (auto builtin = swift_ASTGen_resolveMacroType(macroMetatype)) {
+      // Make sure we clean up after the macro.
+      ctx.addCleanup([builtin]() {
+        swift_ASTGen_destroyMacro(builtin);
+      });
+
+      return MacroDefinition::forBuiltin(
+          MacroDefinition::Expression, builtin);
+    }
   }
-
-
 #endif
 
   ctx.Diags.diagnose(
@@ -206,7 +202,7 @@ Expr *swift::expandMacroExpr(
          /*range*/ Lexer::getCharSourceRangeFromSourceRange(
              sourceMgr, expr->getSourceRange()), ctx, pluginDiags);
       for (auto &diag : pluginDiags) {
-\        auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
+        auto loc = sourceMgr.getLocForOffset(*bufferID, diag.position);
         Diag<DeclName, StringRef> diagID;
         switch (diag.severity) {
         case CompilerPlugin::DiagnosticSeverity::Note:
