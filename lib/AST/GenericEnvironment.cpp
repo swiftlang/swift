@@ -404,78 +404,82 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   Type result;
 
   auto rootGP = requirements.anchor->getRootGenericParam();
-  if (rootGP->isParameterPack()) {
-    assert(getKind() == Kind::Primary);
-    result = PackArchetypeType::get(ctx, this, requirements.anchor,
-                                    requirements.packShape,
-                                    requirements.protos, superclass,
-                                    requirements.layout);
-  } else {
-    switch (getKind()) {
-    case Kind::Primary:
+  switch (getKind()) {
+  case Kind::Primary:
+    if (rootGP->isParameterPack()) {
+      result = PackArchetypeType::get(ctx, this, requirements.anchor,
+                                      requirements.packShape,
+                                      requirements.protos, superclass,
+                                      requirements.layout);
+    } else {
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
-      break;
+    }
 
-    case Kind::Opaque: {
-      // If the anchor type isn't rooted in a generic parameter that
-      // represents an opaque declaration, then apply the outer substitutions.
-      // It would be incorrect to build an opaque type archetype here.
-      unsigned opaqueDepth =
-          getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
-      if (rootGP->getDepth() < opaqueDepth) {
-        result = maybeApplyOuterContextSubstitutions(requirements.anchor);
-        break;
-      }
+    break;
 
-      result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
-                                               requirements.protos, superclass,
-                                               requirements.layout);
+  case Kind::Opaque: {
+    assert(!rootGP->isParameterPack());
+
+    // If the anchor type isn't rooted in a generic parameter that
+    // represents an opaque declaration, then apply the outer substitutions.
+    // It would be incorrect to build an opaque type archetype here.
+    unsigned opaqueDepth =
+        getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
+    if (rootGP->getDepth() < opaqueDepth) {
+      result = maybeApplyOuterContextSubstitutions(requirements.anchor);
       break;
     }
 
-    case Kind::OpenedExistential: {
-      // FIXME: The existential layout's protocols might differ from the
-      // canonicalized set of protocols determined by the generic signature.
-      // Before NestedArchetypeType was removed, we used the former when
-      // building a root OpenedArchetypeType, and the latter when building
-      // nested archetypes.
-      // For compatibility, continue using the existential layout's version when
-      // the interface type is a generic parameter. We should align these at
-      // some point.
-      if (depType->is<GenericTypeParamType>()) {
-        auto layout = getOpenedExistentialType()->getExistentialLayout();
-        SmallVector<ProtocolDecl *, 2> protos;
-        for (auto proto : layout.getProtocols())
-          protos.push_back(proto);
-
-        result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
-                                             superclass, requirements.layout);
-      } else {
-        result = OpenedArchetypeType::getNew(this, requirements.anchor,
+    result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
                                              requirements.protos, superclass,
                                              requirements.layout);
-      }
+    break;
+  }
 
+  case Kind::OpenedExistential: {
+    assert(!rootGP->isParameterPack());
+
+    // FIXME: The existential layout's protocols might differ from the
+    // canonicalized set of protocols determined by the generic signature.
+    // Before NestedArchetypeType was removed, we used the former when
+    // building a root OpenedArchetypeType, and the latter when building
+    // nested archetypes.
+    // For compatibility, continue using the existential layout's version when
+    // the interface type is a generic parameter. We should align these at
+    // some point.
+    if (depType->is<GenericTypeParamType>()) {
+      auto layout = getOpenedExistentialType()->getExistentialLayout();
+      SmallVector<ProtocolDecl *, 2> protos;
+      for (auto proto : layout.getProtocols())
+        protos.push_back(proto);
+
+      result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
+                                           superclass, requirements.layout);
+    } else {
+      result = OpenedArchetypeType::getNew(this, requirements.anchor,
+                                           requirements.protos, superclass,
+                                           requirements.layout);
+    }
+
+    break;
+  }
+
+  case Kind::OpenedElement: {
+    auto packElements = getGenericSignature().getInnermostGenericParams();
+    auto elementDepth = packElements.front()->getDepth();
+
+    if (rootGP->getDepth() < elementDepth) {
+      result = maybeApplyOuterContextSubstitutions(requirements.anchor);
       break;
     }
 
-    case Kind::OpenedElement: {
-      auto packElements = getGenericSignature().getInnermostGenericParams();
-      auto elementDepth = packElements.front()->getDepth();
-
-      if (rootGP->getDepth() < elementDepth) {
-        result = maybeApplyOuterContextSubstitutions(requirements.anchor);
-        break;
-      }
-
-      result = ElementArchetypeType::getNew(this, requirements.anchor,
-                                            requirements.protos, superclass,
-                                            requirements.layout);
-      break;
-    }
-    }
+    result = ElementArchetypeType::getNew(this, requirements.anchor,
+                                          requirements.protos, superclass,
+                                          requirements.layout);
+    break;
+  }
   }
 
   if (genericParam)

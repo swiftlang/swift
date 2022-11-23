@@ -42,3 +42,19 @@ func localValuePack<T...>(_ t: T...) -> (T..., T...) {
 
   return (local..., localAnnotated...)
 }
+
+protocol P {
+  associatedtype A
+
+  var value: A { get }
+
+  func f(_ self: Self) -> Self
+}
+
+func outerArchetype<T..., U>(t: T..., u: U) where T: P {
+  let _: (T.A, U)... = (t.value, u)...
+}
+
+func sameElement<T..., U>(t: T..., u: U) where T: P, T == U {
+  let _: T... = t.f(u)...
+}
