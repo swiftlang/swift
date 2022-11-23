@@ -1207,26 +1207,6 @@ function host_has_darwin_symbols() {
     esac
 }
 
-function get_stdlib_targets_for_host() {
-    # Don't build the stdlib in the Xcode train for host and cross-compilations host.
-    if [[ "${STDLIB_DEPLOYMENT_TARGETS[@]}" == "" ]]; then
-        return 0
-    fi
-
-# FIXME: STDLIB_DEPLOYMENT_TARGETS argument assumed to apply when Host == Build
-# Cross-compile Hosts are only built with their native standard libraries.
-# To fix this, we would need to pass in a list of stdlib targets _per host_,
-# and the SWIFT_SDKS parameters would need to be able to capture both the SDK
-# and architecture of each stdlib target -- currently it only captures the SDK.
-#
-# We turn these targets in to SWIFT_SDKS in `calculate_targets_for_host()`
-    if [[ $(is_cross_tools_host $1) ]] ; then
-        echo "$1"
-    else
-        echo "${STDLIB_DEPLOYMENT_TARGETS[@]}"
-    fi
-}
-
 #
 # Calculate source directories for each product.
 #
@@ -3183,7 +3163,7 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         # We can only run tests built for the host machine, because
-        # cross-compiled hosts only build their native target. See: get_stdlib_targets_for_host()
+        # cross-compiled hosts only build their native target.
         if [[ $(is_cross_tools_host ${host}) ]]; then
             echo "--- Can't execute tests for ${host}, skipping... ---"
             continue
