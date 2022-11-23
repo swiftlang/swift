@@ -188,6 +188,12 @@ public:
   EffectiveClangContext(const clang::DeclContext *dc)
       : KindOrBiasedLength(DeclContext) {
     assert(dc != nullptr && "use null constructor instead");
+
+    // Skip over any linkage spec decl contexts
+    while (auto externCDecl = dyn_cast<clang::LinkageSpecDecl>(dc)) {
+      dc = externCDecl->getLexicalDeclContext();
+    }
+
     if (auto tagDecl = dyn_cast<clang::TagDecl>(dc)) {
       DC = tagDecl->getCanonicalDecl();
     } else if (auto oiDecl = dyn_cast<clang::ObjCInterfaceDecl>(dc)) {
@@ -198,11 +204,8 @@ public:
       DC = omDecl->getCanonicalDecl();
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
-    } else if (auto externCDecl = dyn_cast<clang::LinkageSpecDecl>(dc)) {
-      DC = externCDecl->getLexicalDeclContext();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
-             isa<clang::LinkageSpecDecl>(dc) ||
              isa<clang::NamespaceDecl>(dc) ||
              isa<clang::ObjCContainerDecl>(dc) &&
                  "No other kinds of effective Clang contexts");
@@ -526,7 +529,7 @@ public:
 
   /// Retrieve the set of base names that are stored in the globals-as-members lookup table.
   SmallVector<SerializedSwiftName, 4> allGlobalsAsMembersBaseNames();
-  
+
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
   SmallVector<clang::NamedDecl *, 4>

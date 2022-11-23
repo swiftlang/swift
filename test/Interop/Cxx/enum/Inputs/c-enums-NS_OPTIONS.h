@@ -18,8 +18,10 @@ extern "C" {
 #define CF_OPTIONS(_type, _name) _type __attribute__((availability(swift, unavailable))) _name; enum __CF_OPTIONS_ATTRIBUTES : _name
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 #define NS_REFINED_FOR_SWIFT __attribute__((swift_private))
+#define UIKIT_EXTERN extern "C" __attribute__((visibility("default")))
 
 typedef unsigned long NSUInteger;
+typedef long NSInteger;
 
 typedef NS_OPTIONS(NSUInteger, NSBinarySearchingOptions) {
 	NSBinarySearchingFirstEqual = (1UL << 8),
@@ -38,6 +40,23 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
 @interface NSAttributedString (NSAttributedStringFormatting)
 - (instancetype)initWithOptions:(NSAttributedStringFormattingOptions)options
     NS_REFINED_FOR_SWIFT;
+@end
+
+UIKIT_EXTERN
+@interface UIPrinter
+
+typedef NS_OPTIONS(NSInteger, UIPrinterJobTypes) {
+  UIPrinterJobTypeUnknown = 0,
+  UIPrinterJobTypeDocument = 1 << 0,
+  UIPrinterJobTypeEnvelope = 1 << 1,
+  UIPrinterJobTypeLabel = 1 << 2,
+  UIPrinterJobTypePhoto = 1 << 3,
+  UIPrinterJobTypeReceipt = 1 << 4,
+  UIPrinterJobTypeRoll = 1 << 5,
+  UIPrinterJobTypeLargeFormat = 1 << 6,
+  UIPrinterJobTypePostcard = 1 << 7
+};
+
 @end
 }
 
