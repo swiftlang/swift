@@ -192,6 +192,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Requirement,
   OpaqueResultType,
   OpaqueVarType,
+  Macro,
   MacroExpansion
 };
 
@@ -2766,6 +2767,9 @@ public:
   /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
   TypeRepr *getOpaqueResultTypeRepr() const;
 
+  /// Get the representative for this value's result type, if it has one.
+  TypeRepr *getResultTypeRepr() const;
+
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
   CustomAttr *getAttachedResultBuilder() const;
@@ -2789,11 +2793,6 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
-
-  /// Returns a synthesized declaration for a query function that provides
-  /// the boolean value for a `if #_hasSymbol(...)` condition. The interface
-  /// type of the function is `() -> Builtin.Int1`.
-  FuncDecl *getHasSymbolQueryDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -3914,8 +3913,9 @@ public:
 
   /// If this declaration has a type wrapper, return `$Storage`
   /// declaration that contains all the stored properties managed
-  /// by the wrapper.
-  NominalTypeDecl *getTypeWrapperStorageDecl() const;
+  /// by the wrapper. Note that if this type is a protocol them
+  /// this method returns an associated type for $Storage.
+  TypeDecl *getTypeWrapperStorageDecl() const;
 
   /// If this declaration is a type wrapper, retrieve
   /// its required initializer - `init(storageWrapper:)`.
@@ -6770,8 +6770,7 @@ public:
     // FIXME: Remove 'Parsed' from this list once we can always delay
     //        parsing bodies. The -experimental-skip-*-function-bodies options
     //        do currently skip parsing, unless disabled through other means in
-    //        SourceFile::hasDelayedBodyParsing (eg. needing to build the full
-    //        syntax tree due to -verify-syntax-tree).
+    //        SourceFile::hasDelayedBodyParsing.
     assert(getBodyKind() == BodyKind::None ||
            getBodyKind() == BodyKind::Unparsed ||
            getBodyKind() == BodyKind::Parsed);
@@ -8273,18 +8272,94 @@ public:
   }
 };
 
+/// Provides a declaration of a macro.
+///
+/// Macros are defined externally via conformances to the 'Macro' type
+/// that is part of swift-syntax, and are introduced into the compiler via
+/// various mechanisms (built-in macros are linked in directly, plugin macros
+/// are introduced via compiler plugins, and so on). They have no explicit
+/// representation in the source code, but are still declarations.
+class MacroDecl : public GenericContext, public ValueDecl {
+public:
+  /// The kind of macro, which determines how it can be used in source code.
+  enum Kind: uint8_t {
+    /// An expression macro.
+    Expression,
+  };
+
+  /// Describes how the macro is implemented.
+  enum class ImplementationKind: uint8_t {
+    /// The macro is built-in to the compiler, linked against the same
+    /// underlying syntax tree libraries.
+    Builtin,
+
+    /// The macro was defined in a compiler plugin.
+    Plugin,
+  };
+
+  /// The kind of macro.
+  const Kind kind;
+
+  /// How the macro is implemented.
+  const ImplementationKind implementationKind;
+
+  /// Supplemental modules that should be imported when
+  const ArrayRef<ModuleDecl *> supplementalSignatureModules;
+
+  /// An opaque handle to the representation of the macro.
+  void * const opaqueHandle;
+
+public:
+  MacroDecl(
+    Kind kind, ImplementationKind implementationKind, Identifier name,
+    ModuleDecl *owningModule,
+    ArrayRef<ModuleDecl *> supplementalSignatureModules,
+    void *opaqueHandle
+  );
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Macro;
+  }
+
+  using DeclContext::operator new;
+  using DeclContext::operator delete;
+  using Decl::getASTContext;
+};
+
 class MacroExpansionDecl : public Decl {
   SourceLoc PoundLoc;
   DeclNameRef Macro;
   DeclNameLoc MacroLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Decl *Rewritten;
 
 public:
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
-                     DeclNameLoc macroLoc, ArgumentList *args)
+                     DeclNameLoc macroLoc,
+                     SourceLoc leftAngleLoc,
+                     ArrayRef<TypeRepr *> genericArgs,
+                     SourceLoc rightAngleLoc,
+                     ArgumentList *args)
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
-        Macro(macro), MacroLoc(macroLoc), ArgList(args), Rewritten(nullptr) {}
+        Macro(macro), MacroLoc(macroLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs), ArgList(args), Rewritten(nullptr) {}
+
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
 
   SourceRange getSourceRange() const;
   SourceLoc getLocFromSource() const { return PoundLoc; }

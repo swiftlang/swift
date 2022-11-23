@@ -45,3 +45,11 @@ class Bar: NSObject {
     }
   }
 }
+
+@_semantics("keypath.mustBeValidForKVO")
+func quux<T, V, U>(_ object: T, at keyPath: KeyPath<T, V>, _ keyPath2: KeyPath<T, U>) { }
+
+// The presence of a valid keypath should not prevent detection of invalid ones
+// later in the argument list, so start with a valid one here.
+quux(Foo(), at: \.number4, \.number1)
+// expected-warning@-1 {{passing reference to non-'@objc dynamic' property 'number1' to KVO method 'quux(_:at:_:)' may lead to unexpected behavior or runtime trap}}

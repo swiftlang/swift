@@ -289,6 +289,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+  VISIT_AND_IGNORE(MacroDecl)
   VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
@@ -892,7 +893,7 @@ namespace {
   /// Retrieve the opaque generic parameter list if present, otherwise the normal generic parameter list.
   template<typename T>
   GenericParamList *getPotentiallyOpaqueGenericParams(T *decl) {
-    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
+    if (auto opaqueRepr = decl->getResultTypeRepr()) {
       if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
         return namedOpaque->getGenericParams();
       }

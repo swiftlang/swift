@@ -347,6 +347,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::BuiltinTuple:
         return;
 
+      // Macros cannot be found by dynamic lookup.
+      case DeclKind::Macro:
+        return;
+
       // Initializers cannot be found by dynamic lookup.
       case DeclKind::Constructor:
       case DeclKind::Destructor:

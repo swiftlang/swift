@@ -13,10 +13,10 @@
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-swift 2>&1 | %FileCheck --check-prefix=SKIP-SWIFT-CHECK %s
 
 # SKIP-CMARK-CHECK-NOT: cmake --build {{.*}}cmark-
-# SKIP-CMARK-CHECK: cmake --build {{.*}}llvm-
-# SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
 # SKIP-CMARK-CHECK-NOT: --- Installing cmark ---
+# SKIP-CMARK-CHECK: cmake --build {{.*}}llvm-
 # SKIP-CMARK-CHECK: --- Installing llvm ---
+# SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
 # SKIP-CMARK-CHECK: --- Installing swift ---
 
 # SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
@@ -32,4 +32,3 @@
 # SKIP-SWIFT-CHECK-NOT: cmake --build {{.*}}swift-
 # SKIP-SWIFT-CHECK: --- Installing llvm ---
 # SKIP-SWIFT-CHECK-NOT: --- Installing swift ---
-

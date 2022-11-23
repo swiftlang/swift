@@ -117,6 +117,7 @@ enum class CodeCompletionDeclKind : uint8_t {
   LocalVar,
   GlobalVar,
   PrecedenceGroup,
+  Macro,
 };
 
 enum class CodeCompletionLiteralKind : uint8_t {
@@ -183,7 +184,7 @@ enum class CodeCompletionKeywordKind : uint8_t {
   None,
 #define KEYWORD(X) kw_##X,
 #define POUND_KEYWORD(X) pound_##X,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 };
 
 enum class CompletionKind : uint8_t {

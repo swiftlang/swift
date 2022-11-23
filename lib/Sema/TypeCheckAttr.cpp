@@ -336,6 +336,8 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
+
+  void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
 };
 
 } // end anonymous namespace
@@ -3597,7 +3599,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   }
 
   if (nominal->getAttrs().hasAttribute<TypeWrapperAttr>()) {
-    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D))) {
+    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D) || isa<ProtocolDecl>(D))) {
       diagnose(attr->getLocation(),
                diag::type_wrapper_attribute_not_allowed_here,
                nominal->getName());
@@ -6930,6 +6932,15 @@ void AttributeChecker::visitCompilerInitializedAttr(
   // focus just on the initialization in the init.
   if (!(var->getDeclContext()->getSelfClassDecl() && var->isInstanceMember())) {
     diagnose(attr->getLocation(), diag::instancemember_compilerinitialized);
+    return;
+  }
+}
+
+void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs)) {
+    diagnose(attr->getLocation(),
+             diag::runtime_discoverable_attrs_are_experimental);
+    attr->setInvalid();
     return;
   }
 }

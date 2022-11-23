@@ -121,15 +121,15 @@ func doIt(_ closure: () -> ()) {
 
 @inlinable
 func testInlinable() {
-  if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@inlinable' function}}
+  if #_hasSymbol(noArgFunc) {}
   doIt {
-    if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@inlinable' function}}
+    if #_hasSymbol(noArgFunc) {}
   }
 }
 
 @_alwaysEmitIntoClient
 func testAEIC() {
-  if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #_hasSymbol(noArgFunc) {}
 }
 
 func testClosure() {

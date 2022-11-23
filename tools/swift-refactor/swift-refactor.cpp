@@ -311,7 +311,6 @@ int main(int argc, char *argv[]) {
   Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
-  Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
 
   if (options::EnableExperimentalConcurrency)

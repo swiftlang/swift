@@ -112,6 +112,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/YAMLTraits.h"
 
 namespace clang {
 class CompilerInstance;

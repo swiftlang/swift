@@ -159,6 +159,10 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::GlobalVar:
           OS << ": ";
           break;
+
+        case CodeCompletionDeclKind::Macro:
+          OS << ": ";
+          break;
         }
       } else {
         OS << ": ";

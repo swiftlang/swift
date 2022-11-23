@@ -1200,17 +1200,23 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto openedType = CS.getTypeOfMacroReference(
-            ctx.getIdentifier(kind), expr);
-        if (!openedType)
-          return Type();
+        auto macroIdent = ctx.getIdentifier(kind);
+        auto macros = lookupMacros(macroIdent, FunctionRefKind::Unapplied);
+        if (!macros.empty()) {
+          // Introduce an overload set for the macro reference.
+          auto locator = CS.getConstraintLocator(expr);
+          auto macroRefType = Type(CS.createTypeVariable(locator, 0));
+          CS.addOverloadSet(macroRefType, macros, CurDC, locator);
 
-        CS.addConstraint(ConstraintKind::LiteralConformsTo, openedType,
-                         protocol->getDeclaredInterfaceType(),
-                         CS.getConstraintLocator(expr));
+          // FIXME: Can this be encoded in the macro definition somehow?
+          CS.addConstraint(ConstraintKind::LiteralConformsTo, macroRefType,
+                           protocol->getDeclaredInterfaceType(),
+                           CS.getConstraintLocator(expr));
 
-        return openedType;
+          return macroRefType;
+        }
       }
+
       // Fall through to use old implementation.
 #endif
 
@@ -2912,27 +2918,24 @@ namespace {
         CS.setType(binding, type);
       }
 
-      auto elementResultType = CS.getType(expr->getPatternExpr());
-      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto *patternLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
+      auto patternTy = CS.createTypeVariable(patternLoc,
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
+      auto elementResultType = CS.getType(expr->getPatternExpr());
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
 
-      // FIXME: Use a ShapeOf constraint here.
-      Type shapeType;
-      auto *binding = expr->getBindings().front();
-      auto type = CS.simplifyType(CS.getType(binding));
-      type.visit([&](Type type) {
-        if (shapeType)
-          return;
+      auto *shapeLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
+      auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
+                                                 TVO_CanBindToPack |
+                                                 TVO_CanBindToHole);
+      CS.addConstraint(ConstraintKind::ShapeOf, patternTy, shapeTypeVar,
+                       CS.getConstraintLocator(expr));
 
-        if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = archetype->getReducedShape();
-        }
-      });
-
-      return PackExpansionType::get(patternTy, shapeType);
+      return PackExpansionType::get(patternTy, shapeTypeVar);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3629,41 +3632,72 @@ namespace {
       return resultTy;
     }
 
+    /// Lookup all macros with the given macro name.
+    SmallVector<OverloadChoice, 1>
+    lookupMacros(Identifier macroName, FunctionRefKind functionRefKind) {
+      auto req = MacroLookupRequest{macroName, CS.DC->getParentModule()};
+      auto macros = evaluateOrDefault(
+          CS.getASTContext().evaluator, req, { });
+      if (macros.empty())
+        return { };
+
+      // FIXME: At some point, we need to check for function-like macros without
+      // arguments and vice-versa.
+
+
+      SmallVector<OverloadChoice, 1> choices;
+      for (auto macro : macros) {
+        OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
+        choices.push_back(choice);
+      }
+      return choices;
+    }
+
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        // Look up the macros with this name.
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
-        auto refType = CS.getTypeOfMacroReference(macroIdent, expr);
-        if (!refType) {
+        bool isCall = expr->getArgs() != nullptr;
+        FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
+                                                 : FunctionRefKind::Unapplied;
+        auto macros = lookupMacros(macroIdent, functionRefKind);
+        if (macros.empty()) {
           ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                              macroIdent)
               .highlight(expr->getMacroNameLoc().getSourceRange());
           return Type();
         }
-        if (expr->getArgs()) {
-          CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
-          // FIXME: Do we have object-like vs. function-like macros?
-          if (auto fnType = dyn_cast<FunctionType>(refType.getPointer())) {
-            SmallVector<AnyFunctionType::Param, 8> params;
-            getMatchingParams(expr->getArgs(), params);
 
-            Type resultType = CS.createTypeVariable(
-                CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-                TVO_CanBindToNoEscape);
+        // Introduce an overload set for the macro reference.
+        auto locator = CS.getConstraintLocator(expr);
+        auto macroRefType = Type(CS.createTypeVariable(locator, 0));
+        CS.addOverloadSet(macroRefType, macros, CurDC, locator);
 
-            CS.addConstraint(
-                ConstraintKind::ApplicableFunction,
-                FunctionType::get(params, resultType),
-                fnType,
-                CS.getConstraintLocator(
-                  expr, ConstraintLocator::ApplyFunction));
+        // For non-calls, the type variable is the result.
+        if (!isCall)
+          return macroRefType;
 
-            return resultType;
-          }
-        }
+        // For calls, set up the argument list and form the applicable-function
+        // constraint. The result type is the result of that call.
+        CS.associateArgumentList(locator, expr->getArgs());
 
-        return refType;
+        SmallVector<AnyFunctionType::Param, 8> params;
+        getMatchingParams(expr->getArgs(), params);
+
+        Type resultType = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            TVO_CanBindToNoEscape);
+
+        CS.addConstraint(
+            ConstraintKind::ApplicableFunction,
+            FunctionType::get(params, resultType),
+            macroRefType,
+            CS.getConstraintLocator(
+              expr, ConstraintLocator::ApplyFunction));
+
+        return resultType;
       }
 #endif
       return Type();

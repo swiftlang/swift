@@ -1054,7 +1054,9 @@ public:
 
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
-  SILValue emitSelfDecl(VarDecl *selfDecl);
+  ///
+  /// This is intended to only be used for destructors.
+  SILValue emitSelfDeclForDestructor(VarDecl *selfDecl);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.

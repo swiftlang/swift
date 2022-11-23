@@ -57,7 +57,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
 
     auto result = SourceFileParsingResult{
         Ctx.AllocateCopy(optionalTypes), /*tokens*/ None,
-        /*interfaceHash*/ None, /*syntaxRoot*/ None};
+        /*interfaceHash*/ None};
 
     Ctx.evaluator.cacheOutput(ParseSourceFileRequest{FileForLookups},
                               std::move(result));

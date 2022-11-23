@@ -666,3 +666,26 @@ do {
   // CHECK-NEXT: in getter storage: \$Storage.b
   // CHECK-NEXT: 42
 }
+
+// Type wrapper inference from protocols
+do {
+  struct Test<T> : WrappedProtocol {
+    var v: [T?]
+
+    init(_ value: T? = nil) {
+      v = [value]
+    }
+  }
+
+  func run_test<T: WrappedProtocol>(_ test: T) {
+    print(test.v)
+    print(test.v.count)
+  }
+
+  run_test(Test(Optional("Hello")))
+  // CHECK: Wrapper.init(for: Test<String>, storage: $Storage(v: [Optional("Hello")]))
+  // CHECK-NEXT: in getter storage: \$Storage.v
+  // CHECK-NEXT: [Optional("Hello")]
+  // CHECK-NEXT: in getter storage: \$Storage.v
+  // CHECK-NEXT: 1
+}

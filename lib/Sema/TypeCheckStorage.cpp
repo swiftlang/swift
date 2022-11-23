@@ -3424,6 +3424,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     } else if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
+    } else if (storage->getName() ==
+               storage->getASTContext().Id_TypeWrapperProperty) {
+      // Type wrapper `$storage` property is `get set` requirement.
+      readImpl = ReadImplKind::Get;
+      writeImpl = WriteImplKind::Set;
+      readWriteImpl = ReadWriteImplKind::Modify;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);

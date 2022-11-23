@@ -227,3 +227,20 @@ let _: [Int: String] = [
   #column: "A", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for #column literal key}}
   #column: "B"  // expected-note{{duplicate key declared here}} {{3-16=}} {{227:15-16=}}
 ]
+
+// https://github.com/apple/swift/issues/62117
+_ = [
+  -1: "",
+  1: "",
+]
+
+_ = [
+  -1.0: "",
+  1.0: "",
+]
+
+_ = [
+  // expected-note@+1{{duplicate key declared}} {{3-9=}} {{9-10=}} 
+  -1: "", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for integer literal key '-1'}}
+  -1: "", // expected-note{{duplicate key declared}} {{3-9=}} {{9-10=}}
+]

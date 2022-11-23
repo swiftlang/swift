@@ -193,6 +193,11 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     printFullContext(Context->getParent(), Buffer);
     return;
 
+  case DeclContextKind::MacroDecl:
+    // Ignore the macro, which won't have anything in it; just print the module.
+    printFullContext(Context->getParent(), Buffer);
+    return;
+
   case DeclContextKind::Initializer:
     // FIXME
     Buffer << "<initializer>";
@@ -256,7 +261,7 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
             .Case("init", false)
 #define KEYWORD(kw) \
             .Case(#kw, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
             .Default(false);
 
     if (shouldEscape) {
@@ -2854,6 +2859,11 @@ public:
       *this << " as ";
       *this << dwfi->getType();
     }
+  }
+
+  void visitHasSymbolInst(HasSymbolInst *hsi) {
+    *this << "#";
+    printValueDecl(hsi->getDecl(), PrintState.OS);
   }
 };
 

@@ -5,7 +5,8 @@ else()
 endif()
 
 set(generated_include_sources
-    Attr.def.gyb)
+    Attr.def.gyb
+    TokenKinds.def.gyb)
 
 add_gyb_target(swift-ast-generated-headers
     "${generated_include_sources}")

@@ -11,6 +11,7 @@
 import os
 import platform
 
+from . import cmake
 from . import shell
 
 try:
@@ -78,7 +79,7 @@ class Platform(object):
         """
         CMake flags to build for a platform, useful for cross-compiling
         """
-        return ''
+        return cmake.CMakeOptions()
 
     def swiftpm_config(self, args, output_dir, swift_toolchain, resource_path):
         """
@@ -160,12 +161,13 @@ class AndroidPlatform(Platform):
         return flags
 
     def cmake_options(self, args):
-        options = '-DCMAKE_SYSTEM_NAME=Android '
-        options += '-DCMAKE_SYSTEM_VERSION=%s ' % (args.android_api_level)
-        options += '-DCMAKE_SYSTEM_PROCESSOR=%s ' % (args.android_arch if not
-                                                     args.android_arch == 'armv7'
-                                                     else 'armv7-a')
-        options += '-DCMAKE_ANDROID_NDK:PATH=%s' % (args.android_ndk)
+        options = cmake.CMakeOptions()
+        options.define('CMAKE_SYSTEM_NAME', 'Android')
+        options.define('CMAKE_SYSTEM_VERSION' , args.android_api_level)
+        options.define('CMAKE_SYSTEM_PROCESSOR', args.android_arch if not
+                       args.android_arch == 'armv7'
+                       else 'armv7-a')
+        options.define('CMAKE_ANDROID_NDK:PATH', args.android_ndk)
         return options
 
     def ndk_toolchain_path(self, args):

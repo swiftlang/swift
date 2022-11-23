@@ -4758,7 +4758,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
         FormalEvaluationScope writeback(SGF);
         auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(),
                                     SGFAccessKind::IgnoredRead);
-        (void) SGF.emitLoadOfLValue(loc, std::move(srcLV), SGFContext());
+        RValue rv = SGF.emitLoadOfLValue(loc, std::move(srcLV), SGFContext());
+        // If we have a move only type, we need to implode and perform a move to
+        // ensure we consume our argument as part of the assignment. Otherwise,
+        // we don't do anything.
+        if (rv.getLoweredType(SGF).isMoveOnly()) {
+          ManagedValue value = std::move(rv).getAsSingleValue(SGF, loc);
+          // If we have an address, then ensure plus one will create a temporary
+          // copy which will act as a consume of the address value. If we have
+          // an object, we need to insert our own move though.
+          value = value.ensurePlusOne(SGF, loc);
+          if (value.getType().isObject())
+            value = SGF.B.createMoveValue(loc, value);
+        }
         return;
       }
 

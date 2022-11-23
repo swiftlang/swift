@@ -1093,7 +1093,8 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
 
   auto *ctor = cast<ConstructorDecl>(storageVar->getDeclContext()->getAsDecl());
   auto *parentType = ctor->getDeclContext()->getSelfNominalTypeDecl();
-  auto *storageDecl = parentType->getTypeWrapperStorageDecl();
+  auto *storageDecl =
+      cast<NominalTypeDecl>(parentType->getTypeWrapperStorageDecl());
 
   for (auto *point : points) {
     SILBuilderWithScope::insertAfter(point, [&](SILBuilder &b) {

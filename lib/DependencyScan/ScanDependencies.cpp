@@ -590,6 +590,8 @@ static void writeJSON(llvm::raw_ostream &out,
       modulePath = get_C_string(swiftPlaceholderDeps->compiled_module_path);
     else if (swiftBinaryDeps)
       modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
+    else if (clangDeps || swiftTextualDeps)
+      modulePath = get_C_string(moduleInfo.module_path);
     else
       modulePath = moduleName + modulePathSuffix;
 
@@ -827,10 +829,14 @@ generateFullDependencyGraph(CompilerInstance &instance,
     const char *modulePathSuffix =
         moduleDeps.isSwiftModule() ? ".swiftmodule" : ".pcm";
     std::string modulePath;
-    if (swiftPlaceholderDeps)
+    if (swiftTextualDeps)
+      modulePath = swiftTextualDeps->moduleOutputPath;
+    else if (swiftPlaceholderDeps)
       modulePath = swiftPlaceholderDeps->compiledModulePath;
     else if (swiftBinaryDeps)
       modulePath = swiftBinaryDeps->compiledModulePath;
+    else if (clangDeps)
+      modulePath = clangDeps->pcmOutputPath;
     else
       modulePath = module.first + modulePathSuffix;
 
@@ -1256,6 +1262,9 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
 
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
+
+  auto ModuleCachePath = getModuleCachePathFromClang(
+               Context.getClangModuleLoader()->getClangInstance());
 
   ModuleDependenciesCache cache(globalCache,
                                 instance.getMainModule()->getNameStr());

@@ -1000,6 +1000,72 @@ protected:
     return failTransform(stmt);                                                \
   }
 
+  /// Visit the element of a brace statement, returning \c None if the element
+  /// was transformed successfully, or an unsupported element if the element
+  /// cannot be handled.
+  Optional<UnsupportedElt>
+  transformBraceElement(ASTNode element, SmallVectorImpl<ASTNode> &newBody,
+                        SmallVectorImpl<Expr *> &buildBlockArguments) {
+    if (auto *returnStmt = getAsStmt<ReturnStmt>(element)) {
+      assert(returnStmt->isImplicit());
+      element = returnStmt->getResult();
+    }
+
+    if (auto *decl = element.dyn_cast<Decl *>()) {
+      switch (decl->getKind()) {
+        // Just ignore #if; the chosen children should appear in
+        // the surrounding context.  This isn't good for source
+        // tools but it at least works.
+      case DeclKind::IfConfig:
+        // Skip #warning/#error; we'll handle them when applying
+        // the builder.
+      case DeclKind::PoundDiagnostic:
+      case DeclKind::PatternBinding:
+      case DeclKind::Var:
+      case DeclKind::Param:
+        newBody.push_back(element);
+        return None;
+
+      default:
+        return UnsupportedElt(decl);
+      }
+      llvm_unreachable("Unhandled case in switch!");
+    }
+
+    if (auto *stmt = element.dyn_cast<Stmt *>()) {
+      // Throw is allowed as is.
+      if (auto *throwStmt = dyn_cast<ThrowStmt>(stmt)) {
+        newBody.push_back(throwStmt);
+        return None;
+      }
+
+      // Allocate variable with a placeholder type
+      auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
+
+      auto result = visit(stmt, resultVar);
+      if (!result)
+        return UnsupportedElt(stmt);
+
+      newBody.push_back(result.get());
+      buildBlockArguments.push_back(
+          builder.buildVarRef(resultVar, stmt->getStartLoc()));
+      return None;
+    }
+
+    auto *expr = element.get<Expr *>();
+    if (builder.supports(ctx.Id_buildExpression)) {
+      expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
+                               {Identifier()});
+    }
+
+    auto *capture = captureExpr(expr, newBody);
+    // A reference to the synthesized variable is passed as an argument
+    // to buildBlock.
+    buildBlockArguments.push_back(
+        builder.buildVarRef(capture, element.getStartLoc()));
+    return None;
+  }
+
   std::pair<NullablePtr<VarDecl>, Optional<UnsupportedElt>>
   transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
     SmallVector<Expr *, 4> buildBlockArguments;
@@ -1009,64 +1075,10 @@ protected:
     };
 
     for (auto element : braceStmt->getElements()) {
-      if (auto *returnStmt = getAsStmt<ReturnStmt>(element)) {
-        assert(returnStmt->isImplicit());
-        element = returnStmt->getResult();
+      if (auto unsupported =
+              transformBraceElement(element, newBody, buildBlockArguments)) {
+        return failTransform(*unsupported);
       }
-
-      if (auto *decl = element.dyn_cast<Decl *>()) {
-        switch (decl->getKind()) {
-        // Just ignore #if; the chosen children should appear in
-        // the surrounding context.  This isn't good for source
-        // tools but it at least works.
-        case DeclKind::IfConfig:
-        // Skip #warning/#error; we'll handle them when applying
-        // the builder.
-        case DeclKind::PoundDiagnostic:
-        case DeclKind::PatternBinding:
-        case DeclKind::Var:
-        case DeclKind::Param:
-          newBody.push_back(element);
-          break;
-
-        default:
-          return failTransform(decl);
-        }
-
-        continue;
-      }
-
-      if (auto *stmt = element.dyn_cast<Stmt *>()) {
-        // Throw is allowed as is.
-        if (auto *throwStmt = dyn_cast<ThrowStmt>(stmt)) {
-          newBody.push_back(throwStmt);
-          continue;
-        }
-
-        // Allocate variable with a placeholder type
-        auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
-
-        auto result = visit(stmt, resultVar);
-        if (!result)
-          return failTransform(stmt);
-
-        newBody.push_back(result.get());
-        buildBlockArguments.push_back(
-            builder.buildVarRef(resultVar, stmt->getStartLoc()));
-        continue;
-      }
-
-      auto *expr = element.get<Expr *>();
-      if (builder.supports(ctx.Id_buildExpression)) {
-        expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
-                                 {Identifier()});
-      }
-
-      auto *capture = captureExpr(expr, newBody);
-      // A reference to the synthesized variable is passed as an argument
-      // to buildBlock.
-      buildBlockArguments.push_back(
-          builder.buildVarRef(capture, element.getStartLoc()));
     }
 
     // Synthesize `buildBlock` or `buildPartial` based on captured arguments.

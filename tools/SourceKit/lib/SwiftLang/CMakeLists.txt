@@ -42,7 +42,6 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSema
   swiftBasic
   swiftSerialization
-  swiftSyntax
   swiftOption
   swiftSymbolGraphGen
   swiftRefactoring
@@ -67,3 +66,8 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   clangAPINotes
   clangBasic)
 add_dependencies(SourceKitSwiftLang clang-tablegen-targets)
+
+if (SWIFT_SWIFT_PARSER)
+  target_link_libraries(SourceKitSwiftLang
+    PRIVATE swift_CompilerPluginSupport)
+endif()

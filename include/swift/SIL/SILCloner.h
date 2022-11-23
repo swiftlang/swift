@@ -3103,6 +3103,14 @@ void SILCloner<ImplClass>
                             getOpValue(Inst->getExpectedExecutor())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitHasSymbolInst(HasSymbolInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createHasSymbol(getOpLocation(Inst->getLoc()),
+                                         Inst->getDecl()));
+}
+
 } // end namespace swift
 
 #endif

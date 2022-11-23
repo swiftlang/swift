@@ -26,6 +26,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -2992,4 +2993,14 @@ SILPhiArgument *SwitchEnumInst::createOptionalSomeResult() {
   auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
   auto someBB = getCaseDestination(someDecl);
   return createResult(someBB, getOperand()->getType().unwrapOptionalType());
+}
+
+void HasSymbolInst::getReferencedFunctions(
+    llvm::SmallVector<SILFunction *, 4> &fns) const {
+  auto &M = getModule();
+  enumerateFunctionsForHasSymbol(M, getDecl(), [&M, &fns](SILDeclRef declRef) {
+    SILFunction *fn = M.lookUpFunction(declRef);
+    assert(fn);
+    fns.push_back(fn);
+  });
 }

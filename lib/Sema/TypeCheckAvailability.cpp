@@ -142,6 +142,7 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
+    case DeclContextKind::MacroDecl:
       break;
 
     case DeclContextKind::Initializer:

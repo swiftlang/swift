@@ -12,11 +12,10 @@
 # directory.
 list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
 
-# Add generated libSyntax headers to global dependencies.
-list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
+# Add generated Swift Syntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-ast-generated-headers)
-list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 
+add_subdirectory(CompilerPluginSupport)
 add_subdirectory(APIDigester)
 add_subdirectory(AST)
 add_subdirectory(ASTGen)
@@ -54,7 +53,4 @@ add_subdirectory(SILGen)
 add_subdirectory(SILOptimizer)
 add_subdirectory(StaticMirror)
 add_subdirectory(SymbolGraphGen)
-add_subdirectory(Syntax)
-add_subdirectory(SyntaxParse)
 add_subdirectory(Threading)
-add_subdirectory(CompilerPluginSupport)

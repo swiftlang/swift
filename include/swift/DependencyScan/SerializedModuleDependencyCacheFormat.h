@@ -124,7 +124,8 @@ using ModuleInfoLayout =
 
 using SwiftInterfaceModuleDetailsLayout =
     BCRecordLayout<SWIFT_INTERFACE_MODULE_DETAILS_NODE, // ID
-                   FileIDField,                       // swiftInterfaceFile
+                   FileIDField,        // outputFilePath
+                   FileIDField,        // swiftInterfaceFile
                    FileIDArrayIDField, // compiledModuleCandidates
                    FlagIDArrayIDField, // buildCommandLine
                    FlagIDArrayIDField, // extraPCMArgs
@@ -162,6 +163,7 @@ using SwiftPlaceholderModuleDetailsLayout =
 
 using ClangModuleDetailsLayout =
     BCRecordLayout<CLANG_MODULE_DETAILS_NODE, // ID
+                   FileIDField,               // pcmOutputPath
                    FileIDField,               // moduleMapPath
                    ContextHashField,          // contextHash
                    FlagIDArrayIDField,        // commandLine

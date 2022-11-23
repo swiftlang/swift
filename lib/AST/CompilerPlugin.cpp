@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Parse/Lexer.h"
@@ -188,9 +189,9 @@ void ASTContext::loadCompilerPlugins() {
     swift_ASTGen_getMacroTypes(getter, &metatypesAddress, &metatypeCount);
     ArrayRef<const void *> metatypes(metatypesAddress, metatypeCount);
     for (const void *metatype : metatypes) {
-      CompilerPlugin plugin(metatype, lib, *this);
-      auto name = plugin.getName();
-      LoadedPlugins.try_emplace(name, std::move(plugin));
+      auto plugin = new CompilerPlugin(metatype, lib, *this);
+      auto name = plugin->getName();
+      addLoadedPlugin(name, plugin);
     }
     free(const_cast<void *>((const void *)metatypes.data()));
 #endif // SWIFT_SWIFT_PARSER
@@ -231,17 +232,37 @@ CompilerPlugin::~CompilerPlugin() {
 }
 
 namespace {
+// Corresponds to Swift type `(UnsafePointer<UInt8>, Int)`.
 struct CharBuffer {
   const char *data;
-  ptrdiff_t size;
+  ptrdiff_t length;
 
   StringRef str() const {
-    return StringRef(data, (size_t)size);
+    return StringRef(data, (size_t)length);
   }
 
   NullTerminatedStringRef cstr() const {
-    return NullTerminatedStringRef(data, (size_t)size);
+    return NullTerminatedStringRef(data, (size_t)length);
   }
+};
+
+// Corresponds to Swift type `(UnsafePointer<UInt8>, Int, Int, UInt8)`.
+struct DiagnosticBuffer {
+  const char *message;
+  ptrdiff_t length;
+  ptrdiff_t position;
+  uint8_t severity;
+
+  StringRef str() const {
+    return StringRef(message, (size_t)length);
+  }
+};
+
+// Corresponds to Swift type
+// `(UnsafePointer<(UnsafePointer<UInt8>, Int, Int)>, Int)`.
+struct DiagnosticArrayBuffer {
+  const DiagnosticBuffer *data;
+  ptrdiff_t count;
 };
 }
 
@@ -268,13 +289,16 @@ CompilerPlugin::Kind CompilerPlugin::invokeKind() const {
 }
 
 Optional<NullTerminatedStringRef>
-CompilerPlugin::invokeRewrite(StringRef targetModuleName,
-                              StringRef filePath,
-                              StringRef sourceFileText,
-                              CharSourceRange range,
-                              ASTContext &ctx) const {
+CompilerPlugin::invokeRewrite(
+    StringRef targetModuleName, StringRef filePath, StringRef sourceFileText,
+    CharSourceRange range, ASTContext &ctx,
+    SmallVectorImpl<Diagnostic> &diagnostics) const {
+  struct RewriteResult {
+    CharBuffer code;
+    DiagnosticArrayBuffer diagnostics;
+  };
 #if __clang__
-  using Method = SWIFT_CC CharBuffer(
+  using Method = SWIFT_CC RewriteResult(
       const char *, ptrdiff_t,
       const char *, ptrdiff_t,
       const char *, ptrdiff_t,
@@ -287,9 +311,20 @@ CompilerPlugin::invokeRewrite(StringRef targetModuleName,
       sourceFileText.data(), (ptrdiff_t)sourceFileText.size(),
       range.str().data(), (ptrdiff_t)range.getByteLength(),
       metadata, metadata, witnessTable);
-  if (!result.data)
+  SWIFT_DEFER {
+    free((void*)result.diagnostics.data);
+  };
+  if (!result.code.data)
     return None;
-  return result.cstr();
+  // Collect diagnostics.
+  for (unsigned i = 0, n = result.diagnostics.count; i < n; ++i) {
+    auto diag = result.diagnostics.data[i];
+    StringRef message(diag.message, diag.length);
+    diagnostics.push_back(
+        {message, (unsigned)diag.position,
+         (CompilerPlugin::DiagnosticSeverity)diag.severity});
+  }
+  return result.code.cstr();
 #else
   llvm_unreachable("Incompatible host compiler");
 #endif

@@ -168,6 +168,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
+  TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
 
    case DeclKind::Enum:
@@ -354,6 +355,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
   ENTRY(OpaqueVarType, "type");
+  ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
   }
 #undef ENTRY
@@ -481,6 +483,7 @@ bool Decl::isInvalid() const {
   case DeclKind::Destructor:
   case DeclKind::Func:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     return cast<ValueDecl>(this)->getInterfaceType()->hasError();
 
   case DeclKind::Accessor: {
@@ -524,6 +527,7 @@ void Decl::setInvalid() {
   case DeclKind::Func:
   case DeclKind::Accessor:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
     return;
 
@@ -1234,6 +1238,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Var;
 
   case DeclKind::Module:
+  case DeclKind::Macro:
     return ImportKind::Module;
   }
   llvm_unreachable("bad DeclKind");
@@ -2680,6 +2685,10 @@ bool ValueDecl::isInstanceMember() const {
     // Modules are never instance members.
     return false;
 
+  case DeclKind::Macro:
+    // Macros are never instance members.
+    return false;
+
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
@@ -3049,7 +3058,8 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+// To-Do: Replce calls to getOpaqueResultTypeRepr with getResultTypeRepr()
+TypeRepr *ValueDecl::getResultTypeRepr() const {
   TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
@@ -3060,7 +3070,7 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
         P = P->getSemanticsProvidingPattern();
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           assert(NP->getDecl() == VD);
-          (void) NP;
+          (void)NP;
 
           returnRepr = TP->getTypeRepr();
         }
@@ -3073,6 +3083,12 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     returnRepr = SD->getElementTypeRepr();
   }
+
+  return returnRepr;
+}
+
+TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+  auto *returnRepr = this->getResultTypeRepr();
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
@@ -9618,7 +9634,30 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+MacroDecl::MacroDecl(
+  Kind kind, ImplementationKind implementationKind, Identifier name,
+  ModuleDecl *owningModule,
+  ArrayRef<ModuleDecl *> supplementalSignatureModules,
+  void *opaqueHandle
+) : GenericContext(DeclContextKind::MacroDecl, owningModule, nullptr),
+    ValueDecl(DeclKind::Macro, owningModule, name, SourceLoc()),
+    kind(kind), implementationKind(implementationKind),
+    supplementalSignatureModules(supplementalSignatureModules),
+    opaqueHandle(opaqueHandle) {
+}
+
+SourceRange MacroDecl::getSourceRange() const {
+  return SourceRange();
+}
+
 SourceRange MacroExpansionDecl::getSourceRange() const {
-  return SourceRange(PoundLoc,
-                     ArgList ? ArgList->getEndLoc() : MacroLoc.getEndLoc());
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
 }

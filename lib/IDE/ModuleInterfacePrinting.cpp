@@ -80,9 +80,8 @@ private:
                     PrintNameContext NameContext) override {
     return OtherPrinter.printTypeRef(T, TD, Name, NameContext);
   }
-  void printModuleRef(ModuleEntity Mod, Identifier Name,
-                      const PrintOptions &Options) override {
-    return OtherPrinter.printModuleRef(Mod, Name, Options);
+  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
+    return OtherPrinter.printModuleRef(Mod, Name);
   }
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     TypeOrExtensionDecl Target,

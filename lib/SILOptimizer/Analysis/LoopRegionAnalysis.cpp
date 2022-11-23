@@ -929,8 +929,13 @@ struct LoopRegionWrapper {
 
 /// An iterator on Regions that first iterates over subregions and then over
 /// successors.
-struct alledge_iterator
-    : std::iterator<std::forward_iterator_tag, LoopRegionWrapper> {
+struct alledge_iterator {
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = LoopRegionWrapper;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   LoopRegionWrapper *Wrapper;
   LoopRegion::subregion_iterator SubregionIter;
   LoopRegion::backedge_iterator BackedgeIter;

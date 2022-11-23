@@ -46,34 +46,31 @@ if (SWIFT_SWIFT_PARSER)
 
     target_compile_options(swiftASTGen PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
 
-  # Link against the SwiftSyntax parser and libraries it depends on. The actual
-  # formulation of this is a hack to work around a CMake bug in Ninja file
-  # generation that results in multiple Ninja targets producing the same file in
-  # a downstream SourceKit target. This should be expressed as:
-  #
-  #   target_link_libraries(swiftASTGen
-  #     PRIVATE
-  #     SwiftSyntax::SwiftCompilerSupport
-  #   )
-  target_link_libraries(swiftASTGen
-    PRIVATE
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftParserDiagnostics>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntaxBuilder>
-    $<TARGET_OBJECTS:SwiftSyntax::_SwiftSyntaxMacros>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+  # Workaround a cmake bug, see the corresponding function in swift-syntax
+  function(force_target_link_libraries TARGET)
+    cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
 
-    swiftAST
-  )
+    foreach(DEPENDENCY ${ARGS_PUBLIC})
+      # This is a hack to workaround a cmake bug that results in multiple ninja targets producing
+      # the same file in a downstream SourceKit target. This should use `PUBLIC`, the dependency
+      # directly (rather than `TARGET_OBJECTS`), and no `add_dependencies`.
+      target_link_libraries(${TARGET} PRIVATE
+       $<TARGET_OBJECTS:${DEPENDENCY}>
+      )
+      add_dependencies(${TARGET} ${DEPENDENCY})
 
-  target_include_directories(swiftASTGen PUBLIC
-    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
+      add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+        DEPENDS ${DEPENDENCY}
+        )
+      target_sources(${TARGET} PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+      )
+    endforeach()
+  endfunction()
 
-  add_dependencies(swiftASTGen
+  # TODO: Change to target_link_libraries when cmake is fixed
+  force_target_link_libraries(swiftASTGen PUBLIC
     SwiftSyntax::SwiftBasicFormat
     SwiftSyntax::SwiftParser
     SwiftSyntax::SwiftParserDiagnostics
@@ -83,8 +80,14 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftSyntaxBuilder
     SwiftSyntax::_SwiftSyntaxMacros
     SwiftSyntax::SwiftCompilerSupport
-    swiftAST
   )
+  target_link_libraries(swiftASTGen PUBLIC
+    swiftAST
+    swift_CompilerPluginSupport
+  )
+
+  target_include_directories(swiftASTGen PUBLIC
+    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()

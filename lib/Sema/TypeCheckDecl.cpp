@@ -2543,6 +2543,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     return resultTy;
   }
+
+  case DeclKind::Macro: {
+    llvm_unreachable("macro types are precomputed right now");
+  }
   }
   llvm_unreachable("invalid decl kind");
 }
@@ -2748,15 +2752,22 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     TypeChecker::checkConformance(conformance->getRootNormalConformance());
   }
 
-  // If the type conforms to Encodable or Decodable, even via an extension,
-  // the CodingKeys enum is synthesized as a member of the type itself.
-  // Force it into existence.
   if (nominal) {
+    // If the type conforms to Encodable or Decodable, even via an extension,
+    // the CodingKeys enum is synthesized as a member of the type itself.
+    // Force it into existence.
     (void) evaluateOrDefault(
       ctx.evaluator,
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
+
+    // Synthesize $Storage type and `var $storage` associated with
+    // type wrapped type.
+    if (nominal->hasTypeWrapper()) {
+      (void)nominal->getTypeWrapperStorageDecl();
+      (void)nominal->getTypeWrapperProperty();
+    }
   }
 
   // If the decl has a @main attribute, we need to force synthesis of the

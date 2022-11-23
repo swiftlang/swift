@@ -57,10 +57,9 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -515,6 +514,15 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
+  /// Cache of compiler plugins keyed by their name.
+  ///
+  /// Names can be overloaded, so there can be multiple plugins with the same
+  /// name.
+  llvm::StringMap<TinyPtrVector<CompilerPlugin*>> LoadedPlugins;
+
+  /// Cache of loaded symbols.
+  llvm::StringMap<void *> LoadedSymbols;
+
   /// The permanent arena.
   Arena Permanent;
 
@@ -549,8 +557,6 @@ struct ASTContext::Implementation {
   
   llvm::FoldingSet<SILLayout> SILLayouts;
 
-  RC<syntax::SyntaxArena> TheSyntaxArena;
-
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
 
   Optional<ClangTypeConverter> Converter;
@@ -573,12 +579,17 @@ struct ASTContext::Implementation {
 
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
-      TheSyntaxArena(new syntax::SyntaxArena()),
       IntrinsicScratchContext(new llvm::LLVMContext())
       {}
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
+
+  for (const auto &pluginsByName : LoadedPlugins) {
+    for (auto plugin : pluginsByName.second) {
+      delete plugin;
+    }
+  }
 }
 
 ConstraintCheckerArenaRAII::
@@ -733,10 +744,6 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   }
   evaluator.setStatsReporter(stats);
   Stats = stats;
-}
-
-RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
-  return getImpl().TheSyntaxArena;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -6047,16 +6054,21 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
-CompilerPlugin *ASTContext::getLoadedPlugin(StringRef name) {
-  auto lookup = LoadedPlugins.find(name);
-  if (lookup == LoadedPlugins.end())
-    return nullptr;
-  return &lookup->second;
+TinyPtrVector<CompilerPlugin *> ASTContext::getLoadedPlugins(StringRef name) {
+  auto &loadedPlugins = getImpl().LoadedPlugins;
+  auto lookup = loadedPlugins.find(name);
+  if (lookup == loadedPlugins.end())
+    return { };
+  return lookup->second;
+}
+
+void ASTContext::addLoadedPlugin(StringRef name, CompilerPlugin *plugin) {
+  getImpl().LoadedPlugins[name].push_back(plugin);
 }
 
 void *ASTContext::getAddressOfSymbol(const char *name,
                                      void *libraryHandleHint) {
-  auto lookup = LoadedSymbols.try_emplace(name, nullptr);
+  auto lookup = getImpl().LoadedSymbols.try_emplace(name, nullptr);
   void *&address = lookup.first->getValue();
 #if !defined(_WIN32)
   if (lookup.second) {

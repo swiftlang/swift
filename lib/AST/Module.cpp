@@ -47,7 +47,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
-#include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -60,6 +59,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 
@@ -1720,14 +1720,6 @@ Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
   return Fingerprint{std::move(hash)};
 }
 
-syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
-  auto &eval = getASTContext().evaluator;
-  auto *mutableThis = const_cast<SourceFile *>(this);
-  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-              .SyntaxRoot;
-}
-
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     const TinyPtrVector<OperatorDecl *> &ops) const {
@@ -2195,6 +2187,14 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
       return Mod;
   }
   return nullptr;
+}
+
+bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
+  auto clangModule = findUnderlyingClangModule();
+  if (!clangModule)
+    return false;
+
+  return other->getRealName().str() == clangModule->ExportAsModule;
 }
 
 void ModuleDecl::collectBasicSourceFileInfo(
@@ -2875,7 +2875,8 @@ void SourceFile::lookupImportedSPIGroups(
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
         (importedModule == import.module.importedModule ||
-         imports.isImportedBy(importedModule, import.module.importedModule))) {
+         (imports.isImportedBy(importedModule, import.module.importedModule) &&
+          importedModule->isExportedAs(import.module.importedModule)))) {
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
@@ -3263,8 +3264,6 @@ SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
   ParsingOptions opts;
   if (langOpts.DisablePoundIfEvaluation)
     opts |= ParsingFlags::DisablePoundIfEvaluation;
-  if (langOpts.BuildSyntaxTree)
-    opts |= ParsingFlags::BuildSyntaxTree;
   if (langOpts.CollectParsedToken)
     opts |= ParsingFlags::CollectParsedTokens;
   return opts;
@@ -3283,11 +3282,6 @@ bool SourceFile::shouldCollectTokens() const {
          ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
-bool SourceFile::shouldBuildSyntaxTree() const {
-  return Kind != SourceFileKind::SIL &&
-         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
-}
-
 bool SourceFile::hasDelayedBodyParsing() const {
   if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
     return false;
@@ -3296,8 +3290,6 @@ bool SourceFile::hasDelayedBodyParsing() const {
   if (Kind == SourceFileKind::SIL)
     return false;
   if (shouldCollectTokens())
-    return false;
-  if (shouldBuildSyntaxTree())
     return false;
 
   return true;
@@ -3507,12 +3499,14 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
-  for (auto *opaqueDecl : UnvalidatedOpaqueReturnTypes.takeVector()) {
-    auto inserted = ValidatedOpaqueReturnTypes.insert(
-              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
-               opaqueDecl});
-    if (inserted.second) {
-      OpaqueReturnTypes.push_back(opaqueDecl);
+  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
+    if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
+      auto inserted = ValidatedOpaqueReturnTypes.insert(
+                {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
+                 opaqueDecl});
+      if (inserted.second) {
+        OpaqueReturnTypes.push_back(opaqueDecl);
+      }
     }
   }
 

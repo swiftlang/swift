@@ -78,18 +78,15 @@ public:
     /// and the associated language option.
     DisablePoundIfEvaluation = 1 << 1,
 
-    /// Whether to build a syntax tree.
-    BuildSyntaxTree = 1 << 2,
-
     /// Whether to save the file's parsed tokens.
-    CollectParsedTokens = 1 << 3,
+    CollectParsedTokens = 1 << 2,
 
     /// Whether to compute the interface hash of the file.
-    EnableInterfaceHash = 1 << 4,
+    EnableInterfaceHash = 1 << 3,
 
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
-    SuppressWarnings = 1 << 5,
+    SuppressWarnings = 1 << 4,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -149,12 +146,9 @@ private:
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of opaque type decls that have not yet been validated.
-  ///
-  /// \note This is populated as opaque type decls are created. Validation
-  /// requires mangling the naming decl, which would lead to circularity
-  /// if it were done from OpaqueResultTypeRequest.
-  llvm::SetVector<OpaqueTypeDecl *> UnvalidatedOpaqueReturnTypes;
+  /// The set of parsed decls with opaque return types that have not yet
+  /// been validated.
+  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
   /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
@@ -250,10 +244,6 @@ public:
   /// Whether this source file is a primary file, meaning that we're generating
   /// code for it. Note this method returns \c false in WMO.
   bool isPrimary() const { return IsPrimary; }
-
-  /// A cache of syntax nodes that can be reused when creating the syntax tree
-  /// for this file.
-  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
@@ -636,18 +626,17 @@ public:
   /// them to be accessed from \c getAllTokens.
   bool shouldCollectTokens() const;
 
-  bool shouldBuildSyntaxTree() const;
-
   /// Whether the bodies of types and functions within this file can be lazily
   /// parsed.
   bool hasDelayedBodyParsing() const;
 
-  syntax::SourceFileSyntax getSyntaxRoot() const;
-
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
-  void addOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    UnvalidatedOpaqueReturnTypes.insert(decl);
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
+  void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
+    UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
@@ -660,9 +649,6 @@ private:
   /// If not \c None, the underlying vector contains the parsed tokens of this
   /// source file.
   Optional<ArrayRef<Token>> AllCollectedTokens;
-
-  /// The root of the syntax tree representing the source file.
-  std::unique_ptr<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
 inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
