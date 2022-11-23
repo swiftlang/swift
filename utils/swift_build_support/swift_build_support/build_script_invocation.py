@@ -104,7 +104,6 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
-            "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
