@@ -97,6 +97,13 @@ SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
   return getTrailingObjects<OpaqueEnvironmentData>()->subMap;
 }
 
+SubstitutionMap
+GenericEnvironment::getPackElementContextSubstitutions() const {
+  assert(getKind() == Kind::OpenedElement);
+  auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
+  return environmentData->outerSubstitutions;
+}
+
 Type GenericEnvironment::getOpenedExistentialType() const {
   assert(getKind() == Kind::OpenedExistential);
   return getTrailingObjects<OpenedExistentialEnvironmentData>()->existential;
@@ -152,11 +159,11 @@ GenericEnvironment::GenericEnvironment(
 }
 
 GenericEnvironment::GenericEnvironment(
-      GenericSignature signature, UUID uuid)
+      GenericSignature signature, UUID uuid, SubstitutionMap outerSubs)
   : SignatureAndKind(signature, Kind::OpenedElement)
 {
   new (getTrailingObjects<OpenedElementEnvironmentData>())
-    OpenedElementEnvironmentData{uuid};
+    OpenedElementEnvironmentData{uuid, outerSubs};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -234,12 +241,20 @@ struct SubstituteOuterFromSubstitutionMap {
 
 }
 
-Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
+Type
+GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::OpenedExistential:
-  case Kind::OpenedElement:
     return type;
+
+  case Kind::OpenedElement: {
+    auto packElements = getGenericSignature().getInnermostGenericParams();
+    auto elementDepth = packElements.front()->getDepth();
+    SubstituteOuterFromSubstitutionMap replacer{
+        getPackElementContextSubstitutions(), elementDepth};
+    return type.subst(replacer, replacer);
+  }
 
   case Kind::Opaque: {
     // Substitute outer generic parameters of an opaque archetype environment.
@@ -313,14 +328,14 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     switch (getKind()) {
     case Kind::Primary:
     case Kind::OpenedExistential:
-    case Kind::OpenedElement:
       if (type->hasTypeParameter()) {
         return mapTypeIntoContext(type, conformanceLookupFn);
       } else {
         return type;
       }
+    case Kind::OpenedElement:
     case Kind::Opaque:
-      return maybeApplyOpaqueTypeSubstitutions(type);
+      return maybeApplyOuterContextSubstitutions(type);
     }
   };
 
@@ -383,7 +398,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       unsigned opaqueDepth =
           getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
       if (rootGP->getDepth() < opaqueDepth) {
-        result = maybeApplyOpaqueTypeSubstitutions(requirements.anchor);
+        result = maybeApplyOuterContextSubstitutions(requirements.anchor);
         break;
       }
 
@@ -419,10 +434,20 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       break;
     }
 
-    case Kind::OpenedElement:
+    case Kind::OpenedElement: {
+      auto packElements = getGenericSignature().getInnermostGenericParams();
+      auto elementDepth = packElements.front()->getDepth();
+
+      if (rootGP->getDepth() < elementDepth) {
+        result = maybeApplyOuterContextSubstitutions(requirements.anchor);
+        break;
+      }
+
       result = ElementArchetypeType::getNew(this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
+      break;
+    }
     }
   }
 
@@ -470,7 +495,7 @@ Type GenericEnvironment::mapTypeIntoContext(
   assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
          "already have a contextual type");
 
-  type = maybeApplyOpaqueTypeSubstitutions(type);
+  type = maybeApplyOuterContextSubstitutions(type);
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
                            SubstFlags::AllowLoweredTypes);

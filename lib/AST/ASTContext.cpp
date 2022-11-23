@@ -5016,7 +5016,8 @@ GenericEnvironment::forOpenedExistential(
 
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid) {
+GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
+                                     SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
   auto &openedElementEnvironments =
@@ -5038,7 +5039,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid) {
                                   OpenedElementEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid);
+  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid,
+                                                  outerSubs);
 
   openedElementEnvironments[uuid] = genericEnv;
 
