@@ -184,6 +184,10 @@ class CMakeProduct(product.Product):
             swift_host_triple = 'armv7-unknown-linux-gnueabihf'
             llvm_target_arch = 'ARM'
 
+        elif host_target == 'alpine-aarch64':
+            swift_host_triple = 'aarch64-alpine-linux-musl'
+            llvm_target_arch = 'ARM'
+
         elif host_target.startswith('macosx') or \
                 host_target.startswith('iphone') or \
                 host_target.startswith('appletv') or \

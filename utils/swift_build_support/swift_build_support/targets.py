@@ -260,6 +260,11 @@ class StdlibDeploymentTarget(object):
     Freestanding = Platform("freestanding",
                             archs=["i386", "x86_64", "armv7", "armv7s", "armv7k",
                                    "arm64", "arm64e"])
+    
+    Alpine = Platform("alpine", sdk_name='ALPINE', archs=[
+        "x86_64",
+        "i686",
+        "aarch64"])                  
 
     Linux = Platform("linux", archs=[
         "x86_64",
@@ -294,6 +299,7 @@ class StdlibDeploymentTarget(object):
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
         Freestanding,
+        Alpine,
         Linux,
         FreeBSD,
         OpenBSD,
