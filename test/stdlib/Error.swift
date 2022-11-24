@@ -243,5 +243,48 @@ ErrorTests.test("willThrow") {
   }
 }
 
+ErrorTests.test("setAndCopyBacktrace") {
+    guard #available(SwiftStdlib 9999, *) else { return }
+    typealias SetBacktrace = @convention(c) (Error, AnyObject, Bool) -> Void
+    typealias CopyBacktrace = @convention(c) (Error) -> Unmanaged<AnyObject>
+    let setBacktrace = pointerToSwiftCoreSymbol(
+        name: "swift_errorSetBacktrace") as! SetBacktrace
+    let copyBacktrace = pointerToSwiftCoreSymbol(
+        name: "swift_errorCopyBacktrace") as! CopyBacktrace
+
+    do {
+        do {
+            do {
+                do {
+                    try throwJazzHands()
+                } catch {
+                    // The backtrace hasn't been set yet, so overwrite = false
+                    // should succeed.
+                    setBacktrace(error, "Overwrite this backtrace!", false)
+                    throw error
+                }
+            } catch {
+                // Check that setting the backtrace with overwrite = false the
+                // first time was successful.
+                let backtrace = copyBacktrace(error).takeRetainedValue()!
+                expectEqual(backtrace, "Overwrite this backtrace!")
+
+                // Setting the backtrace with overwrite = true should always
+                // succeed.
+                setBacktrace(error, "This backtrace should stick!", true)
+                throw error
+            }
+        } catch {
+            // Setting the backtrace again with overwrite = false should fail.
+            setBacktrace(error, "This backtrace should not overwrite!", false)
+            throw error
+        }
+    } catch {
+        // Confirm we have the expected backtrace.
+        let backtrace = copyBacktrace(error).takeRetainedValue()!
+        expectEqual(backtrace, "This backtrace should stick!")
+    }
+}
+
 runAllTests()
 

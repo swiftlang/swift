@@ -235,6 +235,8 @@ process start and the function returns.
 
 ```
 0000000000027140 T _swift_willThrow
+                   swift_errorCopyBacktrace
+                   swift_errorSetBacktrace
 ```
 
 ## Objective-C Bridging

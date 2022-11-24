@@ -290,13 +290,6 @@ swift::swift_allocError(const Metadata *type,
   return BoxPair{reinterpret_cast<HeapObject*>(instance), valuePtr};
 }
 
-/// Deallocate an error object whose contained object has already been
-/// destroyed.
-void
-swift::swift_deallocError(SwiftError *error, const Metadata *type) {
-  object_dispose((id)error);
-}
-
 static const WitnessTable *getNSErrorConformanceToError() {
   // CFError and NSError are toll-free-bridged, so we can use either type's
   // witness table interchangeably. CFError's is potentially slightly more

@@ -93,6 +93,20 @@ struct SwiftError : SwiftErrorHeader {
   mutable std::atomic<const hashable_support::HashableWitnessTable *> hashableConformance;
 #endif
 
+  /// Storage for a backtrace associated with this error. Backtraces are
+  /// normally not captured in Swift, however testing libraries like XCTest may
+  /// find it necessary to store the backtrace of an error when implementing
+  /// @c _swift_willThrow in order to produce concurrency-safe error diagnosis.
+  ///
+  /// The backtrace is stored as an object with refcount +1. Don't access this
+  /// field directly; use @c copyBacktrace() and @c setBacktrace() instead. The
+  /// backtrace is released in @c swift_deallocError().
+  ///
+  /// On platforms with Objective-C interop, if the error is bridged from
+  /// @c NSError then the backtrace is stored in an Objective-C associated
+  /// object instead of in this field.
+  std::atomic<OpaqueValue *> backtrace;
+
   /// Get a pointer to the value contained inside the indirectly-referenced
   /// box reference.
   static const OpaqueValue *getIndirectValue(const SwiftError * const *ptr) {
@@ -128,7 +142,7 @@ struct SwiftError : SwiftErrorHeader {
   
 #if SWIFT_OBJC_INTEROP
   // True if the object is really an NSError or CFError instance.
-  // The type and errorConformance fields don't exist in an NSError.
+  // The type, errorConformance, and backtrace fields don't exist in an NSError.
   bool isPureNSError() const;
 #else
   bool isPureNSError() const { return false; }
@@ -155,6 +169,13 @@ struct SwiftError : SwiftErrorHeader {
   /// Returns NULL if the type does not conform.
   const hashable_support::HashableWitnessTable *getHashableConformance() const;
 #endif
+
+  /// Get the backtrace associated with this error. Returned at +1.
+  OpaqueValue *copyBacktrace() const;
+
+  /// Set the backtrace associated with this error. If a backtrace has already
+  /// been stored for this error, @a overwrite determines if it is replaced.
+  void setBacktrace(OpaqueValue *value, bool overwrite);
 
   // Don't copy or move, please.
   SwiftError(const SwiftError &) = delete;

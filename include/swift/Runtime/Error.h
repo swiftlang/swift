@@ -71,6 +71,20 @@ SWIFT_RUNTIME_STDLIB_API void
 swift_willThrow(SWIFT_CONTEXT void *unused,
                 SWIFT_ERROR_RESULT SwiftError **object);
 
+/// For debugger use only -- copies a backtrace previously assigned to an
+/// error by @c swift_errorSetBacktrace(). The caller takes ownership of the
+/// result and must release it with @c swift_unknownObjectRelease() when done.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API OpaqueValue *
+swift_errorCopyBacktrace(SwiftError *object);
+
+/// For debugger use only -- stores a backtrace in an error. If a backtrace has
+/// already been stored for this error, @a overwrite determines if it is
+/// replaced or not.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API void
+swift_errorSetBacktrace(SwiftError *object, OpaqueValue *value, bool overwrite);
+
 /// Called when an error is thrown out of the top level of a script.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void

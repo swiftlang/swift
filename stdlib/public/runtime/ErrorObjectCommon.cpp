@@ -22,7 +22,74 @@
 #include "ErrorObject.h"
 #include "ErrorObjectTestSupport.h"
 
+#if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/ObjCBridge.h"
+#include <objc/runtime.h>
+#endif
+
 using namespace swift;
+
+#if SWIFT_OBJC_INTEROP
+static char backtraceKey;
+#endif
+
+OpaqueValue *SwiftError::copyBacktrace() const {
+#if SWIFT_OBJC_INTEROP
+  if (isPureNSError()) {
+    auto nsError = reinterpret_cast<id>(const_cast<SwiftError *>(this));
+    id value = objc_getAssociatedObject(nsError, &backtraceKey);
+    return reinterpret_cast<OpaqueValue *>(swift_unknownObjectRetain(value));
+  }
+#endif
+
+  return reinterpret_cast<OpaqueValue *>(swift_unknownObjectRetain(backtrace));
+}
+
+void SwiftError::setBacktrace(OpaqueValue *value, bool overwrite) {
+#if SWIFT_OBJC_INTEROP
+  if (isPureNSError()) {
+    auto nsError = reinterpret_cast<id>(this);
+    if (!overwrite && objc_getAssociatedObject(nsError, &backtraceKey)) {
+      // Already set, but don't want to overwrite.
+    } else {
+      objc_setAssociatedObject(nsError,
+                               &backtraceKey,
+                               reinterpret_cast<id>(value),
+                               OBJC_ASSOCIATION_RETAIN);
+    }
+
+    return;
+  }
+#endif
+
+  if (overwrite) {
+    value = reinterpret_cast<OpaqueValue *>(swift_unknownObjectRetain(value));
+    if (auto oldValue = backtrace.exchange(value)) {
+      swift_unknownObjectRelease(oldValue);
+    }
+  } else {
+    OpaqueValue *expected = nullptr;
+    if (backtrace.compare_exchange_strong(expected, value)) {
+      swift_unknownObjectRetain(value);
+    }
+  }
+}
+
+void
+swift::swift_deallocError(SwiftError *error, const Metadata *type) {
+  if (!error->isPureNSError()) {
+    OpaqueValue *backtrace = error->backtrace;
+    if (SWIFT_UNLIKELY(backtrace)) {
+      swift_unknownObjectRelease(backtrace);
+    }
+  }
+#if SWIFT_OBJC_INTEROP
+  object_dispose((id)error);
+#else
+  auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
+  swift_deallocUninitializedObject(error, sizeAndAlign.first, sizeAndAlign.second);
+#endif
+}
 
 void (*swift::_swift_willThrow)(SwiftError *error);
 
@@ -35,4 +102,15 @@ swift::swift_willThrow(SWIFT_CONTEXT void *unused,
   if (SWIFT_LIKELY(!_swift_willThrow))
     return;
   _swift_willThrow(*error);
+}
+
+SWIFT_CC(swift) OpaqueValue *
+swift::swift_errorCopyBacktrace(SwiftError *object) {
+    return object->copyBacktrace();
+}
+
+SWIFT_CC(swift) void
+swift::swift_errorSetBacktrace(SwiftError *object, OpaqueValue *value,
+                               bool overwrite) {
+    object->setBacktrace(value, overwrite);
 }

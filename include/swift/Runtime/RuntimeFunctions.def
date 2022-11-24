@@ -160,6 +160,20 @@ FUNCTION(WillThrow, swift_willThrow, SwiftCC,  AlwaysAvailable,
          ATTRS(NoUnwind),
          EFFECT(NoEffect))
 
+// OpaqueValue *swift_errorCopyBacktrace(SwiftError *object);
+FUNCTION(ErrorCopyBacktrace, swift_errorCopyBacktrace, SwiftCC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting))
+
+// void swift_errorSetBacktrace(SwiftError *object, OpaqueValue *value, bool overwrite);
+FUNCTION(ErrorSetBacktrace, swift_errorSetBacktrace, SwiftCC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy, RefCountedPtrTy, Int1Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting, Deallocating))
+
 // void swift_errorInMain(error *ptr);
 FUNCTION(ErrorInMain, swift_errorInMain, SwiftCC, AlwaysAvailable,
          RETURNS(VoidTy),
