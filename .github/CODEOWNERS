@@ -106,3 +106,8 @@ utils/*windows*       @compnerd
 # TODO: /*test/SIL/
 # TODO: /*test/SILGen/
 # TODO: /unittests/SIL/
+
+# SILOptimizer
+# TODO: /include/swift/SILOptimizer/
+# TODO: /lib/SILOptimizer/
+# TODO: /*test/SILOptimizer/
