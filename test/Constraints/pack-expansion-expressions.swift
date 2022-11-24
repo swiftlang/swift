@@ -58,3 +58,8 @@ func outerArchetype<T..., U>(t: T..., u: U) where T: P {
 func sameElement<T..., U>(t: T..., u: U) where T: P, T == U {
   let _: T... = t.f(u)...
 }
+
+func forEachEach<C..., U>(c: C..., function: (U) -> Void)
+    where C: Collection, C.Element == U {
+  _ = c.forEach(function)...
+}

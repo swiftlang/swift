@@ -2932,7 +2932,10 @@ namespace {
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      CS.addConstraint(ConstraintKind::ShapeOf, patternTy, shapeTypeVar,
+      auto packReference = expr->getBindings().front();
+      auto packType = CS.simplifyType(CS.getType(packReference))
+          ->castTo<PackExpansionType>()->getPatternType();
+      CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
                        CS.getConstraintLocator(expr));
 
       return PackExpansionType::get(patternTy, shapeTypeVar);
