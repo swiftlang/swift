@@ -455,6 +455,7 @@ function verify_host_is_supported() {
       | openbsd-amd64           \
       | cygwin-x86_64           \
       | haiku-x86_64            \
+      | alpine-aarch64          \
       | linux-x86_64            \
       | linux-i686              \
       | linux-armv5             \
