@@ -37,9 +37,10 @@ lib/Driver           @artemcm
 test/Driver          @artemcm
 
 # Owners of the parser
-include/swift/Parse @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-lib/Parse           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-test/Parse          @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/include/swift/Parse/ @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/lib/Parse/           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/*test/Parse/         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/unittests/Parse/     @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 
 SwiftCompilerSources @eeckstein
 
