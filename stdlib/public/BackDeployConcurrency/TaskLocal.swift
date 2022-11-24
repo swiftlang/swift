@@ -134,8 +134,9 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
+  @Sendable
   @discardableResult
-  public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
+  public func withValue<R>(_ valueDuringOperation: Value, operation: @Sendable () async throws -> R,
                            file: String = #file, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)

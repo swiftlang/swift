@@ -200,6 +200,24 @@ func withLocal_body_mustNotEscape() async {
 }
 
 @available(SwiftStdlib 5.1, *)
+actor Worker {
+  @TaskLocal
+  static var declaredInActor: String = "<default-value>"
+
+  func setAndRead() async {
+    print("setAndRead") // CHECK: setAndRead
+    await Worker.$declaredInActor.withValue("value-1") {
+      await printTaskLocalAsync(Worker.$declaredInActor) // CHECK-NEXT: TaskLocal<String>(defaultValue: <default-value>) (value-1)
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func inside_actor() async {
+  await Worker().setAndRead()
+}
+
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await simple()
@@ -210,5 +228,6 @@ func withLocal_body_mustNotEscape() async {
     await nested_3_onlyTopContributes()
     await nested_3_onlyTopContributesAsync()
     await nested_3_onlyTopContributesMixed()
+    await inside_actor()
   }
 }
