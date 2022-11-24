@@ -98,3 +98,11 @@ utils/*windows*       @compnerd
 /test/type/                     @hborla @slavapestov @xedin
 /validation-test/Sema/          @hborla @slavapestov @xedin
 /unittests/Sema/                @hborla @xedin
+
+# SIL/SILGen
+# TODO: /include/swift/SIL/
+# TODO: /lib/SIL/
+# TODO: /lib/SILGen/
+# TODO: /*test/SIL/
+# TODO: /*test/SILGen/
+# TODO: /unittests/SIL/
