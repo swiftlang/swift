@@ -14,6 +14,13 @@
 /docs/Generics/    @slavapestov
 /docs/Generics.rst @slavapestov
 
+# Standard Library
+# TODO: /stdlib/
+/stdlib/public/Cxx/        @zoecarver @hyp @egorzhdan
+/stdlib/public/Windows/    @compnerd
+# TODO: /*test/stdlib/
+# TODO: /unittests/stdlib/
+
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
 
@@ -41,7 +48,6 @@ include/swift/ClangImporter @zoecarver @hyp @egorzhdan
 include/swift/PrintAsClang  @zoecarver @hyp @egorzhdan
 lib/ClangImporter           @zoecarver @hyp @egorzhdan
 lib/PrintAsClang            @zoecarver @hyp @egorzhdan
-stdlib/public/Cxx           @zoecarver @hyp @egorzhdan
 test/Interop                @zoecarver @hyp @egorzhdan
 
 # Threading implementation
@@ -51,7 +57,6 @@ lib/Threading           @al45tair
 # Windows support
 cmake/**/*Windows*    @compnerd
 lib/Basic/Windows     @compnerd
-stdlib/public/Windows @compnerd
 utils/*windows*       @compnerd
 
 # AST
