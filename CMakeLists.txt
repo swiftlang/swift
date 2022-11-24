@@ -886,7 +886,7 @@ endif()
 # We could easily do that - we have all of that information in build-script-impl.
 # Darwin targets cheat and use `xcrun`.
 
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX") OR ("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ALPINE"))
 
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
@@ -895,6 +895,13 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   is_sdk_requested(LINUX swift_build_linux)
   if(swift_build_linux)
     configure_sdk_unix("Linux" "${SWIFT_HOST_VARIANT_ARCH}")
+    set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
+
+  is_sdk_requested(ALPINE swift_build_alpine)
+  if(swift_build_alpine)
+    configure_sdk_unix("Alpine" "${SWIFT_HOST_VARIANT_ARCH}")
     set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
@@ -1044,6 +1051,10 @@ if("${SWIFT_SDKS}" STREQUAL "")
 endif()
 
 list_subtract("${SWIFT_SDKS}" "${SWIFT_CONFIGURED_SDKS}" unknown_sdks)
+
+message(STATUS "SWIFT_HOST_VARIANT_SDK is ${SWIFT_HOST_VARIANT_SDK}")
+message(STATUS "SDKs is: ${SWIFT_SDKS}")
+message(STATUS "Configured SDKs is: ${SWIFT_CONFIGURED_SDKS}")
 
 precondition(unknown_sdks NEGATE MESSAGE "Unknown SDKs: ${unknown_sdks}")
 precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")
