@@ -260,6 +260,95 @@ public:
   }
 };
 
+class TaskPoolTaskStatusRecord : public TaskStatusRecord {
+  AsyncTask *FirstChild;
+  AsyncTask *LastChild;
+
+public:
+  TaskPoolTaskStatusRecord()
+      : TaskStatusRecord(TaskStatusRecordKind::TaskPool),
+        FirstChild(nullptr),
+        LastChild(nullptr) {
+  }
+
+  TaskPoolTaskStatusRecord(AsyncTask *child)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskPool),
+        FirstChild(child),
+        LastChild(child) {
+    assert(!LastChild || !LastChild->childFragment()->getNextChild());
+  }
+
+  TaskPool *getPool() { return reinterpret_cast<TaskPool *>(this); }
+
+  /// Return the first child linked by this record.  This may be null;
+  /// if not, it (and all of its successors) are guaranteed to satisfy
+  /// `isChildTask()`.
+  AsyncTask *getFirstChild() const { return FirstChild; }
+
+  /// Attach the passed in `child` task to this group.
+  void attachChild(AsyncTask *child) {
+    assert(child->hasPoolChildFragment());
+    assert(child->poolChildFragment()->getPool() == getPool());
+
+    auto oldLastChild = LastChild;
+    LastChild = child;
+
+    if (!FirstChild) {
+      // This is the first child we ever attach, so store it as FirstChild.
+      FirstChild = child;
+      return;
+    }
+
+    oldLastChild->childFragment()->setNextChild(child);
+  }
+
+  void detachChild(AsyncTask *child) {
+    assert(child && "cannot remove a null child from group");
+    if (FirstChild == child) {
+      FirstChild = getNextChildTask(child);
+      if (FirstChild == nullptr) {
+        LastChild = nullptr;
+      }
+      return;
+    }
+
+    AsyncTask *prev = FirstChild;
+    // Remove the child from the linked list, i.e.:
+    //     prev -> afterPrev -> afterChild
+    //                 ==
+    //               child   -> afterChild
+    // Becomes:
+    //     prev --------------> afterChild
+    while (prev) {
+      auto afterPrev = getNextChildTask(prev);
+
+      if (afterPrev == child) {
+        auto afterChild = getNextChildTask(child);
+        prev->childFragment()->setNextChild(afterChild);
+        if (child == LastChild) {
+          LastChild = prev;
+        }
+        return;
+      }
+
+      prev = afterPrev;
+    }
+  }
+
+  static AsyncTask *getNextChildTask(AsyncTask *task) {
+    return task->childFragment()->getNextChild();
+  }
+
+  using child_iterator = LinkedListIterator<AsyncTask, getNextChildTask>;
+  llvm::iterator_range<child_iterator> children() const {
+    return child_iterator::rangeBeginning(getFirstChild());
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskGroup;
+  }
+};
+
 /// A cancellation record which states that a task has an arbitrary
 /// function that needs to be called if the task is cancelled.
 ///

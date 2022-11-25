@@ -2525,6 +2525,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncTaskInPool:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
     case BuiltinValueKind::InitializeDefaultActor:
@@ -2537,6 +2538,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
+    case BuiltinValueKind::CreateTaskPool:
+    case BuiltinValueKind::DestroyTaskPool:
       return;
 
     // General memory access to a pointer in first operand position.

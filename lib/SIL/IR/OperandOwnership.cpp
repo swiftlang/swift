@@ -822,12 +822,15 @@ BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLetWithLocalBuffer)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLetLifetime)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup) // TODO: should this be destroying consume?
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskPool)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskPool) // TODO: should this be destroying consume?
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_POOL_FUTURE_FUNCTION = 3;
 
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
@@ -850,6 +853,20 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
   if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION))
     return OperandOwnership::DestroyingConsume;
   
+  // FIXME: These are considered InteriorPointer because they may propagate a
+  // pointer into a borrowed values. If they do not propagate an interior pointer,
+  // then they should be InstantaneousUse instead and should not require a
+  // guaranteed value.
+  return OperandOwnership::InteriorPointer;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInPool(BuiltinInst *bi,
+                                                               StringRef attr) {
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_POOL_FUTURE_FUNCTION))
+    return OperandOwnership::DestroyingConsume;
+
   // FIXME: These are considered InteriorPointer because they may propagate a
   // pointer into a borrowed values. If they do not propagate an interior pointer,
   // then they should be InstantaneousUse instead and should not require a

@@ -643,6 +643,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
+  SwiftTaskPoolPtrTy = Int8PtrTy; // we pass it opaquely (TaskPool*)
   SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
@@ -651,6 +652,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.task_group_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
     SwiftTaskGroupPtrTy,        // Task group
+  });
+  SwiftTaskGroupTaskOptionRecordTy = createStructType(
+      *this, "swift.task_pool_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SwiftTaskPoolPtrTy,         // Task pool
   });
   ExecutorFirstTy = SizeTy;
   ExecutorSecondTy = SizeTy;

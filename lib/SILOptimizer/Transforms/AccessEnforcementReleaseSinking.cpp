@@ -148,6 +148,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
+    case BuiltinValueKind::CreateTaskPool:
+    case BuiltinValueKind::DestroyTaskPool:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::AssumeAlignment:
@@ -179,6 +181,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncTaskInPool:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     case BuiltinValueKind::ConvertTaskToJob:

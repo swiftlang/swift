@@ -27,6 +27,7 @@ struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
+class TaskPool;
 
 // ==== Task Locals Values ---------------------------------------------------
 

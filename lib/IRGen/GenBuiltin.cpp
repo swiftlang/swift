@@ -276,15 +276,27 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // Task Group
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     // Claim metadata pointer.
     (void)args.claimAll();
     out.add(emitCreateTaskGroup(IGF, substitutions));
     return;
   }
-
   if (Builtin.ID == BuiltinValueKind::DestroyTaskGroup) {
     emitDestroyTaskGroup(IGF, args.claimNext());
+    return;
+  }
+
+  // Task Pool
+  if (Builtin.ID == BuiltinValueKind::CreateTaskPool) {
+    // Claim metadata pointer.
+    (void) args.claimAll();
+    out.add(emitCreateTaskPool(IGF, substitutions));
+    return;
+  }
+  if (Builtin.ID == BuiltinValueKind::DestroyTaskPool) {
+    emitDestroyTaskPool(IGF, args.claimNext());
     return;
   }
 
@@ -296,11 +308,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInPool) {
 
     auto flags = args.claimNext();
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
+        ? args.claimNext()
+        : nullptr;
+    auto taskPool =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInPool)
         ? args.claimNext()
         : nullptr;
     auto futureResultType = args.claimNext();
@@ -311,6 +328,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         IGF,
         flags,
         taskGroup,
+        taskPool,
         futureResultType,
         taskFunction, taskContext,
         substitutions);

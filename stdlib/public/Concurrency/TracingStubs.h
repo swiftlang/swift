@@ -42,9 +42,11 @@ inline void actor_state_changed(HeapObject *actor, Job *firstJob,
 inline void actor_note_job_queue(HeapObject *actor, Job *first,
                                  Job *(*getNext)(Job *)) {}
 
-inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
+inline void task_create(AsyncTask *task, AsyncTask *parent,
+                        TaskGroup *group, TaskPool *pool,
                         AsyncLet *asyncLet, uint8_t jobPriority,
-                        bool isChildTask, bool isFuture, bool isGroupChildTask,
+                        bool isChildTask, bool isFuture,
+                        bool isGroupChildTask, bool isPoolChildTask,
                         bool isAsyncLetTask) {}
 
 inline void task_destroy(AsyncTask *task) {}

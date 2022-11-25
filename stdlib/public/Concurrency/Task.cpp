@@ -279,6 +279,15 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     group->offer(this, context);
   }
 
+  // If this is task pool child, notify the parent group about the completion.
+  if (hasPoolChildFragment()) {
+    SWIFT_TASK_DEBUG_LOG("offer task = %p to pool", this);
+    // then we must offer into the parent pool that we completed.
+    auto pool = poolChildFragment()->getPool();
+    SWIFT_TASK_DEBUG_LOG("offer task = %p to pool = %p", this, pool);
+    pool->offer(this, context);
+  }
+
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
 
@@ -454,11 +463,7 @@ static void completeTaskImpl(AsyncTask *task,
     task->completeFuture(context);
   }
 
-  // TODO: set something in the status?
-  // if (task->hasChildFragment()) {
-    // TODO: notify the parent somehow?
-    // TODO: remove this task from the child-task chain?
-  // }
+  fprintf(stderr, "[%s:%d](%s) completeTaskImpl, task = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 }
 
 /// The function that we put in the context of a simple task
@@ -607,7 +612,10 @@ static inline bool isUnspecified(JobPriority priority) {
 }
 
 static inline bool taskIsStructured(JobFlags jobFlags) {
-  return jobFlags.task_isAsyncLetTask() || jobFlags.task_isGroupChildTask();
+  return
+      jobFlags.task_isAsyncLetTask() ||
+      jobFlags.task_isGroupChildTask() ||
+      jobFlags.task_isPoolChildTask();
 }
 
 static inline bool taskIsUnstructured(TaskCreateFlags createFlags, JobFlags jobFlags) {
@@ -619,7 +627,8 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
 }
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
-    const AsyncTask *parent, const TaskGroup *group,
+    const AsyncTask *parent,
+    const TaskGroup *group, const TaskPool *pool,
     const Metadata *futureResultType, size_t initialContextSize) {
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -627,7 +636,12 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
   if (group) {
+    assert(!pool && "group child task also has pool set; those two are exclusive");
     headerSize += sizeof(AsyncTask::GroupChildFragment);
+  }
+  if (pool) {
+    assert(!group && "pool child task also has group set; those two are exclusive");
+    headerSize += sizeof(AsyncTask::PoolChildFragment);
   }
   if (futureResultType) {
     headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
@@ -670,6 +684,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Collect the options we know about.
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
+  TaskPool *pool = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
   RunInlineTaskOptionRecord *runInlineOption = nullptr;
@@ -681,8 +696,16 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
     case TaskOptionRecordKind::TaskGroup:
       group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
+        fprintf(stderr, "[%s:%d](%s) make pool child task; group = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, group);
       assert(group && "Missing group");
       jobFlags.task_setIsGroupChildTask(true);
+      break;
+
+    case TaskOptionRecordKind::TaskPool:
+      pool = cast<TaskPoolTaskOptionRecord>(option)->getPool();
+      fprintf(stderr, "[%s:%d](%s) make pool child task; pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, pool);
+      assert(pool && "Missing pool");
+      jobFlags.task_setIsPoolChildTask(true);
       break;
 
     case TaskOptionRecordKind::AsyncLet:
@@ -715,10 +738,13 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     }
   }
 
-  // Add to the task group, if requested.
-  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
-    assert(group && "Missing group");
-    swift_taskGroup_addPending(group, /*unconditionally=*/true);
+  // Add to the task group or pool, if requested.
+  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) { // TODO: rename the flag
+    if (group) {
+      swift_taskGroup_addPending(group, /*unconditionally=*/true);
+    } else if (pool) {
+      swift_taskPool_addPending(pool, /*unconditionally=*/true);
+    }
   }
 
   AsyncTask *parent = nullptr;
@@ -774,7 +800,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     // priority
   } else {
     // Is a structured concurrency child task. Must have a parent.
-    assert((asyncLet || group) && parent);
+    assert((asyncLet || group || pool) && parent);
     SWIFT_TASK_DEBUG_LOG("Creating an structured concurrency task from %p", currentTask);
 
     if (isUnspecified(basePriority)) {
@@ -793,7 +819,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
     // Task will be created with escalated priority = base priority. We will
     // update the escalated priority with the right rules in
-    // updateNewChildWithParentAndGroupState when we link the child into
+    // updateNewChildWithParentAndContainerState when we link the child into
     // the parent task/task group since we'll have the right
     // synchronization then.
   }
@@ -806,7 +832,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   size_t headerSize, amountToAllocate;
   std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
-      parent, group, futureResultType, initialContextSize);
+      parent, group, pool, futureResultType, initialContextSize);
 
   unsigned initialSlabSize = 512;
 
@@ -912,6 +938,13 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     ::new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
 
+  // Initialize the pool child fragment if applicable.
+  if (pool) {
+    fprintf(stderr, "[%s:%d](%s) add new task = %p, to pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task, pool);
+    auto poolChildFragment = task->poolChildFragment();
+    ::new (poolChildFragment) AsyncTask::PoolChildFragment(pool);
+  }
+
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
@@ -972,10 +1005,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   initialContext->Parent = nullptr;
 
   concurrency::trace::task_create(
-      task, parent, group, asyncLet,
+      task, parent, group, pool, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
       task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
-      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isPoolChildTask(),
+      task->Flags.task_isAsyncLetTask());
 
   // Attach to the group, if needed.
   if (group) {
@@ -986,6 +1020,20 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     // below since we'd enqueue the child task. But since we're not going to be
     // enqueueing the child task in this model, we need to take this +1 to
     // balance out the release that exists after the task group child task
+    // creation
+    swift_retain(task);
+#endif
+  }
+
+  // Attach to the pool, if needed.
+  if (pool) {
+    swift_taskPool_attachChild(pool, task);
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // We need to take a retain here to keep the child task for the task pool
+    // alive. In the non-task-to-thread model, we'd always take this retain
+    // below since we'd enqueue the child task. But since we're not going to be
+    // enqueueing the child task in this model, we need to take this +1 to
+    // balance out the release that exists after the task pool child task
     // creation
     swift_retain(task);
 #endif
@@ -1054,7 +1102,8 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t candidateAllocationBytes = SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES;
   size_t minimumAllocationSize =
       amountToAllocateForHeaderAndTask(/*parent=*/nullptr, /*group=*/nullptr,
-                                       futureResultType, closureContextSize)
+                                       /*pool=*/nullptr, futureResultType,
+                                       closureContextSize)
           .second;
   void *allocation = nullptr;
   size_t allocationBytes = 0;

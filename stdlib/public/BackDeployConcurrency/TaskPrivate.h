@@ -44,7 +44,7 @@ namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
-#if 0
+#if 1
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
           (unsigned long)Thread::current()::platformThreadId(),                \
@@ -56,6 +56,7 @@ namespace swift {
 
 class AsyncTask;
 class TaskGroup;
+class TaskPool;
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be

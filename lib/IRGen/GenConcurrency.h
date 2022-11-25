@@ -74,6 +74,12 @@ llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF, SubstitutionMap subs);
 /// Emit the destroyTaskGroup builtin.
 void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);
 
+/// Emit the createTaskPool builtin.
+llvm::Value *emitCreateTaskPool(IRGenFunction &IGF, SubstitutionMap subs);
+
+/// Emit the destroyTaskPool builtin.
+void emitDestroyTaskPool(IRGenFunction &IGF, llvm::Value *pool);
+
 void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                        llvm::Value *result, llvm::Value *closure,
                        llvm::Value *closureContext);

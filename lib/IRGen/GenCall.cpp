@@ -162,6 +162,7 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
   case SpecialKind::AsyncLetGetThrowing:
   case SpecialKind::AsyncLetFinish:
   case SpecialKind::TaskGroupWaitNext:
+  case SpecialKind::TaskPoolWaitAll:
   case SpecialKind::DistributedExecuteTarget:
     // The current guarantee for all of these functions is the same.
     // See TaskFutureWaitAsyncContext.
@@ -4128,6 +4129,7 @@ llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF,
     llvm::Value *flags,
     llvm::Value *taskGroup,
+    llvm::Value *taskPool,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction,
     llvm::Value *localContextInfo,
@@ -4136,7 +4138,9 @@ llvm::Value *irgen::emitTaskCreate(
   // it.
   llvm::Value *taskOptions = llvm::ConstantInt::get(
       IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+
   if (taskGroup) {
+    assert(!taskPool);
     TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
     llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
         IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
@@ -4154,6 +4158,29 @@ llvm::Value *irgen::emitTaskCreate(
 
     IGF.Builder.CreateStore(
         taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  }
+
+  if (taskPool) {
+    assert(!taskGroup);
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskPool);
+    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
+        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    auto optionsRecord = IGF.createAlloca(
+        IGF.IGM.SwiftTaskGroupTaskOptionRecordTy, Alignment(),
+        "task_pool_options");
+    auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
+        optionsRecord, 0, Size());
+    IGF.Builder.CreateStore(
+        optionsFlagsVal,
+        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+
+    IGF.Builder.CreateStore(
+        taskPool, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
   }

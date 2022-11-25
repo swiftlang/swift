@@ -46,6 +46,7 @@ fileprivate class ConcurrencyDumper {
     var isChildTask: Bool
     var isFuture: Bool
     var isGroupChildTask: Bool
+    // TODO: isPoolChildTask
     var isAsyncLetTask: Bool
     var maxPriority: UInt32
     var isCancelled: Bool

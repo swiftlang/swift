@@ -27,6 +27,7 @@ class ExecutorRef;
 struct HeapObject;
 class Job;
 class TaskGroup;
+class TaskPool;
 class TaskStatusRecord;
 
 namespace concurrency {
@@ -57,9 +58,12 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 
 // Task trace calls.
 
-void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
+// FIXME(pool): This is ABI so we need to evolve this by adding another overload
+void task_create(AsyncTask *task, AsyncTask *parent,
+                 TaskGroup *group, TaskPool *pool,
                  AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
-                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
+                 bool isFuture, bool isGroupChildTask, bool isPoolChildTask,
+                 bool isAsyncLetTask);
 
 void task_destroy(AsyncTask *task);
 

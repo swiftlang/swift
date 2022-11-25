@@ -785,6 +785,14 @@ BUILTIN_MISC_OPERATION(CreateTaskGroup,
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
 
+/// Create a task pool.
+BUILTIN_MISC_OPERATION(CreateTaskPool,
+                       "createTaskPool", "", Special)
+
+/// Destroy a task pool.
+BUILTIN_MISC_OPERATION(DestroyTaskPool,
+                       "destroyTaskPool", "", Special)
+
 /// A builtin that can only be called from a transparent generic function. Takes
 /// two operands, the first operand the result address, the second operand the
 /// input address. Transforms into
@@ -953,6 +961,17 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 /// task group and a function to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
+
+/// createAsyncTaskInPool(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // pool
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task pool and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInPool,
+    "createAsyncTaskInPool", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

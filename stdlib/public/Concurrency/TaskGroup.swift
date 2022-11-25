@@ -12,7 +12,6 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
-import Darwin
 
 // ==== TaskGroup --------------------------------------------------------------
 

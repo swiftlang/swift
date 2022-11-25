@@ -438,6 +438,33 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   });
 }
 
+SWIFT_CC(swift)
+static void swift_taskPool_attachChildImpl(TaskPool *pool,
+                                           AsyncTask *child) {
+
+  // We are always called from the context of the parent
+  //
+  // Acquire the status record lock of parent - we want to synchronize with
+  // concurrent cancellation or escalation as we're adding new tasks to the
+  // group.
+  auto parent = child->childFragment()->getParent();
+  assert(parent == swift_task_getCurrent());
+
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
+    pool->addChildTask(child);
+
+    // After getting parent's status record lock, do some sanity checks to
+    // see if parent task or group has state changes that need to be
+    // propagated to the child.
+    //
+    // This is the same logic that we would do if we were adding a child
+    // task status record - see also asyncLet_addImpl. Since we attach a
+    // child task to a TaskGroupRecord instead, we synchronize on the
+    // parent's task status and then update the child.
+    updateNewChildWithParentAndContainerState(child, parentStatus, /*group=*/nullptr, pool);
+  });
+}
+
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
@@ -541,6 +568,12 @@ static void performEscalationAction(TaskStatusRecord *record,
   }
   case TaskStatusRecordKind::TaskGroup: {
     auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_escalate(child, newPriority);
+    return;
+  }
+  case TaskStatusRecordKind::TaskPool: {
+    auto childRecord = cast<TaskPoolTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
     return;

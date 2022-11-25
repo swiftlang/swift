@@ -75,6 +75,23 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
   }
 };
 
+class TaskPoolTaskOptionRecord : public TaskOptionRecord {
+  TaskPool * const Pool;
+
+  public:
+    TaskPoolTaskOptionRecord(TaskPool *pool)
+    : TaskOptionRecord(TaskOptionRecordKind::TaskPool),
+      Pool(pool) {}
+
+  TaskPool *getPool() const {
+    return Pool;
+  }
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::TaskPool;
+  }
+};
+
 
 /// Task option to specify on what executor the task should be executed.
 ///

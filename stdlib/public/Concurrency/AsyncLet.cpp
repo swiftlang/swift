@@ -151,7 +151,7 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
   // current task
   bool addedRecord =
       addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
-        updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
+        updateNewChildWithParentAndContainerState(task, parentStatus, NULL, NULL);
         return true;
       });
   assert(addedRecord);

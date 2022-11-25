@@ -176,9 +176,11 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
 
 // Task trace calls.
 
-inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
+inline void task_create(AsyncTask *task, AsyncTask *parent,
+                        TaskGroup *group, TaskPool *pool,
                         AsyncLet *asyncLet, uint8_t jobPriority,
-                        bool isChildTask, bool isFuture, bool isGroupChildTask,
+                        bool isChildTask, bool isFuture,
+                        bool isGroupChildTask, bool isPoolChildTask,
                         bool isAsyncLetTask) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
@@ -187,11 +189,11 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
       TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,
       "task=%" PRIx64
       " resumefn=%p jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
-      "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
-      " group=%p asyncLet=%p",
+      "isGroupChildTask=%{bool}d isPoolChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
+      " group=%p pool=%p asyncLet=%p",
       task->getTaskId(), task->getResumeFunctionForLogging(), jobPriority,
-      isChildTask, isFuture, isGroupChildTask, isAsyncLetTask, parentID, group,
-      asyncLet);
+      isChildTask, isFuture, isGroupChildTask, isPoolChildTask, isAsyncLetTask, parentID,
+      group, pool, asyncLet);
 }
 
 inline void task_destroy(AsyncTask *task) {

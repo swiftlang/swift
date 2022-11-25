@@ -32,6 +32,14 @@ public struct X {
     }
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV16launchPoolChild_5groupyx_BptlF : $@convention(method) <T> (@in_guaranteed T, Builtin.RawPointer, X) -> () {
+  func launchPoolChild<T>(_ value: T, pool: Builtin.RawPointer) {
+    // CHECK: builtin "createAsyncTaskInGroup"<T>([[ZERO:%.*]] : $Int, [[POOL:%.*]] : $Builtin.RawPointer, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    _ = Builtin.createAsyncTaskInPool(0, pool) { () async throws -> T in
+      return value
+    }
+  }
+
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
     _ = Builtin.createAsyncTask(0, closure)
   }

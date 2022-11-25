@@ -38,7 +38,7 @@ namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
-#if 0
+#if 1
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                              \
           (unsigned long)Thread::current().platformThreadId(), __FILE__,       \
@@ -49,6 +49,7 @@ namespace swift {
 
 class AsyncTask;
 class TaskGroup;
+class TaskPool;
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
@@ -94,6 +95,19 @@ void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
 /// This is an internal API; clients outside of the TaskGroup implementation
 /// should generally use a higher-level function.
 void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
+
+/// Cancel all the child tasks that belong to `pool`.
+///
+/// The caller must guarantee that this is either called from the
+/// owning task of the task pool or while holding the owning task's
+/// status record lock.
+void _swift_taskPool_cancelAllChildren(TaskPool *pool);
+
+/// Remove the given task from the given task pool.
+///
+/// This is an internal API; clients outside of the TaskPool implementation
+/// should generally use a higher-level function.
+void _swift_taskPool_detachChild(TaskPool *pool, AsyncTask *child);
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
@@ -864,9 +878,10 @@ bool addStatusRecord(TaskStatusRecord *record,
 /// A helper function for updating a new child task that is created with
 /// information from the parent or the group that it was going to be added to.
 SWIFT_CC(swift)
-void updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                           ActiveTaskStatus parentStatus,
-                                           TaskGroup *group);
+void updateNewChildWithParentAndContainerState(AsyncTask *child,
+                                               ActiveTaskStatus parentStatus,
+                                               TaskGroup *group,
+                                               TaskPool *pool);
 
 } // end namespace swift
 

@@ -1455,6 +1455,19 @@ static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getCreateAsyncTaskInPool(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder); // <T>
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // 1 pool
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+
+  return builder.build(id);
+}
+
 static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted),
@@ -1540,6 +1553,19 @@ static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
+static ValueDecl *getCreateTaskPool(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getDestroyTaskPool(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer),
                             _void);
@@ -2808,6 +2834,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
 
+  case BuiltinValueKind::CreateAsyncTaskInPool:
+    return getCreateAsyncTaskInPool(Context, Id);
+
   case BuiltinValueKind::TaskRunInline:
     return getTaskRunInline(Context, Id);
 
@@ -2869,9 +2898,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateTaskGroup:
     return getCreateTaskGroup(Context, Id);
-
   case BuiltinValueKind::DestroyTaskGroup:
     return getDestroyTaskGroup(Context, Id);
+
+  case BuiltinValueKind::CreateTaskPool:
+    return getCreateTaskPool(Context, Id);
+  case BuiltinValueKind::DestroyTaskPool:
+    return getDestroyTaskPool(Context, Id);
 
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:

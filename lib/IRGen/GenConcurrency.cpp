@@ -296,6 +296,36 @@ void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
   IGF.Builder.CreateLifetimeEnd(group);
 }
 
+llvm::Value *irgen::emitCreateTaskPool(IRGenFunction &IGF,
+                                       SubstitutionMap subs) {
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskPool);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskPool));
+  auto pool = IGF.Builder.CreateBitCast(address.getAddress(),
+                                         IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(pool);
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "createTaskPool should have a type substitution");
+  auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskPoolInitializeFunctionPointer(),
+                             {pool, resultTypeMetadata});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  return pool;
+}
+
+void irgen::emitDestroyTaskPool(IRGenFunction &IGF, llvm::Value *pool) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPoolDestroyFunctionPointer(), {pool});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.Builder.CreateLifetimeEnd(pool);
+}
+
 llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   StringRef name = "__swift_continuation_await_point";
   if (llvm::GlobalValue *F = Module.getNamedValue(name))

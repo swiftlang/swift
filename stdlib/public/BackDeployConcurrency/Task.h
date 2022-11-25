@@ -37,6 +37,7 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
+class TaskPool;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 

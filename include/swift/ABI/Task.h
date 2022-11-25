@@ -39,6 +39,7 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
+class TaskPool;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
@@ -183,11 +184,11 @@ public:
 /// ### Fragments
 /// An AsyncTask may have the following fragments:
 ///
-///    +--------------------------+
-///    | childFragment?           |
-///    | groupChildFragment?      |
-///    | futureFragment?          |*
-///    +--------------------------+
+///    +------------------------------------------------+
+///    | childFragment?                                 |
+///    | (groupChildFragment | poolChildFragment)?      |
+///    | futureFragment?                                |*
+///    +------------------------------------------------+
 ///
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
@@ -425,6 +426,7 @@ public:
 
   GroupChildFragment *groupChildFragment() {
     assert(hasGroupChildFragment());
+    assert(!hasPoolChildFragment()); // pool and group are mutually exclusive
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
@@ -432,6 +434,45 @@ public:
       offset += sizeof(ChildFragment);
 
     return reinterpret_cast<GroupChildFragment *>(offset);
+  }
+
+  // ==== TaskPool Child ------------------------------------------------------
+
+  /// A child task created by `pool.addTask` is called a "task pool child."
+  /// Upon completion, in addition to the usual future notifying all its waiters,
+  /// it must also `pool->offer` itself to the pool.
+  class PoolChildFragment {
+  private:
+    TaskPool* Pool;
+
+    friend class AsyncTask;
+    friend class TaskPool;
+
+  public:
+    explicit PoolChildFragment(TaskPool *pool)
+        : Pool(pool) {}
+
+    /// Return the group this task should offer into when it completes.
+    TaskPool* getPool() {
+      return Pool;
+    }
+  };
+
+  // Checks if task is a child of a TaskPool task.
+  //
+  // A child task that is a group child knows that it's parent is a group
+  // and therefore may `groupOffer` to it upon completion.
+  bool hasPoolChildFragment() const { return Flags.task_isPoolChildTask(); }
+
+  PoolChildFragment *poolChildFragment() {
+    assert(hasPoolChildFragment());
+
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+
+    return reinterpret_cast<PoolChildFragment *>(offset);
   }
 
   // ==== Future ---------------------------------------------------------------
@@ -549,12 +590,15 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-    auto offset = reinterpret_cast<char*>(this);
+    auto offset = reinterpret_cast<char *>(this);
     offset += sizeof(AsyncTask);
     if (hasChildFragment())
       offset += sizeof(ChildFragment);
-    if (hasGroupChildFragment())
+    if (hasGroupChildFragment()) {
       offset += sizeof(GroupChildFragment);
+    } else if (hasPoolChildFragment()) {
+      offset += sizeof(PoolChildFragment);
+    }
 
     return reinterpret_cast<FutureFragment *>(offset);
   }

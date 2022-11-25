@@ -19,6 +19,7 @@
 
 #include "Task.h"
 #include "TaskGroup.h"
+#include "TaskPool.h"
 #include "AsyncLet.h"
 #include "TaskStatus.h"
 
@@ -255,6 +256,117 @@ bool swift_taskGroup_isCancelled(TaskGroup *group);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isEmpty(TaskGroup *group);
+
+/// Wait for a readyQueue of a Channel to become non empty.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_waitAll(
+///     waitingTask: Builtin.NativeObject, // current task
+///     pool: Builtin.RawPointer
+/// ) async -> T
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swiftasync)
+void swift_taskPool_waitAll(
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskPool *pool, ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    AsyncContext *callContext);
+
+/// Initialize a `TaskGroup` in the passed `group` memory location.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_initialize(group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskPool_initialize(TaskPool *pool, const Metadata *Void);
+
+/// Attach a child task to the parent task's task group record.
+///
+/// This function MUST be called from the AsyncTask running the task group.
+///
+/// Since the group (or rather, its record) is inserted in the parent task at
+/// creation we do not need the parent task here, the group already is attached
+/// to it.
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_attachChild(
+///     group: Builtin.RawPointer,
+///     child: Builtin.NativeObject
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskPool_attachChild(TaskPool *pool, AsyncTask *child);
+
+/// Its Swift signature is
+///
+/// This function MUST be called from the AsyncTask running the task group.
+///
+/// \code
+/// func swift_taskPool_destroy(_ group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskPool_destroy(TaskPool *pool);
+
+/// Before starting a task group child task, inform the group that there is one
+/// more 'pending' child to account for.
+///
+/// This function SHOULD be called from the AsyncTask running the task group,
+/// however is generally thread-safe as it only only works with the group status.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_addPending(
+///     group: Builtin.RawPointer,
+///     unconditionally: Bool
+/// ) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_taskPool_addPending(TaskPool *pool, bool unconditionally);
+
+/// Cancel all tasks in the group.
+/// This also prevents new tasks from being added.
+///
+/// This can be called from any thread.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_cancelAll(group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskPool_cancelAll(TaskPool *pool);
+
+/// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
+///
+/// This check DOES NOT take into account the task in which the group is running
+/// being cancelled or not.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_isCancelled(group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_taskPool_isCancelled(TaskPool *pool);
+
+/// Check the readyQueue of a task group, return true if it has no pending tasks.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_taskPool_isEmpty(
+///     _ group: Builtin.RawPointer
+/// ) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_taskPool_isEmpty(TaskPool *pool);
 
 /// DEPRECATED. swift_asyncLet_begin is used instead.
 /// Its Swift signature is

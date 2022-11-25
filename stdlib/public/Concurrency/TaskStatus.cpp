@@ -353,9 +353,10 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 /// parent's task status record lock. When called to link a child into a task
 /// group, this holds the parent's task status record lock.
 SWIFT_CC(swift)
-void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                                  ActiveTaskStatus parentStatus,
-                                                  TaskGroup *group) {
+void swift::updateNewChildWithParentAndContainerState(AsyncTask *child,
+                                                      ActiveTaskStatus parentStatus,
+                                                      TaskGroup *group,
+                                                      TaskPool *pool) {
   // We can take the fast path of just modifying the ActiveTaskStatus in the
   // child task since we know that it won't have any task status records and
   // cannot be accessed by anyone else since it hasn't been linked in yet.
@@ -366,7 +367,9 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
 
   auto newChildTaskStatus = oldChildTaskStatus;
 
-  if (parentStatus.isCancelled() || (group && group->isCancelled())) {
+  if (parentStatus.isCancelled() ||
+      (group && group->isCancelled()) ||
+      (pool && pool->isCancelled())) {
     newChildTaskStatus = newChildTaskStatus.withCancelled();
   }
 
@@ -401,7 +404,34 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
     // task status record - see also asyncLet_addImpl. Since we attach a
     // child task to a TaskGroupRecord instead, we synchronize on the
     // parent's task status and then update the child.
-    updateNewChildWithParentAndGroupState(child, parentStatus, group);
+    updateNewChildWithParentAndContainerState(child, parentStatus, group, /*pool=*/nullptr);
+  });
+}
+
+SWIFT_CC(swift)
+static void swift_taskPool_attachChildImpl(TaskPool *pool,
+                                           AsyncTask *child) {
+
+  // We are always called from the context of the parent
+  //
+  // Acquire the status record lock of parent - we want to synchronize with
+  // concurrent cancellation or escalation as we're adding new tasks to the
+  // group.
+  auto parent = child->childFragment()->getParent();
+  assert(parent == swift_task_getCurrent());
+
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
+    pool->addChildTask(child);
+
+    // After getting parent's status record lock, do some sanity checks to
+    // see if parent task or group has state changes that need to be
+    // propagated to the child.
+    //
+    // This is the same logic that we would do if we were adding a child
+    // task status record - see also asyncLet_addImpl. Since we attach a
+    // child task to a TaskGroupRecord instead, we synchronize on the
+    // parent's task status and then update the child.
+    updateNewChildWithParentAndContainerState(child, parentStatus, /*group=*/nullptr, pool);
   });
 }
 
@@ -414,6 +444,19 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 
   withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
     group->removeChildTask(child);
+  });
+}
+
+// FIXME: this is not actually right; is it? are we guaranteeing locking right in a pool?
+void swift::_swift_taskPool_detachChild(TaskPool *pool,
+                                        AsyncTask *child) {
+  // We are called synchronously from the perspective of the owning task.
+  // That doesn't necessarily mean the owning task *is* the current task,
+  // though, just that it's not concurrently running.
+  auto parent = child->childFragment()->getParent();
+
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
+    pool->removeChildTask(child);
   });
 }
 
@@ -441,6 +484,13 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
     _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
+    return;
+  }
+
+  // Task pools need their children to be cancelled, the same way as groups.
+  case TaskStatusRecordKind::TaskPool: {
+    auto poolRecord = cast<TaskPoolTaskStatusRecord>(record);
+    _swift_taskPool_cancelAllChildren(poolRecord->getPool());
     return;
   }
 
@@ -531,6 +581,12 @@ static void performEscalationAction(TaskStatusRecord *record,
   }
   case TaskStatusRecordKind::TaskGroup: {
     auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_escalate(child, newPriority);
+    return;
+  }
+  case TaskStatusRecordKind::TaskPool: {
+    auto childRecord = cast<TaskPoolTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
     return;

@@ -45,6 +45,7 @@
 #  define OVERRIDE_TASK OVERRIDE
 #  define OVERRIDE_ASYNC_LET OVERRIDE
 #  define OVERRIDE_TASK_GROUP OVERRIDE
+#  define OVERRIDE_TASK_POOL OVERRIDE
 #  define OVERRIDE_TASK_LOCAL OVERRIDE
 #  define OVERRIDE_TASK_STATUS OVERRIDE
 #else
@@ -56,6 +57,9 @@
 #  endif
 #  ifndef OVERRIDE_ASYNC_LET
 #    define OVERRIDE_ASYNC_LET(...)
+#  endif
+#  ifndef OVERRIDE_TASK_GROUP
+#    define OVERRIDE_TASK_GROUP(...)
 #  endif
 #  ifndef OVERRIDE_TASK_GROUP
 #    define OVERRIDE_TASK_GROUP(...)
@@ -278,6 +282,47 @@ OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     swift::, (TaskGroup *group, bool unconditionally),
                     (group, unconditionally))
 
+OVERRIDE_TASK_POOL(taskPool_initialize, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (TaskPool *pool, const Metadata *Void), (pool, Void))
+
+OVERRIDE_TASK_STATUS(taskPool_attachChild, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, AsyncTask *child),
+                   (pool, child))
+
+OVERRIDE_TASK_POOL(taskPool_destroy, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, const Metadata *T), (pool, T))
+
+OVERRIDE_TASK_POOL(taskPool_wait_next_throwing, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (OpaqueValue *resultPointer,
+                    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    TaskPool *_pool,
+                    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (resultPointer, callerContext, _pool, resumeFn,
+                   callContext))
+
+OVERRIDE_TASK_POOL(taskPool_isEmpty, bool,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, const Metadata *T), (pool, T))
+
+OVERRIDE_TASK_POOL(taskPool_isCancelled, bool,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, const Metadata *T), (pool, T))
+
+OVERRIDE_TASK_POOL(taskPool_cancelAll, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, const Metadata *T), (pool, T))
+
+OVERRIDE_TASK_POOL(taskPool_addPending, bool,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (TaskPool *pool, bool unconditionally),
+                   (pool, unconditionally))
+
 
 OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
@@ -323,6 +368,10 @@ OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )
+
+OVERRIDE_TASK_POOL(task_hasTaskGroupStatusRecord, bool,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, , )
 
 OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

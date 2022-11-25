@@ -55,6 +55,9 @@ enum {
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 
+  /// The number of words in a task pool.
+  NumWords_TaskPool = 32,
+
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
 
@@ -144,6 +147,9 @@ const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// The alignment of an AsyncLet.
 const size_t Alignment_AsyncLet = MaximumAlignment;
+
+/// The alignment of a TaskPool.
+const size_t Alignment_TaskPool = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -2249,17 +2255,17 @@ class TaskCreateFlags : public FlagSet<size_t> {
 public:
   enum {
     // Priority that user specified while creating the task
-    RequestedPriority = 0,
-    RequestedPriority_width = 8,
+    RequestedPriority                       = 0,
+    RequestedPriority_width                 = 8,
 
-    Task_IsChildTask                              = 8,
-    // Should only be set in task-to-thread model where Task.runInline is
-    // available
-    Task_IsInlineTask                             = 9,
-    Task_CopyTaskLocals                           = 10,
-    Task_InheritContext                           = 11,
-    Task_EnqueueJob                               = 12,
-    Task_AddPendingGroupTaskUnconditionally       = 13,
+    Task_IsChildTask                        = 8,
+    // Should only be set in task-to-thread model
+    // where Task.runInline is available
+    Task_IsInlineTask                       = 9,
+    Task_CopyTaskLocals                     = 10,
+    Task_InheritContext                     = 11,
+    Task_EnqueueJob                         = 12,
+    Task_AddPendingGroupTaskUnconditionally = 13,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2286,6 +2292,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_AddPendingGroupTaskUnconditionally,
                                 addPendingGroupTaskUnconditionally,
                                 setAddPendingGroupTaskUnconditionally)
+  // re-use the group flag for adding to a pool
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_AddPendingGroupTaskUnconditionally,
+                                addPendingPoolTaskUnconditionally,
+                                setAddPendingPoolTaskUnconditionally)
 };
 
 /// Flags for schedulable jobs.
@@ -2305,7 +2315,7 @@ public:
     Task_IsChildTask           = 24,
     Task_IsFuture              = 25,
     Task_IsGroupChildTask      = 26,
-    // 27 is currently unused
+    Task_IsPoolChildTask       = 27,
     Task_IsAsyncLetTask        = 28,
   };
 
@@ -2339,6 +2349,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsPoolChildTask,
+                                task_isPoolChildTask,
+                                task_setIsPoolChildTask)
 };
 
 /// Kinds of task status record.
@@ -2363,6 +2376,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// escalated.
   EscalationNotification = 4,
 
+  /// TaskPool
+  TaskPool = 5,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2379,6 +2395,8 @@ enum class TaskOptionRecordKind : uint8_t {
   AsyncLet  = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
+  /// Request a child task to be part of a specific task pool.
+  TaskPool = 4,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

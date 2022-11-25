@@ -37,6 +37,7 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
+class TaskPool;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
@@ -433,6 +434,47 @@ public:
       offset += sizeof(ChildFragment);
 
     return reinterpret_cast<GroupChildFragment *>(offset);
+  }
+
+  // ==== TaskPool Child ------------------------------------------------------
+
+  /// A child task created by `pool.add` is called a "task pool child."
+  /// Upon completion, in addition to the usual future notifying all its waiters,
+  /// it must also `pool->offer` itself to the pool.
+  ///
+  /// This signalling is necessary to correctly implement the pool's `next()`.
+  class PoolChildFragment {
+  private:
+    TaskPool* Pool;
+
+    friend class AsyncTask;
+    friend class TaskPool;
+
+  public:
+    explicit PoolChildFragment(TaskPool *pool)
+        : Pool(pool) {}
+
+    /// Return the pool this task should offer into when it completes.
+    TaskPool* getPool() {
+      return Pool;
+    }
+  };
+
+  // Checks if task is a child of a TaskPool task.
+  //
+  // A child task that is a pool child knows that it's parent is a pool
+  // and therefore may `poolOffer` to it upon completion.
+  bool hasPoolChildFragment() const { return Flags.task_isPoolChildTask(); }
+
+  PoolChildFragment *poolChildFragment() {
+    assert(hasPoolChildFragment());
+
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+
+    return reinterpret_cast<PoolChildFragment *>(offset);
   }
 
   // ==== Future ---------------------------------------------------------------

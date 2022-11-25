@@ -223,6 +223,7 @@ namespace irgen {
     IRGenFunction &IGF,
     llvm::Value *flags,
     llvm::Value *taskGroup,
+    llvm::Value *taskPool,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction,
     llvm::Value *localContextInfo,

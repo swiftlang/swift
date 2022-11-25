@@ -181,6 +181,8 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_end) {
   swift_asyncLet_end(nullptr);
 }
 
+// TODO: handle TaskPool
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {
   swift_taskGroup_initialize(nullptr, nullptr);
 }

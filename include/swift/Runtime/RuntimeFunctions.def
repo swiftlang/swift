@@ -2069,6 +2069,24 @@ FUNCTION(TaskGroupDestroy,
          ATTRS(NoUnwind),
          EFFECT(Concurrency))
 
+// void swift_taskPool_initialize(TaskPool *pool, const Metadata *Void);
+FUNCTION(TaskPoolInitialize,
+         swift_taskPool_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency))
+
+// void swift_taskPool_destroy(TaskPool *pool);
+FUNCTION(TaskPoolDestroy,
+         swift_taskPool_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency))
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
          swift_autoDiffCreateLinearMapContext, SwiftCC,
