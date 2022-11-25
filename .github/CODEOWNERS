@@ -113,3 +113,8 @@ utils/*windows*       @compnerd
 # TODO: /include/swift/SILOptimizer/
 # TODO: /lib/SILOptimizer/
 # TODO: /*test/SILOptimizer/
+
+# IRGen
+# TODO: /include/swift/IRGen/
+# TODO: /lib/IRGen/
+# TODO: /*test/IRGen/
