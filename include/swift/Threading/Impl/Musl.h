@@ -17,6 +17,8 @@
 #ifndef SWIFT_THREADING_IMPL_MUSL_H
 #define SWIFT_THREADING_IMPL_MUSL_H
 
+// `PTHREAD_MUTEX_INITIALIZER` can't be made `constexpr` with Musl, working
+// around that with these macro directives.
 #undef SWIFT_LAZY_MUTEX_INITIALIZER 
 #define SWIFT_LAZY_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
