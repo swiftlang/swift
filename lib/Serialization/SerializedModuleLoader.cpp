@@ -781,6 +781,9 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
+    for (auto name: loadedModuleFile->getAllowableClientNames()) {
+      M.addAllowableClientName(Ctx.getIdentifier(name));
+    }
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(
         fileUnit, diagLocOrInvalid, Ctx.LangOpts.AllowModuleWithCompilerErrors);

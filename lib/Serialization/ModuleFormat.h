@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 722; // has_symbol SIL serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 723; // allowable client serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -769,7 +769,8 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
-    IS_OSSA
+    IS_OSSA,
+    ALLOWABLE_CLIENT_NAME
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -808,6 +809,11 @@ namespace control_block {
   using IsOSSALayout = BCRecordLayout<
     IS_OSSA,
     BCFixed<1>
+  >;
+
+  using AllowableClientLayout = BCRecordLayout<
+    ALLOWABLE_CLIENT_NAME,
+    BCBlob
   >;
 }
 

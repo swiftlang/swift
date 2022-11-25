@@ -2923,6 +2923,9 @@ static void printModuleMetadata(ModuleDecl *MD) {
   MD->collectSerializedSearchPath([&](StringRef path) {
     OS << "searchpath=" << path << ";\n";
   });
+  for (auto name: MD->getAllowableClientNames()) {
+    OS <<"allowable client: " << name << ";\n";
+  }
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,

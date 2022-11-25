@@ -480,6 +480,10 @@ public:
     return Core->UserModuleVersion;
   }
 
+  ArrayRef<StringRef> getAllowableClientNames() const {
+    return Core->AllowableClientNames;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;
