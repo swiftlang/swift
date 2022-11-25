@@ -3796,6 +3796,24 @@ public:
   bool isCached() const { return true; }
 };
 
+class SynthesizeRuntimeMetadataAttrGenerator
+    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGenerator,
+                           FuncDecl *(CustomAttr *, ValueDecl *),
+                           RequestFlags::Cached> {
+
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, CustomAttr *attr,
+                     ValueDecl *parent) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Compute the local discriminators for the given declaration context.
 ///
 /// This is a state-changing operation for closures within the context, which
