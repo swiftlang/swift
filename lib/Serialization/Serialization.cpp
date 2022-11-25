@@ -4314,10 +4314,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(macro->getFormalAccess());
 
-    Type resultType = evaluateOrDefault(
-        S.getASTContext().evaluator,
-        ResultTypeRequest{const_cast<MacroDecl *>(macro)},
-        Type());
+    Type resultType = macro->getResultInterfaceType();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];
     MacroLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,

@@ -2550,8 +2550,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Macro: {
     auto macro = cast<MacroDecl>(D);
-    Type resultType = evaluateOrDefault(
-        Context.evaluator, ResultTypeRequest{macro}, ErrorType::get(Context));
+    Type resultType = macro->getResultInterfaceType();
     if (!macro->parameterList)
       return resultType;
 

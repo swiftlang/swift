@@ -8316,6 +8316,9 @@ public:
 
   SourceRange getSourceRange() const;
 
+  /// Retrieve the interface type produced when expanding this macro.
+  Type getResultInterfaceType() const;
+
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
       return classof(D);

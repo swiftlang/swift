@@ -9654,6 +9654,16 @@ MacroDecl::MacroDecl(
     parameterList->setDeclContextOfParamDecls(this);
 }
 
+Type MacroDecl::getResultInterfaceType() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<MacroDecl *>(this);
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
+}
+
 SourceRange MacroDecl::getSourceRange() const {
   return SourceRange(macroLoc, externalMacroTypeNameLoc);
 }
