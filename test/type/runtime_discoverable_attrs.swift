@@ -54,3 +54,5 @@ do {
   @Flag func localFn() {}
   // expected-error@-1 {{@Flag can only be applied to non-generic types, methods, instance properties, and global functions}}
 }
+
+@Flag @Flag func test() {} // expected-error {{duplicate runtime discoverable attribute}}

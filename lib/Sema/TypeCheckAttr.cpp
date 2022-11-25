@@ -43,6 +43,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
@@ -7250,4 +7251,55 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
+}
+
+template <typename ATTR>
+static void forEachCustomAttribute(
+    ValueDecl *decl,
+    llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
+  auto &ctx = decl->getASTContext();
+
+  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    auto *mutableAttr = const_cast<CustomAttr *>(attr);
+
+    auto *nominal = evaluateOrDefault(
+        ctx.evaluator,
+        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
+
+    if (!nominal)
+      continue;
+
+    if (nominal->getAttrs().hasAttribute<ATTR>())
+      fn(mutableAttr, nominal);
+  }
+}
+
+ArrayRef<CustomAttr *>
+GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
+                                           ValueDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> attrs;
+  forEachCustomAttribute<RuntimeMetadataAttr>(
+      decl, [&](CustomAttr *attr, NominalTypeDecl *attrType) {
+        if (attrs.count(attrType)) {
+          ctx.Diags
+              .diagnose(attr->getLocation(),
+                        diag::duplicate_runtime_discoverable_attr)
+              .highlight(attr->getRange());
+          attr->setInvalid();
+          return;
+        }
+
+        (void)attrs.insert({attrType, attr});
+      });
+
+  auto result = ctx.AllocateUninitialized<CustomAttr *>(attrs.size());
+  {
+    unsigned index = 0;
+    for (const auto &entry : attrs)
+      result[index++] = entry.second;
+  }
+
+  return result;
 }

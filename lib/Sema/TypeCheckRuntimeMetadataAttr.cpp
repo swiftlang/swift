@@ -27,6 +27,13 @@
 
 using namespace swift;
 
+ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetRuntimeDiscoverableAttributes{mutableSelf},
+                           nullptr);
+}
+
 static BraceStmt *
 deriveGeneratorBody(FuncDecl *generator,
                     std::pair<CustomAttr *, ValueDecl *> content) {

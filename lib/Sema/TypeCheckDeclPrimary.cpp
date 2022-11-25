@@ -1875,6 +1875,9 @@ public:
       // Compute access level.
       (void) VD->getFormalAccess();
 
+      // Force runtime discoverable attribute checking.
+      (void) VD->getRuntimeDiscoverableAttrs();
+
       // Compute overrides.
       if (!VD->getOverriddenDecls().empty())
         checkOverrideActorIsolation(VD);

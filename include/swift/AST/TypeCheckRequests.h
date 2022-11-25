@@ -3796,6 +3796,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class GetRuntimeDiscoverableAttributes
+    : public SimpleRequest<GetRuntimeDiscoverableAttributes,
+                           ArrayRef<CustomAttr *>(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class SynthesizeRuntimeMetadataAttrGenerator
     : public SimpleRequest<SynthesizeRuntimeMetadataAttrGenerator,
                            FuncDecl *(CustomAttr *, ValueDecl *),

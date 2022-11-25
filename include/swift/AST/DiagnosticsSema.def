@@ -6807,6 +6807,9 @@ ERROR(invalid_decl_for_runtime_discoverable_attr,none,
       "@%0 can only be applied to non-generic types, methods, "
       "instance properties, and global functions", (StringRef))
 
+ERROR(duplicate_runtime_discoverable_attr,none,
+      "duplicate runtime discoverable attribute", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 
