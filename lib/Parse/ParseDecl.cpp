@@ -8986,7 +8986,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   return makeParserResult(result);
 }
 
-ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
+ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   assert(Tok.isContextualKeyword("macro"));
   SourceLoc macroLoc = consumeToken(); // 'macro'
 
@@ -9088,6 +9088,7 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &Attributes) {
       macroLoc, macroFullName, macroNameLoc, genericParams, parameterList,
       arrowOrColonLoc, resultType, externalMacroModule, externalMacroModuleLoc,
       externalMacroTypeName, externalMacroTypeNameLoc, CurDeclContext);
+  macro->getAttrs() = attributes;
 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {

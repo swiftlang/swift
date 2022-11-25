@@ -2332,6 +2332,8 @@ Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
     return SD;
   if (auto EED = dyn_cast<EnumElementDecl>(D))
     return EED;
+  if (auto MD = dyn_cast<MacroDecl>(D))
+    return MD;
 
   llvm_unreachable("Unknown Decl : DeclContext kind");
 }
@@ -4508,6 +4510,99 @@ public:
     return dtor;
   }
 
+  Expected<Decl *> deserializeMacro(ArrayRef<uint64_t> scratch,
+                                    StringRef blobData) {
+    DeclContextID contextID;
+    bool isImplicit, hasParameterList;
+    GenericSignatureID genericSigID;
+    TypeID resultInterfaceTypeID;
+    uint8_t rawAccessLevel;
+    unsigned numArgNames;
+    IdentifierID externalModuleNameID;
+    IdentifierID externalMacroTypeNameID;
+
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
+
+    decls_block::MacroLayout::readRecord(scratch, contextID,
+                                         isImplicit,
+                                         genericSigID,
+                                         hasParameterList,
+                                         resultInterfaceTypeID,
+                                         rawAccessLevel,
+                                         numArgNames,
+                                         externalModuleNameID,
+                                         externalMacroTypeNameID,
+                                         argNameAndDependencyIDs);
+
+    // Get the base name.
+    DeclBaseName baseName = MF.getDeclBaseName(argNameAndDependencyIDs.front());
+    argNameAndDependencyIDs = argNameAndDependencyIDs.drop_front();
+
+    // Resolve the name ids.
+    DeclName name;
+    if (numArgNames > 0) {
+      SmallVector<Identifier, 2> argNames;
+      for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
+        argNames.push_back(MF.getIdentifier(argNameID));
+      name = DeclName(ctx, baseName, argNames);
+    } else {
+      name = baseName;
+    }
+    PrettySupplementalDeclNameTrace trace(name);
+
+    argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numArgNames);
+
+    // Check dependency types.
+    for (TypeID dependencyID : argNameAndDependencyIDs) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        DeclDeserializationError::Flags errorFlags;
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()),
+            errorFlags);
+      }
+    }
+
+    auto parent = MF.getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *genericParams = MF.maybeReadGenericParams(parent);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    const auto resultInterfaceType = MF.getType(resultInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *macro = new (ctx) MacroDecl(SourceLoc(), name, SourceLoc(),
+                                      genericParams, nullptr,
+                                      SourceLoc(),
+                                      nullptr,
+                                      MF.getIdentifier(externalModuleNameID),
+                                      SourceLoc(),
+                                      MF.getIdentifier(externalMacroTypeNameID),
+                                      SourceLoc(),
+                                      parent);
+    declOrOffset = macro;
+
+    macro->setGenericSignature(MF.getGenericSignature(genericSigID));
+    macro->resultType.setType(resultInterfaceType);
+
+    if (hasParameterList)
+      macro->parameterList = MF.readParameterList();
+
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
+      macro->setAccess(*accessLevel);
+    else
+      MF.fatal();
+
+    if (isImplicit)
+      macro->setImplicit();
+
+    return macro;
+  }
+
   AvailableAttr *readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
                                          StringRef blobData);
 };
@@ -5258,6 +5353,7 @@ DeclDeserializer::getDeclCheckedImpl(
   CASE(Subscript)
   CASE(Extension)
   CASE(Destructor)
+  CASE(Macro)
 #undef CASE
 
   case decls_block::XREF: {

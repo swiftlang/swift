@@ -4295,6 +4295,49 @@ public:
     writeInlinableBodyTextIfNeeded(dtor);
   }
 
+  void visitMacroDecl(const MacroDecl *macro) {
+    using namespace decls_block;
+    verifyAttrSerializable(macro);
+
+    auto contextID = S.addDeclContextRef(macro->getDeclContext());
+
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(
+        S.addDeclBaseNameRef(macro->getName().getBaseName()));
+    for (auto argName : macro->getName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
+
+    Type ty = macro->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
+
+    uint8_t rawAccessLevel =
+      getRawStableAccessLevel(macro->getFormalAccess());
+
+    Type resultType = evaluateOrDefault(
+        S.getASTContext().evaluator,
+        ResultTypeRequest{const_cast<MacroDecl *>(macro)},
+        Type());
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];
+    MacroLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                            contextID.getOpaqueValue(),
+                            macro->isImplicit(),
+                            S.addGenericSignatureRef(
+                                        macro->getGenericSignature()),
+                            macro->parameterList != nullptr,
+                            S.addTypeRef(resultType),
+                            rawAccessLevel,
+                            macro->getName().getArgumentNames().size(),
+                            S.addDeclBaseNameRef(macro->externalModuleName),
+                            S.addDeclBaseNameRef(macro->externalMacroTypeName),
+                            nameComponentsAndDependencies);
+
+    writeGenericParams(macro->getGenericParams());
+    if (macro->parameterList)
+      writeParameterList(macro->parameterList);
+  }
+
   void visitTopLevelCodeDecl(const TopLevelCodeDecl *) {
     // Top-level code is ignored; external clients don't need to know about it.
   }
@@ -4321,10 +4364,6 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
-  }
-
-  void visitMacroDecl(const MacroDecl *) {
-    llvm_unreachable("macro decls shouldn't be serialized");
   }
 
   void visitMacroExpansionDecl(const MacroExpansionDecl *) {
@@ -5219,6 +5258,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubscriptLayout>();
   registerDeclTypeAbbr<ExtensionLayout>();
   registerDeclTypeAbbr<DestructorLayout>();
+  registerDeclTypeAbbr<MacroLayout>();
 
   registerDeclTypeAbbr<ParameterListLayout>();
 
