@@ -4880,6 +4880,9 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
       checkExistentialTypes(ctx, funcDecl->getGenericParams());
       checkExistentialTypes(ctx, funcDecl->getTrailingWhereClause());
     }
+  } else if (auto *macroDecl = dyn_cast<MacroDecl>(decl)) {
+    checkExistentialTypes(ctx, macroDecl->getGenericParams());
+    checkExistentialTypes(ctx, macroDecl->getTrailingWhereClause());
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))

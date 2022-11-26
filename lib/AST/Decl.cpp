@@ -9665,7 +9665,10 @@ Type MacroDecl::getResultInterfaceType() const {
 }
 
 SourceRange MacroDecl::getSourceRange() const {
-  return SourceRange(macroLoc, externalMacroTypeNameLoc);
+  SourceLoc endLoc = externalMacroTypeNameLoc;
+  if (auto trailing = getTrailingWhereClause())
+    endLoc = trailing->getSourceRange().End;
+  return SourceRange(macroLoc, endLoc);
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {

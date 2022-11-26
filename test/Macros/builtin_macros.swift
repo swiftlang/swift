@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Macros -enable-experimental-feature BuiltinMacros -dump-ast %s -module-name MacrosTest 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
 
-macro function<T: ExpressibleByStringLiteral>: T = _SwiftSyntaxMacros.FunctionMacro
+macro function<T>: T = _SwiftSyntaxMacros.FunctionMacro where T: ExpressibleByStringLiteral
 macro line<T: ExpressibleByIntegerLiteral>: T = _SwiftSyntaxMacros.LineMacro
 macro column<T: ExpressibleByIntegerLiteral>: T = _SwiftSyntaxMacros.ColumnMacro
 
