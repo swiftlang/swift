@@ -6752,6 +6752,21 @@ WARNING(macro_warning, none,
         "%1 (in macro %0)", (DeclName, StringRef))
 ERROR(macro_error, none,
       "%1 (in macro %0)", (DeclName, StringRef))
+ERROR(macro_type_access,none,
+      "macro %select{must be declared "
+      "%select{private|fileprivate|internal|%error|%error}1"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its %select{parameter|result type}3 uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}2 type",
+      (bool, AccessLevel, AccessLevel, bool))
+WARNING(macro_type_access_warn,none,
+        "macro %select{should be declared "
+        "%select{private|fileprivate|internal|%error|%error}1"
+        "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+        "because its %select{parameter|result type}3 uses "
+        "%select{a private|a fileprivate|an internal|%error|%error}2 type",
+        (bool, AccessLevel, AccessLevel, bool))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

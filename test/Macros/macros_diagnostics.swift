@@ -8,6 +8,10 @@ protocol P { }
 macro tryToHide<T: P>(_: P) -> some P = BuiltinMacros.Blah
 // expected-error@-1{{some' types are only permitted in properties, subscripts, and functions}}
 
+internal struct X { } // expected-note{{type declared here}}
+
+public macro createAnX: X = BuiltinMacros.Blah
+// expected-error@-1{{macro cannot be declared public because its result type uses an internal type}}
 
 func test(a: Int, b: Int) {
   // FIXME: Bad diagnostic.

@@ -1983,7 +1983,9 @@ public:
   }
 
   void visitMacroDecl(MacroDecl *MD) {
-    // Macros have no definitions, so there is nothing to check.
+    TypeChecker::checkDeclAttributes(MD);
+    // FIXME: Check for redeclarations
+    checkAccessControl(MD);
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
