@@ -725,12 +725,11 @@ extension Sequence where Element: StringProtocol {
 
   @inline(__always) // Pick up @_specialize and devirtualize from two callers
   internal func _joined(separator: String) -> String {
-    // A likely-under-estimate, but lets us skip some of the growth curve
-    // for large Sequences.
-    let underestimatedCap =
-      (1 &+ separator._guts.count) &* self.underestimatedCount
+    let separatorCount = separator.count
+    let joinedCount = self.lazy.map {$0.count + separatorCount}
+      .reduce(-separatorCount, +)
     var result = ""
-    result.reserveCapacity(underestimatedCap)
+    result.reserveCapacity(joinedCount)
     if separator.isEmpty {
       for x in self {
         result.append(x._ephemeralString)
