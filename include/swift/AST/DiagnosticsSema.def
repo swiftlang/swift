@@ -6767,6 +6767,8 @@ WARNING(macro_type_access_warn,none,
         "because its %select{parameter|result type}3 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, AccessLevel, AccessLevel, bool))
+ERROR(macro_in_nested,none,
+      "macro %0 can only be declared at file scope", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

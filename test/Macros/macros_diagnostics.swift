@@ -25,6 +25,11 @@ macro m3(_: Int) -> Float = A.B
 macro m4(_: Int) -> Int = A.B // expected-note{{'m4' previously declared here}}
 macro m4(_: Int) -> Int = A.B // expected-error{{invalid redeclaration of 'm4'}}
 
+struct ZZZ {
+  macro m5: Int = A.B
+  // expected-error@-1{{macro 'm5' can only be declared at file scope}}
+}
+
 func test(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
