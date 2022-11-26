@@ -725,8 +725,8 @@ extension Sequence where Element: StringProtocol {
 
   @inline(__always) // Pick up @_specialize and devirtualize from two callers
   internal func _joined(separator: String) -> String {
-    let separatorCount = separator.count
-    let joinedCount = self.lazy.map {$0.count + separatorCount}
+    let separatorCount = separator.utf8.count
+    let joinedCount = self.lazy.map {$0.utf8.count + separatorCount}
       .reduce(-separatorCount, +)
     var result = ""
     result.reserveCapacity(joinedCount)
