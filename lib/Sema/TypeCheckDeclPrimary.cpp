@@ -1984,7 +1984,6 @@ public:
 
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
-    // FIXME: Check for redeclarations
     checkAccessControl(MD);
   }
 
