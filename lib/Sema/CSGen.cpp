@@ -3667,10 +3667,11 @@ namespace {
     ) {
       auto result = TypeChecker::lookupUnqualified(
           CurDC, DeclNameRef(macroName), loc,
-          defaultUnqualifiedLookupOptions);
+          (defaultUnqualifiedLookupOptions |
+           NameLookupFlags::IncludeOuterResults));
 
       SmallVector<OverloadChoice, 1> choices;
-      for (const auto &found : result) {
+      for (const auto &found : result.allResults()) {
         if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
           OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
           choices.push_back(choice);

@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
 // REQUIRES: OS=macosx
 
-macro stringify<T>(_ value: T) -> (T, String) = BuiltinMacros.StringifyMacro
+macro stringify<T>(_ value: T) -> (T, String) = _SwiftSyntaxMacros.StringifyMacro
 
 protocol P { }
 
@@ -35,3 +35,6 @@ func test(a: Int, b: Int) {
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
 }
 
+func shadow(a: Int, b: Int, stringify: Int) {
+  _ = #stringify(a + b)
+}
