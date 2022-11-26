@@ -137,6 +137,7 @@ private:
   void validateTestable(ModuleDecl *topLevelModule);
   void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                           SourceFile &SF);
+  void validateAllowableClient(ModuleDecl *topLevelModule, SourceFile &SF);
 
   /// Diagnoses an inability to import \p modulePath in this situation and, if
   /// \p attrs is provided and has an \p attrKind, invalidates the attribute and
@@ -621,6 +622,7 @@ void UnboundImport::validateOptions(NullablePtr<ModuleDecl> topLevelModule,
     // changing behavior, but it smells funny.
     validateTestable(top);
     validatePrivate(top);
+    validateAllowableClient(top, SF);
   }
 
   validateResilience(topLevelModule, SF);
@@ -710,6 +712,19 @@ void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
     return;
 
   diagnoseInvalidAttr(DAK_Testable, ctx.Diags, diag::module_not_testable);
+}
+
+void UnboundImport::validateAllowableClient(ModuleDecl *importee,
+                                            SourceFile &SF) {
+  assert(importee);
+  auto *importer = SF.getParentModule();
+  if (!importee->allowImportedBy(importer)) {
+    ASTContext &ctx = SF.getASTContext();
+    ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
+                       diag::module_allowable_client_violation,
+                       importee->getName(),
+                       importer->getName());
+  }
 }
 
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,

@@ -424,6 +424,7 @@ public:
   ArrayRef<Identifier> getAllowableClientNames() const {
     return allowableClientNames;
   }
+  bool allowImportedBy(ModuleDecl *importer) const;
 private:
 
   /// An array of module names that are allowed to import this one.

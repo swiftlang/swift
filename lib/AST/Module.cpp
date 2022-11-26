@@ -1923,6 +1923,18 @@ Identifier ModuleDecl::getRealName() const {
   return getASTContext().getRealModuleName(getName());
 }
 
+bool ModuleDecl::allowImportedBy(ModuleDecl *importer) const {
+  if (allowableClientNames.empty())
+    return true;
+  for (auto id: allowableClientNames) {
+    if (importer->getRealName() == id)
+      return true;
+    if (importer->getABIName() == id)
+      return true;
+  }
+  return false;
+}
+
 Identifier ModuleDecl::getABIName() const {
   if (!ModuleABIName.empty())
     return ModuleABIName;
