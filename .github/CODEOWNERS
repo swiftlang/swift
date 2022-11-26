@@ -1,6 +1,7 @@
 # Lines starting with '#' are comments.
-# Each line is a file pattern followed by one or more owners.
+# Each line is a case-sensitive file pattern followed by one or more owners.
 # Order is important. The last matching pattern has the most precedence.
+# More information: https://docs.github.com/en/articles/about-code-owners
 
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
