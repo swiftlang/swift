@@ -1332,7 +1332,7 @@ void swift::ide::deliverCompletionResults(
         if (!Result.second)
           return; // already handled.
         RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups});
+          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
 
         auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
@@ -1350,7 +1350,7 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes);
+      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();

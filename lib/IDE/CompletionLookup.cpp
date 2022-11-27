@@ -127,6 +127,11 @@ bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
 }
 
+bool swift::ide::MacroFilter(ValueDecl *decl, DeclVisibilityKind,
+                             DynamicLookupInfo dynamicLookupInfo) {
+  return isa<MacroDecl>(decl);
+}
+
 bool swift::ide::isCodeCompletionAtTopLevel(const DeclContext *DC) {
   if (DC->isModuleScopeContext())
     return true;
@@ -1773,6 +1778,36 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
 }
 
+void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
+                                         DeclVisibilityKind Reason) {
+  if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
+      MD->shouldHideFromEditor())
+    return;
+
+  CodeCompletionResultBuilder Builder(
+      Sink, CodeCompletionResultKind::Declaration,
+      getSemanticContext(MD, Reason, DynamicLookupInfo()));
+  Builder.setAssociatedDecl(MD);
+
+  if (NeedLeadingMacroPound) {
+    Builder.addTextChunk("#");
+  }
+
+  addValueBaseName(Builder, MD->getBaseIdentifier());
+
+  Type macroType = MD->getInterfaceType();
+  if (MD->parameterList && macroType->is<FunctionType>()) {
+    Builder.addLeftParen();
+    addCallArgumentPatterns(Builder, macroType->castTo<FunctionType>(),
+                            MD->parameterList,
+                            MD->getGenericSignature());
+    Builder.addRightParen();
+  }
+
+  addTypeAnnotation(
+      Builder, MD->getResultInterfaceType(), MD->getGenericSignature());
+}
+
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
                                   SemanticContextKind SK,
                                   CodeCompletionKeywordKind KeyKind,
@@ -2054,6 +2089,11 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     // Swift key path allows .[0]
     if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
       addSubscriptCall(SD, Reason, dynamicLookupInfo);
+      return;
+    }
+
+    if (auto *MD = dyn_cast<MacroDecl>(D)) {
+      addMacroExpansion(MD, Reason);
       return;
     }
     return;
@@ -2724,6 +2764,11 @@ void CompletionLookup::addObjCPoundKeywordCompletions(bool needPound) {
   }
 }
 
+void CompletionLookup::getMacroCompletions(bool needPound) {
+  RequestedCachedResults.insert(
+      RequestedResultsTy::toplevelResults().onlyMacros(needPound));
+}
+
 void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
                                                         DeclFilter Filter,
                                                         bool LiteralCompletions,
@@ -3137,18 +3182,21 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
           ModuleQualifier));
 }
 
-void CompletionLookup::getToplevelCompletions(bool OnlyTypes) {
+void CompletionLookup::getToplevelCompletions(bool OnlyTypes, bool OnlyMacros) {
   Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                    : LookupKind::ValueInDeclContext;
   NeedLeadingDot = false;
+  NeedLeadingMacroPound = !OnlyMacros;
 
   UsableFilteringDeclConsumer UsableFilteringConsumer(
       Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
       *this);
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext,
                                                       UsableFilteringConsumer);
+  DeclFilter Filter = OnlyMacros ? MacroFilter : DefaultFilter;
+  FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
 
-  CurrModule->lookupVisibleDecls({}, AccessFilteringConsumer,
+  CurrModule->lookupVisibleDecls({}, FilteringConsumer,
                                  NLKind::UnqualifiedLookup);
 }
 
