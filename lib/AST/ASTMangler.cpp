@@ -2381,7 +2381,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     return appendContext(ctx->getParent(), useModuleName);
 
   case DeclContextKind::MacroDecl:
-    llvm_unreachable("macro declarations are never mangled");
+    return appendContext(ctx->getParent(), useModuleName);
   }
 
   llvm_unreachable("bad decl context");
