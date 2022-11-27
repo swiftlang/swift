@@ -2798,6 +2798,10 @@ public:
   /// Retrieve runtime discoverable attributes (if any) associated
   /// with this declaration.
   ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
+
+  /// Given a runtime discoverable attribute, return a generator function
+  /// which could be used to instantiate it for this declaration.
+  FuncDecl *getRuntimeDiscoverableAttributeGenerator(CustomAttr *) const;
 };
 
 /// This is a common base class for declarations which declare a type.

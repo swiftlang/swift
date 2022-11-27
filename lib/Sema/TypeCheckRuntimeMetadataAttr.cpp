@@ -34,6 +34,14 @@ ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
                            nullptr);
 }
 
+FuncDecl *
+ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeRuntimeMetadataAttrGenerator{attr, mutableSelf}, nullptr);
+}
+
 static BraceStmt *
 deriveGeneratorBody(FuncDecl *generator,
                     std::pair<CustomAttr *, ValueDecl *> content) {
@@ -82,7 +90,7 @@ FuncDecl *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
       /*Async=*/false,
       /*Throws=*/false,
       /*GenericParams=*/nullptr, ParameterList::createEmpty(ctx), resultType,
-      /*DC=*/parent->getDeclContext()->getParentModule());
+      /*DC=*/parent->getDeclContext()->getParentSourceFile());
 
   generator->setSynthesized(true);
   generator->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/false);
