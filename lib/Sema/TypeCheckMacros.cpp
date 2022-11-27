@@ -98,8 +98,9 @@ static void const *lookupMacroTypeMetadataByExternalName(
 MacroDefinition MacroDefinitionRequest::evaluate(
     Evaluator &evaluator, MacroDecl *macro
 ) const {
-#if SWIFT_SWIFT_PARSER
   ASTContext &ctx = macro->getASTContext();
+
+#if SWIFT_SWIFT_PARSER
 
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
