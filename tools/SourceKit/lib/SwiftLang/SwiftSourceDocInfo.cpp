@@ -920,8 +920,8 @@ static void setLocationInfo(const ValueDecl *VD,
 
 static llvm::Error
 fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
-               ModuleDecl *MainModule, SourceLoc CursorLoc, bool AddSymbolGraph,
-               SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
+               SourceLoc CursorLoc, bool AddSymbolGraph, SwiftLangSupport &Lang,
+               const CompilerInvocation &Invoc,
                ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
                llvm::BumpPtrAllocator &Allocator) {
   SmallString<256> Buffer;
@@ -1142,11 +1142,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passCursorInfoForDecl(
-    const ResolvedValueRefCursorInfo &Info, ModuleDecl *MainModule,
-    bool AddRefactorings, bool AddSymbolGraph,
-    ArrayRef<RefactoringInfo> KnownRefactoringInfo, SwiftLangSupport &Lang,
-    const CompilerInvocation &Invoc, std::string &Diagnostic,
-    ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
+    const ResolvedValueRefCursorInfo &Info, bool AddRefactorings,
+    bool AddSymbolGraph, ArrayRef<RefactoringInfo> KnownRefactoringInfo,
+    SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
+    std::string &Diagnostic, ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   DeclInfo OrigInfo(Info.getValueD(), Info.getContainerType(), Info.isRef(),
                     Info.isDynamic(), Info.getReceiverTypes(), Invoc);
@@ -1165,9 +1164,9 @@ static bool passCursorInfoForDecl(
   // The primary result for constructor calls, eg. `MyType()` should be
   // the type itself, rather than the constructor. The constructor will be
   // added as a secondary result.
-  if (auto Err = fillSymbolInfo(MainSymbol, MainInfo, MainModule, Info.getLoc(),
-                                AddSymbolGraph, Lang, Invoc, PreviousSnaps,
-                                Allocator)) {
+  if (auto Err =
+          fillSymbolInfo(MainSymbol, MainInfo, Info.getLoc(), AddSymbolGraph,
+                         Lang, Invoc, PreviousSnaps, Allocator)) {
     llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
       Diagnostic = E.message();
     });
@@ -1175,9 +1174,9 @@ static bool passCursorInfoForDecl(
   }
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
     CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
-    if (auto Err = fillSymbolInfo(CtorSymbol, OrigInfo, MainModule,
-                                  Info.getLoc(), AddSymbolGraph, Lang, Invoc,
-                                  PreviousSnaps, Allocator)) {
+    if (auto Err =
+            fillSymbolInfo(CtorSymbol, OrigInfo, Info.getLoc(), AddSymbolGraph,
+                           Lang, Invoc, PreviousSnaps, Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
       llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
       Symbols.pop_back();
@@ -1187,9 +1186,9 @@ static bool passCursorInfoForDecl(
     CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
     DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
                    ArrayRef<NominalTypeDecl *>(), Invoc);
-    if (auto Err = fillSymbolInfo(SymbolInfo, DInfo, MainModule, Info.getLoc(),
-                                  AddSymbolGraph, Lang, Invoc, PreviousSnaps,
-                                  Allocator)) {
+    if (auto Err =
+            fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
+                           Lang, Invoc, PreviousSnaps, Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
       llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
       Symbols.pop_back();
@@ -1476,7 +1475,6 @@ static void resolveCursor(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      ModuleDecl *MainModule = CompIns.getMainModule();
       SourceManager &SM = CompIns.getSourceMgr();
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
       SourceLoc Loc =
@@ -1548,8 +1546,8 @@ static void resolveCursor(
       case CursorInfoKind::ValueRef: {
         std::string Diagnostic;
         bool Success = passCursorInfoForDecl(
-            cast<ResolvedValueRefCursorInfo>(CursorInfo), MainModule,
-            Actionables, SymbolGraph, Actions, Lang, CompInvok, Diagnostic,
+            cast<ResolvedValueRefCursorInfo>(CursorInfo), Actionables,
+            SymbolGraph, Actions, Lang, CompInvok, Diagnostic,
             getPreviousASTSnaps(), Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
@@ -1880,13 +1878,12 @@ void SwiftLangSupport::getCursorInfo(
           passCursorInfoForModule(Entity.Mod, IFaceGenContexts, Invok,
                                   Receiver);
         } else {
-          std::string Diagnostic;  // Unused.
-          ModuleDecl *MainModule = IFaceGenRef->getModuleDecl();
+          std::string Diagnostic; // Unused.
           ResolvedValueRefCursorInfo Info;
           Info.setValueD(const_cast<ValueDecl *>(Entity.Dcl));
           Info.setIsRef(Entity.IsRef);
-          passCursorInfoForDecl(Info, MainModule, Actionables, SymbolGraph, {},
-                                *this, Invok, Diagnostic, {}, Receiver);
+          passCursorInfoForDecl(Info, Actionables, SymbolGraph, {}, *this,
+                                Invok, Diagnostic, {}, Receiver);
         }
       } else {
         CursorInfoData Info;
@@ -2060,7 +2057,6 @@ static void resolveCursorFromUSR(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      ModuleDecl *MainModule = CompIns.getMainModule();
 
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
@@ -2101,7 +2097,7 @@ static void resolveCursorFromUSR(
 
         std::string Diagnostic;
         bool Success =
-            passCursorInfoForDecl(Info, MainModule, /*AddRefactorings*/ false,
+            passCursorInfoForDecl(Info, /*AddRefactorings*/ false,
                                   /*AddSymbolGraph*/ false, {}, Lang, CompInvok,
                                   Diagnostic, PreviousASTSnaps, Receiver);
         if (!Success) {
