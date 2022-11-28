@@ -2479,7 +2479,10 @@ ASTContext::getModule(ImportPath::Module ModulePath, bool AllowMemoryCached) {
       if (LangOpts.EnableModuleLoadingRemarks) {
         Diags.diagnose(ModulePath.getSourceRange().Start,
                        diag::module_loaded,
-                       M->getModuleFilename());
+                       M->getName(),
+                       /*overlay=*/false,
+                       M->getModuleSourceFilename(),
+                       M->getModuleLoadedFilename());
       }
       return M;
     }
@@ -2507,8 +2510,17 @@ ModuleDecl *ASTContext::getOverlayModule(const FileUnit *FU) {
   for (auto &importer : getImpl().ModuleLoaders) {
     if (importer.get() == getClangModuleLoader())
       continue;
-    if (ModuleDecl *M = importer->loadModule(SourceLoc(), ModPath))
+    if (ModuleDecl *M = importer->loadModule(SourceLoc(), ModPath)) {
+      if (LangOpts.EnableModuleLoadingRemarks) {
+        Diags.diagnose(SourceLoc(),
+                       diag::module_loaded,
+                       M->getName(),
+                       /*overlay=*/true,
+                       M->getModuleSourceFilename(),
+                       M->getModuleLoadedFilename());
+      }
       return M;
+    }
   }
 
   return nullptr;

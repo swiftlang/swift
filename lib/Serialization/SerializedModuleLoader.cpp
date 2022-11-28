@@ -1582,6 +1582,10 @@ StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
 
+StringRef SerializedASTFile::getLoadedFilename() const {
+  return File.getModuleLoadedFilename();
+}
+
 StringRef SerializedASTFile::getTargetTriple() const {
   return File.getTargetTriple();
 }
