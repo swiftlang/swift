@@ -3037,6 +3037,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isDistributed()) {
     OS << "[distributed] ";
   }
+  if (isRuntimeAccessible()) {
+    OS << "[runtime_accessible] ";
+  }
+
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }

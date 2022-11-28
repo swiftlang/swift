@@ -365,6 +365,14 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     Visitor.addMethodDescriptor(method);
   }
 
+  void addRuntimeDiscoverableAttrGenerators(ValueDecl *D) {
+    for (auto *attr : D->getRuntimeDiscoverableAttrs()) {
+      auto *generator = D->getRuntimeDiscoverableAttributeGenerator(attr);
+      assert(generator);
+      addFunction(SILDeclRef(generator), /*ignoreLinkage=*/true);
+    }
+  }
+
 public:
   SILSymbolVisitorImpl(SILSymbolVisitor &Visitor,
                        const SILSymbolVisitorContext &Ctx)
@@ -473,6 +481,8 @@ public:
                          IndexSubset::get(AFD->getASTContext(), 1, {0}),
                          AFD->getGenericSignature()));
 
+    addRuntimeDiscoverableAttrGenerators(AFD);
+
     visitDefaultArguments(AFD, AFD->getParameters());
 
     if (AFD->hasAsync()) {
@@ -555,6 +565,8 @@ public:
     }
 
     visitAbstractStorageDecl(VD);
+
+    addRuntimeDiscoverableAttrGenerators(VD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -577,6 +589,8 @@ public:
 
     // There are symbols associated with any protocols this type conforms to.
     addConformances(NTD);
+
+    addRuntimeDiscoverableAttrGenerators(NTD);
 
     if (Ctx.getOpts().VisitMembers)
       for (auto member : NTD->getMembers())

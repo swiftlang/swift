@@ -611,7 +611,8 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                               IsNotTransparent,
                               IsNotSerialized,
                               IsNotDynamic,
-                              IsNotDistributed);
+                              IsNotDistributed,
+                              IsNotRuntimeAccessible);
 
   return fn;
 }
@@ -1667,7 +1668,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
       SILLinkage::Private, funcName, initSILType, nullptr, SILLocation(binding),
-      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed);
+      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
   f->setSpecialPurpose(SILFunction::Purpose::GlobalInitOnceFunction);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();

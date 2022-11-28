@@ -975,7 +975,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
       pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->isSerialized(),
-      original->isDynamicallyReplaceable(), original->isDistributed());
+      original->isDynamicallyReplaceable(), original->isDistributed(),
+      original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
   return pullback;
