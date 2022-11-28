@@ -4,6 +4,21 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.8
 
+* [#56139][]:
+
+  Сollection downcasts in cast patterns are now supported. For example:
+
+  ```swift
+  func collectionDowncast(_ arr: [Any]) {
+    switch arr {
+    case let ints as [Int]:
+      // ...
+    case is [Bool]:
+      // ...
+    }
+  }
+  ``` 
+
 * [SE-0365][]:
  
   Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
@@ -9624,3 +9639,4 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#54246]: <https://github.com/apple/swift/issues/54246>
 [#57081]: <https://github.com/apple/swift/issues/57081>
 [#57225]: <https://github.com/apple/swift/issues/57225>
+[#56139]: <https://github.com/apple/swift/issues/56139>
