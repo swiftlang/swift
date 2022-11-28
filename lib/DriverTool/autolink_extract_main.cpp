@@ -249,6 +249,8 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       {"-lswiftSwiftOnoneSupport", false},
       {"-lswiftCore", false},
       {"-lswift_Concurrency", false},
+      {"-lswift_StringProcessing", false},
+      {"-lswift_RegexParser", false}
   };
 
   // Extract the linker flags from the objects.
