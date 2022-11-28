@@ -497,7 +497,7 @@ public:
   }
   
   bool hasCaptures() const {
-    return Captures.hasValue();
+    return Captures.has_value();
   }
 
   AbstractionPattern getOrigFormalType() const {
@@ -1334,11 +1334,11 @@ public:
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
         CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
-            SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
+            SGF.InitDelegationLoc.value(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
             ManagedValue(superMV.getValue(), newWriteback);
-        super = RValue(SGF, SGF.InitDelegationLoc.getValue(), superFormalType,
+        super = RValue(SGF, SGF.InitDelegationLoc.value(), superFormalType,
                        SGF.SuperInitDelegationSelf);
       }
 
@@ -3954,7 +3954,7 @@ public:
   /// unevaluated arguments and their formal type.
   void addCallSite(CallSite &&site) {
     // Append to the main argument list if we have uncurry levels remaining.
-    assert(!callSite.hasValue());
+    assert(!callSite.has_value());
     callSite = std::move(site);
   }
 
@@ -3968,7 +3968,7 @@ public:
   void addSelfParam(SILLocation loc,
                     ArgumentSource &&self,
                     AnyFunctionType::Param selfParam) {
-    assert(!selfArg.hasValue());
+    assert(!selfArg.has_value());
 
     PreparedArguments preparedSelf(llvm::ArrayRef<AnyFunctionType::Param>{selfParam});
     preparedSelf.addArbitrary(std::move(self));
@@ -4096,7 +4096,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   auto fnValue = callee.getFnValue(SGF, borrowedSelf);
 
-  return SGF.emitBeginApply(uncurriedLoc.getValue(), fnValue,
+  return SGF.emitBeginApply(uncurriedLoc.value(), fnValue,
                             callee.getSubstitutions(), uncurriedArgs,
                             calleeTypeInfo.substFnType, options, yields);
 }
@@ -4149,7 +4149,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
   // Check for a specialized emitter.
   if (auto emitter = callee.getSpecializedEmitter(SGF.SGM)) {
-    return applySpecializedEmitter(emitter.getValue(), C);
+    return applySpecializedEmitter(emitter.value(), C);
   }
 
   if (isEnumElementConstructor()) {
@@ -4188,7 +4188,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   calleeTypeInfo.origResultType = origFormalType.getFunctionResultType();
   calleeTypeInfo.substResultType = formalType.getResult();
 
-  if (selfArg.hasValue() && callSite.hasValue()) {
+  if (selfArg.has_value() && callSite.has_value()) {
     calleeTypeInfo.origFormalType =
         calleeTypeInfo.origFormalType->getFunctionResultType();
     calleeTypeInfo.origResultType =
@@ -4224,7 +4224,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   // Emit the uncurried call.
   return SGF.emitApply(
-      std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
+      std::move(resultPlan), std::move(argScope), uncurriedLoc.value(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
       uncurriedContext, implicitActorHopTarget);
 }
@@ -4289,7 +4289,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
     formalResultType = cast<FunctionType>(formalResultType).getResult();
     origFormalType = origFormalType.getFunctionResultType();
   } else {
-    assert(!callSite.hasValue());
+    assert(!callSite.has_value());
   }
 
   ManagedValue resultMV = SGF.emitInjectEnum(
@@ -4324,7 +4324,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (specializedEmitter.isEarlyEmitter()) {
     auto emitter = specializedEmitter.getEarlyEmitter();
 
-    assert(!selfArg.hasValue());
+    assert(!selfArg.has_value());
     assert(!formalType->getExtInfo().isThrowing());
     SILLocation uncurriedLoc = callSite->Loc;
 
@@ -4382,7 +4382,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 
   // First get the indirect result addrs and add them to rawArgs. We want to be
   // able to handle them specially later as well, so we keep them in two arrays.
-  if (resultPlan.hasValue())
+  if (resultPlan.has_value())
     (*resultPlan)->gatherIndirectResultAddrs(SGF, loc, rawArgs);
 
   // Then add all arguments to our array, copying them if they are not at +1
@@ -4400,7 +4400,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
 
-  if (argScope.hasValue())
+  if (argScope.has_value())
     std::move(argScope)->pop();
 
   // If we have a direct result, it will consist of a single value even if
@@ -4414,7 +4414,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   ArrayRef<ManagedValue> directResultsFinal(directResultsArray);
 
   // Then finish our value.
-  if (resultPlan.hasValue()) {
+  if (resultPlan.has_value()) {
     return std::move(*resultPlan)
         ->finish(SGF, loc, formalResultType, directResultsFinal, SILValue());
   } else {
@@ -4432,13 +4432,13 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  args.reserve(selfArg.hasValue() ? 2 : 1);
+  args.reserve(selfArg.has_value() ? 2 : 1);
   {
     ParamLowering paramLowering(substFnType, SGF);
 
     assert((!foreign.error && !foreign.async)
-           || !selfArg.hasValue()
-           || (selfArg.hasValue() && substFnType->hasSelfParam()));
+           || !selfArg.has_value()
+           || (selfArg.has_value() && substFnType->hasSelfParam()));
 
     if (callSite->isNoThrows()) {
       options |= ApplyFlags::DoesNotThrow;
@@ -4456,7 +4456,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     }
 
     // Collect the arguments to the uncurried call.
-    if (selfArg.hasValue()) {
+    if (selfArg.has_value()) {
       args.push_back({});
       
       // Claim the foreign "self" with the self param.
@@ -4690,7 +4690,7 @@ RValue SILGenFunction::emitApply(
     auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
 
     std::tie(errorTemp, errorArgSlot) =
-        resultPlan->emitForeignErrorArgument(*this, loc).getValue();
+        resultPlan->emitForeignErrorArgument(*this, loc).value();
   }
 
   // Emit the raw application.

@@ -772,7 +772,7 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
     if (!outerUsers)
       return false;
 
-    outerUseInsts = std::move(outerUsers).getValue();
+    outerUseInsts = std::move(outerUsers).value();
 
     filterOuterBorrowUseInsts(outerUseInsts);
   }

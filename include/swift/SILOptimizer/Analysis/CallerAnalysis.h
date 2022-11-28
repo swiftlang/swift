@@ -317,7 +317,7 @@ public:
     for (const auto &iter : callerStates) {
       if (auto numArgs = iter.second.getNumPartiallyAppliedArguments()) {
         foundArg = true;
-        minArgs = std::min(minArgs, numArgs.getValue());
+        minArgs = std::min(minArgs, numArgs.value());
       }
     }
 

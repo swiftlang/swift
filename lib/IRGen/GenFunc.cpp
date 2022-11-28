@@ -375,7 +375,7 @@ namespace {
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
       mask.appendSetBits(pointerSize.getValueInBits());
       mask.appendClearBits(pointerSize.getValueInBits());
-      return mask.build().getValue();
+      return mask.build().value();
     }
   };
 

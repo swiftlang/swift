@@ -588,7 +588,7 @@ namespace {
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
       mask.append(bits);
       mask.padWithClearBitsTo(totalSize);
-      return mask.build().getValue();
+      return mask.build().value();
     }
   };
 
@@ -656,7 +656,7 @@ namespace {
         auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian()); \
         mask.append(bits); \
         mask.padWithClearBitsTo(getFixedSize().getValueInBits()); \
-        return mask.build().getValue(); \
+        return mask.build().value(); \
       } else { \
         return Super::getFixedExtraInhabitantMask(IGM); \
       } \
@@ -948,7 +948,7 @@ public:
     mask.appendClearBits(getLayout().getMetadataRefOffset(IGM).getValueInBits());
     mask.appendSetBits(IGM.getPointerSize().getValueInBits());
     mask.padWithClearBitsTo(getFixedSize().getValueInBits());
-    return mask.build().getValue();
+    return mask.build().value();
   }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src, SILType T,

@@ -282,7 +282,7 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     auto requirementID = rule.getRequirementID();
 
-    if (!requirementID.hasValue()) {
+    if (!requirementID.has_value()) {
       if (!rule.isRedundant())
         nonExplicitNonRedundantRules.insert(ruleID);
 

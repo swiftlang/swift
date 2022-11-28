@@ -759,17 +759,17 @@ bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
   auto POp = ProjectionPath::getProjectionPath(Base, Derived);
   // We can not build a projection path from the base to the derived, bail out.
   // and return true so that we can stop the epilogue walking sequence.
-  if (!POp.hasValue())
+  if (!POp.has_value())
     return true;
 
   for (auto &R : Insts) {
     SILValue ROp = R->getOperand(0);
     auto PROp = ProjectionPath::getProjectionPath(Base, ROp); 
-    if (!PROp.hasValue())
+    if (!PROp.has_value())
       return true;
     // If Op is a part of ROp or Rop is a part of Op. then we have seen
     // a redundant release.
-    if (!PROp.getValue().hasNonEmptySymmetricDifference(POp.getValue()))
+    if (!PROp.value().hasNonEmptySymmetricDifference(POp.value()))
       return true;
   }
   return false;
@@ -786,7 +786,7 @@ bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
     auto PP = ProjectionPath::getProjectionPath(Arg, I->getOperand(0));
     if (!PP)
       return false;
-    Paths.insert(PP.getValue());
+    Paths.insert(PP.value());
   } 
 
   // Is there an uncovered non-trivial type.

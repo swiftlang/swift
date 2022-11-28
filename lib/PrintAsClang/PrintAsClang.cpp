@@ -506,7 +506,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    bool enableCxx = frontendOpts.ClangHeaderExposedDecls.hasValue() ||
+    bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
                      frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
                      M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
     if (!enableCxx)
@@ -516,13 +516,13 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
         "_SwiftCxxInteroperability.h");
 
     bool requiresExplicitExpose =
-        !frontendOpts.ClangHeaderExposedDecls.hasValue() ||
+        !frontendOpts.ClangHeaderExposedDecls.has_value() ||
         *frontendOpts.ClangHeaderExposedDecls ==
             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr;
     // Default dependency behavior is used when the -clang-header-expose-decls
     // flag is not specified.
     bool defaultDependencyBehavior =
-        !frontendOpts.ClangHeaderExposedDecls.hasValue();
+        !frontendOpts.ClangHeaderExposedDecls.has_value();
 
     std::string moduleContentsBuf;
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};

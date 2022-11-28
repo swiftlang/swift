@@ -149,7 +149,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // If not from the same file, sort by file name.
       if (auto LFile = Ext->getSourceFileName()) {
         if (auto RFile = Rhs.Ext->getSourceFileName()) {
-          int Result = LFile.getValue().compare(RFile.getValue());
+          int Result = LFile.value().compare(RFile.value());
           if (Result != 0)
             return Result < 0;
         }
@@ -158,7 +158,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // Otherwise, sort by source order.
       if (auto LeftOrder = Ext->getSourceOrder()) {
         if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
-          return LeftOrder.getValue() < RightOrder.getValue();
+          return LeftOrder.value() < RightOrder.value();
         }
       }
 

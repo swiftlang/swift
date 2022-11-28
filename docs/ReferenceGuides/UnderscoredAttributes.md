@@ -535,6 +535,15 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
+## `@inline(__always)`
+
+Forces the function to be inlined.
+
+If it's not possible to always inline the function, e.g. if it's a self-
+recursive function, the attribute is ignored.
+
+This attribute has no effect in debug builds.
+
 ## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that

@@ -3002,18 +3002,18 @@ public:
   }
   
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UniqueUnderlyingType.hasValue() && "resetting underlying type?!");
+    assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
   }
 
   bool hasConditionallyAvailableSubstitutions() const {
-    return ConditionallyAvailableTypes.hasValue();
+    return ConditionallyAvailableTypes.has_value();
   }
 
   ArrayRef<ConditionallyAvailableSubstitutions *>
   getConditionallyAvailableSubstitutions() const {
     assert(ConditionallyAvailableTypes);
-    return ConditionallyAvailableTypes.getValue();
+    return ConditionallyAvailableTypes.value();
   }
 
   void setConditionallyAvailableSubstitutions(
@@ -4891,7 +4891,7 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSig.hasValue();
+    return RequirementSig.has_value();
   }
 
   void setRequirementSignature(RequirementSignature requirementSig);
@@ -6451,8 +6451,8 @@ class BodyAndFingerprint {
 
 public:
   BodyAndFingerprint(BraceStmt *body, Optional<Fingerprint> fp)
-      : BodyAndHasFp(body, fp.hasValue()),
-        Fp(fp.hasValue() ? *fp : Fingerprint::ZERO()) {}
+      : BodyAndHasFp(body, fp.has_value()),
+        Fp(fp.has_value() ? *fp : Fingerprint::ZERO()) {}
   BodyAndFingerprint() : BodyAndFingerprint(nullptr, None) {}
 
   BraceStmt *getBody() const { return BodyAndHasFp.getPointer(); }
@@ -6465,7 +6465,7 @@ public:
   }
 
   void setFingerprint(Optional<Fingerprint> fp) {
-    if (fp.hasValue()) {
+    if (fp.has_value()) {
       Fp = *fp;
       BodyAndHasFp.setInt(true);
     } else {

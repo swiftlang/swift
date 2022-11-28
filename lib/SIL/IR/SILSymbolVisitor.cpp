@@ -38,7 +38,7 @@ static bool requiresLinkerDirective(Decl *D) {
   for (auto *attr : D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.hasValue())
+      if (Active.has_value())
         return true;
     }
   }

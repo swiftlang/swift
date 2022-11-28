@@ -257,9 +257,9 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
                     .Default(None);
-  if (!Result.hasValue())
+  if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
-  value = Result.getValue();
+  value = Result.value();
 }
 
 ValueOwnershipKind

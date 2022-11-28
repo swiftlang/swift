@@ -134,8 +134,8 @@ bool extractParameterOutline(
 
       for (auto SubListChild : SubList->getChildren()) {
         auto Param = extractParamOutlineItem(MC, SubListChild);
-        if (Param.hasValue()) {
-          ParamFields.push_back(Param.getValue());
+        if (Param.has_value()) {
+          ParamFields.push_back(Param.value());
         }
       }
     }
@@ -200,8 +200,8 @@ bool extractSeparatedParams(
     ParagraphText->setLiteralContent(ParagraphContent.ltrim());
 
     auto ParamField = extractParamOutlineItem(MC, I);
-    if (ParamField.hasValue())
-      ParamFields.push_back(ParamField.getValue());
+    if (ParamField.has_value())
+      ParamFields.push_back(ParamField.value());
     else
       NormalItems.push_back(Child);
   }
@@ -511,7 +511,7 @@ StringRef Decl::getBriefComment() const {
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<StringRef> Comment = Context.getBriefComment(this))
-    return Comment.getValue();
+    return Comment.value();
 
   // Check if the serialized module may have the brief comment available.
   if (auto *Unit =

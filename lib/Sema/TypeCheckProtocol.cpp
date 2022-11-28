@@ -683,7 +683,7 @@ swift::matchWitness(
 
     // Check that the witness has no more effects than the requirement.
     if (auto problem = checkEffects(witnessASD, reqASD))
-      return problem.getValue();
+      return problem.value();
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
@@ -725,7 +725,7 @@ swift::matchWitness(
     Optional<RequirementMatch> result;
     std::tie(result, reqType, witnessType) = setup();
     if (result) {
-      return std::move(result.getValue());
+      return std::move(result.value());
     }
   }
 
@@ -759,7 +759,7 @@ swift::matchWitness(
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-        return std::move(result.getValue());
+        return std::move(result.value());
       }
     }
 
@@ -814,7 +814,7 @@ swift::matchWitness(
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-        return std::move(result.getValue());
+        return std::move(result.value());
       }
     }
 
@@ -853,7 +853,7 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-      return std::move(result.getValue());
+      return std::move(result.value());
     }
   }
 
@@ -1551,8 +1551,8 @@ bool WitnessChecker::findBestWitness(
 }
 
 AccessScope WitnessChecker::getRequiredAccessScope() {
-  if (RequiredAccessScopeAndUsableFromInline.hasValue())
-    return RequiredAccessScopeAndUsableFromInline.getValue().first;
+  if (RequiredAccessScopeAndUsableFromInline.has_value())
+    return RequiredAccessScopeAndUsableFromInline.value().first;
 
   AccessScope result = Proto->getFormalAccessScope(DC);
 
@@ -1564,8 +1564,8 @@ AccessScope WitnessChecker::getRequiredAccessScope() {
     // and the protocol's access scope.
     auto scopeIntersection =
         result.intersectWith(adoptingNominal->getFormalAccessScope(DC));
-    assert(scopeIntersection.hasValue());
-    result = scopeIntersection.getValue();
+    assert(scopeIntersection.has_value());
+    result = scopeIntersection.value();
 
     if (!result.isPublic()) {
       witnessesMustBeUsableFromInline =
@@ -2077,7 +2077,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
           break;
       }
       if (diagKind) {
-        C.Diags.diagnose(ComplainLoc, diagKind.getValue(), T, ProtoType);
+        C.Diags.diagnose(ComplainLoc, diagKind.value(), T, ProtoType);
         conformance->setInvalid();
         return conformance;
       }
@@ -3393,15 +3393,15 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         Optional<AccessScope> underlyingTypeScope =
             TypeAccessScopeChecker::getAccessScope(type, DC,
                                                    /*usableFromInline*/false);
-        assert(underlyingTypeScope.hasValue() &&
+        assert(underlyingTypeScope.has_value() &&
                "the type is already invalid and we shouldn't have gotten here");
 
         AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
         Optional<AccessScope> widestPossibleScope =
             underlyingTypeScope->intersectWith(nominalAccessScope);
-        assert(widestPossibleScope.hasValue() &&
+        assert(widestPossibleScope.has_value() &&
                "we found the nominal and the type witness, didn't we?");
-        requiredAccessScope = widestPossibleScope.getValue();
+        requiredAccessScope = widestPossibleScope.value();
       }
 
       // An associated type witness can never be less than fileprivate, since
@@ -4042,7 +4042,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
             // defined.
-            fixItDiag.getValue().flush();
+            fixItDiag.value().flush();
             fixItDiag.emplace(diags.diagnose(ctor, diag::decl_declared_here,
                                              ctor->getName()));
           }
@@ -5158,13 +5158,13 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
-                  fixItDiag.getValue(), witness,
+                  fixItDiag.value(), witness,
                   witness->getObjCRuntimeName(),
                   requirement->getObjCRuntimeName());
             }
@@ -5179,13 +5179,13 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
-                  fixItDiag.getValue(), witness,
+                  fixItDiag.value(), witness,
                   witness->getObjCRuntimeName(),
                   requirement->getObjCRuntimeName());
             }
@@ -5200,7 +5200,7 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
@@ -6192,7 +6192,7 @@ static void diagnoseUnstableName(ProtocolConformance *conformance,
       !hasExplicitObjCName(classDecl)) {
     C.Diags.diagnose(cast<NormalProtocolConformance>(conformance)->getLoc(),
                      diag::nscoding_unstable_mangled_name,
-                     static_cast<unsigned>(kind.getValue()),
+                     static_cast<unsigned>(kind.value()),
                      classDecl->getDeclaredInterfaceType());
     auto insertionLoc =
       classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -6775,7 +6775,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       if (req->getAttrs().isUnavailable(ctx)) continue;
 
       // Dig out the conformance.
-      if (!conformance.hasValue()) {
+      if (!conformance.has_value()) {
         SmallVector<ProtocolConformance *, 2> conformances;
         nominal->lookupConformance(proto, conformances);
         if (conformances.size() == 1)

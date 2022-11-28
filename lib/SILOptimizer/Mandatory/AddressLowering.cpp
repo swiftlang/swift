@@ -2815,7 +2815,7 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::Copy: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(0, opAddr);
@@ -3403,7 +3403,7 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::Copy: {
       SILValue addr = addrMat.materializeAddress(bi);
       builder.createBuiltin(
@@ -3648,7 +3648,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
   // by the defVisitor.
   for (auto optionalApply : pass.indirectApplies) {
     if (optionalApply) {
-      rewriteIndirectApply(optionalApply.getValue(), pass);
+      rewriteIndirectApply(optionalApply.value(), pass);
     }
   }
 

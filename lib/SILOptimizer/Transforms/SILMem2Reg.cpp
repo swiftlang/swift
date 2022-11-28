@@ -799,7 +799,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       }
       assert(!deinitializationPoints[blockPromotingWithin]);
       deinitializationPoints[blockPromotingWithin] = inst;
-      if (!runningVals.hasValue()) {
+      if (!runningVals.has_value()) {
         continue;
       }
       if (sbi->getSrc() != runningVals->value.stored) {
@@ -1829,7 +1829,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (sbi->getDest() != asi) {
         continue;
       }
-      if (!runningVals.hasValue()) {
+      if (!runningVals.has_value()) {
         continue;
       }
       if (sbi->getSrc() != runningVals->value.stored) {

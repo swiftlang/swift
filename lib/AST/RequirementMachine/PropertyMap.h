@@ -128,7 +128,7 @@ public:
       const PropertyMap &map) const;
 
   bool isConcreteType() const {
-    return ConcreteType.hasValue();
+    return ConcreteType.has_value();
   }
 
   CanType getConcreteType() const {

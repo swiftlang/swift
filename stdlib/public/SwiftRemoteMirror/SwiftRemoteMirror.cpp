@@ -278,7 +278,7 @@ int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
-  return Context->addImage(RemoteAddress(imageStart)).hasValue();
+  return Context->addImage(RemoteAddress(imageStart)).has_value();
 }
 
 int
@@ -637,7 +637,7 @@ int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef 
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
   auto Pair = Context->projectExistentialAndUnwrapClass(
       RemoteExistentialAddress, *ExistentialTR);
-  if (!Pair.hasValue())
+  if (!Pair.has_value())
     return false;
   *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
   *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();

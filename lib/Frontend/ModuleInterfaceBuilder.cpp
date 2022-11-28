@@ -124,8 +124,8 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
 
     // Serialize the paths of dependencies in the SDK relative to it.
     Optional<StringRef> SDKRelativePath = getRelativeDepPath(DepName, SDKPath);
-    StringRef DepNameToStore = SDKRelativePath.getValueOr(DepName);
-    bool IsSDKRelative = SDKRelativePath.hasValue();
+    StringRef DepNameToStore = SDKRelativePath.value_or(DepName);
+    bool IsSDKRelative = SDKRelativePath.has_value();
 
     // Forwarding modules add the underlying prebuilt module to their
     // dependency list -- don't serialize that.

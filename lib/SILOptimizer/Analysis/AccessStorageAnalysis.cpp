@@ -35,7 +35,7 @@ bool AccessStorageResult::mayConflictWith(
     SILAccessKind otherAccessKind, const AccessStorage &otherStorage) const {
   if (hasUnidentifiedAccess()
       && accessKindMayConflict(otherAccessKind,
-                               unidentifiedAccess.getValue())) {
+                               unidentifiedAccess.value())) {
     return true;
   }
   for (auto &storageAccess : storageAccessSet) {
@@ -84,7 +84,7 @@ static bool updateOptionalAccessKind(Optional<SILAccessKind> &LHS,
     LHS = RHS;
     return true;
   }
-  return updateAccessKind(LHS.getValue(), RHS.getValue());
+  return updateAccessKind(LHS.value(), RHS.value());
 }
 
 bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
@@ -108,7 +108,7 @@ bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
     unidentifiedAccess = accessKind;
     return true;
   }
-  return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
+  return updateAccessKind(unidentifiedAccess.value(), accessKind);
 }
 
 // Merge the given AccessStorageResult in `other` into this
@@ -173,7 +173,7 @@ bool AccessStorageResult::mergeAccesses(
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
   if (other.unidentifiedAccess != None)
-    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.getValue());
+    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.value());
 
   return changed;
 }
@@ -336,7 +336,7 @@ void AccessStorageResult::print(raw_ostream &os) const {
 
   if (unidentifiedAccess != None) {
     os << "  unidentified accesses: "
-       << getSILAccessKindName(unidentifiedAccess.getValue()) << "\n";
+       << getSILAccessKindName(unidentifiedAccess.value()) << "\n";
   }
 }
 

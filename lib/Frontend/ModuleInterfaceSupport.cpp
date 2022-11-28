@@ -398,8 +398,8 @@ class InheritedProtocolCollector {
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
   getAvailabilityAttrs(const Decl *D, Optional<AvailableAttrList> &cache) {
-    if (cache.hasValue())
-      return cache.getValue();
+    if (cache.has_value())
+      return cache.value();
 
     cache.emplace();
     while (D) {
@@ -417,7 +417,7 @@ class InheritedProtocolCollector {
       D = D->getDeclContext()->getAsDecl();
     }
 
-    return cache.getValue();
+    return cache.value();
   }
 
   static OriginallyDefinedInAttrList

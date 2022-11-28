@@ -123,7 +123,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
-    bufferID = BufID.getValue();
+    bufferID = BufID.value();
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 

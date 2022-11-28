@@ -223,7 +223,7 @@ static Optional<CanType> joinOptional(CanType first, CanType second) {
 CanType TypeJoin::visitBoundGenericEnumType(CanType second) {
   // Deal with either First or second (or both) being optionals.
   if (auto joined = joinOptional(First, second))
-    return joined.getValue();
+    return joined.value();
 
   assert(First != second);
 

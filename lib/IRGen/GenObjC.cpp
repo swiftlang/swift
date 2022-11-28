@@ -113,8 +113,8 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // Check to see if we've already computed the market.  Note that we
   // might have cached a null marker, and that's fine.
   auto &cache = ObjCRetainAutoreleasedReturnValueMarker;
-  if (cache.hasValue())
-    return cache.getValue();
+  if (cache.has_value())
+    return cache.value();
 
   // Ask the target for the string.
   StringRef asmString = TargetInfo.ObjCRetainAutoreleasedReturnValueMarker;
@@ -144,7 +144,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
     cache = llvm::InlineAsm::get(type, asmString, "", /*sideeffects*/ true);
   }
 
-  return cache.getValue();
+  return cache.value();
 }
 
 /// Reclaim an autoreleased return value.
@@ -505,13 +505,16 @@ static void updateProtocolRefs(IRGenModule &IGM,
   assert(clangImporter && "Must have a clang importer");
 
   // Get the array containining the protocol refs.
-  unsigned protocolRefsSize;
-  llvm::ConstantArray *protocolRefs;
-  std::tie(protocolRefsSize, protocolRefs) = getProtocolRefsList(protocol);
+  unsigned protocolRefsSize = getProtocolRefsList(protocol).first;
   unsigned currentIdx = 0;
   auto inheritedObjCProtocols = getRuntimeProtocolList(objcProtocol->protocols());
   for (auto inheritedObjCProtocol : inheritedObjCProtocols) {
     assert(currentIdx < protocolRefsSize);
+
+    // Getting the `protocolRefs` constant must not be hoisted out of the loop
+    // because this constant might be deleted by
+    // `oldVar->replaceAllUsesWith(newOpd)` below.
+    llvm::ConstantArray *protocolRefs = getProtocolRefsList(protocol).second;
     auto oldVar = protocolRefs->getOperand(currentIdx);
     // Map the objc protocol to swift protocol.
     auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);

@@ -92,7 +92,7 @@ public:
       bool isValid = false;
       if (auto Version = VersionParser::parseVersionString(
               A->getValue(), SourceLoc(), nullptr)) {
-        if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+        if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
           Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
           isValid = true;
         }

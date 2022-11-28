@@ -305,14 +305,14 @@ static void mapInterfaceTypes(SILFunction *F,
     Result = InterfaceResult;
   }
 
-  if (InterfaceErrorResult.hasValue()) {
-    if (InterfaceErrorResult.getValue().getInterfaceType()->hasArchetype()) {
+  if (InterfaceErrorResult.has_value()) {
+    if (InterfaceErrorResult.value().getInterfaceType()->hasArchetype()) {
       InterfaceErrorResult =
-          SILResultInfo(InterfaceErrorResult.getValue()
+          SILResultInfo(InterfaceErrorResult.value()
                             .getInterfaceType()
                             ->mapTypeOutOfContext()
                             ->getCanonicalType(),
-                        InterfaceErrorResult.getValue().getConvention());
+                        InterfaceErrorResult.value().getConvention());
     }
   }
 }
@@ -422,8 +422,8 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
     ArgumentDescriptor &AD, SmallVectorImpl<SILParameterInfo> &Out) {
   // If this argument is live, but we cannot optimize it.
   if (!AD.canOptimizeLiveArg()) {
-    if (AD.PInfo.hasValue())
-      Out.push_back(AD.PInfo.getValue());
+    if (AD.PInfo.has_value())
+      Out.push_back(AD.PInfo.value());
     return;
   }
 
@@ -450,7 +450,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       }
 
       // Ty is not trivial, pass it through as the original calling convention.
-      auto ParameterConvention = AD.PInfo.getValue().getConvention();
+      auto ParameterConvention = AD.PInfo.value().getConvention();
       if (AD.OwnedToGuaranteed) {
         if (ParameterConvention == ParameterConvention::Direct_Owned)
           ParameterConvention = ParameterConvention::Direct_Guaranteed;
@@ -471,7 +471,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
   // parameter, change the parameter to @guaranteed and continue...
   if (AD.OwnedToGuaranteed) {
     ++NumOwnedConvertedToGuaranteed;
-    auto ParameterConvention = AD.PInfo.getValue().getConvention();
+    auto ParameterConvention = AD.PInfo.value().getConvention();
     if (ParameterConvention == ParameterConvention::Direct_Owned)
       ParameterConvention = ParameterConvention::Direct_Guaranteed;
     else if (ParameterConvention == ParameterConvention::Indirect_In)
@@ -480,14 +480,14 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       llvm_unreachable("Unknown parameter convention transformation");
     }
 
-    SILParameterInfo NewInfo(AD.PInfo.getValue().getInterfaceType(),
+    SILParameterInfo NewInfo(AD.PInfo.value().getInterfaceType(),
                              ParameterConvention);
     Out.push_back(NewInfo);
     return;
   }
 
   // Otherwise just propagate through the parameter info.
-  Out.push_back(AD.PInfo.getValue());
+  Out.push_back(AD.PInfo.value());
 }
 
 //===----------------------------------------------------------------------===//

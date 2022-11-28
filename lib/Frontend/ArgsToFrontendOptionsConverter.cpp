@@ -194,7 +194,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     assert(!inputsAndOutputs->hasInputs());
   } else {
     HaveNewInputsAndOutputs = true;
-    Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+    Opts.InputsAndOutputs = std::move(inputsAndOutputs).value();
     if (Opts.AllowModuleWithCompilerErrors)
       Opts.InputsAndOutputs.setShouldRecoverMissingInputs();
   }

@@ -1327,7 +1327,7 @@ static bool readSwiftInterfaceVersionAndArgs(
   // FIXME We should diagnose this at a location that makes sense:
   auto Vers =
       VersionParser::parseVersionString(VersMatches[1], SourceLoc(), &Diags);
-  if (!Vers.hasValue()) {
+  if (!Vers.has_value()) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1425,7 +1425,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
-  if (LangOpts.ClangTarget.hasValue()) {
+  if (LangOpts.ClangTarget.has_value()) {
     genericSubInvocation.getLangOptions().ClangTarget = LangOpts.ClangTarget;
     auto triple = ArgSaver.save(genericSubInvocation.getLangOptions()
       .ClangTarget->getTriple());
@@ -1848,7 +1848,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     "-Xcc",
     ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
   };
-  if (!subInvocation.getLangOptions().ClangTarget.hasValue()) {
+  if (!subInvocation.getLangOptions().ClangTarget.has_value()) {
     ExtraPCMArgs.insert(ExtraPCMArgs.begin(), {"-Xcc", "-target",
                                                "-Xcc", target});
   }

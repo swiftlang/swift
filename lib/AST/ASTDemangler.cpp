@@ -1043,7 +1043,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
     if (privateDiscriminator.empty()) {
       if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
         return findForeignTypeDecl(name, relatedEntityKind,
-                                    foreignModuleKind.getValue(),
+                                    foreignModuleKind.value(),
                                     node->getKind());
       }
     }

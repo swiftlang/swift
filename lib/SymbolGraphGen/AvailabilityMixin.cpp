@@ -196,9 +196,9 @@ void Availability::serialize(llvm::json::OStream &OS) const {
 }
 
 bool Availability::empty() const {
-  return !Introduced.hasValue() &&
-         !Deprecated.hasValue() &&
-         !Obsoleted.hasValue() &&
+  return !Introduced.has_value() &&
+         !Deprecated.has_value() &&
+         !Obsoleted.has_value() &&
          !IsUnconditionallyDeprecated &&
          !IsUnconditionallyUnavailable;
 }
