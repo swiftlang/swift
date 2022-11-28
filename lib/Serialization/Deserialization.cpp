@@ -1224,7 +1224,9 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   unsigned kind;
   GenericSignatureID parentSigID;
   TypeID existentialID;
-  GenericEnvironmentLayout::readRecord(scratch, kind, existentialID, parentSigID);
+  SubstitutionMapID subsID;
+  GenericEnvironmentLayout::readRecord(scratch, kind, existentialID,
+                                       parentSigID, subsID);
 
   auto existentialTypeOrError = getTypeChecked(existentialID);
   if (!existentialTypeOrError)
@@ -1233,6 +1235,10 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   auto parentSigOrError = getGenericSignatureChecked(parentSigID);
   if (!parentSigOrError)
     return parentSigOrError.takeError();
+
+  auto contextSubsOrError = getSubstitutionMapChecked(subsID);
+  if (!contextSubsOrError)
+    return contextSubsOrError.takeError();
 
   GenericEnvironment *genericEnv = nullptr;
   switch (GenericEnvironmentKind(kind)) {
@@ -1243,7 +1249,7 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
 
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
-        parentSigOrError.get(), UUID::fromTime());
+        parentSigOrError.get(), UUID::fromTime(), contextSubsOrError.get());
   }
 
   envOffset = genericEnv;
