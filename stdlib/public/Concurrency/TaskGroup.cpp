@@ -575,9 +575,6 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
   case PollStatus::MustWait:
     assert(false && "filling a waiting status?");
     return;
-  case PollStatus::Empty:
-    assert(false && "filling from empty status?");
-    return;
 
   case PollStatus::Error: {
     context->fillWithError(reinterpret_cast<SwiftError *>(result.storage));
