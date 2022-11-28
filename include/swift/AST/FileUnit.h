@@ -404,6 +404,11 @@ public:
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
 
+  /// Get the path to the file loaded by the compiler. Usually the binary
+  /// swiftmodule file or a pcm in the cache. Returns an empty string if not
+  /// applicable.
+  virtual StringRef getLoadedFilename() const { return StringRef(); }
+
   virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
     return StringRef();
   }

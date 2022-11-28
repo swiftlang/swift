@@ -712,6 +712,10 @@ public:
     return Core->ModuleInputBuffer->getBufferIdentifier();
   }
 
+  StringRef getModuleLoadedFilename() const {
+    return Core->ModuleInputBuffer->getBufferIdentifier();
+  }
+
   StringRef getTargetTriple() const {
     return Core->TargetTriple;
   }

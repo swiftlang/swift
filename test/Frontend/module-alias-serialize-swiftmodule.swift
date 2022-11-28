@@ -31,9 +31,9 @@
 
 /// Check AppleLogging.swiftmodule is loaded, and XLogging.swiftmodule is not loaded
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-LOAD1
-// CHECK-LOAD1: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-LOAD1: remark: loaded module {{.*}}AppleLogging.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-NOT-LOAD1
-// CHECK-NOT-LOAD1: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-NOT-LOAD1: remark: loaded module {{.*}}XLogging.swiftmodule
 
 /// Check Lib.swiftmodule contains AppleLogging and NOT XLogging as an imported module
 /// in the binary
@@ -52,7 +52,7 @@
 // RUN: not test -f %t/XLogging.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/result-Client.output -check-prefix CHECK-LOAD2
-// CHECK-LOAD2: remark: loaded module at {{.*}}Lib.swiftmodule
+// CHECK-LOAD2: remark: loaded module {{.*}}Lib.swiftmodule
 
 /// Check Client.swiftmodule contains Lib as an imported module in the binary
 // RUN: llvm-bcanalyzer --dump %t/Client.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT2

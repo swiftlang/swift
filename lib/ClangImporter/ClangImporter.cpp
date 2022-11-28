@@ -3635,6 +3635,12 @@ StringRef ClangModuleUnit::getFilename() const {
   return StringRef();
 }
 
+StringRef ClangModuleUnit::getLoadedFilename() const {
+  if (const clang::FileEntry *F = clangModule->getASTFile())
+    return F->getName();
+  return StringRef();
+}
+
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.Instance->getTarget();
 }

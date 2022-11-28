@@ -1965,6 +1965,25 @@ StringRef ModuleDecl::getModuleFilename() const {
   return Result;
 }
 
+StringRef ModuleDecl::getModuleSourceFilename() const {
+  for (auto F : getFiles()) {
+    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+      continue;
+    return F->getModuleDefiningPath();
+  }
+
+  return StringRef();
+}
+
+StringRef ModuleDecl::getModuleLoadedFilename() const {
+  for (auto F : getFiles()) {
+    if (auto LF = dyn_cast<LoadedFile>(F)) {
+      return LF->getLoadedFilename();
+    }
+  }
+  return StringRef();
+}
+
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
