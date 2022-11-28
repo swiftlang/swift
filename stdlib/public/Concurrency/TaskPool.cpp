@@ -94,31 +94,17 @@ public:
 
   /// The result of waiting on the TaskPoolImpl.
   struct PollResult {
-    PollStatus status; // TODO: pack it into storage pointer or not worth it?
+    PollStatus status;
 
-    static PollResult get(AsyncTask *asyncTask, bool hadErrorResult) {
+    static PollResult get(AsyncTask *asyncTask) {
       // A TaskPool task is always Void, so we don't even have to collect the result from its future fragment.
       return PollResult{
-        /*status*/ hadErrorResult ?
-                   PollStatus::Error :
-                   PollStatus::Success
+        /*status*/ PollStatus::Success
       };
     }
   };
 
-  /// An item within the pending queue.
-  struct PendingQueueItem {
-    AsyncTask * const storage;
-
-    AsyncTask *getTask() const {
-      return storage;
-    }
-
-    static PendingQueueItem get(AsyncTask *task) {
-      assert(task == nullptr || task->isFuture());
-      return PendingQueueItem{task};
-    }
-  };
+  const size_t TaskPoolMaximumPendingTasks = 0b0011111111111111111111111111111111111111111111111111111111111111;
 
   struct PoolStatus {
     static const uint64_t cancelled      = 0b1000000000000000000000000000000000000000000000000000000000000000;
@@ -182,6 +168,43 @@ public:
       return PoolStatus{0};
     };
   };
+
+  // =============================================================================
+  // ==== Checks -----------------------------------------------------------------
+
+    static void _taskPool_reportPendingTaskOverflow(TaskPoolImpl *pool, uint64_t pendingCount) {
+
+      char *message;
+      swift_asprintf(
+          &message,
+          "error: task-pool: detected pending task overflow, in task pool %p! Pending task count: %ull",
+          pool, pendingCount);
+
+      if (_swift_shouldReportFatalErrorsToDebugger()) {
+        RuntimeErrorDetails details = {
+            .version = RuntimeErrorDetails::currentVersion,
+            .errorType = "task-pool-violation",
+            .currentStackDescription = "Task-pool exceeded supported pending task count",
+            .framesToSkip = 1,
+        };
+        _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
+      }
+
+#if defined(_WIN32)
+      #define STDERR_FILENO 2
+  _write(STDERR_FILENO, message, strlen(message));
+#else
+      write(STDERR_FILENO, message, strlen(message));
+#endif
+#if defined(__APPLE__)
+      asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#elif defined(__ANDROID__)
+      __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
+#endif
+
+      free(message);
+      abort();
+    }
 
 private:
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
@@ -311,6 +334,11 @@ public:
   /// Returns *assumed* new status, including the just performed +1.
   PoolStatus statusAddPendingTaskRelaxed(bool unconditionally) {
     auto assumed = statusIncrementPendingAssumeAcquire();
+
+    if (assumed.pendingTasks() == TaskPoolMaximumPendingTasks) {
+      _taskPool_reportPendingTaskOverflow(this, assumed.pendingTasks());
+      llvm_unreachable(); // reportOverflow will abort();
+    }
 
     if (!unconditionally && assumed.isCancelled()) {
       // revert that add, it was meaningless
