@@ -9,6 +9,11 @@
 /.github/ISSUE_TEMPLATE/          @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
 /.github/PULL_REQUEST_TEMPLATE.md @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
 
+# docs
+/docs/HowToGuides/ @AnthonyLatsis @LucianoPAlmeida @xedin
+/docs/Generics/    @slavapestov
+/docs/Generics.rst @slavapestov
+
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
 
