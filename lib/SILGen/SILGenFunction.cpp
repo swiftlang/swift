@@ -254,6 +254,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (closure.kind == SILDeclRef::Kind::DefaultArgGenerator) {
         auto *param = getParameterAt(closure.getDecl(),
                                      closure.defaultArgIndex);
+        assert(param);
         loc = param->getLoc();
       } else {
         auto f = *closure.getAnyFunctionRef();

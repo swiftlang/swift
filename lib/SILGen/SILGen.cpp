@@ -907,6 +907,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   case SILDeclRef::Kind::DefaultArgGenerator: {
     auto *decl = constant.getDecl();
     auto *param = getParameterAt(decl, constant.defaultArgIndex);
+    assert(param);
+
     auto *initDC = param->getDefaultArgumentInitContext();
 
     switch (param->getDefaultArgumentKind()) {
