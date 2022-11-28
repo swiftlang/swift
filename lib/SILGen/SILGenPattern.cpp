@@ -1023,7 +1023,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
       emitWildcardDispatch(clauses, args, wildcardRow, innerFailure);
     } else {
       // Otherwise, specialize on the necessary column.
-      emitSpecializedDispatch(clauses, args, firstRow, column.getValue(),
+      emitSpecializedDispatch(clauses, args, firstRow, column.value(),
                               innerFailure);
     }
 

@@ -85,7 +85,7 @@ APInt PointerInfo::getFixedExtraInhabitantValue(const IRGenModule &IGM,
   valueBits.appendClearBits(offset);
   valueBits.append(APInt(pointerSizeInBits, value));
   valueBits.padWithClearBitsTo(bits);
-  return valueBits.build().getValue();
+  return valueBits.build().value();
 }
 
 APInt irgen::getHeapObjectFixedExtraInhabitantValue(const IRGenModule &IGM,

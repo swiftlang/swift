@@ -984,8 +984,8 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   // in the same module as the decl
   // FIXME: This will miss macros.
   auto clangModule = getClangSubmoduleForDecl(decl);
-  if (clangModule.hasValue() && clangModule.getValue())
-    clangModule = clangModule.getValue()->getTopLevelModule();
+  if (clangModule.has_value() && clangModule.value())
+    clangModule = clangModule.value()->getTopLevelModule();
 
   auto conflicts = [&](const clang::Decl *OtherD) -> bool {
     // If these are simply redeclarations, they do not conflict.
@@ -1006,14 +1006,14 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
     }
 
     auto declModule = getClangSubmoduleForDecl(OtherD);
-    if (!declModule.hasValue())
+    if (!declModule.has_value())
       return false;
 
     // Handle the bridging header case. This is pretty nasty since things
     // can get added to it *later*, but there's not much we can do.
-    if (!declModule.getValue())
+    if (!declModule.value())
       return *clangModule == nullptr;
-    return *clangModule == declModule.getValue()->getTopLevelModule();
+    return *clangModule == declModule.value()->getTopLevelModule();
   };
 
   // Allow this lookup to find hidden names.  We don't want the
@@ -2243,11 +2243,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
               ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
               : None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [](const ForeignAsyncConvention::Info &info) {
               return info.completionHandlerParamIndex();
             }),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [&](const ForeignAsyncConvention::Info &info) {
               return method->getDeclName().getObjCSelector().getNameForSlot(
                                             info.completionHandlerParamIndex());
@@ -2383,7 +2383,7 @@ bool NameImporter::forEachDistinctImportName(
     return true;
 
   ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext(),
-                    newName.getAsyncInfo().hasValue());
+                    newName.getAsyncInfo().has_value());
   if (action(newName, activeVersion))
     seenNames.push_back(key);
 
@@ -2394,7 +2394,7 @@ bool NameImporter::forEachDistinctImportName(
         if (!newName)
           return;
         ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext(),
-                          newName.getAsyncInfo().hasValue());
+                          newName.getAsyncInfo().has_value());
 
         bool seen = llvm::any_of(
             seenNames, [&key](const ImportNameKey &existing) -> bool {

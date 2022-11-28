@@ -100,20 +100,20 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
-  if (!OK1.hasValue())
+  if (!OK1.has_value())
     return OK2;
 
-  DIKind K1 = OK1.getValue();
+  DIKind K1 = OK1.value();
 
   // If "this" is already partial, we won't learn anything.
   if (K1 == DIKind::Partial)
     return K1;
 
   // If OK2 is unset, take K1.
-  if (!OK2.hasValue())
+  if (!OK2.has_value())
     return K1;
 
-  DIKind K2 = OK2.getValue();
+  DIKind K2 = OK2.value();
 
   // If "K1" is yes, or no, then switch to partial if we find a different
   // answer.
@@ -153,7 +153,7 @@ namespace {
     unsigned size() const { return Data.size()/2; }
 
     DIKind get(unsigned Elt) const {
-      return getConditional(Elt).getValue();
+      return getConditional(Elt).value();
     }
 
     Optional<DIKind> getConditional(unsigned Elt) const {
@@ -172,10 +172,10 @@ namespace {
     }
     
     void set(unsigned Elt, Optional<DIKind> K) {
-      if (!K.hasValue())
+      if (!K.has_value())
         Data[Elt*2] = true, Data[Elt*2+1] = true;
       else
-        set(Elt, K.getValue());
+        set(Elt, K.value());
     }
 
     /// containsUnknownElements - Return true if there are any elements that are
@@ -183,7 +183,7 @@ namespace {
     bool containsUnknownElements() const {
       // Check that we didn't get any unknown values.
       for (unsigned i = 0, e = size(); i != e; ++i)
-        if (!getConditional(i).hasValue())
+        if (!getConditional(i).has_value())
           return true;
       return false;
     }
@@ -191,7 +191,7 @@ namespace {
     bool isAll(DIKind K) const {
       for (unsigned i = 0, e = size(); i != e; ++i) {
         auto Elt = getConditional(i);
-        if (!Elt.hasValue() || Elt.getValue() != K)
+        if (!Elt.has_value() || Elt.value() != K)
           return false;
       }
       return true;
@@ -200,7 +200,7 @@ namespace {
     bool hasAny(DIKind K) const {
       for (unsigned i = 0, e = size(); i != e; ++i) {
         auto Elt = getConditional(i);
-        if (Elt.hasValue() && Elt.getValue() == K)
+        if (Elt.has_value() && Elt.value() == K)
           return true;
       }
       return false;
@@ -213,7 +213,7 @@ namespace {
     /// known yet, switch them to the specified value.
     void changeUnsetElementsTo(DIKind K) {
       for (unsigned i = 0, e = size(); i != e; ++i)
-        if (!getConditional(i).hasValue())
+        if (!getConditional(i).has_value())
           set(i, K);
     }
     
@@ -228,7 +228,7 @@ namespace {
       OS << '(';
       for (unsigned i = 0, e = size(); i != e; ++i) {
         if (Optional<DIKind> Elt = getConditional(i)) {
-          switch (Elt.getValue()) {
+          switch (Elt.value()) {
             case DIKind::No:      OS << 'n'; break;
             case DIKind::Yes:     OS << 'y'; break;
             case DIKind::Partial: OS << 'p'; break;
@@ -294,9 +294,9 @@ namespace {
     void setUnknownToNotAvailable() {
       LocalAvailability.changeUnsetElementsTo(DIKind::No);
       OutAvailability.changeUnsetElementsTo(DIKind::No);
-      if (!LocalSelfInitialized.hasValue())
+      if (!LocalSelfInitialized.has_value())
         LocalSelfInitialized = DIKind::No;
-      if (!OutSelfInitialized.hasValue())
+      if (!OutSelfInitialized.has_value())
         OutSelfInitialized = DIKind::No;
     }
 
@@ -312,14 +312,14 @@ namespace {
                               const Optional<DIKind> out,
                               const Optional<DIKind> local,
                               Optional<DIKind> &result) {
-      if (local.hasValue()) {
+      if (local.has_value()) {
         // A local availability overrides the incoming value.
         result = local;
       } else {
         result = mergeKinds(out, pred);
       }
-      if (result.hasValue() &&
-          (!out.hasValue() || result.getValue() != out.getValue())) {
+      if (result.has_value() &&
+          (!out.has_value() || result.value() != out.value())) {
         return true;
       }
       return false;
@@ -373,7 +373,7 @@ namespace {
 
     /// If true, we're not done with our dataflow analysis yet.
     bool containsUndefinedValues() {
-      return (!OutSelfInitialized.hasValue() ||
+      return (!OutSelfInitialized.has_value() ||
               OutAvailability.containsUnknownElements());
     }
   };
@@ -3757,7 +3757,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   SILBasicBlock *InstBB = Inst->getParent();
   auto &BlockInfo = getBlockInfo(InstBB);
 
-  if (BlockInfo.LocalSelfInitialized.hasValue())
+  if (BlockInfo.LocalSelfInitialized.has_value())
     return *BlockInfo.LocalSelfInitialized;
 
   Optional<DIKind> Result;
@@ -3766,7 +3766,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   // If the result wasn't computed, we must be analyzing code within
   // an unreachable cycle that is not dominated by "TheMemory".  Just force
   // the result to initialized so that clients don't have to handle this.
-  if (!Result.hasValue())
+  if (!Result.has_value())
     Result = DIKind::Yes;
 
   return *Result;

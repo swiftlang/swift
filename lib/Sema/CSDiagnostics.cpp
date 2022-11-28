@@ -1929,7 +1929,7 @@ bool AssignmentFailure::diagnoseAsError() {
   std::tie(immutableExpr, choice) = resolveImmutableBase(DestExpr);
 
   // Attempt diagnostics based on the overload choice.
-  if (choice.hasValue()) {
+  if (choice.has_value()) {
 
     auto getKeyPathArgument = [](SubscriptExpr *expr) {
       auto *args = expr->getArgs();

@@ -767,7 +767,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       return true;
     }
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
-      Module->print(RawOS.getValue(), nullptr);
+      Module->print(RawOS.value(), nullptr);
       return false;
     }
   } else {
@@ -1299,7 +1299,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
         desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
-        symsToEmit.map([](const auto &x) { return x.silRefsToEmit; })};
+        symsToEmit.transform([](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.

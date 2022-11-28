@@ -272,7 +272,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     llvm::VersionTuple OSVersion;
     triple.getMacOSXVersion(OSVersion);
 
-    osx << OSVersion.getMajor() << "." << OSVersion.getMinor().getValueOr(0);
+    osx << OSVersion.getMajor() << "." << OSVersion.getMinor().value_or(0);
     if (auto Subminor = OSVersion.getSubminor())
       osx << "." << *Subminor;
 

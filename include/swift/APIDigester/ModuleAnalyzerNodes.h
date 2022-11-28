@@ -212,7 +212,7 @@ public:
   DiagnosticEngine &getDiags(SourceLoc Loc = SourceLoc());
   void addDiagConsumer(DiagnosticConsumer &Consumer);
   void setCommonVersion(uint8_t Ver) {
-    assert(!CommonVersion.hasValue());
+    assert(!CommonVersion.has_value());
     CommonVersion = Ver;
   }
   uint8_t getCommonVersion() const {
@@ -401,7 +401,7 @@ public:
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
   StringRef getScreenInfo() const;
-  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
+  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.has_value(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
   StringRef getObjCName() const { return ObjCName; }
@@ -685,9 +685,9 @@ protected:
 public:
   bool isThrowing() const { return IsThrowing; }
   bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
-  uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
+  uint8_t getSelfIndex() const { return SelfIndex.value(); }
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
-  bool hasSelfIndex() const { return SelfIndex.hasValue(); }
+  bool hasSelfIndex() const { return SelfIndex.has_value(); }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &out) override;
   static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);

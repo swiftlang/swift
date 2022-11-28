@@ -63,7 +63,7 @@ public:
       Vector.push_back({std::make_pair(Arg, ValueT())});
       return (*Vector[Num]).second;
     }
-    return Vector[Pair.first->second].getValue().second;
+    return Vector[Pair.first->second].value().second;
   }
 
   template <typename... Ts>
@@ -107,7 +107,7 @@ public:
     if (It == Map.end())
       return Vector.end();
     auto Iter = Vector.begin() + It->second;
-    if (!Iter->hasValue())
+    if (!Iter->has_value())
       return Vector.end();
     return Iter;
   }

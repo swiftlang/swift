@@ -463,10 +463,10 @@ public:
   // instructions. This assumes that DeadFunctionValSet::erase() is stable.
   void cleanupDeadClosures(SILFunction *F) {
     for (Optional<SILInstruction *> I : deadFunctionVals) {
-      if (!I.hasValue() || I.getValue()->isDeleted())
+      if (!I.has_value() || I.value()->isDeleted())
         continue;
 
-      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.value()))
         cleanupCalleeValue(SVI, invalidatedStackNesting);
     }
   }

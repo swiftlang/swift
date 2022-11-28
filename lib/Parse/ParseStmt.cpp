@@ -1196,7 +1196,7 @@ validateAvailabilitySpecList(Parser &P,
   }
   case Parser::AvailabilitySpecSource::Unavailable: {
     if (OtherPlatformSpecLoc != None) {
-      SourceLoc Loc = OtherPlatformSpecLoc.getValue();
+      SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
         .fixItRemove(Loc);
     }
@@ -1204,7 +1204,7 @@ validateAvailabilitySpecList(Parser &P,
   }
   case Parser::AvailabilitySpecSource::Macro: {
     if (OtherPlatformSpecLoc != None) {
-      SourceLoc Loc = OtherPlatformSpecLoc.getValue();
+      SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
     }
     break;

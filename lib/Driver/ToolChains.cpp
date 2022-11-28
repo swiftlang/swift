@@ -361,7 +361,7 @@ static void addRuntimeLibraryFlags(const OutputInfo &OI,
   if (!OI.RuntimeVariant)
     return;
 
-  const OutputInfo::MSVCRuntime RT = OI.RuntimeVariant.getValue();
+  const OutputInfo::MSVCRuntime RT = OI.RuntimeVariant.value();
 
   Arguments.push_back("-autolink-library");
   Arguments.push_back("oldnames");
@@ -1373,7 +1373,7 @@ void ToolChain::addPathEnvironmentVariableIfNeeded(
   }
   if (auto currentPaths = llvm::sys::Process::GetEnv(name)) {
     newPaths.append(separator);
-    newPaths.append(currentPaths.getValue());
+    newPaths.append(currentPaths.value());
   }
   env.emplace_back(name, args.MakeArgString(newPaths));
 }

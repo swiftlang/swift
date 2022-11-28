@@ -280,7 +280,7 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
       liveNontrivialLeafCountUpperBound > 0) {
     if (auto maybeReleases =
             epilogueReleaseMatcher.getPartiallyPostDomReleaseSet(argument)) {
-      auto releases = maybeReleases.getValue();
+      auto releases = maybeReleases.value();
       llvm::SmallPtrSet<SILInstruction *, 8> users;
       users.insert(std::begin(releases), std::end(releases));
 

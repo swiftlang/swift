@@ -365,14 +365,14 @@ public:
   // the deferred nodes.
   ASTScopeImpl *visitGuardStmt(GuardStmt *e, ASTScopeImpl *p,
                                ScopeCreator &scopeCreator) {
-    ASTScopeAssert(endLoc.hasValue(), "GuardStmt outside of a BraceStmt?");
+    ASTScopeAssert(endLoc.has_value(), "GuardStmt outside of a BraceStmt?");
     return scopeCreator.constructExpandAndInsert<GuardStmtScope>(
       p, e, *endLoc);
   }
   ASTScopeImpl *visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                       ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
-    ASTScopeAssert(endLoc.hasValue(), "TopLevelCodeDecl in wrong place?");
+    ASTScopeAssert(endLoc.has_value(), "TopLevelCodeDecl in wrong place?");
     return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(
         p, d, *endLoc);
   }
@@ -420,7 +420,7 @@ public:
     }
 
     SourceLoc endLocForBraceStmt = bs->getEndLoc();
-    if (endLoc.hasValue())
+    if (endLoc.has_value())
       endLocForBraceStmt = *endLoc;
 
     ASTContext &ctx = scopeCreator.getASTContext();
@@ -575,7 +575,7 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
     Optional<SourceLoc> endLocForBinding = None;
     if (isLocalBinding) {
       endLocForBinding = endLoc;
-      ASTScopeAssert(endLoc.hasValue() && endLoc->isValid(),
+      ASTScopeAssert(endLoc.has_value() && endLoc->isValid(),
                      "PatternBindingDecl in local context outside of BraceStmt?");
     }
 

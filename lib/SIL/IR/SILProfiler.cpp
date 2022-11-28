@@ -525,7 +525,7 @@ public:
     return Iter->second;
   }
 
-  bool hasStartLoc() const { return StartLoc.hasValue(); }
+  bool hasStartLoc() const { return StartLoc.has_value(); }
 
   void setStartLoc(SourceLoc Loc) {
     assert(Loc.isValid());
@@ -537,7 +537,7 @@ public:
     return *StartLoc;
   }
 
-  bool hasEndLoc() const { return EndLoc.hasValue(); }
+  bool hasEndLoc() const { return EndLoc.has_value(); }
 
   void setEndLoc(SourceLoc Loc) {
     assert(Loc.isValid());

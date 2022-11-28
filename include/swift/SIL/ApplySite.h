@@ -47,7 +47,7 @@ struct ApplySiteKind {
   explicit ApplySiteKind(SILInstructionKind kind) {
     auto newValue = ApplySiteKind::fromNodeKindHelper(kind);
     assert(newValue && "Non apply site passed into ApplySiteKind");
-    value = newValue.getValue();
+    value = newValue.value();
   }
 
   ApplySiteKind(innerty value) : value(value) {}
@@ -101,7 +101,7 @@ public:
     if (!kind)
       return ApplySite();
 
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case ApplySiteKind::ApplyInst:
       return ApplySite(cast<ApplyInst>(inst));
     case ApplySiteKind::BeginApplyInst:
@@ -547,7 +547,7 @@ struct FullApplySiteKind {
   explicit FullApplySiteKind(SILInstructionKind kind) {
     auto fullApplySiteKind = FullApplySiteKind::fromNodeKindHelper(kind);
     assert(fullApplySiteKind && "SILNodeKind is not a FullApplySiteKind?!");
-    value = fullApplySiteKind.getValue();
+    value = fullApplySiteKind.value();
   }
 
   FullApplySiteKind(innerty value) : value(value) {}
@@ -591,7 +591,7 @@ public:
     auto kind = FullApplySiteKind::fromNodeKind(inst->getKind());
     if (!kind)
       return FullApplySite();
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case FullApplySiteKind::ApplyInst:
       return FullApplySite(cast<ApplyInst>(inst));
     case FullApplySiteKind::BeginApplyInst:

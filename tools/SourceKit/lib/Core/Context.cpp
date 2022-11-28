@@ -20,10 +20,10 @@ GlobalConfig::Settings
 GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
                      Optional<unsigned> CompletionCheckDependencyInterval) {
   llvm::sys::ScopedLock L(Mtx);
-  if (CompletionMaxASTContextReuseCount.hasValue())
+  if (CompletionMaxASTContextReuseCount.has_value())
     State.CompletionOpts.MaxASTContextReuseCount =
         *CompletionMaxASTContextReuseCount;
-  if (CompletionCheckDependencyInterval.hasValue())
+  if (CompletionCheckDependencyInterval.has_value())
     State.CompletionOpts.CheckDependencyInterval =
         *CompletionCheckDependencyInterval;
   return State;

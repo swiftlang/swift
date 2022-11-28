@@ -895,7 +895,7 @@ llvm::Value *AlignedGroupEntry::size(IRGenFunction &IGF) const {
 }
 
 bool AlignedGroupEntry::isFixedSize(IRGenModule &IGM) const {
-  return fixedSize(IGM).hasValue();
+  return fixedSize(IGM).has_value();
 }
 
 bool AlignedGroupEntry::isPOD() const {
@@ -941,7 +941,7 @@ bool AlignedGroupEntry::canValueWitnessExtraInhabitantsUpTo(
 bool AlignedGroupEntry::isSingleRetainablePointer() const { return false; }
 
 llvm::Optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
-  if (_fixedSize.hasValue())
+  if (_fixedSize.has_value())
     return *_fixedSize;
   Size currentSize(0);
   for (auto *entry : entries) {
@@ -957,7 +957,7 @@ llvm::Optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
 
 llvm::Optional<Alignment>
 AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
-  if (_fixedAlignment.hasValue())
+  if (_fixedAlignment.has_value())
     return *_fixedAlignment;
 
   Alignment currentAlignment = Alignment(1);
@@ -973,7 +973,7 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
 
 llvm::Optional<uint32_t>
 AlignedGroupEntry::fixedXICount(IRGenModule &IGM) const {
-  if (_fixedXICount.hasValue())
+  if (_fixedXICount.has_value())
     return *_fixedXICount;
   uint32_t currentMaxXICount = 0;
   // Choose the field with the max xi count.
@@ -1535,7 +1535,7 @@ llvm::Value *EnumTypeLayoutEntry::size(IRGenFunction &IGF) const {
 }
 
 bool EnumTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
-  return fixedSize(IGM).hasValue();
+  return fixedSize(IGM).has_value();
 }
 
 bool EnumTypeLayoutEntry::isPOD() const {

@@ -90,7 +90,7 @@ public:
     auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
     mask.appendSetBits(pointerSize.getValueInBits());
     mask.appendClearBits(pointerSize.getValueInBits());
-    return mask.build().getValue();
+    return mask.build().value();
   }
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,

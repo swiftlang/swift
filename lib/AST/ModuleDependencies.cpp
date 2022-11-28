@@ -236,9 +236,9 @@ GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()
                          /* OptimizeArgs */ false) {}
 GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
 GlobalModuleDependenciesCache::getCurrentCache() const {
-  assert(CurrentTriple.hasValue() &&
+  assert(CurrentTriple.has_value() &&
          "Global Module Dependencies Cache not configured with Triple.");
-  return getCacheForTriple(CurrentTriple.getValue());
+  return getCacheForTriple(CurrentTriple.value());
 }
 
 GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
@@ -361,14 +361,14 @@ Optional<ModuleDependencies> GlobalModuleDependenciesCache::findDependencies(
          kind != ModuleDependenciesKind::LastKind; ++kind) {
       auto dep =
           findDependencies(moduleName, {kind, details.currentSearchPaths});
-      if (dep.hasValue())
-        return dep.getValue();
+      if (dep.has_value())
+        return dep.value();
     }
     return None;
   }
 
-  assert(details.kind.hasValue() && "Expected dependencies kind for lookup.");
-  if (details.kind.getValue() == swift::ModuleDependenciesKind::SwiftSource) {
+  assert(details.kind.has_value() && "Expected dependencies kind for lookup.");
+  if (details.kind.value() == swift::ModuleDependenciesKind::SwiftSource) {
     return findSourceModuleDependency(moduleName);
   }
 
@@ -400,7 +400,7 @@ bool GlobalModuleDependenciesCache::hasDependencies(
   assert(details.kind != ModuleDependenciesKind::Clang &&
          "Attempting to query Clang dependency in persistent Dependency "
          "Scanner Cache.");
-  return findDependencies(moduleName, details).hasValue();
+  return findDependencies(moduleName, details).has_value();
 }
 
 Optional<ModuleDependenciesVector>
@@ -414,14 +414,14 @@ GlobalModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
 
       auto deps =
           findAllDependenciesIrrespectiveOfSearchPaths(moduleName, kind);
-      if (deps.hasValue())
-        return deps.getValue();
+      if (deps.has_value())
+        return deps.value();
     }
     return None;
   }
 
-  assert(kind.hasValue() && "Expected dependencies kind for lookup.");
-  assert(kind.getValue() != swift::ModuleDependenciesKind::SwiftSource);
+  assert(kind.has_value() && "Expected dependencies kind for lookup.");
+  assert(kind.value() != swift::ModuleDependenciesKind::SwiftSource);
 
   const auto &map = getDependenciesMap(*kind);
   auto known = map.find(moduleName);
@@ -558,8 +558,8 @@ Optional<const ModuleDependencies *> ModuleDependenciesCache::findDependencies(
     for (auto kind = ModuleDependenciesKind::FirstKind;
          kind != ModuleDependenciesKind::LastKind; ++kind) {
       auto dep = findDependencies(moduleName, kind);
-      if (dep.hasValue())
-        return dep.getValue();
+      if (dep.has_value())
+        return dep.value();
     }
     return None;
   }
@@ -579,15 +579,15 @@ ModuleDependenciesCache::findDependencies(StringRef moduleName,
   // 2. If no module found, query the global cache using the module details
   // lookup
   auto localResult = findDependencies(moduleName, details.kind);
-  if (localResult.hasValue())
-    return *(localResult.getValue());
+  if (localResult.has_value())
+    return *(localResult.value());
   else
     return globalCache.findDependencies(moduleName, details);
 }
 
 bool ModuleDependenciesCache::hasDependencies(
     StringRef moduleName, ModuleLookupSpecifics details) const {
-  return findDependencies(moduleName, details).hasValue();
+  return findDependencies(moduleName, details).has_value();
 }
 
 void ModuleDependenciesCache::recordDependencies(

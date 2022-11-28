@@ -1066,7 +1066,7 @@ protected:
     return None;
   }
 
-  std::pair<NullablePtr<VarDecl>, Optional<UnsupportedElt>>
+  std::pair<NullablePtr<Expr>, Optional<UnsupportedElt>>
   transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
     SmallVector<Expr *, 4> buildBlockArguments;
 
@@ -1082,7 +1082,6 @@ protected:
     }
 
     // Synthesize `buildBlock` or `buildPartial` based on captured arguments.
-    NullablePtr<VarDecl> buildBlockVar;
     {
       // If the builder supports `buildPartialBlock(first:)` and
       // `buildPartialBlock(accumulated:next:)`, use this to combine
@@ -1097,16 +1096,19 @@ protected:
             {buildBlockArguments.front()},
             /*argLabels=*/{ctx.Id_first});
 
-        buildBlockVar = captureExpr(buildPartialFirst, newBody);
+        auto *buildBlockVar = captureExpr(buildPartialFirst, newBody);
 
         for (auto *argExpr : llvm::drop_begin(buildBlockArguments)) {
           auto *accumPartialBlock = builder.buildCall(
               braceStmt->getStartLoc(), ctx.Id_buildPartialBlock,
-              {builder.buildVarRef(buildBlockVar.get(), argExpr->getStartLoc()),
+              {builder.buildVarRef(buildBlockVar, argExpr->getStartLoc()),
                argExpr},
               {ctx.Id_accumulated, ctx.Id_next});
           buildBlockVar = captureExpr(accumPartialBlock, newBody);
         }
+
+        return std::make_pair(
+            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()), None);
       }
       // If `buildBlock` does not exist at this point, it could be the case that
       // `buildPartialBlock` did not have the sufficient availability for this
@@ -1118,17 +1120,14 @@ protected:
             builder.getType());
         return failTransform(braceStmt);
       }
-      // Otherwise, call `buildBlock` on all subexpressions.
-      else {
-        // Call Builder.buildBlock(... args ...)
-        auto *buildBlock = builder.buildCall(
-            braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
-            /*argLabels=*/{});
-        buildBlockVar = captureExpr(buildBlock, newBody);
-      }
-    }
 
-    return std::make_pair(buildBlockVar.get(), None);
+      // Otherwise, call `buildBlock` on all subexpressions.
+      // Call Builder.buildBlock(... args ...)
+      auto *buildBlock = builder.buildCall(
+          braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
+          /*argLabels=*/{});
+      return std::make_pair(buildBlock, None);
+    }
   }
 
   std::pair<bool, UnsupportedElt>
@@ -1141,10 +1140,10 @@ protected:
       return std::make_pair(true, element);
     };
 
-    NullablePtr<VarDecl> buildBlockVar;
+    NullablePtr<Expr> buildBlockVarRef;
     Optional<UnsupportedElt> unsupported;
 
-    std::tie(buildBlockVar, unsupported) = transform(braceStmt, elements);
+    std::tie(buildBlockVarRef, unsupported) = transform(braceStmt, elements);
     if (unsupported)
       return failure(*unsupported);
 
@@ -1156,14 +1155,12 @@ protected:
     // are attached to the beginning of the brace instead of its end.
     auto resultLoc = braceStmt->getStartLoc();
     if (bodyVar) {
-      elements.push_back(new (ctx) AssignExpr(
-          builder.buildVarRef(bodyVar.get(), resultLoc),
-          /*EqualLoc=*/SourceLoc(),
-          builder.buildVarRef(buildBlockVar.get(), resultLoc),
-          /*Implicit=*/true));
+      elements.push_back(
+          new (ctx) AssignExpr(builder.buildVarRef(bodyVar.get(), resultLoc),
+                               /*EqualLoc=*/SourceLoc(), buildBlockVarRef.get(),
+                               /*Implicit=*/true));
     } else {
-      Expr *buildBlockResult =
-          builder.buildVarRef(buildBlockVar.get(), resultLoc);
+      Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
       // a call to `buildFialBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
@@ -1220,9 +1217,9 @@ protected:
     if (!isBuildableIfChain(ifStmt, numPayloads, isOptional))
       return failTransform(ifStmt);
 
-    SmallVector<std::pair<VarDecl *, Stmt *>, 4> branchVars;
+    SmallVector<std::pair<Expr *, Stmt *>, 4> branchVarRefs;
 
-    auto transformed = transformIf(ifStmt, branchVars);
+    auto transformed = transformIf(ifStmt, branchVarRefs);
     if (!transformed)
       return failTransform(ifStmt);
 
@@ -1236,17 +1233,15 @@ protected:
       // `if` goes first.
       doBody.push_back(ifStmt);
 
-      assert(numPayloads == branchVars.size());
+      assert(numPayloads == branchVarRefs.size());
 
       SmallVector<Expr *, 4> buildEitherCalls;
       for (unsigned i = 0; i != numPayloads; i++) {
-        VarDecl *branchVar;
+        Expr *branchVarRef;
         Stmt *anchor;
 
-        std::tie(branchVar, anchor) = branchVars[i];
+        std::tie(branchVarRef, anchor) = branchVarRefs[i];
 
-        auto *branchVarRef =
-            builder.buildVarRef(branchVar, ifStmt->getEndLoc());
         auto *builderCall =
             buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
 
@@ -1308,7 +1303,7 @@ protected:
 
   NullablePtr<IfStmt>
   transformIf(IfStmt *ifStmt,
-              SmallVectorImpl<std::pair<VarDecl *, Stmt *>> &branchVars) {
+              SmallVectorImpl<std::pair<Expr *, Stmt *>> &branchVarRefs) {
     Optional<UnsupportedElt> unsupported;
 
     // If there is a #available in the condition, wrap the 'then' or 'else'
@@ -1317,14 +1312,14 @@ protected:
     bool supportsAvailability =
         availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
 
-    NullablePtr<VarDecl> thenVar;
+    NullablePtr<Expr> thenVarRef;
     NullablePtr<Stmt> thenBranch;
     {
       SmallVector<ASTNode, 4> thenBody;
 
       auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
 
-      std::tie(thenVar, unsupported) = transform(ifBraceStmt, thenBody);
+      std::tie(thenVarRef, unsupported) = transform(ifBraceStmt, thenBody);
       if (unsupported) {
         recordUnsupported(*unsupported);
         return nullptr;
@@ -1332,27 +1327,25 @@ protected:
 
       if (supportsAvailability &&
           !availabilityCond->getAvailability()->isUnavailability()) {
-        auto *thenVarRef =
-            builder.buildVarRef(thenVar.get(), ifBraceStmt->getEndLoc());
-
         auto *builderCall = buildCallIfWanted(
-            ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
-            {thenVarRef}, {Identifier()});
+            ifBraceStmt->getStartLoc(), ctx.Id_buildLimitedAvailability,
+            {thenVarRef.get()}, {Identifier()});
 
-        thenVar = captureExpr(builderCall, thenBody);
+        thenVarRef = builder.buildVarRef(captureExpr(builderCall, thenBody),
+                                         ifBraceStmt->getStartLoc());
       }
 
       thenBranch = cloneBraceWith(ifBraceStmt, thenBody);
-      branchVars.push_back({thenVar.get(), thenBranch.get()});
+      branchVarRefs.push_back({thenVarRef.get(), thenBranch.get()});
     }
 
     NullablePtr<Stmt> elseBranch;
 
     if (auto *elseStmt = ifStmt->getElseStmt()) {
-      NullablePtr<VarDecl> elseVar;
+      NullablePtr<Expr> elseVarRef;
 
       if (auto *innerIfStmt = getAsStmt<IfStmt>(elseStmt)) {
-        elseBranch = transformIf(innerIfStmt, branchVars);
+        elseBranch = transformIf(innerIfStmt, branchVarRefs);
         if (!elseBranch) {
           recordUnsupported(innerIfStmt);
           return nullptr;
@@ -1361,7 +1354,7 @@ protected:
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
         SmallVector<ASTNode> elseBody;
 
-        std::tie(elseVar, unsupported) = transform(elseBraceStmt, elseBody);
+        std::tie(elseVarRef, unsupported) = transform(elseBraceStmt, elseBody);
         if (unsupported) {
           recordUnsupported(*unsupported);
           return nullptr;
@@ -1371,18 +1364,16 @@ protected:
         // call to buildLimitedAvailability(_:).
         if (supportsAvailability &&
             availabilityCond->getAvailability()->isUnavailability()) {
-          auto *elseVarRef =
-              builder.buildVarRef(elseVar.get(), elseBraceStmt->getEndLoc());
+          auto *builderCall = buildCallIfWanted(
+              elseBraceStmt->getStartLoc(), ctx.Id_buildLimitedAvailability,
+              {elseVarRef.get()}, {Identifier()});
 
-          auto *builderCall = buildCallIfWanted(elseBraceStmt->getStartLoc(),
-                                                ctx.Id_buildLimitedAvailability,
-                                                {elseVarRef}, {Identifier()});
-
-          elseVar = captureExpr(builderCall, elseBody);
+          elseVarRef = builder.buildVarRef(captureExpr(builderCall, elseBody),
+                                           elseBraceStmt->getStartLoc());
         }
 
         elseBranch = cloneBraceWith(elseBraceStmt, elseBody);
-        branchVars.push_back({elseVar.get(), elseBranch.get()});
+        branchVarRefs.push_back({elseVarRef.get(), elseBranch.get()});
       }
     }
 
@@ -1404,7 +1395,7 @@ protected:
     SmallVector<ASTNode, 4> doBody;
 
     SmallVector<ASTNode, 4> cases;
-    SmallVector<VarDecl *, 4> caseVars;
+    SmallVector<Expr *, 4> caseVarRefs;
 
     for (auto *caseStmt : switchStmt->getCases()) {
       auto transformed = transformCase(caseStmt);
@@ -1412,7 +1403,7 @@ protected:
         return failTransform(caseStmt);
 
       cases.push_back(transformed->second);
-      caseVars.push_back(transformed->first);
+      caseVarRefs.push_back(transformed->first);
     }
 
     // If there are no 'case' statements in the body let's try
@@ -1420,7 +1411,7 @@ protected:
     // before failing a builder transform, otherwise type-checker
     // might end up without any diagnostics which leads to crashes
     // in SILGen.
-    if (caseVars.empty()) {
+    if (caseVarRefs.empty()) {
       TypeChecker::checkSwitchExhaustiveness(switchStmt, dc,
                                              /*limitChecking=*/true);
       return failTransform(switchStmt);
@@ -1434,15 +1425,13 @@ protected:
     doBody.push_back(transformedSwitch);
 
     SmallVector<Expr *, 4> injectedExprs;
-    for (auto idx : indices(caseVars)) {
-      auto caseStmt = cases[idx];
-      auto *caseVar = caseVars[idx];
+    for (auto idx : indices(caseVarRefs)) {
+      auto *caseVarRef = caseVarRefs[idx];
 
       // Build the expression that injects the case variable into appropriate
       // buildEither(first:)/buildEither(second:) chain.
-      Expr *caseVarRef = builder.buildVarRef(caseVar, caseStmt.getEndLoc());
       Expr *injectedCaseExpr = buildWrappedChainPayload(
-          caseVarRef, idx, caseVars.size(), /*isOptional=*/false);
+          caseVarRef, idx, caseVarRefs.size(), /*isOptional=*/false);
 
       injectedExprs.push_back(injectedCaseExpr);
     }
@@ -1454,7 +1443,7 @@ protected:
     return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
   }
 
-  Optional<std::pair<VarDecl *, CaseStmt *>> transformCase(CaseStmt *caseStmt) {
+  Optional<std::pair<Expr *, CaseStmt *>> transformCase(CaseStmt *caseStmt) {
     auto *body = caseStmt->getBody();
 
     // Explicitly disallow `case` statements with empty bodies
@@ -1470,11 +1459,11 @@ protected:
       }
     }
 
-    NullablePtr<VarDecl> caseVar;
+    NullablePtr<Expr> caseVarRef;
     Optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
 
-    std::tie(caseVar, unsupported) = transform(body, newBody);
+    std::tie(caseVarRef, unsupported) = transform(body, newBody);
 
     if (unsupported) {
       recordUnsupported(*unsupported);
@@ -1489,7 +1478,7 @@ protected:
         caseStmt->getCaseBodyVariablesOrEmptyArray(), caseStmt->isImplicit(),
         caseStmt->getFallthroughStmt());
 
-    return std::make_pair(caseVar.get(), newCase);
+    return std::make_pair(caseVarRef.get(), newCase);
   }
 
   /// do {
@@ -1533,12 +1522,12 @@ protected:
         ArrayExpr::create(ctx, /*LBrace=*/endLoc, /*Elements=*/{},
                           /*Commas=*/{}, /*RBrace=*/endLoc));
 
-    NullablePtr<VarDecl> bodyVar;
+    NullablePtr<Expr> bodyVarRef;
     Optional<UnsupportedElt> unsupported;
 
     SmallVector<ASTNode, 4> newBody;
     {
-      std::tie(bodyVar, unsupported) =
+      std::tie(bodyVarRef, unsupported) =
           transform(forEachStmt->getBody(), newBody);
       if (unsupported)
         return failTransform(*unsupported);
@@ -1552,9 +1541,8 @@ protected:
             DeclNameLoc(endLoc), /*implicit=*/true);
         arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-        auto bodyVarRef = builder.buildVarRef(bodyVar.get(), endLoc);
         auto *argList = ArgumentList::createImplicit(
-            ctx, endLoc, {Argument::unlabeled(bodyVarRef)}, endLoc);
+            ctx, endLoc, {Argument::unlabeled(bodyVarRef.get())}, endLoc);
 
         newBody.push_back(
             CallExpr::createImplicit(ctx, arrayAppendRef, argList));
@@ -1874,7 +1862,7 @@ public:
       // Handle pattern bindings.
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         auto resultTarget = rewriteTarget(SolutionApplicationTarget{patternBinding});
-        assert(resultTarget.hasValue()
+        assert(resultTarget.has_value()
                && "Could not rewrite pattern binding entries!");
         TypeChecker::typeCheckDecl(resultTarget->getAsPatternBinding());
         newElements.push_back(resultTarget->getAsPatternBinding());
@@ -2779,7 +2767,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
 
     auto loc = extractNearestSourceLoc(dc);
     auto context = ExportContext::forFunctionBody(dc, loc);
-    return TypeChecker::checkDeclarationAvailability(D, context).hasValue();
+    return TypeChecker::checkDeclarationAvailability(D, context).has_value();
   };
 
   bool foundMatch = false;
@@ -2902,7 +2890,7 @@ void swift::printResultBuilderBuildFunction(
     componentTypeString = "<#Component#>";
 
   // Render the code.
-  std::string stubIndentStr = stubIndent.getValueOr(std::string());
+  std::string stubIndentStr = stubIndent.value_or(std::string());
   ExtraIndentStreamPrinter printer(out, stubIndentStr);
 
   // If we're supposed to provide a full stub, add a newline and the introducer

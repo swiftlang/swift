@@ -498,7 +498,7 @@ void BindingSet::finalize(
       if (!hasViableBindings()) {
         inferTransitiveProtocolRequirements(inferredBindings);
 
-        if (TransitiveProtocols.hasValue()) {
+        if (TransitiveProtocols.has_value()) {
           for (auto *constraint : *TransitiveProtocols) {
             auto protocolTy = constraint->getSecondType();
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});

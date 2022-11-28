@@ -1368,8 +1368,8 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   assert(nativeInputs.size() == bridgedFormalTypes.size());
   assert(nativeInputs.size() == nativeFormalTypes.size());
   assert(inputs.size() ==
-           nativeInputs.size() + unsigned(foreignError.hasValue())
-                               + unsigned(foreignAsync.hasValue()));
+           nativeInputs.size() + unsigned(foreignError.has_value())
+                               + unsigned(foreignAsync.has_value()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = SGF.getSILType(inputs[i], objcFnTy);
     SILValue arg = SGF.F.begin()->createFunctionArgument(argTy);
@@ -1411,8 +1411,8 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   }
 
   assert(bridgedArgs.size()
-           + unsigned(foreignError.hasValue())
-           + unsigned(foreignAsync.hasValue())
+           + unsigned(foreignError.has_value())
+           + unsigned(foreignAsync.has_value())
         == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
   assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
@@ -1784,8 +1784,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     };
     
     unsigned numResults
-      = completionTy->getParameters().size() - errorParamIndex.hasValue()
-                                             - errorFlagIndex.hasValue();
+      = completionTy->getParameters().size() - errorParamIndex.has_value()
+                                             - errorFlagIndex.has_value();
     
     if (numResults == 1) {
       for (unsigned i = 0; i < completionTy->getNumParameters(); ++i) {

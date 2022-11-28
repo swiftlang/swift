@@ -836,7 +836,9 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
   bool hasSuspended = false;
   bool haveRunOneChildTaskInline = false;
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
 reevaluate_if_taskgroup_has_results:;
+#endif
   auto assumed = statusMarkWaitingAssumeAcquire();
   if (haveRunOneChildTaskInline) {
     assert(assumed.readyTasks());

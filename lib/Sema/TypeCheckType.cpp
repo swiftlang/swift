@@ -2816,12 +2816,12 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         } else {
           rep = *parsedRep;
           parsedClangFunctionType = tryParseClangType(
-              attrs.ConventionArguments.getValue(), shouldStoreClangType(rep));
+              attrs.ConventionArguments.value(), shouldStoreClangType(rep));
         }
 
         if (rep == SILFunctionType::Representation::WitnessMethod) {
           auto protocolName =
-            attrs.ConventionArguments.getValue().WitnessMethodProtocol;
+            attrs.ConventionArguments.value().WitnessMethodProtocol;
           witnessMethodProtocol = new (getASTContext())
               SimpleIdentTypeRepr(DeclNameLoc(), protocolName);
         }
@@ -2872,7 +2872,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           rep = *parsedRep;
 
           parsedClangFunctionType = tryParseClangType(
-              attrs.ConventionArguments.getValue(), shouldStoreClangType(rep));
+              attrs.ConventionArguments.value(), shouldStoreClangType(rep));
         }
       }
 
@@ -3820,7 +3820,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
   // We don't expect to have a reason to support multiple independent
   // error results.  (Would this be disjunctive or conjunctive?)
-  if (errorResult.hasValue()) {
+  if (errorResult.has_value()) {
     diagnose(repr->getStartLoc(),
              diag::sil_function_multiple_error_results);
     return true;

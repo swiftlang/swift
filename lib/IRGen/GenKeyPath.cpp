@@ -1056,7 +1056,7 @@ emitKeyPathComponent(IRGenModule &IGM,
           ++i;
         }
         assert(structIdx && "not a stored property of the struct?!");
-        idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.getValue());
+        idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.value());
       } else if (classDecl) {
         // TODO: This field index would require runtime resolution with Swift
         // native class resilience. We never directly access ObjC-imported

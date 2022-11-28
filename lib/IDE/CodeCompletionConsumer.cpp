@@ -114,7 +114,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     // module.
     llvm::Optional<CodeCompletionCache::ValueRefCntPtr> V =
         context.Cache.get(R.Key);
-    if (!V.hasValue()) {
+    if (!V.has_value()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
       // Temporary sink in which we gather the result. The cache value retains
@@ -145,7 +145,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       }
       context.Cache.set(R.Key, *V);
     }
-    assert(V.hasValue());
+    assert(V.has_value());
     auto newItems = copyCodeCompletionResults(
         context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups,
         TypeContext, DC, CanCurrDeclContextHandleAsync);

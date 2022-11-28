@@ -180,7 +180,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  bool isOpaqueLayout = !typeSizeAlign.hasValue();
+  bool isOpaqueLayout = !typeSizeAlign.has_value();
 
   ClangSyntaxPrinter printer(os);
 

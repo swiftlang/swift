@@ -173,8 +173,8 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 
   // Using the interface type is sufficient as type parameters get mapped to
   // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)
-  auto resultClangTy = result.hasValue()
-                     ? convert(result.getValue().getInterfaceType())
+  auto resultClangTy = result.has_value()
+                     ? convert(result.value().getInterfaceType())
                      : ClangASTContext.VoidTy;
 
   if (resultClangTy.isNull())

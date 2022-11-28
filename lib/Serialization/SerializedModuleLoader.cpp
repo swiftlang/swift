@@ -574,7 +574,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       SerializedModuleBaseName
       absoluteBaseName{currPath, targetSpecificBaseName};
 
-      if (!firstAbsoluteBaseName.hasValue())
+      if (!firstAbsoluteBaseName.has_value())
         firstAbsoluteBaseName.emplace(absoluteBaseName);
 
       auto result = findModuleFilesInDirectory(
@@ -781,7 +781,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
-    auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
+    auto diagLocOrInvalid = diagLoc.value_or(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(
         fileUnit, diagLocOrInvalid, Ctx.LangOpts.AllowModuleWithCompilerErrors);
 
@@ -806,7 +806,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
-      findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
+      findOverlayFiles(diagLoc.value_or(SourceLoc()), &M, fileUnit);
     } else {
       fileUnit = nullptr;
     }
@@ -833,7 +833,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   // If the imported module was built with -experimental-hermetic-seal-at-link
   // but the current module isn't, error out.
   if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
-    Ctx.Diags.diagnose(diagLoc.getValueOr(SourceLoc()),
+    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
                        diag::need_hermetic_seal_to_import_module, M.getName());
   }
 
@@ -949,7 +949,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
         loadedModuleFile->getDependencies(),
         [](const ModuleFile::Dependency &next) {
           return next.isLoaded() &&
-                 !(next.Import.hasValue() &&
+                 !(next.Import.has_value() &&
                    next.Import->importedModule->hasResolvedImports());
         });
     assert(circularDependencyIter !=
@@ -1490,7 +1490,7 @@ void SerializedASTFile::lookupImportedSPIGroups(
   auto M = getParentModule();
   auto &imports = M->getASTContext().getImportCache();
   for (auto &dep : File.Dependencies) {
-    if (!dep.Import.hasValue())
+    if (!dep.Import.has_value())
       continue;
 
     if (dep.Import->importedModule == importedModule ||

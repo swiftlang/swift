@@ -150,7 +150,7 @@ void sourcekitd::initializeService(
     Dict.set(KeyCompileID, std::to_string(OpId));
     Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
     if (auto OperationUID = getUIDForOperationKind(OpKind))
-      Dict.set(KeyCompileOperation, OperationUID.getValue());
+      Dict.set(KeyCompileOperation, OperationUID.value());
     Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
     postNotification(RespBuilder.createResponse());
   });
@@ -162,7 +162,7 @@ void sourcekitd::initializeService(
     Dict.set(KeyNotification, CompileDidFinishUID);
     Dict.set(KeyCompileID, std::to_string(OpId));
     if (auto OperationUID = getUIDForOperationKind(OpKind))
-      Dict.set(KeyCompileOperation, OperationUID.getValue());
+      Dict.set(KeyCompileOperation, OperationUID.value());
     auto DiagArray = Dict.setArray(KeyDiagnostics);
     for (const auto &DiagInfo : Diagnostics)
       fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
@@ -407,20 +407,20 @@ static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
     const Optional<VFSOptions> &vfsOptions, llvm::SmallString<64> &ErrBuf) {
   std::unique_ptr<llvm::MemoryBuffer> InputBuf;
 
-  if (SourceText.hasValue()) {
+  if (SourceText.has_value()) {
     StringRef BufName;
-    if (SourceFile.hasValue())
+    if (SourceFile.has_value())
       BufName = *SourceFile;
     else
       BufName = "<input>";
     InputBuf = llvm::MemoryBuffer::getMemBuffer(*SourceText, BufName);
 
-  } else if (vfsOptions.hasValue() && SourceFile.hasValue()) {
+  } else if (vfsOptions.has_value() && SourceFile.has_value()) {
     ErrBuf = "using 'key.sourcefile' to read source text from the filesystem "
              "is not supported when using 'key.vfs.name'";
     return nullptr;
 
-  } else if (SourceFile.hasValue()) {
+  } else if (SourceFile.has_value()) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
         llvm::MemoryBuffer::getFile(*SourceFile);
     if (FileBufOrErr) {
@@ -492,10 +492,10 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
     Optional<unsigned> CompletionMaxASTContextReuseCount =
         Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
-            .map([](int64_t v) -> unsigned { return v; });
+            .transform([](int64_t v) -> unsigned { return v; });
     Optional<unsigned> CompletionCheckDependencyInterval =
         Req.getOptionalInt64(KeyCompletionCheckDependencyInterval)
-            .map([](int64_t v) -> unsigned { return v; });
+            .transform([](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
         Config->update(CompletionMaxASTContextReuseCount,
@@ -558,12 +558,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     sourcekitd_response_t err = nullptr;
     bool failed = Req.dictionaryArrayApply(KeyNames, [&](RequestDict dict) {
       Optional<StringRef> ModuleName = dict.getString(KeyModuleName);
-      if (!ModuleName.hasValue()) {
+      if (!ModuleName.has_value()) {
         err = createErrorRequestInvalid("missing 'key.modulename'");
         return true;
       }
       Optional<StringRef> ClassName = dict.getString(KeyName);
-      if (!ClassName.hasValue()) {
+      if (!ClassName.has_value()) {
         err = createErrorRequestInvalid("missing 'key.name'");
         return true;
       }
@@ -632,13 +632,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     StringRef ModuleName;
     Optional<StringRef> ModuleNameOpt = Req.getString(KeyModuleName);
-    if (ModuleNameOpt.hasValue()) ModuleName = *ModuleNameOpt;
+    if (ModuleNameOpt.has_value()) ModuleName = *ModuleNameOpt;
     return Rec(reportDocInfo(InputBuf.get(), ModuleName, Args));
   }
 
   if (ReqUID == RequestEditorOpen) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     std::unique_ptr<llvm::MemoryBuffer> InputBuf =
         getInputBufForRequest(SourceFile, SourceText, vfsOptions, ErrBuf);
@@ -662,7 +662,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   }
   if (ReqUID == RequestEditorClose) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
 
     // Whether we remove the cached AST from libcache, by default, false.
@@ -672,7 +672,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   }
   if (ReqUID == RequestEditorReplaceText) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
         SourceFile, SourceText, vfsOptions, ErrBuf);
@@ -701,10 +701,10 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   }
   if (ReqUID == RequestEditorFormatText) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     Optional<RequestDict> FmtOptions = Req.getDictionary(KeyFormatOptions);
-    if (FmtOptions.hasValue())
+    if (FmtOptions.has_value())
       editorApplyFormatOptions(*Name, *FmtOptions);
     int64_t Line = 0;
     Req.getInt64(KeyLine, Line, /*isOptional=*/false);
@@ -714,7 +714,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   }
   if (ReqUID == RequestEditorExpandPlaceholder) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     int64_t Offset = 0;
     Req.getInt64(KeyOffset, Offset, /*isOptional=*/false);
@@ -725,10 +725,10 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestEditorOpenInterface) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     Optional<StringRef> ModuleName = Req.getString(KeyModuleName);
-    if (!ModuleName.hasValue())
+    if (!ModuleName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     Optional<StringRef> GroupName = Req.getString(KeyGroupName);
     int64_t SynthesizedExtension = false;
@@ -741,10 +741,10 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestEditorOpenHeaderInterface) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     Optional<StringRef> HeaderName = Req.getString(KeyFilePath);
-    if (!HeaderName.hasValue())
+    if (!HeaderName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.filepath'"));
     int64_t SynthesizedExtension = false;
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
@@ -752,24 +752,24 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     Optional<int64_t> UsingSwiftArgs = Req.getOptionalInt64(KeyUsingSwiftArgs);
     std::string swiftVer;
     Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
-    if (swiftVerValStr.hasValue()) {
-      swiftVer = swiftVerValStr.getValue().str();
+    if (swiftVerValStr.has_value()) {
+      swiftVer = swiftVerValStr.value().str();
     } else {
       Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
-      if (swiftVerVal.hasValue())
+      if (swiftVerVal.has_value())
         swiftVer = std::to_string(*swiftVerVal);
     }
     return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
-                                         UsingSwiftArgs.getValueOr(false),
+                                         UsingSwiftArgs.value_or(false),
                                          SynthesizedExtension, swiftVer));
   }
 
   if (ReqUID == RequestEditorOpenSwiftSourceInterface) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     Optional<StringRef> FileName = Req.getString(KeySourceFile);
-    if (!FileName.hasValue())
+    if (!FileName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
     return editorOpenSwiftSourceInterface(*Name, *FileName, Args,
                                           CancellationToken, Rec);
@@ -777,45 +777,45 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestEditorOpenSwiftTypeInterface) {
     Optional<StringRef> Usr = Req.getString(KeyUSR);
-    if (!Usr.hasValue())
+    if (!Usr.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.usr'"));
     return editorOpenSwiftTypeInterface(*Usr, Args, Rec);
   }
 
   if (ReqUID == RequestEditorExtractTextFromComment) {
     Optional<StringRef> Source = Req.getString(KeySourceText);
-    if (!Source.hasValue())
+    if (!Source.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcetext'"));
-    return Rec(editorExtractTextFromComment(Source.getValue()));
+    return Rec(editorExtractTextFromComment(Source.value()));
   }
 
   if (ReqUID == RequestMarkupToXML) {
     Optional<StringRef> Source = Req.getString(KeySourceText);
-    if (!Source.hasValue())
+    if (!Source.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcetext'"));
-    return Rec(editorConvertMarkupToXML(Source.getValue()));
+    return Rec(editorConvertMarkupToXML(Source.value()));
   }
 
   if (ReqUID == RequestEditorFindUSR) {
     Optional<StringRef> Name = Req.getString(KeySourceFile);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
     Optional<StringRef> USR = Req.getString(KeyUSR);
-    if (!USR.hasValue())
+    if (!USR.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.usr'"));
     return Rec(editorFindUSR(*Name, *USR));
   }
 
   if (ReqUID == RequestEditorFindInterfaceDoc) {
     Optional<StringRef> ModuleName = Req.getString(KeyModuleName);
-    if (!ModuleName.hasValue())
+    if (!ModuleName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     return Rec(editorFindInterfaceDoc(*ModuleName, Args));
   }
 
   if (ReqUID == RequestModuleGroups) {
     Optional<StringRef> ModuleName = Req.getString(KeyModuleName);
-    if (!ModuleName.hasValue())
+    if (!ModuleName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     return Rec(editorFindModuleGroups(*ModuleName, Args));
   }
@@ -847,7 +847,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   if (ReqUID == RequestCodeCompleteClose) {
     // Unlike opening code completion, this is not a semantic request.
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
@@ -857,7 +857,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestCodeCompleteCacheOnDisk) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     Lang.codeCompleteCacheOnDisk(*Name);
@@ -882,7 +882,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     bool failed = Req.dictionaryArrayApply(KeyResults, [&](RequestDict dict) {
       CustomCompletionInfo CCInfo;
       Optional<StringRef> Name = dict.getString(KeyName);
-      if (!Name.hasValue()) {
+      if (!Name.has_value()) {
         err = createErrorRequestInvalid("missing 'key.name'");
         return true;
       }
@@ -959,7 +959,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestCompile) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
 
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
@@ -988,7 +988,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
 
   if (ReqUID == RequestCompileClose) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
 
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
@@ -997,7 +997,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     return Rec(ResponseBuilder().createResponse());
   }
 
-  if (!SourceFile.hasValue() && !SourceText.hasValue() &&
+  if (!SourceFile.has_value() && !SourceText.has_value() &&
       ReqUID != RequestCodeCompleteUpdate)
     return Rec(createErrorRequestInvalid(
         "missing 'key.sourcefile' or 'key.sourcetext'"));
@@ -1051,7 +1051,7 @@ static void handleSemanticRequest(
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
@@ -1063,7 +1063,7 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestCodeCompleteUpdate) {
     Optional<StringRef> Name = Req.getString(KeyName);
-    if (!Name.hasValue())
+    if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
@@ -1104,7 +1104,7 @@ static void handleSemanticRequest(
                                     CancellationToken));
   }
 
-  if (!SourceFile.hasValue())
+  if (!SourceFile.has_value())
     return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
 
   if (ReqUID == RequestIndex) {
@@ -1227,9 +1227,9 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestCollectVariableType) {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).map(
+    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).transform(
         [](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
+    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).transform(
         [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
@@ -1279,9 +1279,9 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("'key.namekind' is unrecognizable"));
     if (auto Base = Req.getString(KeyBaseName)) {
       if (Input.NameKind == UIDKindNameSwift) {
-        Input.BaseName = Base.getValue().trim('`');
+        Input.BaseName = Base.value().trim('`');
       } else {
-        Input.BaseName = Base.getValue();
+        Input.BaseName = Base.value();
       }
     }
     llvm::SmallVector<const char*, 4> ArgParts;
@@ -1477,7 +1477,7 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
   }
 
   if (Info.EffectiveAccess)
-    Elem.set(KeyEffectiveAccess, Info.EffectiveAccess.getValue());
+    Elem.set(KeyEffectiveAccess, Info.EffectiveAccess.value());
 
   EntitiesStack.push_back({ Info.Kind, Elem, ResponseBuilder::Array(),
                             ResponseBuilder::Array()});
@@ -1809,12 +1809,12 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
     Elem.set(KeyPlatform, Info.Platform);
   if (!Info.Message.empty())
     Elem.set(KeyMessage, Info.Message);
-  if (Info.Introduced.hasValue())
-    Elem.set(KeyIntroduced, Info.Introduced.getValue().getAsString());
-  if (Info.Deprecated.hasValue())
-    Elem.set(KeyDeprecated, Info.Deprecated.getValue().getAsString());
-  if (Info.Obsoleted.hasValue())
-    Elem.set(KeyObsoleted, Info.Obsoleted.getValue().getAsString());
+  if (Info.Introduced.has_value())
+    Elem.set(KeyIntroduced, Info.Introduced.value().getAsString());
+  if (Info.Deprecated.has_value())
+    Elem.set(KeyDeprecated, Info.Deprecated.value().getAsString());
+  if (Info.Obsoleted.has_value())
+    Elem.set(KeyObsoleted, Info.Obsoleted.value().getAsString());
 
   return true;
 }
@@ -1951,7 +1951,7 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.setBool(KeyIsSynthesized, true);
 
   if (Symbol.ParentNameOffset)
-    Elem.set(KeyParentLoc, Symbol.ParentNameOffset.getValue());
+    Elem.set(KeyParentLoc, Symbol.ParentNameOffset.value());
 }
 
 static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
@@ -2566,7 +2566,7 @@ typeContextInfo(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     void cancelled() override { WasCancelled = true; }
 
     bool wasCancelled() const { return WasCancelled; }
-    bool isError() const { return ErrorDescription.hasValue(); }
+    bool isError() const { return ErrorDescription.has_value(); }
     const char *getErrorDescription() const {
       return ErrorDescription->c_str();
     }
@@ -2637,7 +2637,7 @@ static sourcekitd_response_t conformingMethodList(
     void cancelled() override { WasCancelled = true; }
 
     bool wasCancelled() const { return WasCancelled; }
-    bool isError() const { return ErrorDescription.hasValue(); }
+    bool isError() const { return ErrorDescription.has_value(); }
     const char *getErrorDescription() const {
       return ErrorDescription->c_str();
     }
@@ -3097,7 +3097,7 @@ editorFindUSR(StringRef DocumentName, StringRef USR) {
                               USR.split(LangSupport::SynthesizedUSRSeparator).
                                 first);
   }
-  if (Range.hasValue()) {
+  if (Range.has_value()) {
     RespBuilder.getDictionary().set(KeyOffset, Range->first);
     RespBuilder.getDictionary().set(KeyLength, Range->second);
   }
@@ -3181,7 +3181,7 @@ buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
     }
 
     Optional<StringRef> OldName = RenameLocation.getString(KeyName);
-    if (!OldName.hasValue()) {
+    if (!OldName.has_value()) {
       Error = "missing key.name";
       return true;
     }
@@ -3189,7 +3189,7 @@ buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
     Optional<StringRef> NewName;
     if (UseNewName) {
       NewName = RenameLocation.getString(KeyNewName);
-      if (!NewName.hasValue()) {
+      if (!NewName.has_value()) {
         Error = "missing key.newname";
         return true;
       }
