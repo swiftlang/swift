@@ -292,7 +292,7 @@ They are preserved mostly for historical interest.
 - [AccessControl.md](/docs/AccessControl.md)
 - [Arrays.md](/docs/Arrays.md)
   <!-- Has additional notes on bridging that may be of general interest? -->
-- [Generics.rst](/docs/Generics.rst)
+- [Generics.rst](/docs/archive/Generics.rst)
 - [ErrorHandling.md](/docs/ErrorHandling.md)
 - [StringDesign.rst](/docs/StringDesign.rst)
 - [TextFormatting.rst](/docs/TextFormatting.rst)
