@@ -441,7 +441,11 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
           if (!environment) {
             auto sig = ctx.getOpenedElementSignature(
                 dc->getGenericSignatureOfContext().getCanonicalSignature());
-            environment = GenericEnvironment::forOpenedElement(sig, UUID::fromTime());
+            auto *contextEnv = dc->getGenericEnvironmentOfContext();
+            auto contextSubs = contextEnv->getForwardingSubstitutionMap();
+            environment =
+                GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
+                                                     contextSubs);
           }
           auto elementType = environment->mapPackTypeIntoElementContext(
               expansionType->getPatternType()->mapTypeOutOfContext());

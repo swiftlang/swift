@@ -231,7 +231,7 @@ void MandatoryGenericSpecializer::run() {
 
     // To avoid phase ordering problems of the involved optimizations, iterate
     // until we reach a fixed point.
-    // This should always happen, but to be on the save side, limit the number
+    // This should always happen, but to be on the safe side, limit the number
     // of iterations to 10 (which is more than enough - usually the loop runs
     // 1 to 3 times).
     for (int i = 0; i < 10; i++) {

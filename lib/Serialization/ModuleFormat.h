@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 723; // allowable client serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 724; // allowable client serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1735,7 +1735,8 @@ namespace decls_block {
     GENERIC_ENVIRONMENT,
     BCFixed<1>,                  // GenericEnvironmentKind
     TypeIDField,                 // existential type
-    GenericSignatureIDField      // parent signature
+    GenericSignatureIDField,     // parent signature
+    SubstitutionMapIDField       // substitution map
   >;
 
   using SubstitutionMapLayout = BCRecordLayout<

@@ -697,12 +697,16 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                 
                 if (currParams[i].getPlainType()->getOptionalObjectType()) {
                   optionalRedecl = true;
-                  if (swift::getParameterAt(current, i)->isImplicitlyUnwrappedOptional())
+                  auto *param = swift::getParameterAt(current, i);
+                  assert(param);
+                  if (param->isImplicitlyUnwrappedOptional())
                     currIsIUO = true;
                 }
                 
                 if (otherParams[i].getPlainType()->getOptionalObjectType()) {
-                  if (swift::getParameterAt(other, i)->isImplicitlyUnwrappedOptional())
+                  auto *param = swift::getParameterAt(other, i);
+                  assert(param);
+                  if (param->isImplicitlyUnwrappedOptional())
                     otherIsIUO = true;
                 }
                 else {
