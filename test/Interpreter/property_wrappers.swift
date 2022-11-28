@@ -87,3 +87,32 @@ func testMyType(_ myType: MyType<Int>) {
 }
 
 testMyType(MyType(x: 17))
+
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+    init(wrappedValue: Int) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+  
+  @Wrapper let value = 20
+  print(value)
+  //CHECK-NEXT: 20
+  
+  struct S {
+    @Wrapper let defaulted = 42
+    @Wrapper let initValue: Int
+    
+    init(v: Int) {
+      initValue = v
+    }
+  }
+  
+  let s = S(v: 50)
+  print(s.defaulted)
+  print(s.initValue)
+  //CHECK-NEXT: 42
+  //CHECK-NEXT: 50
+}
