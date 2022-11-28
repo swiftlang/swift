@@ -5016,7 +5016,8 @@ GenericEnvironment::forOpenedExistential(
 
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid) {
+GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
+                                     SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
   auto &openedElementEnvironments =
@@ -5038,7 +5039,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid) {
                                   OpenedElementEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid);
+  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid,
+                                                  outerSubs);
 
   openedElementEnvironments[uuid] = genericEnv;
 
@@ -5621,40 +5623,75 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
   }
 #endif
 
-  SmallVector<GenericTypeParamType *, 2> genericParams;
+  // The pack element signature includes all type parameters and requirements
+  // from the outer context, plus a new set of type parameters representing
+  // open pack elements and their corresponding element requirements.
+
+  llvm::SmallMapVector<GenericTypeParamType *,
+                       GenericTypeParamType *, 2> packElementParams;
+  SmallVector<GenericTypeParamType *, 2> genericParams(
+      baseGenericSig.getGenericParams().begin(), baseGenericSig.getGenericParams().end());
   SmallVector<Requirement, 2> requirements;
 
+  auto packElementDepth =
+      baseGenericSig.getInnermostGenericParams().front()->getDepth() + 1;
+
   for (auto paramType : baseGenericSig.getGenericParams()) {
-    genericParams.push_back(paramType->asScalar(*this));
+    if (!paramType->isParameterPack())
+      continue;
+
+    auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
+                                                   packElementDepth,
+                                                   packElementParams.size(),
+                                                   *this);
+    genericParams.push_back(elementParam);
+    packElementParams[paramType] = elementParam;
   }
 
   auto eraseParameterPackRec = [&](Type type) -> Type {
     return type.transformRec([&](Type t) -> Optional<Type> {
-      if (auto *paramType = t->getAs<GenericTypeParamType>())
-        return Type(paramType->asScalar(*this));
+      if (auto *paramType = t->getAs<GenericTypeParamType>()) {
+        if (paramType->isParameterPack()) {
+          return Type(packElementParams[paramType]);
+        }
+
+        return t;
+      }
       return None;
     });
   };
 
   for (auto requirement : baseGenericSig.getRequirements()) {
+    requirements.push_back(requirement);
+
+    // If this requirement contains parameter packs, create a new requirement
+    // for the corresponding pack element.
     switch (requirement.getKind()) {
     case RequirementKind::SameShape:
       // Drop same-shape requirements from the element signature.
       break;
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
-    case RequirementKind::SameType:
-      requirements.emplace_back(
-          requirement.getKind(),
-          eraseParameterPackRec(requirement.getFirstType()),
-          eraseParameterPackRec(requirement.getSecondType()));
+    case RequirementKind::SameType: {
+      auto firstType = eraseParameterPackRec(requirement.getFirstType());
+      auto secondType = eraseParameterPackRec(requirement.getSecondType());
+      if (firstType->isEqual(requirement.getFirstType()) &&
+          secondType->isEqual(requirement.getSecondType()))
+        break;
+
+      requirements.emplace_back(requirement.getKind(),
+                                firstType, secondType);
       break;
-    case RequirementKind::Layout:
-      requirements.emplace_back(
-          requirement.getKind(),
-          eraseParameterPackRec(requirement.getFirstType()),
-          requirement.getLayoutConstraint());
+    }
+    case RequirementKind::Layout: {
+      auto firstType = eraseParameterPackRec(requirement.getFirstType());
+      if (firstType->isEqual(requirement.getFirstType()))
+        break;
+
+      requirements.emplace_back(requirement.getKind(), firstType,
+                                requirement.getLayoutConstraint());
       break;
+    }
     }
   }
 
