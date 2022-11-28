@@ -627,9 +627,9 @@ protected:
   AccessScope getRequiredAccessScope();
 
   bool isUsableFromInlineRequired() {
-    assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
+    assert(RequiredAccessScopeAndUsableFromInline.has_value() &&
            "must check access first using getRequiredAccessScope");
-    return RequiredAccessScopeAndUsableFromInline.getValue().second;
+    return RequiredAccessScopeAndUsableFromInline.value().second;
   }
 
   /// Gather the value witnesses for the given requirement.

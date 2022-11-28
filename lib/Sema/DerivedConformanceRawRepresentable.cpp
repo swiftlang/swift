@@ -332,7 +332,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
     // If checkAvailability() discovered we need a runtime version check,
     // add it now.
-    if (versionCheck.hasValue())
+    if (versionCheck.has_value())
       stmts.push_back(ASTNode(versionCheck->createEarlyReturnStmt(C)));
 
     // Create a statement which assigns the case to self.

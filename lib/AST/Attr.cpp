@@ -83,7 +83,7 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
 
 void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
   llvm::raw_svector_ostream stream(buf);
-  auto &convention = ConventionArguments.getValue();
+  auto &convention = ConventionArguments.value();
   stream << convention.Name;
   if (convention.WitnessMethodProtocol) {
     stream << ": " << convention.WitnessMethodProtocol;
@@ -158,11 +158,11 @@ DeclAttributes::isUnavailableInSwiftVersion(
 
       if (available->getPlatformAgnosticAvailability() ==
           PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
-        if (available->Introduced.hasValue() &&
-            available->Introduced.getValue() > vers)
+        if (available->Introduced.has_value() &&
+            available->Introduced.value() > vers)
           return true;
-        if (available->Obsoleted.hasValue() &&
-            available->Obsoleted.getValue() <= vers)
+        if (available->Obsoleted.has_value() &&
+            available->Obsoleted.value() <= vers)
           return true;
       }
     }
@@ -305,7 +305,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
         return AvAttr;
 
       Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
-      if (!DeprecatedVersion.hasValue())
+      if (!DeprecatedVersion.has_value())
         continue;
 
       llvm::VersionTuple MinVersion = AvAttr->getActiveVersion(ctx);
@@ -316,7 +316,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       // query the type refinement context hierarchy to determine
       // whether a declaration is deprecated on all versions
       // allowed by the context containing the reference.
-      if (DeprecatedVersion.getValue() <= MinVersion) {
+      if (DeprecatedVersion.value() <= MinVersion) {
         conditional = AvAttr;
       }
     }
@@ -343,12 +343,12 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
         continue;
 
       Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
-      if (!DeprecatedVersion.hasValue())
+      if (!DeprecatedVersion.has_value())
         continue;
 
       llvm::VersionTuple ActiveVersion = AvAttr->getActiveVersion(ctx);
 
-      if (DeprecatedVersion.getValue() > ActiveVersion) {
+      if (DeprecatedVersion.value() > ActiveVersion) {
         conditional = AvAttr;
       }
     }
@@ -417,13 +417,13 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (AvailAttr->IsSPI)
     return false;
 
-  if (!AvailAttr->Introduced.hasValue())
+  if (!AvailAttr->Introduced.has_value())
     return false;
 
-  if (AvailAttr->Deprecated.hasValue())
+  if (AvailAttr->Deprecated.has_value())
     return false;
 
-  if (AvailAttr->Obsoleted.hasValue())
+  if (AvailAttr->Obsoleted.has_value())
     return false;
 
   if (!AvailAttr->Message.empty())
@@ -489,26 +489,26 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   if (Attrs.size() == 1 &&
       FirstAvail->getPlatformAgnosticAvailability() !=
       PlatformAgnosticAvailabilityKind::None) {
-    assert(FirstAvail->Introduced.hasValue());
+    assert(FirstAvail->Introduced.has_value());
     if (FirstAvail->isLanguageVersionSpecific()) {
       Printer << "swift ";
     } else {
       assert(FirstAvail->isPackageDescriptionVersionSpecific());
       Printer << "_PackageDescription ";
     }
-    Printer << FirstAvail->Introduced.getValue().getAsString();
+    Printer << FirstAvail->Introduced.value().getAsString();
     if (!forAtSpecialize)
       Printer << ")";
   } else {
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
-      assert(AvailAttr->Introduced.hasValue());
+      assert(AvailAttr->Introduced.has_value());
       // Avoid omitting available attribute when we are printing module interface.
       if (!Options.IsForSwiftInterface &&
           isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
       Printer << platformString(AvailAttr->Platform) << " "
-              << AvailAttr->Introduced.getValue().getAsString() << ", ";
+              << AvailAttr->Introduced.value().getAsString() << ", ";
     }
     Printer << "*";
     if (!forAtSpecialize)
@@ -818,11 +818,11 @@ static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
     Printer << ", noasync";
 
   if (Attr->Introduced)
-    Printer << ", introduced: " << Attr->Introduced.getValue().getAsString();
+    Printer << ", introduced: " << Attr->Introduced.value().getAsString();
   if (Attr->Deprecated)
-    Printer << ", deprecated: " << Attr->Deprecated.getValue().getAsString();
+    Printer << ", deprecated: " << Attr->Deprecated.value().getAsString();
   if (Attr->Obsoleted)
-    Printer << ", obsoleted: " << Attr->Obsoleted.getValue().getAsString();
+    Printer << ", obsoleted: " << Attr->Obsoleted.value().getAsString();
 
   if (!Attr->Rename.empty()) {
     Printer << ", renamed: \"" << Attr->Rename << "\"";
@@ -1023,7 +1023,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       return false;
     if (!Options.PrintSPIs && Attr->IsSPI) {
       assert(Attr->hasPlatform());
-      assert(Attr->Introduced.hasValue());
+      assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
       Printer << "(";
       Printer << Attr->platformString();
@@ -1735,7 +1735,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   // Also check if the platform is active by using target variant. This ensures
   // we emit linker directives for multiple platforms when building zippered
   // libraries.
-  if (ctx.LangOpts.TargetVariant.hasValue() &&
+  if (ctx.LangOpts.TargetVariant.has_value() &&
       isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/true)) {
     Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
     return Result;
@@ -1755,9 +1755,9 @@ bool AvailableAttr::isLanguageVersionSpecific() const {
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
     {
       assert(Platform == PlatformKind::none &&
-             (Introduced.hasValue() ||
-              Deprecated.hasValue() ||
-              Obsoleted.hasValue()));
+             (Introduced.has_value() ||
+              Deprecated.has_value() ||
+              Obsoleted.has_value()));
       return true;
     }
   return false;
@@ -1768,9 +1768,9 @@ bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
       PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific)
     {
       assert(Platform == PlatformKind::none &&
-             (Introduced.hasValue() ||
-              Deprecated.hasValue() ||
-              Obsoleted.hasValue()));
+             (Introduced.has_value() ||
+              Deprecated.has_value() ||
+              Obsoleted.has_value()));
       return true;
     }
   return false;

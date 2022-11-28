@@ -1564,7 +1564,7 @@ private:
 
     CanType foreignCHTy =
         TopLevelOrigType.getObjCMethodAsyncCompletionHandlerForeignType(
-            Foreign.async.getValue(), TC);
+            Foreign.async.value(), TC);
     auto completionHandlerOrigTy = TopLevelOrigType.getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
     auto completionHandlerTy = TC.getLoweredType(completionHandlerOrigTy,
                                                  foreignCHTy, expansion)
@@ -2126,7 +2126,7 @@ static CanSILFunctionType getSILFunctionType(
       params.push_back(ty);
     clangType = TC.Context.getClangFunctionType(
         params, substFnInterfaceType.getResult(),
-        convertRepresentation(silRep).getValue());
+        convertRepresentation(silRep).value());
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)

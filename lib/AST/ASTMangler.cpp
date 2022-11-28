@@ -2264,7 +2264,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
       if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.getValue());
+        appendInitializerEntity(var.value());
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.
@@ -2352,7 +2352,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
       if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.getValue());
+        appendInitializerEntity(var.value());
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.

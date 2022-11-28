@@ -783,7 +783,7 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
       ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
-      .hasValue();
+      .has_value();
 }
 
 Type

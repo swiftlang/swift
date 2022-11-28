@@ -161,7 +161,7 @@ public:
   void requestCancellation() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
     IsCancelled = true;
-    if (CancellationRequestCallback.hasValue()) {
+    if (CancellationRequestCallback.has_value()) {
       (*CancellationRequestCallback)(shared_from_this());
       CancellationRequestCallback = None;
     }
@@ -177,7 +177,7 @@ public:
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    assert(!CancellationRequestCallback.hasValue() &&
+    assert(!CancellationRequestCallback.has_value() &&
            "Can't set two cancellation callbacks on a SwiftASTConsumer");
     if (IsCancelled) {
       NewCallback(shared_from_this());

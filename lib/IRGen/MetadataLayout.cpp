@@ -70,7 +70,7 @@ public:
   }
 
   MetadataSize getMetadataSize() const {
-    assert(AddressPoint.hasValue() && !AddressPoint->isInvalid()
+    assert(AddressPoint.has_value() && !AddressPoint->isInvalid()
            && "did not find address point?!");
     assert(*AddressPoint < this->NextOffset
            && "address point is after end?!");

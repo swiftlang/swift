@@ -65,7 +65,7 @@ static std::string identifierForContext(const DeclContext *DC) {
   }
 
   const auto *ext = cast<ExtensionDecl>(DC);
-  auto fp = ext->getBodyFingerprint().getValueOr(Fingerprint::ZERO());
+  auto fp = ext->getBodyFingerprint().value_or(Fingerprint::ZERO());
   auto typeStr = Mangler.mangleTypeAsContextUSR(ext->getExtendedNominal());
   return (typeStr + "@" + fp.getRawValue()).str();
 }

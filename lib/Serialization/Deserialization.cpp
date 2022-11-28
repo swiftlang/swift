@@ -2309,9 +2309,9 @@ Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
     return FileContext;
 
   if (Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
-    return getLocalDeclContext(contextID.getValue());
+    return getLocalDeclContext(contextID.value());
 
-  auto deserialized = getDeclChecked(DCID.getAsDeclID().getValue());
+  auto deserialized = getDeclChecked(DCID.getAsDeclID().value());
   if (!deserialized)
     return deserialized.takeError();
 
@@ -3080,9 +3080,9 @@ public:
     ctor->setIsObjC(isObjC);
     if (hasStubImplementation)
       ctor->setStubImplementation(true);
-    if (initKind.hasValue())
+    if (initKind.has_value())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
-                                std::move(initKind.getValue()));
+                                std::move(initKind.value()));
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
                               std::move(needsNewVTableEntry));
 
@@ -3513,7 +3513,7 @@ public:
     GenericParamList *genericParams = MF.maybeReadGenericParams(DC);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
-    if (!staticSpelling.hasValue())
+    if (!staticSpelling.has_value())
       MF.fatal();
 
     if (declOrOffset.isComplete())
@@ -3525,12 +3525,12 @@ public:
 
     FuncDecl *fn;
     if (!isAccessor) {
-      fn = FuncDecl::createDeserialized(ctx, staticSpelling.getValue(), name,
+      fn = FuncDecl::createDeserialized(ctx, staticSpelling.value(), name,
                                         async, throws, genericParams,
                                         resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
-          ctx, accessorKind, storage, staticSpelling.getValue(), async, throws,
+          ctx, accessorKind, storage, staticSpelling.value(), async, throws,
           resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
@@ -3776,7 +3776,7 @@ public:
                                                   numPatterns,
                                                   initContextIDs);
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
-    if (!StaticSpelling.hasValue())
+    if (!StaticSpelling.has_value())
       MF.fatal();
 
     auto dc = MF.getDeclContext(contextID);
@@ -3800,7 +3800,7 @@ public:
 
     auto binding =
       PatternBindingDecl::createDeserialized(ctx, SourceLoc(),
-                                             StaticSpelling.getValue(),
+                                             StaticSpelling.value(),
                                              SourceLoc(), patterns.size(), dc);
     declOrOffset = binding;
 
@@ -3973,7 +3973,7 @@ public:
     auto DC = MF.getDeclContext(contextID);
 
     auto associativity = getActualAssociativity(rawAssociativity);
-    if (!associativity.hasValue())
+    if (!associativity.has_value())
       MF.fatal();
 
     if (numHigherThan > rawRelations.size())
@@ -4327,7 +4327,7 @@ public:
       return declOrOffset;
     
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
-    if (!staticSpelling.hasValue())
+    if (!staticSpelling.has_value())
       MF.fatal();
 
     const auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
@@ -5673,11 +5673,11 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   }
 
   auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
-  if (!representation.hasValue())
+  if (!representation.has_value())
     MF.fatal();
 
   auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
-  if (!diffKind.hasValue())
+  if (!diffKind.has_value())
     MF.fatal();
 
   const clang::Type *clangFunctionType = nullptr;
@@ -5834,14 +5834,14 @@ Expected<Type> DESERIALIZE_TYPE(REFERENCE_STORAGE_TYPE)(
 
   auto ownership = getActualReferenceOwnership(
       (serialization::ReferenceOwnership)rawOwnership);
-  if (!ownership.hasValue())
+  if (!ownership.has_value())
     MF.fatal();
 
   auto objectTy = MF.getTypeChecked(objectTypeID);
   if (!objectTy)
     return objectTy.takeError();
 
-  return ReferenceStorageType::get(objectTy.get(), ownership.getValue(),
+  return ReferenceStorageType::get(objectTy.get(), ownership.value(),
                                    MF.getContext());
 }
 
@@ -6186,11 +6186,11 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   // Process the ExtInfo.
   auto representation =
       getActualSILFunctionTypeRepresentation(rawRepresentation);
-  if (!representation.hasValue())
+  if (!representation.has_value())
     MF.fatal();
 
   auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
-  if (!diffKind.hasValue())
+  if (!diffKind.has_value())
     MF.fatal();
 
   const clang::Type *clangFunctionType = nullptr;
@@ -6208,12 +6208,12 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
-  if (!coroutineKind.hasValue())
+  if (!coroutineKind.has_value())
     MF.fatal();
 
   // Process the callee convention.
   auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
-  if (!calleeConvention.hasValue())
+  if (!calleeConvention.has_value())
     MF.fatal();
 
   auto processParameter =
@@ -6353,8 +6353,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!patternSubsOrErr)
     return patternSubsOrErr.takeError();
 
-  return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
-                              calleeConvention.getValue(), allParams, allYields,
+  return SILFunctionType::get(invocationSig, extInfo, coroutineKind.value(),
+                              calleeConvention.value(), allParams, allYields,
                               allResults, errorResult,
                               patternSubsOrErr.get().getCanonical(),
                               invocationSubsOrErr.get().getCanonical(),

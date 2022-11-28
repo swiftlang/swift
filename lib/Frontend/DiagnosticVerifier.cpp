@@ -162,7 +162,7 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
       continue;
 
     // If a specific column was expected, verify it.
-    if (Expected.ColumnNo.hasValue() && I->Column != *Expected.ColumnNo)
+    if (Expected.ColumnNo.has_value() && I->Column != *Expected.ColumnNo)
       continue;
 
     // Verify the classification and string.
@@ -446,7 +446,7 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
   LineColumnRange Range;
 
   if (const auto lineAndCol = parseLineAndColumn()) {
-    std::tie(Range.StartLine, Range.StartCol) = lineAndCol.getValue();
+    std::tie(Range.StartLine, Range.StartCol) = lineAndCol.value();
   } else {
     return None;
   }
@@ -460,7 +460,7 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
   }
 
   if (const auto lineAndCol = parseLineAndColumn()) {
-    std::tie(Range.EndLine, Range.EndCol) = lineAndCol.getValue();
+    std::tie(Range.EndLine, Range.EndCol) = lineAndCol.value();
   } else {
     return None;
   }
@@ -684,7 +684,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // If this check starts with 'educational-notes=', check for one or more
       // educational notes instead of a fix-it.
       if (CheckStr.startswith(educationalNotesSpecifier)) {
-        if (Expected.EducationalNotes.hasValue()) {
+        if (Expected.EducationalNotes.has_value()) {
           addError(CheckStr.data(),
                    "each verified diagnostic may only have one "
                    "{{educational-notes=<#notes#>}} declaration");
@@ -739,7 +739,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       if (const auto range =
               parseExpectedFixItRange(CheckStr, Expected.LineNo, addError)) {
-        FixIt.Range = range.getValue();
+        FixIt.Range = range.value();
       } else {
         continue;
       }

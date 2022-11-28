@@ -366,7 +366,7 @@ bool BBEnumTagDataflowState::initWithFirstPred(SILBasicBlock *FirstPredBB) {
   // TODO: I am writing this too fast. Clean this up later.
   if (FirstPredBB->getSingleSuccessorBlock()) {
     for (auto P : ValueToCaseMap.getItems()) {
-      if (!P.hasValue())
+      if (!P.has_value())
         continue;
       EnumToEnumBBCaseListMap[P->first].push_back({FirstPredBB, P->second});
     }
@@ -462,7 +462,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
     for (auto P : ValueToCaseMap.getItems()) {
       // If this SILValue was blotted, there is nothing left to do, we found
       // some sort of conflicting definition and are being conservative.
-      if (!P.hasValue())
+      if (!P.has_value())
         continue;
 
       // Then attempt to look up the enum state associated in our SILValue in
@@ -474,7 +474,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
       // cannot find a covering switch for this BB or forward any enum tag
       // information for this enum value.
       if (PredIter == PredBBState->ValueToCaseMap.end() ||
-          !(*PredIter).hasValue()) {
+          !(*PredIter).has_value()) {
         // Otherwise, we are conservative and do not forward the EnumTag that we
         // are tracking. Blot it!
         LLVM_DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
@@ -757,7 +757,7 @@ bool BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(
 
     // If EnumValue is null, we deleted this entry. There is nothing to do for
     // this value... Skip it.
-    if (!P.hasValue())
+    if (!P.has_value())
       continue;
 
     // Look up the actual enum value using our index to make sure that other

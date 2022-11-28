@@ -402,7 +402,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
     // For an autoclosure capture, present a way to fix the problem.
     if (paramName)
       diagnose(Context, PAI->getLoc(), diag::copy_inout_captured_by_autoclosure,
-               paramName.getValue());
+               paramName.value());
     else
       diagnose(Context, PAI->getLoc(), diag::copy_self_captured_by_autoclosure);
   }

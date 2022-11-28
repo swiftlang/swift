@@ -651,7 +651,7 @@ private:
   }
 
 public:
-  bool hasResult() { return Result.hasValue(); }
+  bool hasResult() { return Result.has_value(); }
 
   void enter(ASTNode Node) {
     bool ContainedInRange;
@@ -985,8 +985,8 @@ public:
   }
 
   ResolvedRangeInfo getResult() {
-    if (Result.hasValue())
-      return Result.getValue();
+    if (Result.has_value())
+      return Result.value();
     return ResolvedRangeInfo(TokensInRange);
   }
 
@@ -1010,7 +1010,7 @@ public:
 
     // Down-grade LValue type to RValue type if it's read-only.
     if (auto Access = Data.AccKind) {
-      switch (Access.getValue()) {
+      switch (Access.value()) {
         case AccessKind::Read:
           Ty = Ty->getRValueType();
           break;
@@ -1145,7 +1145,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 RangeInfoOwner::RangeInfoOwner(SourceFile *File, unsigned Offset,
                                unsigned Length): File(File) {
   SourceManager &SM = File->getASTContext().SourceMgr;
-  unsigned BufferId = File->getBufferID().getValue();
+  unsigned BufferId = File->getBufferID().value();
   StartLoc = SM.getLocForOffset(BufferId, Offset);
   EndLoc = SM.getLocForOffset(BufferId, Offset + Length);
 }

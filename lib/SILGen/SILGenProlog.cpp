@@ -942,8 +942,8 @@ Optional<SILValue> SILGenFunction::emitExecutor(
 
   case ActorIsolation::ActorInstance: {
     // "self" here means the actor instance's "self" value.
-    assert(maybeSelf.hasValue() && "actor-instance but no self provided?");
-    auto self = maybeSelf.getValue();
+    assert(maybeSelf.has_value() && "actor-instance but no self provided?");
+    auto self = maybeSelf.value();
     return emitLoadActorExecutor(loc, self);
   }
 

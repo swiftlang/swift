@@ -289,7 +289,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     assert(Loc.isValid());
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
                                                 Loc));
-    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.getValue()));
+    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.value()));
   }
 
   Impl.TokenNodes = std::move(Nodes);
@@ -387,7 +387,7 @@ public:
       : AllTokensInFile(File.getAllTokens()),
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
-        BufferID(File.getBufferID().getValue()),
+        BufferID(File.getBufferID().value()),
         Ctx(File.getASTContext()),
         Walker(Walker) { }
 
@@ -1711,8 +1711,8 @@ bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {
     return true;
 
   auto FieldNode = parseFieldNode(Text, OrigText, OrigLoc);
-  if (FieldNode.hasValue())
-    passNode(FieldNode.getValue());
+  if (FieldNode.has_value())
+    passNode(FieldNode.value());
   else
     searchForURL(Node.Range);
   return true;
@@ -1757,8 +1757,8 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
     if (Line.size() < Indent)
       continue;
     auto FieldNode = parseFieldNode(Line.drop_front(Indent), OrigText, OrigLoc);
-    if (FieldNode.hasValue())
-      passNode(FieldNode.getValue());
+    if (FieldNode.has_value())
+      passNode(FieldNode.value());
     else
       searchForURL(CharSourceRange(Node.Range.getStart().
         getAdvancedLoc(Line.data() - OrigText.data()),

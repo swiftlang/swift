@@ -487,7 +487,7 @@ ManagedValue SILGenBuilder::createInputFunctionArgument(
 ManagedValue
 SILGenBuilder::createInputFunctionArgument(SILType type,
                                            Optional<SILLocation> inputLoc) {
-  assert(inputLoc.hasValue() && "This optional is only for overload resolution "
+  assert(inputLoc.has_value() && "This optional is only for overload resolution "
                                 "purposes! Do not pass in None here!");
   return ::createInputFunctionArgument(*this, type, *inputLoc);
 }

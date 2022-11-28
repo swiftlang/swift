@@ -217,7 +217,7 @@ bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
   RewriteBufferEditsReceiver Rewriter {
     ClangSourceManager,
     Editor.getClangFileIDForSwiftBufferID(
-      StartInstance->getPrimarySourceFile()->getBufferID().getValue()),
+      StartInstance->getPrimarySourceFile()->getBufferID().value()),
     InputState->getOutputText()
   };
 

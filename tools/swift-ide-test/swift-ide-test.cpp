@@ -2803,7 +2803,7 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     TypeOrExtensionDecl Target,
                                     Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
+    if (Bracket.has_value() && !Bracket.value().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
@@ -2812,7 +2812,7 @@ public:
   printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                 TypeOrExtensionDecl Target,
                                 Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
+    if (Bracket.has_value() && !Bracket.value().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
   }
@@ -2847,8 +2847,8 @@ struct GroupNamesPrinter {
   void addDecl(const Decl *D) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
-        StringRef Name = VD->getGroupName().hasValue() ?
-          VD->getGroupName().getValue() : "";
+        StringRef Name = VD->getGroupName().has_value() ?
+          VD->getGroupName().value() : "";
         Groups.insert(Name.empty() ? "<NULL>" : Name);
       }
     }
@@ -3661,7 +3661,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
                                 const StringRef FileName,
                                 const StringRef LCPair) {
   auto Pair = parseLineCol(LCPair);
-  if (!Pair.hasValue())
+  if (!Pair.has_value())
     return 1;
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -3682,13 +3682,13 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   }
   assert(SF && "no source file?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  auto Offset = SM.resolveFromLineCol(BufID, Pair.getValue().first,
-                                      Pair.getValue().second);
-  if (!Offset.hasValue()) {
+  auto Offset = SM.resolveFromLineCol(BufID, Pair.value().first,
+                                      Pair.value().second);
+  if (!Offset.has_value()) {
     llvm::errs() << "Cannot resolve source location.\n";
     return 1;
   }
-  SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.getValue());
+  SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.value());
   auto SemaT =
     evaluateOrDefault(SF->getASTContext().evaluator,
                       CursorInfoRequest{CursorInfoOwner(SF, Loc)},
@@ -3914,10 +3914,10 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
                             StringRef EndPos) {
   auto StartOp = parseLineCol(StartPos);
   auto EndOp = parseLineCol(EndPos);
-  if (!StartOp.hasValue() || !EndOp.hasValue())
+  if (!StartOp.has_value() || !EndOp.has_value())
     return 1;
-  auto StartLineCol = StartOp.getValue();
-  auto EndLineCol = EndOp.getValue();
+  auto StartLineCol = StartOp.value();
+  auto EndLineCol = EndOp.value();
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
@@ -3942,9 +3942,9 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().hasValue() && "no buffer id?");
+  assert(SF->getBufferID().has_value() && "no buffer id?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned bufferID = SF->getBufferID().getValue();
+  unsigned bufferID = SF->getBufferID().value();
   SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
@@ -4048,7 +4048,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  assert(SF->getBufferID().hasValue() && "no buffer id?");
+  assert(SF->getBufferID().has_value() && "no buffer id?");
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
@@ -4351,8 +4351,8 @@ int main(int argc, char *argv[]) {
       options::SwiftVersion[options::SwiftVersion.size()-1];
     if (auto swiftVersion = VersionParser::parseVersionString(
             LastSwiftVersion, SourceLoc(), nullptr)) {
-      if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
-        InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
+      if (auto actual = swiftVersion.value().getEffectiveLanguageVersion())
+        InitInvok.getLangOptions().EffectiveLanguageVersion = actual.value();
     }
   }
   if (!options::ToolsDirectory.empty()) {

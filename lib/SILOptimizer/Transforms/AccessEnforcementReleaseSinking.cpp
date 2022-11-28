@@ -75,7 +75,7 @@ static bool isBarrier(SILInstruction *inst) {
     // Whitelist the safe builtin categories. Builtins should generally be
     // treated conservatively, because introducing a new builtin does not
     // require updating all passes to be aware of it.
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case BuiltinValueKind::None:
       llvm_unreachable("Builtin must has a non-empty kind.");
 

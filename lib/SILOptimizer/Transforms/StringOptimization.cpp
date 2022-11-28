@@ -307,7 +307,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
   Optional<int> isQualifiedOpt = getIntConstant(typeNameCall->getArgument(1));
   if (!isQualifiedOpt)
     return false;
-  bool isQualified = isQualifiedOpt.getValue();
+  bool isQualified = isQualifiedOpt.value();
 
   // Create the constant type string by mangling + demangling.
   Mangle::ASTMangler mangler;
@@ -547,7 +547,7 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
     int reservedCapacity = std::numeric_limits<int>::max();
     if (apply->getNumArguments() > 0) {
       if (Optional<int> capacity = getIntConstant(apply->getArgument(0)))
-        reservedCapacity = capacity.getValue();
+        reservedCapacity = capacity.value();
     }
     return StringInfo("", reservedCapacity);
   }

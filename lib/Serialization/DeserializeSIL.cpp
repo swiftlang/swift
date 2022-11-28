@@ -591,7 +591,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
                             << " for SILFunction\n");
     MF->fatal("invalid linkage code");
   }
-  SILLinkage linkage = linkageOpt.getValue();
+  SILLinkage linkage = linkageOpt.value();
 
   ValueDecl *clangNodeOwner = nullptr;
   if (clangNodeOwnerID != 0) {
@@ -1890,7 +1890,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto encoding = fromStableStringEncoding(Attr);
     if (!encoding) return true;
     ResultInst =
-        Builder.createStringLiteral(Loc, StringVal, encoding.getValue());
+        Builder.createStringLiteral(Loc, StringVal, encoding.value());
     break;
   }
   case SILInstructionKind::CondFailInst: {
@@ -3117,7 +3117,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   }
 
   // Bail if it is not a required linkage.
-  if (Linkage && linkage.getValue() != *Linkage)
+  if (Linkage && linkage.value() != *Linkage)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
@@ -3214,7 +3214,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-      SILMod, linkage.getValue(),
+      SILMod, linkage.value(),
       isSerialized ? IsSerialized : IsNotSerialized,
       Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
       None,
@@ -3388,7 +3388,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue(), (bool)IsNonOverridden);
+                                 Func, EntryKind.value(), (bool)IsNonOverridden);
     }
 
     // Fetch the next record.

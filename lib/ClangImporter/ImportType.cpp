@@ -776,7 +776,7 @@ namespace {
       // point of ObjCTypeParamType. Fixing this might be source-breaking,
       // though. rdar://problem/29763975
       if (auto result = importObjCTypeParamDecl(type->getDecl()))
-        return result.getValue();
+        return result.value();
       // Fall back to importing the desugared type, which uses the parameter's
       // bound. This isn't perfect but it's better than dropping the type.
       return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
@@ -788,7 +788,7 @@ namespace {
       if (auto *objcTypeParamDecl =
             dyn_cast<clang::ObjCTypeParamDecl>(type->getDecl())) {
         if (auto result = importObjCTypeParamDecl(objcTypeParamDecl))
-          return result.getValue();
+          return result.value();
         return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
       }
 
@@ -830,7 +830,7 @@ namespace {
 
       // For certain special typedefs, we don't want to use the imported type.
       if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
-        switch (specialKind.getValue()) {
+        switch (specialKind.value()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:
           break;
@@ -2102,7 +2102,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           return {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
@@ -2164,7 +2164,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
@@ -2261,7 +2261,7 @@ ClangImporter::Implementation::importParameterType(
               findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.getValue()
+        assert(clangEnum.value()
                    ->getIntegerType()
                    ->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
@@ -2822,7 +2822,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   Optional<ForeignErrorConvention::Info> errorInfo =
       importedName.getErrorInfo();
   auto asyncInfo = importedName.getAsyncInfo();
-  bool isAsync = asyncInfo.hasValue();
+  bool isAsync = asyncInfo.has_value();
   if (!isAsync)
     asyncInfo = importedName.getAsyncAlternateInfo();
 
@@ -2853,7 +2853,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};

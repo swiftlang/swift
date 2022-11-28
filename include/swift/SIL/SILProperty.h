@@ -61,7 +61,7 @@ public:
   AbstractStorageDecl *getDecl() const { return Decl; }
   
   bool isTrivial() const {
-    return !Component.hasValue();
+    return !Component.has_value();
   }
   
   const Optional<KeyPathPatternComponent> &getComponent() const {

@@ -252,8 +252,8 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
 
     // If we found either a signal of a payloaded or a non-payloaded enum,
     // return that value.
-    if (Result.hasValue())
-      return Result.getValue();
+    if (Result.has_value())
+      return Result.value();
 
     // If we didn't reach RCIdentityBB, keep processing up the DomTree.
     if (DominatingBB != RCIdentityBB)

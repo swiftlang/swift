@@ -459,7 +459,7 @@ RValue Lowering::emitConditionalCheckedCast(
         loc, resultBuffer, someDecl,
         resultTy.getOptionalObjectType().getAddressType());
     resultObjectTemp.emplace(resultObjectBuffer, CleanupHandle::invalid());
-    resultObjectCtx = SGFContext(&resultObjectTemp.getValue());
+    resultObjectCtx = SGFContext(&resultObjectTemp.value());
   }
 
   // Prepare a jump destination here.
@@ -493,7 +493,7 @@ RValue Lowering::emitConditionalCheckedCast(
         // We always are performing a take here, so Value should be None since
         // the
         // object should have been destroyed immediately in the fail block.
-        assert(!Value.hasValue() && "Expected a take_always consumption kind");
+        assert(!Value.has_value() && "Expected a take_always consumption kind");
         auto noneDecl = SGF.getASTContext().getOptionalNoneDecl();
 
         // If we're not emitting into a temporary, just wrap up the result
@@ -565,7 +565,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, yes);
       },
       [&](Optional<ManagedValue> Value) {
-        assert(!Value.hasValue() && "Expected take_always semantics");
+        assert(!Value.has_value() && "Expected take_always semantics");
         SILValue no = SGF.B.createIntegerLiteral(loc, i1Ty, 0);
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, no);
       });

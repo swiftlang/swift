@@ -1673,7 +1673,7 @@ Fingerprint SourceFile::getInterfaceHash() const {
   Optional<StableHasher> interfaceHasher =
       evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
               .InterfaceHasher;
-  return Fingerprint{StableHasher{interfaceHasher.getValue()}.finalize()};
+  return Fingerprint{StableHasher{interfaceHasher.value()}.finalize()};
 }
 
 Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
@@ -2032,7 +2032,7 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   if (diagLoc.isInvalid())
     return true;
 
-  assert(kind.hasValue() && "multiple entry points without attributes");
+  assert(kind.has_value() && "multiple entry points without attributes");
 
   // %select indices for UI/NSApplication-related diagnostics.
   enum : unsigned {
@@ -2041,7 +2041,7 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
     MainType = 2,
   } mainTypeDiagKind;
 
-  switch (kind.getValue()) {
+  switch (kind.value()) {
   case ArtificialMainKind::UIApplicationMain:
     mainTypeDiagKind = UIApplicationMainClass;
     break;

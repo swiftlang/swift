@@ -362,7 +362,7 @@ void RewriteSystem::addRules(
 
     // When this is called while adding conditional requirements, there
     // shouldn't be any new structural requirement IDs.
-    assert(ruleCount == 0 || !requirementID.hasValue());
+    assert(ruleCount == 0 || !requirementID.has_value());
 
     addExplicitRule(lhs, rhs, requirementID);
   }

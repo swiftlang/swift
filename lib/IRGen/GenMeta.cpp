@@ -2262,7 +2262,7 @@ namespace {
                substitutionSet) {
         auto getInt32Constant =
             [&](Optional<unsigned> value) -> llvm::ConstantInt * {
-          return llvm::ConstantInt::get(IGM.Int32Ty, value.getValueOr(0));
+          return llvm::ConstantInt::get(IGM.Int32Ty, value.value_or(0));
         };
 
         auto symbol = getSymbol();

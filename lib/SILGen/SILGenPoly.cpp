@@ -757,7 +757,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     SGFContext eltCtxt =
-      (outputEltTemp ? SGFContext(&outputEltTemp.getValue()) : SGFContext());
+      (outputEltTemp ? SGFContext(&outputEltTemp.value()) : SGFContext());
     auto outputElt = transform(inputElt,
                                inputEltOrigType, inputEltSubstType,
                                outputEltOrigType, outputEltSubstType,
@@ -773,7 +773,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     // Otherwise, make sure we emit into the slot.
-    auto &temp = outputEltTemp.getValue();
+    auto &temp = outputEltTemp.value();
     auto outputEltAddr = temp.getManagedAddress();
 
     // That might involve storing directly.

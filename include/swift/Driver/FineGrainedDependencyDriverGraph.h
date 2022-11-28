@@ -83,7 +83,7 @@ public:
   const Optional<std::string> &getSwiftDeps() const { return swiftDeps; }
 
   std::string getSwiftDepsOrEmpty() const {
-    return getSwiftDeps().getValueOr(std::string());
+    return getSwiftDeps().value_or(std::string());
   }
 
   std::string getSwiftDepsForMapKey() const {
@@ -93,14 +93,14 @@ public:
   }
 
   const std::string &getSwiftDepsOfProvides() const {
-    return getSwiftDeps().getValue();
+    return getSwiftDeps().value();
   }
 
   /// Nodes can move from file to file when the driver reads the result of a
   /// compilation.
   void setSwiftDeps(Optional<std::string> s) { swiftDeps = s; }
 
-  bool getIsProvides() const { return getSwiftDeps().hasValue(); }
+  bool getIsProvides() const { return getSwiftDeps().has_value(); }
 
   /// Return true if this node describes a definition for which the job is known
   bool isDefinedInAKnownFile() const { return getIsProvides(); }
@@ -245,7 +245,7 @@ private:
 
   void eraseNodeFromCurrentPathIfTracing(ModuleDepGraphNode *nodeToErase) {
     if (currentPathIfTracing)
-      eraseNodeFromVector(currentPathIfTracing.getValue(), nodeToErase);
+      eraseNodeFromVector(currentPathIfTracing.value(), nodeToErase);
   }
 
   void eraseNodeFromDependencyPathToJobs(ModuleDepGraphNode *nodeToErase) {
@@ -276,8 +276,8 @@ private:
   }
 
   const driver::Job *getJob(Optional<std::string> swiftDeps) const {
-    assert(swiftDeps.hasValue() && "Don't call me for expats.");
-    auto iter = jobsBySwiftDeps.find(swiftDeps.getValue());
+    assert(swiftDeps.has_value() && "Don't call me for expats.");
+    auto iter = jobsBySwiftDeps.find(swiftDeps.value());
     assert(iter != jobsBySwiftDeps.end() && "All jobs should be tracked.");
     return iter->second;
   }
@@ -474,7 +474,7 @@ public:
                                  const StringRef filename);
 
   bool isCurrentPathForTracingEmpty() const {
-    return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();
+    return !currentPathIfTracing.has_value() || currentPathIfTracing->empty();
   }
 
   //============================================================================

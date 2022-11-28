@@ -280,13 +280,13 @@ void PropertyBag::verify(const RewriteSystem &system) const {
 
   // FIXME: Add asserts requiring that the layout, superclass and
   // concrete type symbols match, as above
-  assert(!Layout.isNull() == LayoutRule.hasValue());
-  assert(ConcreteType.hasValue() == !ConcreteTypeRules.empty());
+  assert(!Layout.isNull() == LayoutRule.has_value());
+  assert(ConcreteType.has_value() == !ConcreteTypeRules.empty());
 
   assert((SuperclassDecl == nullptr) == Superclasses.empty());
   for (const auto &pair : Superclasses) {
     const auto &req = pair.second;
-    assert(req.SuperclassType.hasValue());
+    assert(req.SuperclassType.has_value());
     assert(!req.SuperclassRules.empty());
   }
 
