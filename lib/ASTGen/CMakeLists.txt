@@ -87,7 +87,7 @@ if (SWIFT_SWIFT_PARSER)
   )
 
   target_include_directories(swiftASTGen PUBLIC
-    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
+    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()
