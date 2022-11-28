@@ -2265,7 +2265,7 @@ public:
     Task_CopyTaskLocals                     = 10,
     Task_InheritContext                     = 11,
     Task_EnqueueJob                         = 12,
-    Task_AddPendingGroupTaskUnconditionally = 13,
+    Task_AddPendingGroupTaskUnconditionally = 13, // used for: TaskGroup, TaskPool
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2290,12 +2290,8 @@ public:
                                 enqueueJob,
                                 setEnqueueJob)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_AddPendingGroupTaskUnconditionally,
-                                addPendingGroupTaskUnconditionally,
-                                setAddPendingGroupTaskUnconditionally)
-  // re-use the group flag for adding to a pool
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_AddPendingGroupTaskUnconditionally,
-                                addPendingPoolTaskUnconditionally,
-                                setAddPendingPoolTaskUnconditionally)
+                                addPendingTaskUnconditionally,
+                                setaddPendingTaskUnconditionally)
 };
 
 /// Flags for schedulable jobs.

@@ -48,6 +48,21 @@
 
 using namespace swift;
 
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#include <mutex>
+#endif
+
+#include <assert.h>
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#include <dispatch/dispatch.h>
+#endif
+
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
+#include <dlfcn.h>
+#endif
+
+using namespace swift;
+
 /******************************************************************************/
 /*************************** TASK POOL ***************************************/
 /******************************************************************************/
@@ -55,169 +70,137 @@ using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 
 namespace {
-class TaskStatusRecord;
+  class TaskStatusRecord;
 
-class TaskPoolImpl: public TaskPoolTaskStatusRecord {
-public:
-  /// Describes the status of the group.
-  enum class ReadyStatus : uintptr_t {
-    /// The task group is empty, no tasks are pending.
-    /// Return immediately, there is no point in suspending.
-    ///
-    /// The storage is not accessible.
-    Empty = 0b00,
+  class TaskPoolImpl: public TaskPoolTaskStatusRecord {
+  public:
+    /// Describes the status of the group.
+    enum class ReadyStatus : uintptr_t {
+      /// The task group is empty, no tasks are pending.
+      /// Return immediately, there is no point in suspending.
+      ///
+      /// The storage is not accessible.
+      Empty = 0b00,
 
-    // not used: 0b01; same value as the PollStatus MustWait,
-    //                 which does not make sense for the ReadyStatus
+      // not used: 0b01; same value as the PollStatus MustWait,
+      //                 which does not make sense for the ReadyStatus
 
-    /// The future has completed with result (of type \c resultType).
-    Success = 0b10,
+      /// The future has completed with result (of type \c resultType).
+      Success = 0b10,
 
-    /// The future has completed by throwing an error (an \c Error
-    /// existential).
-    Error = 0b11,
-  };
-
-  enum class PollStatus : uintptr_t {
-    /// The group is known to be empty and we can immediately return nil.
-    Empty = 0b00,
-
-    /// The task has been enqueued to the groups wait queue.
-    MustWait = 0b01,
-
-    /// The task has completed with result (of type \c resultType).
-    Success = 0b10,
-
-    /// The task has completed by throwing an error (an \c Error existential).
-    Error = 0b11,
-  };
-
-  /// The result of waiting on the TaskPoolImpl.
-  struct PollResult {
-    PollStatus status; // TODO: pack it into storage pointer or not worth it?
-
-//    /// Storage for the result of the future.
-//    ///
-//    /// When the future completed normally, this is a pointer to the storage
-//    /// of the result value, which lives inside the future task itself.
-//    ///
-//    /// When the future completed by throwing an error, this is the error
-//    /// object itself.
-//    OpaqueValue *storage;
-//
-//    const Metadata *voidType;
-
-//    /// The completed task, if necessary to keep alive until consumed by next().
-//    ///
-//    /// # Important: swift_release
-//    /// If if a task is returned here, the task MUST be swift_released
-//    /// once we are done with it, to balance out the retain made before
-//    /// when the task was enqueued into the ready queue to keep it alive
-//    /// until a next() call eventually picks it up.
-//    AsyncTask *retainedTask;
-
-//    bool isStorageAccessible() {
-//      return status == PollStatus::Success ||
-//             status == PollStatus::Error ||
-//             status == PollStatus::Empty;
-//    }
-
-    static PollResult get(AsyncTask *asyncTask, bool hadErrorResult) {
-      // A TaskPool task is always Void, so we don't even have to collect the result from its future fragment.
-      return PollResult{
-        /*status*/ hadErrorResult ?
-                   PollStatus::Error :
-                   PollStatus::Success
-//                   ,
-//        /*storage*/ hadErrorResult ?
-//                    reinterpret_cast<OpaqueValue *>(fragment->getError()) :
-//                    fragment->getStoragePtr(),
-//        /*voidType*/fragment->getResultType(),
-//        /*task*/ asyncTask
-      };
-    }
-  };
-
-  /// An item within the pending queue.
-  struct PendingQueueItem {
-    AsyncTask * const storage;
-
-    AsyncTask *getTask() const {
-      return storage;
-    }
-
-    static PendingQueueItem get(AsyncTask *task) {
-      assert(task == nullptr || task->isFuture());
-      return PendingQueueItem{task};
-    }
-  };
-
-  struct PoolStatus {
-    static const uint64_t cancelled      = 0b1000000000000000000000000000000000000000000000000000000000000000;
-    static const uint64_t waiting        = 0b0100000000000000000000000000000000000000000000000000000000000000;
-
-    // 62 bits for pending tasks counter
-    static const uint64_t maskPending    = 0b0011111111111111111111111111111111111111111111111111111111111111;
-    static const uint64_t onePendingTask = 0b0000000000000000000000000000000000000000000000000000000000000001;
-
-    uint64_t status;
-
-    bool isCancelled() {
-      return (status & cancelled) > 0;
-    }
-
-    bool hasWaitingTask() {
-      return (status & waiting) > 0;
-    }
-
-    unsigned int pendingTasks() {
-      return (status & maskPending);
-    }
-
-    bool isEmpty() {
-      return pendingTasks() == 0;
-    }
-
-    /// Status value decrementing the Ready, Pending and Waiting counters by one.
-    PoolStatus completingPendingWaiting() {
-      assert(pendingTasks() &&
-             "can only complete waiting task when pending tasks available");
-      assert(hasWaitingTask() &&
-             "can only complete waiting task when waiting task available");
-      return PoolStatus{status - waiting - onePendingTask};
-    }
-
-    PoolStatus completingWaiting() {
-      assert(hasWaitingTask() &&
-             "must have waiting task to complete it");
-      return PoolStatus{status - waiting};
-    }
-
-    /// Pretty prints the status, as follows:
-    /// PoolStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
-    std::string to_string() {
-      std::string str;
-      str.append("PoolStatus{ ");
-      str.append("C:"); // cancelled
-      str.append(isCancelled() ? "y " : "n ");
-      str.append("W:"); // has waiting task
-      str.append(hasWaitingTask() ? "y " : "n ");
-      str.append(" P:"); // pending
-      str.append(std::to_string(pendingTasks()));
-      str.append(" " + std::bitset<64>(status).to_string());
-      str.append(" }");
-      return str;
-    }
-
-    /// Initially there are no waiting and no pending tasks.
-    static const PoolStatus initial() {
-      return PoolStatus{0};
+      /// The future has completed by throwing an error (an \c Error
+      /// existential).
+      Error = 0b11,
     };
-  };
 
-private:
+    enum class PollStatus : uintptr_t {
+      /// The group is known to be empty and we can immediately return nil.
+      Empty = 0b00,
+
+      /// The task has been enqueued to the groups wait queue.
+      MustWait = 0b01,
+
+      /// The task has completed with result (of type \c resultType).
+      Success = 0b10,
+
+      /// The task has completed by throwing an error (an \c Error existential).
+      Error = 0b11,
+    };
+
+    /// The result of waiting on the TaskPoolImpl.
+    struct PollResult {
+      PollStatus status; // TODO: pack it into storage pointer or not worth it?
+
+      static PollResult get(AsyncTask *asyncTask, bool hadErrorResult) {
+        // A TaskPool task is always Void, so we don't even have to collect the result from its future fragment.
+        return PollResult{
+            /*status*/ hadErrorResult ?
+                       PollStatus::Error :
+                       PollStatus::Success
+        };
+      }
+    };
+
+    /// An item within the pending queue.
+    struct PendingQueueItem {
+      AsyncTask * const storage;
+
+      AsyncTask *getTask() const {
+        return storage;
+      }
+
+      static PendingQueueItem get(AsyncTask *task) {
+        assert(task == nullptr || task->isFuture());
+        return PendingQueueItem{task};
+      }
+    };
+
+    struct PoolStatus {
+      static const uint64_t cancelled      = 0b1000000000000000000000000000000000000000000000000000000000000000;
+      static const uint64_t waiting        = 0b0100000000000000000000000000000000000000000000000000000000000000;
+
+      // 62 bits for pending tasks counter
+      static const uint64_t maskPending    = 0b0011111111111111111111111111111111111111111111111111111111111111;
+      static const uint64_t onePendingTask = 0b0000000000000000000000000000000000000000000000000000000000000001;
+
+      uint64_t status;
+
+      bool isCancelled() {
+        return (status & cancelled) > 0;
+      }
+
+      bool hasWaitingTask() {
+        return (status & waiting) > 0;
+      }
+
+      unsigned int pendingTasks() {
+        return (status & maskPending);
+      }
+
+      bool isEmpty() {
+        return pendingTasks() == 0;
+      }
+
+      /// Status value decrementing the Ready, Pending and Waiting counters by one.
+      PoolStatus completingPendingWaiting() {
+        assert(pendingTasks() &&
+               "can only complete waiting task when pending tasks available");
+        assert(hasWaitingTask() &&
+               "can only complete waiting task when waiting task available");
+        return PoolStatus{status - waiting - onePendingTask};
+      }
+
+      PoolStatus completingWaiting() {
+        assert(hasWaitingTask() &&
+               "must have waiting task to complete it");
+        return PoolStatus{status - waiting};
+      }
+
+      /// Pretty prints the status, as follows:
+      /// PoolStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
+      std::string to_string() {
+        std::string str;
+        str.append("PoolStatus{ ");
+        str.append("C:"); // cancelled
+        str.append(isCancelled() ? "y " : "n ");
+        str.append("W:"); // has waiting task
+        str.append(hasWaitingTask() ? "y " : "n ");
+        str.append(" P:"); // pending
+        str.append(std::to_string(pendingTasks()));
+        str.append(" " + std::bitset<64>(status).to_string());
+        str.append(" }");
+        return str;
+      }
+
+      /// Initially there are no waiting and no pending tasks.
+      static const PoolStatus initial() {
+        return PoolStatus{0};
+      };
+    };
+
+  private:
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-  // Synchronization is simple here. In a single threaded mode, all swift tasks
+    // Synchronization is simple here. In a single threaded mode, all swift tasks
   // run on a single thread so no coordination is needed. In a task-to-thread
   // model, only the parent task which created the task group can
   //
@@ -229,129 +212,132 @@ private:
   void lock() const {}
   void unlock() const {}
 #else
-  // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
-  mutable std::mutex mutex_;
+    // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
+    mutable std::mutex mutex_;
 
-  void lock() const { mutex_.lock(); }
-  void unlock() const { mutex_.unlock(); }
+    void lock() const { mutex_.lock(); }
+    void unlock() const { mutex_.unlock(); }
 #endif
 
-  /// Used for queue management, counting number of waiting and ready tasks
-  std::atomic <uint64_t> status;
+    /// Used for queue management, counting number of waiting and ready tasks
+    std::atomic <uint64_t> status;
 
-//  /// Queue containing completed tasks offered into this group.
-//  ///
-//  /// The low bits contain the status, the rest of the pointer is the
-//  /// AsyncTask.
-//  NaiveQueue<ReadyQueueItem> readyQueue;
+    /// The task currently waiting on `group.next()`.  Since only the owning
+    /// task can ever be waiting on a group, this is just either a reference
+    /// to that task or null.
+    std::atomic<AsyncTask *> waitQueue;
 
-  /// The task currently waiting on `group.next()`.  Since only the owning
-  /// task can ever be waiting on a group, this is just either a reference
-  /// to that task or null.
-  std::atomic<AsyncTask *> waitQueue;
 
-  const Metadata *voidType; // TODO: must be Void so just assume it
+    friend class ::swift::AsyncTask;
 
-  friend class ::swift::AsyncTask;
+  public:
+    const Metadata *voidType;
 
-public:
-  explicit TaskPoolImpl(const Metadata *T)
-    : TaskPoolTaskStatusRecord(),
-      status(PoolStatus::initial().status),
-//      readyQueue(),
-      waitQueue(nullptr),
-      voidType(T)
-      {}
+    explicit TaskPoolImpl(const Metadata *T)
+        : TaskPoolTaskStatusRecord(),
+          status(PoolStatus::initial().status),
+          waitQueue(nullptr),
+          voidType(T)
+    {}
 
-  TaskPoolTaskStatusRecord *getTaskRecord() {
-    return reinterpret_cast<TaskPoolTaskStatusRecord *>(this);
-  }
-
-  /// Destroy the storage associated with the group.
-  void destroy();
-
-  bool isEmpty() {
-    auto oldStatus = PoolStatus{status.load(std::memory_order_relaxed)};
-    return oldStatus.pendingTasks() == 0;
-  }
-
-  bool isCancelled() {
-    auto oldStatus = PoolStatus{status.load(std::memory_order_relaxed)};
-    return oldStatus.isCancelled();
-  }
-
-  /// Cancel the task group and all tasks within it.
-  ///
-  /// Returns `true` if this is the first time cancelling the group, false otherwise.
-  bool cancelAll();
-
-  PoolStatus statusCancel() {
-    auto old = status.fetch_or(PoolStatus::cancelled,
-                               std::memory_order_relaxed);
-    return PoolStatus{old};
-  }
-
-  /// Returns *assumed* new status, including the just performed +1.
-  PoolStatus statusMarkWaitingAssumeAcquire() {
-    auto old = status.fetch_or(PoolStatus::waiting, std::memory_order_acquire);
-    return PoolStatus{old | PoolStatus::waiting};
-  }
-
-  PoolStatus statusRemoveWaiting() {
-    auto old = status.fetch_and(~PoolStatus::waiting,
-                                std::memory_order_release);
-    return PoolStatus{old};
-  }
-
-  // NOTE: the following change from a TaskGroup which adds ready; we just remove pending.
-  // statusAddReadyAssumeAcquire >>>> statusDecrementPendingAssumeAcquire
-  /// Returns *assumed* new status, including the just performed +1.
-  PoolStatus statusDecrementPendingAssumeAcquire() {
-    auto old = status.fetch_sub(PoolStatus::onePendingTask,
-                                std::memory_order_acquire);
-    return PoolStatus{old - PoolStatus::onePendingTask};
-  }
-
-  PoolStatus statusRemovePendingAcquire() {
-    auto old = status.fetch_add(PoolStatus::onePendingTask,
-                                std::memory_order_acquire);
-    return PoolStatus{old - PoolStatus::onePendingTask};
-  }
-
-  /// Add a single pending task to the status counter.
-  /// This is used to implement next() properly, as we need to know if there
-  /// are pending tasks worth suspending/waiting for or not.
-  ///
-  /// Note that the group does *not* store child tasks at all, as they are
-  /// stored in the `TaskPoolTaskStatusRecord` inside the current task, that
-  /// is currently executing the group. Here we only need the counts of
-  /// pending/ready tasks.
-  ///
-  /// If the `unconditionally` parameter is `true` the operation always successfully
-  /// adds a pending task, even if the group is cancelled. If the unconditionally
-  /// flag is `false`, the added pending count will be *reverted* before returning.
-  /// This is because we will NOT add a task to a cancelled group, unless doing
-  /// so unconditionally.
-  ///
-  /// Returns *assumed* new status, including the just performed +1.
-  PoolStatus statusAddPendingTaskRelaxed(bool unconditionally) {
-    auto old = status.fetch_add(PoolStatus::onePendingTask,
-                                std::memory_order_relaxed);
-    auto s = PoolStatus{old + PoolStatus::onePendingTask};
-
-    if (!unconditionally && s.isCancelled()) {
-      // revert that add, it was meaningless
-      auto o = status.fetch_sub(PoolStatus::onePendingTask,
-                                std::memory_order_relaxed);
-      s = PoolStatus{o - PoolStatus::onePendingTask};
+    TaskPoolTaskStatusRecord *getTaskRecord() {
+      return reinterpret_cast<TaskPoolTaskStatusRecord *>(this);
     }
 
-    return s;
-  }
+    /// Destroy the storage associated with the group.
+    void destroy();
 
-  PoolStatus statusLoadRelaxed() {
-    return PoolStatus{status.load(std::memory_order_relaxed)};
-  }
+    bool isEmpty() {
+      auto oldStatus = PoolStatus{status.load(std::memory_order_relaxed)};
+      return oldStatus.pendingTasks() == 0;
+    }
+
+    bool isCancelled() {
+      auto oldStatus = PoolStatus{status.load(std::memory_order_relaxed)};
+      return oldStatus.isCancelled();
+    }
+
+    /// Cancel the task group and all tasks within it.
+    ///
+    /// Returns `true` if this is the first time cancelling the group, false otherwise.
+    bool cancelAll();
+
+    PoolStatus statusCancel() {
+      auto old = status.fetch_or(PoolStatus::cancelled,
+                                 std::memory_order_relaxed);
+      return PoolStatus{old};
+    }
+
+    /// Returns *assumed* new status, including the just performed +1.
+    PoolStatus statusMarkWaitingAssumeAcquire() {
+      auto old = status.fetch_or(PoolStatus::waiting, std::memory_order_acquire);
+      return PoolStatus{old | PoolStatus::waiting};
+    }
+
+    PoolStatus statusRemoveWaiting() {
+      auto old = status.fetch_and(~PoolStatus::waiting,
+                                  std::memory_order_release);
+      return PoolStatus{old};
+    }
+
+    /// Decrement the pending task count.
+    /// Returns *assumed* new status, including the just performed +1.
+    PoolStatus statusDecrementPendingAssumeAcquire() {
+      auto old = status.fetch_sub(PoolStatus::onePendingTask,
+                                  std::memory_order_acquire);
+      assert(PoolStatus{old}.pendingTasks() > 0 && "attempted to decrement pending count when it was 0 already");
+      return PoolStatus{old - PoolStatus::onePendingTask};
+    }
+
+    /// Increment the pending task count.
+    ///
+    /// Returns *assumed* new status, including the just performed -1.
+    PoolStatus statusIncrementPendingAssumeAcquire() {
+      auto old = status.fetch_add(PoolStatus::onePendingTask,
+                                  std::memory_order_acquire);
+      return PoolStatus{old + PoolStatus::onePendingTask};
+    }
+
+    /// Similar to decrementing the pending count, however does so 'relaxed'.
+    /// Used to undo an optimistic increment, when the pool already is cancelled.
+    ///
+    /// Returns *assumed* new status, including the just performed -1.
+    PoolStatus statusUndoIncrementPendingAssumeRelaxed() {
+      auto o = status.fetch_sub(PoolStatus::onePendingTask,
+                                std::memory_order_relaxed);
+      return PoolStatus{o - PoolStatus::onePendingTask};
+    }
+
+    /// Add a single pending task to the status counter.
+    /// This is used to implement next() properly, as we need to know if there
+    /// are pending tasks worth suspending/waiting for or not.
+    ///
+    /// Note that the group does *not* store child tasks at all, as they are
+    /// stored in the `TaskPoolTaskStatusRecord` inside the current task, that
+    /// is currently executing the group. Here we only need the counts of
+    /// pending/ready tasks.
+    ///
+    /// If the `unconditionally` parameter is `true` the operation always successfully
+    /// adds a pending task, even if the group is cancelled. If the unconditionally
+    /// flag is `false`, the added pending count will be *reverted* before returning.
+    /// This is because we will NOT add a task to a cancelled group, unless doing
+    /// so unconditionally.
+    ///
+    /// Returns *assumed* new status, including the just performed +1.
+    PoolStatus statusAddPendingTaskRelaxed(bool unconditionally) {
+      auto assumed = statusIncrementPendingAssumeAcquire();
+
+      if (!unconditionally && assumed.isCancelled()) {
+        // revert that add, it was meaningless
+        return statusUndoIncrementPendingAssumeRelaxed();
+      }
+      fprintf(stderr, "[%s:%d](%s) status after add: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__, assumed.to_string().c_str());
+      return assumed;
+    }
+
+    PoolStatus statusLoadRelaxed() {
+      return PoolStatus{status.load(std::memory_order_relaxed)};
+    }
 
 //  /// Compare-and-set old status to a status derived from the old one,
 //  /// by simultaneously decrementing one Pending and one Waiting tasks.
@@ -372,31 +358,31 @@ public:
 //  }
 
 
-  /// Offer result of a task into this task pool.
-  ///
-  /// Unlike a task group, result values are never stored and we immediately
-  /// release the task after decrementing the `pending` count in the pool's status.
-  ///
-  /// If the TaskPool is currently "draining" tasks (i.e. its body has completed),
-  /// there may be a `waiting` task. If so, and this is the last pending task,
-  /// this offer will resume it, allowing the TaskPool to complete and destroy itself.
-  void offer(AsyncTask *completed, AsyncContext *context);
+    /// Offer result of a task into this task pool.
+    ///
+    /// Unlike a task group, result values are never stored and we immediately
+    /// release the task after decrementing the `pending` count in the pool's status.
+    ///
+    /// If the TaskPool is currently "draining" tasks (i.e. its body has completed),
+    /// there may be a `waiting` task. If so, and this is the last pending task,
+    /// this offer will resume it, allowing the TaskPool to complete and destroy itself.
+    void offer(AsyncTask *completed, AsyncContext *context);
 
-  /// A `TaskPool` is not able to wait on individual completions,
-  /// instead, it can only await on "all pending tasks have been processed".
-  ///
-  ///
-  /// If unable to complete the waiting task immediately (with an readily
-  /// available completed task), either returns an `PollStatus::Empty`
-  /// result if it is known that no pending tasks in the group,
-  /// or a `PollStatus::MustWait` result if there are tasks in flight
-  /// and the waitingTask eventually be woken up by a completion.
-  PollResult waitAll(AsyncTask *waitingTask);
+    /// A `TaskPool` is not able to wait on individual completions,
+    /// instead, it can only await on "all pending tasks have been processed".
+    ///
+    ///
+    /// If unable to complete the waiting task immediately (with an readily
+    /// available completed task), either returns an `PollStatus::Empty`
+    /// result if it is known that no pending tasks in the group,
+    /// or a `PollStatus::MustWait` result if there are tasks in flight
+    /// and the waitingTask eventually be woken up by a completion.
+    PollResult waitAll(AsyncTask *waitingTask);
 
-private:
-  /// Enqueue the completed task onto ready queue if there are no waiting tasks yet
-  PoolStatus completeTask(AsyncTask *completedTask);
-};
+//private:
+//  /// Enqueue the completed task onto ready queue if there are no waiting tasks yet
+//  PoolStatus completeTask(AsyncTask *completedTask);
+  };
 
 } // end anonymous namespace
 
@@ -421,7 +407,7 @@ static TaskPool *asAbstract(TaskPoolImpl *group) {
 }
 
 TaskPoolTaskStatusRecord * TaskPool::getTaskRecord() {
-    return asImpl(this)->getTaskRecord();
+  return asImpl(this)->getTaskRecord();
 }
 
 // =============================================================================
@@ -429,12 +415,12 @@ TaskPoolTaskStatusRecord * TaskPool::getTaskRecord() {
 
 // Initializes into the preallocated _pool an actual TaskPoolImpl.
 SWIFT_CC(swift)
-static void swift_taskPool_initializeImpl(TaskPool *group, const Metadata *Void) {
-  SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
+static void swift_taskPool_initializeImpl(TaskPool *pool, const Metadata *Void) {
+  SWIFT_TASK_DEBUG_LOG("creating task pool = %p", pool);
 
-  TaskPoolImpl *impl = ::new (group) TaskPoolImpl(Void);
+  TaskPoolImpl *impl = ::new (pool) TaskPoolImpl(Void);
   auto record = impl->getTaskRecord();
-  assert(impl == record && "the group IS the task record");
+  assert(impl == record && "the pool IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
   addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
@@ -490,8 +476,8 @@ void TaskPoolImpl::destroy() {
   SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
   if (!this->isEmpty()) {
     auto status = this->statusLoadRelaxed();
-    SWIFT_TASK_DEBUG_LOG("destroying task group = %p, tasks .ready = %d, .pending = %d",
-                         this, status.readyTasks(), status.pendingTasks());
+    SWIFT_TASK_DEBUG_LOG("destroying task group = %p, .pending = %d",
+                         this, status.pendingTasks());
   }
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
 
@@ -543,52 +529,52 @@ bool TaskPool::isCancelled() {
 static void fillPoolNextVoidResult(TaskFutureWaitAsyncContext *context,
                                    const Metadata *voidType,
                                    PollResult result) {
+  fprintf(stderr, "[%s:%d](%s) fill in void\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   /// Fill in the result value
   switch (result.status) {
-  case PollStatus::MustWait:
-    assert(false && "filling a waiting status?");
-    return;
+    case PollStatus::MustWait:
+      assert(false && "filling a waiting status?");
+      return;
 
-  case PollStatus::Error: {
-    assert(false && "cannot have errors");
-    return;
-  }
+    case PollStatus::Error: {
+      assert(false && "cannot have errors");
+      return;
+    }
 
-  case PollStatus::Success: {
-    // Initialize the result as an Optional<Void>.
-//    const Metadata *voidType = nullptr; // result.voidType; // FIXME: should be Void type
-    OpaqueValue *destPtr = context->successResultPointer;
-    // TODO: figure out a way to try to optimistically take the
-    // value out of the finished task's future, if there are no
-    // remaining references to it.
-    voidType->vw_initializeWithCopy(destPtr, nullptr);
-    voidType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
-    return;
-  }
+    case PollStatus::Success: {
+      // Initialize the result as an Optional<Void>.
+      // const Metadata *voidType = nullptr; // result.voidType; // FIXME: should be Void type
+      OpaqueValue *destPtr = context->successResultPointer;
+      // TODO: figure out a way to try to optimistically take the
+      // value out of the finished task's future, if there are no
+      // remaining references to it.
+      voidType->vw_initializeWithCopy(destPtr, nullptr);
+      voidType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
+      return;
+    }
 
-  case PollStatus::Empty: {
-    // Initialize the result as a nil Optional<Success>.
-//    const Metadata *voidType = nullptr; // result.voidType; // FIXME: should be Void type
-    OpaqueValue *destPtr = context->successResultPointer;
-    voidType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
-    return;
-  }
+    case PollStatus::Empty: {
+      // Initialize the result as a nil Optional<Success>.
+      // const Metadata *voidType = nullptr; // result.voidType; // FIXME: should be Void type
+      OpaqueValue *destPtr = context->successResultPointer;
+      voidType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+      return;
+    }
   }
 }
 
-// TaskPool is locked upon entry and exit
-TaskPoolImpl::PoolStatus TaskPoolImpl::completeTask(AsyncTask *completedTask) {
-    SWIFT_TASK_DEBUG_LOG("pool does not retain tasks for their results; we're done here = %p", completedTask);
-    // DO NOT RETAIN THE TASK.
-    // We know it is Void, so we don't need to store the result;
-    // By releasing tasks eagerly we're able to keep "infinite" task groups,
-    // running, that never consume their values. Even more-so,
-
-    return this->statusDecrementPendingAssumeAcquire();
-}
+//// TaskPool is locked upon entry and exit
+//TaskPoolImpl::PoolStatus TaskPoolImpl::completeTask(AsyncTask *completedTask) {
+//    SWIFT_TASK_DEBUG_LOG("pool does not retain tasks for their results; we're done here = %p", completedTask);
+//    // DO NOT RETAIN THE TASK.
+//    // We know it is Void, so we don't need to store the result;
+//    // By releasing tasks eagerly we're able to keep "infinite" task groups,
+//    // running, that never consume their values. Even more-so,
+//
+//    return this->statusDecrementPendingAssumeAcquire();
+//}
 
 void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
-  fprintf(stderr, "[%s:%d](%s) offer task = %p, pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, completedTask, pool);
   assert(completedTask);
   assert(completedTask->isFuture());
   assert(completedTask->hasChildFragment());
@@ -611,6 +597,9 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     // instead, we need to enqueue this result:
     hadErrorResult = true;
   }
+
+  SWIFT_TASK_DEBUG_LOG("pool(%p) child task=%p completed, detach", this, completedTask);
+  _swift_taskPool_detachChild(asAbstract(this), completedTask);
 
   // ==== a) has waiting task.
   // A TaskPool only has a waiting task while terminating, and that task shall only be resumed once
@@ -689,7 +678,7 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     // ready for it, and will process it immediately without suspending.
     assert(!waitQueue.load(std::memory_order_relaxed));
 
-    completeTask(completedTask);
+    // completeTask(completedTask);
     unlock(); // TODO: remove fragment lock, and use status for synchronization
   }
 
@@ -724,7 +713,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_taskPool_waitAllImpl(
 #endif
 
 // =============================================================================
-// ==== group.next() implementation (wait_next and groupPoll) ------------------
+// ==== pool.waitAll() implementation ------------------------------------------
 
 SWIFT_CC(swiftasync)
 static void swift_taskPool_waitAllImpl(
@@ -732,6 +721,7 @@ static void swift_taskPool_waitAllImpl(
     TaskPool *_pool,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
+  fprintf(stderr, "[%s:%d](%s) wait all; pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, _pool);
   auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = TASK_POOL_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
@@ -744,47 +734,46 @@ static void swift_taskPool_waitAllImpl(
   context->successResultPointer = resultPointer;
 
   auto pool = asImpl(_pool);
-  assert(pool && "swift_taskPool_waitAll was passed context without group!");
+  assert(pool && "swift_taskPool_waitAll was passed context without pool!");
 
   PollResult polled = pool->waitAll(waitingTask);
   switch (polled.status) {
-  case PollStatus::MustWait:
-    SWIFT_TASK_DEBUG_LOG("poll group = %p, no ready tasks, waiting task = %p",
-                         group, waitingTask);
-    // The waiting task has been queued on the channel,
-    // there were pending tasks so it will be woken up eventually.
+    case PollStatus::MustWait:
+    SWIFT_TASK_DEBUG_LOG("poll pool = %p, no ready tasks, waiting task = %p",
+                         pool, waitingTask);
+      // The waiting task has been queued on the channel,
+      // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
-    return workaround_function_swift_taskPool_waitAllImpl(
+      return workaround_function_swift_taskPool_waitAllImpl(
         resultPointer, callerContext, _pool, resumeFunction, rawContext);
 #else /* __ARM_ARCH_7K__ */
-    return;
+      return;
 #endif /* __ARM_ARCH_7K__ */
 
-  case PollStatus::Empty:
-  case PollStatus::Error:
-  case PollStatus::Success:
-    SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
-                         group, waitingTask, polled.retainedTask);
-//    if (group->eagerlyReleaseCompleteTasks) {
-    fillPoolNextVoidResult(context, pool->voidType, polled);
+    case PollStatus::Empty:
+    case PollStatus::Error:
+    case PollStatus::Success:
+    SWIFT_TASK_DEBUG_LOG("[pool:%p] poll, task = %p", pool, waitingTask);
+//    if (pool->eagerlyReleaseCompleteTasks) {
+      fillPoolNextVoidResult(context, pool->voidType, polled);
 //    } else {
 //      fillPoolNextResult(context, polled);
 //    }
 //    if (auto completedTask = polled.retainedTask) {
-//      // Remove the child from the task group's running tasks list.
-//      _swift_taskPool_detachChild(asAbstract(group), completedTask);
+//      // Remove the child from the task pool's running tasks list.
+//      _swift_taskPool_detachChild(asAbstract(pool), completedTask);
 //
 //      // Balance the retain done by completeTask.
 //      swift_release(completedTask);
 //    }
 
-    return waitingTask->runInFullyEstablishedContext();
+      return waitingTask->runInFullyEstablishedContext();
   }
 }
 
 PollResult TaskPoolImpl::waitAll(AsyncTask *waitingTask) {
-  lock(); // TODO: remove group lock, and use status for synchronization
-  SWIFT_TASK_DEBUG_LOG("pool = %p, waitAll pending", this);
+  lock(); // TODO: remove pool lock, and use status for synchronization
+  SWIFT_TASK_DEBUG_LOG("[pool:%p], waitAll pending; status = %s", this, statusLoadRelaxed().to_string().c_str());
 
   PollResult result;
 
@@ -792,18 +781,18 @@ PollResult TaskPoolImpl::waitAll(AsyncTask *waitingTask) {
   bool hasSuspended = false;
   bool haveRunOneChildTaskInline = false;
 
-reevaluate_if_taskgroup_has_results:;
+  reevaluate_if_taskpool_has_results:;
   auto assumed = statusMarkWaitingAssumeAcquire();
   // ==== 1) bail out early if no tasks are pending ----------------------------
   if (assumed.isEmpty()) {
-    SWIFT_TASK_DEBUG_LOG("poll group = %p, group is empty, no pending tasks", this);
+    SWIFT_TASK_DEBUG_LOG("[pool:%p] poll, is empty, no pending tasks", this);
     // No tasks in flight, we know no tasks were submitted before this poll
     // was issued, and if we parked here we'd potentially never be woken up.
     // Bail out and return `nil` from `group.next()`.
     statusRemoveWaiting();
     result.status = PollStatus::Empty;
     // result.voidType = this->voidType;
-    unlock(); // TODO: remove group lock, and use status for synchronization
+    unlock(); // TODO: remove pool lock, and use status for synchronization
     return result;
   }
 
@@ -842,7 +831,7 @@ reevaluate_if_taskgroup_has_results:;
       // We are back to being the parent task and now that we've run the child
       // task, we should reevaluate parent task
       _swift_task_setCurrent(oldTask);
-      goto reevaluate_if_taskgroup_has_results;
+      goto reevaluate_if_taskpool_has_results;
 #endif
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
@@ -910,6 +899,7 @@ static void swift_task_cancel_pool_child_tasksImpl(TaskPool *pool) {
 /// owning task of the task group or while holding the owning task's
 /// status record lock.
 void swift::_swift_taskPool_cancelAllChildren(TaskPool *pool) {
+  SWIFT_TASK_DEBUG_LOG("pool(%p) cancel all children tasks", pool);
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
   // while holding the owning task's status record lock, we do not need
@@ -923,6 +913,7 @@ void swift::_swift_taskPool_cancelAllChildren(TaskPool *pool) {
 
 SWIFT_CC(swift)
 static bool swift_taskPool_addPendingImpl(TaskPool *pool, bool unconditionally) {
+  fprintf(stderr, "[%s:%d](%s) add pending task to pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, pool);
   auto assumed = asImpl(pool)->statusAddPendingTaskRelaxed(unconditionally);
   SWIFT_TASK_DEBUG_LOG("add pending %s to pool %p, tasks pending = %d",
                        unconditionally ? "unconditionally" : "",

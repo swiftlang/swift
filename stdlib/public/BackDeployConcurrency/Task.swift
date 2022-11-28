@@ -424,7 +424,7 @@ struct JobFlags {
 func taskCreateFlags(
   priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
   inheritContext: Bool, enqueueJob: Bool,
-  addPendingGroupTaskUnconditionally: Bool
+  addPendingTaskUnconditionally: Bool
 ) -> Int {
   var bits = 0
   bits |= (bits & ~0xFF) | Int(priority?.rawValue ?? 0)
@@ -440,7 +440,7 @@ func taskCreateFlags(
   if enqueueJob {
     bits |= 1 << 12
   }
-  if addPendingGroupTaskUnconditionally {
+  if addPendingTaskUnconditionally {
     bits |= 1 << 13
   }
   return bits
@@ -483,7 +483,7 @@ extension Task where Failure == Never {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false)
+      addPendingTaskUnconditionally: false)
 
     // Create the asynchronous task.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -531,7 +531,7 @@ extension Task where Failure == Error {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 
     // Create the asynchronous task future.
@@ -578,7 +578,7 @@ extension Task where Failure == Never {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false)
+      addPendingTaskUnconditionally: false)
 
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -625,7 +625,7 @@ extension Task where Failure == Error {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 
     // Create the asynchronous task future.

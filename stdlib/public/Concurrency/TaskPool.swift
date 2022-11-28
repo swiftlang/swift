@@ -23,18 +23,39 @@ import Darwin
 /// submitting work using child tasks, where the results of those child tasks do not need to be collected.
 /// 
 /// A task pool cannot be iterated over and its child tasks cannot be awaited on explicitly.
+/// 
 /// Task pool tasks are immediately removed from the pool as soon as they complete, 
 /// this is the primary difference from a task pool which stores results (and thus retains the results),
 /// until they are consumed.
 ///
-/// Similarly to a `TaskGroup` a `TaskPool` awaits all tasks that are submitted to it before returning 
+/// Similarly to a ``TaskGroup`` a `TaskPool` awaits all tasks that are submitted to it before returning
 /// from the `withTaskPool` call.
 ///
-/// Task Group Cancellation
+/// Typical usage of a ``TaskPool`` to handle a stream of incoming requests may look something like this:
+/// 
+/// ```
+/// try await withTaskPool() { pool in
+///     for try await request in self.requests { // may throw on cancellation
+///         pool.addTaskUnlessCancelled {
+///             await handler.handle(request, response: responseWriter) // handler is responsible for writing response
+///         }
+///     }
+/// }
+/// ```
+///
+/// It is typical for servers to want to consume incoming requests as fast as possible, and feed them into the
+/// some `handler` that will perform the actual invocation of user-code and write the response back to the network.
+///
+/// > Note: Note that a `TaskPool` does not guarantee execution order of tasks added using `addTask`,
+/// > they are subject to the same scheduling rules as a `TaskGroup`, and should be used in cases where parallelism
+/// > is desired, rather than a strict one-by-one execution, which can be achieved by not creating additional tasks
+/// > for the processing of the requests.
+/// 
+/// Task Pool Cancellation
 /// =======================
 ///
 /// You can cancel a task pool and all of its child tasks
-/// by calling the `cancelAll()` method on the task pool,
+/// by calling the ``cancelAll()`` method on the task pool,
 /// or by canceling the task in which the pool is running.
 ///
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled pool,
@@ -117,18 +138,18 @@ public struct TaskPool {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInPool
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true
+      addPendingTaskUnconditionally: true
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
+      addPendingTaskUnconditionally: true
     )
 #endif
 
@@ -153,7 +174,7 @@ public struct TaskPool {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInPool
     let canAdd = _taskPoolAddPendingTask(pool: _pool, unconditionally: false)
 
     guard canAdd else {
@@ -164,18 +185,18 @@ public struct TaskPool {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 #endif
 
     // Create the task in this pool.
-    _ = Builtin.createAsyncTaskInGroup(flags, _pool, operation)
+    _ = Builtin.createAsyncTaskInPool(flags, _pool, operation)
 
     return true
 #else
@@ -200,15 +221,15 @@ public struct TaskPool {
   public mutating func addTask(
     operation: __owned @Sendable @escaping () async -> Void
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInPool
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
+      addPendingTaskUnconditionally: true
     )
 
     // Create the task in this pool.
-    _ = Builtin.createAsyncTaskInGroup(flags, _pool, operation)
+    _ = Builtin.createAsyncTaskInPool(flags, _pool, operation)
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -233,7 +254,7 @@ public struct TaskPool {
   public mutating func addTaskUnlessCancelled(
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInPool
     let canAdd = _taskPoolAddPendingTask(pool: _pool, unconditionally: false)
 
     guard canAdd else {
@@ -244,7 +265,7 @@ public struct TaskPool {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 
     // Create the task in this pool.

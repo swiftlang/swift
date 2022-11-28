@@ -241,7 +241,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
+      addPendingTaskUnconditionally: true
     )
 
     // Create the task in this group.
@@ -276,7 +276,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 
     // Create the task in this group.
@@ -493,7 +493,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
+      addPendingTaskUnconditionally: true
     )
 
     // Create the task in this group.
@@ -531,7 +531,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
+      addPendingTaskUnconditionally: false
     )
 
     // Create the task in this group.

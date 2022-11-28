@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Object management for child tasks that are children of a task group.
+// Object management for child tasks that are children of a task pool.
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,7 +61,7 @@ class TaskPoolImpl: public TaskPoolTaskStatusRecord {
 public:
   /// Describes the status of the group.
   enum class ReadyStatus : uintptr_t {
-    /// The task group is empty, no tasks are pending.
+    /// The task pool is empty, no tasks are pending.
     /// Return immediately, there is no point in suspending.
     ///
     /// The storage is not accessible.
@@ -187,13 +187,13 @@ private:
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   // Synchronization is simple here. In a single threaded mode, all swift tasks
   // run on a single thread so no coordination is needed. In a task-to-thread
-  // model, only the parent task which created the task group can
+  // model, only the parent task which created the task pool can
   //
-  //   (a) add child tasks to a group
+  //   (a) add child tasks to a pool
   //   (b) run the child tasks
   //
   // So we shouldn't need to worry about coordinating between child tasks and
-  // parents in a task group
+  // parents in a task pool
   void lock() const {}
   void unlock() const {}
 #else
@@ -242,7 +242,7 @@ public:
     return oldStatus.isCancelled();
   }
 
-  /// Cancel the task group and all tasks within it.
+  /// Cancel the task pool and all tasks within it.
   ///
   /// Returns `true` if this is the first time cancelling the group, false otherwise.
   bool cancelAll();
@@ -424,7 +424,7 @@ static void swift_taskPool_initializeImpl(TaskPool *pool, const Metadata *Void) 
 void TaskPool::addChildTask(AsyncTask *child) {
   SWIFT_TASK_DEBUG_LOG("attach child task = %p to pool = %p", child, this);
 
-  // Add the child task to this task group.  The corresponding removal
+  // Add the child task to this task pool.  The corresponding removal
   // won't happen until the parent task successfully polls for this child
   // task, either synchronously in poll (if a task is available
   // synchronously) or asynchronously in offer (otherwise).  In either
@@ -432,7 +432,7 @@ void TaskPool::addChildTask(AsyncTask *child) {
 
   // The task status record lock is held during this operation, which
   // prevents us from racing with cancellation or escalation.  We don't
-  // need to acquire the task group lock because the child list is only
+  // need to acquire the task pool lock because the child list is only
   // accessed under the task status record lock.
   auto record = asImpl(this)->getTaskRecord();
   record->attachChild(child);
@@ -872,9 +872,9 @@ bool TaskPoolImpl::cancelAll() {
 
 SWIFT_CC(swift)
 static void swift_task_cancel_pool_child_tasksImpl(TaskPool *pool) {
-  // TaskPool is not a Sendable type, and so this operation (which is not
-  // currently exposed in the API) can only be called from the owning
-  // task.  This satisfies the precondition on cancelAllChildren().
+  // TaskPool is not a Sendable type, and so this operation can
+  // only be called from the owning task.
+  // This satisfies the precondition on cancelAllChildren().
   _swift_taskPool_cancelAllChildren(pool);
 }
 
@@ -898,7 +898,6 @@ void swift::_swift_taskPool_cancelAllChildren(TaskPool *pool) {
 
 SWIFT_CC(swift)
 static bool swift_taskPool_addPendingImpl(TaskPool *pool, bool unconditionally) {
-  fprintf(stderr, "[%s:%d](%s) add pending task to pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, pool);
   auto assumed = asImpl(pool)->statusAddPendingTaskRelaxed(unconditionally);
   SWIFT_TASK_DEBUG_LOG("add pending %s to pool %p, tasks pending = %d",
                        unconditionally ? "unconditionally" : "",

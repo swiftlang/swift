@@ -27,7 +27,7 @@
 
 namespace swift {
 
-/// The task group is responsible for maintaining dynamically created child tasks.
+/// The task pool is responsible for maintaining dynamically created child tasks.
 class alignas(Alignment_TaskPool) TaskPool {
 public:
   // These constructors do not initialize the group instance, and the
@@ -38,21 +38,21 @@ public:
 
   void *PrivateData[NumWords_TaskPool];
 
-  /// Upon a future task's completion, offer it to the task group it belongs to.
+  /// Upon a future task's completion, offer it to the task pool it belongs to.
   void offer(AsyncTask *completed, AsyncContext *context);
 
   /// Checks the cancellation status of the group.
   bool isCancelled();
 
-  // Add a child task to the task group. Always called while holding the
-  // status record lock of the task group's owning task.
+  // Add a child task to the task pool. Always called while holding the
+  // status record lock of the task pool's owning task.
   void addChildTask(AsyncTask *task);
 
-  // Remove a child task from the task group. Always called while holding
-  // the status record lock of the task group's owning task.
+  // Remove a child task from the task pool. Always called while holding
+  // the status record lock of the task pool's owning task.
   void removeChildTask(AsyncTask *task);
 
-  // Provide accessor for task group's status record
+  // Provide accessor for task pool's status record
   TaskPoolTaskStatusRecord *getTaskRecord();
 };
 

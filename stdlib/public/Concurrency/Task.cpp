@@ -739,7 +739,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // Add to the task group or pool, if requested.
-  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) { // TODO: rename the flag
+  if (taskCreateFlags.addPendingTaskUnconditionally()) { // TODO: rename the flag
     if (group) {
       swift_taskGroup_addPending(group, /*unconditionally=*/true);
     } else if (pool) {

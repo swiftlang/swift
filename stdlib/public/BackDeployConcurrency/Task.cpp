@@ -508,7 +508,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // Add to the task group, if requested.
-  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
+  if (taskCreateFlags.addPendingTaskUnconditionally()) {
     assert(group && "Missing group");
     swift_taskGroup_addPending(group, /*unconditionally=*/true);
   }
