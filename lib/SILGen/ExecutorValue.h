@@ -22,8 +22,10 @@ class SILGenBuilder;
 
 /// A thin wrapper around a raw SILValue that represents an executor.
 struct ExecutorValue {
-  SILValue rawValue;
+  private:
+    SILValue rawValue;
 
+  public:
   ExecutorValue() : rawValue() {}
   ExecutorValue(SILValue val) : rawValue(val) {}
   ExecutorValue(SILValue const& val) : rawValue(val) {}
@@ -34,10 +36,12 @@ struct ExecutorValue {
 
   operator bool() const { return rawValue; }
 
-  void emitHopToExecutor(SILLocation, SILGenBuilder, bool isMandatory);
+  /// Convenience method to load the executor and emit a hop.
+  /// Equivalent to emitting `hop_to_executor (this->emitLoadExecutor())`
+  void emitHopToExecutor(SILLocation, SILGenBuilder&, bool isMandatory);
 
-  /// \returns a value of type Builtin.Executor
-  SILValue emitGetCurrentExecutor(SILLocation, SILGenBuilder);
+  /// \returns the executor represented by this value.
+  SILValue emitLoadExecutor(SILLocation, SILGenBuilder&);
 };
 
 } // Lowering

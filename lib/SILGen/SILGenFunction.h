@@ -907,8 +907,6 @@ public:
   ///
   /// This function emits the appropriate hop_to_executor for a constructor's
   /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
   void emitConstructorPrologActorHop(SILLocation loc,
                                      ConstructorDecl *ctor,
                                      ManagedValue self,

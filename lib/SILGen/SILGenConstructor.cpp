@@ -360,13 +360,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                   ctor->getThrowsLoc());
   emitConstructorMetatypeArg(*this, ctor);
 
-  // Make sure we've hopped to the right global actor, if any.
+  // Make sure we've hopped to the right actor, if any.
   if (ctor->hasAsync()) {
     auto isolation = getActorIsolation(ctor);
     SILLocation prologueLoc(selfDecl);
     prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, ctor,
-                                  ManagedValue::forLValue(selfLV), isolation);
+    auto managedSelf = ManagedValue::forUnmanaged(VarLocs[selfDecl].value); // FIXME
+    emitConstructorPrologActorHop(prologueLoc, ctor, managedSelf, isolation);
   }
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -725,7 +725,7 @@ void SILGenFunction::emitConstructorPrologActorHop(
   if (!ExpectedExecutor)
     ExpectedExecutor = emitGenericExecutor(loc);
 
-  // if it's not injected by definite init, we do it in the prologue now.
+  // FIXME: does DI even need to inject the hop? we have more info in SILGen to do it right.
   if (!ctorPrologueHopsAreInjectedByDefiniteInit(ctor, isolation))
     ExpectedExecutor.emitHopToExecutor(loc, B, /*mandatory*/ false);
 
@@ -839,7 +839,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     auto isolation = getActorIsolation(ctor);
     SILLocation prologueLoc(selfDecl);
     prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, ctor, selfArg, isolation);
+    auto managedSelf = ManagedValue::forUnmanaged(VarLocs[selfDecl].value); // FIXME
+    emitConstructorPrologActorHop(prologueLoc, ctor, managedSelf, isolation);
   }
 
   // Some distributed actor initializers need to init the actorSystem & id now
