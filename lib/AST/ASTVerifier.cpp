@@ -645,7 +645,7 @@ public:
             if (genericEnv->getKind() == GenericEnvironment::Kind::OpenedElement) {
               auto contextSubs = genericEnv->getPackElementContextSubstitutions();
               QuerySubstitutionMap isInContext{contextSubs};
-              if (isInContext(root->getInterfaceType()->getAs<GenericTypeParamType>()))
+              if (isInContext(root->getInterfaceType()->castTo<GenericTypeParamType>()))
                 return false;
             }
           }
