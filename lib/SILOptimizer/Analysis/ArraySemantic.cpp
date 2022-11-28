@@ -740,9 +740,9 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   auto InsertPt = V->getFunction()->hasOwnership()
                       ? getInsertAfterPoint(V)
                       : SemanticsCall->getIterator();
-  assert(InsertPt.hasValue());
+  assert(InsertPt.has_value());
 
-  SILValue CopiedVal = SILBuilderWithScope(InsertPt.getValue())
+  SILValue CopiedVal = SILBuilderWithScope(InsertPt.value())
                            .emitCopyValueOperation(SemanticsCall->getLoc(), V);
   SemanticsCall->replaceAllUsesWith(CopiedVal);
 
@@ -804,8 +804,8 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
     // immediately after V, where we can be sure it is live.
     auto InsertPt = F->hasOwnership() ? getInsertAfterPoint(V)
                                       : SemanticsCall->getIterator();
-    assert(InsertPt.hasValue());
-    SILValue CopiedVal = SILBuilderWithScope(InsertPt.getValue())
+    assert(InsertPt.has_value());
+    SILValue CopiedVal = SILBuilderWithScope(InsertPt.value())
                              .emitCopyValueOperation(V.getLoc(), V);
     auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
     ValLowering.emitStoreOfCopy(Builder, Loc, CopiedVal, AllocStackInst,

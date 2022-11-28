@@ -317,7 +317,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
     if (!context.isSwiftVersionAtLeast(5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
-                                    static_cast<unsigned>(reason.getValue()));
+                                    static_cast<unsigned>(reason.value()));
     fixItAccess(inFlightDiag, D, AccessLevel::Public);
   }
 

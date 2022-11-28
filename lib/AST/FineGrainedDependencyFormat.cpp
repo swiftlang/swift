@@ -232,7 +232,7 @@ bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
       if (node == nullptr)
         llvm::report_fatal_error("Unexpected FINGERPRINT_NODE record");
       if (auto fingerprint = Fingerprint::fromString(BlobData))
-        node->setFingerprint(fingerprint.getValue());
+        node->setFingerprint(fingerprint.value());
       else
         llvm::report_fatal_error(Twine("Unconvertable FINGERPRINT_NODE record: '") + BlobData + "'" );
       break;

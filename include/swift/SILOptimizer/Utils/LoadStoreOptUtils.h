@@ -100,24 +100,24 @@ public:
   }
 
   /// Returns whether the LSBase has been initialized properly.
-  virtual bool isValid() const { return Base && Path.hasValue(); }
+  virtual bool isValid() const { return Base && Path.has_value(); }
 
   /// Returns true if the LSBase has a non-empty projection path.
-  bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
+  bool hasEmptyProjectionPath() const { return !Path.value().size(); }
 
   /// return true if that the two objects have the same base but access different
   /// fields of the base object.
   bool hasNonEmptySymmetricPathDifference(const LSBase &RHS) const {
-    const ProjectionPath &P = RHS.Path.getValue();
-    return Path.getValue().hasNonEmptySymmetricDifference(P);
+    const ProjectionPath &P = RHS.Path.value();
+    return Path.value().hasNonEmptySymmetricDifference(P);
   }
 
   /// Subtract the given path from the ProjectionPath.
   void removePathPrefix(Optional<ProjectionPath> &P) {
-    if (!P.hasValue())
+    if (!P.has_value())
       return;
     // Remove prefix does not modify the Path in-place.
-    Path = ProjectionPath::removePrefix(Path.getValue(), P.getValue());
+    Path = ProjectionPath::removePrefix(Path.value(), P.value());
   }
 
   /// Return true if the RHS have identical projection paths.
@@ -127,18 +127,18 @@ public:
   bool hasIdenticalProjectionPath(const LSBase &RHS) const {
     // If both Paths have no value, then the 2 LSBases are
     // different.
-    if (!Path.hasValue() && !RHS.Path.hasValue())
+    if (!Path.has_value() && !RHS.Path.has_value())
       return false;
     // If 1 Path has value while the other does not, then the 2
     // LSBases are different.
-    if (Path.hasValue() != RHS.Path.hasValue())
+    if (Path.has_value() != RHS.Path.has_value())
       return false;
     // If both Paths are empty, then the 2 LSBases are the same.
-    if (Path.getValue().empty() && RHS.Path.getValue().empty())
+    if (Path.value().empty() && RHS.Path.value().empty())
       return true;
     // If both Paths have different values, then the 2 LSBases are
     // different.
-    if (Path.getValue() != RHS.Path.getValue())
+    if (Path.value() != RHS.Path.value())
       return false;
     // Otherwise, the 2 LSBases are the same.
     return true;
@@ -171,7 +171,7 @@ public:
     os << Base;
     SILFunction *F = Base->getFunction();
     if (F) {
-      Path.getValue().print(os, F->getModule(), TypeExpansionContext(*F));
+      Path.value().print(os, F->getModule(), TypeExpansionContext(*F));
     }
   }
 
@@ -184,9 +184,9 @@ static inline llvm::hash_code hash_value(const LSBase &S) {
   const SILValue Base = S.getBase();
   const Optional<ProjectionPath> &Path = S.getPath();
   llvm::hash_code HC = llvm::hash_combine(Base.getOpaqueValue());
-  if (!Path.hasValue())
+  if (!Path.has_value())
     return HC;
-  return llvm::hash_combine(HC, hash_value(Path.getValue()));
+  return llvm::hash_combine(HC, hash_value(Path.value()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -243,7 +243,7 @@ public:
 
   /// Take the last level projection off. Return the modified LSValue.
   LSValue &stripLastLevelProjection() {
-    Path.getValue().pop_back();
+    Path.value().pop_back();
     return *this;
   }
 
@@ -260,14 +260,14 @@ public:
     if (isa<SILUndef>(Base))
       return Base;
     auto Val = Base;
-    auto InsertPt = getInsertAfterPoint(Base).getValue();
+    auto InsertPt = getInsertAfterPoint(Base).value();
     SILBuilderWithScope Builder(InsertPt);
-    if (Inst->getFunction()->hasOwnership() && !Path.getValue().empty()) {
+    if (Inst->getFunction()->hasOwnership() && !Path.value().empty()) {
       // We have to create a @guaranteed scope with begin_borrow in order to
       // create a struct_extract in OSSA
       Val = Builder.emitBeginBorrowOperation(InsertPt->getLoc(), Base);
     }
-    auto Res = Path.getValue().createExtract(Val, &*InsertPt, true);
+    auto Res = Path.value().createExtract(Val, &*InsertPt, true);
     if (Val != Base) {
       Res = makeCopiedValueAvailable(Res, Inst->getParent());
       Builder.emitEndBorrowOperation(InsertPt->getLoc(), Val);
@@ -353,7 +353,7 @@ public:
 
   /// Returns the type of the object the LSLocation represents.
   SILType getType(SILModule *M, TypeExpansionContext context) {
-    return Path.getValue().getMostDerivedType(*M, context);
+    return Path.value().getMostDerivedType(*M, context);
   }
 
   /// Get the first level locations based on this location's first level

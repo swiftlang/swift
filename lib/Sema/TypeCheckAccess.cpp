@@ -195,7 +195,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
     // In this case we should have diagnosed the bad reference already.
-    if (!typeAccessScope.hasValue())
+    if (!typeAccessScope.has_value())
       return;
     problematicAccessScope = *typeAccessScope;
   }
@@ -213,7 +213,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Optional<AccessScope> typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                checkUsableFromInline);
-    if (!typeReprAccessScope.hasValue())
+    if (!typeReprAccessScope.has_value())
       return;
 
     if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
@@ -1619,7 +1619,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().hasValue())
+      if (where.getUnavailablePlatformKind().has_value())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets

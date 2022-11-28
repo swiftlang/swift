@@ -121,13 +121,13 @@ AbstractionPattern::EncodedForeignInfo::encode(
                          const Optional<ForeignErrorConvention> &foreignError,
                          const Optional<ForeignAsyncConvention> &foreignAsync) {
   // Foreign async convention takes precedence.
-  if (foreignAsync.hasValue()) {
+  if (foreignAsync.has_value()) {
     return EncodedForeignInfo(EncodedForeignInfo::Async,
                               foreignAsync->completionHandlerParamIndex(),
                               foreignAsync->completionHandlerErrorParamIndex(),
                               foreignAsync->completionHandlerFlagParamIndex(),
                               foreignAsync->completionHandlerFlagIsErrorOnZero());
-  } else if (foreignError.hasValue()) {
+  } else if (foreignError.has_value()) {
     return EncodedForeignInfo(EncodedForeignInfo::Error,
                               foreignError->getErrorParameterIndex(),
                               foreignError->isErrorParameterReplacedWithVoid(),
@@ -746,15 +746,15 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                     .getAsyncCompletionHandlerErrorParamIndex();
       auto callbackErrorFlagIndex = getEncodedForeignInfo()
                                 .getAsyncCompletionHandlerErrorFlagParamIndex();
-      assert((!callbackErrorIndex.hasValue()
+      assert((!callbackErrorIndex.has_value()
               || callbackParamTy->getNumParams() > *callbackErrorIndex)
              && "completion handler has invalid error param index?!");
-      assert((!callbackErrorFlagIndex.hasValue()
+      assert((!callbackErrorFlagIndex.has_value()
               || callbackParamTy->getNumParams() > *callbackErrorFlagIndex)
              && "completion handler has invalid error param index?!");
       unsigned numNonErrorParams
-        = callbackParamTy->getNumParams() - callbackErrorIndex.hasValue()
-                                          - callbackErrorFlagIndex.hasValue();
+        = callbackParamTy->getNumParams() - callbackErrorIndex.has_value()
+                                          - callbackErrorFlagIndex.has_value();
             
       switch (numNonErrorParams) {
       case 0:

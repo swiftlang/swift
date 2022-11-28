@@ -215,7 +215,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       maybeCompletionHandlerOrigTy = cast<AnyFunctionType>(
           completionHandlerOrigTy.getOptionalObjectType());
     }
-    return maybeCompletionHandlerOrigTy.getValue();
+    return maybeCompletionHandlerOrigTy.value();
   }();
   
   // Bridge the block type, so that if it is formally expressed in terms of

@@ -150,7 +150,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     bool isValid = false;
     if (auto Version = VersionParser::parseVersionString(
             SwiftVersion, SourceLoc(), nullptr)) {
-      if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+      if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
         Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
         isValid = true;
       }

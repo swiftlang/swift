@@ -709,7 +709,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
     if (match(BI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
       if (Result->getType() == BI->getType().getTupleElementType(0))
         if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
+          if (!signBit.value())
             return Result;
     }
     break;

@@ -133,7 +133,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
     const auto &rule = Rules[ruleID];
 
     auto requirementID = rule.getRequirementID();
-    if (!requirementID.hasValue()) {
+    if (!requirementID.has_value()) {
       if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
         llvm::dbgs() << "\n- rule does not have a requirement ID: "
                      << rule;
@@ -157,7 +157,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
       // one, which makes it easier to suppress redundancy warnings for
       // inferred requirements later on.
       auto existingID = replacement.getRequirementID();
-      if (existingID.hasValue() && !WrittenRequirements[*existingID].inferred) {
+      if (existingID.has_value() && !WrittenRequirements[*existingID].inferred) {
         if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
           llvm::dbgs() << "\n- rule already has a requirement ID: "
                        << rule;
@@ -365,7 +365,7 @@ findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
       // Otherwise, perform a shortlex comparison on (LHS, RHS).
       Optional<int> comparison = rule.compare(otherRule, Context);
 
-      if (!comparison.hasValue()) {
+      if (!comparison.has_value()) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
         // C and C' are superclass, concrete type or concrete conformance
         // symbols.

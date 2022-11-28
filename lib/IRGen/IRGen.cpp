@@ -580,7 +580,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       return true;
     }
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
-      Module->print(RawOS.getValue(), nullptr);
+      Module->print(RawOS.value(), nullptr);
       return false;
     }
   } else {

@@ -194,7 +194,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
                             /*allow fixes*/ false, listener,
-                            None).hasValue();
+                            None).has_value();
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -1042,7 +1042,7 @@ constraints::matchCallArguments(
       !requiresBothTrailingClosureDirections(
           args, params, paramInfo, unlabeledTrailingClosureArgIndex)) {
     return singleMatchCall(
-        trailingClosureMatching.getValueOr(TrailingClosureMatching::Forward));
+        trailingClosureMatching.value_or(TrailingClosureMatching::Forward));
   }
 
   MatchCallArgumentListener noOpListener;
@@ -4357,11 +4357,11 @@ static ConstraintFix *fixPropertyWrapperFailure(
     case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
       return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
-                                        baseTy, toType.getValueOr(type),
+                                        baseTy, toType.value_or(type),
                                         locator);
 
     case Fix::WrappedValue:
-      return UseWrappedValue::create(cs, decl, baseTy, toType.getValueOr(type),
+      return UseWrappedValue::create(cs, decl, baseTy, toType.value_or(type),
                                      locator);
     }
     llvm_unreachable("Unhandled Fix type in switch");
@@ -12212,7 +12212,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // backward scanning for the unlabeled trailing closure. Create a
       // disjunction so that we explore both paths, and can diagnose
       // ambiguities later.
-      assert(!trailingClosureMatching.hasValue());
+      assert(!trailingClosureMatching.has_value());
 
       auto applyLocator = getConstraintLocator(locator);
       auto forwardConstraint = Constraint::createApplicableFunction(

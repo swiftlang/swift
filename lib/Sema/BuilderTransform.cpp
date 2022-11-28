@@ -1874,7 +1874,7 @@ public:
       // Handle pattern bindings.
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         auto resultTarget = rewriteTarget(SolutionApplicationTarget{patternBinding});
-        assert(resultTarget.hasValue()
+        assert(resultTarget.has_value()
                && "Could not rewrite pattern binding entries!");
         TypeChecker::typeCheckDecl(resultTarget->getAsPatternBinding());
         newElements.push_back(resultTarget->getAsPatternBinding());
@@ -2779,7 +2779,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
 
     auto loc = extractNearestSourceLoc(dc);
     auto context = ExportContext::forFunctionBody(dc, loc);
-    return TypeChecker::checkDeclarationAvailability(D, context).hasValue();
+    return TypeChecker::checkDeclarationAvailability(D, context).has_value();
   };
 
   bool foundMatch = false;
@@ -2902,7 +2902,7 @@ void swift::printResultBuilderBuildFunction(
     componentTypeString = "<#Component#>";
 
   // Render the code.
-  std::string stubIndentStr = stubIndent.getValueOr(std::string());
+  std::string stubIndentStr = stubIndent.value_or(std::string());
   ExtraIndentStreamPrinter printer(out, stubIndentStr);
 
   // If we're supposed to provide a full stub, add a newline and the introducer

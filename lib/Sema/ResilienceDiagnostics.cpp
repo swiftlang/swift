@@ -245,7 +245,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   ASTContext &ctx = M->getASTContext();
 
   auto reason = where.getExportabilityReason();
-  if (!reason.hasValue())
+  if (!reason.has_value())
     reason = ExportabilityReason::General;
 
   ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,

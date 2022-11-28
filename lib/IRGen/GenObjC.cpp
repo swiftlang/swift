@@ -113,8 +113,8 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // Check to see if we've already computed the market.  Note that we
   // might have cached a null marker, and that's fine.
   auto &cache = ObjCRetainAutoreleasedReturnValueMarker;
-  if (cache.hasValue())
-    return cache.getValue();
+  if (cache.has_value())
+    return cache.value();
 
   // Ask the target for the string.
   StringRef asmString = TargetInfo.ObjCRetainAutoreleasedReturnValueMarker;
@@ -144,7 +144,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
     cache = llvm::InlineAsm::get(type, asmString, "", /*sideeffects*/ true);
   }
 
-  return cache.getValue();
+  return cache.value();
 }
 
 /// Reclaim an autoreleased return value.

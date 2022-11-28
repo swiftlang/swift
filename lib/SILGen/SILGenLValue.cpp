@@ -1619,7 +1619,7 @@ namespace {
 
         // First, we need to find index of the current field in `_storage.
         auto fieldIdx = getTupleFieldIndex(localVar, field->getName());
-        assert(fieldIdx.hasValue());
+        assert(fieldIdx.has_value());
 
         // Load `_storage.<name>`
         auto localVarRef =
@@ -1689,7 +1689,7 @@ namespace {
           // First, we need to find index of the backing storage field in
           // `_storage`.
           auto fieldIdx = getTupleFieldIndex(localVar, backingVar->getName());
-          assert(fieldIdx.hasValue());
+          assert(fieldIdx.has_value());
 
           // Load `_storage.<name>`
           auto localVarRef =

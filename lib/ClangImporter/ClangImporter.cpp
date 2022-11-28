@@ -204,11 +204,11 @@ namespace {
       }
 
       auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
-      if (PCH.hasValue()) {
+      if (PCH.has_value()) {
         Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
-            PCH.getValue();
+            PCH.value();
         Impl.IsReadingBridgingPCH = true;
-        Impl.setSinglePCHImport(PCH.getValue());
+        Impl.setSinglePCHImport(PCH.value());
       }
 
       return true;
@@ -737,8 +737,8 @@ importer::addCommonInvocationArguments(
   using ImporterImpl = ClangImporter::Implementation;
   llvm::Triple triple = ctx.LangOpts.Target;
   // Use clang specific target triple if given.
-  if (ctx.LangOpts.ClangTarget.hasValue()) {
-    triple = ctx.LangOpts.ClangTarget.getValue();
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    triple = ctx.LangOpts.ClangTarget.value();
   }
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   const ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
@@ -942,12 +942,12 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
-  if (!PCHFilename.hasValue()) {
+  if (!PCHFilename.has_value()) {
     return None;
   }
   if (!isExplicit && !ImporterOptions.PCHDisableValidation &&
-      !canReadPCH(PCHFilename.getValue())) {
-    StringRef parentDir = llvm::sys::path::parent_path(PCHFilename.getValue());
+      !canReadPCH(PCHFilename.value())) {
+    StringRef parentDir = llvm::sys::path::parent_path(PCHFilename.value());
     std::error_code EC = llvm::sys::fs::create_directories(parentDir);
     if (EC) {
       llvm::errs() << "failed to create directory '" << parentDir << "': "
@@ -955,13 +955,13 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
       return None;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.getValue());
+                                        PCHFilename.value());
     if (FailedToEmit) {
       return None;
     }
   }
 
-  return PCHFilename.getValue();
+  return PCHFilename.value();
 }
 
 std::vector<std::string>
@@ -2224,12 +2224,12 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     // in Swift.
     if (isAsync && !clangDecl->hasAttr<clang::SwiftAsyncAttr>()) {
       return major < 10 ||
-          (major == 10 && (!minor.hasValue() || minor.getValue() <= 14));
+          (major == 10 && (!minor.has_value() || minor.value() <= 14));
     }
 
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
-           (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+           (major == 10 && (!minor.has_value() || minor.value() <= 9));
 
   case PlatformKind::iOS:
   case PlatformKind::iOSApplicationExtension:
@@ -2412,12 +2412,12 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
   auto maybeModule = getClangSubmoduleForDecl(D, allowForwardDeclaration);
   if (!maybeModule)
     return nullptr;
-  if (!maybeModule.getValue())
+  if (!maybeModule.value())
     return ImportedHeaderUnit;
 
   // Get the parent module because currently we don't represent submodules with
   // ClangModuleUnit.
-  auto *M = maybeModule.getValue()->getTopLevelModule();
+  auto *M = maybeModule.value()->getTopLevelModule();
 
   return getWrapperForModule(M);
 }
@@ -3908,7 +3908,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &imports) const {
 
   // Reuse our cached list of imports if we have one.
-  if (importedModulesForLookup.hasValue()) {
+  if (importedModulesForLookup.has_value()) {
     imports.append(importedModulesForLookup->begin(),
                    importedModulesForLookup->end());
     return;

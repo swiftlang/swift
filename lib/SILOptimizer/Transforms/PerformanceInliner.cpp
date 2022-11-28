@@ -713,8 +713,8 @@ bool SILPerformanceInliner::decideInWarmBlock(
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
-    if (ShouldInlineGeneric.hasValue())
-      return ShouldInlineGeneric.getValue();
+    if (ShouldInlineGeneric.has_value())
+      return ShouldInlineGeneric.value();
   }
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
@@ -736,8 +736,8 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
-    if (ShouldInlineGeneric.hasValue())
-      return ShouldInlineGeneric.getValue();
+    if (ShouldInlineGeneric.has_value())
+      return ShouldInlineGeneric.value();
 
     return false;
   }

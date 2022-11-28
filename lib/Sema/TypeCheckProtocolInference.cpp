@@ -1254,7 +1254,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         // for substitutions into other tentative type witnesses.
         typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
 
-        abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
+        abstractTypeWitnesses.push_back(std::move(typeWitness.value()));
         continue;
       }
 

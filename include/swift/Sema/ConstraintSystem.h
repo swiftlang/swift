@@ -4229,12 +4229,12 @@ public:
       return Type();
 
     // No need to generate a new type variable if there's only one type to join
-    if ((begin + 1 == end) && !supertype.hasValue())
+    if ((begin + 1 == end) && !supertype.has_value())
       return getType(begin).first;
 
     // The type to capture the result of the join, which is either the specified supertype,
     // or a new type variable.
-    Type resultTy = supertype.hasValue() ? supertype.getValue() :
+    Type resultTy = supertype.has_value() ? supertype.value() :
                     createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
 
     using RawExprKind = uint8_t;

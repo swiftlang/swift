@@ -882,7 +882,7 @@ ProjectionTreeNode::getChildForProjection(ProjectionTree &Tree,
                                           const Projection &P) {
   for (unsigned Index : ChildProjections) {
     ProjectionTreeNode *N = Tree.getNode(Index);
-    if (N->Proj && N->Proj.getValue() == P) {
+    if (N->Proj && N->Proj.value() == P) {
       return N;
     }
   }
@@ -893,14 +893,14 @@ ProjectionTreeNode *
 ProjectionTreeNode::getParent(ProjectionTree &Tree) {
   if (!Parent)
     return nullptr;
-  return Tree.getNode(Parent.getValue());
+  return Tree.getNode(Parent.value());
 }
 
 const ProjectionTreeNode *
 ProjectionTreeNode::getParent(const ProjectionTree &Tree) const {
   if (!Parent)
     return nullptr;
-  return Tree.getNode(Parent.getValue());
+  return Tree.getNode(Parent.value());
 }
 
 NullablePtr<SingleValueInstruction>
@@ -1007,9 +1007,9 @@ void ProjectionTreeNode::createNextLevelChildrenForStruct(
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " <<NodeTy << "\n");
     LLVM_DEBUG(llvm::dbgs() << "            Projection: " 
-               << Node->getProjection().getValue().getIndex() << "\n");
+               << Node->getProjection().value().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
-    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+    assert(getChildForProjection(Tree, Node->getProjection().value()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
   }
@@ -1025,9 +1025,9 @@ createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
     auto *Node = Tree.createChildForTuple(this, NodeTy, i);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy <<"\n");
     LLVM_DEBUG(llvm::dbgs() << "            Projection: "
-               << Node->getProjection().getValue().getIndex() << "\n");
+               << Node->getProjection().value().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
-    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+    assert(getChildForProjection(Tree, Node->getProjection().value()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
   }
@@ -1126,7 +1126,7 @@ public:
 
   void setValueForChild(ProjectionTreeNode *Child, SILValue V) {
     assert(!Invalidated && "Must not be invalidated to set value for child");
-    Values[Child->Proj.getValue().getIndex()] = V;
+    Values[Child->Proj.value().getIndex()] = V;
   }
 };
 

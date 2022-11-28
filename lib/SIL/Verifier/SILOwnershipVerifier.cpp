@@ -150,12 +150,12 @@ private:
 } // namespace swift
 
 bool SILValueOwnershipChecker::check() {
-  if (result.hasValue())
-    return result.getValue();
+  if (result.has_value())
+    return result.value();
 
   LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
   result = checkUses();
-  if (!result.getValue()) {
+  if (!result.value()) {
     return false;
   }
 
@@ -169,7 +169,7 @@ bool SILValueOwnershipChecker::check() {
                                                  allRegularUsers, errorBuilder);
   result = !linearLifetimeResult.getFoundError();
 
-  return result.getValue();
+  return result.value();
 }
 
 bool SILValueOwnershipChecker::isCompatibleDefUse(

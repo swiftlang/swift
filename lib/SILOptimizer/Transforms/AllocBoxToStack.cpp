@@ -575,7 +575,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   SILValue StackBox = ASI;
   if (Kind) {
     StackBox =
-        Builder.createMarkUninitialized(ASI->getLoc(), ASI, Kind.getValue());
+        Builder.createMarkUninitialized(ASI->getLoc(), ASI, Kind.value());
   }
 
   // Replace all uses of the address of the box's contained value with
@@ -1082,7 +1082,7 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
     if (!iterAndSuccess.second) {
       // Blot the previously inserted apply and insert at the end with updated
       // indices
-      auto OldIndices = iterAndSuccess.first->getValue().second;
+      auto OldIndices = iterAndSuccess.first->value().second;
       OldIndices.push_back(CalleeArgIndexNumber);
       AppliesToSpecialize.erase(iterAndSuccess.first);
       AppliesToSpecialize.insert(std::make_pair(Apply, OldIndices));
@@ -1094,11 +1094,11 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
   // ApplySite.
   SILOptFunctionBuilder FuncBuilder(*pass.T);
   for (auto &It : AppliesToSpecialize) {
-    if (!It.hasValue()) {
+    if (!It.has_value()) {
       continue;
     }
-    auto Apply = It.getValue().first;
-    auto Indices = It.getValue().second;
+    auto Apply = It.value().first;
+    auto Indices = It.value().second;
     // Sort the indices and unique them.
     sortUnique(Indices);
 

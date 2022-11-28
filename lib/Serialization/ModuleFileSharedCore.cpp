@@ -1402,7 +1402,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           }
 
           Dependencies.push_back(
-              {blobData, spiBlob, importKind.getValue(), scoped});
+              {blobData, spiBlob, importKind.value(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {

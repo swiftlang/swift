@@ -343,7 +343,7 @@ public:
     /// results in an unreachable being hit.
     backedge_iterator() : InnerIter() {}
 
-    bool hasValue() const { return InnerIter.hasValue(); }
+    bool hasValue() const { return InnerIter.has_value(); }
 
     /// Return the index of the current backedge index.
     unsigned operator*() const { return **InnerIter; }
@@ -367,11 +367,11 @@ public:
       return iter;
     }
     bool operator==(backedge_iterator rhs) const {
-      if (InnerIter.hasValue() != rhs.InnerIter.hasValue())
+      if (InnerIter.has_value() != rhs.InnerIter.has_value())
         llvm_unreachable("Comparing uncomparable iterators");
       // Now we know that the two either both have values or both do not have
       // values.
-      if (!InnerIter.hasValue())
+      if (!InnerIter.has_value())
         return true;
       return *InnerIter == *rhs.InnerIter;
     }

@@ -88,7 +88,7 @@ private:
   Optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
     // poNumber will be None for unreachable blocks
     auto poNumber = PO->getPONumber(BB);
-    if (poNumber.hasValue())
+    if (poNumber.has_value())
       return &IndexToStateMap[*poNumber];
     return None;
   }
@@ -122,7 +122,7 @@ private:
     auto state = getState(BB);
     if (!state)
       return SILValue();
-    SILValue A = state.getValue()->LocalArg;
+    SILValue A = state.value()->LocalArg;
     if (A)
       return A;
     return Arg;

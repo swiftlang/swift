@@ -1748,8 +1748,8 @@ public:
   void dumpSwiftLookupTables();
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
-    if (PCHFilename.hasValue()) {
-      assert(llvm::sys::path::extension(PCHFilename.getValue())
+    if (PCHFilename.has_value()) {
+      assert(llvm::sys::path::extension(PCHFilename.value())
                  .endswith(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
@@ -1760,7 +1760,7 @@ public:
   /// files, we can provide the PCH filename for declaration caching,
   /// especially in code completion.
   StringRef getSinglePCHImport() const {
-    if (SinglePCHImport.hasValue())
+    if (SinglePCHImport.has_value())
       return *SinglePCHImport;
     return StringRef();
   }
