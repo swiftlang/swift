@@ -18,6 +18,11 @@ module ConstructorsObjC {
   requires cplusplus
 }
 
+module CustomNewOperator {
+  header "custom-new-operator.h"
+  requires cplusplus
+}
+
 module Destructors {
   header "destructors.h"
   requires cplusplus
