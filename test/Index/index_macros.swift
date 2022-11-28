@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-//
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s -enable-experimental-feature Macros | %FileCheck %s
+// REQUIRES: OS=macosx
 
 
 macro myLine: Int = _SwiftSyntaxMacros.LineMacro
