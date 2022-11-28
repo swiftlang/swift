@@ -148,7 +148,6 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 }
 
 void NullaryContinuationJob::process(Job *_job) {
-  fprintf(stderr, "[%s:%d](%s) process job!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   auto *job = cast<NullaryContinuationJob>(_job);
 
   auto *task = job->Task;
@@ -163,8 +162,6 @@ void NullaryContinuationJob::process(Job *_job) {
 }
 
 void AsyncTask::completeFuture(AsyncContext *context) {
-  fprintf(stderr, "[%s:%d](%s) complete future!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
   SWIFT_TASK_DEBUG_LOG("complete future = %p", this);

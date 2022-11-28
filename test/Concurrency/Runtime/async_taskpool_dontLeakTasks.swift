@@ -16,16 +16,11 @@ import Darwin
 
 func test_taskPool_next() async {
   // CHECK: creating task [[MAIN_TASK:0x.*]] with parent 0x0
-  // CHECK: creating task [[POOL_TASK_1:0x.*]] with parent [[MAIN_TASK]]
-  // CHECK: creating task [[POOL_TASK_2:0x.*]] with parent [[MAIN_TASK]]
-  // CHECK: creating task [[POOL_TASK_3:0x.*]] with parent [[MAIN_TASK]]
-  // CHECK: creating task [[POOL_TASK_4:0x.*]] with parent [[MAIN_TASK]]
-  // CHECK: creating task [[POOL_TASK_5:0x.*]] with parent [[MAIN_TASK]]
 
   _ = await withTaskPool(returning: Int.self) { pool in
     for n in 0..<5 {
       pool.addTask {
-        return n
+        print("run \(n))")
       }
     }
     return 0

@@ -33,6 +33,16 @@
 #include <atomic>
 #include <new>
 
+#if defined(__APPLE__)
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
+#if defined(_WIN32)
+#include <io.h>
+#endif
+
 #if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
 #include <mutex>
 #endif
@@ -173,11 +183,10 @@ public:
   // ==== Checks -----------------------------------------------------------------
 
     static void _taskPool_reportPendingTaskOverflow(TaskPoolImpl *pool, uint64_t pendingCount) {
-
       char *message;
       swift_asprintf(
           &message,
-          "error: task-pool: detected pending task overflow, in task pool %p! Pending task count: %ull",
+          "error: task-pool: detected pending task overflow, in task pool %p! Pending task count: %llu",
           pool, pendingCount);
 
       if (_swift_shouldReportFatalErrorsToDebugger()) {
@@ -335,14 +344,13 @@ public:
 
     if (assumed.pendingTasks() == TaskPoolMaximumPendingTasks) {
       _taskPool_reportPendingTaskOverflow(this, assumed.pendingTasks());
-      llvm_unreachable(); // reportOverflow will abort();
+      abort(); // reportOverflow will abort();
     }
 
     if (!unconditionally && assumed.isCancelled()) {
       // revert that add, it was meaningless
       return statusUndoIncrementPendingAssumeRelaxed();
     }
-    fprintf(stderr, "[%s:%d](%s) status after add: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__, assumed.to_string().c_str());
     return assumed;
   }
 
@@ -493,7 +501,6 @@ bool TaskPool::isCancelled() {
 static void fillPoolNextVoidResult(TaskFutureWaitAsyncContext *context,
                                    const Metadata *voidType,
                                    PollResult result) {
-  fprintf(stderr, "[%s:%d](%s) fill in void\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   /// Fill in the result value
   switch (result.status) {
   case PollStatus::MustWait:
@@ -540,18 +547,15 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   // Immediately decrement the pending count; we do not keep track of "ready" tasks and never store them;
   // This is different from a task group, which has to keep the pending count and add +1 "ready" when offered to.
   auto assumed = statusDecrementPendingAssumeAcquire();
-  SWIFT_TASK_DEBUG_LOG("pool %p, remaining pending: %d", this, assumed.pendingTasks());
+  SWIFT_TASK_DEBUG_LOG("pool(%p), remaining pending: %d", this, assumed.pendingTasks());
 
   auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
       reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
-  bool hadErrorResult = false;
-  auto errorObject = asyncContextPrefix->errorResult;
-  if (errorObject) {
-    // instead, we need to enqueue this result:
-    hadErrorResult = true;
-  }
 
   SWIFT_TASK_DEBUG_LOG("pool(%p) child task=%p completed, detach", this, completedTask);
+  /// We're offering concurrently to the parent task (which owns the pool), and must remove
+  /// the child from the pool record's children container.
+  /// The _swift_taskPool_detachChild will take the parent task lock to perform the child removal.
   _swift_taskPool_detachChild(asAbstract(this), completedTask);
 
   // ==== a) has waiting task.
@@ -564,7 +568,6 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     while (true) {
       // ==== a) run waiting task directly -------------------------------------
       assert(assumed.hasWaitingTask());
-      assert(assumed.pendingTasks() && "offered to pool with no pending tasks!");
       // We are the "first" completed task to arrive,
       // and since there is a task waiting we immediately claim and complete it.
       if (waitQueue.compare_exchange_strong(
@@ -586,13 +589,12 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         // we can't just have the parent task set itself up as a waiter.
         // But since it's what we're doing, we basically take the same
         // path as we would if there wasn't a waiter.
-//        completeTask(completedTask);
         unlock(); // TODO: remove fragment lock, and use status for synchronization
         return;
 
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
         // Run the task.
-        auto result = PollResult::get(completedTask, hadErrorResult);
+        auto result = PollResult::get(completedTask);
 
         unlock(); // TODO: remove fragment lock, and use status for synchronization
 
@@ -623,18 +625,9 @@ void TaskPoolImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
       }
     }
     llvm_unreachable("should have enqueued and returned.");
-  } else {
-    // ==== b) enqueue completion ------------------------------------------------
-    //
-    // else, no-one was waiting (yet), so we have to instead enqueue to the message
-    // queue when a task polls during next() it will notice that we have a value
-    // ready for it, and will process it immediately without suspending.
-    assert(!waitQueue.load(std::memory_order_relaxed));
+  } // else, there still are pending tasks; so there is nothing to wake up just yet
 
-    // completeTask(completedTask);
-    unlock(); // TODO: remove fragment lock, and use status for synchronization
-  }
-
+  unlock(); // TODO: remove fragment lock, and use status for synchronization
   return;
 }
 
@@ -674,8 +667,7 @@ static void swift_taskPool_waitAllImpl(
     TaskPool *_pool,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
-  SWIFT_TASK_DEBUG_LOG("pool(%p) waitAll, no ready tasks, waiting task = %p",
-                       pool, waitingTask);  auto waitingTask = swift_task_getCurrent();
+  auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = TASK_POOL_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
@@ -688,6 +680,9 @@ static void swift_taskPool_waitAllImpl(
 
   auto pool = asImpl(_pool);
   assert(pool && "swift_taskPool_waitAll was passed context without pool!");
+
+  SWIFT_TASK_DEBUG_LOG("pool(%p) waitAll, no ready tasks, waiting task = %p",
+                       pool, waitingTask);
 
   PollResult polled = pool->waitAll(waitingTask);
   switch (polled.status) {
@@ -733,7 +728,6 @@ reevaluate_if_taskpool_has_results:;
     // Bail out and return `nil` from `group.next()`.
     statusRemoveWaitingRelease();
     result.status = PollStatus::Empty;
-    // result.voidType = this->voidType;
     return result;
   }
 

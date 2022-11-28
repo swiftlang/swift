@@ -462,8 +462,6 @@ static void completeTaskImpl(AsyncTask *task,
   if (task->isFuture()) {
     task->completeFuture(context);
   }
-
-  fprintf(stderr, "[%s:%d](%s) completeTaskImpl, task = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 }
 
 /// The function that we put in the context of a simple task
@@ -696,14 +694,12 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
     case TaskOptionRecordKind::TaskGroup:
       group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
-        fprintf(stderr, "[%s:%d](%s) make pool child task; group = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, group);
       assert(group && "Missing group");
       jobFlags.task_setIsGroupChildTask(true);
       break;
 
     case TaskOptionRecordKind::TaskPool:
       pool = cast<TaskPoolTaskOptionRecord>(option)->getPool();
-      fprintf(stderr, "[%s:%d](%s) make pool child task; pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, pool);
       assert(pool && "Missing pool");
       jobFlags.task_setIsPoolChildTask(true);
       break;
@@ -940,7 +936,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Initialize the pool child fragment if applicable.
   if (pool) {
-    fprintf(stderr, "[%s:%d](%s) add new task = %p, to pool = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task, pool);
     auto poolChildFragment = task->poolChildFragment();
     ::new (poolChildFragment) AsyncTask::PoolChildFragment(pool);
   }
