@@ -12671,30 +12671,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   if (simplifiedBoundType->isTypeVariableOrMember())
     return formUnsolved();
 
-  // Determine the overload locator for this constraint.
-  ConstraintLocator *overloadLocator = nullptr;
-  if (auto anchorExpr = locator.getAnchor().dyn_cast<Expr *>()) {
-    if (auto expansion = dyn_cast<MacroExpansionExpr>(anchorExpr)) {
-      overloadLocator = getConstraintLocator(expansion);
-    } else if (auto specialize =
-                   dyn_cast<UnresolvedSpecializeExpr>(anchorExpr)) {
-      overloadLocator = getConstraintLocator(
-          specialize->getSubExpr()->getSemanticsProvidingExpr());
-    }
-  } else if (auto anchorDecl = locator.getAnchor().dyn_cast<Decl *>()) {
-    if (auto expansion = dyn_cast<MacroExpansionDecl>(anchorDecl)) {
-      overloadLocator = getConstraintLocator(expansion);
-    }
-  }
-  assert(overloadLocator && "Specialize expression has the wrong form");
-
   // If the overload hasn't been resolved, we can't simplify this constraint.
-  auto resolvedOverloadIter = getResolvedOverloads().find(overloadLocator);
-  if (resolvedOverloadIter == getResolvedOverloads().end())
+  auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+  auto selectedOverload = findSelectedOverloadFor(overloadLocator);
+  if (!selectedOverload)
     return formUnsolved();
 
-  auto selectedOverload = resolvedOverloadIter->second;
-  auto overloadChoice = selectedOverload.choice;
+  auto overloadChoice = selectedOverload->choice;
   if (!overloadChoice.isDecl()) {
     return SolutionKind::Error;
   }

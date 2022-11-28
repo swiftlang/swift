@@ -1645,7 +1645,9 @@ namespace {
 
     /// Given a set of specialization arguments, resolve those arguments and
     /// introduce them as an explicit generic arguments constraint.
-    void addSpecializationConstraint(
+    ///
+    /// \returns true if resolving any of the specialization types failed.
+    bool addSpecializationConstraint(
         ConstraintLocator *locator, Type boundType,
         ArrayRef<TypeRepr *> specializationArgs) {
       // Resolve each type.
@@ -1658,6 +1660,9 @@ namespace {
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, locator),
             HandlePlaceholderType(CS, locator));
+        if (result->hasError())
+          return true;
+
         specializationArgTypes.push_back(result);
       }
 
@@ -1665,6 +1670,7 @@ namespace {
           ConstraintKind::ExplicitGenericArguments, boundType,
           PackType::get(CS.getASTContext(), specializationArgTypes),
           locator);
+      return false;
     }
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -3710,9 +3716,10 @@ namespace {
 
         // Add explicit generic arguments, if there were any.
         if (expr->getGenericArgsRange().isValid()) {
-          addSpecializationConstraint(
-              CS.getConstraintLocator(expr), macroRefType,
-              expr->getGenericArgs());
+          if (addSpecializationConstraint(
+                CS.getConstraintLocator(expr), macroRefType,
+                expr->getGenericArgs()))
+            return Type();
         }
 
         // For non-calls, the type variable is the result.
