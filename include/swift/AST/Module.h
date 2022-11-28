@@ -836,6 +836,17 @@ public:
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
+  /// Get the path to the file defining this module, what we consider the
+  /// source of truth about the module. Usually a swiftinterface file for a
+  /// resilient module, a swiftmodule for a non-resilient module, or the
+  /// modulemap for a clang module. Returns an empty string if not applicable.
+  StringRef getModuleSourceFilename() const;
+
+  /// Get the path to the file loaded by the compiler. Usually the binary
+  /// swiftmodule file or a pcm in the cache. Returns an empty string if not
+  /// applicable.
+  StringRef getModuleLoadedFilename() const;
+
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 

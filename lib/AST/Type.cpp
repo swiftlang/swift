@@ -3627,7 +3627,7 @@ CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
   auto sig = Environment->getOpaqueTypeDecl()
       ->getOpaqueInterfaceGenericSignature();
   CanType canonicalType = interfaceType->getReducedType(sig);
-  return Environment->maybeApplyOpaqueTypeSubstitutions(canonicalType)
+  return Environment->maybeApplyOuterContextSubstitutions(canonicalType)
       ->getCanonicalType();
 }
 

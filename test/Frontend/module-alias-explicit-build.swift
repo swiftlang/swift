@@ -48,4 +48,4 @@
 // RUN: not test -f %t/inputs/Cat.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/outputs/load-result.output -check-prefix CHECK
-// CHECK: remark: loaded module at {{.*}}Bar.swiftmodule
+// CHECK: remark: loaded module {{.*}}Bar.swiftmodule
