@@ -295,7 +295,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += [
-                "--skip-test-cmark",
                 "--skip-test-lldb",
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
