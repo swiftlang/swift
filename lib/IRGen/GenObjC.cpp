@@ -505,13 +505,16 @@ static void updateProtocolRefs(IRGenModule &IGM,
   assert(clangImporter && "Must have a clang importer");
 
   // Get the array containining the protocol refs.
-  unsigned protocolRefsSize;
-  llvm::ConstantArray *protocolRefs;
-  std::tie(protocolRefsSize, protocolRefs) = getProtocolRefsList(protocol);
+  unsigned protocolRefsSize = getProtocolRefsList(protocol).first;
   unsigned currentIdx = 0;
   auto inheritedObjCProtocols = getRuntimeProtocolList(objcProtocol->protocols());
   for (auto inheritedObjCProtocol : inheritedObjCProtocols) {
     assert(currentIdx < protocolRefsSize);
+
+    // Getting the `protocolRefs` constant must not be hoisted out of the loop
+    // because this constant might be deleted by
+    // `oldVar->replaceAllUsesWith(newOpd)` below.
+    llvm::ConstantArray *protocolRefs = getProtocolRefsList(protocol).second;
     auto oldVar = protocolRefs->getOperand(currentIdx);
     // Map the objc protocol to swift protocol.
     auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);
