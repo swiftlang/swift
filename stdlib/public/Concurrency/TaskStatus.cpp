@@ -450,9 +450,6 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 // FIXME: this is not actually right; is it? are we guaranteeing locking right in a pool?
 void swift::_swift_taskPool_detachChild(TaskPool *pool,
                                         AsyncTask *child) {
-  // We are called synchronously from the perspective of the owning task.
-  // That doesn't necessarily mean the owning task *is* the current task,
-  // though, just that it's not concurrently running.
   auto parent = child->childFragment()->getParent();
 
   withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
