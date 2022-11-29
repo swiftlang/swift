@@ -5,6 +5,19 @@
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
 
+# Dependency scanning
+include/swift/DependencyScan                 @artemcm
+lib/AST/ModuleLoader.cpp                     @artemcm
+lib/DependencyScan                           @artemcm
+lib/Frontend/ModuleInterfaceLoader.cpp       @artemcm
+lib/Serialization/SerializedModuleLoader.cpp @artemcm
+test/ScanDependencies                        @artemcm
+
+# Driver
+include/swift/Driver @artemcm
+lib/Driver           @artemcm
+test/Driver          @artemcm
+
 # Owners of the parser
 include/swift/Parse @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 lib/Parse           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
