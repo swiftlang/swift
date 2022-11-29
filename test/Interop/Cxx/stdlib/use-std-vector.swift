@@ -7,7 +7,7 @@
 
 import StdlibUnittest
 import StdVector
-import std.vector
+import CxxStdlib.vector
 
 var StdVectorTestSuite = TestSuite("StdVector")
 
