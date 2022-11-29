@@ -194,8 +194,6 @@ class CMakeProduct(product.Product):
                 host_target.startswith('appletv') or \
                 host_target.startswith('watch'):
 
-            swift_cmake_options.define('Python2_EXECUTABLE',
-                                       self.toolchain.find_tool('python2.7'))
             swift_cmake_options.define('Python3_EXECUTABLE',
                                        self.toolchain.find_tool('python3'))
 
