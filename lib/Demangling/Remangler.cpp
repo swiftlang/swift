@@ -1693,6 +1693,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
       case Node::Kind::HasSymbolQuery:
+      case Node::Kind::RuntimeDiscoverableAttributeRecord:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3572,6 +3573,13 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
                                                      unsigned int depth) {
   // We don't support absolute references in the mangling of these
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
+Remangler::mangleRuntimeDiscoverableAttributeRecord(Node *node,
+                                                    unsigned depth) {
+  Buffer << "Ha";
+  return ManglingError::Success;
 }
 
 } // anonymous namespace

@@ -609,6 +609,7 @@ private:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2074,6 +2075,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::AccessibleFunctionRecord:
     if (!Options.ShortenThunk) {
       Printer << "accessible function runtime record for ";
+    }
+    return nullptr;
+  case Node::Kind::RuntimeDiscoverableAttributeRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "runtime discoverable attribute record for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:

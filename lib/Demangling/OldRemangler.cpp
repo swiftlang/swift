@@ -2878,3 +2878,10 @@ ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
   Buffer << "TwS";
   return ManglingError::Success;
 }
+
+ManglingError
+Remangler::mangleRuntimeDiscoverableAttributeRecord(Node *node,
+                                                    unsigned depth) {
+  Buffer << "Ha";
+  return ManglingError::Success;
+}

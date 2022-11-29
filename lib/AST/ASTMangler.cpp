@@ -908,6 +908,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
+    case SymbolKind::RuntimeDiscoverableAttributeRecord:
+      return appendOperator("Ha");
   }
 }
 

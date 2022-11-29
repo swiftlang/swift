@@ -443,3 +443,4 @@ $s7Library3fooyyFTwS ---> #_hasSymbol query for Library.foo() -> ()
 $s7Library5KlassCTwS ---> #_hasSymbol query for Library.Klass
 $s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swift_ide_test.myColorLiteral(red: Swift.Float, green: Swift.Float, blue: Swift.Float, alpha: Swift.Float) -> swift_ide_test.Color
 $s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
+$s4main4FlagVHa ---> runtime discoverable attribute record for main.Flag

@@ -147,6 +147,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
       return true;
     default:
       return false;
@@ -827,6 +828,7 @@ recur:
     case 'H':
       switch (char c2 = nextChar()) {
       case 'A': return demangleDependentProtocolConformanceAssociated();
+      case 'a': return createNode(Node::Kind::RuntimeDiscoverableAttributeRecord);
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();

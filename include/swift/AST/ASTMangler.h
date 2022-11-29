@@ -158,6 +158,7 @@ public:
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,
+    RuntimeDiscoverableAttributeRecord,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
