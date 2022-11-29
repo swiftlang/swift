@@ -93,6 +93,7 @@ struct ValidationInfo {
   StringRef sdkName = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
+  std::vector<StringRef> allowableClients;
 };
 
 /// A collection of options that can be used to set up a new AST context
