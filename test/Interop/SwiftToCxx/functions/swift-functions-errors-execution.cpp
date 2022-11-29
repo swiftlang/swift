@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -enable-experimental-cxx-interop -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -25,24 +25,27 @@ int main() {
 
   try {
     Functions::emptyThrowFunction();
-  } catch (swift::Error& e) {
+  } catch (Swift::Error& e) {
     printf("Exception\n");
   }
   try {
     Functions::throwFunction();
-  } catch (swift::Error& e) {
-      auto errorVal = e.as<Functions::NaiveErrors>();
+  } catch (Swift::Error& e) {
+      auto errorOpt = e.as<Functions::NaiveErrors>();
+      assert(errorOpt.isSome());
+
+      auto errorVal = errorOpt.get();
       assert(errorVal == Functions::NaiveErrors::throwError);
       errorVal.getMessage();
   }
   try {
     Functions::throwFunctionWithReturn();
-  } catch (swift::Error& e) {
+  } catch (Swift::Error& e) {
      printf("Exception\n");
   }
   try {
     Functions::testDestroyedError();
-  } catch(const swift::Error &e) { }
+  } catch(const Swift::Error &e) { }
 
   return 0;
 }
