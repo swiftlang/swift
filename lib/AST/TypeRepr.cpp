@@ -127,22 +127,24 @@ SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   return SourceLoc();
 }
 
-TypeDecl *IdentTypeRepr::getBoundDecl() const {
-  return const_cast<IdentTypeRepr *>(this)->getLastComponent()->getBoundDecl();
+TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
+  return const_cast<DeclRefTypeRepr *>(this)
+      ->getLastComponent()
+      ->getBoundDecl();
 }
 
-DeclNameRef IdentTypeRepr::getNameRef() const {
-  return const_cast<IdentTypeRepr *>(this)->getLastComponent()->getNameRef();
+DeclNameRef DeclRefTypeRepr::getNameRef() const {
+  return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameRef();
 }
 
-TypeRepr *IdentTypeRepr::getBaseComponent() {
+TypeRepr *DeclRefTypeRepr::getBaseComponent() {
   if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
     return Comp;
 
   return cast<MemberTypeRepr>(this)->getBaseComponent();
 }
 
-ComponentIdentTypeRepr *IdentTypeRepr::getLastComponent() {
+ComponentIdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
   if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
     return Comp;
 

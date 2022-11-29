@@ -2423,12 +2423,12 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 
 /// Determine the types directly referenced by the given identifier type.
 static DirectlyReferencedTypeDecls
-directReferencesForIdentTypeRepr(Evaluator &evaluator,
-                                 ASTContext &ctx, IdentTypeRepr *ident,
-                                 DeclContext *dc, bool allowUsableFromInline) {
+directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
+                                   DeclRefTypeRepr *repr, DeclContext *dc,
+                                   bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  auto *baseComp = ident->getBaseComponent();
+  auto *baseComp = repr->getBaseComponent();
   if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
     // If we already set a declaration, use it.
     if (auto *typeDecl = identBase->getBoundDecl()) {
@@ -2444,7 +2444,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                           allowUsableFromInline);
   }
 
-  auto *memberTR = dyn_cast<MemberTypeRepr>(ident);
+  auto *memberTR = dyn_cast<MemberTypeRepr>(repr);
   if (!memberTR)
     return current;
 
@@ -2503,9 +2503,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Member:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
-    return directReferencesForIdentTypeRepr(evaluator, ctx,
-                                            cast<IdentTypeRepr>(typeRepr), dc,
-                                            allowUsableFromInline);
+    return directReferencesForDeclRefTypeRepr(evaluator, ctx,
+                                              cast<DeclRefTypeRepr>(typeRepr),
+                                              dc, allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
@@ -2851,9 +2851,9 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
           Reprs.clear();
         }
-      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
-        if (identRepr->isProtocol(dc))
-          Reprs.push_back(identRepr);
+      } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
+        if (declRefTR->isProtocol(dc))
+          Reprs.push_back(declRefTR);
       }
       return Action::Continue();
     }

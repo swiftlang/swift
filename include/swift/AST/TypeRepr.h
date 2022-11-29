@@ -36,7 +36,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class DeclContext;
-  class IdentTypeRepr;
+  class DeclRefTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
 
@@ -79,15 +79,15 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, TypeRepr);
-  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, IdentTypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(DeclRefTypeRepr, TypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, DeclRefTypeRepr);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, ComponentIdentTypeRepr, 32,
     : NumPadBits,
     NumGenericArgs : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, IdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, DeclRefTypeRepr, 32,
     : NumPadBits,
     NumMemberComponents : 32
   );
@@ -247,13 +247,15 @@ private:
 
 class ComponentIdentTypeRepr;
 
-/// This is the abstract base class for types with identifier components.
+/// This is the abstract base class for types that directly reference a
+/// type declaration. In written syntax, this type representation consists of
+/// one or more components, separated by dots.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
-class IdentTypeRepr : public TypeRepr {
+class DeclRefTypeRepr : public TypeRepr {
 protected:
-  explicit IdentTypeRepr(TypeReprKind K) : TypeRepr(K) {}
+  explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
   TypeRepr *getBaseComponent();
@@ -270,10 +272,10 @@ public:
            T->getKind() == TypeReprKind::GenericIdent ||
            T->getKind() == TypeReprKind::Member;
   }
-  static bool classof(const IdentTypeRepr *T) { return true; }
+  static bool classof(const DeclRefTypeRepr *T) { return true; }
 };
 
-class ComponentIdentTypeRepr : public IdentTypeRepr {
+class ComponentIdentTypeRepr : public DeclRefTypeRepr {
   DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
@@ -289,7 +291,7 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
 
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
-    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
+      : DeclRefTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -409,7 +411,7 @@ private:
 ///   Foo.Bar<Gen>.Baz
 ///   [Int].Bar
 /// \endcode
-class MemberTypeRepr final : public IdentTypeRepr,
+class MemberTypeRepr final : public DeclRefTypeRepr,
     private llvm::TrailingObjects<MemberTypeRepr,
                                   ComponentIdentTypeRepr *> {
   friend TrailingObjects;
@@ -419,7 +421,7 @@ class MemberTypeRepr final : public IdentTypeRepr,
 
   MemberTypeRepr(TypeRepr *Base,
                  ArrayRef<ComponentIdentTypeRepr *> MemberComponents)
-      : IdentTypeRepr(TypeReprKind::Member), Base(Base) {
+      : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
     Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
     assert(MemberComponents.size() > 0 &&
            "should have just used the single ComponentIdentTypeRepr directly");

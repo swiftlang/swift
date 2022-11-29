@@ -148,13 +148,13 @@ lookupEnumMemberElement(DeclContext *DC, Type ty,
 }
 
 namespace {
-// Build up an IdentTypeRepr and see what it resolves to.
-struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
-{
+/// Build up an \c DeclRefTypeRepr and see what it resolves to.
+/// FIXME: Support DeclRefTypeRepr nodes with non-identifier base components.
+struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
   SmallVectorImpl<ComponentIdentTypeRepr *> &components;
   ASTContext &C;
 
-  ExprToIdentTypeRepr(decltype(components) &components, ASTContext &C)
+  ExprToDeclRefTypeRepr(decltype(components) &components, ASTContext &C)
     : components(components), C(C) {}
   
   bool visitExpr(Expr *e) {
@@ -476,13 +476,13 @@ public:
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
     SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, Context).visit(ude->getBase()))
+    if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
-    IdentTypeRepr *repr = nullptr;
+    DeclRefTypeRepr *repr = nullptr;
     if (components.size() == 1) {
       repr = components.front();
     } else {
@@ -582,7 +582,7 @@ public:
     }
 
     SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, Context).visit(ce->getFn()))
+    if (!ExprToDeclRefTypeRepr(components, Context).visit(ce->getFn()))
       return nullptr;
     
     if (components.empty())
@@ -609,7 +609,7 @@ public:
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      IdentTypeRepr *prefixRepr = nullptr;
+      DeclRefTypeRepr *prefixRepr = nullptr;
       if (components.size() == 1) {
         prefixRepr = components.front();
       } else {

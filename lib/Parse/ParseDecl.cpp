@@ -4952,8 +4952,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
                  nominal->createNameRef());
       } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
         if (auto repr = extension->getExtendedTypeRepr()) {
-          if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
-            diagnose(extension->getLoc(), diag::note_in_extension_of, idRepr);
+          if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
+            diagnose(extension->getLoc(), diag::note_in_extension_of,
+                     declRefTR);
           }
         }
       }

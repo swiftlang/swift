@@ -2018,8 +2018,8 @@ namespace {
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
-    NeverNullType resolveIdentifierType(IdentTypeRepr *IdType,
-                                        TypeResolutionOptions options);
+    NeverNullType resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                            TypeResolutionOptions options);
     NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
@@ -2168,7 +2168,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   if (options.is(TypeResolverContext::FunctionInput) &&
       !isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
-      !isa<IdentTypeRepr>(repr) &&
+      !isa<DeclRefTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options.setContext(None);
   }
@@ -2198,7 +2198,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::Member: {
-    return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
+    return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
   }
 
   case TypeReprKind::Function: {
@@ -3803,11 +3803,11 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 }
 
 NeverNullType
-TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
-                                    TypeResolutionOptions options) {
+TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
+                                     TypeResolutionOptions options) {
   Type result;
 
-  auto *baseComp = IdType->getBaseComponent();
+  auto *baseComp = repr->getBaseComponent();
   if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
     // The base component uses unqualified lookup.
     result = resolveTopLevelIdentTypeComponent(resolution.withOptions(options),
@@ -3820,7 +3820,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(result->getASTContext());
 
   // Remaining components are resolved via iterated qualified lookups.
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(IdType)) {
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
     SourceRange parentRange = baseComp->getSourceRange();
     for (auto *nestedComp : memberTR->getMemberComponents()) {
       result = resolveNestedIdentTypeComponent(resolution.withOptions(options),
@@ -3833,7 +3833,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     }
   }
 
-  auto lastComp = IdType->getLastComponent();
+  auto lastComp = repr->getLastComponent();
 
   // Diagnose an error if the last component's generic arguments are missing.
   if (result->is<UnboundGenericType>() &&
@@ -3881,9 +3881,9 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
         options.isConstraintImplicitExistential()) {
       // Check whether this type is an implicit opaque result type.
       if (auto *opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
-        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(IdType)) {
-          return diagnoseDisallowedExistential(IdType,
-              getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr)) {
+          return diagnoseDisallowedExistential(
+              repr, getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
         }
       }
 
@@ -3893,7 +3893,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
         if (auto genericContext = declDC->getAsGenericContext()) {
           if (auto genericParams = genericContext->getGenericParams()) {
             for (auto genericParam : *genericParams) {
-              if (genericParam->getOpaqueTypeRepr() == IdType)
+              if (genericParam->getOpaqueTypeRepr() == repr)
                 return genericParam->getDeclaredInterfaceType();
             }
           }

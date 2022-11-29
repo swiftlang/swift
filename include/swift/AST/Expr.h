@@ -42,7 +42,7 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class AvailabilitySpec;
-  class IdentTypeRepr;
+  class DeclRefTypeRepr;
   class Type;
   class TypeRepr;
   class ValueDecl;
@@ -1338,18 +1338,19 @@ public:
                                        DeclNameLoc NameLoc,
                                        TypeDecl *Decl);
 
-  /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
-  static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
+  /// Create a \c TypeExpr for a member \c TypeDecl of the given parent
+  /// \c DeclRefTypeRepr.
+  static TypeExpr *createForMemberDecl(DeclRefTypeRepr *ParentTR,
                                        DeclNameLoc NameLoc,
                                        TypeDecl *Decl);
 
-  /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
-  /// at the specified location.
+  /// Create a \c TypeExpr from an \c DeclRefTypeRepr with the given arguments
+  /// applied at the specified location.
   ///
   /// Returns nullptr if the reference cannot be formed, which is a hack due
   /// to limitations in how we model generic typealiases.
-  static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
-                                            ArrayRef<TypeRepr*> Args,
+  static TypeExpr *createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
+                                            ArrayRef<TypeRepr *> Args,
                                             SourceRange AngleLocs,
                                             ASTContext &C);
 

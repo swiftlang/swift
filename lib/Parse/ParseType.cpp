@@ -676,7 +676,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
         IDECallbacks->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+      return makeParserCodeCompletionResult<DeclRefTypeRepr>();
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -750,12 +750,12 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     break;
   }
 
-  IdentTypeRepr *ITR = nullptr;
+  DeclRefTypeRepr *DeclRefTR = nullptr;
   if (!ComponentsR.empty()) {
     if (ComponentsR.size() == 1) {
-      ITR = ComponentsR.front();
+      DeclRefTR = ComponentsR.front();
     } else {
-      ITR = MemberTypeRepr::create(Context, ComponentsR);
+      DeclRefTR = MemberTypeRepr::create(Context, ComponentsR);
     }
   }
 
@@ -764,16 +764,16 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       // We have a dot.
       consumeToken();
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithDot(ITR);
+        IDECallbacks->completeTypeIdentifierWithDot(DeclRefTR);
     } else {
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithoutDot(ITR);
+        IDECallbacks->completeTypeIdentifierWithoutDot(DeclRefTR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
   }
 
-  return makeParserResult(Status, ITR);
+  return makeParserResult(Status, DeclRefTR);
 }
 
 /// parseTypeSimpleOrComposition
@@ -920,9 +920,9 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       // Parse the type-identifier.
       ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
       Status |= Protocol;
-      if (auto *ident =
-            dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
-        Protocols.push_back(ident);
+      if (auto *DeclRefTR =
+              dyn_cast_or_null<DeclRefTypeRepr>(Protocol.getPtrOrNull()))
+        Protocols.push_back(DeclRefTR);
     } while (consumeIf(tok::comma));
   }
 

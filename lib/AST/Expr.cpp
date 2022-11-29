@@ -2224,7 +2224,7 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   return new (C) TypeExpr(TR);
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
+TypeExpr *TypeExpr::createForMemberDecl(DeclRefTypeRepr *ParentTR,
                                         DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
@@ -2246,8 +2246,8 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   return new (C) TypeExpr(TR);
 }
 
-TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
-                                             ArrayRef<TypeRepr*> Args,
+TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
+                                             ArrayRef<TypeRepr *> Args,
                                              SourceRange AngleLocs,
                                              ASTContext &C) {
   auto *lastComp = ParentTR->getLastComponent();

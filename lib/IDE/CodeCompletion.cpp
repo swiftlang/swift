@@ -214,12 +214,13 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
     ParsedTypeLoc.setType(ty);
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
-    if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
+    if (auto *declRefTR =
+            dyn_cast<DeclRefTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       // If it has more than one component, it can't be a module name.
-      if (isa<MemberTypeRepr>(ITR))
+      if (isa<MemberTypeRepr>(declRefTR))
         return false;
 
-      const auto *component = cast<ComponentIdentTypeRepr>(ITR);
+      const auto *component = cast<ComponentIdentTypeRepr>(declRefTR);
       ImportPath::Module::Builder builder(
           component->getNameRef().getBaseIdentifier(),
           component->getLoc());
@@ -266,8 +267,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithDot(DeclRefTypeRepr *TR) override;
+  void completeTypeIdentifierWithoutDot(DeclRefTypeRepr *TR) override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -495,21 +496,21 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
 }
 
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
-    IdentTypeRepr *ITR) {
-  if (!ITR) {
+    DeclRefTypeRepr *TR) {
+  if (!TR) {
     completeTypeSimpleBeginning();
     return;
   }
   Kind = CompletionKind::TypeIdentifierWithDot;
-  ParsedTypeLoc = TypeLoc(ITR);
+  ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
-    IdentTypeRepr *ITR) {
-  assert(ITR);
+    DeclRefTypeRepr *TR) {
+  assert(TR);
   Kind = CompletionKind::TypeIdentifierWithoutDot;
-  ParsedTypeLoc = TypeLoc(ITR);
+  ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
 

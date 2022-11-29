@@ -3986,11 +3986,11 @@ public:
       : where(where), flags(flags) {}
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    auto *ITR = dyn_cast<IdentTypeRepr>(T);
-    if (!ITR)
+    auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
+    if (!declRefTR)
       return Action::Continue();
 
-    auto *baseComp = ITR->getBaseComponent();
+    auto *baseComp = declRefTR->getBaseComponent();
     if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
       if (checkComponentIdentTypeRepr(identBase)) {
         foundAnyIssues = true;

@@ -474,9 +474,9 @@ namespace {
         : dc(dc), params(params) {}
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
+      if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
       if (auto *base =
-              dyn_cast<ComponentIdentTypeRepr>(ident->getBaseComponent())) {
+              dyn_cast<ComponentIdentTypeRepr>(declRefTR->getBaseComponent())) {
         auto name = base->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name))
           base->setValue(paramDecl, dc);

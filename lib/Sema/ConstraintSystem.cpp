@@ -1929,12 +1929,11 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
   if (!typeRepr)
     return false;
 
-  auto identTypeRepr = dyn_cast<IdentTypeRepr>(typeRepr);
-  if (!identTypeRepr)
+  auto declRefTR = dyn_cast<DeclRefTypeRepr>(typeRepr);
+  if (!declRefTR)
     return false;
 
-  if (identTypeRepr->getNameRef().getBaseName().userFacingName() !=
-      "DispatchQueue")
+  if (declRefTR->getNameRef().getBaseName().userFacingName() != "DispatchQueue")
     return false;
 
   return true;
