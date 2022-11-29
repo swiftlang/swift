@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -153,19 +153,6 @@ public:
   Optional<int64_t> getOptionalInt64(SourceKit::UIdent Key);
 };
 
-/// Initialize the service. Must be called before attempting to handle requests.
-/// \param swiftExecutablePath The path of the swift-frontend executable.
-///                            Used to find clang relative to it.
-/// \param runtimeLibPath The path to the toolchain's library directory.
-/// \param diagnosticDocumentationPath The path to diagnostics documentation.
-/// \param postNotification Callback to post a notification.
-void initializeService(
-    llvm::StringRef swiftExecutablePath, llvm::StringRef runtimeLibPath,
-    llvm::StringRef diagnosticDocumentationPath,
-    std::function<void(sourcekitd_response_t)> postNotification);
-/// Shutdown the service.
-void shutdownService();
-
 /// Initialize the sourcekitd client library. Returns true if this is the first
 /// time it is initialized.
 bool initializeClient();
@@ -174,16 +161,6 @@ bool initializeClient();
 bool shutdownClient();
 
 void set_interrupted_connection_handler(llvm::function_ref<void()> handler);
-
-typedef std::function<void(sourcekitd_response_t)> ResponseReceiver;
-
-void handleRequest(sourcekitd_object_t Request,
-                   SourceKitCancellationToken CancellationToken,
-                   ResponseReceiver Receiver);
-
-void cancelRequest(SourceKitCancellationToken CancellationToken);
-
-void disposeCancellationToken(SourceKitCancellationToken CancellationToken);
 
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
