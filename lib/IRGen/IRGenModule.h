@@ -771,6 +771,8 @@ public:
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
+  llvm::StructType *RuntimeDiscoverableAttributeTy; // { i32, i32*, i32 }
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::GlobalVariable *swiftImmortalRefCount = nullptr;
