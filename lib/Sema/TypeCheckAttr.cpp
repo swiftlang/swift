@@ -1150,6 +1150,17 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
         }
       }
     }
+
+    // Forbid enum elements marked SPI in frozen types.
+    if (auto elt = dyn_cast<EnumElementDecl>(VD)) {
+      if (auto ED = dyn_cast<EnumDecl>(D->getDeclContext())) {
+        if (ED->getAttrs().hasAttribute<FrozenAttr>(/*allowInvalid*/ true) &&
+            !ED->isSPI()) {
+          diagnoseAndRemoveAttr(attr, diag::spi_attribute_on_frozen_enum_case,
+                                VD->getDescriptiveKind(), VD->getName());
+        }
+      }
+    }
   }
 
   if (auto ID = dyn_cast<ImportDecl>(D)) {

@@ -1970,6 +1970,9 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+ERROR(spi_attribute_on_frozen_enum_case,none,
+      "%0 %1 cannot be declared '@_spi' in a '@frozen' enum",
+      (DescriptiveDeclKind, DeclName))
 WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
