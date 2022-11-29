@@ -433,6 +433,19 @@ getProtocolRefsList(llvm::Constant *protocol) {
   return std::make_pair(size, protocolRefsList);
 }
 
+static void appendNonRuntimeImpliedProtocols(
+  clang::ObjCProtocolDecl *proto,
+  llvm::SetVector<clang::ObjCProtocolDecl *> &nonRuntimeImpliedProtos) {
+
+  if (!proto->isNonRuntimeProtocol()) {
+    nonRuntimeImpliedProtos.insert(proto->getCanonicalDecl());
+    return;
+  }
+
+  for (auto *parent : proto->protocols())
+    appendNonRuntimeImpliedProtocols(parent, nonRuntimeImpliedProtos);
+}
+
 // Get runtime protocol list used during emission of objective-c protocol
 // metadata taking non-runtime protocols into account.
 static std::vector<clang::ObjCProtocolDecl *>
@@ -454,23 +467,8 @@ getRuntimeProtocolList(clang::ObjCProtocolDecl::protocol_range protocols) {
   // Find the non-runtime implied protocols: protocols that occur in the closest
   // ancestry of a non-runtime protocol.
   llvm::SetVector<clang::ObjCProtocolDecl *> nonRuntimeImpliedProtos;
-  std::vector<clang::ObjCProtocolDecl *> worklist;
-  llvm::DenseSet<clang::ObjCProtocolDecl*> seen;
   for (auto *nonRuntimeProto : nonRuntimeProtocols) {
-    worklist.push_back(nonRuntimeProto);
-    while(!worklist.empty()) {
-       auto *item = worklist.back();
-       worklist.pop_back();
-       if (!seen.insert(item).second)
-         continue;
-
-       if (item->isNonRuntimeProtocol()) {
-         for (auto *parent : item->protocols())
-           worklist.push_back(parent);
-       } else {
-         nonRuntimeImpliedProtos.insert(item->getCanonicalDecl());
-       }
-    }
+    appendNonRuntimeImpliedProtocols(nonRuntimeProto, nonRuntimeImpliedProtos);
   }
 
   // Subtract the implied protocols of the runtime protocols and non runtime
@@ -529,8 +527,11 @@ static void updateProtocolRefs(IRGenModule &IGM,
     auto record = IGM.getAddrOfObjCProtocolRecord(inheritedSwiftProtocol,
                                                   NotForDefinition);
     auto newOpd = llvm::ConstantExpr::getBitCast(record, oldVar->getType());
-    if (newOpd != oldVar)
-      oldVar->replaceAllUsesWith(newOpd);
+    if (newOpd != oldVar) {
+      oldVar->replaceUsesWithIf(newOpd, [protocol](llvm::Use &U) -> bool {
+                                return U.getUser() == getProtocolRefsList(protocol).second;
+                                });
+    }
     ++currentIdx;
   }
   assert(currentIdx == protocolRefsSize);
