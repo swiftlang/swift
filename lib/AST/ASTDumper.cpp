@@ -1702,8 +1702,6 @@ public:
       OS << ")\n";
       Indent -= 2;
     }
-    printRec(S->getPattern());
-    OS << '\n';
     printRec(S->getParsedSequence());
     OS << '\n';
     if (S->getIteratorVar()) {
