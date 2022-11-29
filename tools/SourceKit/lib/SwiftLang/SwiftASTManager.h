@@ -262,8 +262,10 @@ public:
                   SourceKitCancellationToken CancellationToken,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
-  std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
-                                                      std::string &Error);
+  std::unique_ptr<llvm::MemoryBuffer>
+  getMemoryBuffer(StringRef Filename,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                  std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
                               ArrayRef<const char *> Args,
