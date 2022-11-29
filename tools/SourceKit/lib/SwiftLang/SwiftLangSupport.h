@@ -516,9 +516,12 @@ public:
 
   /// Execute \p PerformOperation synchronously with the parameters necessary to
   /// invoke a completion-like operation on \c CompletionInstance.
+  /// If \p InsertCodeCompletionToken is \c true, a code completion token will
+  /// be inserted into the source buffer, if \p InsertCodeCompletionToken is \c
+  /// false, the buffer is left as-is.
   void performWithParamsToCompletionLikeOperation(
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-      ArrayRef<const char *> Args,
+      bool InsertCodeCompletionToken, ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       SourceKitCancellationToken CancellationToken,
       llvm::function_ref<
