@@ -22,7 +22,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   The API of `UnsafeMutableRawPointer`, `UnsafeMutableBufferPointer`, `UnsafeMutableRawBufferPointer` were improved, adding previously missing initialization (and deinitialization) methods, including more performant initialization from `Collection` types.
 
-  For `UnsafeMutablePointer<T>` and `UnsafeMutableBufferPointer<T>`, method names containing the word "assign" were renamed to use the word "update", and many more were added. Every initialization method of `UnsafeMutablePointer` and `UnsafeMutableBufferPointer` has a corresponding "update" method.
+  For `UnsafeMutablePointer<T>` and `UnsafeMutableBufferPointer<T>`, method names containing the word "assign" were renamed to use the word "update", and many more were added. Every multi-element initialization method of `UnsafeMutablePointer` and `UnsafeMutableBufferPointer` now has a corresponding "update" method.
 
   Slices of `UnsafeBufferPointer`, `UnsafeRawBufferPointer`, `UnsafeMutableBufferPointer` and `UnsafeMutableRawBufferPointer` now share the collection-like API of their base type. For example, given an initialized `b: UnsafeMutableBufferPointer<Int>`, the following lines are synonymous:
   ```swift
