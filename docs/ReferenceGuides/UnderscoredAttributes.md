@@ -1005,9 +1005,3 @@ the distributed actor isolation checks. This is used for things like `whenLocal`
 where the actor passed to the closure is known-to-be-local, and similarly a 
 `self` of obtained from an _isolated_ function inside a distributed actor is 
 also guaranteed to be local by construction.
-
-## @_GenerateLayoutBytecode
-
-Rather than lowering value witness functions to copy and destroy a type to
-code, create a smaller bytecode layout representing the type and interpret that
-at runtime to destroy the type.

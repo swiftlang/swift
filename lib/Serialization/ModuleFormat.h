@@ -1877,11 +1877,6 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
-  using GenerateLayoutBytecodeDeclAttrLayout =
-      BCRecordLayout<GenerateLayoutBytecode_DECL_ATTR,
-                     BCFixed<1> // implicit flag
-                     >;
-
   using CDeclDeclAttrLayout = BCRecordLayout<
     CDecl_DECL_ATTR,
     BCFixed<1>, // implicit flag

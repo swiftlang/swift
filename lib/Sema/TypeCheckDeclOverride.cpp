@@ -1498,7 +1498,6 @@ namespace  {
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
-    UNINTERESTING_ATTR(GenerateLayoutBytecode)
     UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)

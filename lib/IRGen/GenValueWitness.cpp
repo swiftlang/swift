@@ -487,16 +487,13 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (concreteType.getNominalOrBoundGenericNominal()
-              ->getAttrs()
-              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+      if (IGM.getOptions().ForceStructTypeLayouts) {
         auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
                                                  IGF.Builder.getInt8PtrTy());
         auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                   IGF.Builder.getInt8PtrTy());
         auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr &&
-               "@_GenerateLayoutBytecode but failed to make layout string");
+        assert(layoutStr && "Failed to make layout string");
         llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
             llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
         auto castStr =
@@ -528,17 +525,14 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (concreteType.getNominalOrBoundGenericNominal()
-              ->getAttrs()
-              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+      if (IGM.getOptions().ForceStructTypeLayouts) {
         auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
                                                  IGF.Builder.getInt8PtrTy());
         auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                   IGF.Builder.getInt8PtrTy());
 
         auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr &&
-               "@_GenerateLayoutBytecode but failed to make layout string");
+        assert(layoutStr && "Failed to make layout string");
         llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
             llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
         auto castStr =
@@ -569,14 +563,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (concreteType.getNominalOrBoundGenericNominal()
-              ->getAttrs()
-              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+      if (IGM.getOptions().ForceStructTypeLayouts) {
         auto castAddr = IGF.Builder.CreateBitCast(object.getAddress(),
                                                   IGF.Builder.getInt8PtrTy());
         auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr &&
-               "@_GenerateLayoutBytecode but failed to make layout string");
+        assert(layoutStr && "Failed to make layout string");
         llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
             llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
         auto castStr =
@@ -626,16 +617,13 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (concreteType.getNominalOrBoundGenericNominal()
-              ->getAttrs()
-              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+      if (IGM.getOptions().ForceStructTypeLayouts) {
         auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
                                                  IGF.Builder.getInt8PtrTy());
         auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                   IGF.Builder.getInt8PtrTy());
         auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr &&
-               "@_GenerateLayoutBytecode but failed to make layout string");
+        assert(layoutStr && "Failed to make layout string");
         llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
             llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
 
@@ -669,17 +657,14 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (concreteType.getNominalOrBoundGenericNominal()
-              ->getAttrs()
-              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+      if (IGM.getOptions().ForceStructTypeLayouts) {
         auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
                                                  IGF.Builder.getInt8PtrTy());
         auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                   IGF.Builder.getInt8PtrTy());
 
         auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr &&
-               "@_GenerateLayoutBytecode but failed to make layout string");
+        assert(layoutStr && "Failed to make layout string");
         llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
             llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
 
