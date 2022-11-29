@@ -4623,7 +4623,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
   if (aliasDecl) {
-    if (aliasDecl->getGenericParams()) {
+    if (aliasDecl->isGeneric()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
           aliasDecl->getASTContext());
@@ -4647,7 +4647,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     if (baseTy->is<ErrorType>())
       return ErrorType::get(memberType);
 
-    subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
+    subs = baseTy->getMemberSubstitutionMap(module, member);
     resultType = memberType.subst(subs);
   } else {
     resultType = memberType;

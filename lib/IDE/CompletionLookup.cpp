@@ -1684,14 +1684,10 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.addBaseName(TAD->getName().str());
   if (auto underlyingType = TAD->getUnderlyingType()) {
     if (underlyingType->hasError()) {
-      Type parentType;
-      if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
-        parentType = nominal->getDeclaredInterfaceType();
-      }
       addTypeAnnotation(Builder,
-                        TypeAliasType::get(const_cast<TypeAliasDecl *>(TAD),
-                                           parentType, SubstitutionMap(),
-                                           underlyingType));
+                        TAD->isGeneric()
+                        ? TAD->getUnboundGenericType()
+                        : TAD->getDeclaredInterfaceType());
 
     } else {
       addTypeAnnotation(Builder, underlyingType);
