@@ -12,7 +12,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://83459813 - assertion failure in TaskGroup.cpp
 // REQUIRES: OS=macosx
 
 import Darwin
