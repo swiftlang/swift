@@ -160,6 +160,17 @@ SourceLoc BraceStmt::getStartLoc() const {
   if (LBLoc) {
     return LBLoc;
   }
+  return getContentStartLoc();
+}
+
+SourceLoc BraceStmt::getEndLoc() const {
+  if (RBLoc) {
+    return RBLoc;
+  }
+  return getContentEndLoc();
+}
+
+SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
     if (auto loc = elt.getStartLoc()) {
       return loc;
@@ -168,10 +179,7 @@ SourceLoc BraceStmt::getStartLoc() const {
   return SourceLoc();
 }
 
-SourceLoc BraceStmt::getEndLoc() const {
-  if (RBLoc) {
-    return RBLoc;
-  }
+SourceLoc BraceStmt::getContentEndLoc() const {
   for (auto elt : llvm::reverse(getElements())) {
     if (auto loc = elt.getEndLoc()) {
       return loc;
