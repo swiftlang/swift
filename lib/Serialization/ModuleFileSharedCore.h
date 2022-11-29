@@ -88,6 +88,9 @@ class ModuleFileSharedCore {
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
 
+  /// An array of module names that are allowed to import this one.
+  ArrayRef<StringRef> AllowableClientNames;
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
