@@ -711,11 +711,13 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     DeclMembersTables[subTableOffset];
   if (!subTable) {
     BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
-    fatalIfNotSuccess(DeclMemberTablesCursor.JumpToBit(subTableOffset));
+    if (diagnoseFatalIfNotSuccess(
+            DeclMemberTablesCursor.JumpToBit(subTableOffset)))
+      return results;
     llvm::BitstreamEntry entry =
         fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
-      fatal();
+      diagnoseAndConsumeFatal();
       return results;
     }
     SmallVector<uint64_t, 64> scratch;
