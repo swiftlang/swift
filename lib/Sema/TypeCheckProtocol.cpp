@@ -3376,8 +3376,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
-    if (type->hasError())
-      aliasDecl->setInvalid();
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getSelfNominalTypeDecl()) {

@@ -3565,10 +3565,6 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
 
-  /// Add loaded members from all extensions. Eagerly load any members that we
-  /// can't lazily load.
-  void addLoadedExtensions();
-
   /// Retrieve the conformance loader (if any), and removing it in the
   /// same operation. The caller is responsible for loading the
   /// conformances.
@@ -3583,13 +3579,19 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   /// A lookup table containing all of the members of this type and
-  /// its extensions.
+  /// its extensions, together with a bit indicating if the table
+  /// has been prepared.
   ///
   /// The table itself is lazily constructed and updated when
   /// lookupDirect() is called.
-  MemberLookupTable *LookupTable = nullptr;
+  llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
+
+  /// Get the lookup table, lazily constructing an empty table if
+  /// necessary.
+  MemberLookupTable *getLookupTable();
 
   /// Prepare the lookup table to make it ready for lookups.
+  /// Does nothing when called more than once.
   void prepareLookupTable();
 
   /// Note that we have added a member into the iterable declaration context,

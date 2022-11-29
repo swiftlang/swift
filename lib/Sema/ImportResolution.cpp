@@ -1060,8 +1060,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
       emittedDiag.emplace(ctx.Diags.diagnose(
           importLoc, diag::imported_decl_is_wrong_kind_typealias,
           typealias->getDescriptiveKind(),
-          TypeAliasType::get(typealias, Type(), SubstitutionMap(),
-                             typealias->getUnderlyingType()),
+          typealias->getDeclaredInterfaceType(),
           getImportKindString(importKind)));
     } else {
       emittedDiag.emplace(ctx.Diags.diagnose(

@@ -1192,10 +1192,6 @@ void LazyConformanceLoader::anchor() {}
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
-  /// The last extension that was included within the member lookup table's
-  /// results.
-  ExtensionDecl *LastExtensionIncluded = nullptr;
-
   /// The type of the internal lookup table.
   typedef llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     LookupTable;
@@ -1211,9 +1207,6 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
-
-  /// Update a lookup table with members from newly-added extensions.
-  void updateLookupTable(NominalTypeDecl *nominal);
 
   /// Add the given member to the lookup table.
   void addMember(Decl *members);
@@ -1250,12 +1243,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &os) const {
-    os << "LastExtensionIncluded:\n";
-    if (LastExtensionIncluded)
-      LastExtensionIncluded->printContext(os, 2);
-    else
-      os << "  nullptr\n";
-
     os << "Lookup:\n  ";
     for (auto &pair : Lookup) {
       pair.getFirst().print(os);
@@ -1357,30 +1344,18 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
-void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
-  // If the last extension we included is the same as the last known extension,
-  // we're already up-to-date.
-  if (LastExtensionIncluded == nominal->LastExtension)
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
+  if (!LookupTable.getInt())
     return;
 
-  // Add members from each of the extensions that we have not yet visited.
-  for (auto next = LastExtensionIncluded
-                     ? LastExtensionIncluded->NextExtension.getPointer()
-                     : nominal->FirstExtension;
-       next;
-       (LastExtensionIncluded = next,next = next->NextExtension.getPointer())) {
-    addMembers(next->getMembers());
-  }
-}
-
-void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
-  if (!LookupTable) return;
+  auto *table = LookupTable.getPointer();
+  assert(table);
 
   if (ext->hasLazyMembers()) {
-    LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
-    LookupTable->clearLazilyCompleteCache();
+    table->addMembers(ext->getCurrentMembersWithoutLoading());
+    table->clearLazilyCompleteCache();
   } else {
-    LookupTable->addMembers(ext->getMembers());
+    table->addMembers(ext->getMembers());
   }
 }
 
@@ -1388,11 +1363,13 @@ void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it. If not, we'll pick up
   // this member when we first create the table.
   auto *vd = dyn_cast<ValueDecl>(member);
-  auto *lookup = LookupTable;
-  if (!vd || !lookup)
+  if (!vd || !LookupTable.getInt())
     return;
 
-  lookup->addMember(vd);
+  auto *table = LookupTable.getPointer();
+  assert(table);
+
+  table->addMember(vd);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
@@ -1406,9 +1383,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 }
 
 void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
-  prepareLookupTable();
-
-  LookupTable->addMember(member);
+  getLookupTable()->addMember(member);
 }
 
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
@@ -1506,37 +1481,52 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   }
 }
 
-void NominalTypeDecl::prepareLookupTable() {
-  // If we have already allocated the lookup table, then there's nothing further
-  // to do.
-  if (LookupTable) {
-    return;
+MemberLookupTable *NominalTypeDecl::getLookupTable() {
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
-  // Otherwise start the first fill.
-  auto &ctx = getASTContext();
-  LookupTable = new (ctx) MemberLookupTable(ctx);
-
-  if (hasLazyMembers()) {
-    assert(!hasUnparsedMembers());
-    LookupTable->addMembers(getCurrentMembersWithoutLoading());
-  } else {
-    LookupTable->addMembers(getMembers());
-  }
+  return LookupTable.getPointer();
 }
 
-void NominalTypeDecl::addLoadedExtensions() {
+void NominalTypeDecl::prepareLookupTable() {
+  // If we have already prepared the lookup table, then there's nothing further
+  // to do.
+  if (LookupTable.getInt())
+    return;
+
+  auto *table = getLookupTable();
+
+  // Otherwise start the first fill.
+  if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+    table->addMembers(getCurrentMembersWithoutLoading());
+  } else {
+    table->addMembers(getMembers());
+  }
+
+  // Note: this calls prepareExtensions()
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
+    //
+    // FIXME: This should be 'e->hasLazyMembers()' but that crashes` because
+    // some imported extensions don't have a Clang node, and only support
+    // LazyMemberLoader::loadAllMembers() and not
+    // LazyMemberLoader::loadNamedMembers().
     if (e->wasDeserialized() || e->hasClangNode()) {
-      LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
+      table->addMembers(e->getCurrentMembersWithoutLoading());
       continue;
     }
 
     // Else, load all the members into the table.
-    LookupTable->addMembers(e->getMembers());
+    table->addMembers(e->getMembers());
   }
+
+  // Any extensions added after this point will add their members to the
+  // lookup table.
+  LookupTable.setInt(true);
 }
 
 static TinyPtrVector<ValueDecl *>
@@ -1592,12 +1582,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
-  // properly invalidate the lazily-complete cache for any extensions brought in
-  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->addLoadedExtensions();
+  // Call prepareExtensions() to ensure we properly invalidate the
+  // lazily-complete cache for any extensions brought in by modules
+  // loaded after-the-fact. This can happen with the LLDB REPL.
+  decl->prepareExtensions();
 
-  auto &Table = *decl->LookupTable;
+  auto &Table = *decl->getLookupTable();
   if (!useNamedLazyMemberLoading) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
@@ -1606,7 +1596,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     for (auto E : decl->getExtensions())
       (void)E->getMembers();
 
-    Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     DeclBaseName baseName(name.getBaseName());
 

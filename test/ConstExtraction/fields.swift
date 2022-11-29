@@ -71,14 +71,14 @@
 // CHECK-NEXT:        "type": "Swift.Int",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
-// CHECK-NEXT:        "value": "Unknown"
+// CHECK-NEXT:        "value": "3"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "p4",
 // CHECK-NEXT:        "type": "Swift.Int",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "true",
-// CHECK-NEXT:        "value": "Unknown"
+// CHECK-NEXT:        "value": "3"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
@@ -91,7 +91,7 @@ public struct Foo {
     let p1: String = "Hello, World"
     static let p2: Float = 42.2
     var p3: Int {3}
-    static var p4: Int {3}
+    static var p4: Int { return 3 }
     let p5: [Int] = [1,2,3,4,5,6,7,8,9]
     let p6: Bool = false
     let p7: Bool? = nil

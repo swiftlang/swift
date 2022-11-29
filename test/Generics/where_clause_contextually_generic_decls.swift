@@ -127,6 +127,8 @@ struct Container<T> {
   // expected-error@-1 {{invalid redeclaration of 'NestedAlias}}
   typealias NestedAlias2 = T.Magnitude where T: FixedWidthInteger
 
+  typealias NestedAlias3 = T.Element where T: Sequence
+
   class NestedClass where T: Equatable {}
 }
 
@@ -154,3 +156,12 @@ _ = Container<Bool>.NestedClass.self
 _ = Container<String>.NestedStruct.self
 _ = Container<Array<UInt8>>.NestedStruct2.self
 _ = Container<Array<Double>>.NestedStruct2.NestedEnum.self
+
+// Make sure the substitution here actually succeeds instead of producing an ErrorType
+func sameType<T>(_: T.Type, _: T.Type) {}
+sameType(Container<Array<Int>>.NestedAlias3.self, Int.self)
+sameType(Container<Array<Bool>>.NestedAlias3.self, Int.self)
+// expected-error@-1 {{cannot convert value of type 'Int.Type' to expected argument type 'Container<Array<Bool>>.NestedAlias3.Type' (aka 'Bool.Type')}}
+
+sameType(Container<Array<Int>>.NestedAlias3.self, Bool.self)
+// expected-error@-1 {{cannot convert value of type 'Bool.Type' to expected argument type 'Container<Array<Int>>.NestedAlias3.Type' (aka 'Int.Type')}}
