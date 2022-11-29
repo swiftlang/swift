@@ -133,6 +133,20 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
     }
   }
 
+  if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
+    auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
+    if (node.is<Stmt *>()) {
+      if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
+        auto expr = returnStmt->getResult();
+        std::string LiteralOutput;
+        llvm::raw_string_ostream OutputStream(LiteralOutput);
+        expr->printConstExprValue(&OutputStream, nullptr);
+        if (!LiteralOutput.empty())
+          return std::make_shared<RawLiteralValue>(LiteralOutput);
+      }
+    }
+  }
+
   return std::make_shared<RuntimeValue>();
 }
 
