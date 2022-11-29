@@ -1490,6 +1490,11 @@ public:
   void emitProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
+  /// Emit runtime discoverable attribute metadata section for the given set
+  /// of source files.
+  void
+  emitRuntimeDiscoverableAttributes(TinyPtrVector<FileUnit *> &filesToEmit);
+
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 

@@ -2208,6 +2208,14 @@ public:
       SGM.visit(TD);
     }
 
+    for (auto *D : sf->getDeclsWithRuntimeDiscoverableAttrs()) {
+      for (auto *attr : D->getRuntimeDiscoverableAttrs()) {
+        auto *generator = D->getRuntimeDiscoverableAttributeGenerator(attr);
+        assert(generator);
+        emitSILFunctionDefinition(SILDeclRef(generator).asRuntimeAccessible());
+      }
+    }
+
     // If the source file contains an artificial main, emit the implicit
     // top-level code.
     if (auto *mainDecl = sf->getMainDecl()) {

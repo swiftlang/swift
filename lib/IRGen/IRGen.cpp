@@ -1361,6 +1361,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitAccessibleFunctions();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
+      IGM.emitRuntimeDiscoverableAttributes(filesToEmit);
       irgen.emitEagerClassInitialization();
       irgen.emitObjCActorsNeedingSuperclassSwizzle();
       irgen.emitDynamicReplacements();
