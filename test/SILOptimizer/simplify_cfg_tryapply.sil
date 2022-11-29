@@ -272,7 +272,7 @@ bb2(%16 : @owned $Error):
 // CHECK:   destroy_value %5 : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error any Error)
 // CHECK:   [[CALL:%.*]] = apply [[COPY]]
 // CHECK:   br bb3([[CALL]] : $Builtin.Int32)
-// CHECK: bb2:                                              // Preds: bb0
+// CHECK: bb2:
 // CHECK:   destroy_value [[COPY]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32
 // CHECK:   destroy_value [[CVT]] : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error any Error)
 // CHECK:   br bb3(
