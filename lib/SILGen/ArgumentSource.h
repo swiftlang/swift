@@ -223,7 +223,7 @@ public:
   }
 
   Expr *findStorageReferenceExprForBorrow() &&;
-  Expr *findStorageReferenceExprForMoveOnlyBorrow() &&;
+  Expr *findStorageReferenceExprForMoveOnlyBorrow(SILGenFunction &SGF) &&;
 
   /// Given that this source is an expression, extract and clear
   /// that expression.

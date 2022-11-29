@@ -2926,7 +2926,8 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   return nullptr;
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow() && {
+Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
+    SILGenFunction &SGF) && {
   if (!isExpr())
     return nullptr;
 
@@ -2935,10 +2936,32 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow() && {
   if (!li)
     return nullptr;
 
-  auto lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
+  auto *lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
 
-  // Claim the value of this argument if we found a storage reference.
+  // Claim the value of this argument if we found a storage reference that has a
+  // move only base.
   if (lvExpr) {
+    // We want to perform a borrow if our initial type is a pure move only /or/
+    // if after looking through multiple copyable member ref expr, we get to a
+    // move only member ref expr or a move only decl ref expr.
+    //
+    // NOTE: We purposely do not look through load implying that if we have
+    // copyable types extracted from a move only class, we will not borrow.
+    auto *iterExpr = lvExpr;
+    while (true) {
+      SILType ty = SGF.getLoweredType(
+          iterExpr->getType()->getWithoutSpecifierType()->getCanonicalType());
+      if (ty.isPureMoveOnly())
+        break;
+
+      if (auto *mre = dyn_cast<MemberRefExpr>(iterExpr)) {
+        iterExpr = mre->getBase();
+        continue;
+      }
+
+      return nullptr;
+    }
+
     (void)std::move(*this).asKnownExpr();
   }
 
@@ -3081,7 +3104,11 @@ private:
         return;
     }
 
-    if (loweredSubstArgType.isPureMoveOnly() && param.isGuaranteed()) {
+    // If we have a guaranteed paramter, see if we have a move only type and can
+    // emit it borrow.
+    //
+    // We check for move only in tryEmitBorrowedMoveOnly.
+    if (param.isGuaranteed()) {
       if (tryEmitBorrowedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3264,13 +3291,14 @@ private:
                                ClaimedParamsRef paramsSlice) {
     assert(paramsSlice.size() == 1);
 
-    // Try to find an expression we can emit as an l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow();
+    // Try to find an expression we can emit as a borrowed l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
     if (!lvExpr)
       return false;
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
                  origParamType, paramsSlice);
+
     return true;
   }
 
