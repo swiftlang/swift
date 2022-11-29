@@ -1345,9 +1345,11 @@ void MemberLookupTable::addMembers(DeclRange members) {
 }
 
 void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
-  auto *table = LookupTable.getPointer();
+  if (!LookupTable.getInt())
+    return;
 
-  if (!table) return;
+  auto *table = LookupTable.getPointer();
+  assert(table);
 
   if (ext->hasLazyMembers()) {
     table->addMembers(ext->getCurrentMembersWithoutLoading());
@@ -1361,9 +1363,11 @@ void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it. If not, we'll pick up
   // this member when we first create the table.
   auto *vd = dyn_cast<ValueDecl>(member);
-  auto *table = LookupTable.getPointer();
-  if (!vd || !table)
+  if (!vd || !LookupTable.getInt())
     return;
+
+  auto *table = LookupTable.getPointer();
+  assert(table);
 
   table->addMember(vd);
 }
@@ -1492,8 +1496,6 @@ void NominalTypeDecl::prepareLookupTable() {
   if (LookupTable.getInt())
     return;
 
-  LookupTable.setInt(true);
-
   auto *table = getLookupTable();
 
   // Otherwise start the first fill.
@@ -1521,6 +1523,10 @@ void NominalTypeDecl::prepareLookupTable() {
     // Else, load all the members into the table.
     table->addMembers(e->getMembers());
   }
+
+  // Any extensions added after this point will add their members to the
+  // lookup table.
+  LookupTable.setInt(true);
 }
 
 static TinyPtrVector<ValueDecl *>
