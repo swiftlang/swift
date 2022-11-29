@@ -1236,6 +1236,8 @@ DeclContextKind DeclContext::getContextKind() const {
       return DeclContextKind::EnumElementDecl;
     case DeclKind::Extension:
       return DeclContextKind::ExtensionDecl;
+    case DeclKind::Macro:
+      return DeclContextKind::MacroDecl;
     default:
       llvm_unreachable("Unhandled Decl kind");
     }

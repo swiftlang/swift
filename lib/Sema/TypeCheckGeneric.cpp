@@ -624,10 +624,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     auto func = dyn_cast<AbstractFunctionDecl>(VD);
     auto subscr = dyn_cast<SubscriptDecl>(VD);
+    auto macro = dyn_cast<MacroDecl>(VD);
 
     // For functions and subscripts, resolve the parameter and result types and
     // note them as inference sources.
-    if (subscr || func) {
+    if (subscr || func || (macro && macro->parameterList)) {
       const auto baseOptions =
           TypeResolutionOptions(func ? TypeResolverContext::AbstractFunctionDecl
                                      : TypeResolverContext::SubscriptDecl);
@@ -636,7 +637,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           TypeResolution::forStructural(GC, baseOptions,
                                         /*unboundTyOpener*/ nullptr,
                                         /*placeholderHandler*/ nullptr);
-      auto params = func ? func->getParameters() : subscr->getIndices();
+      auto params = func ? func->getParameters()
+                      : subscr ? subscr->getIndices()
+                      : macro->parameterList;
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
@@ -662,9 +665,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       }
 
       // Gather requirements from the result type.
-      auto *resultTypeRepr = [&subscr, &func]() -> TypeRepr * {
+      auto *resultTypeRepr = [&subscr, &func, &macro]() -> TypeRepr * {
         if (subscr) {
           return subscr->getElementTypeRepr();
+        } else if (macro) {
+          return macro->resultType.getTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
           return FD->getResultTypeRepr();
         } else {

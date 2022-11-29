@@ -1058,6 +1058,11 @@ ManglingError Remangler::mangleSubscript(Node *node, EntityContext &ctx,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
+  Buffer << "fm";
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleAccessor(Node *storageNode,
                                         StringRef accessorCode,
                                         EntityContext &ctx, unsigned depth) {

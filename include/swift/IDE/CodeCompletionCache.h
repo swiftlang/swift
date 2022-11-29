@@ -118,6 +118,7 @@ struct RequestedCachedModule {
   const ModuleDecl *TheModule;
   bool OnlyTypes;
   bool OnlyPrecedenceGroups;
+  bool OnlyMacros;
 };
 
 } // end namespace ide

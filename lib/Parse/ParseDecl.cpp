@@ -4494,6 +4494,10 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     return Tok.is(tok::identifier);
   }
 
+  // 'macro' name
+  if (Tok.isContextualKeyword("macro") && Tok2.is(tok::identifier))
+    return true;
+
   // If the next token is obviously not the start of a decl, bail early.
   if (!isKeywordPossibleDeclStart(Tok2))
     return false;
@@ -4821,6 +4825,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);
       DeclResult = parseDeclClass(Flags, Attributes);
+      break;
+    }
+
+    if (Tok.isContextualKeyword("macro") && peekToken().is(tok::identifier)) {
+      Tok.setKind(tok::contextual_keyword);
+      DeclResult = parseDeclMacro(Attributes);
       break;
     }
 
@@ -8974,6 +8984,123 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   if (hasCodeCompletion)
     return makeParserCodeCompletionResult(result);
   return makeParserResult(result);
+}
+
+ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
+  assert(Tok.isContextualKeyword("macro"));
+  SourceLoc macroLoc = consumeToken(); // 'macro'
+
+  Identifier macroName;
+  SourceLoc macroNameLoc;
+  ParserStatus status;
+
+  status |= parseIdentifierDeclName(
+      *this, macroName, macroNameLoc, "macro",
+      [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_paren) || startsWithLess(next);
+      });
+  if (status.isErrorOrHasCompletion())
+    return status;
+
+  DebuggerContextChange dcc (*this, macroName, DeclKind::Macro);
+
+  // Parse the generic-params, if present.
+  GenericParamList *genericParams = nullptr;
+  {
+    auto result = maybeParseGenericParams();
+    genericParams = result.getPtrOrNull();
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+  }
+
+  // Parse the macro signature.
+  ParameterList *parameterList = nullptr;
+  SourceLoc arrowOrColonLoc;
+  TypeRepr *resultType = nullptr;
+  DeclName macroFullName;
+  if (consumeIf(tok::colon, arrowOrColonLoc)) {
+    // Value-like macros.
+    auto type = parseType(diag::expected_macro_value_type);
+    status |= type;
+    if (status.isErrorOrHasCompletion())
+      return status;
+
+    resultType = type.getPtrOrNull();
+    macroFullName = macroName;
+  } else {
+    // Parameter list.
+    SmallVector<Identifier, 2> namePieces;
+    DefaultArgumentInfo defaultArgs;
+    auto parameterResult = parseSingleParameterClause(
+        ParameterContextKind::Macro, &namePieces, &defaultArgs);
+    status |= parameterResult;
+    parameterList = parameterResult.getPtrOrNull();
+
+    // ->
+    if (consumeIf(tok::arrow, arrowOrColonLoc)) {
+      // Result type.
+      auto parsedResultType =
+          parseDeclResultType(diag::expected_type_macro_result);
+      resultType = parsedResultType.getPtrOrNull();
+      status |= parsedResultType;
+      if (status.isErrorOrHasCompletion())
+        return status;
+    }
+
+    macroFullName = DeclName(Context, macroName, namePieces);
+  }
+
+  // Parse '=' ModuleName . MacroTypeName
+  if (!consumeIf(tok::equal)) {
+    diagnose(Tok, diag::macro_decl_expected_equal);
+  }
+
+  // ModuleName
+  Identifier externalMacroModule;
+  SourceLoc externalMacroModuleLoc;
+  if (Tok.is(tok::identifier)) {
+    externalMacroModuleLoc = consumeIdentifier(externalMacroModule, true);
+  } else {
+    diagnose(Tok, diag::macro_decl_expected_macro_module);
+    status.setIsParseError();
+    externalMacroModuleLoc = Tok.getLoc();
+  }
+
+  // '.'
+  if (!consumeIf(tok::period)) {
+    diagnose(Tok, diag::macro_decl_expected_period);
+  }
+
+  // MacroTypeName
+  Identifier externalMacroTypeName;
+  SourceLoc externalMacroTypeNameLoc;
+  if (Tok.is(tok::identifier)) {
+    externalMacroTypeNameLoc = consumeIdentifier(
+        externalMacroTypeName, true);
+  } else {
+    diagnose(Tok, diag::macro_decl_expected_macro_type);
+    status.setIsParseError();
+    externalMacroTypeNameLoc = Tok.getLoc();
+  }
+
+  // Create the macro declaration.
+  auto *macro = new (Context) MacroDecl(
+      macroLoc, macroFullName, macroNameLoc, genericParams, parameterList,
+      arrowOrColonLoc, resultType, externalMacroModule, externalMacroModuleLoc,
+      externalMacroTypeName, externalMacroTypeNameLoc, CurDeclContext);
+  macro->getAttrs() = attributes;
+
+  // Parse a 'where' clause if present.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(macro);
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
+      return whereStatus;
+    }
+    status |= whereStatus;
+  }
+
+  return dcc.fixupParserResult(status, macro);
 }
 
 ParserResult<MacroExpansionDecl>

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 724; // allowable client serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 725; // macro declarations
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1668,6 +1668,24 @@ namespace decls_block {
     // This record is trailed by its inlinable body text
   >;
 
+  using MacroLayout = BCRecordLayout<
+    MACRO_DECL,
+    DeclContextIDField,  // context decl
+    BCFixed<1>,   // implicit?
+    GenericSignatureIDField, // generic environment
+    BCFixed<1>,   // whether there is a parameter list
+    TypeIDField,  // result interface type
+    AccessLevelField, // access level
+    BCVBR<5>,    // number of parameter name components
+    IdentifierIDField, // external module name
+    IdentifierIDField,  // external type name
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
+    // The record is trailed by:
+    // - its generic parameters, if any
+    // - parameter list, if present
+  >;
+
   using InlinableBodyTextLayout = BCRecordLayout<
     INLINABLE_BODY_TEXT,
     BCBlob // body text
@@ -2200,6 +2218,8 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
     return decls_block::CONSTRUCTOR_DECL;
   case DeclKind::Destructor:
     return decls_block::DESTRUCTOR_DECL;
+  case DeclKind::Macro:
+    return decls_block::MACRO_DECL;
 
   default:
     llvm_unreachable("cannot store this kind of decl in a hash table");

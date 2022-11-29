@@ -94,14 +94,14 @@ enum class DeclContextKind : unsigned {
   EnumElementDecl,
   AbstractFunctionDecl,
   SerializedLocal,
-  Last_LocalDeclContextKind = SerializedLocal,
+  MacroDecl,
+  Last_LocalDeclContextKind = MacroDecl,
 
   Module,
   FileUnit,
   GenericTypeDecl,
   ExtensionDecl,
-  MacroDecl,
-  Last_DeclContextKind = MacroDecl
+  Last_DeclContextKind = ExtensionDecl
 };
 
 /// Kinds of DeclContexts after deserialization.

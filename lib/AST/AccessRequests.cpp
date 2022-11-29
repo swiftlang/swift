@@ -128,8 +128,8 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
   case DeclContextKind::MacroDecl:
-    // Macros are always public.
-    return AccessLevel::Public;
+    // There are no declarations inside a macro.
+    return AccessLevel::Private;
   }
   llvm_unreachable("unhandled kind");
 }
