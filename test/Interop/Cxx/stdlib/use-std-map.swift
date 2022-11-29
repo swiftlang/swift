@@ -10,7 +10,7 @@
 
 import StdlibUnittest
 import StdMap
-import std
+import CxxStdlib
 import Cxx
 
 var StdMapTestSuite = TestSuite("StdMap")
