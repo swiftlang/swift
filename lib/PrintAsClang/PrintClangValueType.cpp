@@ -129,14 +129,14 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
                    "return result;\n"
                    "};\n";
     cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
-                   "$sSS23_bridgeToObjectiveCImplyXlyF(swift_interop_stub_"
+                   "$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(swift_interop_stub_"
                    "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
     printer.printObjCBlock([](raw_ostream &os) {
       os << "  ";
       ClangSyntaxPrinter(os).printInlineForThunk();
       os << "operator NSString * _Nonnull () const noexcept {\n";
       os << "    return (__bridge_transfer NSString "
-            "*)(_impl::$sSS23_bridgeToObjectiveCImplyXlyF(_impl::swift_interop_"
+            "*)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_"
             "passDirect_Swift_String(_getOpaquePointer())));\n";
       os << "  }\n";
     });
