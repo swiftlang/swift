@@ -18,7 +18,7 @@ using namespace swift::ide;
 
 static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
-    bool onlyTypes, bool onlyPrecedenceGroups,
+    bool onlyTypes, bool onlyPrecedenceGroups, bool onlyMacros,
     const ExpectedTypeContext *TypeContext, const DeclContext *DC,
     bool CanCurrDeclContextHandleAsync) {
 
@@ -69,7 +69,12 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
   } else if (onlyPrecedenceGroups) {
     shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
       return R->getAssociatedDeclKind() ==
-             CodeCompletionDeclKind::PrecedenceGroup;
+      CodeCompletionDeclKind::PrecedenceGroup;
+    };
+  } else if (onlyMacros) {
+    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
+      return R->getAssociatedDeclKind() ==
+      CodeCompletionDeclKind::Macro;
     };
   } else {
     shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
@@ -148,7 +153,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     assert(V.has_value());
     auto newItems = copyCodeCompletionResults(
         context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups,
-        TypeContext, DC, CanCurrDeclContextHandleAsync);
+        R.OnlyMacros, TypeContext, DC, CanCurrDeclContextHandleAsync);
     postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
                                  &context.getResultSink());
   }

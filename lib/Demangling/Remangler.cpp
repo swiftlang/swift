@@ -2859,6 +2859,12 @@ ManglingError Remangler::mangleSubscript(Node *node, unsigned depth) {
   return mangleAbstractStorage(node, "p", depth + 1);
 }
 
+ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "fm";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {
   // Just add the suffix back on.
   Buffer << node->getText();

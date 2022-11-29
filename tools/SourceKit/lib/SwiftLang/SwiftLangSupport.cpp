@@ -412,7 +412,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::InstanceVar: return KindRefVarInstance;
     case CodeCompletionDeclKind::LocalVar: return KindRefVarLocal;
     case CodeCompletionDeclKind::GlobalVar: return KindRefVarGlobal;
-      case CodeCompletionDeclKind::Macro: return KindRefMacro;
+    case CodeCompletionDeclKind::Macro: return KindRefMacro;
     }
   }
 

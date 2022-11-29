@@ -157,6 +157,7 @@ public:
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #include "swift/AST/Attr.def"
 #undef CONTEXTUAL_CASE
+      .Case("macro", true)
       .Default(false);
   }
 

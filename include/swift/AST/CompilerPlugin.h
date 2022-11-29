@@ -54,21 +54,10 @@ private:
   // stdlib/toolchain/CompilerPluginSupport.swift.
   enum class WitnessTableEntry: unsigned {
     ConformanceDescriptor = 0,
-    // static func _name() -> (UnsafePointer<UInt8>, count: Int8)
-    Name = 1,
     // static func _kind() -> _CompilerPluginKind
-    Kind = 2,
+    Kind = 1,
     // static func _rewrite(...) -> (UnsafePointer<UInt8>?, count: Int)
-    Rewrite = 3,
-    // static func _genericSignature(...) -> (UnsafePointer<UInt8>?, count: Int)
-    GenericSignature = 4,
-    // static func _typeSignature(...) -> (UnsafePointer<UInt8>, count: Int)
-    TypeSignature = 5,
-    // static func _owningModule(...) -> (UnsafePointer<UInt8>, count: Int)
-    OwningModule = 6,
-    // static func _supplementalSignatureModules(...)
-    //     -> (UnsafePointer<UInt8>, count: Int)
-    SupplementalSignatureModules = 7,
+    Rewrite = 2,
   };
 
   /// The plugin type metadata.
@@ -77,8 +66,6 @@ private:
   void *parentLibrary;
   /// The witness table proving that the plugin conforms to `_CompilerPlugin`.
   const void *witnessTable;
-  /// The plugin name, aka. result of the `_name()` method.
-  StringRef name;
   /// The plugin's kind, aka. result of the `_kind()` method.
   Kind kind;
 
@@ -87,14 +74,10 @@ private:
     return reinterpret_cast<const Func *const *>(witnessTable)[(unsigned)entry];
   }
 
-protected:
-  CompilerPlugin(const void *metadata, void *parentLibrary, ASTContext &ctx);
+  CompilerPlugin(
+      const void *metadata, void *parentLibrary, const void *witnessTable);
 
 private:
-  /// Invoke the `_name` method. The caller assumes ownership of the result
-  /// string buffer.
-  StringRef invokeName() const;
-
   /// Invoke the `_kind` method.
   Kind invokeKind() const;
 
@@ -103,32 +86,15 @@ public:
   CompilerPlugin(const CompilerPlugin &) = delete;
   CompilerPlugin(CompilerPlugin &&) = default;
 
+  /// Try to resolve a compiler plugin given the metadata point.
+  static CompilerPlugin *fromMetatype(const void *metadata, ASTContext &ctx);
+
   /// Invoke the `_rewrite` method. The caller assumes ownership of the result
   /// string buffer and diagnostic buffers.
   Optional<NullTerminatedStringRef> invokeRewrite(
       StringRef targetModuleName, StringRef filePath, StringRef sourceFileText,
       CharSourceRange range, ASTContext &ctx,
       SmallVectorImpl<Diagnostic> &diagnostics) const;
-
-  /// Invoke the `_genericSignature` method. The caller assumes ownership of the
-  /// result string buffer.
-  Optional<StringRef> invokeGenericSignature() const;
-
-  /// Invoke the `_typeSignature` method. The caller assumes ownership of the
-  /// result string buffer.
-  StringRef invokeTypeSignature() const;
-
-  /// Invoke the `_owningModule` method. The caller assumes ownership of the
-  /// result string buffer.
-  StringRef invokeOwningModule() const;
-
-  /// Invoke the `_supplementalSignatureModules` method. The caller assumes
-  /// ownership of the result string buffer.
-  StringRef invokeSupplementalSignatureModules() const;
-
-  StringRef getName() const {
-    return name;
-  }
 
   Kind getKind() const {
     return kind;

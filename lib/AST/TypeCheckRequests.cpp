@@ -946,8 +946,10 @@ Optional<Type> ResultTypeRequest::getCachedResult() const {
   auto *const decl = std::get<0>(getStorage());
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     type = funcDecl->FnRetType.getType();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    type = subscript->ElementTy.getType();
   } else {
-    type = cast<SubscriptDecl>(decl)->ElementTy.getType();
+    type = cast<MacroDecl>(decl)->resultType.getType();
   }
 
   if (type.isNull())
@@ -960,8 +962,10 @@ void ResultTypeRequest::cacheResult(Type type) const {
   auto *const decl = std::get<0>(getStorage());
   if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     funcDecl->FnRetType.setType(type);
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    subscript->ElementTy.setType(type);
   } else {
-    cast<SubscriptDecl>(decl)->ElementTy.setType(type);
+    cast<MacroDecl>(decl)->resultType.setType(type);
   }
 }
 
@@ -1553,6 +1557,11 @@ Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
 void CustomAttrTypeRequest::cacheResult(Type value) const {
   auto *attr = std::get<0>(getStorage());
   attr->setType(value);
+}
+
+SourceLoc MacroDefinitionRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc->getLoc();
 }
 
 bool ActorIsolation::requiresSubstitution() const {

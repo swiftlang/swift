@@ -1983,7 +1983,11 @@ public:
   }
 
   void visitMacroDecl(MacroDecl *MD) {
-    // Macros have no definitions, so there is nothing to check.
+    TypeChecker::checkDeclAttributes(MD);
+    checkAccessControl(MD);
+
+    if (!MD->getDeclContext()->isModuleScopeContext())
+      MD->diagnose(diag::macro_in_nested, MD->getName());
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {

@@ -45,7 +45,7 @@ class DefaultArgumentExpr;
 class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
-class Macro;
+struct MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
@@ -3715,11 +3715,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Lookup all macros with the given name that are visible from the given
-/// module.
-class MacroLookupRequest
-    : public SimpleRequest<MacroLookupRequest,
-                           ArrayRef<MacroDecl *>(Identifier, ModuleDecl *),
+/// Find the definition of a given macro.
+class MacroDefinitionRequest
+    : public SimpleRequest<MacroDefinitionRequest,
+                           MacroDefinition(MacroDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3727,10 +3726,12 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<MacroDecl *> evaluate(Evaluator &evaluator,
-                                 Identifier macroName, ModuleDecl *mod) const;
+  MacroDefinition evaluate(Evaluator &evaluator, MacroDecl *macro) const;
 
 public:
+  // Source location
+  SourceLoc getNearestLoc() const;
+
   bool isCached() const { return true; }
 };
 

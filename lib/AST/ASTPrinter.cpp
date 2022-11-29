@@ -1899,10 +1899,6 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
       return true;
   }
 
-  // Skip macros, which don't have an in-source representation.
-  if (isa<MacroDecl>(D))
-    return false;
-
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessFilter > AccessLevel::Private &&
@@ -2738,7 +2734,7 @@ static bool usesFeatureActors(Decl *decl) {
 }
 
 static bool usesFeatureMacros(Decl *decl) {
-  return isa<MacroExpansionDecl>(decl);
+  return isa<MacroExpansionDecl>(decl) || isa<MacroDecl>(decl);
 }
 
 static bool usesFeatureConcurrentFunctions(Decl *decl) {
@@ -4446,7 +4442,59 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
 }
 
 void PrintAST::visitMacroDecl(MacroDecl *decl) {
-  // No in-source representation of macros.
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  printAccess(decl);
+
+  Printer.printIntroducerKeyword("macro", Options, " ");
+  printContextIfNeeded(decl);
+
+  recordDeclLoc(
+      decl,
+      [&]{
+        Printer.printName(
+            decl->getBaseIdentifier(),
+            getTypeMemberPrintNameContext(decl));
+      },
+      [&] {
+        printGenericDeclGenericParams(decl);
+        if (decl->parameterList) {
+          auto params = ArrayRef<AnyFunctionType::Param>();
+          if (!decl->isInvalid()) {
+            // Walk to the params of the subscript's indices.
+            auto type = decl->getInterfaceType();
+            params = type->castTo<AnyFunctionType>()->getParams();
+          }
+          printParameterList(
+              decl->parameterList, params, /*isAPINameByDefault*/true);
+        }
+      }
+  );
+
+  {
+    Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
+    };
+
+    if (decl->parameterList)
+      Printer << " -> ";
+    else
+      Printer << ": ";
+
+    TypeLoc resultTypeLoc(
+        decl->resultType.getTypeRepr(), decl->getResultInterfaceType());
+
+    Printer.printDeclResultTypePre(decl, resultTypeLoc);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+    printTypeLocWithOptions(resultTypeLoc, Options);
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  }
+
+  Printer << " = ";
+  Printer << decl->externalModuleName << "." << decl->externalMacroTypeName;
+
+  printDeclGenericRequirements(decl);
 }
 
 void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {

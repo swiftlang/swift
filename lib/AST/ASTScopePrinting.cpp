@@ -178,6 +178,10 @@ void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
+void MacroDeclScope::printSpecifics(llvm::raw_ostream &out) const {
+  decl->dumpRef(out);
+}
+
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
   sec.getPattern()->print(out);

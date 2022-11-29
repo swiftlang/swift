@@ -10,6 +10,16 @@
 // UNSUPPORTED: CPU=arm64e
 import ColorLib
 
+macro customStringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+
+macro customColorLiteral<T: _ExpressibleByColorLiteral>(
+  red: Float, green: Float, blue: Float, alpha: Float
+) -> T = MacroDefinition.ColorLiteralMacro
+
+macro customColorLiteral(
+  hue: Float, saturation: Float, value: Float
+) -> MyColor = MacroDefinition.HSVColorLiteralMacro
+
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))
 
 // CHECK: (macro_expansion_expr type='(Int, String)' {{.*}} name=customStringify

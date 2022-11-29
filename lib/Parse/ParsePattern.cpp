@@ -116,6 +116,9 @@ static ParserStatus parseDefaultArgument(
   case Parser::ParameterContextKind::Curried:
     diagID = diag::no_default_arg_curried;
     break;
+  case Parser::ParameterContextKind::Macro:
+    diagID = diag::no_default_arg_macro;
+    break;
   }
   
   assert((diagID.ID != DiagID()) == !defaultArgs &&
@@ -662,6 +665,7 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
     case Parser::ParameterContextKind::Function:
+    case Parser::ParameterContextKind::Macro:
       isKeywordArgumentByDefault = true;
       break;
     }
@@ -740,6 +744,9 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
       break;
     case ParameterContextKind::Initializer:
       diagID = diag::expected_lparen_initializer;
+      break;
+    case ParameterContextKind::Macro:
+      diagID = diag::expected_lparen_macro;
       break;
     case ParameterContextKind::EnumElement:
     case ParameterContextKind::Closure:

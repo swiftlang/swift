@@ -2988,6 +2988,7 @@ namespace {
               expr->getStartLoc(), DeclNameRef(macro->getName()),
               DeclNameLoc(expr->getLoc()), SourceLoc(), { }, SourceLoc(),
               nullptr, /*isImplicit=*/true, expandedType);
+          expansion->setMacroRef(macroRef);
           expansion->setRewritten(newExpr);
           cs.cacheExprTypes(expansion);
           return expansion;
@@ -5403,6 +5404,7 @@ namespace {
 
         auto macro = cast<MacroDecl>(overload.choice.getDecl());
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
+        E->setMacroRef(macroRef);
 
         if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);
