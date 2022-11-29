@@ -1672,6 +1672,22 @@ bb2:
   unwind
 }
 
+// CHECK-LABEL: sil [ossa] @testBeginApplyFYieldDirectOwnedAndAddressOnlyGuaranteed : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] :
+// CHECK:         ([[OWNED_INSTANCE:%[^,]+]], [[ADDR:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply
+// CHECK:         destroy_value [[OWNED_INSTANCE]]
+// CHECK:         copy_addr [[ADDR]] to [init] [[OUT_ADDR]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyFYieldDirectOwnedAndAddressOnlyGuaranteed'
+sil [ossa] @testBeginApplyFYieldDirectOwnedAndAddressOnlyGuaranteed : $@convention(thin) <T> () -> @out T {
+entry:
+  (%klass, %instance, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <T> () -> (@yields @owned Klass, @yields @in_guaranteed T)
+  destroy_value %klass : $Klass
+  %retval = copy_value %instance : $T
+  end_apply %token
+  return %retval : $T
+}
+
 // CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
