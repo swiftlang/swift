@@ -216,7 +216,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       // If it has more than one component, it can't be a module name.
-      if (isa<CompoundIdentTypeRepr>(ITR))
+      if (isa<MemberTypeRepr>(ITR))
         return false;
 
       const auto *component = cast<ComponentIdentTypeRepr>(ITR);

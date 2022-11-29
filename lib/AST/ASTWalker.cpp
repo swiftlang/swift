@@ -1972,7 +1972,7 @@ bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
+bool Traversal::visitMemberTypeRepr(MemberTypeRepr *T) {
   if (doIt(T->getBaseComponent()))
     return true;
 

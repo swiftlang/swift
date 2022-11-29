@@ -2256,10 +2256,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
-          if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
+          if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
             if (auto identBase = dyn_cast<ComponentIdentTypeRepr>(
-                    compound->getBaseComponent())) {
-              auto memberComps = compound->getMemberComponents();
+                    memberTR->getBaseComponent())) {
+              auto memberComps = memberTR->getMemberComponents();
               if (memberComps.size() == 1 &&
                   identBase->getNameRef().isSimpleName("Builtin") &&
                   memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
@@ -2444,15 +2444,15 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                           allowUsableFromInline);
   }
 
-  auto *compound = dyn_cast<CompoundIdentTypeRepr>(ident);
-  if (!compound)
+  auto *memberTR = dyn_cast<MemberTypeRepr>(ident);
+  if (!memberTR)
     return current;
 
   // If we didn't find anything, fail now.
   if (current.empty())
     return current;
 
-  for (const auto &component : compound->getMemberComponents()) {
+  for (const auto &component : memberTR->getMemberComponents()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
       current = {1, typeDecl};
@@ -2500,7 +2500,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return result;
   }
 
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::Member:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
     return directReferencesForIdentTypeRepr(evaluator, ctx,
@@ -3085,7 +3085,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                 identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
 
             auto *newTE = new (ctx) TypeExpr(
-                CompoundIdentTypeRepr::create(ctx, baseComp, {identTypeRepr}));
+                MemberTypeRepr::create(ctx, baseComp, {identTypeRepr}));
             attr->resetTypeInformation(newTE);
             return nominal;
           }

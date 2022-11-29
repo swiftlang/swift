@@ -82,7 +82,7 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
   if (components.size() == 1) {
     typeRepr = components.front();
   } else {
-    typeRepr = CompoundIdentTypeRepr::create(ctx, components);
+    typeRepr = MemberTypeRepr::create(ctx, components);
   }
 
   if (forMetatype)

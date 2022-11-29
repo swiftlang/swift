@@ -87,7 +87,7 @@ protected:
     NumGenericArgs : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CompoundIdentTypeRepr, IdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, IdentTypeRepr, 32,
     : NumPadBits,
     NumMemberComponents : 32
   );
@@ -266,9 +266,9 @@ public:
   DeclNameRef getNameRef() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent  ||
+    return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent ||
-           T->getKind() == TypeReprKind::CompoundIdent;
+           T->getKind() == TypeReprKind::Member;
   }
   static bool classof(const IdentTypeRepr *T) { return true; }
 };
@@ -403,22 +403,24 @@ private:
   friend class TypeRepr;
 };
 
-/// A type with identifier components.
+/// A member type consisting of an arbitrary base component and one or more
+/// identifier type member components.
 /// \code
-///   Foo.Bar<Gen>
+///   Foo.Bar<Gen>.Baz
+///   [Int].Bar
 /// \endcode
-class CompoundIdentTypeRepr final : public IdentTypeRepr,
-    private llvm::TrailingObjects<CompoundIdentTypeRepr,
+class MemberTypeRepr final : public IdentTypeRepr,
+    private llvm::TrailingObjects<MemberTypeRepr,
                                   ComponentIdentTypeRepr *> {
   friend TrailingObjects;
 
   /// The base component, which is not necessarily an identifier type.
   TypeRepr *Base;
 
-  CompoundIdentTypeRepr(TypeRepr *Base,
-                        ArrayRef<ComponentIdentTypeRepr *> MemberComponents)
-      : IdentTypeRepr(TypeReprKind::CompoundIdent), Base(Base) {
-    Bits.CompoundIdentTypeRepr.NumMemberComponents = MemberComponents.size();
+  MemberTypeRepr(TypeRepr *Base,
+                 ArrayRef<ComponentIdentTypeRepr *> MemberComponents)
+      : IdentTypeRepr(TypeReprKind::Member), Base(Base) {
+    Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
     assert(MemberComponents.size() > 0 &&
            "should have just used the single ComponentIdentTypeRepr directly");
     std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
@@ -426,18 +428,18 @@ class CompoundIdentTypeRepr final : public IdentTypeRepr,
   }
 
 public:
-  static CompoundIdentTypeRepr *
+  static MemberTypeRepr *
   create(const ASTContext &Ctx, TypeRepr *Base,
          ArrayRef<ComponentIdentTypeRepr *> MemberComponents);
 
-  static CompoundIdentTypeRepr *
+  static MemberTypeRepr *
   create(const ASTContext &Ctx, ArrayRef<ComponentIdentTypeRepr *> Components);
 
   TypeRepr *getBaseComponent() const { return Base; }
 
   ArrayRef<ComponentIdentTypeRepr *> getMemberComponents() const {
     return {getTrailingObjects<ComponentIdentTypeRepr *>(),
-            Bits.CompoundIdentTypeRepr.NumMemberComponents};
+            Bits.MemberTypeRepr.NumMemberComponents};
   }
 
   ComponentIdentTypeRepr *getLastComponent() const {
@@ -445,9 +447,9 @@ public:
   }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompoundIdent;
+    return T->getKind() == TypeReprKind::Member;
   }
-  static bool classof(const CompoundIdentTypeRepr *T) { return true; }
+  static bool classof(const MemberTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const {
@@ -1354,7 +1356,7 @@ inline bool TypeRepr::isSimple() const {
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::Member:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::Dictionary:

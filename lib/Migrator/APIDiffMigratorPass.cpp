@@ -205,7 +205,7 @@ public:
     return handleParent(T, T->getGenericArgs());
   }
 
-  FoundResult visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
+  FoundResult visitMemberTypeRepr(MemberTypeRepr *T) {
     return visit(T->getLastComponent());
   }
 

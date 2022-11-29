@@ -486,7 +486,7 @@ public:
     if (components.size() == 1) {
       repr = components.front();
     } else {
-      repr = CompoundIdentTypeRepr::create(Context, components);
+      repr = MemberTypeRepr::create(Context, components);
     }
 
     // See if the repr resolves to a type.
@@ -613,7 +613,7 @@ public:
       if (components.size() == 1) {
         prefixRepr = components.front();
       } else {
-        prefixRepr = CompoundIdentTypeRepr::create(Context, components);
+        prefixRepr = MemberTypeRepr::create(Context, components);
       }
 
       // See first if the entire repr resolves to a type.

@@ -2197,7 +2197,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                              options);
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
-  case TypeReprKind::CompoundIdent: {
+  case TypeReprKind::Member: {
     return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
   }
 
@@ -3820,9 +3820,9 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(result->getASTContext());
 
   // Remaining components are resolved via iterated qualified lookups.
-  if (auto *compound = dyn_cast<CompoundIdentTypeRepr>(IdType)) {
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(IdType)) {
     SourceRange parentRange = baseComp->getSourceRange();
-    for (auto *nestedComp : compound->getMemberComponents()) {
+    for (auto *nestedComp : memberTR->getMemberComponents()) {
       result = resolveNestedIdentTypeComponent(resolution.withOptions(options),
                                                genericParams, result,
                                                parentRange, nestedComp);
@@ -4700,10 +4700,10 @@ public:
 
     if (T->isInvalid())
       return Action::SkipChildren();
-    if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
+    if (auto memberTR = dyn_cast<MemberTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
-      visit(compound->getLastComponent());
+      visit(memberTR->getLastComponent());
       return Action::SkipChildren();
     }
     // Arbitrary protocol constraints are OK on opaque types.
@@ -4766,7 +4766,7 @@ public:
     case TypeReprKind::Existential:
     case TypeReprKind::SimpleIdent:
     case TypeReprKind::GenericIdent:
-    case TypeReprKind::CompoundIdent:
+    case TypeReprKind::Member:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Tuple:

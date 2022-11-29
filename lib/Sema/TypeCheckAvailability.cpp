@@ -4001,8 +4001,8 @@ public:
       return Action::SkipChildren();
     }
 
-    if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(T)) {
-      for (auto *comp : CTR->getMemberComponents()) {
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      for (auto *comp : memberTR->getMemberComponents()) {
         // If a parent type is unavailable, don't go on to diagnose
         // the member since that will just produce a redundant
         // diagnostic.

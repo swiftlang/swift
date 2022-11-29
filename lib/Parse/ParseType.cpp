@@ -755,7 +755,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (ComponentsR.size() == 1) {
       ITR = ComponentsR.front();
     } else {
-      ITR = CompoundIdentTypeRepr::create(Context, ComponentsR);
+      ITR = MemberTypeRepr::create(Context, ComponentsR);
     }
   }
 

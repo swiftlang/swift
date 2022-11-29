@@ -504,7 +504,7 @@ void *IdentTypeRepr_create(void *ctx, BridgedArrayRef bridgedComponents) {
     return components.front();
   }
 
-  return CompoundIdentTypeRepr::create(Context, components);
+  return MemberTypeRepr::create(Context, components);
 }
 
 void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,

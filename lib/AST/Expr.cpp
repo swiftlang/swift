@@ -2220,7 +2220,7 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
       new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
   MemberComp->setValue(Decl, nullptr);
 
-  auto *TR = CompoundIdentTypeRepr::create(C, ParentComp, {MemberComp});
+  auto *TR = MemberTypeRepr::create(C, ParentComp, {MemberComp});
   return new (C) TypeExpr(TR);
 }
 
@@ -2231,8 +2231,8 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
 
   // Create a new list of components.
   SmallVector<ComponentIdentTypeRepr *, 2> Components;
-  if (auto *Compound = dyn_cast<CompoundIdentTypeRepr>(ParentTR)) {
-    auto MemberComps = Compound->getMemberComponents();
+  if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+    auto MemberComps = MemberTR->getMemberComponents();
     Components.append(MemberComps.begin(), MemberComps.end());
   }
 
@@ -2241,8 +2241,8 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
-  auto *TR = CompoundIdentTypeRepr::create(C, ParentTR->getBaseComponent(),
-                                           Components);
+  auto *TR =
+      MemberTypeRepr::create(C, ParentTR->getBaseComponent(), Components);
   return new (C) TypeExpr(TR);
 }
 
@@ -2256,7 +2256,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     return nullptr;
 
   if (isa<TypeAliasDecl>(lastComp->getBoundDecl())) {
-    if (auto *compound = dyn_cast<CompoundIdentTypeRepr>(ParentTR)) {
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
       // If any of our parent types are unbound, bail out and let
       // the constraint solver can infer generic parameters for them.
       //
@@ -2279,13 +2279,13 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
         return false;
       };
 
-      for (auto *comp : compound->getMemberComponents().drop_back()) {
+      for (auto *comp : memberTR->getMemberComponents().drop_back()) {
         if (isUnboundGenericComponent(comp))
           return nullptr;
       }
 
       if (auto *identBase =
-              dyn_cast<ComponentIdentTypeRepr>(compound->getBaseComponent())) {
+              dyn_cast<ComponentIdentTypeRepr>(memberTR->getBaseComponent())) {
         if (isUnboundGenericComponent(identBase))
           return nullptr;
       }
@@ -2297,8 +2297,8 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
   genericComp->setValue(lastComp->getBoundDecl(), lastComp->getDeclContext());
 
   TypeRepr *TR = nullptr;
-  if (auto *compound = dyn_cast<CompoundIdentTypeRepr>(ParentTR)) {
-    auto oldMemberComps = compound->getMemberComponents().drop_back();
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+    auto oldMemberComps = memberTR->getMemberComponents().drop_back();
 
     // Create a new list of member components, replacing the last one with the
     // new specialized one.
@@ -2306,8 +2306,8 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
     newMemberComps.push_back(genericComp);
 
-    TR = CompoundIdentTypeRepr::create(C, compound->getBaseComponent(),
-                                       newMemberComps);
+    TR =
+        MemberTypeRepr::create(C, memberTR->getBaseComponent(), newMemberComps);
   } else {
     TR = genericComp;
   }
