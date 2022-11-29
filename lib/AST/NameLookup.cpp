@@ -1192,10 +1192,6 @@ void LazyConformanceLoader::anchor() {}
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
-  /// The last extension that was included within the member lookup table's
-  /// results.
-  ExtensionDecl *LastExtensionIncluded = nullptr;
-
   /// The type of the internal lookup table.
   typedef llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     LookupTable;
@@ -1211,9 +1207,6 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
-
-  /// Update a lookup table with members from newly-added extensions.
-  void updateLookupTable(NominalTypeDecl *nominal);
 
   /// Add the given member to the lookup table.
   void addMember(Decl *members);
@@ -1250,12 +1243,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &os) const {
-    os << "LastExtensionIncluded:\n";
-    if (LastExtensionIncluded)
-      LastExtensionIncluded->printContext(os, 2);
-    else
-      os << "  nullptr\n";
-
     os << "Lookup:\n  ";
     for (auto &pair : Lookup) {
       pair.getFirst().print(os);
@@ -1354,22 +1341,6 @@ void MemberLookupTable::addMember(Decl *member) {
 void MemberLookupTable::addMembers(DeclRange members) {
   for (auto member : members) {
     addMember(member);
-  }
-}
-
-void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
-  // If the last extension we included is the same as the last known extension,
-  // we're already up-to-date.
-  if (LastExtensionIncluded == nominal->LastExtension)
-    return;
-
-  // Add members from each of the extensions that we have not yet visited.
-  for (auto next = LastExtensionIncluded
-                     ? LastExtensionIncluded->NextExtension.getPointer()
-                     : nominal->FirstExtension;
-       next;
-       (LastExtensionIncluded = next,next = next->NextExtension.getPointer())) {
-    addMembers(next->getMembers());
   }
 }
 
@@ -1619,7 +1590,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     for (auto E : decl->getExtensions())
       (void)E->getMembers();
 
-    Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     DeclBaseName baseName(name.getBaseName());
 
