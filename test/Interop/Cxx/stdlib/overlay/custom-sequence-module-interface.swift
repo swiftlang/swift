@@ -1,30 +1,30 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
 
-// CHECK: struct SimpleSequence {
+// CHECK: struct SimpleSequence : CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIterator.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequence>
 // CHECK:   typealias RawIterator = ConstIterator
 // CHECK: }
 
-// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual {
+// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual : CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIteratorOutOfLineEq.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequenceWithOutOfLineEqualEqual>
 // CHECK:   typealias RawIterator = ConstIteratorOutOfLineEq
 // CHECK: }
 
-// CHECK: struct SimpleArrayWrapperNullableIterators {
+// CHECK: struct SimpleArrayWrapperNullableIterators : CxxConvertibleToCollection {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapperNullableIterators>
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK: }
 
-// CHECK: struct SimpleEmptySequence {
+// CHECK: struct SimpleEmptySequence : CxxConvertibleToCollection {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleEmptySequence>
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK: }
 
-// CHECK: struct HasMutatingBeginEnd {
+// CHECK: struct HasMutatingBeginEnd : CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIterator.Pointee
 // CHECK:   typealias Iterator = CxxIterator<HasMutatingBeginEnd>
 // CHECK:   typealias RawIterator = ConstIterator
