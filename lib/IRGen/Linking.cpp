@@ -881,8 +881,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
   case Kind::DistributedAccessor:
-  case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
+  case Kind::AccessibleFunctionRecord:
+    return getSILFunction()->isDistributed() ? SILLinkage::Private
+                                             : SILLinkage::Shared;
   case Kind::ExtendedExistentialTypeShape:
     return (isExtendedExistentialTypeShapeShared()
               ? SILLinkage::Shared : SILLinkage::Private);

@@ -1727,6 +1727,8 @@ public:
 
   void emitDistributedTargetAccessor(SILFunction *method);
 
+  llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
+
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.
   CanGenericSignature getCurGenericContext();

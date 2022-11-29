@@ -1196,6 +1196,12 @@ Address IRGenModule::getAddrOfObjCISAMask() {
   return Address(ObjCISAMaskPtr, IntPtrTy, getPointerAlignment());
 }
 
+llvm::Constant *
+IRGenModule::getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn) {
+  auto entity = LinkEntity::forAccessibleFunctionRecord(accessibleFn);
+  return getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
+}
+
 ModuleDecl *IRGenModule::getSwiftModule() const {
   return IRGen.SIL.getSwiftModule();
 }
