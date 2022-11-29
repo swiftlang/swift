@@ -2798,6 +2798,12 @@ public:
   /// Retrieve runtime discoverable attributes (if any) associated
   /// with this declaration.
   ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
+  /// Retrieve a nominal type declaration backing given runtime discoverable
+  /// attribute.
+  ///
+  /// FIXME: This should be a more general facility but its unclear where
+  ///        to place it for maximum impact.
+  NominalTypeDecl *getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const;
 
   /// Given a runtime discoverable attribute, return a generator function
   /// which could be used to instantiate it for this declaration.
