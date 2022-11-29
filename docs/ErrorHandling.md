@@ -8,20 +8,20 @@ manipulating recoverable error conditions.
 Error handling is a well-trod path, with many different approaches in
 other languages, many of them problematic in various ways. We believe
 that our approach provides an elegant solution, drawing on the lessons
-we\'ve learned from other languages and fixing or avoiding some of the
+we've learned from other languages and fixing or avoiding some of the
 pitfalls. The result is expressive and concise while still feeling
 explicit, safe, and familiar; and we believe it will work beautifully
 with the Cocoa APIs.
 
-We\'re intentionally not using the term \"exception handling\", which
+We're intentionally not using the term "exception handling", which
 carries a lot of connotations from its use in other languages. Our
 proposal has some similarities to the exceptions systems in those
 languages, but it also has a lot of important differences.
 
 ## Kinds of Error
 
-What exactly is an \"error\"? There are many possible error conditions,
-and they don\'t all make sense to handle in exactly the same way,
+What exactly is an "error"? There are many possible error conditions,
+and they don't all make sense to handle in exactly the same way,
 because they arise in different circumstances and programmers have to
 react to them differently.
 
@@ -30,22 +30,22 @@ severity:
 
 A **simple domain error** arises from an operation that can fail in some
 obvious way and which is often invoked speculatively. Parsing an integer
-from a string is a really good example. The client doesn\'t need a
+from a string is a really good example. The client doesn't need a
 detailed description of the error and will usually want to handle the
 error immediately. These errors are already well-modeled by returning an
-optional value; we don\'t need a more complex language solution for
+optional value; we don't need a more complex language solution for
 them.
 
 A **recoverable error** arises from an operation which can fail in
 complex ways, but whose errors can be reasonably anticipated in advance.
 Examples including opening a file or reading from a network connection.
-These are the kinds of errors that Apple\'s APIs use NSError for today,
+These are the kinds of errors that Apple's APIs use NSError for today,
 but there are close analogues in many other APIs, such as `errno` in
 POSIX.
 
 Ignoring this kind of error is usually a bad idea, and it can even be
 dangerous (e.g. by introducing a security hole). Developers should be
-strongly encouraged to write code that handles the error. It\'s common
+strongly encouraged to write code that handles the error. It's common
 for developers to want to handle errors from different operations in the
 same basic way, either by reporting the error to the user or passing the
 error back to their own clients.
@@ -54,7 +54,7 @@ These errors will be the focus of this proposal.
 
 The final two classes of error are outside the scope of this proposal. A
 **universal error** is theoretically recoverable, but by its nature the
-language can\'t help the programmer anticipate where it will come from.
+language can't help the programmer anticipate where it will come from.
 A **logic failure** arises from a programmer mistake and should not be
 recoverable at all. In our system, these kinds of errors are reported
 either with Objective-C/C++ exceptions or simply by logging a message
@@ -77,13 +77,13 @@ Notably, the approach preserves these advantages of this convention:
     and a simple inspection reveals how the function reacts to the
     error.
 -   Throwing an error provides similar performance to allocating an
-    error and returning it \-- it isn\'t an expensive, table-based stack
+    error and returning it \-- it isn't an expensive, table-based stack
     unwinding process.
 -   Cocoa APIs using standard `NSError` patterns can be imported into
     this world automatically. Other common patterns (e.g. `CFError`,
     `errno`) can be added to the model in future versions of Swift.
 
-In addition, we feel that this design improves on Objective-C\'s error
+In addition, we feel that this design improves on Objective-C's error
 handling approach in a number of ways:
 
 -   It eliminates a lot of boilerplate control-flow code for propagating
@@ -98,25 +98,25 @@ exception handling. We considered intentionally using different terms
 (like `raise` / `handle`) to try to distinguish our approach from other
 languages. However, by and large, error propagation in this proposal
 works like it does in exception handling, and people are inevitably
-going to make the connection. Given that, we couldn\'t find a compelling
+going to make the connection. Given that, we couldn't find a compelling
 reason to deviate from the `throw` / `catch` legacy.
 
 This document just contains the basic proposal and will be very light on
 rationale. We considered many different languages and programming
-environments as part of making this proposal, and there\'s an extensive
+environments as part of making this proposal, and there's an extensive
 discussion of them in the separate rationale document. For example, that
-document explains why we don\'t simply allow all functions to throw, why
-we don\'t propagate errors using simply an `ErrorOr<T>` return type, and
-why we don\'t just make error propagation part of a general monad
-feature. We encourage you to read that rationale if you\'re interested
+document explains why we don't simply allow all functions to throw, why
+we don't propagate errors using simply an `ErrorOr<T>` return type, and
+why we don't just make error propagation part of a general monad
+feature. We encourage you to read that rationale if you're interested
 in understanding why we made the decisions we did.
 
-With that out of the way, let\'s get to the details of the proposal.
+With that out of the way, let's get to the details of the proposal.
 
 ## Typed propagation
 
 Whether a function can throw is part of its type. This applies to all
-functions, whether they\'re global functions, methods, or closures.
+functions, whether they're global functions, methods, or closures.
 
 By default, a function cannot throw. The compiler statically enforces
 this: anything the function does which can throw must appear in a
@@ -126,7 +126,7 @@ A function can be declared to throw by writing `throws` on the function
 declaration or type:
 
 ```swift
-func foo() -> Int {  // This function is not permitted to throw.
+func foo() -> Int {          // This function is not permitted to throw.
 func bar() throws -> Int {   // This function is permitted to throw.
 ```
 
@@ -156,7 +156,7 @@ func jerry(_ i: Int)(j: Int) throws -> Int {
 
 `throws` is tracked as part of the type system: a function value must
 also declare whether it can throw. Functions that cannot throw are a
-subtype of functions that can, so you can use a function that can\'t
+subtype of functions that can, so you can use a function that can't
 throw anywhere you could use a function that can:
 
 ```swift
@@ -172,7 +172,7 @@ handle the error.
 A call to a function which can throw within a context that is not
 allowed to throw is rejected by the compiler.
 
-It isn\'t possible to overload functions solely based on whether the
+It isn't possible to overload functions solely based on whether the
 functions throw. That is, this is not legal:
 
 ```swift
@@ -227,13 +227,15 @@ a direct call to a `rethrows` function is considered to not throw if it
 is fully applied and none of the function arguments can throw. For
 example:
 
-    // This call to map is considered not to throw because its
-    // argument function does not throw.
-    let absolutePaths = paths.map { "/" + $0 }
+```swift
+// This call to map is considered not to throw because its
+// argument function does not throw.
+let absolutePaths = paths.map { "/" + $0 }
 
-    // This call to map is considered to throw because its
-    // argument function does throw.
-    let streams = try absolutePaths.map { try InputStream(filename: $0) }
+// This call to map is considered to throw because its
+// argument function does throw.
+let streams = try absolutePaths.map { try InputStream(filename: $0) }
+```
 
 For now, `rethrows` is a property of declared functions, not of function
 values. Binding a variable (even a constant) to a function loses the
@@ -345,7 +347,7 @@ scopes (that permit it), rather than relying on the programmer to
 manually check for errors and do their own control flow. This is just a
 lot less boilerplate for common error handling tasks. However, doing
 this naively would introduce a lot of implicit control flow, which makes
-it difficult to reason about the function\'s behavior. This is a serious
+it difficult to reason about the function's behavior. This is a serious
 maintenance problem and has traditionally been a considerable source of
 bugs in languages that heavily use exceptions.
 
@@ -378,7 +380,7 @@ func readStuff() throws {
 }
 ```
 
-Developers can choose to \"scope\" the `try` very tightly by writing it
+Developers can choose to "scope" the `try` very tightly by writing it
 within parentheses or on a specific argument or list element:
 
 ```swift
@@ -395,7 +397,7 @@ let array = [ try foo(), bar(), baz() ]
 
 Some developers may wish to do this to make the specific throwing calls
 very clear. Other developers may be content with knowing that something
-within a statement can throw. The compiler\'s fixit hints will guide
+within a statement can throw. The compiler's fixit hints will guide
 developers towards inserting a single `try` that covers the entire
 statement. This could potentially be controlled someday by a coding
 style flag passed to the compiler.
@@ -411,7 +413,7 @@ expression is considered to handle any error originating from within its
 operand.
 
 `try!` is otherwise exactly like `try`: it can appear in exactly the
-same positions and doesn\'t affect the type of an expression.
+same positions and doesn't affect the type of an expression.
 
 ## Manual propagation and manipulation of errors
 
@@ -430,7 +432,7 @@ As such, the Swift standard library should provide a standard Rust-like
     propagating the error in the current context.
 
 This is something that composes on top of the basic model, but that has
-not been designed yet and details aren\'t included in this proposal.
+not been designed yet and details aren't included in this proposal.
 
 The name `Result<T>` is a stand-in and needs to be designed and
 reviewed, as well as the basic operations on the type.
@@ -488,7 +490,7 @@ based on real-world usage experience.
 
 ## Importing Cocoa
 
-If possible, Swift\'s error-handling model should transparently work
+If possible, Swift's error-handling model should transparently work
 with the SDK with a minimal amount of effort from framework owners.
 
 We believe that we can cover the vast majority of Objective-C APIs with
@@ -521,7 +523,7 @@ couple of simple heuristics:
 -   Also common is a pointer result, where a `nil` result usually means
     an error occurred. This appears to be universal in Objective-C; APIs
     that can return `nil` results seem to do so via out-parameters. So
-    it seems to be safe to make a policy decision that it\'s okay to
+    it seems to be safe to make a policy decision that it's okay to
     assume that a `nil` result is an error by default.
 
     If the pattern for a method is that a `nil` result means it produced
@@ -534,7 +536,7 @@ For other sentinel cases, we can consider adding a new clang attribute
 to indicate to the compiler what the sentinel is:
 
 -   There are several APIs returning `NSInteger` or `NSUInteger`. At
-    least some of these return 0 on error, but that doesn\'t seem like a
+    least some of these return 0 on error, but that doesn't seem like a
     reasonable general assumption.
 -   `AVFoundation` provides a couple methods returning
     `AVKeyValueStatus`. These produce an error if the API returned
@@ -564,8 +566,8 @@ just Swift. (For example, they could try to detect an invalid error
 check.)
 
 Cases that do not match the automatically imported patterns and that
-lack an attribute would be left unmodified (i.e., they\'d keep their
-NSErrorPointer argument) and considered \"not awesome\" in the SDK
+lack an attribute would be left unmodified (i.e., they'd keep their
+NSErrorPointer argument) and considered "not awesome" in the SDK
 auditing tool. These will still be usable in Swift: callers will get the
 NSError back like they do today, and have to throw the result manually.
 
@@ -573,7 +575,7 @@ For initializers, importing an initializer as throwing takes precedence
 over importing it as failable. That is, an imported initializer with a
 nullable result and an error parameter would be imported as throwing.
 Throwing initializers have very similar constraints to failable
-initializers; in a way, it\'s just a new axis of failability.
+initializers; in a way, it's just a new axis of failability.
 
 One limitation of this approach is that we need to be able to
 reconstruct the selector to use when an overload of a method is
@@ -601,38 +603,38 @@ APIs in the public API:
 The above translation rule would import methods like this one from
 `NSDocument`:
 
-    ```objc
-    - (NSDocument *)duplicateAndReturnError:(NSError **)outError;
-    ```
+```objc
+- (NSDocument *)duplicateAndReturnError:(NSError **)outError;
+```
 
 like so:
 
-    ```swift
-    func duplicateAndReturnError() throws -> NSDocument
-    ```
+```swift
+func duplicateAndReturnError() throws -> NSDocument
+```
 
 The `AndReturnError` bit is common but far from universal; consider this
 method from `NSManagedObject`:
 
-    ```objc
-    - (BOOL)validateForDelete:(NSError **)error;
-    ```
+```objc
+- (BOOL)validateForDelete:(NSError **)error;
+```
 
 This would be imported as:
 
-    ```swift
-    func validateForDelete() throws
-    ```
+```swift
+func validateForDelete() throws
+```
 
-This is a really nice import, and it\'s somewhat unfortunate that we
-can\'t import `duplicateAndReturnError:` as `duplicate()`.
+This is a really nice import, and it's somewhat unfortunate that we
+can't import `duplicateAndReturnError:` as `duplicate()`.
 
 ## Potential future extensions to this model
 
 We believe that the proposal above is sufficient to provide a huge step
 forward in error handling in Swift programs, but there is always more to
-consider in the future. Some specific things we\'ve discussed (and may
-come back to in the future) but don\'t consider to be core to the Swift
+consider in the future. Some specific things we've discussed (and may
+come back to in the future) but don't consider to be core to the Swift
 2.0 model are:
 
 ### Higher-order polymorphism
@@ -649,7 +651,7 @@ func map<T, U>(_ array: [T], fn: T -> U) throwsIf(fn) -> [U] {
 }
 ```
 
-There\'s no need for a more complex logical operator than disjunction
+There's no need for a more complex logical operator than disjunction
 for normal higher-order stuff.
 
 This feature is highly desired (e.g. it would allow many otherwise
@@ -682,19 +684,19 @@ autoreleasepool {
 }
 ```
 
-The error-handling model doesn\'t cause major problems for this. The
+The error-handling model doesn't cause major problems for this. The
 compiler can infer that the closure throws, and `autoreleasepool` can be
 overloaded on whether its argument closure throws; the overload that
 takes a throwing closures would itself throw.
 
 There is one minor usability problem here, though. If the closure
 contains throwing expressions, those expressions must be explicitly
-marked within the closure with `try`. However, from the compiler\'s
+marked within the closure with `try`. However, from the compiler's
 perspective, the call to `autoreleasepool` is also a call that can
 throw, and so it must also be marked with `try`:
 
 ```swift
-try autoreleasepool {    // 'try' is required here...
+try autoreleasepool {              // 'try' is required here...
     let string = try parseString() // ...and here.
     ...
 }
@@ -702,10 +704,10 @@ try autoreleasepool {    // 'try' is required here...
 
 This marking feels redundant. We want functions like `autoreleasepool`
 to feel like statements, but marks inside built-in statements like `if`
-don\'t require the outer statement to be marked. It would be better if
-the compiler didn\'t require the outer `try`.
+don't require the outer statement to be marked. It would be better if
+the compiler didn't require the outer `try`.
 
-On the other hand, the \"statement-like\" story already has a number of
+On the other hand, the "statement-like" story already has a number of
 other holes: for example, `break`, `continue`, and `return` behave
 differently in the argument closure than in statements. In the future,
 we may consider fixing that; that fix will also need to address the
@@ -727,9 +729,9 @@ here: 1) the memory management rules for CFErrors are unclear and
 potentially inconsistent. 2) we need to know when an error is raised.
 
 In principle, we could import POSIX functions into Swift as throwing
-functions, filling in the error from `errno`. It\'s nearly impossible to
+functions, filling in the error from `errno`. It's nearly impossible to
 imagine doing this with an automatic import rule, however; much more
-likely, we\'d need to wrap them all in an overlay.
+likely, we'd need to wrap them all in an overlay.
 
 In both cases, it is possible to pull these into the Swift error
 handling model, but because this is likely to require massive SDK
