@@ -29,6 +29,12 @@
 #include <memory>
 #include <type_traits>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace swift {
 
 /// This is a platform independent version of Dl_info from dlfcn.h
@@ -112,55 +118,73 @@ int lookupSymbol(const void *address, SymbolInfo *info);
 /// Configure the environment to allow calling into the Debug Help library.
 ///
 /// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
+///   the Debug Help library. If it did so successfully, the handle used during
+///   initialization is passed to this function and should be used with
+///   subsequent calls to the Debug Help library. Do not close this handle.
 /// \param context A caller-supplied value to pass to \a body.
 ///
 /// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
 /// calls into it from the Swift runtime and stdlib should route through this
 /// function.
+///
+/// This function sets the Debug Help library's options by calling
+/// \c SymSetOptions() before \a body is invoked, and then resets them back to
+/// their old value before returning. \a body can also call \c SymSetOptions()
+/// if needed.
 SWIFT_RUNTIME_STDLIB_SPI
 void _swift_withWin32DbgHelpLibrary(
-  void (* body)(bool isInitialized, void *context), void *context);
+  void (* body)(HANDLE hProcess, void *context), void *context);
 
 /// Configure the environment to allow calling into the Debug Help library.
 ///
 /// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
+///   the Debug Help library. If it did so successfully, the handle used during
+///   initialization is passed to this function and should be used with
+///   subsequent calls to the Debug Help library. Do not close this handle.
 ///
 /// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
 /// calls into it from the Swift runtime and stdlib should route through this
 /// function.
+///
+/// This function sets the Debug Help library's options by calling
+/// \c SymSetOptions() before \a body is invoked, and then resets them back to
+/// their old value before returning. \a body can also call \c SymSetOptions()
+/// if needed.
 static inline void _swift_withWin32DbgHelpLibrary(
-  const std::function<void(bool /*isInitialized*/)> &body) {
-  _swift_withWin32DbgHelpLibrary([](bool isInitialized, void *context) {
+  const std::function<void(HANDLE /*hProcess*/)> &body) {
+  _swift_withWin32DbgHelpLibrary([](HANDLE hProcess, void *context) {
     auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
-    (* bodyp)(isInitialized);
+    (* bodyp)(hProcess);
   }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
 }
 
 /// Configure the environment to allow calling into the Debug Help library.
 ///
 /// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
+///   the Debug Help library. If it did so successfully, the handle used during
+///   initialization is passed to this function and should be used with
+///   subsequent calls to the Debug Help library. Do not close this handle.
 ///
 /// \returns Whatever is returned from \a body.
 ///
 /// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
 /// calls into it from the Swift runtime and stdlib should route through this
 /// function.
+///
+/// This function sets the Debug Help library's options by calling
+/// \c SymSetOptions() before \a body is invoked, and then resets them back to
+/// their old value before returning. \a body can also call \c SymSetOptions()
+/// if needed.
 template <
   typename F,
-  typename R = typename std::result_of_t<F&(bool /*isInitialized*/)>,
+  typename R = typename std::result_of_t<F&(HANDLE /*hProcess*/)>,
   typename = typename std::enable_if_t<!std::is_same<void, R>::value>
 >
 static inline R _swift_withWin32DbgHelpLibrary(const F& body) {
   R result;
 
-  _swift_withWin32DbgHelpLibrary([&body, &result] (bool isInitialized) {
-    result = body(isInitialized);
+  _swift_withWin32DbgHelpLibrary([&body, &result] (HANDLE hProcess) {
+    result = body(hProcess);
   });
 
   return result;
