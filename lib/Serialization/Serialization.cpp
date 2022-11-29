@@ -829,6 +829,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
   BLOCK_RECORD(control_block, IS_OSSA);
+  BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -957,6 +958,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     control_block::SDKNameLayout SDKName(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
+    control_block::AllowableClientLayout Allowable(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -995,6 +997,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     if (!options.SDKName.empty())
       SDKName.emit(ScratchRecord, options.SDKName);
 
+    for (auto &name: options.AllowableClients) {
+      Allowable.emit(ScratchRecord, name);
+    }
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
     // Write the producer's Swift revision.

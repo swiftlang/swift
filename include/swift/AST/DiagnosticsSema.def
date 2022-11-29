@@ -984,6 +984,10 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+ERROR(module_allowable_client_violation,none,
+      "module %0 doesn't allow importation from module %1",
+      (Identifier, Identifier))
+
 REMARK(cross_import_added,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))

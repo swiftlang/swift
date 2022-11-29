@@ -310,6 +310,9 @@ static ValidationInfo validateControlBlock(
     case control_block::TARGET:
       result.targetTriple = blobData;
       break;
+    case control_block::ALLOWABLE_CLIENT_NAME:
+      result.allowableClients.push_back(blobData);
+      break;
     case control_block::SDK_NAME: {
       result.sdkName = blobData;
 
@@ -1320,6 +1323,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;
+      AllowableClientNames = info.allowableClients;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
       Bits.IsStaticLibrary = extInfo.isStaticLibrary();

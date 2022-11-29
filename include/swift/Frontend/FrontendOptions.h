@@ -97,6 +97,9 @@ public:
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
 
+  /// A set of modules allowed to import this module.
+  std::set<std::string> AllowableClients;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
