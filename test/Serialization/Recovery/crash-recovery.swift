@@ -3,6 +3,7 @@
 
 // RUN: echo 'import Lib; _ = Sub.disappearingMethod' | not --crash %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -swift-version 4 -disable-deserialization-recovery -Xcc -DBAD - 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-4 %s
 // RUN: echo 'import Lib; _ = Sub.disappearingMethod' | not --crash %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -swift-version 4.2 -disable-deserialization-recovery -Xcc -DBAD - 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-4_2 %s
+// RUN: echo 'import Lib; _ = Sub.disappearingMethod' | not --crash %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -debugger-support -swift-version 4 -disable-deserialization-recovery -Xcc -DBAD - 2>&1 | %FileCheck -check-prefix CHECK-CRASH-DEBUGGER %s
 
 // REQUIRES: objc_interop
 
@@ -21,3 +22,7 @@ public class Sub: Base {
 // CHECK-CRASH-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
 // CHECK-CRASH: module 'Lib', builder version {{.*}}4.1.50
 // CHECK-CRASH: could not find 'disappearingMethod()' in parent class
+// Part of the error message:
+// CHECK-CRASH-DEBUGGER: Stack dump
+// Produced by fatal() because of -disable-deserialization-recovery.
+// CHECK-CRASH-DEBUGGER: Stack dump
