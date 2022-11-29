@@ -1216,6 +1216,8 @@ public:
   BodyAndFingerprint
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 
+  ParserResult<MacroDecl> parseDeclMacro(DeclAttributes &Attributes);
+
   ParserStatus parsePrimaryAssociatedTypes(
       SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserStatus parsePrimaryAssociatedTypeList(
@@ -1427,6 +1429,8 @@ public:
     Curried,
     /// An enum element.
     EnumElement,
+    /// A macro.
+    Macro,
   };
 
   /// Whether we are at the start of a parameter name when parsing a parameter.

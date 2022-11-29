@@ -2100,8 +2100,10 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   TypeRepr *resultTyRepr = nullptr;
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     resultTyRepr = funcDecl->getResultTypeRepr();
+  } else if (auto subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
+    resultTyRepr = subscriptDecl->getElementTypeRepr();
   } else {
-    resultTyRepr = cast<SubscriptDecl>(decl)->getElementTypeRepr();
+    resultTyRepr = cast<MacroDecl>(decl)->resultType.getTypeRepr();
   }
 
   if (!resultTyRepr && decl->getClangDecl() &&
@@ -2223,9 +2225,11 @@ static Type validateParameterType(ParamDecl *decl) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::SubscriptDecl);
-  } else {
-    assert(isa<EnumElementDecl>(dc));
+  } else if (isa<EnumElementDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
+  } else {
+    assert(isa<MacroDecl>(dc));
+    options = TypeResolutionOptions(TypeResolverContext::MacroDecl);
   }
 
   // Set the "preconcurrency" flag if this is a parameter of a preconcurrency
@@ -2547,7 +2551,15 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   }
 
   case DeclKind::Macro: {
-    llvm_unreachable("macro types are precomputed right now");
+    auto macro = cast<MacroDecl>(D);
+    Type resultType = macro->getResultInterfaceType();
+    if (!macro->parameterList)
+      return resultType;
+
+    SmallVector<AnyFunctionType::Param, 4> paramTypes;
+    macro->parameterList->getParams(paramTypes);
+    FunctionType::ExtInfo info;
+    return FunctionType::get(paramTypes, resultType, info);
   }
   }
   llvm_unreachable("invalid decl kind");

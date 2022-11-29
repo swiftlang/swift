@@ -466,7 +466,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
-  NO_REFERENCE(MacroExpansion);
+  SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE

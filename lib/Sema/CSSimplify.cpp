@@ -2306,6 +2306,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2666,6 +2667,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     return true;
   }
 
@@ -3084,6 +3086,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6459,6 +6462,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::PackElementOf:
     case ConstraintKind::ShapeOf:
+    case ConstraintKind::ExplicitGenericArguments:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -12644,6 +12648,78 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *shapeOf = Constraint::create(
+          *this, ConstraintKind::ShapeOf, type1, type2,
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(shapeOf);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  // Bail out if we haven't selected an overload yet.
+  auto simplifiedBoundType = simplifyType(type1, flags);
+  if (simplifiedBoundType->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // If the overload hasn't been resolved, we can't simplify this constraint.
+  auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+  auto selectedOverload = findSelectedOverloadFor(overloadLocator);
+  if (!selectedOverload)
+    return formUnsolved();
+
+  auto overloadChoice = selectedOverload->choice;
+  if (!overloadChoice.isDecl()) {
+    return SolutionKind::Error;
+  }
+
+  auto decl = overloadChoice.getDecl();
+  auto genericContext = decl->getAsGenericContext();
+  if (!genericContext)
+    return SolutionKind::Error;
+
+  auto genericParams = genericContext->getGenericParams();
+  if (!genericParams || genericParams->size() == 0) {
+    // FIXME: Record an error here that we're ignoring the parameters.
+    return SolutionKind::Solved;
+  }
+
+  // Map the generic parameters we have over to their opened types.
+  SmallVector<Type, 2> openedGenericParams;
+  auto genericParamDepth = genericParams->getParams()[0]->getDepth();
+  for (const auto &openedType : getOpenedTypes(overloadLocator)) {
+    if (openedType.first->getDepth() == genericParamDepth) {
+      openedGenericParams.push_back(Type(openedType.second));
+    }
+  }
+  assert(openedGenericParams.size() == genericParams->size());
+
+  // Match the opened generic parameters to the specialized arguments.
+  auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
+  PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext());
+  if (matcher.match())
+    return SolutionKind::Error;
+
+  // Bind the opened generic parameters to the specialization arguments.
+  for (const auto &pair : matcher.pairs) {
+    addConstraint(
+        ConstraintKind::Bind, pair.lhs, pair.rhs,
+        getConstraintLocator(
+            locator, LocatorPathElt::GenericArgument(pair.idx)));
+  }
+
+  return SolutionKind::Solved;
+}
+
 static llvm::PointerIntPair<Type, 3, unsigned>
 getBaseTypeForPointer(TypeBase *type) {
   unsigned unwrapCount = 0;
@@ -13993,6 +14069,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ExplicitGenericArguments:
+    return simplifyExplicitGenericArgumentsConstraint(
+        first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14583,6 +14663,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyShapeOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
         constraint.getLocator());
+
+  case ConstraintKind::ExplicitGenericArguments:
+    return simplifyExplicitGenericArgumentsConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ None, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

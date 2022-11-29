@@ -408,7 +408,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroDecl(MacroDecl *MD) {
-    // FIXME: Nothing specific to visit right now.
+    bool WalkGenerics = visitGenericParamListIfNeeded(MD);
+
+    if (MD->parameterList && visit(MD->parameterList))
+      return true;
+
+    if (auto resultTypeRepr = MD->resultType.getTypeRepr()) {
+      if (doIt(resultTypeRepr))
+        return true;
+    }
+
+    // Visit trailing requirements
+    if (WalkGenerics && visitTrailingRequirements(MD))
+       return true;
+
     return false;
   }
 

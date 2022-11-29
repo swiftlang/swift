@@ -590,6 +590,30 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
     // We already visited the children.
     return doSkipChildren();
+  } else if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
+    // The macro itself.
+    auto macroRef = ME->getMacroRef();
+    auto macroDecl = macroRef.getDecl();
+    auto macroRefType =
+        macroDecl->getInterfaceType().subst(macroRef.getSubstitutions());
+    if (!passReference(
+            macroDecl, macroRefType, ME->getMacroNameLoc(),
+            ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+      return Action::Stop();
+
+    // Walk the arguments, since they were written directly by the user.
+    if (auto argList = ME->getArgs()) {
+      if (!argList->walk(*this))
+        return Action::Stop();
+    }
+
+    if (auto rewritten = ME->getRewritten()) {
+      if (!rewritten->walk(*this))
+        return Action::Stop();
+    }
+
+    // Already walked the children.
+    return doSkipChildren();
   }
 
   return Action::Continue(E);

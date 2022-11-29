@@ -1775,16 +1775,16 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::pound:
+    if (peekToken().is(tok::code_complete) &&
+        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+      return parseExprPoundCodeCompletion(/*ParentKind*/None);
+    }
     if (Context.LangOpts.hasFeature(Feature::Macros)) {
       return parseExprMacroExpansion(isExprBasic);
     }
     if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundUnknown(SourceLoc());
-    }
-    if (peekToken().is(tok::code_complete) &&
-        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-      return parseExprPoundCodeCompletion(/*ParentKind*/None);
     }
     goto UnknownCharacter;
 
