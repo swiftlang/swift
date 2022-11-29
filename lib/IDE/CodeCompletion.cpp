@@ -287,7 +287,7 @@ public:
   void completeTypeAttrBeginning() override;
   void completeOptionalBinding() override;
 
-  void doneParsing() override;
+  void doneParsing(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -1552,7 +1552,7 @@ static void undoSingleExpressionReturn(DeclContext *DC) {
   }
 }
 
-void CodeCompletionCallbacksImpl::doneParsing() {
+void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
   if (Kind == CompletionKind::None) {

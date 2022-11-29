@@ -48,7 +48,7 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
 
-  void doneParsing() override;
+  void doneParsing(SourceFile *SrcFile) override;
 };
 
 void ContextInfoCallbacks::completePostfixExprBeginning(CodeCompletionExpr *E) {
@@ -85,7 +85,7 @@ void ContextInfoCallbacks::completeCaseStmtBeginning(CodeCompletionExpr *E) {
   // TODO: Implement?
 }
 
-void ContextInfoCallbacks::doneParsing() {
+void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
   if (!ParsedExpr)
     return;
 
