@@ -504,7 +504,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     class EraseTypeParamWalker : public ASTWalker {
     public:
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
               ident->overwriteNameRef(genericParam->createNameRef());
@@ -689,7 +689,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     return nullptr;
   }
   ParserStatus Status;
-  SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
+  SmallVector<IdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
     DeclNameLoc Loc;
@@ -710,7 +710,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       }
       EndLoc = Loc.getEndLoc();
 
-      ComponentIdentTypeRepr *CompT;
+      IdentTypeRepr *CompT;
       if (HasGenericArgs) {
         CompT = GenericIdentTypeRepr::create(Context, Loc, Name, GenericArgs,
                                              SourceRange(LAngle, RAngle));

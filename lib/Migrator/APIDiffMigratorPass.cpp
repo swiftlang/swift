@@ -92,7 +92,7 @@ private:
   }
 
   bool isUserTypeAlias(TypeRepr *T) const {
-    if (auto Ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+    if (auto Ident = dyn_cast<IdentTypeRepr>(T)) {
       if (auto Bound = Ident->getBoundDecl()) {
         return isa<TypeAliasDecl>(Bound) &&
           !Bound->getModuleContext()->isSystemModule();

@@ -2257,8 +2257,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
-            if (auto identBase = dyn_cast<ComponentIdentTypeRepr>(
-                    memberTR->getBaseComponent())) {
+            if (auto identBase =
+                    dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
               auto memberComps = memberTR->getMemberComponents();
               if (memberComps.size() == 1 &&
                   identBase->getNameRef().isSimpleName("Builtin") &&
@@ -2429,7 +2429,7 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   DirectlyReferencedTypeDecls current;
 
   auto *baseComp = repr->getBaseComponent();
-  if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
+  if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
     // If we already set a declaration, use it.
     if (auto *typeDecl = identBase->getBoundDecl()) {
       current = {1, typeDecl};

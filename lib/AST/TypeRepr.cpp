@@ -138,20 +138,20 @@ DeclNameRef DeclRefTypeRepr::getNameRef() const {
 }
 
 TypeRepr *DeclRefTypeRepr::getBaseComponent() {
-  if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
-    return Comp;
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
 
   return cast<MemberTypeRepr>(this)->getBaseComponent();
 }
 
-ComponentIdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
-  if (auto *Comp = dyn_cast<ComponentIdentTypeRepr>(this))
-    return Comp;
+IdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
 
   return cast<MemberTypeRepr>(this)->getLastComponent();
 }
 
-DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
+DeclNameRef IdentTypeRepr::getNameRef() const {
   if (IdOrDecl.is<DeclNameRef>())
     return IdOrDecl.get<DeclNameRef>();
 
@@ -280,8 +280,8 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
   Printer << ">";
 }
 
-void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
-                                       const PrintOptions &Opts) const {
+void IdentTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
@@ -386,16 +386,14 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
 
 MemberTypeRepr *
 MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
-                       ArrayRef<ComponentIdentTypeRepr *> MemberComponents) {
-  auto size =
-      totalSizeToAlloc<ComponentIdentTypeRepr *>(MemberComponents.size());
+                       ArrayRef<IdentTypeRepr *> MemberComponents) {
+  auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
   auto mem = C.Allocate(size, alignof(MemberTypeRepr));
   return new (mem) MemberTypeRepr(Base, MemberComponents);
 }
 
-MemberTypeRepr *
-MemberTypeRepr::create(const ASTContext &Ctx,
-                       ArrayRef<ComponentIdentTypeRepr *> Components) {
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
+                                       ArrayRef<IdentTypeRepr *> Components) {
   return create(Ctx, Components.front(), Components.drop_front());
 }
 

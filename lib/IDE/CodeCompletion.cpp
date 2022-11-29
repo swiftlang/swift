@@ -220,10 +220,9 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
       if (isa<MemberTypeRepr>(declRefTR))
         return false;
 
-      const auto *component = cast<ComponentIdentTypeRepr>(declRefTR);
+      const auto *identTR = cast<IdentTypeRepr>(declRefTR);
       ImportPath::Module::Builder builder(
-          component->getNameRef().getBaseIdentifier(),
-          component->getLoc());
+          identTR->getNameRef().getBaseIdentifier(), identTR->getLoc());
 
       if (auto Module = Context.getLoadedModule(builder.get()))
         ParsedTypeLoc.setType(ModuleType::get(Module));

@@ -151,20 +151,20 @@ namespace {
 /// Build up an \c DeclRefTypeRepr and see what it resolves to.
 /// FIXME: Support DeclRefTypeRepr nodes with non-identifier base components.
 struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
-  SmallVectorImpl<ComponentIdentTypeRepr *> &components;
+  SmallVectorImpl<IdentTypeRepr *> &components;
   ASTContext &C;
 
   ExprToDeclRefTypeRepr(decltype(components) &components, ASTContext &C)
-    : components(components), C(C) {}
-  
+      : components(components), C(C) {}
+
   bool visitExpr(Expr *e) {
     return false;
   }
   
   bool visitTypeExpr(TypeExpr *te) {
     if (auto *TR = te->getTypeRepr())
-      if (auto *CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
-        components.push_back(CITR);
+      if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
+        components.push_back(ITR);
         return true;
       }
     return false;
@@ -475,7 +475,7 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    SmallVector<ComponentIdentTypeRepr *, 2> components;
+    SmallVector<IdentTypeRepr *, 2> components;
     if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
@@ -581,7 +581,7 @@ public:
       return P;
     }
 
-    SmallVector<ComponentIdentTypeRepr *, 2> components;
+    SmallVector<IdentTypeRepr *, 2> components;
     if (!ExprToDeclRefTypeRepr(components, Context).visit(ce->getFn()))
       return nullptr;
     

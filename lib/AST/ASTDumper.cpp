@@ -3112,7 +3112,7 @@ public:
     printRec(T->getTypeRepr());
   }
 
-  void visitComponentIdentTypeRepr(ComponentIdentTypeRepr *T) {
+  void visitIdentTypeRepr(IdentTypeRepr *T) {
     printCommon("type_ident");
 
     PrintWithColorRAII(OS, IdentifierColor)

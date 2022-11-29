@@ -488,7 +488,7 @@ ASTWalker::PreWalkAction NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (shouldSkip(T->getSourceRange()))
     return Action::SkipChildren();
 
-  if (isa<ComponentIdentTypeRepr>(T)) {
+  if (isa<IdentTypeRepr>(T)) {
     // If we're walking a CustomAttr's type we may have an associated call
     // argument to resolve with from its semantic initializer.
     if (CustomAttrArgList.has_value() && CustomAttrArgList->Loc == T->getLoc()) {

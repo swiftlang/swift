@@ -3956,7 +3956,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   const ExportContext &where;
   DeclAvailabilityFlags flags;
 
-  bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
+  bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
@@ -3991,8 +3991,8 @@ public:
       return Action::Continue();
 
     auto *baseComp = declRefTR->getBaseComponent();
-    if (auto *identBase = dyn_cast<ComponentIdentTypeRepr>(baseComp)) {
-      if (checkComponentIdentTypeRepr(identBase)) {
+    if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+      if (checkIdentTypeRepr(identBase)) {
         foundAnyIssues = true;
         return Action::SkipChildren();
       }
@@ -4006,7 +4006,7 @@ public:
         // If a parent type is unavailable, don't go on to diagnose
         // the member since that will just produce a redundant
         // diagnostic.
-        if (checkComponentIdentTypeRepr(comp)) {
+        if (checkIdentTypeRepr(comp)) {
           foundAnyIssues = true;
           break;
         }

@@ -6152,7 +6152,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
       if (Params.empty())
         return Action::SkipChildren();
 
-      auto *ident = dyn_cast<ComponentIdentTypeRepr>(T);
+      auto *ident = dyn_cast<IdentTypeRepr>(T);
       if (!ident)
         return Action::Continue();
 

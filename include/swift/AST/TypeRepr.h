@@ -80,17 +80,15 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(DeclRefTypeRepr, TypeRepr);
-  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, DeclRefTypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, DeclRefTypeRepr);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, ComponentIdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, IdentTypeRepr, 32,
     : NumPadBits,
     NumGenericArgs : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, DeclRefTypeRepr, 32,
-    : NumPadBits,
-    NumMemberComponents : 32
-  );
+                             : NumPadBits, NumMemberComponents : 32);
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
     : NumPadBits,
@@ -245,7 +243,7 @@ private:
   friend class TypeRepr;
 };
 
-class ComponentIdentTypeRepr;
+class IdentTypeRepr;
 
 /// This is the abstract base class for types that directly reference a
 /// type declaration. In written syntax, this type representation consists of
@@ -258,8 +256,13 @@ protected:
   explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
+  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
+  /// is a \c MemberTypeRepr, and the method returns its base component.
   TypeRepr *getBaseComponent();
-  ComponentIdentTypeRepr *getLastComponent();
+
+  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
+  /// is a \c MemberTypeRepr, and the method returns its last member component.
+  IdentTypeRepr *getLastComponent();
 
   /// The type declaration the last component is bound to.
   TypeDecl *getBoundDecl() const;
@@ -275,7 +278,12 @@ public:
   static bool classof(const DeclRefTypeRepr *T) { return true; }
 };
 
-class ComponentIdentTypeRepr : public DeclRefTypeRepr {
+/// An identifier type with an optional set of generic arguments.
+/// \code
+///   Foo
+///   Bar<Gen>
+/// \endcode
+class IdentTypeRepr : public DeclRefTypeRepr {
   DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
@@ -290,7 +298,7 @@ class ComponentIdentTypeRepr : public DeclRefTypeRepr {
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
+  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
       : DeclRefTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
@@ -321,7 +329,7 @@ public:
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent;
   }
-  static bool classof(const ComponentIdentTypeRepr *T) { return true; }
+  static bool classof(const IdentTypeRepr *T) { return true; }
 
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -331,10 +339,10 @@ protected:
 };
 
 /// A simple identifier type like "Int".
-class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
+class SimpleIdentTypeRepr : public IdentTypeRepr {
 public:
   SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-    : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
+      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -358,16 +366,17 @@ private:
 /// \code
 ///   Bar<Gen>
 /// \endcode
-class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
-    private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+class GenericIdentTypeRepr final
+    : public IdentTypeRepr,
+      private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
   GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
-                       ArrayRef<TypeRepr*> GenericArgs,
+                       ArrayRef<TypeRepr *> GenericArgs,
                        SourceRange AngleBrackets)
-    : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-      AngleBrackets(AngleBrackets) {
+      : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
+        AngleBrackets(AngleBrackets) {
     Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
@@ -412,39 +421,36 @@ private:
 ///   [Int].Bar
 /// \endcode
 class MemberTypeRepr final : public DeclRefTypeRepr,
-    private llvm::TrailingObjects<MemberTypeRepr,
-                                  ComponentIdentTypeRepr *> {
+      private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
   friend TrailingObjects;
 
   /// The base component, which is not necessarily an identifier type.
   TypeRepr *Base;
 
-  MemberTypeRepr(TypeRepr *Base,
-                 ArrayRef<ComponentIdentTypeRepr *> MemberComponents)
+  MemberTypeRepr(TypeRepr *Base, ArrayRef<IdentTypeRepr *> MemberComponents)
       : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
     Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
     assert(MemberComponents.size() > 0 &&
-           "should have just used the single ComponentIdentTypeRepr directly");
+           "MemberTypeRepr requires at least 1 member component");
     std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
-                            getTrailingObjects<ComponentIdentTypeRepr *>());
+                            getTrailingObjects<IdentTypeRepr *>());
   }
 
 public:
-  static MemberTypeRepr *
-  create(const ASTContext &Ctx, TypeRepr *Base,
-         ArrayRef<ComponentIdentTypeRepr *> MemberComponents);
+  static MemberTypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
+                                ArrayRef<IdentTypeRepr *> MemberComponents);
 
-  static MemberTypeRepr *
-  create(const ASTContext &Ctx, ArrayRef<ComponentIdentTypeRepr *> Components);
+  static MemberTypeRepr *create(const ASTContext &Ctx,
+                                ArrayRef<IdentTypeRepr *> Components);
 
   TypeRepr *getBaseComponent() const { return Base; }
 
-  ArrayRef<ComponentIdentTypeRepr *> getMemberComponents() const {
-    return {getTrailingObjects<ComponentIdentTypeRepr *>(),
+  ArrayRef<IdentTypeRepr *> getMemberComponents() const {
+    return {getTrailingObjects<IdentTypeRepr *>(),
             Bits.MemberTypeRepr.NumMemberComponents};
   }
 
-  ComponentIdentTypeRepr *getLastComponent() const {
+  IdentTypeRepr *getLastComponent() const {
     return getMemberComponents().back();
   }
 

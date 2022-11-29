@@ -2225,12 +2225,11 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(DeclRefTypeRepr *ParentTR,
-                                        DeclNameLoc NameLoc,
-                                        TypeDecl *Decl) {
+                                        DeclNameLoc NameLoc, TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
   // Create a new list of components.
-  SmallVector<ComponentIdentTypeRepr *, 2> Components;
+  SmallVector<IdentTypeRepr *, 2> Components;
   if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
     auto MemberComps = MemberTR->getMemberComponents();
     Components.append(MemberComps.begin(), MemberComps.end());
@@ -2269,9 +2268,9 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
       //
       // FIXME: Once we can model generic typealiases properly, rip
       // this out.
-      auto isUnboundGenericComponent = [](ComponentIdentTypeRepr *TR) -> bool {
-        if (isa<SimpleIdentTypeRepr>(TR)) {
-          auto *decl = dyn_cast_or_null<GenericTypeDecl>(TR->getBoundDecl());
+      auto isUnboundGenericComponent = [](IdentTypeRepr *ITR) -> bool {
+        if (isa<SimpleIdentTypeRepr>(ITR)) {
+          auto *decl = dyn_cast_or_null<GenericTypeDecl>(ITR->getBoundDecl());
           if (decl && decl->isGeneric())
             return true;
         }
@@ -2285,7 +2284,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
       }
 
       if (auto *identBase =
-              dyn_cast<ComponentIdentTypeRepr>(memberTR->getBaseComponent())) {
+              dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
         if (isUnboundGenericComponent(identBase))
           return nullptr;
       }
@@ -2302,7 +2301,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
 
     // Create a new list of member components, replacing the last one with the
     // new specialized one.
-    SmallVector<ComponentIdentTypeRepr *, 2> newMemberComps;
+    SmallVector<IdentTypeRepr *, 2> newMemberComps;
     newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
     newMemberComps.push_back(genericComp);
 
