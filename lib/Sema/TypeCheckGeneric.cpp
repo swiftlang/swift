@@ -530,8 +530,7 @@ static void collectAdditionalExtensionRequirements(
 
   // If we have a passthrough typealias, add the requirements from its
   // generic signature.
-  if (typealias && TypeChecker::isPassThroughTypealias(
-                       typealias, typealias->getUnderlyingType(), nominal)) {
+  if (typealias && TypeChecker::isPassThroughTypealias(typealias, nominal)) {
     for (auto req : typealias->getGenericSignature().getRequirements())
       sameTypeReqs.push_back(req);
   }
