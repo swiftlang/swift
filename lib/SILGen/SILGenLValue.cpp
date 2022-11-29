@@ -776,7 +776,7 @@ protected:
 
 public:
   NominalTypeElementComponent(KindTy kind, VarDecl *field,
-                              LValueOptions options, SILType substFieldType,
+                              SILType substFieldType,
                               LValueTypeData typeData, SubstitutionMap subs,
                               Optional<ActorIsolation> actorIso)
       : PhysicalPathComponent(typeData, kind, actorIso), Field(field),
@@ -788,55 +788,24 @@ public:
 
   virtual ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                                ManagedValue base) && override = 0;
+
+  void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
+           ManagedValue base) &&
+    override;
 };
 
 class RefElementComponent : public NominalTypeElementComponent {
-  bool IsNonAccessing;
   LValueOptions Options;
 
 public:
   RefElementComponent(VarDecl *field, LValueOptions options,
                       SILType substFieldType, LValueTypeData typeData,
                       SubstitutionMap subs, Optional<ActorIsolation> actorIso)
-      : NominalTypeElementComponent(RefElementKind, field, options,
+      : NominalTypeElementComponent(RefElementKind, field,
                                     substFieldType, typeData, subs, actorIso),
-        IsNonAccessing(options.IsNonAccessing) {}
+        Options(options) {}
 
   bool isLoadingPure() const override { return true; }
-
-  void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
-           ManagedValue base) &&
-      override {
-    if (isa_and_nonnull<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
-        Field->hasAttachedPropertyWrapper() && Field->isLet()) {
-      auto backingVar = Field->getPropertyWrapperBackingProperty();
-      auto ValType = backingVar->getValueInterfaceType();
-      if (!Subs.empty()) {
-        ValType = ValType.subst(Subs);
-      }
-      auto wrapperValue = SGF.emitApplyOfPropertyWrapperBackingInitializer(
-          loc, Field, Subs, std::move(value).getAsRValue(SGF));
-
-      auto typeData = getLogicalStorageTypeData(
-          SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
-          ValType->getCanonicalType());
-      SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-          TypeExpansionContext::minimal(), backingVar,
-          ValType->getCanonicalType());
-      RefElementComponent REC(backingVar, Options, varStorageType, typeData,
-                              Subs, /*actorIsolation=*/None);
-      auto proj = std::move(REC).project(SGF, loc, base);
-
-      auto srcRValue = std::move(wrapperValue).ensurePlusOne(SGF, loc);
-      std::move(srcRValue).assignInto(SGF, loc, proj.getValue());
-      return;
-    }
-    auto finalDestAddr = std::move(*this).project(SGF, loc, base);
-    assert(finalDestAddr.getType().isAddress());
-
-    auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
-    std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
-  }
 
   ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                        ManagedValue base) &&
@@ -856,7 +825,7 @@ public:
 
     // Avoid emitting access markers completely for non-accesses or immutable
     // declarations. Access marker verification is aware of these cases.
-    if (!IsNonAccessing && !Field->isLet()) {
+    if (!Options.IsNonAccessing && !Field->isLet()) {
       if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
         result = enterAccessScope(SGF, loc, base, result, getTypeData(),
                                   getAccessKind(), *enforcement,
@@ -919,46 +888,11 @@ public:
     StructElementComponent(VarDecl *field, SILType substFieldType,
                            LValueTypeData typeData, SubstitutionMap subs,
                            Optional<ActorIsolation> actorIso)
-        : NominalTypeElementComponent(StructElementKind, field, LValueOptions(),
+        : NominalTypeElementComponent(StructElementKind, field,
                                       substFieldType, typeData, subs,
                                       actorIso) {}
 
     bool isLoadingPure() const override { return true; }
-
-    void set(SILGenFunction &SGF, SILLocation loc, ArgumentSource &&value,
-             ManagedValue base) &&
-        override {
-      if (isa_and_nonnull<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
-          Field->hasAttachedPropertyWrapper() && Field->isLet()) {
-        auto backingVar = Field->getPropertyWrapperBackingProperty();
-        auto ValType = backingVar->getValueInterfaceType();
-        if (!Subs.empty()) {
-          ValType = ValType.subst(Subs);
-        }
-        auto wrapperValue = SGF.emitApplyOfPropertyWrapperBackingInitializer(
-            loc, Field, Subs, std::move(value).getAsRValue(SGF));
-
-        auto typeData = getLogicalStorageTypeData(
-            SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
-            ValType->getCanonicalType());
-        SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-            TypeExpansionContext::minimal(), backingVar,
-            ValType->getCanonicalType());
-        StructElementComponent SEC(backingVar, varStorageType, typeData, Subs,
-                                   /*actorIsolation=*/None);
-        auto proj = std::move(SEC).project(SGF, loc, base);
-
-        auto srcRValue = std::move(wrapperValue).ensurePlusOne(SGF, loc);
-        std::move(srcRValue).assignInto(SGF, loc, proj.getValue());
-        return;
-      }
-      auto finalDestAddr = std::move(*this).project(SGF, loc, base);
-      assert(finalDestAddr.getType().isAddress());
-
-      auto srcRValue =
-          std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
-      std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
-    }
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
@@ -992,6 +926,54 @@ public:
                         << Field->getName() << ")\n";
     }
   };
+
+  void NominalTypeElementComponent::set(SILGenFunction &SGF, SILLocation loc,
+                                        ArgumentSource &&value,
+                                        ManagedValue base) && {
+    auto assignValue = [&](NominalTypeElementComponent &&component,
+                           RValue &&value) {
+      auto destAddr = std::move(component).project(SGF, loc, base);
+      assert(destAddr.getType().isAddress());
+
+      auto srcRValue = std::move(value).ensurePlusOne(SGF, loc);
+      std::move(srcRValue).assignInto(SGF, loc, destAddr.getValue());
+    };
+
+    if (isa_and_nonnull<ConstructorDecl>(SGF.FunctionDC->getAsDecl()) &&
+        Field->hasAttachedPropertyWrapper() && Field->isLet()) {
+      auto backingVar = Field->getPropertyWrapperBackingProperty();
+      auto ValType = backingVar->getValueInterfaceType();
+
+      if (!Subs.empty()) {
+        ValType = ValType.subst(Subs);
+      }
+
+      auto wrapperValue = SGF.emitApplyOfPropertyWrapperBackingInitializer(
+          loc, Field, Subs, std::move(value).getAsRValue(SGF));
+
+      auto typeData = getLogicalStorageTypeData(
+          SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
+          ValType->getCanonicalType());
+      SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
+          TypeExpansionContext::minimal(), backingVar,
+          ValType->getCanonicalType());
+
+      if (getKind() == RefElementKind) {
+        RefElementComponent backingVarRef(backingVar, LValueOptions(),
+                                          varStorageType, typeData, Subs,
+                                          /*actorIsolation=*/None);
+        assignValue(std::move(backingVarRef), std::move(wrapperValue));
+      } else {
+        StructElementComponent backingVarRef(backingVar, varStorageType,
+                                             typeData, Subs,
+                                             /*actorIsolation=*/None);
+        assignValue(std::move(backingVarRef), std::move(wrapperValue));
+      }
+      return;
+    }
+
+    assignValue(std::move(*this), std::move(value).getAsRValue(SGF));
+  }
 
   /// A physical path component which force-projects the address of
   /// the value of an optional l-value.
