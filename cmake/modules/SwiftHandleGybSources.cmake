@@ -135,7 +135,6 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/DeclNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/ExprNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/GenericNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/NodeSerializationCodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/PatternNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/StmtNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/TypeNodes.py"
