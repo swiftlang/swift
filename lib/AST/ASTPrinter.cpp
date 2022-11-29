@@ -276,6 +276,21 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
           return false;
       }
 
+      // Skip enum cases containing enum elements we wouldn't print.
+      if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
+        auto elements = ECD->getElements();
+        if (!elements.empty()) {
+          // Enum elements are usually not printed, so we have to override the
+          // print option controlling that. We only check the first element
+          // because all the elements in a single case decl should have the same
+          // characteristics.
+          PrintOptions optionsCopy = options;
+          optionsCopy.ExplodeEnumCaseDecls = true;
+          if (!shouldPrint(elements[0], optionsCopy))
+            return false;
+        }
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
