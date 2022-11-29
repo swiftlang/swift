@@ -505,6 +505,9 @@ void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType) {
   ((TypeAliasDecl *)decl)->setUnderlyingTypeRepr((TypeRepr *)underlyingType);
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 void TopLevelCodeDecl_dump(void *decl) {
   ((TopLevelCodeDecl *)decl)->dump(llvm::errs());
 }
@@ -513,3 +516,5 @@ void Expr_dump(void *expr) { ((Expr *)expr)->dump(llvm::errs()); }
 void Decl_dump(void *expr) { ((Decl *)expr)->dump(llvm::errs()); }
 void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
 void Type_dump(void *expr) { ((TypeRepr *)expr)->dump(); }
+
+#pragma clang diagnostic pop
