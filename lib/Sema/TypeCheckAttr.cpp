@@ -4391,19 +4391,14 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
   if (Attrs.empty())
     return;
 
-  // Diagnose conflicting attributes. @_alwaysEmitIntoClient, @inlinable, and
-  // @_transparent all conflict with back deployment because they each cause the
-  // body of a function to be copied into the client under certain conditions
-  // and would defeat the goal of back deployment, which is to always use the
-  // ABI version of the declaration when it is available.
+  // Diagnose conflicting attributes. @_alwaysEmitIntoClient and @_transparent
+  // conflict with back deployment because they each cause the body of a
+  // function to always be copied into the client and would defeat the goal of
+  // back deployment, which is to use the ABI version of the declaration when it
+  // is available.
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
     diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deploy,
                           AEICA, D->getDescriptiveKind());
-  }
-
-  if (auto *IA = D->getAttrs().getAttribute<InlinableAttr>()) {
-    diagnoseAndRemoveAttr(IA, diag::attr_incompatible_with_back_deploy, IA,
-                          D->getDescriptiveKind());
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
