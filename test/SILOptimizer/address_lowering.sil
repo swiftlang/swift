@@ -1068,6 +1068,28 @@ bb3(%15 : @owned $T):
   return %15 : $T
 }
 
+// Verify that trivial arguments are loaded trivially and for which no
+// end_borrows were created.
+// CHECK-LABEL: sil [ossa] @f171_subtract_overflow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[RETVAL:%[^,]+]] : $*Builtin.Int64, [[LHS_ADDR:%[^,]+]] : $*Builtin.Int64, [[RHS_ADDR:%[^,]+]] :
+// CHECK:         [[LHS:%[^,]+]] = load [trivial] [[LHS_ADDR]]
+// CHECK:         [[RHS:%[^,]+]] = load [trivial] [[RHS_ADDR]]
+// CHECK:         [[SUM_AND:%[^,]+]] = apply {{%[^,]+}}([[LHS]], [[RHS]])
+// CHECK-NOT:     end_borrow
+// CHECK:         ([[SUM:%[^,]+]], [[OVERFLOWED:%[^,]+]]) = destructure_tuple [[SUM_AND]]
+// CHECK:         store [[SUM]] to [trivial] [[RETVAL]]
+// CHECK:         return [[OVERFLOWED]]
+// CHECK-LABEL: } // end sil function 'f171_subtract_overflow'
+sil [ossa] @f171_subtract_overflow : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> (@out Int, Bool) {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = function_ref @f171_subtract_overflow_callee : $@convention(method) (Int, Int) -> (Int, Bool)
+  %3 = apply %2(%0, %1) : $@convention(method) (Int, Int) -> (Int, Bool)
+  (%4, %5) = destructure_tuple %3 : $(Int, Bool)
+  %6 = tuple (%4 : $Int, %5 : $Bool)
+  return %6 : $(Int, Bool)
+}
+sil [ossa] @f171_subtract_overflow_callee : $@convention(method) (Int, Int) -> (Int, Bool)
+
 // Test switching on a single opaque value.
 // CHECK-LABEL: sil [ossa] @f210_testSwitchEnum : $@convention(method) <T> (@in Optional<T>, @inout T) -> () {
 // CHECK: bb0(%0 : $*Optional<T>, %1 : $*T):

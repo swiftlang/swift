@@ -40,6 +40,27 @@ STATISTIC(NumMandatoryInlines,
           "Number of function application sites inlined by the mandatory "
           "inlining pass");
 
+//===----------------------------------------------------------------------===//
+//                           Printing Helpers
+//===----------------------------------------------------------------------===//
+
+extern llvm::cl::opt<bool> SILPrintInliningCallee;
+
+extern llvm::cl::opt<bool> SILPrintInliningCallerBefore;
+
+extern llvm::cl::opt<bool> SILPrintInliningCallerAfter;
+
+extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                       SILFunction *callee);
+
+extern void printInliningDetailsCallerBefore(StringRef passName,
+                                             SILFunction *caller,
+                                             SILFunction *callee);
+
+extern void printInliningDetailsCallerAfter(StringRef passName,
+                                            SILFunction *caller,
+                                            SILFunction *callee);
+
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
@@ -923,11 +944,21 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
 
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
+      if (SILPrintInliningCallee) {
+        printInliningDetailsCallee("MandatoryInlining", F, CalleeFunction);
+      }
+      if (SILPrintInliningCallerBefore) {
+        printInliningDetailsCallerBefore("MandatoryInlining", F,
+                                         CalleeFunction);
+      }
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      if (SILPrintInliningCallerAfter) {
+        printInliningDetailsCallerAfter("MandatoryInlining", F, CalleeFunction);
+      }
       nextBB = lastBB->getReverseIterator();
       ++NumMandatoryInlines;
 
