@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -Xcc -fno-exceptions -enable-experimental-cxx-interop -emit-clang-header-path %t/functions.h
 
-// RUN: %target-interop-build-clangxx -fno-exceptions -c %s -I %t -fno-exceptions -o %t/swift-expected-execution.o
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-expected-execution.o
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-expected-execution -Xlinker %t/swift-expected-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-expected-execution
@@ -73,24 +73,6 @@ int main() {
   if (testIntValue.value() == 42)
     printf("Test get T's Value\n");
 
-  // Test get Swift::Error (const)
-  const auto constExpectedResult = Functions::throwFunctionWithPossibleReturn(0);
-  if (!constExpectedResult.has_value()) {
-    auto constError = constExpectedResult.error(); // using const function
-    auto optionalError = constError.as<Functions::NaiveErrors>();
-    auto errorValue = optionalError.get();
-    errorValue.getMessage();
-  }
-
-  // Test get Swift::Error
-  auto expectedResult = Functions::throwFunctionWithPossibleReturn(0);
-  if (!expectedResult.has_value()) {
-    auto error = expectedResult.error();
-    auto optionalError = error.as<Functions::NaiveErrors>();
-    auto errorValue = optionalError.get();
-    errorValue.getMessage();
-  }
-
   // Test has Value
   if (testIntValue.has_value())
     printf("testIntValue has a value\n");
@@ -107,9 +89,5 @@ int main() {
 // CHECK-NEXT: Test operator bool
 // CHECK-NEXT: Test get T's Value (const)
 // CHECK-NEXT: Test get T's Value
-// CHECK-NEXT: passThrowFunctionWithPossibleReturn
-// CHECK-NEXT: returnError
-// CHECK-NEXT: passThrowFunctionWithPossibleReturn
-// CHECK-NEXT: returnError
 // CHECK-NEXT: testIntValue has a value
 // CHECK-NEXT: testIntError doesn't have a value
