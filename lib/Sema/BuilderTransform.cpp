@@ -2370,9 +2370,10 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   if (cs.isDebugMode()) {
-    auto &log = llvm::errs();
+    auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
+    auto &log = llvm::errs().indent(indent);
     log << "--- Applying Solution ---\n";
-    solutions.front().dump(log);
+    solutions.front().dump(log, indent);
     log << '\n';
   }
 
@@ -2387,7 +2388,8 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     auto *body = result->getFunctionBody();
 
     if (cs.isDebugMode()) {
-      auto &log = llvm::errs();
+      auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
+      auto &log = llvm::errs().indent(indent);
       log << "--- Type-checked function body ---\n";
       body->dump(log);
       log << '\n';
