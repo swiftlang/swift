@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library -enable-library-evolution %t/has_symbol_helper.swift
 // RUN: %target-swift-frontend -emit-sil -verify %s -I %t/
 
+// REQUIRES: vendor=apple
+
 sil_stage raw
 
 import Builtin
