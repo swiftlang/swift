@@ -2721,6 +2721,18 @@ namespace {
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = parentType;
+          // Perform member lookup into the external pattern metatype. e.g.
+          // `case let .test(tuple) as Test`.
+        } else if (externalPatternType) {
+          Type externalMetaType = MetatypeType::get(externalPatternType);
+
+          CS.addValueMemberConstraint(
+              externalMetaType, enumPattern->getName(), memberType, CurDC,
+              functionRefKind, {},
+              CS.getConstraintLocator(locator,
+                                      LocatorPathElt::PatternMatch(pattern)));
+
+          baseType = externalPatternType;
         } else {
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
