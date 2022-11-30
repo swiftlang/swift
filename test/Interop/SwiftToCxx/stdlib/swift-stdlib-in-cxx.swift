@@ -79,6 +79,12 @@
 // CHECK-NEXT:  inline __attribute__((always_inline)) operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
+// CHECK-NEXT:  static inline __attribute__((always_inline)) String init(NSString * _Nonnull nsString) noexcept {
+// CHECK-NEXT:  auto result = _make();
+// CHECK-NEXT:  auto res = _impl::$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge void *)nsString);
+// CHECK-NEXT:  memcpy(result._getOpaquePointer(), &res, sizeof(res));
+// CHECK-NEXT:  return result;
+// CHECK-NEXT:  }
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
 // CHECK-NEXT: private:

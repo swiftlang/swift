@@ -61,5 +61,13 @@ int main() {
     assert(std::string(nsStr.UTF8String) == "hello");
     assert([nsStr isEqualToString:@"hello"]);
   }
+
+  {
+    NSString *nsStr = @"nsstr";
+    auto str = String::init(nsStr);
+    NSString *nsStr2 = str;
+    assert(std::string(nsStr.UTF8String) == "nsstr");
+    assert([nsStr2 isEqualToString:nsStr]);
+  }
   return 0;
 }
