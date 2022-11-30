@@ -60,9 +60,11 @@ Some Swift APIs patterns will map to distinct C++ language constructs or pattern
 
 The semantics of how Swift types behave should be preserved when they’re mapped to C++. For instance, in C++, there should still be a semantic difference between Swift value and reference types. Additionally, Swift’s copy-on-write data types like `Array` should still obey the copy-on-write semantics in C++.
 
-### Swift API design should be unaffected
+### Swift language evolution and API design should be unaffected
 
 Swift API authors should not change the way they write Swift code and design Swift APIs based on how specific Swift language constructs are exposed to C++. They should use the most effective Swift constructs for the task. It is a key goal of C++ interoperability that the exposed C++ interfaces are safe, performant, and ergonomic enough that programmers will not be tempted to make their Swift code worse just to make the C++ interfaces better.
+
+The design of new language features added to Swift during its evolution process should not be constrained by what can be represented in the generated C++ header. Such new features do not have to be exposed to C++ when it doesn't make sense to do so.
 
 ### Objective-C support
 
