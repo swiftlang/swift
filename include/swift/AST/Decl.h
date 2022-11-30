@@ -7479,7 +7479,16 @@ public:
             Bits.EnumCaseDecl.NumElements};
   }
   SourceRange getSourceRange() const;
-  
+
+  /// Returns the first of the member elements or null if there are no elements.
+  /// The attributes written with an EnumCaseDecl will be attached to each of
+  /// the elements instead so inspecting the attributes of the first element is
+  /// often useful.
+  EnumElementDecl *getFirstElement() const {
+    auto elements = getElements();
+    return elements.empty() ? nullptr : elements.front();
+  }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumCase;
   }

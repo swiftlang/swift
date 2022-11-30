@@ -1609,9 +1609,8 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the
     // first EnumElementDecl.
-    ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
-    if (!Elems.empty()) {
-      return Elems.front();
+    if (auto *Elem = ECD->getFirstElement()) {
+      return Elem;
     }
   }
 

@@ -278,15 +278,12 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
       // Skip enum cases containing enum elements we wouldn't print.
       if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
-        auto elements = ECD->getElements();
-        if (!elements.empty()) {
+        if (auto *element = ECD->getFirstElement()) {
           // Enum elements are usually not printed, so we have to override the
-          // print option controlling that. We only check the first element
-          // because all the elements in a single case decl should have the same
-          // characteristics.
+          // print option controlling that.
           PrintOptions optionsCopy = options;
           optionsCopy.ExplodeEnumCaseDecls = true;
-          if (!shouldPrint(elements[0], optionsCopy))
+          if (!shouldPrint(element, optionsCopy))
             return false;
         }
       }
@@ -4219,14 +4216,14 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
-  auto elems = decl->getElements();
-  if (!elems.empty()) {
+  if (auto *element = decl->getFirstElement()) {
     // Documentation comments over the case are attached to the enum elements.
-    printDocumentationComment(elems[0]);
-    printAttributes(elems[0]);
+    printDocumentationComment(element);
+    printAttributes(element);
   }
   Printer.printIntroducerKeyword("case", Options, " ");
 
+  auto elems = decl->getElements();
   llvm::interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(elt);
