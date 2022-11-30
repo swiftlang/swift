@@ -1950,7 +1950,12 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      llvm_unreachable("copy into");
+      if (B.getModule().useLoweredAddresses()) {
+        B.createCopyAddr(loc, src, dest, isTake, isInit);
+      } else {
+        SILValue value = emitLoadOfCopy(B, loc, src, isTake);
+        emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
     }
 
     // OpaqueValue store cannot be decoupled from a destroy because it is not
