@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/TypeID.h"
 #include "swift/ConstExtract/ConstExtract.h"
-#include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -21,11 +19,14 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/TypeID.h"
+#include "swift/ConstExtract/ConstExtractRequests.h"
+#include "swift/Subsystems.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
-#include "swift/Subsystems.h"
 
 #include <set>
 #include <sstream>
@@ -119,17 +120,66 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
   return true;
 }
 
+static std::string extractLiteralOutput(Expr *expr) {
+  std::string LiteralOutput;
+  llvm::raw_string_ostream OutputStream(LiteralOutput);
+  expr->printConstExprValue(&OutputStream, nullptr);
+
+  return LiteralOutput;
+}
+
 static std::shared_ptr<CompileTimeValue>
 extractPropertyInitializationValue(VarDecl *propertyDecl) {
   auto binding = propertyDecl->getParentPatternBinding();
   if (binding) {
     auto originalInit = binding->getOriginalInit(0);
     if (originalInit) {
-      std::string LiteralOutput;
-      llvm::raw_string_ostream OutputStream(LiteralOutput);
-      originalInit->printConstExprValue(&OutputStream, nullptr);
-      if (!LiteralOutput.empty())
-        return std::make_shared<RawLiteralValue>(LiteralOutput);
+      auto literalOutput = extractLiteralOutput(originalInit);
+      if (!literalOutput.empty()) {
+        return std::make_shared<RawLiteralValue>(literalOutput);
+      }
+
+      if (auto callExpr = dyn_cast<CallExpr>(originalInit)) {
+        if (callExpr->getFn()->getKind() != ExprKind::ConstructorRefCall) {
+          return std::make_shared<RuntimeValue>();
+        }
+
+        std::vector<FunctionParameter> parameters;
+        const auto args = callExpr->getArgs();
+        for (auto arg : *args) {
+          auto label = arg.getLabel().str().str();
+          auto expr = arg.getExpr();
+
+          switch (expr->getKind()) {
+          case ExprKind::DefaultArgument: {
+            auto defaultArgument = cast<DefaultArgumentExpr>(expr);
+            auto *decl = defaultArgument->getParamDecl();
+
+            if (decl->hasDefaultExpr()) {
+              literalOutput =
+                  extractLiteralOutput(decl->getTypeCheckedDefaultExpr());
+            }
+
+            break;
+          }
+          default:
+            literalOutput = extractLiteralOutput(expr);
+            break;
+          }
+
+          if (literalOutput.empty()) {
+            parameters.push_back(
+                {label, expr->getType(), std::make_shared<RuntimeValue>()});
+          } else {
+            parameters.push_back(
+                {label, expr->getType(),
+                 std::make_shared<RawLiteralValue>(literalOutput)});
+          }
+        }
+
+        auto name = toFullyQualifiedTypeNameString(callExpr->getType());
+        return std::make_shared<InitCallValue>(name, parameters);
+      }
     }
   }
 
@@ -138,9 +188,7 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
     if (node.is<Stmt *>()) {
       if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
         auto expr = returnStmt->getResult();
-        std::string LiteralOutput;
-        llvm::raw_string_ostream OutputStream(LiteralOutput);
-        expr->printConstExprValue(&OutputStream, nullptr);
+        std::string LiteralOutput = extractLiteralOutput(expr);
         if (!LiteralOutput.empty())
           return std::make_shared<RawLiteralValue>(LiteralOutput);
       }
@@ -207,33 +255,49 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
-std::string toString(const CompileTimeValue *Value) {
-  switch (Value->getKind()) {
-    case CompileTimeValue::RawLiteral:
-      return cast<RawLiteralValue>(Value)->getValue();
-    case CompileTimeValue::InitCall:
-      // TODO
-    case CompileTimeValue::Builder:
-      // TODO
-    case CompileTimeValue::Dictionary:
-      // TODO
-    case CompileTimeValue::Runtime:
-      return "Unknown";
+void writeValue(llvm::json::OStream &JSON,
+                std::shared_ptr<CompileTimeValue> Value) {
+  auto value = Value.get();
+  switch (value->getKind()) {
+  case CompileTimeValue::ValueKind::RawLiteral: {
+    JSON.attribute("valueKind", "RawLiteral");
+    JSON.attribute("value", cast<RawLiteralValue>(value)->getValue());
+    break;
   }
-}
 
-std::string toString(CompileTimeValue::ValueKind Kind) {
-  switch (Kind) {
-    case CompileTimeValue::ValueKind::RawLiteral:
-      return "RawLiteral";
-    case CompileTimeValue::ValueKind::InitCall:
-      return "InitCall";
-    case CompileTimeValue::ValueKind::Builder:
-      return "Builder";
-    case CompileTimeValue::ValueKind::Dictionary:
-      return "Dictionary";
-    case CompileTimeValue::ValueKind::Runtime:
-      return "Runtime";
+  case CompileTimeValue::ValueKind::InitCall: {
+    auto initCallValue = cast<InitCallValue>(value);
+
+    JSON.attribute("valueKind", "InitCall");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("type", initCallValue->getName());
+      JSON.attributeArray("arguments", [&] {
+        for (auto FP : initCallValue->getParameters()) {
+          JSON.object([&] {
+            JSON.attribute("label", FP.Label);
+            JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+            writeValue(JSON, FP.Value);
+          });
+        }
+      });
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Builder: {
+    JSON.attribute("valueKind", "Builder");
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Dictionary: {
+    JSON.attribute("valueKind", "Dictionary");
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Runtime: {
+    JSON.attribute("valueKind", "Runtime");
+    break;
+  }
   }
 }
 
@@ -252,19 +316,14 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         JSON.attributeArray("properties", [&] {
           for (const auto &PropertyInfo : TypeInfo.Properties) {
             JSON.object([&] {
-              const auto *PropertyDecl = PropertyInfo.VarDecl;
-              JSON.attribute("label", PropertyDecl->getName().str().str());
-              JSON.attribute("type", toFullyQualifiedTypeNameString(PropertyDecl->getType()));
-              JSON.attribute("isStatic",
-                             PropertyDecl->isStatic() ? "true" : "false");
+              const auto *decl = PropertyInfo.VarDecl;
+              JSON.attribute("label", decl->getName().str().str());
+              JSON.attribute("type",
+                             toFullyQualifiedTypeNameString(decl->getType()));
+              JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
-                             !PropertyDecl->hasStorage() ? "true" : "false");
-              auto value = PropertyInfo.Value.get();
-              auto valueKind = value->getKind();
-              JSON.attribute("valueKind", toString(valueKind));
-              if (valueKind != CompileTimeValue::ValueKind::Runtime) {
-                JSON.attribute("value", toString(value));
-              }
+                             !decl->hasStorage() ? "true" : "false");
+              writeValue(JSON, PropertyInfo.Value);
             });
           }
         });
