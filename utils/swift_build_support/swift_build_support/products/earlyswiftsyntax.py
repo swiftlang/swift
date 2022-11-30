@@ -49,7 +49,7 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
     def build(self, host_target):
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.swift_build_variant)
-        self.cmake_options.define('BUILD_SHARED_LIBS:STRING', 'NO')
+        self.cmake_options.define('BUILD_SHARED_LIBS:STRING', 'YES')
 
         (platform, arch) = host_target.split('-')
 
