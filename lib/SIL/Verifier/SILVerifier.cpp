@@ -5845,12 +5845,16 @@ public:
       if (DS != LastSeenScope) {
         llvm::errs() << "Broken instruction!\n"; 
         SI.dump();
+#ifndef NDEBUG
         llvm::errs() << "in scope\n";
         DS->print(SI.getFunction()->getModule());
+#endif
         llvm::errs() << "Previous, non-contiguous scope set by";
         LastSeenScopeInst->dump();
+#ifndef NDEBUG
         llvm::errs() << "in scope\n";
         LastSeenScope->print(SI.getFunction()->getModule());
+#endif
         llvm::errs() << "Please report a bug on bugs.swift.org\n";
         llvm::errs() <<
           "Pass -Xllvm -verify-di-holes=false to disable the verification\n";
