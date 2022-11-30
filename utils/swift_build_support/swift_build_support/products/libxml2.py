@@ -85,5 +85,5 @@ class LibXML2(cmake_product.CMakeProduct):
         self.cmake_options.define('LIBXML2_WITH_TESTS', 'NO')
         self.cmake_options.define('LIBXML2_WITH_ZLIB', 'NO')
 
-        self.generate_toolchain_file(host_target)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
         self.build_with_cmake(["LibXml2"], self.args.libxml2_build_variant, [])

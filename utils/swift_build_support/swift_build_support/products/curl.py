@@ -109,7 +109,7 @@ class LibCurl(cmake_product.CMakeProduct):
         self.cmake_options.define('ENABLE_UNIX_SOCKETS', 'NO')
         self.cmake_options.define('ENABLE_THREADED_RESOLVER', 'NO')
 
-        self.generate_toolchain_file(host_target)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
         if self.args.build_zlib:
             # If we're building zlib, make cmake search in the built toolchain

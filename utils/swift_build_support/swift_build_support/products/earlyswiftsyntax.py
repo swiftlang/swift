@@ -51,7 +51,7 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
                                   self.args.swift_build_variant)
         self.cmake_options.define('BUILD_SHARED_LIBS:STRING', 'NO')
 
-        self.generate_toolchain_file(host_target)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
         self.build_with_cmake(["all"], self.args.swift_build_variant, [])
 

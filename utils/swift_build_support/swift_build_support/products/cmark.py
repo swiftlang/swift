@@ -54,7 +54,7 @@ class CMark(cmake_product.CMakeProduct):
 
         self.cmake_options.define('CMARK_THREADING', 'ON')
 
-        host_toolchain = self.generate_toolchain_file(host_target)
+        host_toolchain = self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
         (platform, _) = host_target.split('-')
         if not host_toolchain and platform == "openbsd":

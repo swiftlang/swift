@@ -81,5 +81,5 @@ class Zlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SKIP_INSTALL_FILES', 'YES')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '/usr')
 
-        self.generate_toolchain_file(host_target)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
         self.build_with_cmake(["all"], self.args.zlib_build_variant, [])

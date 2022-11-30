@@ -411,14 +411,16 @@ class Product(object):
 
         return toolchain_file
 
-    def generate_toolchain_file(self, host_target):
+    def generate_toolchain_file_for_darwin_or_linux(self, host_target):
         """
         Checks `host_target` platform and generates a new CMake tolchain file
-        appropriate for that target plaftorm. Defines `CMAKE_C_FLAGS` and
-        `CMAKE_CXX_FLAGS` as CMake options. Also defines `CMAKE_TOOLCHAIN_FILE`
-        with the path of the generated toolchain file as a CMake option.
+        appropriate for that target plaftorm (either Darwin or Linux). Defines
+        `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS` as CMake options. Also defines
+        `CMAKE_TOOLCHAIN_FILE` with the path of the generated toolchain file
+        as a CMake option.
 
-            Returns: path to the newly generated toolchain file on the filesystem.
+            Returns: path to the newly generated toolchain file on the
+            filesystem.
         """
 
         (platform, arch) = host_target.split('-')
