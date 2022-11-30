@@ -944,14 +944,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
 
-    // TODO: Verify if we need to jump thread to remove releases in OSSA.
     // If the value being substituted on is release there is a chance we could
     // remove the release after jump threading.
-    if (!Arg->getType().isTrivial(*SrcBB->getParent()) &&
-        couldRemoveRelease(SrcBB, Arg, DestBB,
-                           DestBB->getArgument(i))) {
-        ThreadingBudget = 8;
-        break;
+    // In ossa, copy propagation can do this, avoid jump threading.
+    if (!Fn.hasOwnership() && !Arg->getType().isTrivial(*SrcBB->getParent()) &&
+        couldRemoveRelease(SrcBB, Arg, DestBB, DestBB->getArgument(i))) {
+      ThreadingBudget = 8;
+      break;
     }
 
     // If the value being substituted is an enum, check to see if there are any
