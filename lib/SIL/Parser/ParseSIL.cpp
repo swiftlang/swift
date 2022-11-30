@@ -4929,7 +4929,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       SILDeclRef Member;
       SILType MethodTy;
       SourceLoc TyLoc;
-      SmallVector<ValueDecl *, 4> values;
       if (parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
         return true;
@@ -6116,7 +6115,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     }
     case SILInstructionKind::HasSymbolInst: {
-      llvm_unreachable("unimplemented"); // FIXME: implement SIL parsing
+      // 'has_symbol' sil-decl-ref
+      SILDeclRef declRef;
+      if (parseSILDeclRef(declRef))
+        return true;
+
+      ResultVal = B.createHasSymbol(InstLoc, declRef.getDecl());
       break;
     }
 
