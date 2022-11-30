@@ -99,7 +99,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 #if defined(_WIN32)
   char szUndName[1024];
   DWORD dwResult;
-  dwResult = _swift_withWin32DbgHelpLibrary([&] (HANDLE hProcess) -> DWORD {
+  dwResult = _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) -> DWORD {
     if (!hProcess) {
       return 0;
     }

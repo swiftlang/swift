@@ -40,7 +40,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolAddress = dli_saddr;
   return 1;
 #elif defined(_WIN32)
-  return _swift_withWin32DbgHelpLibrary([&] (HANDLE hProcess) {
+  return _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) {
     static const constexpr size_t kSymbolMaxNameLen = 1024;
 
     if (!hProcess) {
@@ -71,7 +71,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 static LazyMutex mutex;
 static HANDLE dbgHelpHandle = nullptr;
 
-void swift::_swift_withWin32DbgHelpLibrary(
+void swift::_swift_win32_withDbgHelpLibrary(
   void (* body)(HANDLE hProcess, void *context), void *context) {
   mutex.withLock([=] () {
     // If we have not previously created a handle to use with the library, do so

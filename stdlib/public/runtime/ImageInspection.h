@@ -132,7 +132,7 @@ int lookupSymbol(const void *address, SymbolInfo *info);
 /// their old value before returning. \a body can also call \c SymSetOptions()
 /// if needed.
 SWIFT_RUNTIME_STDLIB_SPI
-void _swift_withWin32DbgHelpLibrary(
+void _swift_win32_withDbgHelpLibrary(
   void (* body)(HANDLE hProcess, void *context), void *context);
 
 /// Configure the environment to allow calling into the Debug Help library.
@@ -150,9 +150,9 @@ void _swift_withWin32DbgHelpLibrary(
 /// \c SymSetOptions() before \a body is invoked, and then resets them back to
 /// their old value before returning. \a body can also call \c SymSetOptions()
 /// if needed.
-static inline void _swift_withWin32DbgHelpLibrary(
+static inline void _swift_win32_withDbgHelpLibrary(
   const std::function<void(HANDLE /*hProcess*/)> &body) {
-  _swift_withWin32DbgHelpLibrary([](HANDLE hProcess, void *context) {
+  _swift_win32_withDbgHelpLibrary([](HANDLE hProcess, void *context) {
     auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
     (* bodyp)(hProcess);
   }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
@@ -180,10 +180,10 @@ template <
   typename R = typename std::result_of_t<F&(HANDLE /*hProcess*/)>,
   typename = typename std::enable_if_t<!std::is_same<void, R>::value>
 >
-static inline R _swift_withWin32DbgHelpLibrary(const F& body) {
+static inline R _swift_win32_withDbgHelpLibrary(const F& body) {
   R result;
 
-  _swift_withWin32DbgHelpLibrary([&body, &result] (HANDLE hProcess) {
+  _swift_win32_withDbgHelpLibrary([&body, &result] (HANDLE hProcess) {
     result = body(hProcess);
   });
 
