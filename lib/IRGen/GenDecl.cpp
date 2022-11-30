@@ -530,6 +530,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)         \
       addBackDeployLib(llvm::VersionTuple Version, LibraryName);
     #include "swift/Frontend/BackDeploymentLibs.def"
+
+    if (IRGen.Opts.AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary)
+      this->addLinkLibrary(LinkLibrary("swiftCompatibilityBytecodeLayouts",
+                                       LibraryKind::Library,
+                                       /*forceLoad*/ true));
   }
 }
 
