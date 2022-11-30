@@ -4,14 +4,14 @@
 
 @runtimeMetadata
 struct Flag<T> {
-  init(_: T.Type, description: String = "") {}
-  init(_: Any, description: String = "") {}
-  init<Base>(_: KeyPath<Base, T>, description: String = "") {}
+  init(attachedTo: T.Type, _ description: String = "") {}
+  init<Args>(attachedTo: (Args) -> T, _ description: String = "") {}
+  init<Base>(attachedTo: KeyPath<Base, T>, _ description: String = "") {}
 }
 
 @runtimeMetadata
 struct OnlyPropsTest<B, V> {
-  init(_: KeyPath<B, V>) {}
+  init(attachedTo: KeyPath<B, V>) {}
 }
 
 @Flag("global") func gloabalFn() {}
@@ -34,6 +34,10 @@ struct A { // Ok
   @Flag func genericFn<T>(_: T) {} // expected-error {{@Flag can only be applied to non-generic types, methods, instance properties, and global functions}}
 
   @OnlyPropsTest @Flag("x") var x: [Int]? = [] // Ok
+
+  class Inner {
+    @OnlyPropsTest @Flag("test property") var test: [Int]? = nil // Ok
+  }
 }
 
 struct Context<T> {

@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/LLVM.h"
@@ -34,7 +35,7 @@ ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
                            nullptr);
 }
 
-FuncDecl *
+Expr *
 ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
   auto *mutableSelf = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(
@@ -42,67 +43,140 @@ ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
       SynthesizeRuntimeMetadataAttrGenerator{attr, mutableSelf}, nullptr);
 }
 
-static BraceStmt *
-deriveGeneratorBody(FuncDecl *generator,
-                    std::pair<CustomAttr *, ValueDecl *> content) {
-  auto &ctx = generator->getASTContext();
+Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
+    Evaluator &evaluator, CustomAttr *attr, ValueDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
 
-  // return nil
-  ASTNode body = new (ctx) ReturnStmt(
-      SourceLoc(),
-      new (ctx) NilLiteralExpr(/*Loc=*/SourceLoc(), /*Implicit=*/true),
-      /*isImplicit=*/true);
+  auto *attrTypeDecl = evaluateOrDefault(
+      ctx.evaluator,
+      CustomAttrNominalRequest{attr, attachedTo->getDeclContext()}, nullptr);
 
-  return BraceStmt::create(ctx, /*lbloc=*/SourceLoc(), body,
-                           /*rbloc=*/SourceLoc(), /*implicit=*/true);
-}
-
-FuncDecl *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
-    Evaluator &evaluator, CustomAttr *attr, ValueDecl *parent) const {
-  auto &ctx = parent->getASTContext();
-
-  auto *attrType = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{attr, parent->getDeclContext()},
-      nullptr);
-
-  if (!attrType)
+  if (!attrTypeDecl)
     return nullptr;
 
-  assert(attrType->getAttrs().hasAttribute<RuntimeMetadataAttr>());
+  assert(attrTypeDecl->getAttrs().hasAttribute<RuntimeMetadataAttr>());
 
-  Mangle::ASTMangler mangler;
+  auto *initContext = new (ctx) RuntimeAttributeInitializer(attr, attachedTo);
 
-  SmallString<32> nameScratch;
+  Expr *initArgument = nullptr;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo)) {
+    // Registry attributes on protocols are only used for
+    // inference on conforming types.
+    if (isa<ProtocolDecl>(nominal))
+      return nullptr;
 
-  nameScratch.append("generator$");
-  nameScratch.append(mangler.mangleAnyDecl(attrType, /*prefix=*/false));
-  nameScratch.append("$");
-  nameScratch.append(mangler.mangleAnyDecl(parent, /*prefix=*/false));
+    // Form an initializer call passing in the metatype
+    auto *metatype = TypeExpr::createImplicit(nominal->getDeclaredType(), ctx);
+    initArgument = new (ctx)
+        DotSelfExpr(metatype, /*dot=*/SourceLoc(), /*self=*/SourceLoc());
+  } else if (auto *func = dyn_cast<FuncDecl>(attachedTo)) {
+    if (auto *nominal = func->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto *baseExpr =
+          TypeExpr::createImplicit(nominal->getDeclaredInterfaceType(), ctx);
 
-  DeclName generatorName(ctx, ctx.getIdentifier(nameScratch.str()),
-                         /*argumentNames=*/ArrayRef<Identifier>());
+      // Form an initializer call passing in the function reference
+      initArgument = new (ctx) MemberRefExpr(baseExpr, /*dotLoc=*/SourceLoc(),
+                                             {func}, /*loc=*/DeclNameLoc(),
+                                             /*Implicit=*/true);
+    } else {
+      initArgument = new (ctx)
+          DeclRefExpr({func}, /*Loc=*/DeclNameLoc(), /*implicit=*/true);
+    }
+  } else {
+    auto *var = cast<VarDecl>(attachedTo);
+    assert(!var->isStatic());
 
-  auto resultType = OptionalType::get(attrType->getInterfaceType());
+    auto *keyPath =
+        KeyPathExpr::createImplicit(ctx, /*backslashLoc=*/SourceLoc(),
+                                    {KeyPathExpr::Component::forProperty(
+                                        {var}, var->getValueInterfaceType(),
+                                        /*Loc=*/SourceLoc())},
+                                    /*endLoc=*/SourceLoc());
 
-  // () -> Optional<<#Attribute#>>
-  auto *generator = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, generatorName, /*NameLoc=*/SourceLoc(),
-      /*Async=*/false,
-      /*Throws=*/false,
-      /*GenericParams=*/nullptr, ParameterList::createEmpty(ctx), resultType,
-      /*DC=*/parent->getDeclContext()->getParentSourceFile());
+    // Build a type repr for base of the key path, since attribute
+    // could be attached to an inner type, we need to go up decl
+    // contexts and add every parent type.
+    {
+      SmallVector<ComponentIdentTypeRepr *, 2> baseNameComponents;
 
-  generator->setSynthesized(true);
-  generator->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/false);
+      auto *DC = var->getDeclContext();
+      while (!DC->isModuleContext()) {
+        auto *NTD = DC->getSelfNominalTypeDecl();
+        // Only contiguous chains of nominals and extensions thereof.
+        if (!NTD)
+          break;
 
-  ASTNode body = deriveGeneratorBody(generator, std::make_pair(attr, parent));
-  if (!body)
+        auto *component = new (ctx) SimpleIdentTypeRepr(
+            /*Loc=*/DeclNameLoc(), NTD->createNameRef());
+
+        // Resolve the component right away, instead of
+        // involving name lookup. This plays well with
+        // the fact that initializer is anchored on a
+        // source file.
+        component->setValue(NTD, NTD->getDeclContext());
+
+        baseNameComponents.push_back(component);
+        DC = NTD->getDeclContext();
+      }
+
+      // Reverse the components to form a valid outer-to-inner name sequence.
+      std::reverse(baseNameComponents.begin(), baseNameComponents.end());
+
+      // Set the 'root' of the key path to the newly build base name.
+      // We cannot do this via `parsedRoot` because it has strict
+      // rules about leading-dot.
+      TypeRepr *rootName = nullptr;
+      if (baseNameComponents.size() == 1) {
+        rootName = baseNameComponents.front();
+      } else {
+        rootName = CompoundIdentTypeRepr::create(ctx, baseNameComponents);
+      }
+
+      keyPath->setRootType(rootName);
+    }
+
+    initArgument = keyPath;
+  }
+
+  auto reprRange = SourceRange();
+  if (auto *repr = attr->getTypeRepr())
+    reprRange = repr->getSourceRange();
+
+  auto attrTy = attrTypeDecl->getDeclaredInterfaceType();
+  // Drop all of the generic parameters from the type and
+  // let type-checker open them while solving.
+  attrTy = attrTy.transform([&](Type type) -> Type {
+    if (auto *BGT = type->getAs<BoundGenericType>()) {
+      return UnboundGenericType::get(BGT->getDecl(), BGT->getParent(), ctx);
+    }
+    return type;
+  });
+
+  auto typeExpr = TypeExpr::createImplicitHack(reprRange.Start, attrTy, ctx);
+
+  // Add the initializer argument at the front of the argument list
+  SmallVector<Argument, 4> newArgs;
+  newArgs.push_back({/*loc=*/SourceLoc(), ctx.Id_attachedTo, initArgument});
+  if (auto *attrArgs = attr->getArgs())
+    newArgs.append(attrArgs->begin(), attrArgs->end());
+
+  ArgumentList *argList = ArgumentList::createImplicit(ctx, reprRange.Start,
+                                                       newArgs, reprRange.End);
+  Expr *init = CallExpr::createImplicit(ctx, typeExpr, argList);
+
+  // result of generator is an optional always.
+  Expr *result = CallExpr::createImplicit(
+      ctx,
+      new (ctx) DeclRefExpr({ctx.getOptionalDecl()}, /*Loc=*/DeclNameLoc(),
+                            /*implicit=*/true),
+      ArgumentList::forImplicitSingle(ctx, /*label=*/Identifier(), init));
+
+  auto resultTy = TypeChecker::typeCheckExpression(result, initContext);
+  if (!resultTy)
     return nullptr;
 
-  TypeChecker::typeCheckASTNode(body, generator);
+  TypeChecker::contextualizeInitializer(initContext, result);
+  TypeChecker::checkInitializerEffects(initContext, result);
 
-  generator->setBody(cast<BraceStmt>(body.get<Stmt *>()),
-                     FuncDecl::BodyKind::TypeChecked);
-
-  return generator;
+  return result;
 }

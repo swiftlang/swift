@@ -3814,7 +3814,7 @@ public:
 
 class SynthesizeRuntimeMetadataAttrGenerator
     : public SimpleRequest<SynthesizeRuntimeMetadataAttrGenerator,
-                           FuncDecl *(CustomAttr *, ValueDecl *),
+                           Expr *(CustomAttr *, ValueDecl *),
                            RequestFlags::Cached> {
 
 public:
@@ -3823,8 +3823,8 @@ public:
 private:
   friend SimpleRequest;
 
-  FuncDecl *evaluate(Evaluator &evaluator, CustomAttr *attr,
-                     ValueDecl *parent) const;
+  Expr *evaluate(Evaluator &evaluator, CustomAttr *attr,
+                 ValueDecl *attachedTo) const;
 
 public:
   bool isCached() const { return true; }

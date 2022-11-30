@@ -450,7 +450,7 @@ SWIFT_REQUEST(TypeChecker, MacroDefinitionRequest,
               MacroDefinition(MacroDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
-              FuncDecl *(CustomAttr *, ValueDecl *),
+              Expr *(CustomAttr *, ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetRuntimeDiscoverableAttributes,
               ArrayRef<CustomAttr *>(ValueDecl *),
