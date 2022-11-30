@@ -29,7 +29,7 @@ namespace swift {
 // Never returns nil. The returned memory is uninitialized. 
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
-SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 void *swift_slowAlloc(size_t bytes, size_t alignMask);
 
 // If the caller cannot promise to zero the object during destruction,
