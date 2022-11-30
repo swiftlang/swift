@@ -2373,6 +2373,14 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto attrInit = cast<RuntimeAttributeInitializer>(ctx);
+
+      auto *decl = attrInit->getAttachedToDecl();
+      appendRuntimeAttributeGeneratorEntity(decl, attrInit->getAttr());
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
 
