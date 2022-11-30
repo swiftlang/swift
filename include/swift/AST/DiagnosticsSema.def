@@ -177,8 +177,9 @@ ERROR(cannot_pass_rvalue_mutating_getter,none,
       (Type))
 
 ERROR(expression_too_complex,none,
-      "the compiler is unable to type-check this expression in reasonable time; please file a bug report "
-      "try breaking up the expression into distinct sub-expressions", ())
+      "the compiler is unable to type-check this expression in reasonable time ",
+      SWIFT_BUG_REPORT_MESSAGE,
+      " try breaking up the expression into distinct sub-expressions ", ())
 
 ERROR(value_type_comparison_with_nil_illegal_did_you_mean,none,
       "value of type %0 cannot be compared by reference; "
