@@ -74,4 +74,9 @@ if (SWIFT_SWIFT_PARSER)
   )
 endif()
 
+if(SWIFT_COMPILER_VERSION)
+  set_property(SOURCE ParseVersion.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DSWIFT_COMPILER_VERSION=\"\\\"${SWIFT_COMPILER_VERSION}\\\"\"")
+endif()
+
 set_swift_llvm_is_available(swiftParse)
