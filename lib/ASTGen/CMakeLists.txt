@@ -114,8 +114,24 @@ if (SWIFT_SWIFT_PARSER)
     )
   endforeach()
 
+  # Copy all of the Swift modules from earlyswiftsyntax so they can be found
+  # in the same relative place within the build directory as in the final
+  # toolchain.
+  list(TRANSFORM SWIFT_SYNTAX_MODULES APPEND ".swiftmodule"
+       OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
+  foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
+    file(GLOB module_files
+         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swift*")
+    add_custom_command(
+      TARGET swiftASTGen PRE_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${module_files} ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}/
+      COMMENT "Copying ${module_dir}"
+    )
+  endforeach()
+
   target_include_directories(swiftASTGen PUBLIC
-    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
+    ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR})
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()
