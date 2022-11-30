@@ -3659,6 +3659,14 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }
 
+std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
+    const ValueDecl *decl, CustomAttr *attr, SymbolKind SKind) {
+  beginMangling();
+  appendRuntimeAttributeGeneratorEntity(decl, attr);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
                                           ParameterizedProtocolType *PPT) {
   auto protoTy = PPT->getBaseType();
@@ -3715,4 +3723,14 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
     }
   }
   return appendOperator("XP");
+}
+
+void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                                       CustomAttr *attr) {
+  auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
+
+  appendEntity(decl, "vp", decl->isStatic());
+  appendOperator("fa");
+  appendContextOf(attrType);
+  appendDeclName(attrType);
 }

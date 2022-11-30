@@ -575,6 +575,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::RuntimeAttributeGenerator:
       if (!fullSubstitutionMap)
         break;
 
@@ -3582,6 +3583,15 @@ Remangler::mangleRuntimeDiscoverableAttributeRecord(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleRuntimeAttributeGenerator(Node *node,
+                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  Buffer << "fa";
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  return mangleChildNode(node, 2, depth + 1);
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
@@ -3657,6 +3667,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::RuntimeAttributeGenerator:
     case Node::Kind::Getter:
     case Node::Kind::Setter:
     case Node::Kind::WillSet:
@@ -3702,6 +3713,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::RuntimeAttributeGenerator:
     case Node::Kind::Static:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;

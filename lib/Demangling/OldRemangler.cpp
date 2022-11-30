@@ -2885,3 +2885,9 @@ Remangler::mangleRuntimeDiscoverableAttributeRecord(Node *node,
   Buffer << "Ha";
   return ManglingError::Success;
 }
+
+ManglingError Remangler::mangleRuntimeAttributeGenerator(Node *node,
+                                                         EntityContext &ctx,
+                                                         unsigned depth) {
+  return mangleSimpleEntity(node, 'I', "a", ctx, depth + 1);
+}

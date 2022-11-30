@@ -1751,6 +1751,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::RuntimeAttributeGenerator:
       return false;
     default:
       return true;
@@ -3530,7 +3531,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     None,
     TypeAndMaybePrivateName,
     TypeAndIndex,
-    Index
+    Index,
+    ContextAndName,
   } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
@@ -3547,6 +3549,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
+    case 'a':
+      Args = ContextAndName;
+      Kind = Node::Kind::RuntimeAttributeGenerator;
+      break;
     case 'm': return demangleEntity(Node::Kind::Macro);
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     case 'P':
@@ -3560,7 +3566,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     default: return nullptr;
   }
 
-  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr;
+  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr,
+              Context = nullptr, Id = nullptr;
   switch (Args) {
     case None:
       break;
@@ -3575,6 +3582,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       break;
     case Index:
       NameOrIndex = demangleIndexAsNode();
+      break;
+    case ContextAndName:
+      Context = demangleOperator();
+      Id = demangleOperator();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -3592,6 +3603,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case TypeAndIndex:
       Entity = addChild(Entity, NameOrIndex);
       Entity = addChild(Entity, ParamType);
+      break;
+    case ContextAndName:
+      Entity = addChild(Entity, Context);
+      Entity = addChild(Entity, Id);
       break;
   }
   return Entity;

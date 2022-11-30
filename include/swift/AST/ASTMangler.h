@@ -361,6 +361,10 @@ public:
 
   std::string mangleHasSymbolQuery(const ValueDecl *decl);
 
+  std::string
+  mangleRuntimeAttributeGeneratorEntity(const ValueDecl *decl, CustomAttr *attr,
+                                        SymbolKind SKind = SymbolKind::Default);
+
   enum SpecialContext {
     ObjCContext,
     ClangImporterContext,
@@ -585,6 +589,9 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
+
+  void appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                             CustomAttr *attr);
 };
 
 } // end namespace Mangle
