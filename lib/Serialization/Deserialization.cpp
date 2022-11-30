@@ -5306,7 +5306,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       // Do a quick check to see if this attribute is a move only attribute. If
       // so, emit a nice error if we don't have experimental move only enabled.
-      if (Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
+      if (Attr && Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
           !MF.getContext().LangOpts.Features.contains(Feature::MoveOnly)) {
         MF.getContext().Diags.diagnose(
             SourceLoc(),
