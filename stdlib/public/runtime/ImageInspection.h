@@ -153,7 +153,7 @@ void _swift_win32_withDbgHelpLibrary(
 static inline void _swift_win32_withDbgHelpLibrary(
   const std::function<void(HANDLE /*hProcess*/)> &body) {
   _swift_win32_withDbgHelpLibrary([](HANDLE hProcess, void *context) {
-    auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
+    auto bodyp = reinterpret_cast<std::function<void(HANDLE)> *>(context);
     (* bodyp)(hProcess);
   }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
 }
