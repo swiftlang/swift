@@ -74,7 +74,7 @@ The existing Swift to Objective-C bridging layer should still be supported even 
 
 The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift functions that use the native Swift calling convention. The header also provides a suitable representation for Swift types. Typically, a single header file is generated for one Swift module.
 
-Currently the generated header file depends on several LLVM and Clang compiler features for the Swift calling convention support, and thus it can only be compiled by Clang. The header does not depend on any other Clang-specific C++ language extensions. The header might depend on some other Clang-only features that improve developer experience for the C++ users, like specific attributes that improve diagnostics.
+Currently the generated header file depends on several LLVM and Clang compiler features for the Swift calling convention support, and thus it can only be compiled by Clang. The header does not depend on any other Clang-specific C++ language extensions. The header can use some other optional Clang-only features that improve developer experience for the C++ users, like specific attributes that improve diagnostics. These Clang-only features are enabled only when the Clang that is being used supports them, so older versions of Clang would still be able to consume the generated header.
 
 The generated header file uses advanced C++ features that require a recent C++ language standard. C++20 is the recommended language standard to use for Swift APIs, however, the generated header should also be compatible with C++17 and C++14.
 
