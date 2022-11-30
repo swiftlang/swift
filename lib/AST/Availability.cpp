@@ -230,6 +230,14 @@ bool Decl::isSemanticallyUnavailable() const {
   return evaluateOrDefault(eval, IsSemanticallyUnavailableRequest{this}, false);
 }
 
+bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
+    ASTContext &Ctx) const {
+  return RequiredDeploymentRange.getLowerEndpoint() <=
+         AvailabilityContext::forDeploymentTarget(Ctx)
+             .getOSVersion()
+             .getLowerEndpoint();
+}
+
 AvailabilityContext
 AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
                                                       ASTContext &ctx) {
