@@ -32,7 +32,7 @@ int main() {
   NSString *nsStr = emptyString;
 }
 
-// CHECKARC: %[[VAL:.*]] = call swiftcc i8* @"$sSS23_bridgeToObjectiveCImplyXlyF"
+// CHECKARC: %[[VAL:.*]] = call swiftcc i8* @"$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"
 // CHECKARC: call i8* @llvm.objc.autorelease(i8* %[[VAL]])
 // CHECKARC: @llvm.objc.
 // CHECKARC-SAME: autorelease(i8*)
