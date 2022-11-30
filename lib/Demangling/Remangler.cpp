@@ -980,6 +980,7 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
                                                         unsigned depth) {
   DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Node *ProtoOrClass = node->getChild(1);
+  DEMANGLER_ASSERT(ProtoOrClass->hasChildren(), ProtoOrClass);
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     RETURN_IF_ERROR(manglePureProtocol(ProtoOrClass, depth + 1));
     auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
