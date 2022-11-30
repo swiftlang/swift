@@ -329,17 +329,21 @@ private:
 
   const Metadata *successType;
 
+  /// If true, this group will never accumulate results,
+  /// and release tasks as soon as they complete.
+  const bool discardResults;
+
   friend class ::swift::AsyncTask;
 
 public:
-  const bool eagerlyReleaseCompleteTasks;
-  explicit TaskGroupImpl(const Metadata *T, bool eagerlyReleaseCompleteTasks)
+
+  explicit TaskGroupImpl(const Metadata *T, bool discardResults)
     : TaskGroupTaskStatusRecord(),
       status(GroupStatus::initial().status),
       readyQueue(),
       waitQueue(nullptr),
       successType(T),
-      eagerlyReleaseCompleteTasks(eagerlyReleaseCompleteTasks) {}
+      discardResults(discardResults) {}
 
   TaskGroupTaskStatusRecord *getTaskRecord() {
     return reinterpret_cast<TaskGroupTaskStatusRecord *>(this);
@@ -347,6 +351,10 @@ public:
 
   /// Destroy the storage associated with the group.
   void destroy();
+
+  bool isDiscardingResults() const {
+    return this->discardResults;
+  }
 
   bool isEmpty() {
     auto oldStatus = GroupStatus{status.load(std::memory_order_relaxed)};
@@ -499,9 +507,18 @@ TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
+  fprintf(stderr, "[%s:%d](%s) INITIALIZE...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  swift_taskGroup_initializeWithFlags(0, group, T);
+}
+
+// Initializes into the preallocated _group an actual TaskGroupImpl.
+SWIFT_CC(swift)
+static void swift_taskGroup_initializeWithFlagsImpl(size_t flags, TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T, /*eagerlyReleaseCompleteTasks=*/true);
+  fprintf(stderr, "[%s:%d](%s) INITIALIZE FLAGS: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, flags);
+
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T, /*discardResults=*/true);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
@@ -556,12 +573,15 @@ static void swift_taskGroup_destroyImpl(TaskGroup *group) {
 }
 
 void TaskGroupImpl::destroy() {
-  SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
+#if SWIFT_TASK_DEBUG_LOG_ENABLED
   if (!this->isEmpty()) {
     auto status = this->statusLoadRelaxed();
     SWIFT_TASK_DEBUG_LOG("destroying task group = %p, tasks .ready = %d, .pending = %d",
                          this, status.readyTasks(), status.pendingTasks());
+  } else {
+    SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
   }
+#endif
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
 
   // First, remove the group from the task and deallocate the record
@@ -600,6 +620,14 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
   }
 
   case PollStatus::Success: {
+    // Initialize the result as an Optional<Success>.
+    const Metadata *successType = result.successType;
+    OpaqueValue *destPtr = context->successResultPointer;
+    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    return;
+  }
+
+  case PollStatus::Empty: {
     // Initialize the result as an Optional<Success>.
     const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
@@ -646,7 +674,7 @@ static void fillGroupNextVoidResult(TaskFutureWaitAsyncContext *context,
 
 // TaskGroup is locked upon entry and exit
 void TaskGroupImpl::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
-  if (this->eagerlyReleaseCompleteTasks) {
+  if (this->discardResults) {
     SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, eager release mode; release result task = %p",
                          completedTask);
     // DO NOT RETAIN THE TASK.
@@ -862,7 +890,7 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::Success:
     SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
                          group, waitingTask, polled.retainedTask);
-    if (group->eagerlyReleaseCompleteTasks) {
+    if (group->isDiscardingResults()) {
       fillGroupNextVoidResult(context, polled);
     } else {
       fillGroupNextResult(context, polled);
@@ -935,7 +963,7 @@ reevaluate_if_taskgroup_has_results:;
 
       // Success! We are allowed to poll.
       ReadyQueueItem item;
-      if (this->eagerlyReleaseCompleteTasks) {
+      if (this->discardResults) {
         SWIFT_TASK_DEBUG_LOG("poll group = %p; polled in eager-release mode; make up Void value to yield",
                              this, assumed.readyTasks(), assumed.pendingTasks());
         result.status = PollStatus::Success;

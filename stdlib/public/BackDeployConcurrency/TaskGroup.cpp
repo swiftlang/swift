@@ -469,7 +469,7 @@ TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
-static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
+static void swift_taskGroup_initializeWithFlagsImpl(size_t flags, TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
   TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
@@ -482,6 +482,12 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
   // If the task has already been cancelled, reflect that immediately in
   // the group status.
   if (!notCancelled) impl->statusCancel();
+}
+
+// Initializes into the preallocated _group an actual TaskGroupImpl.
+SWIFT_CC(swift)
+static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
+  swift_taskGroup_initializeWithFlagsImpl(0, group, T);
 }
 
 // =============================================================================
@@ -564,29 +570,11 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
   }
 }
 
-static void fillGroupNextVoidResult(TaskFutureWaitAsyncContext *context,
-                                PollResult result) {
-  /// Fill in the result value
-  switch (result.status) {
-  case PollStatus::MustWait:
-    assert(false && "filling a waiting status?");
-    return;
-
-  case PollStatus::Error: {
-    assert(false && "this type of task group cannot throw");
-    return;
-  }
-
-  case PollStatus::Success:
-  case PollStatus::Empty: {
-    // "Success" type is guaranteed to be Void
-    // Initialize the result as a nil Optional<Success>.
-    const Metadata *successType = result.successType;
-    OpaqueValue *destPtr = context->successResultPointer;
-    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
-    return;
-  }
-  }
+static void fillGroupNextNilResult(TaskFutureWaitAsyncContext *context) {
+  /// Fill in the result value with 'nil'
+  const Metadata *successType = result.successType;
+  OpaqueValue *destPtr = context->successResultPointer;
+  successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
 }
 
 void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
@@ -641,8 +629,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
             static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
 
-        if (this->eagerlyReleaseCompleteTasks) {
-          fprintf(stderr, "[%s:%d](%s) offer: eagerlyReleaseCompleteTasks\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+        if (isDiscardingResults()) {
+          fprintf(stderr, "[%s:%d](%s) offer: discardResults\n", __FILE_NAME__, __LINE__, __FUNCTION__);
           fillGroupNextResult(waitingContext, result);
         } else {
           fprintf(stderr, "[%s:%d](%s) offer: NOT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
@@ -667,7 +655,14 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   // queue when a task polls during next() it will notice that we have a value
   // ready for it, and will process it immediately without suspending.
   assert(!waitQueue.load(std::memory_order_relaxed));
-  if (!this->eagerlyReleaseCompleteTasks) {
+  if (isDiscardingResults()) {
+    // DO NOT retain the task; and do not store the value in the readyQueue at all (!)
+    //
+    // In the "eagerlyRelease" completed tasks mode, we are guaranteed that tasks are of Void type,
+    // and thus there is no necessity to store values, because we can always "make them up" when polled.
+    // From the user's perspective, it is indistinguishable if they received the "real value" or one we "made up",
+    // because Void is always the same, and cannot be examined in any way to determine if it was the "actual" Void or not.
+  } else {
     SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, RETAIN and store ready task = %p",
                          completedTask);
     // Retain the task while it is in the queue;
@@ -682,14 +677,6 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     assert(completedTask == readyItem.getTask());
     assert(readyItem.getTask()->isFuture());
     readyQueue.enqueue(readyItem);
-  } else {
-    assert(this->eagerlyReleaseCompleteTasks);
-    // DO NOT retain the task; and do not store the value in the readyQueue at all (!)
-    //
-    // In the "eagerlyRelease" completed tasks mode, we are guaranteed that tasks are of Void type,
-    // and thus there is no necessity to store values, because we can always "make them up" when polled.
-    // From the user's perspective, it is indistinguishable if they received the "real value" or one we "made up",
-    // because Void is always the same, and cannot be examined in any way to determine if it was the "actual" Void or not.
   }
 
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -727,6 +714,16 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_t
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 
 SWIFT_CC(swiftasync)
+static void swift_taskGroup_wait_next_discardResultsImpl(
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroupImpl *group,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    AsyncContext *rawContext,
+    AsyncTask *waitingTask) {
+
+}
+
+SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
@@ -736,15 +733,20 @@ static void swift_taskGroup_wait_next_throwingImpl(
   waitingTask->ResumeTask = task_group_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
+  auto group = asImpl(_group);
+  assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
+
+  if (group->discardResults) {
+    return swift_taskGroup_wait_next_discardResultsImpl(
+        callerContext, group, resumeFunction, rawContext, waitingTask)
+  }
+
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   context->ResumeParent =
       reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
   context->Parent = callerContext;
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
-
-  auto group = asImpl(_group);
-  assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
 
   PollResult polled = group->poll(waitingTask);
   switch (polled.status) {
@@ -765,8 +767,8 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::Success:
     SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
                          group, waitingTask, polled.retainedTask);
-    if (this->eagerlyReleaseCompleteTasks) {
-      fillGroupNextVoidResult(context, polled);
+    if (isDiscardingResults()) {
+      fillGroupNextNilResult(context);
     } else {
       fillGroupNextResult(context, polled);
     }

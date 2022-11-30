@@ -205,6 +205,17 @@ void swift_taskGroup_wait_next_throwing(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 
+/// Initialize a `TaskGroup` in the passed `group` memory location.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_initialize(flags: Int, group: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group, const Metadata *T);
+
 /// Attach a child task to the parent task's task group record.
 ///
 /// This function MUST be called from the AsyncTask running the task group.

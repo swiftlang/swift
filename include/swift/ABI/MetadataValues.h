@@ -2383,6 +2383,30 @@ enum class TaskOptionRecordKind : uint8_t {
   RunInline = UINT8_MAX,
 };
 
+/// Flags for TaskGroup.
+class TaskGroupFlags : public FlagSet<uint32_t> {
+public:
+  enum {
+    // 8 bits are un-used, in case we want to introduce a Kind here
+
+    TaskGroup_DiscardResults = 8,
+  };
+
+  explicit TaskGroupFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr TaskGroupFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(TaskGroup_DiscardResults,
+                                task_isDiscardResults,
+                                task_setIsDiscardResults)
+};
+
+/// Kinds of task group option records that can be passed to creating a task group.
+enum class TaskGroupOptionRecordKind : uint8_t {
+  /// Request that the task group immediately releases completed tasks,
+  /// and discard their results.
+  DiscardResults  = 0,
+};
+
 /// Flags for cancellation records.
 class TaskStatusRecordFlags : public FlagSet<size_t> {
 public:
@@ -2416,6 +2440,24 @@ public:
   }
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, TaskOptionRecordKind,
+                                 getKind, setKind)
+};
+
+/// Flags for task group option records.
+class TaskGroupOptionRecordFlags : public FlagSet<size_t> {
+public:
+  enum {
+    Kind           = 0,
+    Kind_width     = 8,
+  };
+
+  explicit TaskGroupOptionRecordFlags(size_t bits) : FlagSet(bits) {}
+  constexpr TaskGroupOptionRecordFlags() {}
+  TaskGroupOptionRecordFlags(TaskGroupOptionRecordKind kind) {
+    setKind(kind);
+  }
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, TaskGroupOptionRecordKind,
                                  getKind, setKind)
 };
 

@@ -17,6 +17,33 @@ import Darwin
 
 // ==== TaskGroup --------------------------------------------------------------
 
+@available(SwiftStdlib 5.8, *)
+public protocol TaskGroupAdd {
+  associatedtype ChildTaskResult: Sendable
+
+  mutating func addTask(
+          priority: TaskPriority?,
+          operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  )
+
+  mutating func addTask(
+          priority: TaskPriority?,
+          operation: __owned @Sendable @escaping (inout any TaskGroupAdd) async -> ChildTaskResult
+  )
+
+  // TODO: unless cancelled versions
+
+}
+
+@available(SwiftStdlib 5.8, *)
+public protocol TaskGroupConsume {
+  associatedtype ChildTaskResult: Sendable
+
+  mutating func next() async -> ChildTaskResult?
+}
+
+// TODO: throwing versions
+
 /// Starts a new scope that can contain a dynamic number of child tasks.
 ///
 /// A group waits for all of its child tasks
@@ -92,18 +119,23 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.8, *)
 @_unsafeInheritExecutor
 @inlinable
-public func withTaskGroupSuper<GroupResult>(
-  of childTaskResultType: Void.Type = Void.self,
+public func withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
-  body: (inout TaskGroup<Void>) async -> GroupResult
+  discardResults: Bool,
+  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
   #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
 
-  let _group = Builtin.createTaskGroup(Void.self)
-  var group = TaskGroup<Void>(group: _group)
+  let flags = taskGroupCreateFlags(
+    discardResults: discardResults
+  )
+
+  let _group = Builtin.createTaskGroupWithFlags(flags, ChildTaskResult.self)
+  var group = TaskGroup<ChildTaskResult>(group: _group)
 
   // Run the withTaskGroup body.
   let result = await body(&group)
@@ -1119,3 +1151,46 @@ enum PollStatus: Int {
 func _taskGroupIsEmpty(
   _ group: Builtin.RawPointer
 ) -> Bool
+
+
+// ==== TaskGroup Flags --------------------------------------------------------------
+
+/// Flags for task groups.
+///
+/// This is a port of the C++ FlagSet.
+@available(SwiftStdlib 5.8, *)
+struct TaskGroupFlags {
+  /// The actual bit representation of these flags.
+  var bits: Int32 = 0
+
+  /// The priority given to the job.
+  var discardResults: Bool? {
+    get {
+      let value = (Int(bits) & 1 << 8)
+
+      return value > 0
+    }
+
+    set {
+      if newValue == true {
+        bits = bits | 1 << 8
+      } else {
+        bits = (bits & ~(1 << 8))
+      }
+    }
+  }
+}
+
+// ==== Task Creation Flags --------------------------------------------------
+
+/// Form task creation flags for use with the createAsyncTask builtins.
+@available(SwiftStdlib 5.8, *)
+@_alwaysEmitIntoClient
+func taskGroupCreateFlags(
+        discardResults: Bool) -> Int {
+  var bits = 0
+  if discardResults {
+    bits |= 1 << 8
+  }
+  return bits
+}

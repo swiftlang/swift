@@ -40,12 +40,11 @@ actor Waiter {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
 func test_taskGroup_void_neverConsume() async {
-  let until = 100_000_000
+  let until = 100
   let waiter = Waiter(until: until)
 
-  let allTasks = await withTaskGroupSuper(of: Void.self, returning: Int.self) { group in
+  let allTasks = await withTaskGroup(of: Void.self, discardResults: true) { group in
     for n in 1...until {
     fputs("> enqueue: \(n)\n", stderr);
       group.addTask {
@@ -55,7 +54,8 @@ func test_taskGroup_void_neverConsume() async {
       }
     }
 
-    let void = await next()
+    let none = await group.next()
+    precondition(none == nil, "discardResults group must always return `nil` from next()")
 
     // wait a little bit, so some tasks complete before we hit the implicit "wait at end of task group scope"
     try? await Task.sleep(until: .now + .milliseconds(500), clock: .continuous)
@@ -68,7 +68,6 @@ func test_taskGroup_void_neverConsume() async {
   print("actor: \(allTasks)")
 }
 
-@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_void_neverConsume()

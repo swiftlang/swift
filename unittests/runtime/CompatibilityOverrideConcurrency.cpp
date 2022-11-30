@@ -185,6 +185,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {
   swift_taskGroup_initialize(nullptr, nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initializeWithFlags) {
+  swift_taskGroup_initializeWithFlags(0, nullptr, nullptr);
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_attachChild) {
   swift_taskGroup_attachChild(nullptr, nullptr);
 }
