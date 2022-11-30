@@ -57,19 +57,20 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-// This is temporarily used for testing until Swift 5.5 branches to reduce risk.
-llvm::cl::opt<bool> EnableOSSASimplifyCFG(
-    "enable-ossa-simplify-cfg",
-    llvm::cl::desc(
-        "Enable non-trivial OSSA simplify-cfg and simple jump threading "
-        "(staging)."));
+llvm::cl::opt<bool> EnableOSSACheckedCastBrJumpThreading(
+    "enable-ossa-checked-cast-br-jump-threading",
+    llvm::cl::desc("Enable OSSA checked cast branch jump threading "
+                   "(staging)."), llvm::cl::init(true));
 
-// This requires new OwnershipOptUtilities which aren't well tested yet.
-llvm::cl::opt<bool> EnableOSSARewriteTerminator(
-    "enable-ossa-rewriteterminator",
-    llvm::cl::desc(
-        "Enable OSSA simplify-cfg with non-trivial terminator rewriting "
-        "(staging)."));
+llvm::cl::opt<bool> EnableOSSASimpleJumpThreading(
+    "enable-ossa-simple-jump-threading",
+    llvm::cl::desc("Enable OSSA simple jump threading (staging)."),
+    llvm::cl::init(true));
+
+llvm::cl::opt<bool> EnableOSSADominatorBasedSimplify(
+    "enable-ossa-dominator-based-simplify",
+    llvm::cl::desc("Enable OSSA dominator based simplifications (staging)."),
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> IsInfiniteJumpThreadingBudget(
     "sil-infinite-jump-threading-budget",
@@ -535,7 +536,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // Get the dominator tree.
   DT = DA->get(&Fn);
 
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
+  if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
     return false;
 
   // Split all critical edges such that we can move code onto edges. This is
@@ -559,7 +560,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
     if (tryCheckedCastBrJumpThreading(&Fn, DT, deBlocks, BlocksForWorklist,
-                                      EnableOSSARewriteTerminator)) {
+                                      EnableOSSACheckedCastBrJumpThreading)) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
 
@@ -906,19 +907,13 @@ static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr)
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
+  if (!EnableOSSASimpleJumpThreading && Fn.hasOwnership())
     return false;
 
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
   TermInst *destTerminator = DestBB->getTerminator();
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (llvm::any_of(DestBB->getArguments(), [this](SILValue op) {
-          return !op->getType().isTrivial(Fn);
-        })) {
-      return false;
-   }
-  }
+
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
   if (destTerminator->isFunctionExiting())
@@ -3056,8 +3051,9 @@ RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
                             llvm::cl::init(true));
 
 bool ArgumentSplitter::split() {
-  if (!EnableOSSARewriteTerminator && Arg->getFunction()->hasOwnership()) {
-    // TODO: OSSA phi support
+  if (Arg->getFunction()->hasOwnership()) {
+    // TODO: Disable for non trivial args in OSSA. Needs additional support for
+    // creating projections in OSSA.
     if (!Arg->getType().isTrivial(*Arg->getFunction()))
       return false;
   }
