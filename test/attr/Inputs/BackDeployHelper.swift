@@ -140,6 +140,7 @@ extension IntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
@@ -180,6 +181,7 @@ extension ReferenceIntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public final subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
