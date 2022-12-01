@@ -17,6 +17,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -34,6 +35,24 @@ struct PackTypeParameterCollector: TypeWalker {
   Action walkToTypePre(Type t) override {
     if (t->is<PackExpansionType>())
       return Action::SkipChildren;
+
+    if (auto *boundGenericType = dyn_cast<BoundGenericType>(t.getPointer())) {
+      if (auto parentType = boundGenericType->getParent())
+        parentType.walk(*this);
+
+      Type(boundGenericType->getExpandedGenericArgsPack()).walk(*this);
+      return Action::SkipChildren;
+    }
+
+    if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
+      if (typeAliasType->getDecl()->isGeneric()) {
+        if (auto parentType = typeAliasType->getParent())
+          parentType.walk(*this);
+
+        Type(typeAliasType->getExpandedGenericArgsPack()).walk(*this);
+        return Action::SkipChildren;
+      }
+    }
 
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
       if (paramTy->isParameterPack())
@@ -347,4 +366,52 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
   subMap.dump(llvm::errs());
   dump(llvm::errs());
   abort();
+}
+
+/// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
+PackType *BoundGenericType::getExpandedGenericArgsPack() {
+  // It would be nicer to use genericSig.getInnermostGenericParams() here,
+  // but that triggers a request cycle if we're in the middle of computing
+  // the generic signature already.
+  SmallVector<Type, 2> params;
+  for (auto *paramDecl : getDecl()->getGenericParams()->getParams()) {
+    params.push_back(paramDecl->getDeclaredInterfaceType());
+  }
+
+  return PackType::get(getASTContext(),
+                       TypeArrayView<GenericTypeParamType>(params),
+                       getGenericArgs());
+}
+
+/// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
+PackType *TypeAliasType::getExpandedGenericArgsPack() {
+  if (!getDecl()->isGeneric())
+    return nullptr;
+
+  auto genericSig = getGenericSignature();
+  return PackType::get(getASTContext(),
+                       genericSig.getInnermostGenericParams(),
+                       getDirectGenericArgs());
+}
+
+/// <T...> Pack{T, Pack{Int, String}} => Pack{T..., Int, String}
+PackType *PackType::get(const ASTContext &C,
+                        TypeArrayView<GenericTypeParamType> params,
+                        ArrayRef<Type> args) {
+  SmallVector<Type, 2> wrappedArgs;
+
+  assert(params.size() == args.size());
+  for (unsigned i = 0, e = params.size(); i < e; ++i) {
+    auto arg = args[i];
+
+    if (params[i]->isParameterPack()) {
+      wrappedArgs.push_back(PackExpansionType::get(
+          arg, arg->getReducedShape()));
+      continue;
+    }
+
+    wrappedArgs.push_back(arg);
+  }
+
+  return get(C, wrappedArgs)->flattenPackTypes();
 }
