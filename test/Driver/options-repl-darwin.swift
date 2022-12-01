@@ -19,7 +19,7 @@
 // RUN: %empty-directory(%t/Toolchains/Test.xctoolchain/usr/bin)
 // RUN: %empty-directory(%t/Toolchains/Test.xctoolchain/usr/lib)
 // RUN: mv %t/usr/bin/swift %t/Toolchains/Test.xctoolchain/usr/bin/swift
-// RUN: %t/Toolchains/Test.xctoolchain/usr/bin/swift -repl -### | %FileCheck -check-prefix=LLDB %s
+// RUN: %host-library-env %t/Toolchains/Test.xctoolchain/usr/bin/swift -repl -### | %FileCheck -check-prefix=LLDB %s
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/Toolchains/Test.xctoolchain/usr/bin/swift

@@ -10,7 +10,7 @@
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/bin/swiftc)
 // RUN: %empty-directory(%t/lib/swift/clang/lib/darwin/)
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
 
 // RUN: touch %t/lib/swift/clang/lib/darwin/libclang_rt.osx.a %t/lib/swift/clang/lib/darwin/libclang_rt.ios.a %t/lib/swift/clang/lib/darwin/libclang_rt.iossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvos.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchos.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchossim.a
 
