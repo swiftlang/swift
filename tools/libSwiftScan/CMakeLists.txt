@@ -34,6 +34,9 @@ if(SWIFT_SWIFT_PARSER)
   set_property(
     TARGET libSwiftScan
     APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
+  set_property(
+    TARGET libSwiftScan
+    APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
 endif()
 
 add_llvm_symbol_exports(libSwiftScan ${LLVM_EXPORTED_SYMBOL_FILE})
