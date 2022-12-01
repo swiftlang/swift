@@ -401,7 +401,8 @@ static ValidationInfo validateControlBlock(
 
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
-    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
+    SmallVectorImpl<SearchPath> *searchPaths) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -430,33 +431,43 @@ static bool validateInputBlock(
     }
     unsigned kind = maybeKind.get();
     switch (kind) {
-    case input_block::FILE_DEPENDENCY: {
-      bool isHashBased = scratch[2] != 0;
-      bool isSDKRelative = scratch[3] != 0;
+    case input_block::FILE_DEPENDENCY:
+      if (dependencies) {
+        bool isHashBased = scratch[2] != 0;
+        bool isSDKRelative = scratch[3] != 0;
 
-      StringRef path = blobData;
-      size_t directoryIndex = scratch[4];
-      if (directoryIndex != 0) {
-        if (directoryIndex > dependencyDirectories.size())
-          return true;
-        dependencyFullPathBuffer = dependencyDirectories[directoryIndex-1];
-        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
-        path = dependencyFullPathBuffer;
-      }
+        StringRef path = blobData;
+        size_t directoryIndex = scratch[4];
+        if (directoryIndex != 0) {
+          if (directoryIndex > dependencyDirectories.size())
+            return true;
+          dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+          llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+          path = dependencyFullPathBuffer;
+        }
 
-      if (isHashBased) {
-        dependencies.push_back(
-          SerializationOptions::FileDependency::hashBased(
-            path, isSDKRelative, scratch[0], scratch[1]));
-      } else {
-        dependencies.push_back(
-          SerializationOptions::FileDependency::modTimeBased(
-            path, isSDKRelative, scratch[0], scratch[1]));
+        if (isHashBased)
+          dependencies->push_back(
+              SerializationOptions::FileDependency::hashBased(
+                  path, isSDKRelative, scratch[0], scratch[1]));
+        else
+          dependencies->push_back(
+              SerializationOptions::FileDependency::modTimeBased(
+                  path, isSDKRelative, scratch[0], scratch[1]));
       }
       break;
-    }
     case input_block::DEPENDENCY_DIRECTORY:
-      dependencyDirectories.push_back(blobData);
+      if (dependencies)
+        dependencyDirectories.push_back(blobData);
+      break;
+    case input_block::SEARCH_PATH:
+      if (searchPaths) {
+        bool isFramework;
+        bool isSystem;
+        input_block::SearchPathLayout::readRecord(scratch, isFramework,
+                                                  isSystem);
+        searchPaths->push_back({std::string(blobData), isFramework, isSystem});
+      }
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -467,7 +478,6 @@ static bool validateInputBlock(
   return false;
 }
 
-
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
                          llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
@@ -477,7 +487,8 @@ bool serialization::isSerializedAST(StringRef data) {
 ValidationInfo serialization::validateSerializedAST(
     StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
     bool requiresRevisionMatch, ExtendedValidationInfo *extendedInfo,
-    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
+    SmallVectorImpl<SearchPath> *searchPaths) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -523,7 +534,7 @@ ValidationInfo serialization::validateSerializedAST(
           extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
         return result;
-    } else if (dependencies &&
+    } else if ((dependencies || searchPaths) &&
                result.status == Status::Valid &&
                topLevelEntry.ID == INPUT_BLOCK_ID) {
       if (llvm::Error Err = cursor.EnterSubBlock(INPUT_BLOCK_ID)) {
@@ -532,7 +543,7 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, *dependencies)) {
+      if (validateInputBlock(cursor, scratch, dependencies, searchPaths)) {
         result.status = Status::Malformed;
         return result;
       }
