@@ -129,15 +129,30 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
                    "return result;\n"
                    "};\n";
     cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
-                   "$sSS23_bridgeToObjectiveCImplyXlyF(swift_interop_stub_"
+                   "$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(swift_interop_stub_"
                    "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
+    cPrologueOS << "SWIFT_EXTERN swift_interop_stub_Swift_String "
+                   "$sSS10FoundationE36_"
+                   "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ("
+                   "void * _Nullable) SWIFT_NOEXCEPT SWIFT_CALL;\n";
     printer.printObjCBlock([](raw_ostream &os) {
       os << "  ";
       ClangSyntaxPrinter(os).printInlineForThunk();
       os << "operator NSString * _Nonnull () const noexcept {\n";
       os << "    return (__bridge_transfer NSString "
-            "*)(_impl::$sSS23_bridgeToObjectiveCImplyXlyF(_impl::swift_interop_"
+            "*)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_"
             "passDirect_Swift_String(_getOpaquePointer())));\n";
+      os << "  }\n";
+      os << "static ";
+      ClangSyntaxPrinter(os).printInlineForThunk();
+      os << "String init(NSString * _Nonnull nsString) noexcept {\n";
+      os << "    auto result = _make();\n";
+      os << "    auto res = "
+            "_impl::$sSS10FoundationE36_"
+            "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge "
+            "void *)nsString);\n";
+      os << "    memcpy(result._getOpaquePointer(), &res, sizeof(res));\n";
+      os << "    return result;\n";
       os << "  }\n";
     });
   } else if (typeDecl == typeDecl->getASTContext().getOptionalDecl()) {

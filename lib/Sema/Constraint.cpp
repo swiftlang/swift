@@ -363,7 +363,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned indent, bool skipLocator) const {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
+                       unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
@@ -398,19 +399,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned inden
                  return false;
                });
 
-    interleave(sortedConstraints,
-               [&](Constraint *constraint) {
-                Out.indent(indent);
-                 if (constraint->isDisabled())
-                   Out << ">  [disabled] ";
-                 else if (constraint->isFavored())
-                   Out << ">  [favored]  ";
-                 else
-                   Out << ">             ";
-                 constraint->print(Out, sm, indent,
-                   /*skipLocator=*/constraint->getLocator() == Locator);
-               },
-               [&] { Out << "\n"; });
+    interleave(
+        sortedConstraints,
+        [&](Constraint *constraint) {
+          Out.indent(indent + 2);
+          if (constraint->isDisabled())
+            Out << ">  [disabled] ";
+          else if (constraint->isFavored())
+            Out << ">  [favored]  ";
+          else
+            Out << ">             ";
+          constraint->print(Out, sm, indent,
+                            /*skipLocator=*/constraint->getLocator() ==
+                                Locator);
+        },
+        [&] { Out << "\n"; });
     return;
   }
 

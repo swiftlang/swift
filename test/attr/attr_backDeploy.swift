@@ -243,7 +243,7 @@ public func alwaysEmitIntoClientFunc() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
-@inlinable // expected-error {{'@inlinable' cannot be applied to a back deployed global function}}
+@inlinable // OK
 public func inlinableFunc() {}
 
 @available(macOS 11.0, *)
