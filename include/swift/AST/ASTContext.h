@@ -289,6 +289,11 @@ public:
 
   ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
+  /// A callback that will be called when the constraint system found a
+  /// solution. Called multiple times if the constraint system has ambiguous
+  /// solutions.
+  ide::TypeCheckCompletionCallback *SolutionCallback = nullptr;
+
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
 
