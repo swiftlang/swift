@@ -240,8 +240,8 @@ bool PartialApplyCombiner::combine() {
     auto *user = use->getUser();
 
     // Recurse through copy_value
-    if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
-      for (auto *copyUse : cvi->getUses())
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      for (auto *copyUse : cast<SingleValueInstruction>(user)->getUses())
         worklist.push_back(copyUse);
       continue;
     }

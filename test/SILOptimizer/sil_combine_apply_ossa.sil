@@ -1152,3 +1152,22 @@ bb3:
   %rv = tuple()
   return %rv : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_copy_and_borrow_of_closure
+// CHECK-NOT: partial_apply
+// CHECK-LABEL: } // end sil function 'test_copy_and_borrow_of_closure'
+sil [ossa] @test_copy_and_borrow_of_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %5 = partial_apply %3(%0) : $@convention(thin) (Int) -> ()
+  %6 = begin_borrow [lexical] %5 : $@callee_owned () -> ()
+  %7 = copy_value %6 : $@callee_owned () -> ()
+  apply %7() : $@callee_owned () -> ()
+  end_borrow %6 : $@callee_owned () -> ()
+  destroy_value %5 : $@callee_owned () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @closure2 : $@convention(thin) (Int) -> ()
+
