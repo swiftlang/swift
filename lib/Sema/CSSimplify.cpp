@@ -2113,7 +2113,7 @@ public:
       if (elt1.getName() != elt2.getName())
         return true;
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2142,7 +2142,7 @@ public:
       if (elt1.hasName() && elt1.getName() != elt2.getName())
         return true;
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2180,7 +2180,7 @@ public:
           hasLabelMismatch = true;
       }
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2209,7 +2209,7 @@ public:
       auto lhs = tuple1->getElementType(idx1);
       auto rhs = tuple2->getElementType(idx2);
 
-      pairs.emplace_back(lhs, rhs, idx1);
+      pairs.emplace_back(lhs, rhs, idx1, idx2);
     }
 
     return false;
@@ -2315,7 +2315,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   for (auto pair : matcher.pairs) {
     auto result = matchTypes(pair.lhs, pair.rhs, subkind, subflags,
                              locator.withPathElement(
-                                       LocatorPathElt::TupleElement(pair.idx)));
+                                    LocatorPathElt::TupleElement(pair.lhsIdx)));
     if (result.isFailure())
       return result;
   }
@@ -2337,7 +2337,7 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   for (auto pair : matcher.pairs) {
     auto result = matchTypes(pair.lhs, pair.rhs, kind, subflags,
                              locator.withPathElement(
-                                 LocatorPathElt::PackElement(pair.idx)));
+                                 LocatorPathElt::PackElement(pair.lhsIdx)));
     if (result.isFailure())
       return result;
   }
@@ -3303,7 +3303,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                (func1Params.size() == 1
                                 ? argumentLocator
                                 : argumentLocator.withPathElement(
-                                      LocatorPathElt::TupleElement(pair.idx))));
+                                  LocatorPathElt::TupleElement(pair.lhsIdx))));
       if (result.isFailure())
         return result;
     }
@@ -12714,7 +12714,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     addConstraint(
         ConstraintKind::Bind, pair.lhs, pair.rhs,
         getConstraintLocator(
-            locator, LocatorPathElt::GenericArgument(pair.idx)));
+            locator, LocatorPathElt::GenericArgument(pair.lhsIdx)));
   }
 
   return SolutionKind::Solved;

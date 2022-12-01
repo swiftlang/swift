@@ -60,7 +60,8 @@ TuplePackMatcher::TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
     ctx(lhsTuple->getASTContext()) {}
 
 bool TuplePackMatcher::match() {
-  unsigned idx = 0;
+  unsigned lhsIdx = 0;
+  unsigned rhsIdx = 0;
 
   // Iterate over the two tuples in parallel, popping elements from
   // the start.
@@ -85,7 +86,7 @@ bool TuplePackMatcher::match() {
              "by an unlabeled element");
 
       auto rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
-      pairs.emplace_back(lhsExpansionType, rhs, idx++);
+      pairs.emplace_back(lhsExpansionType, rhs, lhsIdx++, rhsIdx);
       continue;
     }
 
@@ -105,7 +106,7 @@ bool TuplePackMatcher::match() {
              "by an unlabeled element");
 
       auto lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
-      pairs.emplace_back(lhs, rhsExpansionType, idx++);
+      pairs.emplace_back(lhs, rhsExpansionType, lhsIdx, rhsIdx++);
       continue;
     }
 
@@ -116,7 +117,7 @@ bool TuplePackMatcher::match() {
     lhsElts = lhsElts.slice(1);
     rhsElts = rhsElts.slice(1);
 
-    pairs.emplace_back(lhsElt.getType(), rhsElt.getType(), idx++);
+    pairs.emplace_back(lhsElt.getType(), rhsElt.getType(), lhsIdx++, rhsIdx++);
   }
 
   return false;
@@ -135,8 +136,11 @@ bool ParamPackMatcher::match() {
   // the pair is a pack expansion type.
   unsigned prefixLength = 0;
   for (unsigned i = 0; i < minLength; ++i) {
-    auto lhsParam = lhsParams[i];
-    auto rhsParam = rhsParams[i];
+    unsigned lhsIdx = i;
+    unsigned rhsIdx = i;
+
+    auto lhsParam = lhsParams[lhsIdx];
+    auto rhsParam = rhsParams[rhsIdx];
 
     // FIXME: Check flags
 
@@ -150,7 +154,7 @@ bool ParamPackMatcher::match() {
 
     // FIXME: Check flags
 
-    pairs.emplace_back(lhsType, rhsType, i);
+    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
     ++prefixLength;
   }
 
@@ -158,8 +162,11 @@ bool ParamPackMatcher::match() {
   // the pair is a pack expansion type.
   unsigned suffixLength = 0;
   for (unsigned i = 0; i < minLength - prefixLength; ++i) {
-    auto lhsParam = lhsParams[lhsParams.size() - i - 1];
-    auto rhsParam = rhsParams[rhsParams.size() - i - 1];
+    unsigned lhsIdx = lhsParams.size() - i - 1;
+    unsigned rhsIdx = rhsParams.size() - i - 1;
+
+    auto lhsParam = lhsParams[lhsIdx];
+    auto rhsParam = rhsParams[rhsIdx];
 
     // FIXME: Check flags
 
@@ -171,7 +178,7 @@ bool ParamPackMatcher::match() {
       break;
     }
 
-    pairs.emplace_back(lhsType, rhsType, i);
+    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
     ++suffixLength;
   }
 
@@ -191,6 +198,9 @@ bool ParamPackMatcher::match() {
   if (lhsParams.size() == 1) {
     auto lhsType = lhsParams[0].getPlainType();
     if (auto *lhsExpansion = lhsType->getAs<PackExpansionType>()) {
+      unsigned lhsIdx = prefixLength;
+      unsigned rhsIdx = prefixLength;
+
       SmallVector<Type, 2> rhsTypes;
       for (auto rhsParam : rhsParams) {
         // FIXME: Check rhs flags
@@ -199,7 +209,7 @@ bool ParamPackMatcher::match() {
       auto rhs = createPackBinding(ctx, rhsTypes);
 
       // FIXME: Check lhs flags
-      pairs.emplace_back(lhsExpansion, rhs, prefixLength);
+      pairs.emplace_back(lhsExpansion, rhs, lhsIdx, rhsIdx);
       return false;
     }
   }
@@ -209,6 +219,9 @@ bool ParamPackMatcher::match() {
   if (rhsParams.size() == 1) {
     auto rhsType = rhsParams[0].getPlainType();
     if (auto *rhsExpansion = rhsType->getAs<PackExpansionType>()) {
+      unsigned lhsIdx = prefixLength;
+      unsigned rhsIdx = prefixLength;
+
       SmallVector<Type, 2> lhsTypes;
       for (auto lhsParam : lhsParams) {
         // FIXME: Check lhs flags
@@ -217,7 +230,7 @@ bool ParamPackMatcher::match() {
       auto lhs = createPackBinding(ctx, lhsTypes);
 
       // FIXME: Check rhs flags
-      pairs.emplace_back(lhs, rhsExpansion, prefixLength);
+      pairs.emplace_back(lhs, rhsExpansion, lhsIdx, rhsIdx);
       return false;
     }
   }
@@ -244,15 +257,18 @@ bool PackMatcher::match() {
   // the pair is a pack expansion type.
   unsigned prefixLength = 0;
   for (unsigned i = 0; i < minLength; ++i) {
-    auto lhsType = lhsTypes[i];
-    auto rhsType = rhsTypes[i];
+    unsigned lhsIdx = i;
+    unsigned rhsIdx = i;
+
+    auto lhsType = lhsTypes[lhsIdx];
+    auto rhsType = rhsTypes[rhsIdx];
 
     if (lhsType->is<PackExpansionType>() ||
         rhsType->is<PackExpansionType>()) {
       break;
     }
 
-    pairs.emplace_back(lhsType, rhsType, i);
+    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
     ++prefixLength;
   }
 
@@ -260,15 +276,18 @@ bool PackMatcher::match() {
   // the pair is a pack expansion type.
   unsigned suffixLength = 0;
   for (unsigned i = 0; i < minLength - prefixLength; ++i) {
-    auto lhsType = lhsTypes[lhsTypes.size() - i - 1];
-    auto rhsType = rhsTypes[rhsTypes.size() - i - 1];
+    unsigned lhsIdx = lhsTypes.size() - i - 1;
+    unsigned rhsIdx = rhsTypes.size() - i - 1;
+
+    auto lhsType = lhsTypes[lhsIdx];
+    auto rhsType = rhsTypes[rhsIdx];
 
     if (lhsType->is<PackExpansionType>() ||
         rhsType->is<PackExpansionType>()) {
       break;
     }
 
-    pairs.emplace_back(lhsType, rhsType, i);
+    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
     ++suffixLength;
   }
 
@@ -288,9 +307,12 @@ bool PackMatcher::match() {
   if (lhsTypes.size() == 1) {
     auto lhsType = lhsTypes[0];
     if (auto *lhsExpansion = lhsType->getAs<PackExpansionType>()) {
+      unsigned lhsIdx = prefixLength;
+      unsigned rhsIdx = prefixLength;
+
       auto rhs = createPackBinding(ctx, rhsTypes);
 
-      pairs.emplace_back(lhsExpansion, rhs, prefixLength);
+      pairs.emplace_back(lhsExpansion, rhs, lhsIdx, rhsIdx);
       return false;
     }
   }
@@ -300,9 +322,12 @@ bool PackMatcher::match() {
   if (rhsTypes.size() == 1) {
     auto rhsType = rhsTypes[0];
     if (auto *rhsExpansion = rhsType->getAs<PackExpansionType>()) {
+      unsigned lhsIdx = prefixLength;
+      unsigned rhsIdx = prefixLength;
+
       auto lhs = createPackBinding(ctx, lhsTypes);
 
-      pairs.emplace_back(lhs, rhsExpansion, prefixLength);
+      pairs.emplace_back(lhs, rhsExpansion, lhsIdx, rhsIdx);
       return false;
     }
   }

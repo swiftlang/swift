@@ -34,11 +34,11 @@ struct MatchedPair {
   Type lhs;
   Type rhs;
 
-  // An index into the original left-hand side.
-  unsigned idx;
+  unsigned lhsIdx;
+  unsigned rhsIdx;
 
-  MatchedPair(Type lhs, Type rhs, unsigned idx)
-    : lhs(lhs), rhs(rhs), idx(idx) {}
+  MatchedPair(Type lhs, Type rhs, unsigned lhsIdx, unsigned rhsIdx)
+    : lhs(lhs), rhs(rhs), lhsIdx(lhsIdx), rhsIdx(rhsIdx) {}
 };
 
 /// Performs a structural match of two lists of tuple elements. The invariant
