@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution
 // RUN: %target-swift-frontend -emit-silgen %s -I %t -module-name test | %FileCheck %s
 
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 @_weakLinked import has_symbol_helper
 

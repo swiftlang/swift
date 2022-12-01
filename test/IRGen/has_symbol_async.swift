@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-irgen %s -I %t -module-name test | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 @_weakLinked import has_symbol_helper
 
