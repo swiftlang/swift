@@ -221,12 +221,16 @@ func throwJazzHands() throws {
 
 // Error isn't allowed in a @convention(c) function when ObjC interop is
 // not available, so pass it through an UnsafeRawPointer.
+@available(SwiftStdlib 5.8, *)
 @_silgen_name("_swift_setWillThrowHandler")
 func setWillThrowHandler(
     _ handler: (@convention(c) (UnsafeRawPointer) -> Void)?
 )
 
 ErrorTests.test("willThrow") {
+  guard #available(SwiftStdlib 5.8, *) else {
+    return
+  }
   setWillThrowHandler {
     if let object = Unmanaged<AnyObject>.fromOpaque($0).takeUnretainedValue(),
        let error = object as? Error {
