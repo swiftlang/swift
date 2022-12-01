@@ -1388,7 +1388,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
       PrintWithColorRAII(os, DiscriminatorColor)
         << "autoclosure discriminator=";
     }
-    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getDiscriminator();
+    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
 
@@ -2555,7 +2555,7 @@ public:
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     PrintWithColorRAII(OS, DiscriminatorColor)
-      << " discriminator=" << E->getDiscriminator();
+      << " discriminator=" << E->getRawDiscriminator();
 
     switch (auto isolation = E->getActorIsolation()) {
     case ClosureActorIsolation::Independent:

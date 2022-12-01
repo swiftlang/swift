@@ -6117,8 +6117,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                          ->castTo<FunctionType>();
 
   auto *closure = new (Context)
-      AutoClosureExpr(expr, newClosureType,
-                      AutoClosureExpr::InvalidDiscriminator, ClosureContext);
+      AutoClosureExpr(expr, newClosureType, ClosureContext);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 

@@ -1857,6 +1857,17 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
   }
 }
 
+unsigned AbstractClosureExpr::getDiscriminator() const {
+  auto raw = getRawDiscriminator();
+  if (raw != InvalidDiscriminator)
+    return raw;
+
+  evaluateOrDefault(
+      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
+}
+
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
   parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
