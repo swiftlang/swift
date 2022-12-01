@@ -364,7 +364,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
@@ -560,7 +560,7 @@ namespace {
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts || getCXXDestructor(T) ||
           !areFieldsABIAccessible()) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       std::vector<TypeLayoutEntry *> fields;
@@ -686,7 +686,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       if (!areFieldsABIAccessible()) {
@@ -748,7 +748,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       if (!areFieldsABIAccessible()) {

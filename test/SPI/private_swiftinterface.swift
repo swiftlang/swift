@@ -34,14 +34,6 @@
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
 
-/// Serialize and deserialize this module, then print.
-// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/Merged-partial.swiftmodule -swift-version 5 -I %t -module-name Merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/Merged-partial.swiftmodule -module-name Merged -emit-module -emit-module-path %t/Merged.swiftmodule -I %t -emit-module-interface-path %t/Merged.swiftinterface -emit-private-module-interface-path %t/Merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Merged.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Merged.private.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
-
 /// Both the public and private textual interfaces should have
 /// SPI information with `-library-level spi`.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
@@ -155,6 +147,34 @@ public struct PublicStruct {
   // CHECK-PRIVATE: @_spi(S) @{{.*}}.WrapperWithInitialValue @_projectedValueProperty($spiWrappedDefault) public var spiWrappedDefault: {{.*}}.SomeClass
   // CHECK-PRIVATE: @_spi(S) public var $spiWrappedDefault: {{.*}}.Wrapper<{{.*}}.SomeClass>
   // CHECK-PUBLIC-NOT: spiWrappedDefault
+}
+
+@_spi(S) public enum SPIEnum {
+// CHECK-PRIVATE: @_spi(S) public enum SPIEnum
+// CHECK-PUBLIC-NOT: SPIEnum
+
+  case spiEnumCase
+  // CHECK-PRIVATE: case spiEnumCase
+  // CHECK-PUBLIC-NOT: spiEnumCase
+}
+
+public enum PublicEnum {
+  case publicCase
+  // CHECK-PUBLIC: case publicCase
+  // CHECK-PRIVATE: case publicCase
+
+  @_spi(S) case spiCase
+  // CHECK-PRIVATE: @_spi(S) case spiCase
+  // CHECK-PUBLIC-NOT: spiCase
+
+  @_spi(S) case spiCaseA, spiCaseB
+  // CHECK-PRIVATE: @_spi(S) case spiCaseA, spiCaseB
+  // CHECK-PUBLIC-NOT: spiCaseA
+  // CHECK-PUBLIC-NOT: spiCaseB
+
+  @_spi(S) case spiCaseWithPayload(_ c: SomeClass)
+  // CHECK-PRIVATE: @_spi(S) case spiCaseWithPayload(_: {{.*}}.SomeClass)
+  // CHECK-PUBLIC-NOT: spiCaseWithPayload
 }
 
 @_spi(LocalSPI) public protocol SPIProto3 {

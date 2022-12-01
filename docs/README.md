@@ -215,7 +215,7 @@ documentation, please create a thread on the Swift forums under the
 
 ### Coding
 
-- [AccessControlInStdlib.rst](/docs/AccessControlInStdlib.rst):
+- [AccessControlInStdlib.md](/docs/AccessControlInStdlib.md):
   Describes the policy for access control modifiers and related naming
   conventions in the stdlib.
   <!-- NOTE: Outdated -->
@@ -290,10 +290,10 @@ documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
 - [AccessControl.md](/docs/AccessControl.md)
-- [Arrays.rst](/docs/Arrays.rst)
+- [Arrays.md](/docs/Arrays.md)
   <!-- Has additional notes on bridging that may be of general interest? -->
 - [Generics.rst](/docs/Generics.rst)
-- [ErrorHandling.rst](/docs/ErrorHandling.rst)
+- [ErrorHandling.md](/docs/ErrorHandling.md)
 - [StringDesign.rst](/docs/StringDesign.rst)
 - [TextFormatting.rst](/docs/TextFormatting.rst)
 

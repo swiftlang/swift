@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
@@ -616,6 +617,8 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #endif
 }
 
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_bridgeObjectRetain)
+
 SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
@@ -655,6 +658,8 @@ void swift::swift_bridgeObjectRelease(void *object) {
   swift_release(static_cast<HeapObject *>(objectRef));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_bridgeObjectRelease)
 
 void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP

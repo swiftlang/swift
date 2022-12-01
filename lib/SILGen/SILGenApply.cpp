@@ -3256,7 +3256,7 @@ private:
         return SGF.emitLValue(e->getSubExpr(), SGFAccessKind::ReadWrite);
       }
     }();
-
+    
     if (loweredSubstParamType.hasAbstractionDifference(Rep,
                                                        loweredSubstArgType)) {
       lv.addSubstToOrigComponent(origType, loweredSubstParamType);

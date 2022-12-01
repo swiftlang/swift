@@ -1077,8 +1077,8 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
 
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
-    if (!EnumCaseD->getElements().empty()) {
-      if (!handleAttrs(EnumCaseD->getElements().front()->getAttrs()))
+    if (auto *element = EnumCaseD->getFirstElement()) {
+      if (!handleAttrs(element->getAttrs()))
         return Action::SkipChildren();
     }
     if (pushStructureNode(SN, D)) {

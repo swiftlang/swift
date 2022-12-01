@@ -1970,6 +1970,9 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+ERROR(spi_attribute_on_frozen_enum_case,none,
+      "%0 %1 cannot be declared '@_spi' in a '@frozen' enum",
+      (DescriptiveDeclKind, DeclName))
 WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
@@ -6716,8 +6719,6 @@ WARNING(has_symbol_decl_must_be_weak,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
       "'#_hasSymbol' condition must refer to a declaration", ())
-ERROR(has_symbol_unsupported_on_target,none,
-      "'#_hasSymbol' is unsupported on target '%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure

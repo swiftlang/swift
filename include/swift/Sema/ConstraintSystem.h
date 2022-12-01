@@ -1708,7 +1708,7 @@ public:
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
-  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
+  void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
 };
 
 /// Describes the differences between several solutions to the same
@@ -6424,9 +6424,10 @@ public:
   bool isSymmetricOperator() const;
   bool isUnaryOperator() const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent = 0) const {
+  void print(llvm::raw_ostream &Out, SourceManager *SM,
+             unsigned indent = 0) const {
     Out << "disjunction choice ";
-    Choice->print(Out, SM);
+    Choice->print(Out, SM, indent);
   }
 
   operator Constraint *() { return Choice; }

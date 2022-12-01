@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t -enable-experimental-feature ResultBuilderASTTransform
 
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 @_weakLinked import has_symbol_helper
 

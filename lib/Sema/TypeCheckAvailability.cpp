@@ -1609,9 +1609,8 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the
     // first EnumElementDecl.
-    ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
-    if (!Elems.empty()) {
-      return Elems.front();
+    if (auto *Elem = ECD->getFirstElement()) {
+      return Elem;
     }
   }
 
@@ -2067,9 +2066,7 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
   auto Platform = prettyPlatformString(targetPlatform(Context.LangOpts));
   auto Version = Reason.getRequiredOSVersionRange().getLowerEndpoint();
 
-  if (Version <= AvailabilityContext::forDeploymentTarget(Context)
-                     .getOSVersion()
-                     .getLowerEndpoint()) {
+  if (Reason.requiresDeploymentTargetOrEarlier(Context)) {
     // The required OS version is at or before the deployment target so this
     // diagnostic should indicate that the decl could be unavailable to clients
     // of the module containing the reference.
@@ -2090,7 +2087,7 @@ bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason,
-    bool WarnBeforeDeploymentTarget) {
+    bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   auto RequiredRange = Reason.getRequiredOSVersionRange();
@@ -3724,18 +3721,20 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (!maybeUnavail.has_value())
     return false;
 
+  auto unavailReason = maybeUnavail.value();
   auto *DC = Where.getDeclContext();
+  if (Flags.contains(
+          DeclAvailabilityFlag::
+              AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
+      unavailReason.requiresDeploymentTargetOrEarlier(DC->getASTContext()))
+    return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
     TypeChecker::diagnosePotentialAccessorUnavailability(
-        accessor, R, DC, maybeUnavail.value(), forInout);
+        accessor, R, DC, unavailReason, forInout);
   } else {
-    bool downgradeBeforeDeploymentTarget = Flags.contains(
-        DeclAvailabilityFlag::
-            WarnForPotentialUnavailabilityBeforeDeploymentTarget);
-    if (!TypeChecker::diagnosePotentialUnavailability(
-            D, R, DC, maybeUnavail.value(), downgradeBeforeDeploymentTarget))
+    if (!TypeChecker::diagnosePotentialUnavailability(D, R, DC, unavailReason))
       return false;
   }
 

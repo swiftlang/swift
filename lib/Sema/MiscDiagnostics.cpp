@@ -4506,15 +4506,6 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
     return false;
 
   auto &ctx = DC->getASTContext();
-  if (!ctx.LangOpts.Target.isOSDarwin()) {
-    // SILGen for #_hasSymbol is currently implemented assuming the target OS
-    // is a Darwin platform.
-    ctx.Diags.diagnose(info->getStartLoc(),
-                       diag::has_symbol_unsupported_on_target,
-                       ctx.LangOpts.Target.str());
-    return true;
-  }
-
   auto decl = info->getReferencedDecl().getDecl();
   if (!decl) {
     // Diagnose because we weren't able to interpret the expression as one
