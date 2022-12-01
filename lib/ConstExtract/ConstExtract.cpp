@@ -1,8 +1,8 @@
-//===-------- ConstExtract.pp -- Gather Compile-Time-Known Values --------===//
+//===-------- ConstExtract.cpp -- Gather Compile-Time-Known Values --------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -222,6 +222,21 @@ std::string toString(const CompileTimeValue *Value) {
   }
 }
 
+std::string toString(CompileTimeValue::ValueKind Kind) {
+  switch (Kind) {
+    case CompileTimeValue::ValueKind::RawLiteral:
+      return "RawLiteral";
+    case CompileTimeValue::ValueKind::InitCall:
+      return "InitCall";
+    case CompileTimeValue::ValueKind::Builder:
+      return "Builder";
+    case CompileTimeValue::ValueKind::Dictionary:
+      return "Dictionary";
+    case CompileTimeValue::ValueKind::Runtime:
+      return "Runtime";
+  }
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -244,7 +259,12 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                              PropertyDecl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
                              !PropertyDecl->hasStorage() ? "true" : "false");
-              JSON.attribute("value", toString(PropertyInfo.Value.get()));
+              auto value = PropertyInfo.Value.get();
+              auto valueKind = value->getKind();
+              JSON.attribute("valueKind", toString(valueKind));
+              if (valueKind != CompileTimeValue::ValueKind::Runtime) {
+                JSON.attribute("value", toString(value));
+              }
             });
           }
         });
