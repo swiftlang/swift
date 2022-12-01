@@ -318,6 +318,15 @@ CanPackType PackType::getReducedShape() {
 }
 
 CanType TypeBase::getReducedShape() {
+  if (isTypeParameter()) {
+    auto *genericParam = getRootGenericParam();
+    if (genericParam->isParameterPack())
+      return genericParam->getCanonicalType();
+
+    // Use () as a placeholder for scalar shape.
+    return getASTContext().TheEmptyTupleType;
+  }
+
   if (auto *packArchetype = getAs<PackArchetypeType>())
      return packArchetype->getReducedShape();
 
