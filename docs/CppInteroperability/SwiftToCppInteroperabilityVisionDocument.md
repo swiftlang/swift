@@ -56,6 +56,8 @@ Swift APIs should be mapped over to C++ language features that have a direct cor
 
 The C++ representation of certain Swift types should be appropriately enhanced to allow them to be used in an idiomatic manner. For instance, it should be possible to use Swift’s `Array` type (or any type that conforms to `Collection`) in a ranged-based for loop in C++. Such enhancements should be done with safety in mind, to ensure that Swift’s memory model is not violated.
 
+Correct modeling of certain Swift type semantics in C++ requires additional overhead. This issue is most prominent when modeling Swift's `take` operation, as it performs a destructive move, which C++ does not support. Thus, the `take` operation has to be modeled using a non-destructive move in C++, which requires additional storage and runtime checks when a Swift value type is used in C++. In cases like this one, the design of how Swift language constructs are mapped to C++ should strive to be as ergonomic and as intuitive as possible, provided there's still a way to achieve appropriate performance using compiler optimizations or future extensions to the C++ language standard.
+
 There should be no differences on the C++ side between using libraries that opt-in into library evolution and libraries that don’t, except in specific required cases, like checking the unknown default case of a resilient enum.
 
 ### Clear language mapping rules
