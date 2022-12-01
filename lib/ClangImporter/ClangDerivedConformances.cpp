@@ -319,6 +319,8 @@ void swift::conformToCxxSequenceIfNeeded(
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
   ProtocolDecl *cxxSequenceProto =
       ctx.getProtocol(KnownProtocolKind::CxxSequence);
+  ProtocolDecl *cxxConvertibleProto =
+      ctx.getProtocol(KnownProtocolKind::CxxConvertibleToCollection);
   // If the Cxx module is missing, or does not include one of the necessary
   // protocols, bail.
   if (!cxxIteratorProto || !cxxSequenceProto)
@@ -389,47 +391,62 @@ void swift::conformToCxxSequenceIfNeeded(
 
   // Try to conform to CxxRandomAccessCollection if possible.
 
-  auto cxxRAIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
-  if (!cxxRAIteratorProto ||
-      !ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection))
-    return;
+  auto tryToConformToRandomAccessCollection = [&]() -> bool {
+    auto cxxRAIteratorProto =
+        ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+    if (!cxxRAIteratorProto ||
+        !ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection))
+      return false;
 
-  // Check if `begin()` and `end()` are non-mutating.
-  if (begin->isMutating() || end->isMutating())
-    return;
+    // Check if `begin()` and `end()` are non-mutating.
+    if (begin->isMutating() || end->isMutating())
+      return false;
 
-  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  auto rawIteratorRAConformanceRef =
-      decl->getModuleContext()->lookupConformance(rawIteratorTy,
-                                                   cxxRAIteratorProto);
-  if (!isConcreteAndValid(rawIteratorRAConformanceRef, module))
-    return;
+    // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
+    auto rawIteratorRAConformanceRef =
+        decl->getModuleContext()->lookupConformance(rawIteratorTy,
+                                                    cxxRAIteratorProto);
+    if (!isConcreteAndValid(rawIteratorRAConformanceRef, module))
+      return false;
 
-  // CxxRandomAccessCollection always uses Int as an Index.
-  auto indexTy = ctx.getIntType();
+    // CxxRandomAccessCollection always uses Int as an Index.
+    auto indexTy = ctx.getIntType();
 
-  auto sliceTy = ctx.getSliceType();
-  sliceTy = sliceTy.subst(
-      [&](SubstitutableType *dependentType) {
-        if (dependentType->isEqual(cxxSequenceSelfTy))
-          return declSelfTy;
-        return Type(dependentType);
-      },
-      LookUpConformanceInModule(module));
+    auto sliceTy = ctx.getSliceType();
+    sliceTy = sliceTy.subst(
+        [&](SubstitutableType *dependentType) {
+          if (dependentType->isEqual(cxxSequenceSelfTy))
+            return declSelfTy;
+          return Type(dependentType);
+        },
+        LookUpConformanceInModule(module));
 
-  auto indicesTy = ctx.getRangeType();
-  indicesTy = indicesTy.subst(
-      [&](SubstitutableType *dependentType) {
-        if (dependentType->isEqual(cxxSequenceSelfTy))
-          return indexTy;
-        return Type(dependentType);
-      },
-      LookUpConformanceInModule(module));
+    auto indicesTy = ctx.getRangeType();
+    indicesTy = indicesTy.subst(
+        [&](SubstitutableType *dependentType) {
+          if (dependentType->isEqual(cxxSequenceSelfTy))
+            return indexTy;
+          return Type(dependentType);
+        },
+        LookUpConformanceInModule(module));
 
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"), sliceTy);
-  impl.addSynthesizedProtocolAttrs(
-      decl, {KnownProtocolKind::CxxRandomAccessCollection});
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
+                                 sliceTy);
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::CxxRandomAccessCollection});
+    return true;
+  };
+
+  bool conformedToRAC = tryToConformToRandomAccessCollection();
+
+  // If the collection does not support random access, let's still allow the
+  // developer to explicitly convert a C++ sequence to a Swift Array (making a
+  // copy of the sequence's elements) by conforming the type to
+  // CxxCollectionConvertible. This enables an overload of Array.init declared
+  // in the Cxx module.
+  if (!conformedToRAC && cxxConvertibleProto)
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::CxxConvertibleToCollection});
 }
