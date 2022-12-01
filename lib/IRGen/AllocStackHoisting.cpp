@@ -427,12 +427,15 @@ private:
 };
 } // end anonymous namespace
 
-bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
+bool inhibitsAllocStackHoisting(SILInstruction *I) {
   if (auto *Apply = dyn_cast<ApplyInst>(I)) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
     return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+  }
+  if (isa<HasSymbolInst>(I)) {
+    return true;
   }
   return false;
 }
@@ -453,8 +456,10 @@ void HoistAllocStack::collectHoistableInstructions() {
           FunctionExits.push_back(Term);
         continue;
       }
-      // Don't perform alloc_stack hoisting in functions with availability.
-      if (indicatesDynamicAvailabilityCheckUse(&Inst)) {
+      // Don't perform alloc_stack hoisting in functions containing
+      // instructions that indicate hoisting may be unsafe (e.g. `if
+      // #available(...)` or `if #_hasSymbol(...)`.
+      if (inhibitsAllocStackHoisting(&Inst)) {
         AllocStackToHoist.clear();
         return;
       }
