@@ -912,9 +912,17 @@ function(add_swift_host_tool executable)
   endif()
 
   if(SWIFT_SWIFT_PARSER)
+    set(extra_relative_rpath "")
+    if(NOT ${ASHT_BOOTSTRAPPING} STREQUAL "")
+      if (${executable} MATCHES "-bootstrapping")
+        set(extra_relative_rpath "../")
+      endif()
+    endif()
+
     set_property(
       TARGET ${executable}
-      APPEND PROPERTY INSTALL_RPATH "@executable_path/../lib/swift/host")
+      APPEND PROPERTY INSTALL_RPATH
+        "@executable_path/../${extra_relative_rpath}lib/swift/host")
   endif()
 
   if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
