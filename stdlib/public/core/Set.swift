@@ -212,11 +212,17 @@ extension Set: ExpressibleByArrayLiteral {
   ///
   /// - Parameter elements: A variadic list of elements of the new set.
   @inlinable
+  @inline(__always)
   public init(arrayLiteral elements: Element...) {
     if elements.isEmpty {
       self.init()
       return
     }
+    self.init(_nonEmptyArrayLiteral: elements)
+  }
+
+  @_alwaysEmitIntoClient
+  internal init(_nonEmptyArrayLiteral elements: [Element]) {
     let native = _NativeSet<Element>(capacity: elements.count)
     for element in elements {
       let (bucket, found) = native.find(element)

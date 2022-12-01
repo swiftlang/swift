@@ -1406,6 +1406,11 @@ def emit_extension_block_symbols: Flag<["-"], "emit-extension-block-symbols">,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit 'swift.extension' symbols for extensions to external types instead of directly associating members and conformances with the extended nominal when generating symbol graphs">;
 
+def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+        NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
