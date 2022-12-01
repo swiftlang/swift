@@ -83,7 +83,7 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         Whether or not this product should be installed with the given
         arguments.
         """
-        return self.args.install_all
+        return self.args.install_swiftsyntax
 
     def install(self, host_target):
         """
