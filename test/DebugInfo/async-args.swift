@@ -3,6 +3,8 @@
 // RUN:    -parse-as-library | %FileCheck %s
 // REQUIRES: concurrency
 
+// REQUIRES: rdar102151684
+
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }

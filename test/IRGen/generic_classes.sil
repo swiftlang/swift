@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 import Builtin
 import Swift
@@ -54,7 +54,7 @@ import Swift
 // --       ivar destroyer
 // CHECK-SAME:   i32 0,
 // --       flags
-// CHECK_SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       immediate pattern size
 // CHECK-native-SAME:   i16 0,
 // CHECK-objc-SAME:     i16 5,
@@ -133,7 +133,7 @@ import Swift
 // --       ivar destroyer
 // CHECK-SAME:   i32 0,
 // --       class flags
-// CHECK_SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       extra data pattern offset
 // CHECK-objc-SAME:     i16 5,
 // --       extra data pattern size
