@@ -867,7 +867,7 @@ For more details, see the
 
 Forces generation of a specialized implementation for a generic declaration.
 
-See [Generics.rst](/docs/Generics.rst) for more details.
+See [Generics.rst](/docs/archive/Generics.rst) for more details.
 
 ## `@_specializeExtension`
 
