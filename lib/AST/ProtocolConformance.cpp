@@ -1053,7 +1053,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
   SmallPtrSet<ProtocolDecl *, 2> protocols;
 
   auto addSynthesized = [&](ProtocolDecl *proto) {
-    llvm::dbgs() << "S\n";
     if (protocols.count(proto) == 0) {
       ConformanceTable->addSynthesizedConformance(
           mutableThis, proto, mutableThis);

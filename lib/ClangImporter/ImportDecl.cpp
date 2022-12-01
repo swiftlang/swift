@@ -2634,7 +2634,10 @@ namespace {
     void addExplicitProtocolConformances(NominalTypeDecl *decl) {
       auto clangDecl = decl->getClangDecl();
 
-      SmallVector<ValueDecl *, 2> results;
+      if (!clangDecl->hasAttrs())
+        return;
+
+      SmallVector<ValueDecl *, 1> results;
       auto conformsToAttr =
           llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
             if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
@@ -2653,11 +2656,24 @@ namespace {
         module.second->lookupValue(Impl.SwiftContext.getIdentifier(name),
                                    NLKind::UnqualifiedLookup, results);
       }
-      for (auto proto : results) {
-        if (auto protocol = dyn_cast<ProtocolDecl>(proto)) {
-          decl->getAttrs().add(
-              new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
-        }
+
+      if (results.empty()) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, name);
+        return;
+      } else if (results.size() != 1) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, name);
+        return;
+      }
+
+      auto result = results.front();
+      if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
+        decl->getAttrs().add(
+            new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
+      } else {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol, name);
       }
     }
 

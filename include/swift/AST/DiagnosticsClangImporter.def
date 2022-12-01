@@ -199,6 +199,16 @@ ERROR(foreign_reference_types_invalid_release,none,
       "specified release function '%0' is invalid. Release must have exactly "
       "one argument of type '%1'", (StringRef, StringRef))
 
+ERROR(cannot_find_conforms_to,none,
+      "specified protocol conformance could not be found '%0'.", (StringRef))
+
+ERROR(conforms_to_ambiguous,none,
+      "specified protocol conformance is ambiguous. "
+      "Found multiple protocols named '%0'.", (StringRef))
+
+ERROR(conforms_to_not_protocol,none,
+      "specified protocol conformance '%0' is not a protocol.", (StringRef))
+
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 not imported", (const clang::NamedDecl*))
