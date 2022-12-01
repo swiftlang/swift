@@ -419,6 +419,9 @@ public:
 
   unsigned DisableReadonlyStaticObjects : 1;
 
+  /// Collocate metadata functions in their own section.
+  unsigned CollocatedMetadataFunctions : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -489,7 +492,8 @@ public:
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
-        DisableReadonlyStaticObjects(false), CmdArgs(),
+        DisableReadonlyStaticObjects(false),
+        CollocatedMetadataFunctions(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {
 #ifndef NDEBUG
