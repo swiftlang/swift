@@ -9,8 +9,6 @@ import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxConvertibleToCollection")
 
-extension SimpleSequence: CxxConvertibleToCollection {}
-
 CxxSequenceTestSuite.test("SimpleSequence to Swift.Array") {
   let seq = SimpleSequence()
   let array = Array(seq)
@@ -22,8 +20,6 @@ CxxSequenceTestSuite.test("SimpleSequence to Swift.Set") {
   let set = Set(seq)
   expectEqual(Set([1, 2, 3, 4] as [Int32]), set)
 }
-
-extension SimpleEmptySequence: CxxConvertibleToCollection {}
 
 CxxSequenceTestSuite.test("SimpleEmptySequence to Swift.Array") {
   let seq = SimpleEmptySequence()
