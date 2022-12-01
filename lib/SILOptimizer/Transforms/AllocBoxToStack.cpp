@@ -70,7 +70,8 @@ static bool useCaptured(Operand *UI) {
   // These instructions do not cause the address to escape.
   if (isa<DebugValueInst>(User)
       || isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User)
-      || isa<DestroyValueInst>(User))
+      || isa<DestroyValueInst>(User)
+      || isa<EndBorrowInst>(User))
     return false;
 
   if (auto *Store = dyn_cast<StoreInst>(User)) {
@@ -254,8 +255,9 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // If we have a copy_value, the copy value does not cause an escape, but its
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
-    if (auto CVI = dyn_cast<CopyValueInst>(User)) {
-      llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
+    if (isa<CopyValueInst>(User) || isa<BeginBorrowInst>(User)) {
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
