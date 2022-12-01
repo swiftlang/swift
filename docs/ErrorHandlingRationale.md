@@ -1,5 +1,63 @@
 # Error Handling Rationale and Proposal
 
+## Table of Contents
+
+- [Fundamentals](#fundamentals)
+  - [Kinds of propagation](#kinds-of-propagation)
+  - [Kinds of error](#kinds-of-error)
+    - [Simple domain errors](#simple-domain-errors)
+    - [Recoverable errors](#recoverable-errors)
+    - [Universal errors](#universal-errors)
+    - [Logic failures](#logic-failures)
+- [Analysis](#analysis)
+  - [Propagation methods](#propagation-methods)
+  - [Marked propagation](#marked-propagation)
+  - [Typed propagation](#typed-propagation)
+    - [Typed manual propagation](#typed-manual-propagation)
+    - [Typed automatic propagation](#typed-automatic-propagation)
+      - [The default typing rule](#the-default-typing-rule)
+      - [Enforcement](#enforcement)
+      - [Specificity](#specificity)
+    - [Tradeoffs of typed propagation](#tradeoffs-of-typed-propagation)
+  - [Error Types](#error-types)
+  - [Implementation design](#implementation-design)
+    - [Implicit manual propagation](#implicit-manual-propagation)
+    - [`setjmp` / `longjmp`](#setjmp--longjmp)
+    - [Table-based unwinding](#table-based-unwinding)
+  - [Clean-up actions](#clean-up-actions)
+    - [`finally`](#finally)
+    - [`defer`](#defer)
+    - [Destructors](#destructors)
+- [Survey](#survey)
+  - [C](#c)
+  - [C++](#c-1)
+  - [Objective-C](#objective-c)
+  - [Java](#java)
+  - [C#](#c-2)
+  - [Haskell](#haskell)
+  - [Rust](#rust)
+  - [Go](#go)
+  - [Scripting languages](#scripting-languages)
+- [Proposal](#proposal)
+  - [Automatic propagation](#automatic-propagation)
+  - [Typed propagation](#typed-propagation-1)
+    - [Higher-order polymorphism](#higher-order-polymorphism)
+    - [Generic polymorphism](#generic-polymorphism)
+    - [Error type](#error-type)
+  - [Marked propagation](#marked-propagation-1)
+    - [Asserting markers](#asserting-markers)
+  - [Other syntax](#other-syntax)
+    - [Clean-up actions](#clean-up-actions-1)
+    - [`using`](#using)
+  - [C and Objective-C Interoperation](#c-and-objective-c-interoperation)
+    - [Error types](#error-types-1)
+    - [Objective-C method error patterns](#objective-c-method-error-patterns)
+      - [Detecting an error](#detecting-an-error)
+      - [The error parameter](#the-error-parameter)
+    - [CoreFoundation functions](#corefoundation-functions)
+    - [Other C APIs](#other-c-apis)
+  - [Implementation design](#implementation-design-1)
+
 This paper surveys the error-handling world, analyzes various ideas
 which have been proposed or are in practice in other languages, and
 ultimately proposes an error-handling scheme for Swift together with
@@ -1836,10 +1894,10 @@ right thing for all but two sets of APIs in the public API:
 -   The `ISyncSessionDriverDelegate` category on `NSObject` declares
     half-a-dozen methods like this:
 
-```objc
-- (BOOL)sessionDriver:(ISyncSessionDriver *)sender
-    didRegisterClientAndReturnError:(NSError **)outError;
-```
+    ```objc
+    - (BOOL)sessionDriver:(ISyncSessionDriver *)sender
+        didRegisterClientAndReturnError:(NSError **)outError;
+    ```
 
     Fortunately, these delegate methods were all deprecated in Lion, and
     Swift currently doesn't even import deprecated methods.
