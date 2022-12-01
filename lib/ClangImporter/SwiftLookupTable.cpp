@@ -213,8 +213,8 @@ translateDeclToContext(clang::NamedDecl *decl) {
       return std::make_pair(SwiftLookupTable::ContextKind::Tag,
                             typedefDecl->getName());
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(tag)) {
-      if (auto typedefType = dyn_cast<clang::TypedefType>(
-              enumDecl->getIntegerType().getTypePtr())) {
+      if (auto typedefType =
+              dyn_cast<clang::TypedefType>(getUnderlyingType(enumDecl))) {
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr,
                                            true)) {
           return std::make_pair(SwiftLookupTable::ContextKind::Tag,
