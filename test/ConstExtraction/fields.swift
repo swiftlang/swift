@@ -15,6 +15,7 @@
 // CHECK-NEXT:        "type": "Swift.String",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "\"Hello, World\""
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -22,6 +23,7 @@
 // CHECK-NEXT:        "type": "[Swift.Int]",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "[1, 2, 3, 4, 5, 6, 7, 8, 9]"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -29,6 +31,7 @@
 // CHECK-NEXT:        "type": "Swift.Bool",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "false"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -36,6 +39,7 @@
 // CHECK-NEXT:        "type": "Swift.Bool?",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "nil"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -43,6 +47,7 @@
 // CHECK-NEXT:        "type": "(Swift.Int, Swift.Float)",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "(42, 6.6)"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -50,6 +55,7 @@
 // CHECK-NEXT:        "type": "[Swift.String : Swift.Int]",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "[(\"One\", 1), (\"Two\", 2), (\"Three\", 3)]"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -57,6 +63,7 @@
 // CHECK-NEXT:        "type": "Swift.Int",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "11"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -64,6 +71,7 @@
 // CHECK-NEXT:        "type": "Swift.Float",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "42.2"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -71,6 +79,7 @@
 // CHECK-NEXT:        "type": "Swift.Int",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "3"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
@@ -78,6 +87,7 @@
 // CHECK-NEXT:        "type": "Swift.Int",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "true",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "3"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
