@@ -40,6 +40,7 @@ print(s.spiVar)
 
 SPIEnum().spiMethod()
 SPIEnum.A.spiMethod()
+_ = PublicEnum.spiCase
 
 var ps = PublicStruct()
 let _ = PublicStruct(alt_init: 1)
