@@ -682,8 +682,8 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   Status |= parseOptionalControlTransferTarget(*this, Target, TargetLoc,
                                                StmtKind::Break);
 
-  return makeParserResult(Status,
-                          new (Context) BreakStmt(Loc, Target, TargetLoc));
+  auto *BS = new (Context) BreakStmt(Loc, Target, TargetLoc, CurDeclContext);
+  return makeParserResult(Status, BS);
 }
 
 /// parseStmtContinue
@@ -699,8 +699,8 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   Status |= parseOptionalControlTransferTarget(*this, Target, TargetLoc,
                                                StmtKind::Continue);
 
-  return makeParserResult(Status,
-                          new (Context) ContinueStmt(Loc, Target, TargetLoc));
+  auto *CS = new (Context) ContinueStmt(Loc, Target, TargetLoc, CurDeclContext);
+  return makeParserResult(Status, CS);
 }
 
 

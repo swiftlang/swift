@@ -40,11 +40,14 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class BreakStmt;
 class ContextualPattern;
+class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
+class LabeledStmt;
 struct MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
@@ -3694,6 +3697,40 @@ private:
   friend SimpleRequest;
 
   VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Lookup the target of a break statement.
+class BreakTargetRequest
+    : public SimpleRequest<BreakTargetRequest,
+                           LabeledStmt *(const BreakStmt *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LabeledStmt *evaluate(Evaluator &evaluator, const BreakStmt *BS) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Lookup the target of a continue statement.
+class ContinueTargetRequest
+    : public SimpleRequest<ContinueTargetRequest,
+                           LabeledStmt *(const ContinueStmt *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LabeledStmt *evaluate(Evaluator &evaluator, const ContinueStmt *CS) const;
 
 public:
   bool isCached() const { return true; }
