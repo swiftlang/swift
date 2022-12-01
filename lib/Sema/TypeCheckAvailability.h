@@ -58,11 +58,9 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// warning. Used for ObjC key path components.
   ForObjCKeyPath = 1 << 3,
   
-  /// Downgrade errors about decl availability to warnings when the fix would be
-  /// to constrain availability to a version that is more available than the
-  /// current deployment target. This is needed for source compatibility in when
-  /// checking public extensions in library modules.
-  WarnForPotentialUnavailabilityBeforeDeploymentTarget = 1 << 4,
+  /// Do not diagnose potential decl unavailability if that unavailability
+  /// would only occur at or below the deployment target.
+  AllowPotentiallyUnavailableAtOrBelowDeploymentTarget = 1 << 4,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
