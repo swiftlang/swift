@@ -1,3 +1,5 @@
+// REQUIRES: asserts
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck -module-name Macros -emit-module-interface-path %t/Macros.swiftinterface -enable-experimental-feature Macros %s

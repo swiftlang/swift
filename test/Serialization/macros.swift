@@ -1,3 +1,5 @@
+// REQUIRES: asserts
+
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 // RUN: %target-swift-frontend -emit-module -o %t/def_macros.swiftmodule %S/Inputs/def_macros.swift -module-name def_macros -enable-experimental-feature Macros
