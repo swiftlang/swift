@@ -391,7 +391,7 @@ public:
 
   /// Returns true if this instruction is removed from its function and
   /// scheduled to be deleted.
-  bool isDeleted() const { return !ParentBB; }
+  bool isDeleted() const { return asSILNode()->isMarkedAsDeleted(); }
 
   enum class MemoryBehavior {
     None,
@@ -10138,7 +10138,6 @@ public:
   }
 
   void addNodeToList(SILInstruction *I);
-  void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
                              instr_iterator first, instr_iterator last);
 

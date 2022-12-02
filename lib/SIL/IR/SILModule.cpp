@@ -276,7 +276,6 @@ void SILModule::willDeleteInstruction(SILInstruction *I) {
 void SILModule::scheduleForDeletion(SILInstruction *I) {
   I->dropAllReferences();
   scheduledForDeletion.push_back(I);
-  I->ParentBB = nullptr;
 }
 
 void SILModule::flushDeletedInsts() {

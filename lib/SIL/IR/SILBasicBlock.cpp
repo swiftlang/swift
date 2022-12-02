@@ -103,8 +103,10 @@ void SILBasicBlock::erase(SILInstruction *I) {
 }
 
 void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
+  assert(!I->isDeleted() && "double delete of instruction");
   module.willDeleteInstruction(I);
   InstList.remove(I);
+  I->asSILNode()->markAsDeleted();
   module.scheduleForDeletion(I);
 }
 
@@ -113,13 +115,11 @@ void SILBasicBlock::moveInstruction(SILInstruction *inst,
   if (inst == beforeInst)
     return;
   inst->getParent()->InstList.remove(inst);
-  inst->ParentBB = nullptr;
   beforeInst->getParent()->insert(beforeInst->getIterator(), inst);
 }
 
 void SILBasicBlock::moveInstructionToFront(SILInstruction *inst) {
   inst->getParent()->InstList.remove(inst);
-  inst->ParentBB = nullptr;
   push_front(inst);
 }
 

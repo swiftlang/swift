@@ -61,13 +61,7 @@ SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
 
 
 void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
-  assert(I->ParentBB == nullptr && "Already in a list!");
   I->ParentBB = getContainingBlock();
-}
-
-void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
-  // When an instruction is removed from a BB, clear the parent pointer.
-  I->ParentBB = nullptr;
 }
 
 void llvm::ilist_traits<SILInstruction>::

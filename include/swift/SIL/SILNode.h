@@ -330,8 +330,13 @@ protected:
   /// -> AAA, BB and C are initialized,
   ///    DD and EEE are uninitialized
   ///
+  /// If the ID is negative, it means that the node (in case it's an instruction)
+  /// is deleted, i.e. it does not belong to the function anymore. Conceptually
+  /// this results in setting all bitfields to zero, which e.g. "removes" the
+  /// node from all NodeSets.
+  ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  uint64_t lastInitializedBitfieldID = 0;
+  int64_t lastInitializedBitfieldID = 0;
 
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
@@ -388,6 +393,12 @@ public:
   void resetBitfields() {
     lastInitializedBitfieldID = 0;
   }
+
+  void markAsDeleted() {
+    lastInitializedBitfieldID = -1;
+  }
+
+  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
 
   static SILNode *instAsNode(SILInstruction *inst);
   static const SILNode *instAsNode(const SILInstruction *inst);

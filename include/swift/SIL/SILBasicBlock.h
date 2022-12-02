@@ -85,7 +85,7 @@ private:
   ///    DD and EEE are uninitialized
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  uint64_t lastInitializedBitfieldID = 0;
+  int64_t lastInitializedBitfieldID = 0;
 
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
