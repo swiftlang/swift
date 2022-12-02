@@ -1979,7 +1979,6 @@ void IRGenerator::emitEagerClassInitialization() {
     IGM->DebugInfo->emitArtificialFunction(RegisterIGF, RegisterIGF.CurFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
   RegisterFn->setCallingConv(IGM->DefaultCC);
-  IGM->setColocateMetadataSection(RegisterFn);
 
   for (ClassDecl *CD : ClassesForEagerInitialization) {
     auto Ty = CD->getDeclaredType()->getCanonicalType();
@@ -2023,7 +2022,6 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
     IGM->DebugInfo->emitArtificialFunction(RegisterIGF, RegisterIGF.CurFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
   RegisterFn->setCallingConv(IGM->DefaultCC);
-  IGM->setColocateMetadataSection(RegisterFn);
 
   // Look up the SwiftNativeNSObject class.
   auto swiftNativeNSObjectName =
@@ -5859,21 +5857,4 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   }
 
   return fn;
-}
-
-void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::MachO:
-    f->setSection("__TEXT, __swift_colocat, regular, pure_instructions");
-    break;
-  case llvm::Triple::DXContainer:
-  case llvm::Triple::GOFF:
-  case llvm::Triple::SPIRV:
-  case llvm::Triple::UnknownObjectFormat:
-  case llvm::Triple::Wasm:
-  case llvm::Triple::ELF:
-  case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    break;
-  }
 }
