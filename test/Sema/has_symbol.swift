@@ -60,6 +60,18 @@ func testEnum(_ e: E) {
   if #_hasSymbol(e.method) {}
 }
 
+func testOpaqueParameter<T: PAT>(_ p: T) {
+  // FIXME: Improve this diagnostic
+  if #_hasSymbol(T.A.self) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
+func testExistentialParameter(_ p: any P) {
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
 func testMetatypes() {
   if #_hasSymbol(P.self) {}
   if #_hasSymbol(S.self) {}
