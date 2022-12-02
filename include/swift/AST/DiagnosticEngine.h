@@ -51,6 +51,7 @@ namespace swift {
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
   enum DeclAttrKind : unsigned;
+  enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -116,6 +117,7 @@ namespace swift {
     ReferenceOwnership,
     StaticSpellingKind,
     DescriptiveDeclKind,
+    DescriptiveStmtKind,
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
@@ -149,6 +151,7 @@ namespace swift {
       ReferenceOwnership ReferenceOwnershipVal;
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
+      StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
@@ -234,6 +237,10 @@ namespace swift {
     DiagnosticArgument(DescriptiveDeclKind DDK)
         : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
           DescriptiveDeclKindVal(DDK) {}
+
+    DiagnosticArgument(StmtKind SK)
+        : Kind(DiagnosticArgumentKind::DescriptiveStmtKind),
+          DescriptiveStmtKindVal(SK) {}
 
     DiagnosticArgument(const DeclAttribute *attr)
         : Kind(DiagnosticArgumentKind::DeclAttribute),
@@ -339,6 +346,11 @@ namespace swift {
     DescriptiveDeclKind getAsDescriptiveDeclKind() const {
       assert(Kind == DiagnosticArgumentKind::DescriptiveDeclKind);
       return DescriptiveDeclKindVal;
+    }
+
+    StmtKind getAsDescriptiveStmtKind() const {
+      assert(Kind == DiagnosticArgumentKind::DescriptiveStmtKind);
+      return DescriptiveStmtKindVal;
     }
 
     const DeclAttribute *getAsDeclAttribute() const {
