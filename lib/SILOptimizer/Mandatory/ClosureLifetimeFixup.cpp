@@ -1004,9 +1004,9 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
   for (auto &block : fn) {
     SILSSAUpdater updater;
 
-    for (SILInstruction *inst : updater.getDeleter().updatingRange(&block)) {
+    for (SILInstruction &inst : block.deletableInstructions()) {
       // Handle, copy_block_without_escaping instructions.
-      if (auto *cb = dyn_cast<CopyBlockWithoutEscapingInst>(inst)) {
+      if (auto *cb = dyn_cast<CopyBlockWithoutEscapingInst>(&inst)) {
         if (fixupCopyBlockWithoutEscaping(cb, updater.getDeleter(), modifiedCFG)) {
           changed = true;
         }
@@ -1015,7 +1015,7 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
 
       // Otherwise, look at convert_escape_to_noescape [not_guaranteed]
       // instructions.
-      auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst);
+      auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(&inst);
       if (!cvt || cvt->isLifetimeGuaranteed())
         continue;
 

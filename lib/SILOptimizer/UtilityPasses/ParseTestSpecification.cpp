@@ -29,8 +29,8 @@ void findAndDeleteTraceValues(SILFunction *function,
                               SmallVectorImpl<SILValue> &values) {
   InstructionDeleter deleter;
   for (auto &block : *function) {
-    for (SILInstruction *inst : deleter.updatingRange(&block)) {
-      if (auto *debugValue = dyn_cast<DebugValueInst>(inst)) {
+    for (SILInstruction &inst : block.deletableInstructions()) {
+      if (auto *debugValue = dyn_cast<DebugValueInst>(&inst)) {
         if (!debugValue->hasTrace())
           continue;
         values.push_back(debugValue->getOperand());
@@ -591,8 +591,8 @@ void swift::test::getTestSpecifications(
     SmallVectorImpl<UnparsedSpecification> &specifications) {
   InstructionDeleter deleter;
   for (auto &block : *function) {
-    for (SILInstruction *inst : deleter.updatingRange(&block)) {
-      if (auto *tsi = dyn_cast<TestSpecificationInst>(inst)) {
+    for (SILInstruction &inst : block.deletableInstructions()) {
+      if (auto *tsi = dyn_cast<TestSpecificationInst>(&inst)) {
         auto ref = tsi->getArgumentsSpecification();
         auto *anchor = findAnchorInstructionAfter(tsi);
         specifications.push_back({std::string(ref.begin(), ref.end()), anchor});
