@@ -65,7 +65,34 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
 // wasi-libc's error.h uses a macro that Swift can't import.
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EACCES'.")
+public let EACCES: Int32 = 2
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EDQUOT'.")
+public let EDQUOT: Int32 = 19
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EEXIST'.")
+public let EEXIST: Int32 = 20
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EFBIG'.")
+public let EFBIG: Int32 = 22
 @available(*, deprecated, message: "Please use 'POSIXErrorCode.EINTR'.")
 public let EINTR: Int32 = 27
 @available(*, deprecated, message: "Please use 'POSIXErrorCode.EINVAL'.")
 public let EINVAL: Int32 = 28
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.ENAMETOOLONG'.")
+public let ENAMETOOLONG: Int32 = 37
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.ENOENT'.")
+public let ENOENT: Int32 = 44
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.ENOSPC'.")
+public let ENOSPC: Int32 = 51
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EPERM'.")
+public let EPERM: Int32 = 63
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EROFS'.")
+public let EROFS: Int32 = 69
+
+
+// wasi-libc's _seek.h uses a macro that Swift can't import.
+// https://developer.apple.com/documentation/swift/using-imported-c-macros-in-swift
+// https://github.com/apple/swift/blob/c55b9cc87925c5d63a21d383ad23dff056d36607/lib/ClangImporter/ImportName.cpp#L2115-L2117
+// https://github.com/WebAssembly/wasi-libc/pull/148
+public let SEEK_SET: Int32 = 0
+public let SEEK_CUR: Int32 = 1
+public let SEEK_END: Int32 = 2
