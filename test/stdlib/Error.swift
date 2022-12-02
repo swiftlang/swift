@@ -232,10 +232,7 @@ ErrorTests.test("willThrow") {
     return
   }
   setWillThrowHandler {
-    let object = Unmanaged<AnyObject>.fromOpaque($0).takeUnretainedValue()
-    if let error = object as? Error {
-      errors.append(error)
-    }
+    errors.append(unsafeBitCast($0, to: Error.self))
   }
   defer {
     setWillThrowHandler(nil)
