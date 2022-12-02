@@ -81,9 +81,10 @@ toolchain as a one-off, there are a couple of differences:
      cd swift
      utils/update-checkout --clone
      ```
-   **Note:** If you've already forked the project on GitHub at this stage,
-   **do not clone your fork** to start off. We describe
-   [how to setup your fork](#setting-up-your-fork) in a subsection below.
+   > **Note**  
+   > If you've already forked the project on GitHub at this stage, **do not
+   > clone your fork** to start off. We describe [how to setup your fork](#setting-up-your-fork)
+   > in a subsection below.
    <!-- Recommending against cloning the fork due to https://github.com/apple/swift/issues/55918 and https://github.com/apple/swift/issues/55947. -->
 3. Double-check that `swift`'s sibling directories are present.
    ```sh
@@ -106,10 +107,10 @@ toolchain as a one-off, there are a couple of differences:
    Detailed branching information, including names for release branches, can
    be found in [Branches.md](/docs/Branches.md).
 
-**Note:**
-The commands used in the rest of this guide assumes that the absolute path
-to your working directory is something like `/path/to/swift-project/swift`.
-Double-check that running `pwd` prints a path ending with `swift`.
+> **Note**  
+> The commands used in the rest of this guide assumes that the absolute path
+> to your working directory is something like `/path/to/swift-project/swift`.
+> Double-check that running `pwd` prints a path ending with `swift`.
 
 [uploaded your SSH keys to GitHub]: https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/
 
@@ -173,8 +174,9 @@ Double-check that running `pwd` prints a path ending with `swift`.
      sudo chmod +x /usr/local/bin/sccache
      ```
 
-**Note:** LLDB currently requires at least `swig-1.3.40` but will
-gsuccessfully build with version 2 shipped with Ubuntu.
+> **Note**  
+> LLDB currently requires at least `swig-1.3.40` but will successfully build
+> with version 2 shipped with Ubuntu.
 
 [Sccache]: https://github.com/mozilla/sccache
 
@@ -258,7 +260,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
    If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
 
-   > **Note:**
+   > **Note**  
    > `--release-debuginfo` means that although debug information will be produced, all targets will
    > be compiled in release mode, meaning optimized code, which can affect your debugging experience.
    > Consider [`--debug-swift` to build a debug variant of the compiler](#debugging-issues) and have 
