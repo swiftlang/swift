@@ -1,6 +1,6 @@
 import SwiftParser
 import SwiftSyntax
-@_spi(Testing) import _SwiftSyntaxMacros
+import _SwiftSyntaxMacros
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {

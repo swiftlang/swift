@@ -121,7 +121,7 @@ if (SWIFT_SWIFT_PARSER)
        OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
   foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
     file(GLOB module_files
-         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swift*")
+         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swiftinterface")
     add_custom_command(
       TARGET swiftASTGen PRE_BUILD
       COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}
