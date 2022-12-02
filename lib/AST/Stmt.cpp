@@ -42,6 +42,50 @@ StringRef Stmt::getKindName(StmtKind K) {
   llvm_unreachable("bad StmtKind");
 }
 
+StringRef Stmt::getDescriptiveKindName(StmtKind K) {
+  switch (K) {
+  case StmtKind::Brace:
+    return "brace";
+  case StmtKind::Return:
+    return "return";
+  case StmtKind::Yield:
+    return "yield";
+  case StmtKind::Defer:
+    return "defer";
+  case StmtKind::If:
+    return "if";
+  case StmtKind::Guard:
+    return "guard";
+  case StmtKind::While:
+    return "while";
+  case StmtKind::Do:
+    return "do";
+  case StmtKind::DoCatch:
+    return "do-catch";
+  case StmtKind::RepeatWhile:
+    return "repeat-while";
+  case StmtKind::ForEach:
+    return "for-in";
+  case StmtKind::Switch:
+    return "switch";
+  case StmtKind::Case:
+    return "case";
+  case StmtKind::Break:
+    return "break";
+  case StmtKind::Continue:
+    return "continue";
+  case StmtKind::Fallthrough:
+    return "fallthrough";
+  case StmtKind::Fail:
+    return "return";
+  case StmtKind::Throw:
+    return "throw";
+  case StmtKind::PoundAssert:
+    return "#assert";
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 // Helper functions to check statically whether a method has been
 // overridden from its implementation in Stmt.  The sort of thing you
 // need when you're avoiding v-tables.
