@@ -125,20 +125,24 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     }
   }
 
+  ResolvedValueRefCursorInfo ValueRefInfo(CursorInfo, D, CtorTyRef, ExtTyRef,
+                                          IsRef, Ty, ContainerType);
   if (Expr *BaseE = getBase(ExprStack)) {
     if (isDynamicRef(BaseE, D)) {
-      CursorInfo.IsDynamic = true;
-      ide::getReceiverType(BaseE, CursorInfo.ReceiverTypes);
+      ValueRefInfo.setIsDynamic(true);
+      SmallVector<NominalTypeDecl *> ReceiverTypes;
+      ide::getReceiverType(BaseE, ReceiverTypes);
+      ValueRefInfo.setReceiverTypes(ReceiverTypes);
     }
   }
 
-  CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
+  CursorInfo = ValueRefInfo;
   return true;
 }
 
 bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   if (Loc == LocToResolve) {
-    CursorInfo.setModuleRef(Mod);
+    CursorInfo = ResolvedModuleRefCursorInfo(CursorInfo, Mod);
     return true;
   }
   return false;
@@ -147,13 +151,13 @@ bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool CursorInfoResolver::tryResolve(Stmt *St) {
   if (auto *LST = dyn_cast<LabeledStmt>(St)) {
     if (LST->getStartLoc() == LocToResolve) {
-      CursorInfo.setTrailingStmt(St);
+      CursorInfo = ResolvedStmtStartCursorInfo(CursorInfo, St);
       return true;
     }
   }
   if (auto *CS = dyn_cast<CaseStmt>(St)) {
     if (CS->getStartLoc() == LocToResolve) {
-      CursorInfo.setTrailingStmt(St);
+      CursorInfo = ResolvedStmtStartCursorInfo(CursorInfo, St);
       return true;
     }
   }
@@ -171,16 +175,21 @@ bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D,
 ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   assert(Loc.isValid());
   LocToResolve = Loc;
-  CursorInfo.Loc = Loc;
+  CursorInfo.setLoc(Loc);
 
   walk(SrcFile);
 
-  if (!CursorInfo.IsRef) {
-    // If we have a definition, add any decls that it potentially shadows
-    auto ShorthandShadowedDecl = ShorthandShadowedDecls[CursorInfo.ValueD];
-    while (ShorthandShadowedDecl) {
-      CursorInfo.ShorthandShadowedDecls.push_back(ShorthandShadowedDecl);
-      ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
+  if (auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo)) {
+    if (!ValueRefInfo->isRef()) {
+      SmallVector<ValueDecl *> ShadowedDecls;
+      // If we have a definition, add any decls that it potentially shadows
+      auto ShorthandShadowedDecl =
+          ShorthandShadowedDecls[ValueRefInfo->getValueD()];
+      while (ShorthandShadowedDecl) {
+        ShadowedDecls.push_back(ShorthandShadowedDecl);
+        ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
+      }
+      ValueRefInfo->setShorthandShadowedDecls(ShadowedDecls);
     }
   }
 
@@ -307,7 +316,7 @@ bool CursorInfoResolver::walkToExprPost(Expr *E) {
     return false;
 
   if (OutermostCursorExpr && isCursorOn(E, LocToResolve)) {
-    CursorInfo.setTrailingExpr(OutermostCursorExpr);
+    CursorInfo = ResolvedExprStartCursorInfo(CursorInfo, OutermostCursorExpr);
     return false;
   }
 
@@ -328,8 +337,9 @@ bool CursorInfoResolver::visitCallArgName(Identifier Name,
     return true;
 
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
-  if (Found)
-    CursorInfo.IsKeywordArgument = true;
+  if (Found) {
+    cast<ResolvedValueRefCursorInfo>(CursorInfo).setIsKeywordArgument(true);
+  }
   return !Found;
 }
 
@@ -383,9 +393,9 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
   if (info.isInvalid())
     return;
   out << "Resolved cursor info at ";
-  auto &SM = info.SF->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*info.SF->getBufferID());
-  auto LC = SM.getLineAndColumnInBuffer(info.Loc);
+  auto &SM = info.getSourceFile()->getASTContext().SourceMgr;
+  out << SM.getIdentifierForBuffer(*info.getSourceFile()->getBufferID());
+  auto LC = SM.getLineAndColumnInBuffer(info.getLoc());
   out << ":" << LC.first << ":" << LC.second;
 }
 
