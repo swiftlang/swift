@@ -2839,7 +2839,6 @@ AllMembersRequest::evaluate(
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
-                                         Type underlyingType,
                                          NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
@@ -2874,7 +2873,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
-  auto boundGenericType = underlyingType->getAs<BoundGenericType>();
+  auto boundGenericType = typealias->getUnderlyingType()
+      ->getAs<BoundGenericType>();
   if (!boundGenericType) return false;
 
   // If our arguments line up with our innermost generic parameters, it's
@@ -2921,24 +2921,13 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      // Nested Hack to break cycles if this is called before validation has
-      // finished.
-      if (aliasDecl->hasInterfaceType()) {
-        auto extendedNominal =
-            aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-        if (extendedNominal)
-          return TypeChecker::isPassThroughTypealias(
-                     aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
-                     ? extendedType
-                     : extendedNominal->getDeclaredType();
-      } else {
-        if (auto ty = aliasDecl->getStructuralType()
-                          ->getAs<NominalOrBoundGenericNominalType>())
-          return TypeChecker::isPassThroughTypealias(aliasDecl, ty,
-                                                     ty->getDecl())
-                     ? extendedType
-                     : ty->getDecl()->getDeclaredType();
-      }
+      auto extendedNominal =
+          aliasDecl->getUnderlyingType()->getAnyNominal();
+      if (extendedNominal)
+        return TypeChecker::isPassThroughTypealias(
+                   aliasDecl, extendedNominal)
+                   ? extendedType
+                   : extendedNominal->getDeclaredType();
     }
   }
 

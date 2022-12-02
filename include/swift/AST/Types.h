@@ -71,6 +71,7 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PackType;
 class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
@@ -2002,6 +2003,8 @@ public:
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const;
 
+  PackType *getExpandedGenericArgsPack();
+
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -2419,6 +2422,8 @@ public:
   ArrayRef<Type> getGenericArgs() const {
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
+
+  PackType *getExpandedGenericArgsPack();
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent(), getGenericArgs());
@@ -6477,6 +6482,10 @@ public:
   static PackType *getEmpty(const ASTContext &C);
   /// Creates a pack from the types in \p elements.
   static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
+
+  static PackType *get(const ASTContext &C,
+                       TypeArrayView<GenericTypeParamType> params,
+                       ArrayRef<Type> args);
 
 public:
   /// Retrieves the number of elements in this pack.

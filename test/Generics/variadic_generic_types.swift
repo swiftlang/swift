@@ -2,45 +2,76 @@
 
 // REQUIRES: asserts
 
-struct TupleStruct<First, Rest...> {
-  var first: First
-  var rest: (Rest...)
-}
+func bindAll() {
+  struct Bind<U...> {}
 
-func directAliases() {
-  typealias Tuple<Ts...> = (Ts...)
-
-  typealias Many<T, U, V, Ws...> = Tuple<T, U, V, Ws... >
-
-  let _: Many<Int, String, Double, Void, Void, Void, Void> = 42 // expected-error {{cannot convert value of type 'Int' to specified type}}
+  typealias Zero = Bind< > // OK
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
 }
 
 func bindPrefix() {
-  struct Bind<Prefix, U...> {}
+  struct Bind<Prefix, U...> {} // expected-note {{generic type 'Bind' declared here}}
 
-  typealias TooFew0 = Bind<> // expected-error {{expected type}}
-  typealias TooFew1 = Bind<String> // OK
-  typealias TooFew2 = Bind<String, String> // OK
-  typealias JustRight = Bind<String, String, String> // OK
-  typealias Oversaturated = Bind<String, String, String, String, String, String, String, String> // OK
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
 }
 
 func bindSuffix() {
-  struct Bind<U..., Suffix> {}
+  struct Bind<U..., Suffix> {} // expected-note {{generic type 'Bind' declared here}}
 
-  typealias TooFew0 = Bind<> // expected-error {{expected type}}
-  typealias TooFew1 = Bind<String> // OK
-  typealias TooFew2 = Bind<String, String> // OK
-  typealias JustRight = Bind<String, String, String> // OK
-  typealias Oversaturated = Bind<String, String, String, String, String, String, String, String> // OK
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
 }
 
 func bindPrefixAndSuffix() {
-  struct Bind<Prefix, U..., Suffix> {} // expected-note {{generic type 'Bind' declared here}}
+  struct Bind<Prefix, U..., Suffix> {} // expected-note 2{{generic type 'Bind' declared here}}
 
-  typealias TooFew0 = Bind<> // expected-error {{expected type}}
-  typealias TooFew1 = Bind<String> // expected-error {{generic type 'Bind' specialized with too few type parameters (got 1, but expected at least 2)}}
-  typealias TooFew2 = Bind<String, String> // OK
-  typealias JustRight = Bind<String, String, String> // OK
-  typealias Oversaturated = Bind<String, String, String, String, String, String, String, String> // OK
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 2)}}
+  typealias One = Bind<Int> // expected-error {{generic type 'Bind' specialized with too few type parameters (got 1, but expected at least 2)}}
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
+  typealias Four = Bind<Int, String, Float, Bool> // OK
+}
+
+func bindAliasAll() {
+  typealias Bind<U...> = (U...)
+
+  typealias Zero = Bind< > // OK
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
+}
+
+func bindAliasPrefix() {
+  typealias Bind<Prefix, U...> = (Prefix, U...) // expected-note {{generic type 'Bind' declared here}}
+
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
+}
+
+func bindAliasSuffix() {
+  typealias Bind<U..., Suffix> = (U..., Suffix) // expected-note {{generic type 'Bind' declared here}}
+
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
+  typealias One = Bind<Int> // OK
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
+}
+
+func bindAliasPrefixAndSuffix() {
+  typealias Bind<Prefix, U..., Suffix> = (Prefix, U..., Suffix) // expected-note 2{{generic type 'Bind' declared here}}
+
+  typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 2)}}
+  typealias One = Bind<Int> // expected-error {{generic type 'Bind' specialized with too few type parameters (got 1, but expected at least 2)}}
+  typealias Two = Bind<Int, String> // OK
+  typealias Three = Bind<Int, String, Float> // OK
+  typealias Four = Bind<Int, String, Float, Bool> // OK
 }

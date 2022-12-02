@@ -27,17 +27,18 @@ namespace swift {
 
 class ASTContext;
 
-/// The result of a match. If one of lhs or rhs is a pack expansion type,
-/// the other one is a pack type.
+/// The result of a match. An important invariant is that either both types
+/// are PackExpansionTypes, or both types are scalars. In particular, any
+/// PackTypes are always wrapped in a PackExpansionType.
 struct MatchedPair {
   Type lhs;
   Type rhs;
 
-  // An index into the original left-hand side.
-  unsigned idx;
+  unsigned lhsIdx;
+  unsigned rhsIdx;
 
-  MatchedPair(Type lhs, Type rhs, unsigned idx)
-    : lhs(lhs), rhs(rhs), idx(idx) {}
+  MatchedPair(Type lhs, Type rhs, unsigned lhsIdx, unsigned rhsIdx)
+    : lhs(lhs), rhs(rhs), lhsIdx(lhsIdx), rhsIdx(rhsIdx) {}
 };
 
 /// Performs a structural match of two lists of tuple elements. The invariant
