@@ -1276,58 +1276,185 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   if (auto *fArg = dyn_cast<SILFunctionArgument>(markedAddress->getOperand()))
     isInOut |= fArg->getArgumentConvention().isInoutConvention();
 
+  /// A per block state structure that we use as we walk the block. We do not
+  /// persist these. We use this data structure so we can simplify the code
+  /// below using helper functions.
+  struct LocalDataflowState {
+    // As we walk the block, this is set to the state associated with the last
+    // take we have seen. If this is non-null when we reach the top of the
+    // block, this is the take that is propagated upwards out of the block.
+    InstOptionalLeafTypePair takeUp = {nullptr, {}};
+
+    /// This is the last liveness providing instruction that we saw since the
+    /// last init or the end of the block. If this is set when we reach the top
+    /// of the block, this is the liveness instruction that we use for the
+    ///
+    /// This is reset when we track a new init since we want to make sure that
+    /// we do not hit any liveness errors from takes that may be earlier than
+    /// the init in the block.
+    InstOptionalLeafTypePair livenessUp = {nullptr, {}};
+
+    // MARK: Local Dataflow Kill State
+
+    /// If we have not yet seen a take or an init in this block, this is set to
+    /// false. Once we have seen one of those, we set this to true. We use this
+    /// to generate our kill set for the block and do it only once.
+    bool foundFirstNonLivenessUse = false;
+
+    /// This is the first take that we see as we walk up the block if we haven't
+    /// yet seen an init. The reason why we track this is that if we have
+    /// liveness in a successor block, we need to error on this take.
+    InstOptionalLeafTypePair firstTake = {nullptr, {}};
+
+    /// This is the first init that we see in the block if we have not seen a
+    /// different init. If this is set, then we know that we need to kill the
+    /// variable in this block. It also lets us know that any takes earlier in
+    /// the block that we see can not have a liveness error due to liveness in
+    /// earlier blocks.
+    InstOptionalLeafTypePair firstInit = {nullptr, {}};
+
+    void initializeLivenessUp(SILInstruction *inst, SILValue address) {
+      livenessUp = {inst, TypeTreeLeafTypeRange(address)};
+    }
+
+    /// If we are not already tracking liveness, begin tracking liveness for
+    /// this type tree range. If we are already tracking liveness, use the later
+    /// instruction.
+    void trackLivenessUp(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+      if (livenessUp.first) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    Found liveness use! Already tracking liveness. Inst: "
+            << inst);
+        return;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Found liveness use! Propagating liveness. Inst: "
+                 << inst);
+      livenessUp = {inst, range};
+    }
+
+    void trackTake(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+      // If we haven't found a first init use, we need to track a first take
+      // since we need to make sure that we do not have any liveness issues
+      // coming up from a successor block.
+      if (!foundFirstNonLivenessUse)
+        firstTake = {inst, range};
+      takeUp = {inst, range};
+      foundFirstNonLivenessUse = true;
+    }
+
+    void trackInit(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+      // Since we are tracking a new variable, reset takeUp and livenessUp.
+      takeUp = {nullptr, {}};
+      livenessUp = {nullptr, {}};
+
+      // Then see if we need to set firstInit so we setup that this block kills
+      // the given range.
+      if (!foundFirstNonLivenessUse) {
+        LLVM_DEBUG(llvm::dbgs() << "    Updated with new init: " << inst);
+        firstInit = {inst, range};
+      } else {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    Found init! Already have first non liveness use. Inst: "
+            << inst);
+      }
+      foundFirstNonLivenessUse = true;
+    }
+
+    /// Track a take given that we emitted a liveness error.
+    ///
+    /// In this case, we reset livenessUp and track the take. We do this to
+    /// ensure that earlier errors are on the consuming take rather than on the
+    /// liveness use. This is especially important when emitting "inout not
+    /// reintialized" errors since we only want one of those to be emitted.
+    void trackTakeForLivenessError(SILInstruction *take,
+                                   TypeTreeLeafTypeRange range) {
+      livenessUp = {nullptr, {}};
+      trackTake(take, range);
+    }
+
+    bool isTrackingAnyState() const { return takeUp.first || livenessUp.first; }
+
+    bool hasLivenessUp() const { return livenessUp.first; }
+
+    SILInstruction *getLivenessUp() const { return livenessUp.first; }
+
+    TypeTreeLeafTypeRange getLivenessUpTypeRange() const {
+      return *livenessUp.second;
+    }
+
+    SILInstruction *getFirstInit() const { return firstInit.first; }
+
+    TypeTreeLeafTypeRange getFirstInitTypeRange() const {
+      return *firstInit.second;
+    }
+
+    SILInstruction *getFirstTake() const { return firstTake.first; }
+
+    TypeTreeLeafTypeRange getFirstTakeTypeRange() const {
+      return *firstTake.second;
+    }
+
+    bool hasTakeUp() const { return takeUp.first; }
+
+    SILInstruction *getTakeUp() const { return takeUp.first; }
+
+    TypeTreeLeafTypeRange getTakeUpTypeRange() const { return *takeUp.second; }
+  };
+
   LLVM_DEBUG(llvm::dbgs() << "Performing single basic block checks!\n");
   for (auto &block : *fn) {
     LLVM_DEBUG(llvm::dbgs()
                << "Visiting block: bb" << block.getDebugID() << "\n");
     // Then walk backwards from the bottom of the block to the top, initializing
     // its state, handling any completely in block diagnostics.
-    InstOptionalLeafTypePair takeUp = {nullptr, {}};
-    InstOptionalLeafTypePair firstTake = {nullptr, {}};
-    InstOptionalLeafTypePair firstInit = {nullptr, {}};
-    InstOptionalLeafTypePair livenessUp = {nullptr, {}};
-    bool foundFirstNonLivenessUse = false;
     auto *term = block.getTerminator();
     bool isExitBlock = term->isFunctionExiting();
+
+    LocalDataflowState state;
     for (auto &inst : llvm::reverse(block)) {
       if (isExitBlock && isInOut && &inst == term) {
         LLVM_DEBUG(llvm::dbgs()
                    << "    Found inout term liveness user: " << inst);
-        livenessUp = {&inst, TypeTreeLeafTypeRange(markedAddress)};
+        state.initializeLivenessUp(&inst, markedAddress);
         continue;
       }
 
       {
         auto iter = addressUseState.takeInsts.find(&inst);
         if (iter != addressUseState.takeInsts.end()) {
-          SWIFT_DEFER { foundFirstNonLivenessUse = true; };
-
           // If we are not yet tracking a "take up" or a "liveness up", then we
           // can update our state. In those other two cases we emit an error
           // diagnostic below.
-          if (!takeUp.first && !livenessUp.first) {
+          if (!state.isTrackingAnyState()) {
             LLVM_DEBUG(llvm::dbgs()
                        << "    Tracking new take up: " << *iter->first);
-            if (!foundFirstNonLivenessUse) {
-              firstTake = {iter->first, iter->second};
-            }
-            takeUp = {iter->first, iter->second};
+            state.trackTake(iter->first, iter->second);
             continue;
           }
 
           bool emittedSomeDiagnostic = false;
-          if (takeUp.first) {
+          if (auto *takeUp = state.getTakeUp()) {
             LLVM_DEBUG(llvm::dbgs()
                        << "    Found two takes, emitting error!\n");
-            LLVM_DEBUG(llvm::dbgs() << "    First take: " << *takeUp.first);
+            LLVM_DEBUG(llvm::dbgs() << "    First take: " << *takeUp);
             LLVM_DEBUG(llvm::dbgs() << "    Second take: " << inst);
             diagnosticEmitter.emitAddressDiagnostic(
-                markedAddress, takeUp.first, &inst, true /*is consuming*/);
+                markedAddress, takeUp, &inst, true /*is consuming*/);
             emittedSomeDiagnostic = true;
           }
 
-          if (livenessUp.first) {
-            if (livenessUp.first == term && isInOut) {
+          // If we found a liveness inst, we are going to emit an error since we
+          // have a use after free.
+          if (auto *livenessUpInst = state.getLivenessUp()) {
+            // If we are tracking state for an inout and our liveness inst is a
+            // function exiting instruction, we want to emit a special
+            // diagnostic error saying that the user has not reinitialized inout
+            // along a path to the end of the function.
+            if (livenessUpInst == term && isInOut) {
               LLVM_DEBUG(llvm::dbgs()
                          << "    Found liveness inout error: " << inst);
               // Even though we emit a diagnostic for inout here, we actually
@@ -1338,13 +1465,14 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
               // if we have multiple consumes along that path.
               diagnosticEmitter.emitInOutEndOfFunctionDiagnostic(markedAddress,
                                                                  &inst);
-              livenessUp = {nullptr, {}};
-              takeUp = {iter->first, iter->second};
+              state.trackTakeForLivenessError(iter->first, iter->second);
             } else {
+              // Otherwise, we just emit a normal liveness error.
               LLVM_DEBUG(llvm::dbgs() << "    Found liveness error: " << inst);
               diagnosticEmitter.emitAddressDiagnostic(
-                  markedAddress, livenessUp.first, &inst,
+                  markedAddress, livenessUpInst, &inst,
                   false /*is not consuming*/);
+              state.trackTakeForLivenessError(iter->first, iter->second);
             }
             emittedSomeDiagnostic = true;
           }
@@ -1359,17 +1487,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       {
         auto iter = addressUseState.livenessUses.find(&inst);
         if (iter != addressUseState.livenessUses.end()) {
-          if (!livenessUp.first) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Found liveness use! Propagating liveness. Inst: "
-                       << inst);
-            livenessUp = {iter->first, iter->second};
-          } else {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "    Found liveness use! Already tracking liveness. Inst: "
-                << inst);
-          }
+          state.trackLivenessUp(iter->first, iter->second);
           continue;
         }
       }
@@ -1378,17 +1496,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       {
         auto iter = addressUseState.borrows.find(&inst);
         if (iter != addressUseState.borrows.end()) {
-          if (!livenessUp.first) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Found borrowed use! Propagating liveness. Inst: "
-                       << inst);
-            livenessUp = {iter->first, iter->second};
-          } else {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "    Found borrowed use! Already tracking liveness. Inst: "
-                << inst);
-          }
+          state.trackLivenessUp(iter->first, iter->second);
           continue;
         }
       }
@@ -1397,78 +1505,64 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       {
         auto iter = addressUseState.initInsts.find(&inst);
         if (iter != addressUseState.initInsts.end()) {
-          takeUp = {nullptr, {}};
-          livenessUp = {nullptr, {}};
-          if (!foundFirstNonLivenessUse) {
-            LLVM_DEBUG(llvm::dbgs() << "    Updated with new init: " << inst);
-            firstInit = {iter->first, iter->second};
-          } else {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "    Found init! Already have first non liveness use. Inst: "
-                << inst);
-          }
-          foundFirstNonLivenessUse = true;
+          state.trackInit(iter->first, iter->second);
           continue;
         }
       }
 
-      // We treat the reinit a reinit as only a kill and not an additional
-      // take. This is because, we are treating their destroy as a last use like
-      // destroy_addr. The hope is that as part of doing fixups, we can just
-      // change this to a store [init] if there isn't an earlier reachable take
-      // use, like we do with destroy_addr.
+      // We treat reinits in the following way:
+      //
+      // 1. For takes that we want to treat like destroy_addr (e.x.: store
+      // [assign] and copy_addr [!init], we treat the reinit as only a kill and
+      // not an additional take. This is because, we are treating their destroy
+      // as a last use like destroy_addr. The hope is that as part of doing
+      // fixups, we can just change this to a store [init] if there isn't an
+      // earlier reachable take use, like we do with destroy_addr.
+      //
+      // 2. If we are unable to convert the reinit, it is a reinit like a
+      // YieldInst or an ApplySite. In that case, we treat this as an actual
+      // kill/take and reinit with a new value.
       {
         auto iter = addressUseState.reinitInsts.find(&inst);
         if (iter != addressUseState.reinitInsts.end()) {
-          takeUp = {nullptr, {}};
-          livenessUp = {nullptr, {}};
-          if (!foundFirstNonLivenessUse) {
-            LLVM_DEBUG(llvm::dbgs() << "    Updated with new reinit: " << inst);
-            firstInit = {iter->first, iter->second};
-          } else {
-            LLVM_DEBUG(llvm::dbgs() << "    Found new reinit, but already "
-                                       "tracking a liveness init. Inst: "
-                                    << inst);
-          }
-          foundFirstNonLivenessUse = true;
+          state.trackInit(iter->first, iter->second);
           continue;
         }
       }
     }
 
     LLVM_DEBUG(llvm::dbgs() << "End of block. Dumping Results!\n");
-    if (firstInit.first) {
-      LLVM_DEBUG(llvm::dbgs() << "    First Init Down: " << *firstInit.first);
-      initDownInsts.emplace_back(firstInit.first, *firstInit.second);
+    if (auto *firstInit = state.getFirstInit()) {
+      LLVM_DEBUG(llvm::dbgs() << "    First Init Down: " << *firstInit);
+      initDownInsts.emplace_back(firstInit, state.getFirstInitTypeRange());
     } else {
       LLVM_DEBUG(llvm::dbgs() << "    No Init Down!\n");
     }
 
     // At this point we want to begin mapping blocks to "first" users.
-    if (takeUp.first) {
-      LLVM_DEBUG(llvm::dbgs() << "Take Up: " << *takeUp.first);
+    if (auto *takeUp = state.getTakeUp()) {
+      LLVM_DEBUG(llvm::dbgs() << "Take Up: " << takeUp);
       blockToState.try_emplace(&block,
-                               BlockState(takeUp.first, firstInit.first));
-      takeUpInsts.emplace_back(takeUp.first, *takeUp.second);
+                               BlockState(takeUp, state.getFirstInit()));
+      takeUpInsts.emplace_back(takeUp, state.getTakeUpTypeRange());
     } else {
       LLVM_DEBUG(llvm::dbgs() << "    No Take Up!\n");
     }
 
-    if (livenessUp.first) {
+    if (auto *liveness = state.getLivenessUp()) {
       // This try_emplace fail if we already above initialized blockToState
       // above in the previous if block.
       blockToState.try_emplace(&block,
-                               BlockState(livenessUp.first, firstInit.first));
-      LLVM_DEBUG(llvm::dbgs() << "Liveness Up: " << *livenessUp.first);
-      livenessUpInsts.emplace_back(livenessUp.first, *livenessUp.second);
+                               BlockState(liveness, state.getFirstInit()));
+      LLVM_DEBUG(llvm::dbgs() << "Liveness Up: " << *liveness);
+      livenessUpInsts.emplace_back(liveness, state.getLivenessUpTypeRange());
     } else {
       LLVM_DEBUG(llvm::dbgs() << "    No Liveness Up!\n");
     }
 
-    if (firstTake.first) {
-      LLVM_DEBUG(llvm::dbgs() << "    First Take Down: " << *firstTake.first);
-      takeDownInsts.emplace_back(firstTake.first, *firstTake.second);
+    if (auto *firstTakeInst = state.getFirstTake()) {
+      LLVM_DEBUG(llvm::dbgs() << "    First Take Down: " << *firstTakeInst);
+      takeDownInsts.emplace_back(firstTakeInst, state.getFirstTakeTypeRange());
       // We only emplace if we didn't already have a takeUp above. In such a
       // case, the try_emplace fails.
       blockToState.try_emplace(&block, BlockState(nullptr, false));
