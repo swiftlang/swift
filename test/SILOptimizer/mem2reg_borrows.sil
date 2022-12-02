@@ -207,6 +207,26 @@ bb0(%0 : @guaranteed $Klass):
   return %8 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test5_lexical :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test5_lexical'
+sil [ossa] @test5_lexical : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  %f = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %b1 = begin_borrow %0 : $Klass
+  %sb1 = store_borrow %b1 to %stk : $*Klass
+  %lb1 = load_borrow %sb1 : $*Klass
+  apply %f(%lb1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %lb1 : $Klass
+  dealloc_stack  %stk : $*Klass
+  end_borrow %sb1 : $*Klass
+  end_borrow %b1 : $Klass
+  destroy_value %0 : $Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test6 :
 // CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test6'

@@ -1881,8 +1881,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (dsi->getOperand() == asi) {
         deleter.forceDelete(dsi);
         NumInstRemoved++;
-        // No need to continue scanning after deallocation.
-        break;
+        // Continue even after deallocation, there may be begin_borrows created
+        // for store_borrow whose lifetime needs to be ended.
+        continue;
       }
     }
 
