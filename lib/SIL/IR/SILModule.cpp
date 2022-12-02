@@ -164,8 +164,8 @@ void SILModule::checkForLeaks() const {
   if (!getOptions().checkSILModuleLeaks)
     return;
 
-  int instsInModule = std::distance(scheduledForDeletion.begin(),
-                                    scheduledForDeletion.end());
+  int instsInModule = scheduledForDeletion.size();
+
   for (const SILFunction &F : *this) {
     const SILFunction *sn = &F;
     do {
@@ -280,11 +280,11 @@ void SILModule::scheduleForDeletion(SILInstruction *I) {
 }
 
 void SILModule::flushDeletedInsts() {
-  while (!scheduledForDeletion.empty()) {
-    SILInstruction *inst = &*scheduledForDeletion.begin();
-    scheduledForDeletion.erase(inst);
-    AlignedFree(inst);
+  for (SILInstruction *instToDelete : scheduledForDeletion) {
+    SILInstruction::destroy(instToDelete);
+    AlignedFree(instToDelete);
   }
+  scheduledForDeletion.clear();
 }
 
 SILWitnessTable *
