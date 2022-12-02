@@ -128,6 +128,14 @@ public:
 
 template <typename F>
 void enumerateFunctionsForHasSymbol(SILModule &M, ValueDecl *D, F Handler) {
+  // Handle clang decls separately.
+  if (auto *clangDecl = D->getClangDecl()) {
+    if (isa<clang::FunctionDecl>(clangDecl))
+      Handler(SILDeclRef(D).asForeign());
+
+    return;
+  }
+
   class SymbolVisitor : public SILSymbolVisitor {
     F Handler;
 
