@@ -8,7 +8,7 @@
 public func variadicFunction<T..., U...>(t: T..., u: U...) -> ((T, U)...) {}
 
 public struct VariadicType<T...> {
-  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV14variadicMethod1t1ux_qd__txQp_txxQp_qd__qd__Qptqd__RhzlF : $@convention(method) <T...><U... where ((T, U)...) : Any> (@in_guaranteed T..., @in_guaranteed U..., VariadicType<T>) -> @out (T, U)... {
-  // CHECK: bb0(%0 : $*(T, U)..., %1 : $*T..., %2 : $*U..., %3 : $VariadicType<T>):
+  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV14variadicMethod1t1ux_qd__txQp_txxQp_qd__qd__Qptqd__RhzlF : $@convention(method) <T...><U... where ((T, U)...) : Any> (@in_guaranteed T..., @in_guaranteed U..., VariadicType<T...>) -> @out (T, U)... {
+  // CHECK: bb0(%0 : $*(T, U)..., %1 : $*T..., %2 : $*U..., %3 : $VariadicType<T...>):
   public func variadicMethod<U...>(t: T..., u: U...) -> ((T, U)...) {}
 }

@@ -366,7 +366,6 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
       AngleBrackets(AngleBrackets) {
     Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
-    assert(!GenericArgs.empty());
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
       assert(arg != nullptr);
