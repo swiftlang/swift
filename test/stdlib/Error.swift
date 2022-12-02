@@ -232,8 +232,8 @@ ErrorTests.test("willThrow") {
     return
   }
   setWillThrowHandler {
-    if let object = Unmanaged<AnyObject>.fromOpaque($0).takeUnretainedValue(),
-       let error = object as? Error {
+    let object = Unmanaged<AnyObject>.fromOpaque($0).takeUnretainedValue()
+    if let error = object as? Error {
       errors.append(error)
     }
   }
