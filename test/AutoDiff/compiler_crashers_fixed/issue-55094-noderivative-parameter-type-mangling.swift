@@ -4,8 +4,8 @@
 // IRGenDebugInfo type reconstruction crash because `@noDerivative` parameters
 // are not mangled
 
-// FIXME: Disabled due to flakiness on Linux (https://github.com/apple/swift/issues/55466), likely related to TF-1197.
-// REQUIRES: SR13021
+// FIXME(https://github.com/apple/swift/issues/55466): Disabled due to flakiness on Linux, likely related to TF-1197.
+// REQUIRES: issue_55466
 
 import _Differentiation
 func id(_ x: Float, _ y: Float) -> Float { x }

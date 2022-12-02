@@ -1171,7 +1171,7 @@ endif()
 # declares the swift-stdlib-* set of targets. These targets will then
 # implicitly depend on any targets declared with IS_STDLIB.
 #
-# https://bugs.swift.org/browse/SR-5975
+# https://github.com/apple/swift/issues/48534
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
@@ -1211,7 +1211,7 @@ if(SWIFT_INCLUDE_TOOLS)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
-  # https://bugs.swift.org/browse/SR-5975
+  # https://github.com/apple/swift/issues/48534
   add_subdirectory(tools)
 
   # Localization targets are configured in a way that assume the swift
