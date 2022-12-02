@@ -1457,8 +1457,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
 
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord: {
-    auto *funcDC = getSILFunction()->getDeclContext();
-    return funcDC->getParentModule();
+    return getSILFunction()->getParentModule();
   }
 
   case Kind::RuntimeDiscoverableAttributeRecord: {
