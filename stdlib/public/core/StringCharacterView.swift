@@ -34,6 +34,11 @@ extension String: BidirectionalCollection {
   public var endIndex: Index { return _guts.endIndex }
 
   /// The number of characters in a string.
+  ///
+  /// To check whether a string is empty,
+  /// use its `isEmpty` property instead of comparing `count` to zero.
+  ///
+  /// - Complexity: O(n), where n is the length of the string.
   @inline(__always)
   public var count: Int {
     return distance(from: startIndex, to: endIndex)
