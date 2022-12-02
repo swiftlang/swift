@@ -3895,9 +3895,9 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
       continue;
     }
     // willDeleteInstruction was already called for open_existential_value to
-    // update the registered type. Carry out the remaining deletion steps.
-    deadInst->getParent()->remove(deadInst);
-    pass.getModule()->scheduleForDeletion(deadInst);
+    // update the registered type. Now fully erase the instruction, which will
+    // harmlessly call willDeleteInstruction again.
+    deadInst->getParent()->erase(deadInst);
   }
 
   pass.valueStorageMap.clear();

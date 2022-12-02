@@ -376,9 +376,6 @@ protected:
     NumCreatedInstructions++;
   }
 
-  /// This method unlinks 'self' from the containing basic block.
-  void removeFromParent();
-
   ~SILInstruction() {
     NumDeletedInstructions++;
   }

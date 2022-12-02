@@ -148,9 +148,10 @@ public:
 
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
-  void remove(SILInstruction *I);
   void erase(SILInstruction *I);
   void erase(SILInstruction *I, SILModule &module);
+  static void moveInstruction(SILInstruction *inst, SILInstruction *beforeInst);
+  void moveInstructionToFront(SILInstruction *inst);
 
   void eraseAllInstructions(SILModule &module);
 

@@ -91,10 +91,6 @@ void SILBasicBlock::push_front(SILInstruction *I) {
   InstList.push_front(I);
 }
 
-void SILBasicBlock::remove(SILInstruction *I) {
-  InstList.remove(I);
-}
-
 void SILBasicBlock::eraseAllInstructions(SILModule &module) {
   while (!empty()) {
     erase(&*begin(), module);
@@ -110,6 +106,21 @@ void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
   module.willDeleteInstruction(I);
   InstList.remove(I);
   module.scheduleForDeletion(I);
+}
+
+void SILBasicBlock::moveInstruction(SILInstruction *inst,
+                                    SILInstruction *beforeInst) {
+  if (inst == beforeInst)
+    return;
+  inst->getParent()->InstList.remove(inst);
+  inst->ParentBB = nullptr;
+  beforeInst->getParent()->insert(beforeInst->getIterator(), inst);
+}
+
+void SILBasicBlock::moveInstructionToFront(SILInstruction *inst) {
+  inst->getParent()->InstList.remove(inst);
+  inst->ParentBB = nullptr;
+  push_front(inst);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.

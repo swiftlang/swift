@@ -103,16 +103,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
 
-void SILInstruction::removeFromParent() {
-#ifndef NDEBUG
-  for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
-  }
-#endif
-  getParent()->remove(this);
-  ParentBB = nullptr;
-}
-
 /// eraseFromParent - This method unlinks 'self' from the containing basic
 /// block and deletes it.
 ///
@@ -126,18 +116,13 @@ void SILInstruction::eraseFromParent() {
 }
 
 void SILInstruction::moveFront(SILBasicBlock *Block) {
-  getParent()->remove(this);
-  Block->push_front(this);
+  Block->moveInstructionToFront(this);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
 /// the basic block that Later lives in, right before Later.
 void SILInstruction::moveBefore(SILInstruction *Later) {
-  if (this == Later)
-    return;
-
-  getParent()->remove(this);
-  Later->getParent()->insert(Later, this);
+  SILBasicBlock::moveInstruction(this, Later);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
