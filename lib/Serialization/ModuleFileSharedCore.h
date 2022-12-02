@@ -151,16 +151,11 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
-  struct SearchPath {
-    std::string Path;
-    bool IsFramework;
-    bool IsSystem;
-  };
   /// Search paths this module may provide.
   ///
   /// This is not intended for use by frameworks, but may show up in debug
   /// modules.
-  std::vector<SearchPath> SearchPaths;
+  std::vector<serialization::SearchPath> SearchPaths;
 
   /// Info for the (lone) imported header for this module.
   struct {
