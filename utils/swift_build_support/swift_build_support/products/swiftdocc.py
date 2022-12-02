@@ -64,13 +64,6 @@ class SwiftDocC(product.Product):
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
         ]
-
-        # Pass Cross compile host info
-        if self.has_cross_compile_hosts() and self.is_darwin_host(host_target):
-            helper_cmd += ['--cross-compile-hosts']
-            for cross_compile_host in self.args.cross_compile_hosts:
-                helper_cmd += [cross_compile_host]
-
         if action != 'install':
             helper_cmd.extend([
                 # There might have been a Package.resolved created by other builds
