@@ -19,6 +19,7 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/CursorInfo.h"
 #include "swift/IDE/ImportDepth.h"
 #include "swift/IDE/SwiftCompletionInfo.h"
 #include "swift/IDE/TypeContextInfo.h"
@@ -74,6 +75,14 @@ struct TypeContextInfoResult {
 struct ConformingMethodListResults {
   /// The actual results. If \c nullptr, no results were found.
   const ConformingMethodListResult *Result;
+  /// Whether an AST was reused for the completion.
+  bool DidReuseAST;
+};
+
+/// The results returned from \c CompletionInstance::conformingMethodList.
+struct CursorInfoResults {
+  /// The actual results. If \c nullptr, no results were found.
+  const ResolvedCursorInfo *Result;
   /// Whether an AST was reused for the completion.
   bool DidReuseAST;
 };
@@ -192,6 +201,14 @@ public:
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
           Callback);
+
+  void cursorInfo(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<CursorInfoResults>)> Callback);
 };
 
 } // namespace ide

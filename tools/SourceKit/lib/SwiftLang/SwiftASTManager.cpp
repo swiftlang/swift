@@ -652,7 +652,8 @@ std::unique_ptr<llvm::MemoryBuffer> SwiftASTManager::getMemoryBuffer(
     StringRef Filename,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
-  return Impl.getMemoryBuffer(Filename, FileSystem, Error);
+  return Impl.getFileContent(Filename, /*IsPrimary=*/false, FileSystem, Error)
+      .Buffer;
 }
 
 static FrontendInputsAndOutputs
