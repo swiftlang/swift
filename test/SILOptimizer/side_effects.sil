@@ -814,6 +814,17 @@ bb0(%0 : $*Int32):
   return %3 : $@callee_owned (Bool) -> Int32
 }
 
+// CHECK-LABEL: sil @partial_apply_chain
+// CHECK-NEXT: [global: ]
+// CHECK-NEXT: {{^[^[]}}
+sil @partial_apply_chain : $@convention(thin) (@in Int32, @in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
+bb0(%0 : $*Int32, %1 : $*Int32):
+  %3 = function_ref @closure2 : $@convention(thin) (Bool, @in Int32, @in Int32) -> Int32
+  %4 = partial_apply %3(%0) : $@convention(thin) (Bool, @in Int32, @in Int32) -> Int32
+  %5 = partial_apply %4(%1) : $@callee_owned (Bool, @in Int32) -> Int32
+  return %5 : $@callee_owned (Bool) -> Int32
+}
+
 // CHECK-LABEL: sil @two_nonstack_partial_applies
 // CHECK-NEXT:  [%0: read v**]
 // CHECK-NEXT:  [%1: write v**]
@@ -851,6 +862,7 @@ bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
 }
 
 sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+sil @closure2 : $@convention(thin) (Bool, @in Int32, @in Int32) -> Int32
 
 sil public_external @public_external_func : $@convention(thin) () -> () {
 bb0:
