@@ -264,9 +264,11 @@ void SILModule::willDeleteInstruction(SILInstruction *I) {
     if (const CanOpenedArchetypeType archeTy =
             svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      RootOpenedArchetypeDefs.erase(key);
+      // In case `willDeleteInstruction` is called twice for the same instruction,
+      // we need to check if the archetype is really still in the map for this
+      // instruction.
+      if (RootOpenedArchetypeDefs.lookup(key) == svi)
+        RootOpenedArchetypeDefs.erase(key);
     }
   }
 }
