@@ -49,7 +49,7 @@ public:
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   // }
 
-  void doneParsing() override;
+  void doneParsing(SourceFile *SrcFile) override;
 };
 
 void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
@@ -64,7 +64,7 @@ void ConformingMethodListCallbacks::completePostfixExpr(Expr *E,
   ParsedExpr = E;
 }
 
-void ConformingMethodListCallbacks::doneParsing() {
+void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   if (!ParsedExpr)
     return;
 
