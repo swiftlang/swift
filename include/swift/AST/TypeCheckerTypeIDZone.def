@@ -434,6 +434,12 @@ SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeStorageWrapperInitializer,
 SWIFT_REQUEST(TypeChecker, SynthesizeLocalVariableForTypeWrapperStorage,
               VarDecl *(ConstructorDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, BreakTargetRequest,
+              LabeledStmt *(const BreakStmt *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ContinueTargetRequest,
+              LabeledStmt *(const ContinueStmt *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

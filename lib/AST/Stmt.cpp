@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -627,6 +628,20 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
     caseStmt->setParentStmt(theSwitch);
 
   return theSwitch;
+}
+
+LabeledStmt *BreakStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, BreakTargetRequest{this}, nullptr);
+}
+
+LabeledStmt *ContinueStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
+  return S->getStartLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is

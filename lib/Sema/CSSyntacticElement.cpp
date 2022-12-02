@@ -1342,27 +1342,14 @@ private:
   }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
-    auto *DC = context.getAsDeclContext();
-    if (auto target = findBreakOrContinueStmtTarget(
-            DC->getASTContext(), DC->getParentSourceFile(), breakStmt->getLoc(),
-            breakStmt->getTargetName(), breakStmt->getTargetLoc(),
-            /*isContinue=*/false, context.getAsDeclContext())) {
-      breakStmt->setTarget(target);
-    }
-
+    // Force the target to be computed in case it produces diagnostics.
+    (void)breakStmt->getTarget();
     return breakStmt;
   }
 
   ASTNode visitContinueStmt(ContinueStmt *continueStmt) {
-    auto *DC = context.getAsDeclContext();
-    if (auto target = findBreakOrContinueStmtTarget(
-            DC->getASTContext(), DC->getParentSourceFile(),
-            continueStmt->getLoc(), continueStmt->getTargetName(),
-            continueStmt->getTargetLoc(), /*isContinue=*/true,
-            context.getAsDeclContext())) {
-      continueStmt->setTarget(target);
-    }
-
+    // Force the target to be computed in case it produces diagnostics.
+    (void)continueStmt->getTarget();
     return continueStmt;
   }
 
