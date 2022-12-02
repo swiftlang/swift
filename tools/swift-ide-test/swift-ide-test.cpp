@@ -3692,23 +3692,24 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     return 1;
   }
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.value());
-  auto SemaT =
-    evaluateOrDefault(SF->getASTContext().evaluator,
-                      CursorInfoRequest{CursorInfoOwner(SF, Loc)},
-                      ResolvedCursorInfo());
-  if (SemaT.isInvalid()) {
+  auto CursorInfo = evaluateOrDefault(
+      SF->getASTContext().evaluator,
+      CursorInfoRequest{CursorInfoOwner(SF, Loc)}, ResolvedCursorInfo());
+  auto SemaT = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (!SemaT) {
     llvm::errs() << "Cannot find sema token at the given location.\n";
     return 1;
   }
-  if (SemaT.Ty.isNull()) {
+  if (SemaT->getType().isNull()) {
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
   StreamPrinter Printer(llvm::outs());
   std::string Error;
   std::string TypeName;
-  if (printTypeInterface(SemaT.ValueD->getDeclContext()->getParentModule(),
-                         SemaT.Ty, Printer, TypeName, Error)) {
+  if (printTypeInterface(
+          SemaT->getValueD()->getDeclContext()->getParentModule(),
+          SemaT->getType(), Printer, TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }

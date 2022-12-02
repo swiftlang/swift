@@ -195,7 +195,7 @@ void Parser::performCodeCompletionSecondPassImpl(
   assert(!State->hasCodeCompletionDelayedDeclState() &&
          "Second pass should not set any code completion info");
 
-  CodeCompletion->doneParsing();
+  CodeCompletion->doneParsing(DC->getParentSourceFile());
 
   State->restoreCodeCompletionDelayedDeclState(info);
 }

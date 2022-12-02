@@ -146,7 +146,8 @@ void SwiftLangSupport::getExpressionContextInfo(
   }
 
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
+      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
         ParamsResult.mapAsync<TypeContextInfoResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
