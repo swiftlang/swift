@@ -859,6 +859,10 @@ public:
   /// applicable.
   StringRef getModuleLoadedFilename() const;
 
+  /// \returns true if this module is defined under the SDK path.
+  /// If no SDK path is defined, this always returns false.
+  bool isSDKModule() const;
+
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 

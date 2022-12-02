@@ -1996,6 +1996,18 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
   return StringRef();
 }
 
+bool ModuleDecl::isSDKModule() const {
+  if (getASTContext().SearchPathOpts.getSDKPath().empty())
+    return false;
+
+  auto sdkPath = SmallString<8>(),
+       modulePath = SmallString<8>();
+  llvm::sys::path::native(getASTContext().SearchPathOpts.getSDKPath(), sdkPath);
+  llvm::sys::path::native(getModuleSourceFilename(), modulePath);
+
+  return modulePath.startswith(sdkPath);
+}
+
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }

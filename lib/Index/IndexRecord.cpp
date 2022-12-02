@@ -447,11 +447,12 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             }
           } else {
             // Serialized AST file.
-            // Only index system modules (essentially stdlib and overlays).
+            // Only index system modules from the SDK, and the stdlib.
             // We don't officially support binary swift modules, so normally
             // the index data for user modules would get generated while
             // building them.
             if (mod->isSystemModule() && indexSystemModules &&
+                (mod->isSDKModule() || mod->isStdlibModule()) &&
                 (!skipStdlib || !mod->isStdlibModule())) {
               emitDataForSwiftSerializedModule(mod, indexStorePath,
                                                indexClangModules,
