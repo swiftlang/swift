@@ -519,7 +519,8 @@ struct CursorSymbolInfo {
 
   llvm::Optional<unsigned> ParentNameOffset;
 
-  void print(llvm::raw_ostream &OS, std::string Indentation) const {
+  void print(llvm::raw_ostream &OS, std::string Indentation,
+             bool ForSolverBasedCursorInfoVerification = false) const {
     OS << Indentation << "CursorSymbolInfo" << '\n';
     OS << Indentation << "  Kind: " << Kind.getName() << '\n';
     OS << Indentation << "  DeclarationLang: " << DeclarationLang.getName()
@@ -528,7 +529,14 @@ struct CursorSymbolInfo {
     OS << Indentation << "  USR: " << USR << '\n';
     OS << Indentation << "  TypeName: " << TypeName << '\n';
     OS << Indentation << "  TypeUSR: " << TypeUSR << '\n';
-    OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
+    // The ContainerTypeUSR varies too much between the solver-based and
+    // AST-based implementation. A few manual inspections showed that the
+    // solver-based container is usually more correct than the old. Instead of
+    // fixing the AST-based container type computation, exclude the container
+    // type from the verification.
+    if (!ForSolverBasedCursorInfoVerification) {
+      OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
+    }
     OS << Indentation << "  DocComment: " << DocComment << '\n';
     OS << Indentation << "  GroupName: " << GroupName << '\n';
     OS << Indentation << "  LocalizationKey: " << LocalizationKey << '\n';
@@ -600,7 +608,7 @@ struct CursorInfoData {
     OS << Indentation << "CursorInfoData" << '\n';
     OS << Indentation << "  Symbols:" << '\n';
     for (auto Symbol : Symbols) {
-      Symbol.print(OS, Indentation + "    ");
+      Symbol.print(OS, Indentation + "    ", ForSolverBasedCursorInfoVerification);
     }
     OS << Indentation << "  AvailableActions:" << '\n';
     for (auto AvailableAction : AvailableActions) {

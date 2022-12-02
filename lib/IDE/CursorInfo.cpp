@@ -16,6 +16,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/IDE/SelectedOverloadInfo.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -51,9 +52,11 @@ void typeCheckDeclAndParentClosures(ValueDecl *VD) {
       TypeCheckASTNodeAtLocContext::declContext(VD->getDeclContext()),
       VD->getLoc());
   if (auto VarD = dyn_cast<VarDecl>(VD)) {
-    // Type check any attached property wrappers so the annotated declaration
-    // can refer to their USRs.
-    (void)VarD->getPropertyWrapperBackingPropertyType();
+    if (VarD->hasAttachedPropertyWrapper()) {
+      // Type check any attached property wrappers so the annotated declaration
+      // can refer to their USRs.
+      (void)VarD->getPropertyWrapperBackingPropertyType();
+    }
     // Visit emitted accessors so we generated accessors from property wrappers.
     VarD->visitEmittedAccessors([&](AccessorDecl *accessor) {});
   }
@@ -61,7 +64,7 @@ void typeCheckDeclAndParentClosures(ValueDecl *VD) {
 
 // MARK: - NodeFinderResults
 
-enum class NodeFinderResultKind { Decl };
+enum class NodeFinderResultKind { Decl, Expr };
 
 class NodeFinderResult {
   NodeFinderResultKind Kind;
@@ -84,6 +87,24 @@ public:
 
   static bool classof(const NodeFinderResult *Res) {
     return Res->getKind() == NodeFinderResultKind::Decl;
+  }
+};
+
+class NodeFinderExprResult : public NodeFinderResult {
+  Expr *E;
+  /// The \c DeclContext in which \c E occurs.
+  DeclContext *DC;
+
+public:
+  NodeFinderExprResult(Expr *E, DeclContext *DC)
+      : NodeFinderResult(NodeFinderResultKind::Expr), E(E), DC(DC) {}
+
+  Expr *getExpr() const { return E; }
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  static bool classof(const NodeFinderResult *Res) {
+    return Res->getKind() == NodeFinderResultKind::Expr;
   }
 };
 
@@ -192,6 +213,23 @@ private:
       }
     }
 
+    if (E->getLoc() != LocToResolve) {
+      return Action::Continue(E);
+    }
+
+    switch (E->getKind()) {
+    case ExprKind::DeclRef:
+    case ExprKind::UnresolvedDot:
+    case ExprKind::UnresolvedDeclRef: {
+      assert(Result == nullptr);
+      Result =
+          std::make_unique<NodeFinderExprResult>(E, getCurrentDeclContext());
+      return Action::Stop();
+    }
+    default:
+      break;
+    }
+
     return Action::Continue(E);
   }
 
@@ -213,6 +251,57 @@ private:
     }
     return Action::Continue(S);
   }
+};
+
+// MARK: - Solver-based expression analysis
+
+class CursorInfoTypeCheckSolutionCallback : public TypeCheckCompletionCallback {
+public:
+  struct CursorInfoDeclReference {
+    /// If the referenced declaration is a member reference, the type of the
+    /// member's base, otherwise \c null.
+    Type BaseType;
+    /// Whether the reference is dynamic (see \c ide::isDynamicRef)
+    bool IsDynamicRef;
+    /// The declaration that is being referenced. Will never be \c nullptr.
+    ValueDecl *ReferencedDecl;
+  };
+
+private:
+  /// The expression for which we want to provide cursor info results.
+  Expr *ResolveExpr;
+
+  SmallVector<CursorInfoDeclReference, 1> Results;
+
+  void sawSolutionImpl(const Solution &S) override {
+    auto &CS = S.getConstraintSystem();
+
+    auto Locator = CS.getConstraintLocator(ResolveExpr);
+    auto CalleeLocator = S.getCalleeLocator(Locator);
+    auto OverloadInfo = getSelectedOverloadInfo(S, CalleeLocator);
+    if (!OverloadInfo.Value) {
+      // We could not resolve the referenced declaration. Skip the solution.
+      return;
+    }
+
+    bool IsDynamicRef = false;
+    auto BaseLocator =
+        CS.getConstraintLocator(Locator, ConstraintLocator::MemberRefBase);
+    if (auto BaseExpr =
+            simplifyLocatorToAnchor(BaseLocator).dyn_cast<Expr *>()) {
+      IsDynamicRef =
+          ide::isDynamicRef(BaseExpr, OverloadInfo.Value,
+                            [&S](Expr *E) { return S.getResolvedType(E); });
+    }
+
+    Results.push_back({OverloadInfo.BaseTy, IsDynamicRef, OverloadInfo.Value});
+  }
+
+public:
+  CursorInfoTypeCheckSolutionCallback(Expr *ResolveExpr)
+      : ResolveExpr(ResolveExpr) {}
+
+  ArrayRef<CursorInfoDeclReference> getResults() const { return Results; }
 };
 
 // MARK: - CursorInfoDoneParsingCallback
@@ -242,6 +331,59 @@ public:
     return CursorInfo;
   }
 
+  std::unique_ptr<ResolvedCursorInfo>
+  getExprResult(NodeFinderExprResult *ExprResult, SourceFile *SrcFile,
+                NodeFinder &Finder) const {
+    Expr *E = ExprResult->getExpr();
+    DeclContext *DC = ExprResult->getDeclContext();
+
+    // Type check the statemnt containing E and listen for solutions.
+    CursorInfoTypeCheckSolutionCallback Callback(E);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        DC->getASTContext().SolutionCallback, &Callback);
+    typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
+                          E->getLoc());
+
+    if (Callback.getResults().empty()) {
+      // No results.
+      return nullptr;
+    }
+
+    for (auto Info : Callback.getResults()) {
+      // Type check the referenced decls so that all their parent closures are
+      // type-checked (see comment in typeCheckDeclAndParentClosures).
+      typeCheckDeclAndParentClosures(Info.ReferencedDecl);
+    }
+
+    if (Callback.getResults().size() != 1) {
+      // FIXME: We need to be able to report multiple results.
+      return nullptr;
+    }
+
+    // Deliver results
+
+    auto Res = Callback.getResults()[0];
+    auto CursorInfo = std::make_unique<ResolvedValueRefCursorInfo>(
+        ResolvedCursorInfo(SrcFile), Res.ReferencedDecl, /*CtorTyRef=*/nullptr,
+        /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
+        /*ContainerType=*/Res.BaseType);
+    CursorInfo->setLoc(RequestedLoc);
+    CursorInfo->setIsDynamic(Res.IsDynamicRef);
+    if (Res.IsDynamicRef && Res.BaseType) {
+      if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
+        CursorInfo->setReceiverTypes({ReceiverType});
+      } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
+        // Look through metatypes to get the nominal type decl.
+        if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
+          CursorInfo->setReceiverTypes({ReceiverType});
+        }
+      }
+    }
+    CursorInfo->setShorthandShadowedDecls(
+        Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
+    return CursorInfo;
+  }
+
   void doneParsing(SourceFile *SrcFile) override {
     if (!SrcFile) {
       return;
@@ -256,6 +398,10 @@ public:
     switch (Result->getKind()) {
     case NodeFinderResultKind::Decl:
       CursorInfo = getDeclResult(cast<NodeFinderDeclResult>(Result.get()),
+                                 SrcFile, Finder);
+      break;
+    case NodeFinderResultKind::Expr:
+      CursorInfo = getExprResult(cast<NodeFinderExprResult>(Result.get()),
                                  SrcFile, Finder);
       break;
     }
