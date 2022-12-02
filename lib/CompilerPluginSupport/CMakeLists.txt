@@ -18,6 +18,12 @@ if(SWIFT_SWIFT_PARSER)
   add_library("${library_name}" SHARED
     CompilerPluginSupport.swift)
 
+  set_target_properties(${library_name}
+    PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/swift/host"
+      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/swift/host"
+  )
+
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
@@ -28,7 +34,7 @@ if(SWIFT_SWIFT_PARSER)
 
   # Determine the Swift module path
   set(module_triple ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE})
-  set(module_dir "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+  set(module_dir "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
   set(module_base "${module_dir}/${module_name}.swiftmodule")
   set(module_file "${module_base}/${module_triple}.swiftmodule")
   set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
@@ -82,17 +88,17 @@ if(SWIFT_SWIFT_PARSER)
       DESTINATION "bin"
       COMPONENT compiler
     FRAMEWORK
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
       COMPONENT compiler
     LIBRARY
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
       COMPONENT compiler
     ARCHIVE
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
       COMPONENT compiler)
 
     swift_install_in_component(DIRECTORY "${module_base}"
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
                                COMPONENT compiler)
 
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${library_name})
