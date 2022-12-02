@@ -121,6 +121,10 @@ public:
   /// to the user of the compiler in any way.
   static StringRef getKindName(StmtKind kind);
 
+  /// Retrieve the descriptive kind name for a given statement. This is suitable
+  /// for use in diagnostics.
+  static StringRef getDescriptiveKindName(StmtKind K);
+
   /// Return the location of the start of the statement.
   SourceLoc getStartLoc() const;
   
