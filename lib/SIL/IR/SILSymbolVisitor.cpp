@@ -367,9 +367,8 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
 
   void addRuntimeDiscoverableAttrGenerators(ValueDecl *D) {
     for (auto *attr : D->getRuntimeDiscoverableAttrs()) {
-      auto *generator = D->getRuntimeDiscoverableAttributeGenerator(attr);
-      assert(generator);
-      addFunction(SILDeclRef(generator), /*ignoreLinkage=*/true);
+      addFunction(SILDeclRef::getRuntimeAttributeGenerator(attr, D),
+                  /*ignoreLinkage=*/true);
     }
   }
 

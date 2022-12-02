@@ -53,6 +53,7 @@ namespace swift {
   enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
   class GenericSignature;
+  class CustomAttr;
 
 /// How a method is dispatched.
 enum class MethodDispatch {
@@ -162,6 +163,10 @@ struct SILDeclRef {
 
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
+
+    /// This constant references the generator function used to instantiate
+    /// attribute value associated with a particular declaration.
+    RuntimeAttributeGenerator,
   };
 
   /// Represents the variants of a back deployable function.
@@ -198,7 +203,7 @@ struct SILDeclRef {
   unsigned defaultArgIndex : 10;
 
   PointerUnion<AutoDiffDerivativeFunctionIdentifier *,
-               const GenericSignatureImpl *>
+               const GenericSignatureImpl *, CustomAttr *>
       pointer;
 
   /// Returns the type of AST node location being stored by the SILDeclRef.
@@ -276,6 +281,9 @@ struct SILDeclRef {
 
   /// Produces a SILDeclRef for the entry-point of an async main FileUnit.
   static SILDeclRef getAsyncMainFileEntryPoint(FileUnit *file);
+
+  static SILDeclRef getRuntimeAttributeGenerator(CustomAttr *attr,
+                                                 ValueDecl *decl);
 
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }

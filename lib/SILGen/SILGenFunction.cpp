@@ -144,9 +144,14 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
   case SILDeclRef::Kind::AsyncEntryPoint:
-  case SILDeclRef::Kind::EntryPoint:
+  case SILDeclRef::Kind::EntryPoint: {
     auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
     return getMagicFunctionName(file);
+  }
+  case SILDeclRef::Kind::RuntimeAttributeGenerator: {
+    auto *DC = dyn_cast<DeclContext>(ref.getDecl());
+    return getMagicFunctionName(DC ? DC : ref.getDecl()->getDeclContext());
+  }
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -1037,6 +1042,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
+  } else if (function.kind == SILDeclRef::Kind::RuntimeAttributeGenerator) {
+    params = ParameterList::createEmpty(getASTContext());
   }
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);

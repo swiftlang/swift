@@ -369,6 +369,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
+  case Kind::RuntimeAttributeGenerator:
     // Implicit decls for these don't splice in user-written code.
     return false;
   }
@@ -508,6 +509,9 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::IVarDestroyer:
     // ivar initializers and destroyers are completely contained within the
     // class from which they come, and never get seen externally.
+    return Limit::NeverPublic;
+
+  case Kind::RuntimeAttributeGenerator:
     return Limit::NeverPublic;
 
   case Kind::EntryPoint:
@@ -668,6 +672,16 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   SILDeclRef result;
   result.loc = file;
   result.kind = Kind::EntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getRuntimeAttributeGenerator(CustomAttr *attr,
+                                                    ValueDecl *decl) {
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::RuntimeAttributeGenerator;
+  result.isRuntimeAccessible = true;
+  result.pointer = attr;
   return result;
 }
 
@@ -1009,7 +1023,8 @@ bool SILDeclRef::isBackDeploymentThunk() const {
 }
 
 bool SILDeclRef::isRuntimeAccessibleFunction() const {
-  return isRuntimeAccessible && kind == Kind::Func;
+  return isRuntimeAccessible &&
+         (kind == Kind::Func || kind == Kind::RuntimeAttributeGenerator);
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
@@ -1188,6 +1203,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
   }
+
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    return mangler.mangleRuntimeAttributeGeneratorEntity(
+        loc.get<ValueDecl *>(), pointer.get<CustomAttr *>(), SKind);
   }
 
   llvm_unreachable("bad entity kind!");
@@ -1556,7 +1575,7 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   // Always uncurried even if the underlying function is curried.
   if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
-      kind == Kind::AsyncEntryPoint)
+      kind == Kind::AsyncEntryPoint || kind == Kind::RuntimeAttributeGenerator)
     return 1;
 
   auto *vd = getDecl();

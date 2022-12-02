@@ -4414,9 +4414,7 @@ void IRGenModule::emitRuntimeDiscoverableAttributes(
 
   // Map attribute type to each declaration it's attached to
   // and a corresponding generator function.
-  llvm::DenseMap<NominalTypeDecl *,
-                 SmallVector<std::pair<ValueDecl *, SILFunction *>, 2>>
-      attributes;
+  llvm::MapVector<NominalTypeDecl *, SmallVector<SILDeclRef, 2>> attributes;
   {
     for (auto *fileUnit : filesToEmit) {
       auto *SF = dyn_cast<SourceFile>(fileUnit);
@@ -4426,14 +4424,15 @@ void IRGenModule::emitRuntimeDiscoverableAttributes(
       for (auto *decl : SF->getDeclsWithRuntimeDiscoverableAttrs()) {
         for (auto *attr : decl->getRuntimeDiscoverableAttrs()) {
           auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
-          auto *generator = getSILModule().lookUpFunction(
-              SILDeclRef(decl->getRuntimeDiscoverableAttributeGenerator(attr)));
-
-          attributes[attrType].push_back({decl, generator});
+          attributes[attrType].push_back(
+              SILDeclRef::getRuntimeAttributeGenerator(attr, decl)
+                  .asRuntimeAccessible());
         }
       }
     }
   }
+
+  auto &SM = getSILModule();
 
   for (auto &attr : attributes) {
     auto *attrType = attr.first;
@@ -4457,9 +4456,9 @@ void IRGenModule::emitRuntimeDiscoverableAttributes(
     B.addInt32(attachedTo.size());
 
     // Emit all of the trailing objects
-    for (auto &e : attachedTo) {
-      auto type = e.first->getInterfaceType()->getCanonicalType();
-      auto *generator = e.second;
+    for (auto &ref : attachedTo) {
+      auto type = ref.getDecl()->getInterfaceType()->getCanonicalType();
+      auto *generator = SM.lookUpFunction(ref);
 
       B.addRelativeAddress(
           getTypeRef(type, /*genericSig=*/nullptr, MangledTypeRefRole::Metadata)

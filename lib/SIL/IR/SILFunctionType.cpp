@@ -2396,6 +2396,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::RuntimeAttributeGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
@@ -3238,6 +3239,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
@@ -3508,6 +3510,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::RuntimeAttributeGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
@@ -4370,6 +4373,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
