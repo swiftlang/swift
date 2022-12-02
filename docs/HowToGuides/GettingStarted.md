@@ -145,7 +145,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 [Xcode]: https://developer.apple.com/xcode/resources/
 [CMake]: https://cmake.org
 [Ninja]: https://ninja-build.org
-[Sccache]: https://github.com/mozilla/sccache
 [Homebrew]: https://brew.sh/
 [Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
 
@@ -157,7 +156,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
-2. To install `sccache` (optional):
+2. To install [Sccache][] (optional):
   * If you're not building within a Docker container:
    ```
    sudo snap install sccache --candidate --classic
@@ -176,14 +175,17 @@ Double-check that running `pwd` prints a path ending with `swift`.
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 
+[Sccache]: https://github.com/mozilla/sccache
+
 ## Building the project for the first time
 
 ### Spot check dependencies
 
-* Run `cmake --version`: This should be 3.19.6 or higher.
-* Run `python3 --version`: Check that this succeeds.
-* Run `ninja --version`: Check that this succeeds.
-* Run `sccache --version`: Check that this succeeds.
+* Run `cmake --version`; this should be 3.19.6 or higher.
+* Run `python3 --version`; check that this succeeds.
+* Run `ninja --version`; check that this succeeds.
+* If you installed and want to use Sccache: Run `sccache --version`; check
+  that this succeeds.
 
 ### The roles of different tools
 
@@ -206,6 +208,11 @@ to understand what the different tools do:
    (i.e. do a "clean build"), Sccache can accelerate the new build
    significantly. There are few things more satisfying than seeing Sccache
    cut through build times.
+
+   > **Note**
+   > Sccache defaults to a cache size of 10GB, which is relatively small
+   > compared to build artifacts. You can bump it up, say, by setting
+   > `export SCCACHE_CACHE_SIZE="50G"` in your dotfile(s).
 5. `utils/update-checkout` is a script to help you work with all the individual
    git repositories together, instead of manually cloning/updating each one.
 6. `utils/build-script` (we will introduce this shortly)
@@ -222,15 +229,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
 
 ### The actual build
 
-1. Make sure you have Sccache running.
-   ```sh
-   sccache --start-server
-   ```
-   (Optional) Sccache defaults to a cache size of 10GB, which is relatively
-   small compared to build artifacts. You can bump it up, say by setting
-   `export SCCACHE_CACHE_SIZE="50G"` in your dotfile(s). For more details,
-   see the [Sccache README][Sccache].
-2. Build the toolchain with optimizations, debuginfo, and assertions, using
+1. Build the toolchain with optimizations, debuginfo, and assertions, using
    Ninja.
    - macOS:
      ```sh
@@ -247,6 +246,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      utils/build-script --release-debuginfo --skip-early-swift-driver \
        --skip-early-swiftsyntax
      ```
+     If you installed and want to use Sccache, include the `--sccache` option in
+     the invocation as well.
 
    > **Note**  
    > If you aren't planning to edit the parts of the compiler that are written
