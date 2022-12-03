@@ -55,7 +55,11 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
       FileIDsByFilePath(SM->computeFileIDMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
-    auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
+    // FIXME: Create file system to read the profile. In the future, the vfs
+    // needs to come from CompilerInstance.
+    auto FS = llvm::vfs::getRealFileSystem();
+    auto ReaderOrErr =
+        llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
     if (auto E = ReaderOrErr.takeError()) {
       diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
                llvm::toString(std::move(E)));
