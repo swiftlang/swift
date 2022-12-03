@@ -23,12 +23,8 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
 
-#include "clang/Basic/FileManager.h"
 #include "clang/Basic/Module.h"
-#include "clang/Lex/HeaderSearch.h"
 
-#include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -390,133 +386,9 @@ static int compareImportModulesByName(const ImportModuleTy *left,
   return 1;
 }
 
-// Makes the provided path absolute and removes any "." or ".." segments from
-// the path
-static llvm::SmallString<128> normalizePath(const llvm::StringRef path) {
-  llvm::SmallString<128> result = path;
-  llvm::sys::path::remove_dots(result, /* remove_dot_dot */ true);
-  llvm::sys::fs::make_absolute(result);
-  return result;
-}
-
-// Collect the set of header includes needed to import the given Clang module
-// into an ObjectiveC program. Modeled after collectModuleHeaderIncludes in the
-// Clang frontend (FrontendAction.cpp)
-// Augment requiredTextualIncludes with the set of headers required.
-static void collectClangModuleHeaderIncludes(
-    const clang::Module *clangModule, clang::FileManager &fileManager,
-    llvm::SmallSet<llvm::SmallString<128>, 10> &requiredTextualIncludes,
-    llvm::SmallSet<const clang::Module *, 10> &visitedModules,
-    const llvm::SmallSet<llvm::SmallString<128>, 10> &includeDirs,
-    const llvm::StringRef cwd) {
-
-  if (!visitedModules.insert(clangModule).second)
-    return;
-
-  auto addHeader = [&](llvm::StringRef headerPath,
-                       llvm::StringRef pathRelativeToRootModuleDir) {
-    if (!clangModule->Directory)
-      return;
-
-    llvm::SmallString<128> textualInclude = normalizePath(headerPath);
-    llvm::SmallString<128> containingSearchDirPath;
-
-    for (auto &includeDir : includeDirs) {
-      if (textualInclude.startswith(includeDir)) {
-        if (includeDir.size() > containingSearchDirPath.size()) {
-          containingSearchDirPath = includeDir;
-        }
-      }
-    }
-
-    if (!containingSearchDirPath.empty()) {
-      llvm::SmallString<128> prefixToRemove =
-          llvm::formatv("{0}/", containingSearchDirPath);
-      llvm::sys::path::replace_path_prefix(textualInclude, prefixToRemove, "");
-    } else {
-      // If we cannot find find the module map on the search path,
-      // fallback to including the header using the provided path relative
-      // to the module map
-      textualInclude = pathRelativeToRootModuleDir;
-    }
-
-    if (clangModule->getTopLevelModule()->IsFramework) {
-      llvm::SmallString<32> frameworkName =
-          clangModule->getTopLevelModuleName();
-      llvm::SmallString<64> oldFrameworkPrefix =
-          llvm::formatv("{0}.framework/Headers", frameworkName);
-      llvm::sys::path::replace_path_prefix(textualInclude, oldFrameworkPrefix,
-                                           frameworkName);
-    }
-
-    requiredTextualIncludes.insert(textualInclude);
-  };
-
-  if (clang::Module::Header umbrellaHeader = clangModule->getUmbrellaHeader()) {
-    addHeader(umbrellaHeader.Entry->tryGetRealPathName(),
-              umbrellaHeader.PathRelativeToRootModuleDirectory);
-  } else if (clang::Module::DirectoryName umbrellaDir =
-                 clangModule->getUmbrellaDir()) {
-    SmallString<128> nativeUmbrellaDirPath;
-    std::error_code errorCode;
-    llvm::sys::path::native(umbrellaDir.Entry->getName(),
-                            nativeUmbrellaDirPath);
-    llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
-    for (llvm::vfs::recursive_directory_iterator
-             dir(fileSystem, nativeUmbrellaDirPath, errorCode),
-         end;
-         dir != end && !errorCode; dir.increment(errorCode)) {
-
-      if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
-              .Cases(".h", ".H", ".hh", ".hpp", true)
-              .Default(false)) {
-
-        // Compute path to the header relative to the root of the module
-        // (location of the module map) First compute the relative path from
-        // umbrella directory to header file
-        SmallVector<StringRef> pathComponents;
-        auto pathIt = llvm::sys::path::rbegin(dir->path());
-
-        for (int i = 0; i != dir.level() + 1; ++i, ++pathIt)
-          pathComponents.push_back(*pathIt);
-        // Then append this to the path from module root to umbrella dir
-        SmallString<128> relativeHeaderPath;
-        if (umbrellaDir.PathRelativeToRootModuleDirectory != ".")
-          relativeHeaderPath += umbrellaDir.PathRelativeToRootModuleDirectory;
-
-        for (auto it = pathComponents.rbegin(), end = pathComponents.rend();
-             it != end; ++it) {
-          llvm::sys::path::append(relativeHeaderPath, *it);
-        }
-
-        addHeader(dir->path(), relativeHeaderPath);
-      }
-    }
-  } else {
-    for (clang::Module::HeaderKind headerKind :
-         {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
-      for (const clang::Module::Header &header :
-           clangModule->Headers[headerKind]) {
-        addHeader(header.Entry->tryGetRealPathName(),
-                  header.PathRelativeToRootModuleDirectory);
-      }
-    }
-    for (auto submodule : clangModule->submodules()) {
-      if (submodule->IsExplicit)
-        continue;
-
-      collectClangModuleHeaderIncludes(submodule, fileManager,
-                                       requiredTextualIncludes, visitedModules,
-                                       includeDirs, cwd);
-    }
-  }
-}
-
 static void writeImports(raw_ostream &out,
                          llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                          ModuleDecl &M, StringRef bridgingHeader,
-                         const FrontendOptions &frontendOpts,
-                         clang::HeaderSearch &clangHeaderSearchInfo,
                          bool useCxxImport = false) {
   // Note: we can't use has_feature(modules) as it's always enabled in C++20
   // mode.
@@ -541,45 +413,6 @@ static void writeImports(raw_ostream &out,
     return import == importer->getImportedHeaderModule();
   };
 
-  clang::FileSystemOptions fileSystemOptions;
-  clang::FileManager fileManager{fileSystemOptions};
-
-  llvm::SmallSet<llvm::SmallString<128>, 10> requiredTextualIncludes;
-  llvm::SmallSet<const clang::Module *, 10> visitedModules;
-  llvm::SmallSet<llvm::SmallString<128>, 10> includeDirs;
-
-  llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
-  llvm::ErrorOr<std::string> cwd = fileSystem.getCurrentWorkingDirectory();
-
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-    assert(cwd && "Access to current working directory required");
-
-    for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
-         searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
-      includeDirs.insert(normalizePath(searchDir->getName()));
-    }
-
-    const clang::Module *foundationModule = clangHeaderSearchInfo.lookupModule(
-        "Foundation", clang::SourceLocation(), false, false);
-    const clang::Module *darwinModule = clangHeaderSearchInfo.lookupModule(
-        "Darwin", clang::SourceLocation(), false, false);
-
-    std::function<void(const clang::Module *)>
-        collectTransitiveSubmoduleClosure;
-    collectTransitiveSubmoduleClosure = [&](const clang::Module *module) {
-      if (!module)
-        return;
-
-      visitedModules.insert(module);
-      for (auto submodule : module->submodules()) {
-        collectTransitiveSubmoduleClosure(submodule);
-      }
-    };
-
-    collectTransitiveSubmoduleClosure(foundationModule);
-    collectTransitiveSubmoduleClosure(darwinModule);
-  }
-
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
   bool includeUnderlying = false;
@@ -592,24 +425,8 @@ static void writeImports(raw_ostream &out,
         includeUnderlying = true;
         continue;
       }
-      if (seenImports.insert(Name).second) {
+      if (seenImports.insert(Name).second)
         out << importDirective << ' ' << Name.str() << ";\n";
-        if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-          if (const clang::Module *underlyingClangModule =
-                  swiftModule->findUnderlyingClangModule()) {
-            collectClangModuleHeaderIncludes(
-                underlyingClangModule, fileManager, requiredTextualIncludes,
-                visitedModules, includeDirs, cwd.get());
-          } else if ((underlyingClangModule =
-                          clangHeaderSearchInfo.lookupModule(
-                              Name.str(), clang::SourceLocation(), true,
-                              true))) {
-            collectClangModuleHeaderIncludes(
-                underlyingClangModule, fileManager, requiredTextualIncludes,
-                visitedModules, includeDirs, cwd.get());
-          }
-        }
-      }
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
@@ -617,21 +434,9 @@ static void writeImports(raw_ostream &out,
       out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
-
-      if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-        collectClangModuleHeaderIncludes(
-            clangModule, fileManager, requiredTextualIncludes, visitedModules,
-            includeDirs, cwd.get());
-      }
     }
   }
 
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-    out << "#else\n";
-    for (auto header : requiredTextualIncludes) {
-      out << "#import <" << header << ">\n";
-    }
-  }
   out << "#endif\n\n";
 
   if (includeUnderlying) {
@@ -685,8 +490,7 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
                                const FrontendOptions &frontendOpts,
-                               const IRGenOptions &irGenOpts,
-                               clang::HeaderSearch &clangHeaderSearchInfo) {
+                               const IRGenOptions &irGenOpts) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
@@ -696,10 +500,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
   printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
-  emitObjCConditional(os, [&] {
-    writeImports(os, imports, *M, bridgingHeader, frontendOpts,
-                 clangHeaderSearchInfo);
-  });
+  emitObjCConditional(os,
+                      [&] { writeImports(os, imports, *M, bridgingHeader); });
   writePostImportPrologue(os, *M);
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
@@ -728,8 +530,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
         moduleContents, *M, interopContext,
         /*requiresExposedAttribute=*/requiresExplicitExpose);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
-    writeImports(os, deps.imports, *M, bridgingHeader, frontendOpts,
-                 clangHeaderSearchInfo, /*useCxxImport=*/true);
+    writeImports(os, deps.imports, *M, bridgingHeader, /*useCxxImport=*/true);
+
     // Embed the standard library directly.
     if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
       assert(!M->isStdlibModule());

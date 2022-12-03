@@ -485,10 +485,6 @@ public:
   /// crashes the compiler.
   bool emptyABIDescriptor = false;
 
-  /// Augment modular imports in any emitted ObjC headers with equivalent
-  /// textual imports
-  bool EmitClangHeaderWithNonModularIncludes = false;
-
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
