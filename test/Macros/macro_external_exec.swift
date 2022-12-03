@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 // RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
-// RUN: %target-build-swift -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
@@ -10,10 +10,15 @@
 
 macro customFileID: String = MacroDefinition.FileIDMacro
 macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+macro fileID<T: _ExpressibleByStringLitera>: T = MacroDefinition.FileIDMacro
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_external_exec.swift
   print("Result is \(#customFileID)")
+
+  // CHECK: Builtin result is MacroUser/macro_external_exec.swift
+  // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
+  print("Builtin result is \(#fileID)")
 }
 
 testFileID(a: 1, b: 2)
