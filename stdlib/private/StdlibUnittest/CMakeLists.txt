@@ -46,7 +46,6 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   StdlibCoreExtras.swift
   StringConvertible.swift
   StringTestHelpers.swift
-  SymbolLookup.swift
   TestHelpers.swift
   TypeIndexed.swift
 

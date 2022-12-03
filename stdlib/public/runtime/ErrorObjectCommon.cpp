@@ -24,7 +24,11 @@
 
 using namespace swift;
 
-void (*swift::_swift_willThrow)(SwiftError *error);
+std::atomic<void (*)(SwiftError *error)> swift::_swift_willThrow;
+
+void swift::_swift_setWillThrowHandler(void (* handler)(SwiftError *error)) {
+  _swift_willThrow.store(handler, std::memory_order_release);
+}
 
 /// Breakpoint hook for debuggers, and calls _swift_willThrow if set.
 SWIFT_CC(swift) void
@@ -32,7 +36,8 @@ swift::swift_willThrow(SWIFT_CONTEXT void *unused,
                        SWIFT_ERROR_RESULT SwiftError **error) {
   // Cheap check to bail out early, since we expect there to be no callbacks
   // the vast majority of the time.
-  if (SWIFT_LIKELY(!_swift_willThrow))
-    return;
-  _swift_willThrow(*error);
+  auto handler = _swift_willThrow.load(std::memory_order_acquire);
+  if (SWIFT_UNLIKELY(handler)) {
+    (* handler)(*error);
+  }
 }
