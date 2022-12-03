@@ -3654,7 +3654,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
       uses.push_back(use);
     }
     for (auto *oper : uses) {
-      assert(isa<DebugValueInst>(oper->getUser()));
+      assert(oper->getUser() && isa<DebugValueInst>(oper->getUser()));
       UseRewriter::rewriteUse(oper, pass);
     }
   }
