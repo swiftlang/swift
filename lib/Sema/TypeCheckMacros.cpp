@@ -101,21 +101,19 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ASTContext &ctx = macro->getASTContext();
 
 #if SWIFT_SWIFT_PARSER
-
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
       ctx, macro->externalModuleName.str(),
       macro->externalMacroTypeName.str());
   if (macroMetatype) {
     // Check whether the macro metatype can be handled as a compiler plugin.
-    // We look here first, because compiler plugins are meant to be resilient.
     if (auto plugin = CompilerPlugin::fromMetatype(macroMetatype, ctx)) {
       // FIXME: Handle other kinds of macros.
       return MacroDefinition::forCompilerPlugin(
           MacroDefinition::Expression, plugin);
     }
 
-    // Otherwise, check whether the macro metatype can be handled as a builtin.
+    // Check whether the macro metatype can be handled as a builtin.
     if (auto builtin = swift_ASTGen_resolveMacroType(macroMetatype)) {
       // Make sure we clean up after the macro.
       ctx.addCleanup([builtin]() {

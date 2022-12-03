@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -emit-library-path=%t/%target-library-name(MacroDefinition) -working-directory=%t -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
+// RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
 // RUN: %target-build-swift -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
@@ -8,10 +9,29 @@
 // REQUIRES: OS=macosx
 
 macro customFileID: String = MacroDefinition.FileIDMacro
+macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
 
-func testFunc(a: Int, b: Int) {
+func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_external_exec.swift
   print("Result is \(#customFileID)")
 }
 
-testFunc(a: 1, b: 2)
+testFileID(a: 1, b: 2)
+
+func testStringify(a: Int, b: Int) {
+  let s = #stringify(a + b)
+
+  // CHECK-AST: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(Int, String)' location=Macro expansion of #stringify
+
+  let (b, s2) = #stringify({ () -> Bool in return true })
+  // CHECK-AST: macro_expansion_expr type='(() -> Bool, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(() -> Bool, String)' location=Macro expansion of #stringify
+
+  let (b2, s3) = #stringify<Double>(1 + 2)
+  // CHECK-AST: macro_expansion_expr type='(Double, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
+}

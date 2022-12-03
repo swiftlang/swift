@@ -1,6 +1,6 @@
 import SwiftParser
 import SwiftSyntax
-import _SwiftSyntaxMacros
+@_spi(Testing) import _SwiftSyntaxMacros
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
@@ -82,6 +82,18 @@ private func allocateUTF8String(
   }
 }
 
+extension String {
+  /// Drop everything up to and including the last '/' from the string.
+  fileprivate func withoutPath() -> String {
+    // Only keep everything after the last slash.
+    if let lastSlash = lastIndex(of: "/") {
+      return String(self[index(after: lastSlash)...])
+    }
+
+    return self
+  }
+}
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
@@ -124,12 +136,9 @@ func evaluateMacro(
       return -1
     }
 
-    let converter = SourceLocationConverter(
-      file: sourceFile.pointee.fileName, tree: sf
-    )
-    let context = MacroEvaluationContext(
+    var context = MacroExpansionContext(
       moduleName: sourceFile.pointee.moduleName,
-      sourceLocationConverter: converter
+      fileName: sourceFile.pointee.fileName.withoutPath()
     )
 
     let evaluatedSyntax: ExprSyntax = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
@@ -138,10 +147,10 @@ func evaluateMacro(
         return ExprSyntax(parentExpansion)
       }
 
-      let expansion = exprMacro.apply(parentExpansion, in: context)
-      // FIXME: Produce diagnostics.
-      return expansion.rewritten
+      return exprMacro.expand(parentExpansion, in: &context)
     }
+
+    // FIXME: Emit diagnostics accumulated in the
 
     var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
     evaluatedSyntaxStr.withUTF8 { utf8 in
@@ -158,16 +167,3 @@ func evaluateMacro(
     return 0
   }
 }
-
-// Makes sure that the type metadata for these macros can be found.
-public var allBuiltinMacros: [Any.Type] = [
-  ColorLiteralMacro.self,
-  ColumnMacro.self,
-  FileIDMacro.self,
-  FileLiteralMacro.self,
-  FilePathMacro.self,
-  FunctionMacro.self,
-  ImageLiteralMacro.self,
-  LineMacro.self,
-  StringifyMacro.self
-]
