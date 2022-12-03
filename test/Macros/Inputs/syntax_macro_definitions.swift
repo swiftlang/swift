@@ -2,23 +2,55 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import _SwiftSyntaxMacros
 
-public struct FileIDMacro: ExpressionMacro {
-  public static func apply(
-    _ macro: MacroExpansionExprSyntax, in context: MacroEvaluationContext
-  ) -> MacroResult<ExprSyntax> {
-    var fileName = context.sourceLocationConverter.location(
-      for: .init(utf8Offset: 0)
-    ).file ?? "<unknown file>"
+/// Replace the label of the first element in the tuple with the given
+/// new label.
+private func replaceFirstLabel(
+  of tuple: TupleExprElementListSyntax, with newLabel: String
+) -> TupleExprElementListSyntax{
+  guard let firstElement = tuple.first else {
+    return tuple
+  }
 
-    // Only keep everything after the last slash.
-    if let lastSlash = fileName.lastIndex(of: "/") {
-      fileName = String(fileName[fileName.index(after: lastSlash)...])
-    }
+  return tuple.replacing(
+    childAt: 0, with: firstElement.withLabel(.identifier(newLabel)))
+}
 
-    let fileLiteral: ExprSyntax = #""\#(context.moduleName)/\#(fileName)""#
+public struct ColorLiteralMacro: ExpressionMacro {
+  public static func expand(
+    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  ) -> ExprSyntax {
+    let argList = replaceFirstLabel(
+      of: macro.argumentList, with: "_colorLiteralRed"
+    )
+    let initSyntax: ExprSyntax = ".init(\(argList))"
     if let leadingTrivia = macro.leadingTrivia {
-      return MacroResult(fileLiteral.withLeadingTrivia(leadingTrivia))
+      return initSyntax.withLeadingTrivia(leadingTrivia)
     }
-    return MacroResult(fileLiteral)
+    return initSyntax
+  }
+}
+
+public struct FileIDMacro: ExpressionMacro {
+  public static func expand(
+    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  ) -> ExprSyntax {
+    let fileLiteral: ExprSyntax = #""\#(context.moduleName)/\#(context.fileName)""#
+    if let leadingTrivia = macro.leadingTrivia {
+      return fileLiteral.withLeadingTrivia(leadingTrivia)
+    }
+    return fileLiteral
+  }
+}
+
+public struct StringifyMacro: ExpressionMacro {
+  public static func expand(
+    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      // FIXME: Create a diagnostic for the missing argument?
+      return ExprSyntax(macro)
+    }
+
+    return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
   }
 }
