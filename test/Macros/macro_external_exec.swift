@@ -20,6 +20,7 @@ testFileID(a: 1, b: 2)
 
 func testStringify(a: Int, b: Int) {
   let s = #stringify(a + b)
+  print(s)
 
   // CHECK-AST: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
   // CHECK-AST-NEXT: argument_list
@@ -35,3 +36,6 @@ func testStringify(a: Int, b: Int) {
   // CHECK-AST-NEXT: argument_list
   // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
 }
+
+// CHECK: (2, "a + b")
+testStringify(a: 1, b: 1)
