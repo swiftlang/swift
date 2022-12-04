@@ -253,7 +253,7 @@ class Builder(object):
         ]
         cmake_args += [
             "-DBOOTSTRAPPING_MODE=HOSTTOOLS",
-            "-DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=" +
+            "-DSWIFT_PATH_TO_STRING_PROCESSING_SOURCE=" +
             os.path.join(SWIFT_SOURCE_ROOT,
                          "swift-experimental-string-processing"),
             "-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=" +

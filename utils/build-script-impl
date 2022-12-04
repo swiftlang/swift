@@ -1224,7 +1224,7 @@ LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
-EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
+SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
@@ -2185,11 +2185,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
-                      -n "$(ls -A "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}")" ]] ; then
+                if [[ -d "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}" && \
+                      -n "$(ls -A "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}")" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}"
+                        -DSWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}"
                     )
                     if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" ]] ; then
                         cmake_options=(
