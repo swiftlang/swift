@@ -325,7 +325,7 @@ public:
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
-  void flagAsCompleted();
+  void flagAsDestroyed();
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.

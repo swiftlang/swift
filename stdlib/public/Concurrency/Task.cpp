@@ -330,7 +330,7 @@ static void destroyJob(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 AsyncTask::~AsyncTask() {
-  flagAsCompleted();
+  flagAsDestroyed();
 
   // For a future, destroy the result.
   if (isFuture()) {
@@ -372,7 +372,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
 
-  SWIFT_TASK_DEBUG_LOG("destroy task %p", task);
+  SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
   free(task);
 }
 
