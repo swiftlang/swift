@@ -523,3 +523,44 @@ bb3:
 bb4:
   return %1 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: sil [ossa] @looprotate_copy :
+// CHECK: bb0(%0 : $Int32, %1 : @guaranteed $Bar):
+// CHECK: copy_value
+// CHECK: cond_br {{.*}}, bb2, bb1
+// CHECK: copy_value
+// CHECK-LABEL: } // end sil function 'looprotate_copy'
+sil [ossa] @looprotate_copy : $@convention(thin) (Int32, @guaranteed Bar) -> Int32 {
+bb0(%0 : $Int32, %1 : @guaranteed $Bar):
+  %2 = struct_extract %0 : $Int32, #Int32._value
+  %3 = integer_literal $Builtin.Int32, 0
+  br bb1(%2 : $Builtin.Int32, %3 : $Builtin.Int32)
+
+bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
+  %7 = copy_value %1 : $Bar
+  %8 = class_method %7 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+  %9 = apply %8(%7) : $@convention(method) (@guaranteed Bar) -> ()
+  %10 = struct $Int32 (%6 : $Builtin.Int32)
+  %11 = builtin "cmp_eq_Word"(%6 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %11, bb3, bb2
+
+bb2:
+  destroy_value %7 : $Bar
+  %14 = integer_literal $Builtin.Int32, 1
+  %15 = integer_literal $Builtin.Int1, -1
+  %16 = builtin "sadd_with_overflow_Word"(%6 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %17 = tuple_extract %16 : $(Builtin.Int32, Builtin.Int1), 0
+  %18 = enum $Optional<Int32>, #Optional.some!enumelt, %10 : $Int32
+  %19 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.some!enumelt
+  %20 = struct_extract %19 : $Int32, #Int32._value
+  %21 = integer_literal $Builtin.Int1, -1
+  %22 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %20 : $Builtin.Int32, %21 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %23 = tuple_extract %22 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%23 : $Builtin.Int32, %17 : $Builtin.Int32)
+
+bb3:
+  destroy_value %7 : $Bar
+  %26 = struct $Int32 (%5 : $Builtin.Int32)
+  return %26 : $Int32
+}
+
