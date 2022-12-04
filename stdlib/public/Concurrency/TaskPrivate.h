@@ -279,11 +279,9 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// or is completed.
     IsEnqueued = 0x1000,
 
-#ifndef NDEBUG
     /// Task has been completed.  This is purely used to enable an assertion
     /// that the task is completed when we destroy it.
     IsComplete = 0x2000,
-#endif
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -401,7 +399,6 @@ public:
 #endif
   }
 
-#ifndef NDEBUG
   bool isComplete() const {
     return Flags & IsComplete;
   }
@@ -413,7 +410,6 @@ public:
     return ActiveTaskStatus(Record, Flags | IsComplete);
 #endif
   }
-#endif
 
   /// Is there a lock on the linked list of status records?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
@@ -588,9 +584,7 @@ struct AsyncTask::PrivateStorage {
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
-#ifndef NDEBUG
       newStatus = newStatus.withComplete();
-#endif
 
       // This can fail since the task can still get concurrently cancelled or
       // escalated.
@@ -607,10 +601,22 @@ struct AsyncTask::PrivateStorage {
       }
     }
 
-    // Destroy and deallocate any remaining task local items.
-    // We need to do this before we destroy the task local deallocator.
+    // Destroy and deallocate any remaining task local items since the task is
+    // completed. We need to do this before we destroy the task local
+    // deallocator.
     Local.destroy(task);
 
+    // Don't destroy the task private storage as a whole since others which have
+    // a reference to the task might still need to access the ActiveTaskStatus.
+    // It is destroyed when task is destroyed
+  }
+
+  // Destroy the opaque storage of the task
+  void destroy() {
+#if NDEBUG
+    auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+    assert(oldStatus.isComplete());
+#endif
     this->~PrivateStorage();
   }
 
@@ -645,11 +651,13 @@ inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
     JobPriority basePri, void *slab, size_t slabCapacity) {
   ::new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
+
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
 }
+
 inline void AsyncTask::OpaquePrivateStorage::destroy() {
-  // nothing else to do
+  get().destroy();
 }
 
 inline AsyncTask::PrivateStorage &AsyncTask::_private() {
@@ -814,10 +822,10 @@ inline void AsyncTask::flagAsSuspended() {
 }
 
 // READ ME: This is not a dead function! Do not remove it! This is a function
-// that can be used when debugging locally to instrument when a task actually is
-// dealloced.
-inline void AsyncTask::flagAsCompleted() {
-  SWIFT_TASK_DEBUG_LOG("task completed %p", this);
+// that can be used when debugging locally to instrument when a task
+// actually is dealloced.
+inline void AsyncTask::flagAsDestroyed() {
+  SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
 
 inline void AsyncTask::localValuePush(const HeapObject *key,
