@@ -173,7 +173,7 @@ using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
 using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
-// FIXME: https://bugs.swift.org/browse/SR-1155
+// FIXME: https://github.com/apple/swift/issues/43763
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 

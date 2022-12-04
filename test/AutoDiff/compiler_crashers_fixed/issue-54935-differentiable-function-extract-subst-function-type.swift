@@ -4,8 +4,8 @@
 // SIL verification error regarding substituted function types and
 // `differentiable_function_extract` instruction. Occurs only with `-O`.
 
-// FIXME: Disabled due to flakiness on Linux (https://github.com/apple/swift/issues/55466), likely related to TF-1197.
-// REQUIRES: SR13021
+// FIXME(https://github.com/apple/swift/issues/55466): Disabled due to flakiness on Linux , likely related to TF-1197.
+// XFAIL: *
 
 import _Differentiation
 

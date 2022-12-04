@@ -3538,7 +3538,7 @@ ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "making %0 final", (Type))
 ERROR(derivative_attr_unsupported_accessor_kind,none,
       "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
-// TODO(SR-13096): Remove this temporary diagnostic.
+// TODO(https://github.com/apple/swift/issues/55542): Remove this temporary diagnostic.
 ERROR(derivative_attr_class_setter_unsupported,none,
       "cannot yet register derivative for class property or subscript setters",
       ())
