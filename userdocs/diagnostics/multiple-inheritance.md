@@ -32,6 +32,6 @@ struct Ladle: ServingUtensil, Spoon { /* ... */ }
 
 Swift protocols can declare interfaces that must be implemented by each conforming type (like abstract class members in other programming languages such as C# or Java), and they can also provide overridable default implementations for those requirements in protocol extensions.
 
-When class inheritance and protocol conformances are used together, subclasses inherit protocol conformances from base classes, introducing additional complexity. For example, the default implementation of a protocol requirement not overridden in the conforming base class also cannot be overridden in any subclass ([SR-103](https://bugs.swift.org/browse/SR-103)).
+When class inheritance and protocol conformances are used together, subclasses inherit protocol conformances from base classes, introducing additional complexity. For example, the default implementation of a protocol requirement not overridden in the conforming base class also cannot be overridden in any subclass ([#42725](https://github.com/apple/swift/issues/42725)).
 
 To learn more about defining and adopting protocols, see the [Protocols](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html) section in _The Swift Programming Language_. To learn more about class inheritance, see the [Inheritance](https://docs.swift.org/swift-book/LanguageGuide/Inheritance.html) section in _The Swift Programming Language_.

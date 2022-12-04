@@ -27,14 +27,14 @@
 
 #if !SELF_SHADOW
 import ShadowyHorror
-// OTHER-DAG: ShadowyHorror.module_shadowing:{{[0-9]+:[0-9]+}}: warning: public class 'ShadowyHorror.module_shadowing' shadows module 'module_shadowing', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the class 'ShadowyHorror.module_shadowing' or the module 'module_shadowing', or see https://bugs.swift.org/browse/SR-14195 for workarounds{{$}}
+// OTHER-DAG: ShadowyHorror.module_shadowing:{{[0-9]+:[0-9]+}}: warning: public class 'ShadowyHorror.module_shadowing' shadows module 'module_shadowing', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the class 'ShadowyHorror.module_shadowing' or the module 'module_shadowing', or see https://github.com/apple/swift/issues/56573 for workarounds{{$}}
 
 @_implementationOnly import TestModule
 #endif
 
 public struct ShadowyHorror {
-  // OTHER-DAG: module_shadowing.swift:[[@LINE-1]]:15: warning: public struct 'module_shadowing.ShadowyHorror' shadows module 'ShadowyHorror', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the struct 'module_shadowing.ShadowyHorror' or the module 'ShadowyHorror', or see https://bugs.swift.org/browse/SR-14195 for workarounds{{$}}
-  // SELF: module_shadowing.swift:[[@LINE-2]]:15: warning: public struct 'ShadowyHorror.ShadowyHorror' shadows module 'ShadowyHorror', which may cause failures when importing 'ShadowyHorror' or its clients in some configurations; please rename either the struct 'ShadowyHorror.ShadowyHorror' or the module 'ShadowyHorror', or see https://bugs.swift.org/browse/SR-14195 for workarounds{{$}}
+  // OTHER-DAG: module_shadowing.swift:[[@LINE-1]]:15: warning: public struct 'module_shadowing.ShadowyHorror' shadows module 'ShadowyHorror', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the struct 'module_shadowing.ShadowyHorror' or the module 'ShadowyHorror', or see https://github.com/apple/swift/issues/56573 for workarounds{{$}}
+  // SELF: module_shadowing.swift:[[@LINE-2]]:15: warning: public struct 'ShadowyHorror.ShadowyHorror' shadows module 'ShadowyHorror', which may cause failures when importing 'ShadowyHorror' or its clients in some configurations; please rename either the struct 'ShadowyHorror.ShadowyHorror' or the module 'ShadowyHorror', or see https://github.com/apple/swift/issues/56573 for workarounds{{$}}
 
   init() {}
   public var property: ShadowyHorror { ShadowyHorror() }
