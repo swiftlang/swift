@@ -147,7 +147,7 @@ func evaluateMacro(
         return ExprSyntax(parentExpansion)
       }
 
-      return exprMacro.expand(parentExpansion, in: &context)
+      return exprMacro.expansion(of: parentExpansion, in: &context)
     }
 
     // FIXME: Emit diagnostics accumulated in the

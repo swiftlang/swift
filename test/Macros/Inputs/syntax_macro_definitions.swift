@@ -16,8 +16,8 @@ private func replaceFirstLabel(
 }
 
 public struct ColorLiteralMacro: ExpressionMacro {
-  public static func expand(
-    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  public static func expansion(
+    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
     let argList = replaceFirstLabel(
       of: macro.argumentList, with: "_colorLiteralRed"
@@ -31,8 +31,8 @@ public struct ColorLiteralMacro: ExpressionMacro {
 }
 
 public struct FileIDMacro: ExpressionMacro {
-  public static func expand(
-    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  public static func expansion(
+    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
     let fileLiteral: ExprSyntax = #""\#(context.moduleName)/\#(context.fileName)""#
     if let leadingTrivia = macro.leadingTrivia {
@@ -43,8 +43,8 @@ public struct FileIDMacro: ExpressionMacro {
 }
 
 public struct StringifyMacro: ExpressionMacro {
-  public static func expand(
-    _ macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  public static func expansion(
+    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
     guard let argument = macro.argumentList.first?.expression else {
       // FIXME: Create a diagnostic for the missing argument?
