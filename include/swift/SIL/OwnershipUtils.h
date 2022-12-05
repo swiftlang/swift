@@ -98,9 +98,12 @@ inline bool isGuaranteedForwardingPhi(SILValue value) {
   if (isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value)) {
     return false;
   }
+  if (isGuaranteedForwarding(value) || isa<SILFunctionArgument>(value)) {
+    return true;
+  }
   auto *phi = dyn_cast<SILPhiArgument>(value);
   if (!phi || !phi->isPhi()) {
-    return true;
+    return false;
   }
   bool isGuaranteedForwardingPhi = true;
   phi->visitTransitiveIncomingPhiOperands(
@@ -108,6 +111,10 @@ inline bool isGuaranteedForwardingPhi(SILValue value) {
         if (isa<BeginBorrowInst>(operand->get()) ||
             isa<LoadBorrowInst>(operand->get())) {
           isGuaranteedForwardingPhi = false;
+          return false;
+        }
+        if (isGuaranteedForwarding(value)) {
+          isGuaranteedForwardingPhi = true;
           return false;
         }
         return true;
