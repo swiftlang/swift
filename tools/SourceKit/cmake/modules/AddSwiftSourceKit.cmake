@@ -158,6 +158,8 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   if(SWIFT_SWIFT_PARSER)
     # Make sure we can find the early SwiftSyntax libraries.
     target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
+    # ... and libswift_SwiftCompilerSupport
+    target_link_directories(${target} PRIVATE "${SWIFTLIB_DIR}/host")
 
     # For the "end step" of bootstrapping configurations on Darwin, need to be
     # able to fall back to the SDK directory for libswiftCore et al.
