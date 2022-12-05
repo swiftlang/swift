@@ -275,7 +275,7 @@ You can see the status of different proposals at
 - [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
   This whitepaper discusses the Swift calling convention (high-level semantics;
   ownership transfer; physical representation; function signature lowering).
-- [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
+- [ErrorHandlingRationale.md](/docs/ErrorHandlingRationale.md):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
 - [WeakReferences.md](/docs/WeakReferences.md):
