@@ -501,8 +501,8 @@ using ModuleDependenciesKindRefMap =
 /// ensure that the returned cached dependency was one that can be found in the
 /// current scanning action's filesystem view.
 class GlobalModuleDependenciesCache {
-  /// Global cache contents specific to a target-triple specified on a scanner invocation
-  struct TargetSpecificGlobalCacheState {
+  /// Global cache contents specific to a specific scanner invocation context
+  struct ContextSpecificGlobalCacheState {
     /// All cached module dependencies, in the order in which they were
     /// encountered.
     std::vector<ModuleDependencyID> AllModules;
@@ -526,13 +526,13 @@ class GlobalModuleDependenciesCache {
 
   /// A map from a String representing the target triple of a scanner invocation to the corresponding
   /// cached dependencies discovered so far when using this triple.
-  llvm::StringMap<std::unique_ptr<TargetSpecificGlobalCacheState>> TargetSpecificCacheMap;
+  llvm::StringMap<std::unique_ptr<ContextSpecificGlobalCacheState>> ContextSpecificCacheMap;
 
-  /// The current target triple cache configuration
-  Optional<std::string> CurrentTriple;
+  /// The current context hash configuration
+  Optional<std::string> CurrentContextHash;
 
-  /// The triples used by scanners using this cache, in the order in which they were used
-  std::vector<std::string> AllTriples;
+  /// The context hashes used by scanners using this cache, in the order in which they were used
+  std::vector<std::string> AllContextHashes;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -548,10 +548,10 @@ public:
   operator=(const GlobalModuleDependenciesCache &) = delete;
   virtual ~GlobalModuleDependenciesCache() {}
 
-  void configureForTriple(std::string triple);
+  void configureForContextHash(std::string scanningContextHash);
 
-  const std::vector<std::string>& getAllTriples() const {
-    return AllTriples;
+  const std::vector<std::string>& getAllContextHashes() const {
+    return AllContextHashes;
   }
 
 private:
@@ -570,11 +570,11 @@ private:
   Optional<ModuleDependencies>
   findDependencies(StringRef moduleName, ModuleLookupSpecifics details) const;
 
-  /// Return a pointer to the target-specific cache state of the current triple configuration.
-  TargetSpecificGlobalCacheState* getCurrentCache() const;
+  /// Return a pointer to the context-specific cache state of the current scanning action.
+  ContextSpecificGlobalCacheState* getCurrentCache() const;
 
-  /// Return a pointer to the target-specific cache state of the specified triple configuration.
-  TargetSpecificGlobalCacheState* getCacheForTriple(StringRef triple) const;
+  /// Return a pointer to the cache state of the specified context hash.
+  ContextSpecificGlobalCacheState* getCacheForScanningContextHash(StringRef scanningContextHash) const;
 
 public:
   /// Look for module dependencies for a module with the given name.
@@ -600,9 +600,9 @@ public:
 
   /// Reference the list of all module dependencies that are not source-based modules
   /// (i.e. interface dependencies, binary dependencies, clang dependencies).
-  const std::vector<ModuleDependencyID> &getAllNonSourceModules(StringRef triple) const {
-    auto targetSpecificCache = getCacheForTriple(triple);
-    return targetSpecificCache->AllModules;
+  const std::vector<ModuleDependencyID> &getAllNonSourceModules(StringRef scanningContextHash) const {
+    auto contextSpecificCache = getCacheForScanningContextHash(scanningContextHash);
+    return contextSpecificCache->AllModules;
   }
 
   /// Return the list of all source-based modules discovered by this cache

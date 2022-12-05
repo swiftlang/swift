@@ -151,16 +151,16 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
 
   bool hasCurrentModule = false;
   std::string currentModuleName;
-  unsigned currentTripleID;
+  unsigned currentContextHashID;
   llvm::Optional<std::vector<std::string>> currentModuleDependencies;
 
-  auto getTriple = [&]() {
-    assert(currentTripleID &&
-           "Expected target triple ID for a MODULE_DETAILS_NODE record");
-    auto triple = getIdentifier(currentTripleID);
-    if (!triple.has_value())
+  auto getContextHash = [&]() {
+    assert(currentContextHashID &&
+           "Expected context hash ID for a MODULE_DETAILS_NODE record");
+    auto contextHash = getIdentifier(currentContextHashID);
+    if (!contextHash.has_value())
       llvm::report_fatal_error("Unexpected MODULE_DETAILS_NODE record");
-    return triple.value();
+    return contextHash.value();
   };
 
   while (!Cursor.AtEndOfStream()) {
@@ -208,14 +208,14 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
 
     case MODULE_NODE: {
       hasCurrentModule = true;
-      unsigned moduleNameID, tripleID, moduleDependenciesArrayID;
-      ModuleInfoLayout::readRecord(Scratch, moduleNameID, tripleID,
+      unsigned moduleNameID, contextHashID, moduleDependenciesArrayID;
+      ModuleInfoLayout::readRecord(Scratch, moduleNameID, contextHashID,
                                    moduleDependenciesArrayID);
       auto moduleName = getIdentifier(moduleNameID);
       if (!moduleName)
         llvm::report_fatal_error("Bad module name");
       currentModuleName = *moduleName;
-      currentTripleID = tripleID;
+      currentContextHashID = contextHashID;
       currentModuleDependencies = getArray(moduleDependenciesArrayID);
       if (!currentModuleDependencies)
         llvm::report_fatal_error("Bad direct dependencies");
@@ -226,7 +226,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       if (!hasCurrentModule)
         llvm::report_fatal_error(
             "Unexpected SWIFT_TEXTUAL_MODULE_DETAILS_NODE record");
-      cache.configureForTriple(getTriple());
+      cache.configureForContextHash(getContextHash());
       unsigned outputPathFileID, interfaceFileID, compiledModuleCandidatesArrayID,
           buildCommandLineArrayID, extraPCMArgsArrayID, contextHashID,
           isFramework, bridgingHeaderFileID, sourceFilesArrayID,
@@ -318,10 +318,10 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       if (!hasCurrentModule)
         llvm::report_fatal_error(
             "Unexpected SWIFT_SOURCE_MODULE_DETAILS_NODE record");
-      // Expected triple ID is 0
-      if (currentTripleID)
+      // Expected context hash ID is 0
+      if (currentContextHashID)
         llvm::report_fatal_error(
-            "Unexpected target triple on MODULE_NODE corresponding to a "
+            "Unexpected context hash on MODULE_NODE corresponding to a "
             "SWIFT_SOURCE_MODULE_DETAILS_NODE record");
       unsigned extraPCMArgsArrayID, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID;
@@ -384,7 +384,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       if (!hasCurrentModule)
         llvm::report_fatal_error(
             "Unexpected SWIFT_BINARY_MODULE_DETAILS_NODE record");
-      cache.configureForTriple(getTriple());
+      cache.configureForContextHash(getContextHash());
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID,
           isFramework;
       SwiftBinaryModuleDetailsLayout::readRecord(
@@ -418,7 +418,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       if (!hasCurrentModule)
         llvm::report_fatal_error(
             "Unexpected SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE record");
-      cache.configureForTriple(getTriple());
+      cache.configureForContextHash(getContextHash());
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID;
       SwiftPlaceholderModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
@@ -449,7 +449,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
     case CLANG_MODULE_DETAILS_NODE: {
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
-      cache.configureForTriple(getTriple());
+      cache.configureForContextHash(getContextHash());
       unsigned pcmOutputPathID, moduleMapPathID, contextHashID, commandLineArrayID,
                fileDependenciesArrayID, capturedPCMArgsArrayID;
       ClangModuleDetailsLayout::readRecord(Scratch, pcmOutputPathID, moduleMapPathID,
@@ -681,7 +681,7 @@ class Serializer {
   void writeArraysOfIdentifiers();
 
   void writeModuleInfo(ModuleDependencyID moduleID,
-                       Optional<std::string> triple,
+                       Optional<std::string> contextHash,
                        const ModuleDependencies &dependencyInfo);
 
 public:
@@ -771,19 +771,19 @@ void Serializer::writeArraysOfIdentifiers() {
 }
 
 void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
-                                 Optional<std::string> triple,
+                                 Optional<std::string> contextHash,
                                  const ModuleDependencies &dependencyInfo) {
   using namespace graph_block;
-  auto tripleStrID = triple.has_value() ? getIdentifier(triple.value()) : 0;
+  auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;
 
   ModuleInfoLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[ModuleInfoLayout::Code],
-      getIdentifier(moduleID.first), tripleStrID,
+      getIdentifier(moduleID.first), contextHashStrID,
       getArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies));
 
   switch (dependencyInfo.getKind()) {
   case swift::ModuleDependenciesKind::SwiftInterface: {
-    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
+    assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
     unsigned outputModulePathFileId =
@@ -811,8 +811,8 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftSource: {
-    assert(!triple.has_value() &&
-           "Did not expect triple for serializing MODULE_NODE");
+    assert(!contextHash.has_value() &&
+           "Did not expect context hash for serializing MODULE_NODE");
     auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
     assert(swiftSourceDeps);
     unsigned bridgingHeaderFileId =
@@ -831,7 +831,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftBinary: {
-    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
+    assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
     assert(swiftBinDeps);
     SwiftBinaryModuleDetailsLayout::emitRecord(
@@ -843,7 +843,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::SwiftPlaceholder: {
-    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
+    assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
     assert(swiftPHDeps);
     SwiftPlaceholderModuleDetailsLayout::emitRecord(
@@ -855,7 +855,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
     break;
   }
   case swift::ModuleDependenciesKind::Clang: {
-    assert(triple.has_value() && "Expected triple for serializing MODULE_NODE");
+    assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto clangDeps = dependencyInfo.getAsClangModule();
     assert(clangDeps);
     ClangModuleDetailsLayout::emitRecord(
@@ -970,9 +970,9 @@ void Serializer::collectStringsAndArrays(
              swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies);
   }
 
-  for (auto &triple : cache.getAllTriples()) {
-    addIdentifier(triple);
-    for (auto &moduleID : cache.getAllNonSourceModules(triple)) {
+  for (auto &contextHash : cache.getAllContextHashes()) {
+    addIdentifier(contextHash);
+    for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
       auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
           moduleID.first, moduleID.second);
       assert(dependencyInfos.has_value() && "Expected dependency info.");
@@ -1092,15 +1092,15 @@ void Serializer::writeInterModuleDependenciesCache(
                     dependencyInfo.value());
   }
 
-  // Write all non-source modules, for each of the target triples this scanner
+  // Write all non-source modules, for each of the context hashes this scanner
   // has been used with
-  for (auto &triple : cache.getAllTriples()) {
-    for (auto &moduleID : cache.getAllNonSourceModules(triple)) {
+  for (auto &contextHash : cache.getAllContextHashes()) {
+    for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
       auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
           moduleID.first, moduleID.second);
       assert(dependencyInfos.has_value() && "Expected dependency info.");
       for (auto &dependencyInfo : *dependencyInfos) {
-        writeModuleInfo(moduleID, triple, dependencyInfo);
+        writeModuleInfo(moduleID, contextHash, dependencyInfo);
       }
     }
   }

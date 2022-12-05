@@ -345,6 +345,11 @@ public:
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
 
+  /// Retrieve a module hash string that is suitable for uniquely
+  /// identifying the conditions under which the current module is built,
+  /// from the perspective of a dependency scanning action.
+  std::string getModuleScanningHash() const;
+
   /// Retrieve the stdlib kind to implicitly import.
   ImplicitStdlibKind getImplicitStdlibKind() const {
     if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {

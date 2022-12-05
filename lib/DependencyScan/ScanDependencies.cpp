@@ -1114,8 +1114,8 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
-      newGlobalCache->configureForTriple(
-          newInstance->getInvocation().getLangOptions().Target.str());
+      newGlobalCache->configureForContextHash(newInstance->getInvocation()
+                                              .getModuleScanningHash());
       
       auto mainModuleName = newInstance->getMainModule()->getNameStr();
       auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
@@ -1257,8 +1257,8 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   GlobalModuleDependenciesCache globalCache;
-  globalCache.configureForTriple(instance.getInvocation()
-                                         .getLangOptions().Target.str());
+  globalCache.configureForContextHash(instance.getInvocation()
+                                      .getModuleScanningHash());
 
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
@@ -1300,8 +1300,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   GlobalModuleDependenciesCache singleUseGlobalCache;
-  singleUseGlobalCache.configureForTriple(instance.getInvocation()
-                                                  .getLangOptions().Target.str());
+  singleUseGlobalCache.configureForContextHash(instance.getInvocation()
+                                               .getModuleScanningHash());
   ModuleDependenciesCache cache(singleUseGlobalCache,
                                 instance.getMainModule()->getNameStr());
   if (out.has_error() || EC) {
@@ -1332,8 +1332,8 @@ bool swift::dependencies::batchScanDependencies(
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   GlobalModuleDependenciesCache singleUseGlobalCache;
-  singleUseGlobalCache.configureForTriple(instance.getInvocation()
-                                                  .getLangOptions().Target.str());
+  singleUseGlobalCache.configureForContextHash(instance.getInvocation()
+                                               .getModuleScanningHash());
   ModuleDependenciesCache cache(singleUseGlobalCache,
                                 instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();
@@ -1368,8 +1368,8 @@ bool swift::dependencies::batchPrescanDependencies(
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   GlobalModuleDependenciesCache singleUseGlobalCache;
-  singleUseGlobalCache.configureForTriple(instance.getInvocation()
-                                                  .getLangOptions().Target.str());
+  singleUseGlobalCache.configureForContextHash(instance.getInvocation()
+                                               .getModuleScanningHash());
   ModuleDependenciesCache cache(singleUseGlobalCache,
                                 instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();

@@ -234,20 +234,20 @@ GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()
                          /* SharedFS */ nullptr,
                          /* ReuseFileManager */ false,
                          /* OptimizeArgs */ false) {}
-GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
+GlobalModuleDependenciesCache::ContextSpecificGlobalCacheState *
 GlobalModuleDependenciesCache::getCurrentCache() const {
-  assert(CurrentTriple.has_value() &&
+  assert(CurrentContextHash.has_value() &&
          "Global Module Dependencies Cache not configured with Triple.");
-  return getCacheForTriple(CurrentTriple.value());
+  return getCacheForScanningContextHash(CurrentContextHash.value());
 }
 
-GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
-GlobalModuleDependenciesCache::getCacheForTriple(StringRef triple) const {
-  auto targetSpecificCache = TargetSpecificCacheMap.find(triple);
-  assert(targetSpecificCache != TargetSpecificCacheMap.end() &&
-         "Global Module Dependencies Cache not configured with Triple-specific "
+GlobalModuleDependenciesCache::ContextSpecificGlobalCacheState *
+GlobalModuleDependenciesCache::getCacheForScanningContextHash(StringRef scanningContextHash) const {
+  auto contextSpecificCache = ContextSpecificCacheMap.find(scanningContextHash);
+  assert(contextSpecificCache != ContextSpecificCacheMap.end() &&
+         "Global Module Dependencies Cache not configured with context-specific "
          "state.");
-  return targetSpecificCache->getValue().get();
+  return contextSpecificCache->getValue().get();
 }
 
 llvm::StringMap<ModuleDependenciesVector> &
@@ -333,24 +333,24 @@ moduleContainedInImportPathSet(const ModuleDependencies &module,
   return false;
 }
 
-void GlobalModuleDependenciesCache::configureForTriple(std::string triple) {
-  auto knownTriple = TargetSpecificCacheMap.find(triple);
-  if (knownTriple != TargetSpecificCacheMap.end()) {
-    // Set the current triple and leave the rest as-is
-    CurrentTriple = triple;
+void GlobalModuleDependenciesCache::configureForContextHash(std::string scanningContextHash) {
+  auto knownContext = ContextSpecificCacheMap.find(scanningContextHash);
+  if (knownContext != ContextSpecificCacheMap.end()) {
+    // Set the current context and leave the rest as-is
+    CurrentContextHash = scanningContextHash;
   } else {
     // First time scanning with this triple, initialize target-specific state.
-    std::unique_ptr<TargetSpecificGlobalCacheState> targetSpecificCache =
-        std::make_unique<TargetSpecificGlobalCacheState>();
+    std::unique_ptr<ContextSpecificGlobalCacheState> contextSpecificCache =
+        std::make_unique<ContextSpecificGlobalCacheState>();
     for (auto kind = ModuleDependenciesKind::FirstKind;
          kind != ModuleDependenciesKind::LastKind; ++kind) {
-      targetSpecificCache->ModuleDependenciesMap.insert(
+      contextSpecificCache->ModuleDependenciesMap.insert(
           {kind, llvm::StringMap<ModuleDependenciesVector>()});
     }
 
-    TargetSpecificCacheMap.insert({triple, std::move(targetSpecificCache)});
-    CurrentTriple = triple;
-    AllTriples.push_back(triple);
+    ContextSpecificCacheMap.insert({scanningContextHash, std::move(contextSpecificCache)});
+    CurrentContextHash = scanningContextHash;
+    AllContextHashes.push_back(scanningContextHash);
   }
 }
 

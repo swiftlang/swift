@@ -205,8 +205,8 @@ DependencyScanningTool::initScannerForAction(
   auto instanceOrErr = initCompilerInstanceForScan(Command);
   if (instanceOrErr.getError())
     return instanceOrErr;
-  SharedCache->configureForTriple((*instanceOrErr)->getInvocation()
-                                  .getLangOptions().Target.str());
+  SharedCache->configureForContextHash((*instanceOrErr)->getInvocation()
+                                       .getModuleScanningHash());
   return instanceOrErr;
 }
 
