@@ -370,5 +370,8 @@ bool SymbolGraphASTWalker::isOurModule(const ModuleDecl *M) const {
 bool SymbolGraphASTWalker::shouldBeRecordedAsExtension(
     const ExtensionDecl *ED) const {
   return Options.EmitExtensionBlockSymbols &&
-      !areModulesEqual(ED->getModuleContext(), ED->getExtendedNominal()->getModuleContext());
+         !areModulesEqual(ED->getModuleContext(),
+                          ED->getExtendedNominal()->getModuleContext()) &&
+         !isExportedImportedModule(
+             ED->getExtendedNominal()->getModuleContext());
 }
