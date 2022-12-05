@@ -5896,7 +5896,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
-  case KnownProtocolKind::CompilerPlugin:
     return SpecialProtocol::None;
   }
 

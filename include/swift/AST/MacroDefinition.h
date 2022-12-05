@@ -22,8 +22,6 @@
 
 namespace swift {
 
-class CompilerPlugin;
-
 /// Provides the definition of a macro.
 struct MacroDefinition {
     /// The kind of macro, which determines how it can be used in source code.
@@ -34,12 +32,9 @@ struct MacroDefinition {
 
     /// Describes how the macro is implemented.
   enum class ImplementationKind: uint8_t {
-      /// The macro is built-in to the compiler, linked against the same
-      /// underlying syntax tree libraries.
-    Builtin,
-
-      /// The macro was defined in a compiler plugin.
-    Plugin,
+    /// The macro is in the same process as the compiler, whether built-in or
+    /// loaded via a compiler plugin.
+    InProcess,
   };
 
 public:
@@ -55,39 +50,22 @@ private:
 public:
   static MacroDefinition forInvalid() {
     return MacroDefinition{
-      Kind::Expression, ImplementationKind::Builtin, nullptr
+      Kind::Expression, ImplementationKind::InProcess, nullptr
     };
   }
 
-  static MacroDefinition forBuiltin(Kind kind, void *opaqueHandle) {
-    return MacroDefinition{kind, ImplementationKind::Builtin, opaqueHandle};
-  }
-
-  static MacroDefinition forCompilerPlugin(Kind kind, CompilerPlugin *plugin) {
-    return MacroDefinition{kind, ImplementationKind::Plugin, plugin};
+  static MacroDefinition forInProcess(Kind kind, void *opaqueHandle) {
+    return MacroDefinition{kind, ImplementationKind::InProcess, opaqueHandle};
   }
 
   bool isInvalid() const { return opaqueHandle == nullptr; }
 
   explicit operator bool() const { return !isInvalid(); }
 
-  void *getAsBuiltin() const {
+  void *getAsInProcess() const {
     switch (implKind) {
-    case ImplementationKind::Builtin:
+    case ImplementationKind::InProcess:
       return opaqueHandle;
-
-    case ImplementationKind::Plugin:
-      return nullptr;
-    }
-  }
-
-  CompilerPlugin *getAsCompilerPlugin() const {
-    switch (implKind) {
-    case ImplementationKind::Builtin:
-      return nullptr;
-
-    case ImplementationKind::Plugin:
-      return (CompilerPlugin *)opaqueHandle;
     }
   }
 };
