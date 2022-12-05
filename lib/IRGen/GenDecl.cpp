@@ -3235,7 +3235,8 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
   const SILOptions &opts = IRGen.SIL.getOptions();
-  return (opts.EnableStackProtection && f->needsStackProtection()) ?
+  // FIXME(katei): stack protection support will be added by https://github.com/WebAssembly/wasi-libc/pull/351
+  return (opts.EnableStackProtection && f->needsStackProtection() && Triple.getObjectFormat() != llvm::Triple::Wasm) ?
     StackProtectorMode::StackProtector : StackProtectorMode::NoStackProtector;
 }
 
