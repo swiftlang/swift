@@ -10595,6 +10595,27 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       return None;
 
     auto numContextualParams = fnType->getNumParams();
+
+    if (numContextualParams == 1) {
+      const auto &param = fnType->getParams()[0];
+      if (auto *tuple = param.getPlainType()->getAs<TupleType>()) {
+        // If arity is the same it's a tuple splat which is allowed
+        // for closures (see SE-0110 for more details):
+        //
+        // func test(_: ((Int, Int)) -> Void) {}
+        // test { (arg, _) in
+        //   ...
+        // }
+        if (tuple->getNumElements() == inferredClosureType->getNumParams() &&
+            param.getParameterFlags().isNone()) {
+          const auto &elt = tuple->getElement(index);
+          return AnyFunctionType::Param(elt.getType(), elt.getName());
+        }
+
+        return None;
+      }
+    }
+
     if (numContextualParams != inferredClosureType->getNumParams() ||
         numContextualParams <= index)
       return None;
