@@ -231,7 +231,7 @@ struct CommentToXMLConverter {
 
     if (PF->isClosureParameter()) {
       OS << "<ClosureParameter>";
-      visitCommentParts(PF->getParts().getValue());
+      visitCommentParts(PF->getParts().value());
       OS << "</ClosureParameter>";
     } else {
       OS << "<Discussion>";
@@ -276,9 +276,9 @@ struct CommentToXMLConverter {
 } // unnamed namespace
 
 void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts &Parts) {
-  if (Parts.Brief.hasValue()) {
+  if (Parts.Brief.has_value()) {
     OS << "<Abstract>";
-    printASTNode(Parts.Brief.getValue());
+    printASTNode(Parts.Brief.value());
     OS << "</Abstract>";
   }
 
@@ -290,11 +290,11 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
     OS << "</Parameters>";
   }
 
-  if (Parts.ReturnsField.hasValue())
-    printResultDiscussion(Parts.ReturnsField.getValue());
+  if (Parts.ReturnsField.has_value())
+    printResultDiscussion(Parts.ReturnsField.value());
 
-  if (Parts.ThrowsField.hasValue())
-    printThrowsDiscussion(Parts.ThrowsField.getValue());
+  if (Parts.ThrowsField.has_value())
+    printThrowsDiscussion(Parts.ThrowsField.value());
 
   if (!Parts.Tags.empty()) {
     printTagFields(llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
@@ -503,7 +503,7 @@ bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
     return false;
 
   if (const auto LKF = DC->getLocalizationKeyField()) {
-    printInlinesUnder(LKF.getValue(), OS);
+    printInlinesUnder(LKF.value(), OS);
     return true;
   }
 
@@ -572,9 +572,9 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
   }
 
   void printNestedParamField(const ParamField *PF) {
-    auto Parts = PF->getParts().getValue();
-    if (Parts.Brief.hasValue()) {
-      visit(Parts.Brief.getValue());
+    auto Parts = PF->getParts().value();
+    if (Parts.Brief.has_value()) {
+      visit(Parts.Brief.value());
     }
 
     if (!Parts.ParamFields.empty()) {
@@ -600,24 +600,24 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
       printNewline();
     }
 
-    if (Parts.ReturnsField.hasValue()) {
+    if (Parts.ReturnsField.has_value()) {
       printNewline();
       print("\\a ");
       print(PF->getName());
       print(" returns: ");
 
-      for (auto Child : Parts.ReturnsField.getValue()->getChildren()) {
+      for (auto Child : Parts.ReturnsField.value()->getChildren()) {
         visit(Child);
       }
     }
 
-    if (Parts.ThrowsField.hasValue()) {
+    if (Parts.ThrowsField.has_value()) {
       printNewline();
       print("\\a ");
       print(PF->getName());
       print(" error: ");
 
-      for (auto Child : Parts.ThrowsField.getValue()->getChildren()) {
+      for (auto Child : Parts.ThrowsField.value()->getChildren()) {
         visit(Child);
       }
     }
@@ -841,8 +841,8 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   DoxygenConverter Converter(OS);
 
   auto Brief = DC->getBrief();
-  if (Brief.hasValue()) {
-    Converter.visit(Brief.getValue());
+  if (Brief.has_value()) {
+    Converter.visit(Brief.value());
   }
 
   for (const auto *N : DC->getBodyNodes()) {
@@ -858,15 +858,15 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   }
 
   auto TF = DC->getThrowsField();
-  if (TF.hasValue()) {
+  if (TF.has_value()) {
     Converter.printNewline();
-    Converter.visit(TF.getValue());
+    Converter.visit(TF.value());
   }
 
   auto RF = DC->getReturnsField();
-  if (RF.hasValue()) {
+  if (RF.has_value()) {
     Converter.printNewline();
-    Converter.visit(RF.getValue());
+    Converter.visit(RF.value());
   }
 }
 

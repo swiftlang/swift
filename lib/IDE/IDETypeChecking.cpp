@@ -149,7 +149,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // If not from the same file, sort by file name.
       if (auto LFile = Ext->getSourceFileName()) {
         if (auto RFile = Rhs.Ext->getSourceFileName()) {
-          int Result = LFile.getValue().compare(RFile.getValue());
+          int Result = LFile.value().compare(RFile.value());
           if (Result != 0)
             return Result < 0;
         }
@@ -158,7 +158,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // Otherwise, sort by source order.
       if (auto LeftOrder = Ext->getSourceOrder()) {
         if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
-          return LeftOrder.getValue() < RightOrder.getValue();
+          return LeftOrder.value() < RightOrder.value();
         }
       }
 
@@ -915,13 +915,22 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
 }
 
 SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-swift::getShorthandShadows(CaptureListExpr *CaptureList) {
+swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (auto Capture : CaptureList->getCaptureList()) {
     if (Capture.PBD->getPatternList().size() != 1) {
       continue;
     }
-    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Capture.PBD->getInit(0));
+    Expr *Init = Capture.PBD->getInit(0);
+    if (!Init) {
+      continue;
+    }
+    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
+      if (DC) {
+        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
+      }
+    }
+    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Init);
     if (!DRE) {
       continue;
     }
@@ -946,17 +955,23 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList) {
 }
 
 SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-swift::getShorthandShadows(LabeledConditionalStmt *CondStmt) {
+swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (const StmtConditionElement &Cond : CondStmt->getCond()) {
     if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
       continue;
     }
-    auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
-    if (!Init) {
+    Expr *Init = Cond.getInitializer();
+    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
+      if (DC) {
+        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
+      }
+    }
+    auto InitDeclRef = dyn_cast<DeclRefExpr>(Init);
+    if (!InitDeclRef) {
       continue;
     }
-    auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
+    auto ReferencedVar = dyn_cast_or_null<VarDecl>(InitDeclRef->getDecl());
     if (!ReferencedVar) {
       continue;
     }

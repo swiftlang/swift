@@ -122,6 +122,11 @@ SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
   return decl->getSourceRangeIncludingAttrs();
 }
 
+SourceRange MacroDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getSourceRangeIncludingAttrs();
+}
+
 SourceRange
 EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
@@ -140,7 +145,7 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   SourceRange range = getPatternEntry().getSourceRange();
-  if (endLoc.hasValue())
+  if (endLoc.has_value())
     range.End = *endLoc;
   return range;
 }
@@ -364,7 +369,7 @@ ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
 }
 
 bool ASTScopeImpl::isCharSourceRangeCached() const {
-  return cachedCharSourceRange.hasValue();
+  return cachedCharSourceRange.has_value();
 }
 
 SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {

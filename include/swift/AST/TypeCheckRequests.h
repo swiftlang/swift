@@ -40,12 +40,15 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class BreakStmt;
 class ContextualPattern;
+class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
-class Macro;
+class LabeledStmt;
+struct MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
@@ -3699,6 +3702,40 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Lookup the target of a break statement.
+class BreakTargetRequest
+    : public SimpleRequest<BreakTargetRequest,
+                           LabeledStmt *(const BreakStmt *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LabeledStmt *evaluate(Evaluator &evaluator, const BreakStmt *BS) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Lookup the target of a continue statement.
+class ContinueTargetRequest
+    : public SimpleRequest<ContinueTargetRequest,
+                           LabeledStmt *(const ContinueStmt *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LabeledStmt *evaluate(Evaluator &evaluator, const ContinueStmt *CS) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class GetTypeWrapperInitializer
     : public SimpleRequest<GetTypeWrapperInitializer,
                            ConstructorDecl *(NominalTypeDecl *),
@@ -3750,11 +3787,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Lookup all macros with the given name that are visible from the given
-/// module.
-class MacroLookupRequest
-    : public SimpleRequest<MacroLookupRequest,
-                           ArrayRef<MacroDecl *>(Identifier, ModuleDecl *),
+/// Find the definition of a given macro.
+class MacroDefinitionRequest
+    : public SimpleRequest<MacroDefinitionRequest,
+                           MacroDefinition(MacroDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3762,10 +3798,12 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<MacroDecl *> evaluate(Evaluator &evaluator,
-                                 Identifier macroName, ModuleDecl *mod) const;
+  MacroDefinition evaluate(Evaluator &evaluator, MacroDecl *macro) const;
 
 public:
+  // Source location
+  SourceLoc getNearestLoc() const;
+
   bool isCached() const { return true; }
 };
 

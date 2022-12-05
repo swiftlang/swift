@@ -1408,7 +1408,7 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
              && "should have split critical edges");
       SILBuilder B(succ->begin());
       auto *SI = B.createStore(
-          loc.getValue(), ssaUpdater.getValueInMiddleOfBlock(succ), initialAddr,
+          loc.value(), ssaUpdater.getValueInMiddleOfBlock(succ), initialAddr,
           StoreOwnershipQualifier::Unqualified);
       (void)SI;
       LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);

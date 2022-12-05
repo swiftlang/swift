@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution -disable-availability-checking
 // RUN: %target-swift-frontend -emit-irgen %s -I %t -module-name test | %FileCheck %s
 
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 // rdar://102246128
 // REQUIRES: PTRSIZE=64
@@ -112,6 +112,30 @@ public func testEnum(_ e: E) {
 // --- E.payloadCase(_:) ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1EO11payloadCaseyAcA1SVcACmFTwS"()
 // CHECK:   ret i1 icmp ne (i32* @"$s17has_symbol_helper1EO11payloadCaseyAcA1SVcACmFWC", i32* null)
+
+public func testOpaqueParameter<T: P>(_ p: T) {
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1PP11requirementyyFTwS"()
+  if #_hasSymbol(p.requirement) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1PP26requirementWithDefaultImplyyFTwS"()
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
+// --- P.requirement() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1PP11requirementyyFTwS"()
+// CHECK:   ret i1 icmp ne (void (%swift.opaque*, %swift.type*, i8**)* @"$s17has_symbol_helper1PP11requirementyyF", void (%swift.opaque*, %swift.type*, i8**)* null)
+
+// --- P.requirementWithDefaultImpl() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1PP26requirementWithDefaultImplyyFTwS"()
+// CHECK:   ret i1 icmp ne (void (%swift.opaque*, %swift.type*, i8**)* @"$s17has_symbol_helper1PP26requirementWithDefaultImplyyF", void (%swift.opaque*, %swift.type*, i8**)* null)
+
+public func testExistentialParameter(_ p: any P) {
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1PP11requirementyyFTwS"()
+  if #_hasSymbol(p.requirement) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1PP26requirementWithDefaultImplyyFTwS"()
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
 
 public func testMetatypes() {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SVTwS"()

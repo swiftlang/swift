@@ -35,6 +35,7 @@ namespace swift {
     std::string ABIDescriptorPath;
     bool emptyABIDescriptor = false;
     llvm::VersionTuple UserModuleVersion;
+    std::set<std::string> AllowableClients;
     std::string SDKName;
 
     StringRef GroupInfoPath;

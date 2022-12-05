@@ -1595,7 +1595,7 @@ public:
   }
 
   bool isElementMismatch() const {
-    return Index.hasValue();
+    return Index.has_value();
   }
 
   bool coalesceAndDiagnose(const Solution &solution,

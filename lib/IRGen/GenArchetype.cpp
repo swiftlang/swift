@@ -51,6 +51,7 @@
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
+#include "TypeLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -133,7 +134,7 @@ class ClassArchetypeTypeInfo
                          Size size, const SpareBitVector &spareBits,
                          Alignment align,
                          ReferenceCounting refCount)
-    : HeapTypeInfo(storageType, size, spareBits, align),
+    : HeapTypeInfo(refCount, storageType, size, spareBits, align),
       RefCount(refCount)
   {}
 

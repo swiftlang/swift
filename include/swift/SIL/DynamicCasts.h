@@ -127,7 +127,7 @@ struct SILDynamicCastKind {
   explicit SILDynamicCastKind(SILInstructionKind kind) {
     auto newValue = SILDynamicCastKind::fromNodeKindHelper(kind);
     assert(newValue && "Non cast passed into SILDynamicCastKind");
-    value = newValue.getValue();
+    value = newValue.value();
   }
 
   SILDynamicCastKind(innerty value) : value(value) {}
@@ -174,7 +174,7 @@ public:
     auto kind = SILDynamicCastKind::fromNodeKind(inst->getKind());
     if (!kind)
       return SILDynamicCastInst();
-    switch (kind.getValue()) {
+    switch (kind.value()) {
 #define DYNAMICCAST_INST(ID, PARENT)                                           \
   case SILDynamicCastKind::ID:                                                 \
     return SILDynamicCastInst(cast<ID>(inst));

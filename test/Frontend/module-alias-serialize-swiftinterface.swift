@@ -30,9 +30,9 @@
 
 /// Check AppleLogging.swiftmodule is loaded
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-LOAD
-// CHECK-LOAD: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-LOAD: remark: loaded module {{.*}}AppleLogging.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-NOT-LOAD1
-// CHECK-NOT-LOAD1: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-NOT-LOAD1: remark: loaded module {{.*}}XLogging.swiftmodule
 
 /// Check imported modules contain AppleLogging, not XLogging
 // RUN: %FileCheck %s -input-file %t/Lib.swiftinterface -check-prefix CHECK-IMPORT

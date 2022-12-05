@@ -181,7 +181,7 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
 NullablePtr<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNode(const DependencyKey &key) {
   auto existing = memoizedNodes.findExisting(key);
-  return existing ? existing.getValue() : NullablePtr<SourceFileDepGraphNode>();
+  return existing ? existing.value() : NullablePtr<SourceFileDepGraphNode>();
 }
 
 std::string DependencyKey::demangleTypeAsContext(StringRef s) {
@@ -232,9 +232,9 @@ bool SourceFileDepGraph::verify() const {
 
 bool SourceFileDepGraph::verifyReadsWhatIsWritten(StringRef path) const {
   auto loadedGraph = SourceFileDepGraph::loadFromPath(path);
-  assert(loadedGraph.hasValue() &&
+  assert(loadedGraph.has_value() &&
          "Should be able to read the exported graph.");
-  verifySame(loadedGraph.getValue());
+  verifySame(loadedGraph.value());
   return true;
 }
 
@@ -335,8 +335,8 @@ void DepGraphNode::dump() const {
 
 void DepGraphNode::dump(raw_ostream &os) const {
   key.dump(os);
-  if (fingerprint.hasValue())
-    os << "fingerprint: " << fingerprint.getValue() << "";
+  if (fingerprint.has_value())
+    os << "fingerprint: " << fingerprint.value() << "";
   else
     os << "no fingerprint";
 }

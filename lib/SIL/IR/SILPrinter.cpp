@@ -660,7 +660,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       break;
     }
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
-      *this << "@" << i.OwnershipKind.getValue() << " ";
+      *this << "@" << i.OwnershipKind.value() << " ";
     }
     return *this << i.Type;
   }
@@ -820,8 +820,8 @@ public:
 
     // If the basic block has a name available, print it as well
     auto debugName = BB->getDebugName();
-    if (debugName.hasValue()) {
-      *this << "// " << debugName.getValue() << '\n';
+    if (debugName.has_value()) {
+      *this << "// " << debugName.value() << '\n';
     }
 
     // Then print the name of our block, the arguments, and the block colon.
@@ -866,7 +866,7 @@ public:
             PrintState.OS << "  // "
                           << SM.extractText(
                                  {SM.getLocForLineCol(Buffer, Line, 0),
-                                  LineLength.getValueOr(0)})
+                                  LineLength.value_or(0)})
                           << "\tSourceLoc: "
                           << SM.getDisplayNameForLoc(CurSourceLoc) << ":"
                           << Line << "\n";
@@ -961,24 +961,24 @@ public:
 
   void printBranchTargets(const SILInstruction *inst) {
     if (auto condBr = dyn_cast<CondBranchInst>(inst)) {
-      if (condBr->getTrueBB()->getDebugName().hasValue()) {
-        *this << ", true->" << condBr->getTrueBB()->getDebugName().getValue();
+      if (condBr->getTrueBB()->getDebugName().has_value()) {
+        *this << ", true->" << condBr->getTrueBB()->getDebugName().value();
       }
-      if (condBr->getFalseBB()->getDebugName().hasValue()) {
-        *this << ", false->" << condBr->getFalseBB()->getDebugName().getValue();
+      if (condBr->getFalseBB()->getDebugName().has_value()) {
+        *this << ", false->" << condBr->getFalseBB()->getDebugName().value();
       }
     } else if (auto br = dyn_cast<BranchInst>(inst)) {
-      if (br->getDestBB()->getDebugName().hasValue()) {
-        *this << ", dest->" << br->getDestBB()->getDebugName().getValue();
+      if (br->getDestBB()->getDebugName().has_value()) {
+        *this << ", dest->" << br->getDestBB()->getDebugName().value();
       }
     } else if (auto termInst = dyn_cast<TermInst>(inst)) {
       // Otherwise, we just print the successors in order without pretty printing
       for (unsigned i = 0, numSuccessors = termInst->getSuccessors().size();
            i != numSuccessors; ++i) {
         auto &successor = termInst->getSuccessors()[i];
-        if (successor.getBB()->getDebugName().hasValue()) {
+        if (successor.getBB()->getDebugName().has_value()) {
           *this << ", #" << i
-                << "->" << successor.getBB()->getDebugName().getValue();
+                << "->" << successor.getBB()->getDebugName().value();
         }
       }
     }

@@ -278,7 +278,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   //
   // TODO: Replace this with a check on the computed subseq relation. See the
   // TODO in computeSubSeqRelation.
-  if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
+  if (V1Path->hasNonEmptySymmetricDifference(V2Path.value()))
     return AliasResult::NoAlias;
 
   // If one of the GEPs is a super path of the other then they partially

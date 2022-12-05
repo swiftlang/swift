@@ -8,7 +8,6 @@
 // RUN: %target-swift-frontend -g -I %t -emit-ir %s  -o - | %FileCheck %s
 
 // REQUIRES: CPU=arm64 || CPU=x86_64
-// REQUIRES: rdar102535969
 
 import resilient_struct
 
@@ -22,7 +21,7 @@ bb0:
   %1 = tuple ()
   return %1 : $()
 }
-
-// CHECK:  %assertions.debug = alloca i8*
-// CHECK:  %assertions = alloca i8, i64 %size
-// CHECK:  store i8* %assertions, i8** %assertions.debug
+// CHECK: define{{.*}} swiftcc void @test_debug_value_resilient()
+// CHECK:  [[ASSERTIONSDBG:%.*]] = alloca i8*
+// CHECK:  [[ASSERTIONS:%.*]] = alloca i8, i64 %size
+// CHECK:  store i8* [[ASSERTIONS]], i8** [[ASSERTIONSDBG]]

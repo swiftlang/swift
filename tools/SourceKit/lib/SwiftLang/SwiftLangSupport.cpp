@@ -412,7 +412,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::InstanceVar: return KindRefVarInstance;
     case CodeCompletionDeclKind::LocalVar: return KindRefVarLocal;
     case CodeCompletionDeclKind::GlobalVar: return KindRefVarGlobal;
-      case CodeCompletionDeclKind::Macro: return KindRefMacro;
+    case CodeCompletionDeclKind::Macro: return KindRefMacro;
     }
   }
 
@@ -855,7 +855,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
 
   for (auto Attr : Attrs) {
     if (auto AttrUID = getUIDForDeclAttribute(Attr)) {
-      AttrUIDs.push_back(AttrUID.getValue());
+      AttrUIDs.push_back(AttrUID.value());
     }
   }
 
@@ -1008,7 +1008,7 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
 
 void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
+    bool InsertCodeCompletionToken, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
@@ -1026,8 +1026,18 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Create a buffer for code completion. This contains '\0' at 'Offset'
   // position of 'UnresolvedInputFile' buffer.
   auto origOffset = Offset;
-  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  // If we inserted a code completion token into the buffer, this keeps the
+  // buffer alive. Should never be accessed, `buffer` should be used instead.
+  std::unique_ptr<llvm::MemoryBuffer> codeCompletionBuffer;
+  llvm::MemoryBuffer *buffer;
+  if (InsertCodeCompletionToken) {
+    codeCompletionBuffer = ide::makeCodeCompletionMemoryBuffer(
+        UnresolvedInputFile, Offset, bufferIdentifier);
+    buffer = codeCompletionBuffer.get();
+  } else {
+    buffer = UnresolvedInputFile;
+  }
 
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -1055,7 +1065,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
       Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
-      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
+      buffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
@@ -1075,7 +1085,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     CancellationFlag->store(true, std::memory_order_relaxed);
   });
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+  CompletionLikeOperationParams Params = {Invocation, buffer, &CIDiags,
                                           CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));

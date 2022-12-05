@@ -831,7 +831,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 }
 
 /// This request primarily emits diagnostics about typealiases and associated
-/// type declarations that override another associate type, and can better be
+/// type declarations that override another associated type, and can better be
 /// expressed as requirements in the 'where' clause.
 ///
 /// It also implements a compatibility behavior where sometimes typealiases in

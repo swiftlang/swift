@@ -105,7 +105,8 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
 
   Lang.performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, CancellationToken,
+      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      FileSystem, CancellationToken,
       [&](CancellableResult<SwiftLangSupport::CompletionLikeOperationParams>
               ParamsResult) {
         ParamsResult.mapAsync<CodeCompleteResult>(
@@ -224,7 +225,7 @@ static void getResultStructure(
   auto *CCStr = result.getCompletionString();
   auto FirstTextChunk = CCStr->getFirstTextChunkIndex(leadingPunctuation);
 
-  if (!FirstTextChunk.hasValue())
+  if (!FirstTextChunk.has_value())
     return;
 
   bool isOperator = result.isOperator();

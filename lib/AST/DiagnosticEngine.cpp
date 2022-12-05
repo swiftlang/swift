@@ -25,6 +25,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
@@ -802,6 +803,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() &&
            "Improper modifier for DescriptiveDeclKind argument");
     Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
+    break;
+
+  case DiagnosticArgumentKind::DescriptiveStmtKind:
+    assert(Modifier.empty() && "Improper modifier for StmtKind argument");
+    Out << Stmt::getDescriptiveKindName(Arg.getAsDescriptiveStmtKind());
     break;
 
   case DiagnosticArgumentKind::DeclAttribute:

@@ -132,7 +132,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
-      CI->getOperandBundle(LLVMContext::OB_ptrauth).hasValue()) {
+      CI->getOperandBundle(LLVMContext::OB_ptrauth).has_value()) {
     // The operand is the callee and it has already been signed. Ignore this
     // because we cannot add another ptrauth bundle to the call instruction.
     return false;

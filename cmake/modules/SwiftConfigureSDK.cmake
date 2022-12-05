@@ -378,7 +378,7 @@ macro(configure_sdk_unix name architectures)
           message(WARNING "CMAKE_SYSTEM_VERSION will not match target")
         endif()
 
-        string(REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
+        string(REGEX REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "FreeBSD Version: ${freebsd_system_version}")
 
         set(SWIFT_SDK_FREEBSD_ARCH_x86_64_TRIPLE "x86_64-unknown-freebsd${freebsd_system_version}")
@@ -387,14 +387,14 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unsupported arch for OpenBSD: ${arch}")
         endif()
 
-        string(REPLACE "[-].*" "" openbsd_system_version ${CMAKE_SYSTEM_VERSION})
+        set(openbsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "OpenBSD Version: ${openbsd_system_version}")
 
         set(SWIFT_SDK_OPENBSD_ARCH_amd64_TRIPLE "amd64-unknown-openbsd${openbsd_system_version}")
 
-	if(CMAKE_SYSROOT)
-	  set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)
-	endif()
+        if(CMAKE_SYSROOT)
+          set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)
+        endif()
       elseif("${prefix}" STREQUAL "CYGWIN")
         if(NOT arch STREQUAL x86_64)
           message(FATAL_ERROR "unsupported arch for cygwin: ${arch}")

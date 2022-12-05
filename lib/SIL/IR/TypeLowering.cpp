@@ -43,6 +43,15 @@
 using namespace swift;
 using namespace Lowering;
 
+// Necessary to straightforwardly write SIL tests that exercise
+// OpaqueValueTypeLowering (and MoveOnlyOpaqueValueTypeLowering): the tests can
+// be written as though opaque values were enabled to begin but have since been
+// lowered out of.
+llvm::cl::opt<bool> TypeLoweringForceOpaqueValueLowering(
+    "type-lowering-force-opaque-value-lowering", llvm::cl::init(false),
+    llvm::cl::desc("Force TypeLowering to behave as if building with opaque "
+                   "values enabled"));
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
@@ -1941,7 +1950,12 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      llvm_unreachable("copy into");
+      if (B.getModule().useLoweredAddresses()) {
+        B.createCopyAddr(loc, src, dest, isTake, isInit);
+      } else {
+        SILValue value = emitLoadOfCopy(B, loc, src, isTake);
+        emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
     }
 
     // OpaqueValue store cannot be decoupled from a destroy because it is not
@@ -2066,7 +2080,8 @@ namespace {
 
     TypeLowering *handleMoveOnlyAddressOnly(CanType type,
                                             RecursiveProperties properties) {
-      if (!TC.Context.SILOpts.EnableSILOpaqueValues) {
+      if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
+          !TypeLoweringForceOpaqueValueLowering) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC)
             MoveOnlyAddressOnlyTypeLowering(silType, properties, Expansion);
@@ -2084,7 +2099,8 @@ namespace {
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
-      if (!TC.Context.SILOpts.EnableSILOpaqueValues) {
+      if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
+          !TypeLoweringForceOpaqueValueLowering) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
@@ -2631,7 +2647,7 @@ bool TypeConverter::visitAggregateLeaves(
                              &worklist](Type substTy, AbstractionPattern origTy,
                                         ValueDecl *field,
                                         Optional<unsigned> maybeIndex) -> bool {
-    unsigned index = maybeIndex.getValueOr(UINT_MAX);
+    unsigned index = maybeIndex.value_or(UINT_MAX);
     if (!visited.insert({substTy.getPointer(), field, index}).second)
       return false;
     worklist.push_back({substTy.getPointer(), origTy, field, index});
@@ -3847,7 +3863,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // If we captured the dynamic 'Self' type and we have a 'self' value also,
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
-  if (selfCapture.hasValue()) {
+  if (selfCapture.has_value()) {
     resultingCaptures.push_back(*selfCapture);
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();

@@ -93,7 +93,7 @@ public:
       cachedIsLetValue =
           V->getType().isAddress() && isLetAddress(getValueAddress());
     }
-    return cachedIsLetValue.getValue();
+    return cachedIsLetValue.value();
   }
 
   // Return true is the given address (or pointer) may alias with 'V'.

@@ -386,8 +386,9 @@ namespace {
         return IGM.typeLayoutCache.getEmptyEntry();
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
-      if (TIK >= Loadable) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+      if (TIK >= Loadable && !IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
+                                                                 T);
       }
 
       unsigned emptyCases = 0;
@@ -1085,7 +1086,11 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
+      }
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
+                                                        ScalarKind::POD);
     }
 
 
@@ -1237,7 +1242,11 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
+      }
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
+                                                        ScalarKind::POD);
     }
 
     /// \group Extra inhabitants for C-compatible enums.
@@ -3417,7 +3426,7 @@ namespace {
       auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
       mask.append(baseMask);
       mask.padWithSetBitsTo(totalSize);
-      return mask.build().getValue();
+      return mask.build().value();
     }
 
     ClusteredBitVector
@@ -3527,9 +3536,10 @@ namespace {
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
 
-      if (AllowFixedLayoutOptimizations && TIK >= Loadable) {
+      if (!IGM.getOptions().ForceStructTypeLayouts && AllowFixedLayoutOptimizations && TIK >= Loadable) {
         // The type layout entry code does not handle spare bits atm.
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
+                                                                 T);
       }
 
       unsigned emptyCases = ElementsWithNoPayload.size();
@@ -5494,7 +5504,7 @@ namespace {
         auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
         mask.append(CommonSpareBits);
         mask.padWithSetBitsTo(fixedTI->getFixedSize().getValueInBits());
-        tagBits = mask.build().getValue();
+        tagBits = mask.build().value();
       }
       return tagBits;
     }
@@ -5555,7 +5565,7 @@ namespace {
         value.appendClearBits(CommonSpareBits.size());
         value.append(APInt(bits - CommonSpareBits.size(), mask & extraTagMask));
       }
-      return value.build().getValue();
+      return value.build().value();
     }
 
     ClusteredBitVector

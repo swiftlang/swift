@@ -4,6 +4,13 @@
 // Declarations //
 //////////////////
 
+public class CopyableKlass {}
+
+public func copyableClassUseMoveOnlyWithoutEscaping(_ x: CopyableKlass) {
+}
+public func copyableClassConsume(_ x: __owned CopyableKlass) {
+}
+
 @_moveOnly
 public class Klass {
     var intField: Int
@@ -24,15 +31,39 @@ public func classConsume(_ x: __owned Klass) {
 @_moveOnly
 public struct NonTrivialStruct {
     var k = Klass()
+    var copyableK = CopyableKlass()
+    var nonTrivialStruct2 = NonTrivialStruct2()
+    var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
 }
 
 public func nonConsumingUseNonTrivialStruct(_ s: NonTrivialStruct) {}
+
+@_moveOnly
+public struct NonTrivialStruct2 {
+    var copyableKlass = CopyableKlass()
+}
+
+public func nonConsumingUseNonTrivialStruct2(_ s: NonTrivialStruct2) {}
+
+public struct NonTrivialCopyableStruct {
+    var copyableKlass = CopyableKlass()
+    var nonTrivialCopyableStruct2 = NonTrivialCopyableStruct2()
+}
+
+public func nonConsumingUseNonTrivialCopyableStruct(_ s: NonTrivialCopyableStruct) {}
+
+public struct NonTrivialCopyableStruct2 {
+    var copyableKlass = CopyableKlass()
+}
+
+public func nonConsumingUseNonTrivialCopyableStruct2(_ s: NonTrivialCopyableStruct2) {}
 
 @_moveOnly
 public enum NonTrivialEnum {
     case first
     case second(Klass)
     case third(NonTrivialStruct)
+    case fourth(CopyableKlass)
 }
 
 public func nonConsumingUseNonTrivialEnum(_ e : NonTrivialEnum) {}
@@ -2120,4 +2151,51 @@ func blackHoleKlassTestCase(_ k: __owned Klass) {
     // expected-note @-1 {{consuming use}}
     // expected-note @-2 {{consuming use}}
     // expected-note @-3 {{consuming use}}
+}
+
+///////////////////////////////////////
+// Copyable Type in a Move Only Type //
+///////////////////////////////////////
+
+func copyableKlassInAMoveOnlyStruct() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
+    copyableClassConsume(a.copyableK)
+}
+
+func copyableKlassInAMoveOnlyStruct2() {
+    var a = NonTrivialStruct() // expected-error {{'a' consumed more than once}}
+    a = NonTrivialStruct()
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
+    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
+    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
+}
+
+func copyableKlassInAMoveOnlyStruct3() {
+    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    a = NonTrivialStruct()
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
+    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK) // expected-note {{non-consuming use}}
+}
+
+// FIXME: We want to transition to a field sensitive model which should cause
+// this to no longer error.
+func copyableKlassInAMoveOnlyStruct4() {
+    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    a = NonTrivialStruct()
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
+    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
+    nonConsumingUseNonTrivialStruct2(a.nonTrivialStruct2) // expected-note {{non-consuming use}}
+}
+
+func copyableStructsInMoveOnlyStructNonConsuming() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    nonConsumingUseNonTrivialStruct(a)
+    nonConsumingUseNonTrivialStruct2(a.nonTrivialStruct2)
+    nonConsumingUseNonTrivialCopyableStruct(a.nonTrivialCopyableStruct)
+    nonConsumingUseNonTrivialCopyableStruct2(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2)
+    copyableClassUseMoveOnlyWithoutEscaping(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass)
 }

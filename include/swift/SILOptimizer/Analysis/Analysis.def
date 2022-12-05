@@ -17,36 +17,36 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// ANALYSIS(NAME) This represents the name of an analysis. It is assumed that
-///                the actual analysis is called `NAME ## ANALYSIS'.
-#ifndef ANALYSIS
-#define ANALYSIS(NAME)
+/// SIL_ANALYSIS(NAME) This represents the name of an analysis. It is assumed that
+///                    the actual analysis is called `NAME ## Analysis'.
+#ifndef SIL_ANALYSIS
+#error "SIL_ANALYSIS macro must be defined"
 #endif
 
-ANALYSIS(AccessSummary)
-ANALYSIS(AccessStorage)
-ANALYSIS(Alias)
-ANALYSIS(BasicCallee)
-ANALYSIS(Caller)
-ANALYSIS(ClassHierarchy)
-ANALYSIS(ClosureScope)
-ANALYSIS(Destructor)
-ANALYSIS(DifferentiableActivity)
-ANALYSIS(Dominance)
-ANALYSIS(EpilogueARC)
-ANALYSIS(Escape)
-ANALYSIS(InductionVariable)
-ANALYSIS(Loop)
-ANALYSIS(LoopRegion)
-ANALYSIS(NonLocalAccessBlock)
-ANALYSIS(OptimizerStats)
-ANALYSIS(PostDominance)
-ANALYSIS(PostOrder)
-ANALYSIS(ProtocolConformance)
-ANALYSIS(RCIdentity)
-ANALYSIS(SideEffect)
-ANALYSIS(TypeExpansion)
-ANALYSIS(PassManagerVerifier)
-ANALYSIS(DeadEndBlocks)
+SIL_ANALYSIS(AccessSummary)
+SIL_ANALYSIS(AccessStorage)
+SIL_ANALYSIS(Alias)
+SIL_ANALYSIS(BasicCallee)
+SIL_ANALYSIS(Caller)
+SIL_ANALYSIS(ClassHierarchy)
+SIL_ANALYSIS(ClosureScope)
+SIL_ANALYSIS(Destructor)
+SIL_ANALYSIS(DifferentiableActivity)
+SIL_ANALYSIS(Dominance)
+SIL_ANALYSIS(EpilogueARC)
+SIL_ANALYSIS(Escape)
+SIL_ANALYSIS(InductionVariable)
+SIL_ANALYSIS(Loop)
+SIL_ANALYSIS(LoopRegion)
+SIL_ANALYSIS(NonLocalAccessBlock)
+SIL_ANALYSIS(OptimizerStats)
+SIL_ANALYSIS(PostDominance)
+SIL_ANALYSIS(PostOrder)
+SIL_ANALYSIS(ProtocolConformance)
+SIL_ANALYSIS(RCIdentity)
+SIL_ANALYSIS(SideEffect)
+SIL_ANALYSIS(TypeExpansion)
+SIL_ANALYSIS(PassManagerVerifier)
+SIL_ANALYSIS(DeadEndBlocks)
 
-#undef ANALYSIS
+#undef SIL_ANALYSIS

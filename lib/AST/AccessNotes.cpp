@@ -61,7 +61,7 @@ bool AccessNoteDeclName::matches(ValueDecl *VD) const {
       return false;
     lookupVD = accessor->getStorage();
   }
-  else if (accessorKind.hasValue())
+  else if (accessorKind.has_value())
     return false;
 
   // Check that `name` matches `lookupVD`.
@@ -260,7 +260,7 @@ void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
 }
 
 std::string MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
-  if (note.ObjCName.hasValue()) {
+  if (note.ObjCName.has_value()) {
     if (!note.ObjC)
       note.ObjC = true;
     else if (!*note.ObjC)

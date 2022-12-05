@@ -399,7 +399,7 @@ private:
       }
       auto index = subscript->get<unsigned long long>();
       return getInstructionAtIndex(index,
-                                   within.getValueOr(context->getFunction()));
+                                   within.value_or(context->getFunction()));
     }
     llvm_unreachable("bad suffix after 'instruction'!?");
   }

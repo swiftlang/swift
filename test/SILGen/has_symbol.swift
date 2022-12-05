@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution
 // RUN: %target-swift-frontend -emit-silgen %s -I %t -module-name test | %FileCheck %s
 
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 @_weakLinked import has_symbol_helper
 
@@ -170,16 +170,31 @@ func testEnum(_ e: E) {
 // CHECK: sil @$s17has_symbol_helper1EO6methodyyF : $@convention(method) (@in_guaranteed E) -> ()
 
 
-// CHECK: sil hidden [ossa] @$s4test0A8Protocolyyx17has_symbol_helper1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> ()
-func testProtocol<T: P>(_ p: T) {
+// CHECK: sil hidden [ossa] @$s4test0A15OpaqueParameteryyx17has_symbol_helper1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> ()
+func testOpaqueParameter<T: P>(_ p: T) {
   // CHECK: [[RES:%[0-9]+]] = has_symbol #P.requirement
   // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
   if #_hasSymbol(p.requirement) {}
+  // CHECK: [[RES:%[0-9]+]] = has_symbol #P.requirementWithDefaultImpl
+  // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
 }
 
 // --- P.requirement() ---
 // CHECK: sil @$s17has_symbol_helper1PP11requirementyyF : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 
+// --- P.requirementWithDefaultImpl() ---
+// CHECK: sil @$s17has_symbol_helper1PP26requirementWithDefaultImplyyF : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+
+// CHECK: sil hidden [ossa] @$s4test0A20ExistentialParameteryy17has_symbol_helper1P_pF : $@convention(thin) (@in_guaranteed any P) -> ()
+func testExistentialParameter(_ p: any P) {
+  // CHECK: [[RES:%[0-9]+]] = has_symbol #P.requirement
+  // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
+  if #_hasSymbol(p.requirement) {}
+  // CHECK: [[RES:%[0-9]+]] = has_symbol #P.requirementWithDefaultImpl
+  // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
 
 // CHECK: sil hidden [ossa] @$s4test0A9MetatypesyyF : $@convention(thin) () -> ()
 func testMetatypes() {

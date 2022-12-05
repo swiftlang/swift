@@ -1446,12 +1446,6 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// Finds the loaded compiler plugins with the given name.
-  TinyPtrVector<CompilerPlugin *> getLoadedPlugins(StringRef name);
-
-  /// Add a loaded plugin with the given name.
-  void addLoadedPlugin(StringRef name, CompilerPlugin *plugin);
-
   /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
   /// search within the library.
   void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);

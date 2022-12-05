@@ -4,7 +4,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
-import std
+import CxxStdlib
 
 var StdStringOverlayTestSuite = TestSuite("std::string overlay")
 

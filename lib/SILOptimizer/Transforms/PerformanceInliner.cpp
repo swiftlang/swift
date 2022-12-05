@@ -67,40 +67,16 @@ llvm::cl::opt<bool> SILPrintInliningCallerAfter(
 //                           Printing Helpers
 //===----------------------------------------------------------------------===//
 
-extern bool isFunctionSelectedForPrinting(SILFunction *F);
+extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                       SILFunction *callee);
 
-static void printInliningDetails(StringRef passName, SILFunction *caller,
-                                 SILFunction *callee, bool isCaller,
-                                 bool alreadyInlined) {
-  if (!isFunctionSelectedForPrinting(caller))
-    return;
-  llvm::dbgs() << "  " << passName
-               << (alreadyInlined ? " has inlined " : " will inline ")
-               << callee->getName() << " into " << caller->getName() << ".\n";
-  auto *printee = isCaller ? caller : callee;
-  printee->dump(caller->getModule().getOptions().EmitVerboseSIL);
-  llvm::dbgs() << '\n';
-}
-
-static void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
-                                       SILFunction *callee) {
-  printInliningDetails(passName, caller, callee, /*isCaller=*/false,
-                       /*alreadyInlined=*/false);
-}
-
-static void printInliningDetailsCallerBefore(StringRef passName,
+extern void printInliningDetailsCallerBefore(StringRef passName,
                                              SILFunction *caller,
-                                             SILFunction *callee) {
-  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
-                       /*alreadyInlined=*/false);
-}
+                                             SILFunction *callee);
 
-static void printInliningDetailsCallerAfter(StringRef passName,
+extern void printInliningDetailsCallerAfter(StringRef passName,
                                             SILFunction *caller,
-                                            SILFunction *callee) {
-  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
-                       /*alreadyInlined=*/true);
-}
+                                            SILFunction *callee);
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -713,8 +689,8 @@ bool SILPerformanceInliner::decideInWarmBlock(
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
-    if (ShouldInlineGeneric.hasValue())
-      return ShouldInlineGeneric.getValue();
+    if (ShouldInlineGeneric.has_value())
+      return ShouldInlineGeneric.value();
   }
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
@@ -736,8 +712,8 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
-    if (ShouldInlineGeneric.hasValue())
-      return ShouldInlineGeneric.getValue();
+    if (ShouldInlineGeneric.has_value())
+      return ShouldInlineGeneric.value();
 
     return false;
   }

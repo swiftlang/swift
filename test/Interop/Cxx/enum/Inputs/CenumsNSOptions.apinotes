@@ -1,0 +1,18 @@
+Name: CenumsNSOptions
+Enumerators:
+- Name: API_NOTES_NAMED_OptionOne
+  SwiftName: SwiftOptionOneApiNotes
+- Name: API_NOTES_NAMED_OptionTwo
+  SwiftName: SwiftOptionTwoApiNotes
+- Name: API_NOTES_NAMED_OptionThree
+  SwiftName: SwiftOptionThreeApiNotes
+- Name: API_NOTES_NAMED_OptionFour
+  SwiftName: SwiftOptionFourApiNotes
+Tags:
+- Name: UIPrinterJobTypes
+  SwiftName: UIPrinter.JobTypes
+SwiftVersions:
+- Version: 4
+  Tags:
+  - Name: UIPrinterJobTypes
+    SwiftName: UIPrinterJobTypes

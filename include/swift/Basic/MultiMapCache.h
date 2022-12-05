@@ -61,7 +61,7 @@ public:
 
     // If we already have a cached value, just return the cached value.
     if (!iter.second) {
-      return iter.first->second.map(
+      return iter.first->second.transform(
           [&](std::tuple<unsigned, unsigned> startLengthRange) {
             return llvm::makeArrayRef(data).slice(
                 std::get<ArrayStartOffset>(startLengthRange),

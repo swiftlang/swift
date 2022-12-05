@@ -397,7 +397,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     return false;
   }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue())) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value())) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }

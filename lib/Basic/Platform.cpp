@@ -404,7 +404,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     llvm::VersionTuple OSVersion;
     Triple.getMacOSXVersion(OSVersion);
     unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().getValueOr(0);
+    unsigned Minor = OSVersion.getMinor().value_or(0);
 
     auto floorFor64 = [&Triple](llvm::VersionTuple v) {
       if (!Triple.isAArch64()) return v;
@@ -419,7 +419,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
       if (Minor <= 14) {
         return floorFor64(llvm::VersionTuple(5, 0));
       } else if (Minor <= 15) {
-        if (OSVersion.getSubminor().getValueOr(0) <= 3) {
+        if (OSVersion.getSubminor().value_or(0) <= 3) {
           return floorFor64(llvm::VersionTuple(5, 1));
         } else {
           return floorFor64(llvm::VersionTuple(5, 2));
@@ -439,7 +439,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   } else if (Triple.isiOS()) { // includes tvOS
     llvm::VersionTuple OSVersion = Triple.getiOSVersion();
     unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().getValueOr(0);
+    unsigned Minor = OSVersion.getMinor().value_or(0);
 
     auto floorForArchitecture = [&Triple, Major](llvm::VersionTuple v) {
       // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
@@ -479,7 +479,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   } else if (Triple.isWatchOS()) {
     llvm::VersionTuple OSVersion = Triple.getWatchOSVersion();
     unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().getValueOr(0);
+    unsigned Minor = OSVersion.getMinor().value_or(0);
 
     auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
       if (!Triple.isArch64Bit()) return v;
@@ -529,7 +529,7 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
             clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
       return MacOStoMacCatalystMapping
           ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), None)
-          .getValueOr(llvm::VersionTuple(0, 0, 0));
+          .value_or(llvm::VersionTuple(0, 0, 0));
     }
     return llvm::VersionTuple(0, 0, 0);
   }

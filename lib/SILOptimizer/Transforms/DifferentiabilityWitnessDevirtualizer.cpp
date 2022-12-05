@@ -57,7 +57,7 @@ bool DifferentiabilityWitnessDevirtualizer::
     changed = true;
     SILBuilderWithScope builder(inst);
     auto kind = inst->getWitnessKind().getAsDerivativeFunctionKind();
-    assert(kind.hasValue());
+    assert(kind.has_value());
     auto *newInst = builder.createFunctionRefFor(inst->getLoc(),
                                                  witness->getDerivative(*kind));
     inst->replaceAllUsesWith(newInst);

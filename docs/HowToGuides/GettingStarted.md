@@ -45,12 +45,15 @@ toolchain as a one-off, there are a couple of differences:
    system. Experimental instructions for Windows are available under
    [Windows.md](/docs/Windows.md).
 2. Python 3: Several utility scripts are written in Python.
-3. Disk space:
+3. Git 2.x to check out the sources. We find that older versions of Git
+   can't successfully check out all of the required repositories or
+   fail during a rebase when switching between checkout schemes.
+4. Disk space:
    Make sure that you have enough available disk space before starting.
    The source code, including full git history, requires about 3.5 GB.
    Build artifacts take anywhere between 5 GB to 70 GB, depending on the
    build settings.
-4. Time:
+5. Time:
    Depending on your machine and build settings,
    a from-scratch build can take a few minutes to several hours,
    so you might want to grab a beverage while you follow the instructions.
@@ -433,7 +436,8 @@ In project settings, locate `Build, Execution, Deployment > CMake`. You will nee
 - Toolchain: Default should be fine
 - Generator: Ninja
 - CMake options: You want to duplicate the essential CMake flags that `build-script` had used here, so CLion understands the build configuration. You can get the full list of CMake arguments from `build-script` by providing the `-n` dry-run flag; look for the last `cmake` command with a `-G Ninja`. Here is a minimal list of what you should provide to CLion here for this setting:
-    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -G Ninja -S .`
+    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -D
+SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=SOME_PATH/swift-project/swift-syntax -G Ninja -S .`
     - replace the `SOME_PATH` to the path where your `swift-project` directory is
     - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
     - **Note**: If you're using an Intel machine to build swift, you'll need to replace the architecture in the options. (ex: `arm64` with `x86_64`)

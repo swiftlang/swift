@@ -49,8 +49,8 @@ void EpilogueARCContext::initializeDataflow() {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingPhiValue(X);
         auto state = getState(X);
-        if (state.hasValue())
-          state.getValue()->LocalArg = IA;
+        if (state.has_value())
+          state.value()->LocalArg = IA;
 
         // Maybe the edge value is another SILArgument.
         ToProcess.push_back(IA);
@@ -68,17 +68,17 @@ bool EpilogueARCContext::convergeDataflow() {
     for (SILBasicBlock *B : PO->getPostOrder()) {
       // Since the basic block is in PO, it is reachable and will always have a
       // state
-      auto *BS = getState(B).getValue();
+      auto *BS = getState(B).value();
       // Merge in all the successors.
       bool BBSetOut = false;
       if (!B->succ_empty()) {
         auto Iter = B->succ_begin();
         // Since the basic block is reachable, its successors are reachable, and
         // will always have a state.
-        BBSetOut = getState(*Iter).getValue()->BBSetIn;
+        BBSetOut = getState(*Iter).value()->BBSetIn;
         Iter = std::next(Iter);
         for (auto E = B->succ_end(); Iter != E; ++Iter) {
-          BBSetOut &= getState(*Iter).getValue()->BBSetIn;
+          BBSetOut &= getState(*Iter).value()->BBSetIn;
         }
       } else if (isExitBlock(B)) {
         // We set the BBSetOut for exit blocks.
@@ -130,10 +130,10 @@ bool EpilogueARCContext::computeEpilogueARC() {
       auto Iter = B->succ_begin();
       // Since basic block B is in PO, its successors will be reachable and will
       // always have a state
-      auto Base = getState(*Iter).getValue()->BBSetIn;
+      auto Base = getState(*Iter).value()->BBSetIn;
       Iter = std::next(Iter);
       for (auto E = B->succ_end(); Iter != E; ++Iter) {
-        if (getState(*Iter).getValue()->BBSetIn != Base)
+        if (getState(*Iter).value()->BBSetIn != Base)
           return false;
       }
       BBSetOut = Base;

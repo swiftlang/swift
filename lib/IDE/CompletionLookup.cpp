@@ -127,6 +127,11 @@ bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
 }
 
+bool swift::ide::MacroFilter(ValueDecl *decl, DeclVisibilityKind,
+                             DynamicLookupInfo dynamicLookupInfo) {
+  return isa<MacroDecl>(decl);
+}
+
 bool swift::ide::isCodeCompletionAtTopLevel(const DeclContext *DC) {
   if (DC->isModuleScopeContext())
     return true;
@@ -1480,7 +1485,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
                                           Optional<Type> Result, bool IsOnType,
                                           Identifier addName) {
   foundFunction(CD);
-  Type MemberType = getTypeOfMember(CD, BaseType.getValueOr(ExprType));
+  Type MemberType = getTypeOfMember(CD, BaseType.value_or(ExprType));
   AnyFunctionType *ConstructorType = nullptr;
   if (auto MemberFuncType = MemberType->getAs<AnyFunctionType>())
     ConstructorType = MemberFuncType->getResult()->castTo<AnyFunctionType>();
@@ -1541,7 +1546,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
 
     addEffectsSpecifiers(Builder, ConstructorType, CD);
 
-    if (!Result.hasValue())
+    if (!Result.has_value())
       Result = ConstructorType->getResult();
     if (CD->isImplicitlyUnwrappedOptional()) {
       addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -1684,14 +1689,10 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.addBaseName(TAD->getName().str());
   if (auto underlyingType = TAD->getUnderlyingType()) {
     if (underlyingType->hasError()) {
-      Type parentType;
-      if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
-        parentType = nominal->getDeclaredInterfaceType();
-      }
       addTypeAnnotation(Builder,
-                        TypeAliasType::get(const_cast<TypeAliasDecl *>(TAD),
-                                           parentType, SubstitutionMap(),
-                                           underlyingType));
+                        TAD->isGeneric()
+                        ? TAD->getUnboundGenericType()
+                        : TAD->getDeclaredInterfaceType());
 
     } else {
       addTypeAnnotation(Builder, underlyingType);
@@ -1771,6 +1772,36 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
 
   if (isUnresolvedMemberIdealType(EnumType))
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
+}
+
+void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
+                                         DeclVisibilityKind Reason) {
+  if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
+      MD->shouldHideFromEditor())
+    return;
+
+  CodeCompletionResultBuilder Builder(
+      Sink, CodeCompletionResultKind::Declaration,
+      getSemanticContext(MD, Reason, DynamicLookupInfo()));
+  Builder.setAssociatedDecl(MD);
+
+  if (NeedLeadingMacroPound) {
+    Builder.addTextChunk("#");
+  }
+
+  addValueBaseName(Builder, MD->getBaseIdentifier());
+
+  Type macroType = MD->getInterfaceType();
+  if (MD->parameterList && macroType->is<FunctionType>()) {
+    Builder.addLeftParen();
+    addCallArgumentPatterns(Builder, macroType->castTo<FunctionType>(),
+                            MD->parameterList,
+                            MD->getGenericSignature());
+    Builder.addRightParen();
+  }
+
+  addTypeAnnotation(
+      Builder, MD->getResultInterfaceType(), MD->getGenericSignature());
 }
 
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
@@ -2054,6 +2085,11 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     // Swift key path allows .[0]
     if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
       addSubscriptCall(SD, Reason, dynamicLookupInfo);
+      return;
+    }
+
+    if (auto *MD = dyn_cast<MacroDecl>(D)) {
+      addMacroExpansion(MD, Reason);
       return;
     }
     return;
@@ -2571,10 +2607,10 @@ void CompletionLookup::addPoundLiteralCompletions(bool needPound) {
     CodeCompletionResultBuilder builder(Sink, CodeCompletionResultKind::Keyword,
                                         SemanticContextKind::None);
     builder.addFlair(flair);
-    builder.setLiteralKind(literalKind.getValue());
+    builder.setLiteralKind(literalKind.value());
     builder.setKeywordKind(kwKind);
     builder.addBaseName(name);
-    addTypeRelationFromProtocol(builder, literalKind.getValue());
+    addTypeRelationFromProtocol(builder, literalKind.value());
   };
 
 #define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                     \
@@ -2722,6 +2758,11 @@ void CompletionLookup::addObjCPoundKeywordCompletions(bool needPound) {
       continue;
     }
   }
+}
+
+void CompletionLookup::getMacroCompletions(bool needPound) {
+  RequestedCachedResults.insert(
+      RequestedResultsTy::toplevelResults().onlyMacros(needPound));
 }
 
 void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
@@ -2957,17 +2998,17 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
-  if (!DK.hasValue())
+  if (!DK.has_value())
     return true;
-  return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
+  return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
 void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
                                                    Optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
-  if (DK.hasValue()) {
-    switch (DK.getValue()) {
+  if (DK.has_value()) {
+    switch (DK.value()) {
 #define DECL(Id, ...)                                                          \
   case DeclKind::Id:                                                           \
     TargetName = #Id;                                                          \
@@ -3137,18 +3178,21 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
           ModuleQualifier));
 }
 
-void CompletionLookup::getToplevelCompletions(bool OnlyTypes) {
+void CompletionLookup::getToplevelCompletions(bool OnlyTypes, bool OnlyMacros) {
   Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                    : LookupKind::ValueInDeclContext;
   NeedLeadingDot = false;
+  NeedLeadingMacroPound = !OnlyMacros;
 
   UsableFilteringDeclConsumer UsableFilteringConsumer(
       Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
       *this);
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext,
                                                       UsableFilteringConsumer);
+  DeclFilter Filter = OnlyMacros ? MacroFilter : DefaultFilter;
+  FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
 
-  CurrModule->lookupVisibleDecls({}, AccessFilteringConsumer,
+  CurrModule->lookupVisibleDecls({}, FilteringConsumer,
                                  NLKind::UnqualifiedLookup);
 }
 

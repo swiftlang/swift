@@ -27,6 +27,7 @@ internalFunc() // expected-error {{cannot find 'internalFunc' in scope}}
 let c = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
 let s = SPIStruct() // expected-error {{cannot find 'SPIStruct' in scope}}
 SPIEnum().spiMethod() // expected-error {{cannot find 'SPIEnum' in scope}}
+_ = PublicEnum.spiCase // expected-error {{'spiCase' is inaccessible due to '@_spi' protection level}}
 
 var ps = PublicStruct()
 let _ = PublicStruct(alt_init: 1) // expected-error {{argument passed to call that takes no arguments}}

@@ -6021,6 +6021,9 @@ private:
   ArgumentList *ArgList;
   Expr *Rewritten;
 
+  /// The referenced macro.
+  ConcreteDeclRef macroRef;
+
 public:
   explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
@@ -6052,6 +6055,9 @@ public:
   void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
   SourceLoc getLoc() const { return PoundLoc; }
+
+  ConcreteDeclRef getMacroRef() const { return macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
 
   SourceRange getSourceRange() const;
 

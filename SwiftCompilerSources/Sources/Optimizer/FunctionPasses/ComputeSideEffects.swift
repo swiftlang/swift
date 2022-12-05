@@ -463,7 +463,7 @@ private extension PartialApplyInst {
     struct EscapesToApply : EscapeVisitor {
       func visitUse(operand: Operand, path: EscapePath) -> UseResult {
         switch operand.instruction {
-        case is ApplySite:
+        case is FullApplySite:
           // Any escape to apply - regardless if it's an argument or the callee operand - might cause
           // the closure to be called.
           return .abort

@@ -2264,7 +2264,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
       if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.getValue());
+        appendInitializerEntity(var.value());
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.
@@ -2352,7 +2352,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
       if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.getValue());
+        appendInitializerEntity(var.value());
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.
@@ -2381,7 +2381,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     return appendContext(ctx->getParent(), useModuleName);
 
   case DeclContextKind::MacroDecl:
-    llvm_unreachable("macro declarations are never mangled");
+    return appendContext(ctx->getParent(), useModuleName);
   }
 
   llvm_unreachable("bad decl context");
@@ -3339,6 +3339,8 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
     return appendAccessorEntity("p", storageDecl, decl->isStatic());
   if (isa<GenericTypeParamDecl>(decl))
     return appendEntity(decl, "fp", decl->isStatic());
+  if (auto macro = dyn_cast<MacroDecl>(decl))
+    return appendEntity(decl, "fm", false);
 
   assert(isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl));
 

@@ -89,3 +89,8 @@ public struct PublicStruct {
 @_spi(HelperSPI) public struct IntLike: ExpressibleByIntegerLiteral, Equatable {
   @_spi(HelperSPI) public init(integerLiteral: Int) {}
 }
+
+public enum PublicEnum {
+  case publicCase
+  @_spi(HelperSPI) case spiCase
+}

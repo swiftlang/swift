@@ -26,7 +26,7 @@
 // RUN: %target-run %t/test %t/%target-library-name(helper) | %FileCheck %s --check-prefix=NO-ANSWER
 
 // REQUIRES: executable_test
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 // This test requires executable tests to be run on the same machine as the
 // compiler, as it links with a dylib that it doesn't arrange to get uploaded

@@ -56,7 +56,7 @@ public:
         foreign(), overrideRep(overrideRep) {}
 
   SILFunctionTypeRepresentation getOverrideRep() const {
-    return overrideRep.getValueOr(substFnType->getRepresentation());
+    return overrideRep.value_or(substFnType->getRepresentation());
   }
 };
 

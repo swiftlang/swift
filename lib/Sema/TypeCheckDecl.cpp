@@ -317,7 +317,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
     if (!context.isSwiftVersionAtLeast(5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
-                                    static_cast<unsigned>(reason.getValue()));
+                                    static_cast<unsigned>(reason.value()));
     fixItAccess(inFlightDiag, D, AccessLevel::Public);
   }
 
@@ -2098,8 +2098,10 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   TypeRepr *resultTyRepr = nullptr;
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     resultTyRepr = funcDecl->getResultTypeRepr();
+  } else if (auto subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
+    resultTyRepr = subscriptDecl->getElementTypeRepr();
   } else {
-    resultTyRepr = cast<SubscriptDecl>(decl)->getElementTypeRepr();
+    resultTyRepr = cast<MacroDecl>(decl)->resultType.getTypeRepr();
   }
 
   if (!resultTyRepr && decl->getClangDecl() &&
@@ -2221,9 +2223,11 @@ static Type validateParameterType(ParamDecl *decl) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::SubscriptDecl);
-  } else {
-    assert(isa<EnumElementDecl>(dc));
+  } else if (isa<EnumElementDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
+  } else {
+    assert(isa<MacroDecl>(dc));
+    options = TypeResolutionOptions(TypeResolverContext::MacroDecl);
   }
 
   // Set the "preconcurrency" flag if this is a parameter of a preconcurrency
@@ -2545,7 +2549,15 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   }
 
   case DeclKind::Macro: {
-    llvm_unreachable("macro types are precomputed right now");
+    auto macro = cast<MacroDecl>(D);
+    Type resultType = macro->getResultInterfaceType();
+    if (!macro->parameterList)
+      return resultType;
+
+    SmallVector<AnyFunctionType::Param, 4> paramTypes;
+    macro->parameterList->getParams(paramTypes);
+    FunctionType::ExtInfo info;
+    return FunctionType::get(paramTypes, resultType, info);
   }
   }
   llvm_unreachable("invalid decl kind");
@@ -2825,7 +2837,6 @@ AllMembersRequest::evaluate(
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
-                                         Type underlyingType,
                                          NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
@@ -2860,7 +2871,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
-  auto boundGenericType = underlyingType->getAs<BoundGenericType>();
+  auto boundGenericType = typealias->getUnderlyingType()
+      ->getAs<BoundGenericType>();
   if (!boundGenericType) return false;
 
   // If our arguments line up with our innermost generic parameters, it's
@@ -2907,24 +2919,13 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      // Nested Hack to break cycles if this is called before validation has
-      // finished.
-      if (aliasDecl->hasInterfaceType()) {
-        auto extendedNominal =
-            aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-        if (extendedNominal)
-          return TypeChecker::isPassThroughTypealias(
-                     aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
-                     ? extendedType
-                     : extendedNominal->getDeclaredType();
-      } else {
-        if (auto ty = aliasDecl->getStructuralType()
-                          ->getAs<NominalOrBoundGenericNominalType>())
-          return TypeChecker::isPassThroughTypealias(aliasDecl, ty,
-                                                     ty->getDecl())
-                     ? extendedType
-                     : ty->getDecl()->getDeclaredType();
-      }
+      auto extendedNominal =
+          aliasDecl->getUnderlyingType()->getAnyNominal();
+      if (extendedNominal)
+        return TypeChecker::isPassThroughTypealias(
+                   aliasDecl, extendedNominal)
+                   ? extendedType
+                   : extendedNominal->getDeclaredType();
     }
   }
 

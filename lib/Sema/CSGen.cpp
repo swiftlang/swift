@@ -1201,7 +1201,8 @@ namespace {
           return Type();
 
         auto macroIdent = ctx.getIdentifier(kind);
-        auto macros = lookupMacros(macroIdent, FunctionRefKind::Unapplied);
+        auto macros = lookupMacros(
+            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -1640,6 +1641,36 @@ namespace {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
                                      expr->getFunctionRefKind(),
                                      expr->getOuterAlternatives());
+    }
+
+    /// Given a set of specialization arguments, resolve those arguments and
+    /// introduce them as an explicit generic arguments constraint.
+    ///
+    /// \returns true if resolving any of the specialization types failed.
+    bool addSpecializationConstraint(
+        ConstraintLocator *locator, Type boundType,
+        ArrayRef<TypeRepr *> specializationArgs) {
+      // Resolve each type.
+      SmallVector<Type, 2> specializationArgTypes;
+      const auto options =
+          TypeResolutionOptions(TypeResolverContext::InExpression);
+      for (auto specializationArg : specializationArgs) {
+        const auto result = TypeResolution::resolveContextualType(
+            specializationArg, CurDC, options,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(CS, locator),
+            HandlePlaceholderType(CS, locator));
+        if (result->hasError())
+          return true;
+
+        specializationArgTypes.push_back(result);
+      }
+
+      CS.addConstraint(
+          ConstraintKind::ExplicitGenericArguments, boundType,
+          PackType::get(CS.getASTContext(), specializationArgTypes),
+          locator);
+      return false;
     }
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -2932,7 +2963,10 @@ namespace {
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      CS.addConstraint(ConstraintKind::ShapeOf, patternTy, shapeTypeVar,
+      auto packReference = expr->getBindings().front();
+      auto packType = CS.simplifyType(CS.getType(packReference))
+          ->castTo<PackExpansionType>()->getPatternType();
+      CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
                        CS.getConstraintLocator(expr));
 
       return PackExpansionType::get(patternTy, shapeTypeVar);
@@ -3634,22 +3668,25 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
-    lookupMacros(Identifier macroName, FunctionRefKind functionRefKind) {
-      auto req = MacroLookupRequest{macroName, CS.DC->getParentModule()};
-      auto macros = evaluateOrDefault(
-          CS.getASTContext().evaluator, req, { });
-      if (macros.empty())
-        return { };
+    lookupMacros(
+        Identifier macroName, SourceLoc loc, FunctionRefKind functionRefKind
+    ) {
+      auto result = TypeChecker::lookupUnqualified(
+          CurDC, DeclNameRef(macroName), loc,
+          (defaultUnqualifiedLookupOptions |
+           NameLookupFlags::IncludeOuterResults));
+
+      SmallVector<OverloadChoice, 1> choices;
+      for (const auto &found : result.allResults()) {
+        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+          OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
+          choices.push_back(choice);
+        }
+      }
 
       // FIXME: At some point, we need to check for function-like macros without
       // arguments and vice-versa.
 
-
-      SmallVector<OverloadChoice, 1> choices;
-      for (auto macro : macros) {
-        OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
-        choices.push_back(choice);
-      }
       return choices;
     }
 
@@ -3662,7 +3699,9 @@ namespace {
         bool isCall = expr->getArgs() != nullptr;
         FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
                                                  : FunctionRefKind::Unapplied;
-        auto macros = lookupMacros(macroIdent, functionRefKind);
+        auto macros = lookupMacros(
+            macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
+            functionRefKind);
         if (macros.empty()) {
           ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                              macroIdent)
@@ -3674,6 +3713,14 @@ namespace {
         auto locator = CS.getConstraintLocator(expr);
         auto macroRefType = Type(CS.createTypeVariable(locator, 0));
         CS.addOverloadSet(macroRefType, macros, CurDC, locator);
+
+        // Add explicit generic arguments, if there were any.
+        if (expr->getGenericArgsRange().isValid()) {
+          if (addSpecializationConstraint(
+                CS.getConstraintLocator(expr), macroRefType,
+                expr->getGenericArgs()))
+            return Type();
+        }
 
         // For non-calls, the type variable is the result.
         if (!isCall)
@@ -4685,10 +4732,10 @@ ResolvedMemberResult::operator bool() const {
 }
 
 bool ResolvedMemberResult::
-hasBestOverload() const { return Impl->BestIdx.hasValue(); }
+hasBestOverload() const { return Impl->BestIdx.has_value(); }
 
 ValueDecl* ResolvedMemberResult::
-getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.getValue()]; }
+getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.value()]; }
 
 ArrayRef<ValueDecl*> ResolvedMemberResult::
 getMemberDecls(InterestedMemberKind Kind) {
@@ -4740,8 +4787,8 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   CS.addOverloadSet(TV, LookupResult.ViableCandidates, &DC, Locator);
   Optional<Solution> OpSolution = CS.solveSingle();
   ValueDecl *Selected = nullptr;
-  if (OpSolution.hasValue()) {
-    Selected = OpSolution.getValue().overloadChoices[Locator].choice.getDecl();
+  if (OpSolution.has_value()) {
+    Selected = OpSolution.value().overloadChoices[Locator].choice.getDecl();
   }
   for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
     ValueDecl *VD = Choice.getDecl();

@@ -195,7 +195,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
     // In this case we should have diagnosed the bad reference already.
-    if (!typeAccessScope.hasValue())
+    if (!typeAccessScope.has_value())
       return;
     problematicAccessScope = *typeAccessScope;
   }
@@ -213,7 +213,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Optional<AccessScope> typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                checkUsableFromInline);
-    if (!typeReprAccessScope.hasValue())
+    if (!typeReprAccessScope.has_value())
       return;
 
     if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
@@ -471,7 +471,6 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
-  UNREACHABLE(Macro, "cannot appear in a type context")
 
   UNREACHABLE(IfConfig, "does not have access control")
   UNREACHABLE(PoundDiagnostic, "does not have access control")
@@ -1056,6 +1055,62 @@ public:
           });
     }
   }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    checkGenericParamAccess(MD, MD);
+
+    auto minAccessScope = AccessScope::getPublic();
+    const TypeRepr *complainRepr = nullptr;
+    auto downgradeToWarning = DowngradeToWarning::No;
+    bool problemIsResult = false;
+
+    if (MD->parameterList) {
+      for (auto *P : *MD->parameterList) {
+        checkTypeAccess(
+            P->getInterfaceType(), P->getTypeRepr(), MD, /*mayBeInferred*/ false,
+            [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+                DowngradeToWarning downgradeDiag) {
+              if (typeAccessScope.isChildOf(minAccessScope) ||
+                  (!complainRepr &&
+                   typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+                minAccessScope = typeAccessScope;
+                complainRepr = thisComplainRepr;
+                downgradeToWarning = downgradeDiag;
+              }
+            });
+      }
+    }
+
+    checkTypeAccess(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(),
+                    MD, /*mayBeInferred*/false,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *thisComplainRepr,
+                        DowngradeToWarning downgradeDiag) {
+      if (typeAccessScope.isChildOf(minAccessScope) ||
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+        minAccessScope = typeAccessScope;
+        complainRepr = thisComplainRepr;
+        downgradeToWarning = downgradeDiag;
+        problemIsResult = true;
+      }
+    });
+
+    if (!minAccessScope.isPublic()) {
+      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+      bool isExplicit =
+        MD->getAttrs().hasAttribute<AccessControlAttr>();
+      auto diagID = diag::macro_type_access;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::macro_type_access_warn;
+      auto macroDeclAccess = isExplicit
+        ? MD->getFormalAccess()
+        : minAccessScope.requiredAccessForDiagnostics();
+      auto diag = MD->diagnose(diagID, isExplicit, macroDeclAccess,
+                               minAccess, problemIsResult);
+      highlightOffendingType(diag, complainRepr);
+    }
+  }
 };
 
 class UsableFromInlineChecker : public AccessControlCheckerBase,
@@ -1099,7 +1154,6 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
-  UNREACHABLE(Macro, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
@@ -1118,6 +1172,7 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
+  UNINTERESTING(Macro)
 
   /// If \p VD's layout is exposed by a @frozen struct or class, return said
   /// struct or class.
@@ -1619,7 +1674,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().hasValue())
+      if (where.getUnavailablePlatformKind().has_value())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets
@@ -1709,7 +1764,6 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
-  UNREACHABLE(Macro, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
@@ -1833,15 +1887,17 @@ public:
     DeclAvailabilityFlags flags =
         DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-    // As a concession to source compatibility for API libraries, downgrade
-    // diagnostics about inheritance from a less available type when the
-    // following conditions are met:
-    // 1. The inherited type is only potentially unavailable before the
-    //    deployment target.
-    // 2. The inheriting type is `@usableFromInline`.
-    if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+    // Allow the `AnyColorBox` class in SwiftUI to inherit from a less available
+    // super class as a one-off source compatibility exception. Availability
+    // checking generally doesn't support a more available class deriving from
+    // a less available base class in a library evolution enabled module, even
+    // when the base class is available at the deployment target, but this
+    // declaration slipped in when the compiler wasn't able to diagnose it and
+    // can't be changed.
+    if (nominal->getName().is("AnyColorBox") &&
+        nominal->getModuleContext()->getName().is("SwiftUI"))
       flags |= DeclAvailabilityFlag::
-          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
+          AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
     llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
@@ -1904,6 +1960,17 @@ public:
       return;
     for (auto &P : *EED->getParameterList())
       checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+  }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    checkGenericParams(MD, MD);
+
+    if (MD->parameterList) {
+      for (auto P : *MD->parameterList) {
+        checkType(P->getInterfaceType(), P->getTypeRepr(), MD);
+      }
+    }
+    checkType(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(), MD);
   }
 
   void checkConstrainedExtensionRequirements(ExtensionDecl *ED,

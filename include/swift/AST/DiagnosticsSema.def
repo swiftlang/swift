@@ -984,13 +984,19 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+ERROR(module_allowable_client_violation,none,
+      "module %0 doesn't allow importation from module %1",
+      (Identifier, Identifier))
+
 REMARK(cross_import_added,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))
 
 REMARK(module_loaded,none,
-       "loaded module at %0",
-       (StringRef))
+       "loaded module %0"
+       "%select{| (overlay for a clang dependency)}1"
+       "; source: '%2', loaded: '%3'",
+       (Identifier, unsigned, StringRef, StringRef))
        
 REMARK(explicit_interface_build_skipped,none,
        "Skipped rebuilding module at %0 - up-to-date",
@@ -1964,6 +1970,9 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+ERROR(spi_attribute_on_frozen_enum_case,none,
+      "%0 %1 cannot be declared '@_spi' in a '@frozen' enum",
+      (DescriptiveDeclKind, DeclName))
 WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
@@ -3529,7 +3538,7 @@ ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "making %0 final", (Type))
 ERROR(derivative_attr_unsupported_accessor_kind,none,
       "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
-// TODO(SR-13096): Remove this temporary diagnostic.
+// TODO(https://github.com/apple/swift/issues/55542): Remove this temporary diagnostic.
 ERROR(derivative_attr_class_setter_unsupported,none,
       "cannot yet register derivative for class property or subscript setters",
       ())
@@ -6710,8 +6719,6 @@ WARNING(has_symbol_decl_must_be_weak,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
       "'#_hasSymbol' condition must refer to a declaration", ())
-ERROR(has_symbol_unsupported_on_target,none,
-      "'#_hasSymbol' is unsupported on target '%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure
@@ -6736,12 +6743,33 @@ ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
 ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
+ERROR(external_macro_not_found,none,
+      "external implementation struct '%0.%1' could not be found in for "
+      "macro %2; the type must be public and provided via "
+      "'-load-plugin-library'", (StringRef, StringRef, DeclName))
 NOTE(macro_note, none,
-     "macro %0: %1", (Identifier, StringRef))
+     "%1 (in macro %0)", (DeclName, StringRef))
 WARNING(macro_warning, none,
-        "macro %0: %1", (Identifier, StringRef))
+        "%1 (in macro %0)", (DeclName, StringRef))
 ERROR(macro_error, none,
-      "macro %0: %1", (Identifier, StringRef))
+      "%1 (in macro %0)", (DeclName, StringRef))
+ERROR(macro_type_access,none,
+      "macro %select{must be declared "
+      "%select{private|fileprivate|internal|%error|%error}1"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its %select{parameter|result type}3 uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}2 type",
+      (bool, AccessLevel, AccessLevel, bool))
+WARNING(macro_type_access_warn,none,
+        "macro %select{should be declared "
+        "%select{private|fileprivate|internal|%error|%error}1"
+        "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+        "because its %select{parameter|result type}3 uses "
+        "%select{a private|a fileprivate|an internal|%error|%error}2 type",
+        (bool, AccessLevel, AccessLevel, bool))
+ERROR(macro_in_nested,none,
+      "macro %0 can only be declared at file scope", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Reflectable Diagnostics

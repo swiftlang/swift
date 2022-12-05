@@ -289,7 +289,6 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(MacroDecl)
   VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
@@ -325,6 +324,7 @@ public:
   VISIT_AND_CREATE(ForEachStmt, ForEachStmtScope)
   VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
   VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
+  VISIT_AND_CREATE(MacroDecl, MacroDeclScope)
 
 #undef VISIT_AND_CREATE
 
@@ -365,14 +365,14 @@ public:
   // the deferred nodes.
   ASTScopeImpl *visitGuardStmt(GuardStmt *e, ASTScopeImpl *p,
                                ScopeCreator &scopeCreator) {
-    ASTScopeAssert(endLoc.hasValue(), "GuardStmt outside of a BraceStmt?");
+    ASTScopeAssert(endLoc.has_value(), "GuardStmt outside of a BraceStmt?");
     return scopeCreator.constructExpandAndInsert<GuardStmtScope>(
       p, e, *endLoc);
   }
   ASTScopeImpl *visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                       ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
-    ASTScopeAssert(endLoc.hasValue(), "TopLevelCodeDecl in wrong place?");
+    ASTScopeAssert(endLoc.has_value(), "TopLevelCodeDecl in wrong place?");
     return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(
         p, d, *endLoc);
   }
@@ -420,7 +420,7 @@ public:
     }
 
     SourceLoc endLocForBraceStmt = bs->getEndLoc();
-    if (endLoc.hasValue())
+    if (endLoc.has_value())
       endLocForBraceStmt = *endLoc;
 
     ASTContext &ctx = scopeCreator.getASTContext();
@@ -575,7 +575,7 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
     Optional<SourceLoc> endLocForBinding = None;
     if (isLocalBinding) {
       endLocForBinding = endLoc;
-      ASTScopeAssert(endLoc.hasValue() && endLoc->isValid(),
+      ASTScopeAssert(endLoc.has_value() && endLoc->isValid(),
                      "PatternBindingDecl in local context outside of BraceStmt?");
     }
 
@@ -682,6 +682,7 @@ NO_NEW_INSERTION_POINT(ForEachStmtScope)
 NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
+NO_NEW_INSERTION_POINT(MacroDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
@@ -1066,6 +1067,17 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   scopeCreator.constructExpandAndInsert<ParameterListScope>(
       leaf, decl->getIndices(), decl->getAccessor(AccessorKind::Get));
   scopeCreator.addChildrenForParsedAccessors(decl, leaf);
+}
+
+void MacroDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addChildrenForKnownAttributes(decl, this);
+  auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
+      decl, getPotentiallyOpaqueGenericParams(decl), this);
+  if (decl->parameterList) {
+    scopeCreator.constructExpandAndInsert<ParameterListScope>(
+        leaf, decl->parameterList, nullptr);
+  }
 }
 
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(

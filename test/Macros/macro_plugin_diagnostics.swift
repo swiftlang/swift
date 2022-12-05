@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -L %swift-lib-dir -emit-library -emit-library-path=%t/%target-library-name(MacroDefinitionMissingAllMacros) -working-directory=%t -module-name=MacroDefinitionMissingAllMacros %S/Inputs/macro_definition_missing_allmacros.swift
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -L %swift-lib-dir -emit-library -emit-library-path=%t/%target-library-name(MacroDefinition) -working-directory=%t -module-name=MacroDefinition %S/Inputs/macro_definition.swift
-// RUN: %target-swift-frontend -I %swift-lib-dir -L %swift-lib-dir -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -load-plugin-library %t/%target-library-name(MacroDefinitionMissingAllMacros) -disable-availability-checking -typecheck -verify -primary-file %s 2>&1 | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -emit-library-path=%t/%target-library-name(MacroDefinitionMissingAllMacros) -working-directory=%t -module-name=MacroDefinitionMissingAllMacros %S/Inputs/macro_definition_missing_allmacros.swift
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -emit-library-path=%t/%target-library-name(MacroDefinition) -working-directory=%t -module-name=MacroDefinition %S/Inputs/macro_definition.swift
+// RUN: %target-swift-frontend -I %swift-host-lib-dir -L %swift-host-lib-dir -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -load-plugin-library %t/%target-library-name(MacroDefinitionMissingAllMacros) -disable-availability-checking -typecheck -verify -primary-file %s
 
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
@@ -9,7 +9,7 @@
 // rdar://102160067
 // UNSUPPORTED: CPU=arm64e
 
-// CHECK: <unknown>:{{.*}}: warning: compiler plugin module 'MacroDefinitionMissingAllMacros' (in {{.*}}/libMacroDefinitionMissingAllMacros.dylib) is missing a top-level computed property 'public var allMacros: [Any.Type]' to declare all macros; undeclared macros will be ignored
+macro customStringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
 
 // expected-note @+2 {{test note}}
 // expected-warning @+1 {{test warning}}

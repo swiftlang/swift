@@ -284,7 +284,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     llvm::dbgs() << "\n";
   }
 
-  assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
+  assert(!substitutions.has_value() || proto == nullptr && "Can't have both");
 
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());

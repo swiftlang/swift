@@ -551,7 +551,7 @@ private:
       os << "    }\n";
 
       if (elementDecl != nullptr) {
-        assert(elementInfo.hasValue());
+        assert(elementInfo.has_value());
 
         Type paramType;
 
@@ -1496,8 +1496,8 @@ private:
       }
 
       // Availability for a specific platform
-      if (!AvAttr->Introduced.hasValue() && !AvAttr->Deprecated.hasValue() &&
-          !AvAttr->Obsoleted.hasValue() &&
+      if (!AvAttr->Introduced.has_value() && !AvAttr->Deprecated.has_value() &&
+          !AvAttr->Obsoleted.has_value() &&
           !AvAttr->isUnconditionallyDeprecated() &&
           !AvAttr->isUnconditionallyUnavailable()) {
         continue;
@@ -1550,22 +1550,22 @@ private:
       if (AvAttr->isUnconditionallyUnavailable()) {
         os << ",unavailable";
       } else {
-        if (AvAttr->Introduced.hasValue()) {
-          os << ",introduced=" << AvAttr->Introduced.getValue().getAsString();
+        if (AvAttr->Introduced.has_value()) {
+          os << ",introduced=" << AvAttr->Introduced.value().getAsString();
         }
-        if (AvAttr->Deprecated.hasValue()) {
-          os << ",deprecated=" << AvAttr->Deprecated.getValue().getAsString();
+        if (AvAttr->Deprecated.has_value()) {
+          os << ",deprecated=" << AvAttr->Deprecated.value().getAsString();
         } else if (AvAttr->isUnconditionallyDeprecated()) {
           // We need to specify some version, we can't just say deprecated.
           // We also can't deprecate it before it's introduced.
-          if (AvAttr->Introduced.hasValue()) {
-            os << ",deprecated=" << AvAttr->Introduced.getValue().getAsString();
+          if (AvAttr->Introduced.has_value()) {
+            os << ",deprecated=" << AvAttr->Introduced.value().getAsString();
           } else {
             os << ",deprecated=0.0.1";
           }
         }
-        if (AvAttr->Obsoleted.hasValue()) {
-          os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
+        if (AvAttr->Obsoleted.has_value()) {
+          os << ",obsoleted=" << AvAttr->Obsoleted.value().getAsString();
         }
       }
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {

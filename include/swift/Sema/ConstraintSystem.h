@@ -1708,7 +1708,7 @@ public:
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
-  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
+  void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
 };
 
 /// Describes the differences between several solutions to the same
@@ -4229,12 +4229,12 @@ public:
       return Type();
 
     // No need to generate a new type variable if there's only one type to join
-    if ((begin + 1 == end) && !supertype.hasValue())
+    if ((begin + 1 == end) && !supertype.has_value())
       return getType(begin).first;
 
     // The type to capture the result of the join, which is either the specified supertype,
     // or a new type variable.
-    Type resultTy = supertype.hasValue() ? supertype.getValue() :
+    Type resultTy = supertype.has_value() ? supertype.value() :
                     createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
 
     using RawExprKind = uint8_t;
@@ -5611,6 +5611,13 @@ private:
       Type type1, Type type2, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
+  /// Simplify an explicit generic argument constraint by equating the
+  /// opened generic types of the bound left-hand type variable to the
+  /// pack type on the right-hand side.
+  SolutionKind simplifyExplicitGenericArgumentsConstraint(
+      Type type1, Type type2, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
@@ -6417,9 +6424,10 @@ public:
   bool isSymmetricOperator() const;
   bool isUnaryOperator() const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent = 0) const {
+  void print(llvm::raw_ostream &Out, SourceManager *SM,
+             unsigned indent = 0) const {
     Out << "disjunction choice ";
-    Choice->print(Out, SM);
+    Choice->print(Out, SM, indent);
   }
 
   operator Constraint *() { return Choice; }

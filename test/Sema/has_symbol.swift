@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t -enable-experimental-feature ResultBuilderASTTransform
 
-// REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc
 
 @_weakLinked import has_symbol_helper
 
@@ -58,6 +58,18 @@ func testEnum(_ e: E) {
   if #_hasSymbol(E.payloadCase) {}
   if #_hasSymbol(E.payloadCase(_:)) {}
   if #_hasSymbol(e.method) {}
+}
+
+func testOpaqueParameter<T: PAT>(_ p: T) {
+  // FIXME: Improve this diagnostic
+  if #_hasSymbol(T.A.self) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
+func testExistentialParameter(_ p: any P) {
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
 }
 
 func testMetatypes() {

@@ -106,7 +106,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
 static std::string
 getVersionedPrebuiltModulePath(Optional<llvm::VersionTuple> sdkVer,
                                StringRef defaultPrebuiltPath) {
-  if (!sdkVer.hasValue())
+  if (!sdkVer.has_value())
     return defaultPrebuiltPath.str();
   std::string versionStr = sdkVer->getAsString();
   StringRef vs = versionStr;
@@ -460,9 +460,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
-    if (vers.hasValue()) {
-      if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
-        Opts.EffectiveLanguageVersion = effectiveVers.getValue();
+    if (vers.has_value()) {
+      if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
+        Opts.EffectiveLanguageVersion = effectiveVers.value();
         isValid = true;
       }
     }
@@ -473,8 +473,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.PackageDescriptionVersion = vers.getValue();
+    if (vers.has_value()) {
+      Opts.PackageDescriptionVersion = vers.value();
     } else {
       return true;
     }
@@ -1363,7 +1363,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
   Opts.EmitExtensionBlockSymbols =
-      Args.hasArg(OPT_emit_extension_block_symbols);
+      Args.hasFlag(OPT_emit_extension_block_symbols,
+                   OPT_omit_extension_block_symbols, /*default=*/false);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =
@@ -1759,7 +1760,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
             .Default(None);
   }
   if (Args.getLastArg(OPT_enable_lexical_lifetimes_noArg)) {
-    if (!enableLexicalLifetimesFlag.getValueOr(true)) {
+    if (!enableLexicalLifetimesFlag.value_or(true)) {
       // Error if lexical lifetimes have been disabled via the meta-var form
       // and enabled via the flag.
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1771,8 +1772,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
-  if (enableLexicalLifetimesFlag.getValueOr(false) &&
-      !enableLexicalBorrowScopesFlag.getValueOr(true)) {
+  if (enableLexicalLifetimesFlag.value_or(false) &&
+      !enableLexicalBorrowScopesFlag.value_or(true)) {
     // Error if lexical lifetimes have been enabled but lexical borrow scopes--
     // on which they are dependent--have been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1782,7 +1783,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalBorrowScopesFlag.getValueOr(true)) {
+      !enableLexicalBorrowScopesFlag.value_or(true)) {
     // Error if move-only is enabled and lexical borrow scopes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1792,7 +1793,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalLifetimesFlag.getValueOr(true)) {
+      !enableLexicalLifetimesFlag.value_or(true)) {
     // Error if move-only is enabled and lexical lifetimes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -2279,7 +2280,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
             .Case("llvm-full", IRGenLLVMLTOKind::Full)
             .Default(llvm::None);
     if (LLVMLTOKind)
-      Opts.LLVMLTOKind = LLVMLTOKind.getValue();
+      Opts.LLVMLTOKind = LLVMLTOKind.value();
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
@@ -2413,6 +2414,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
         getRuntimeCompatVersion();
   }
+
+  Opts.AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary = Args.hasArg(
+      options::OPT_enable_autolinking_runtime_compatibility_bytecode_layouts);
 
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {

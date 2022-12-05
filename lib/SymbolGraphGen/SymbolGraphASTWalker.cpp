@@ -65,8 +65,8 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
 
   if (areModulesEqual(&this->M, M)) {
     return &MainGraph;
-  } else if (MainGraph.DeclaringModule.hasValue() &&
-             areModulesEqual(MainGraph.DeclaringModule.getValue(), M)) {
+  } else if (MainGraph.DeclaringModule.has_value() &&
+             areModulesEqual(MainGraph.DeclaringModule.value(), M)) {
     // Cross-import overlay modules already appear as "extensions" of their declaring module; we
     // should put actual extensions of that module into the main graph
     return &MainGraph;

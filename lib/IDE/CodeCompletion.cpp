@@ -287,7 +287,7 @@ public:
   void completeTypeAttrBeginning() override;
   void completeOptionalBinding() override;
 
-  void doneParsing() override;
+  void doneParsing(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -786,11 +786,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     // FIXME: This should use canUseAttributeOnDecl.
 
     // Remove user inaccessible keywords.
-    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK))
+    if (DAK.has_value() && DeclAttribute::isUserInaccessible(*DAK))
       return;
 
     // Remove keywords only available when concurrency is enabled.
-    if (DAK.hasValue() && !IsConcurrencyEnabled &&
+    if (DAK.has_value() && !IsConcurrencyEnabled &&
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
 
@@ -1332,7 +1332,7 @@ void swift::ide::deliverCompletionResults(
         if (!Result.second)
           return; // already handled.
         RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups});
+          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
 
         auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
@@ -1350,7 +1350,7 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes);
+      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();
@@ -1552,7 +1552,7 @@ static void undoSingleExpressionReturn(DeclContext *DC) {
   }
 }
 
-void CodeCompletionCallbacksImpl::doneParsing() {
+void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
   if (Kind == CompletionKind::None) {

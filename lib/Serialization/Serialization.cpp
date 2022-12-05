@@ -485,7 +485,8 @@ static ModuleDecl *getModule(ModuleOrSourceFile DC) {
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
-        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC);
+        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC) &&
+        !isa<MacroDecl>(DC);
 }
 
 namespace {
@@ -829,6 +830,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
   BLOCK_RECORD(control_block, IS_OSSA);
+  BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -957,6 +959,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     control_block::SDKNameLayout SDKName(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
+    control_block::AllowableClientLayout Allowable(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -995,6 +998,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     if (!options.SDKName.empty())
       SDKName.emit(ScratchRecord, options.SDKName);
 
+    for (auto &name: options.AllowableClients) {
+      Allowable.emit(ScratchRecord, name);
+    }
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
     // Write the producer's Swift revision.
@@ -1504,11 +1510,13 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
     auto parentSig = genericEnv->getOpenedExistentialParentSignature();
     auto parentSigID = addGenericSignatureRef(parentSig);
+    auto emptySubs = SubstitutionMap();
+    auto subsID = addSubstitutionMapRef(emptySubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
     GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
                                          unsigned(kind), existentialTypeID,
-                                         parentSigID);
+                                         parentSigID, subsID);
     return;
   }
 
@@ -1516,11 +1524,13 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     auto kind = GenericEnvironmentKind::OpenedElement;
     auto parentSig = genericEnv->getGenericSignature();
     auto parentSigID = addGenericSignatureRef(parentSig);
+    auto contextSubs = genericEnv->getPackElementContextSubstitutions();
+    auto subsID = addSubstitutionMapRef(contextSubs);
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
     GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
                                          unsigned(kind), /*existentialTypeID=*/0,
-                                         parentSigID);
+                                         parentSigID, subsID);
     return;
   }
 
@@ -1635,7 +1645,7 @@ void Serializer::writeLocalNormalProtocolConformance(
         subs = subs.mapReplacementTypesOutOfContext();
 
       data.push_back(addSubstitutionMapRef(subs));
-      data.push_back(witness.getEnterIsolation().hasValue() ? 1 : 0);
+      data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
   });
 
   unsigned abbrCode
@@ -2869,7 +2879,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origAccessorKind.hasValue(), rawAccessorKind, origDeclID,
+          origAccessorKind.has_value(), rawAccessorKind, origDeclID,
           derivativeKind, paramIndicesVector);
       return;
     }
@@ -3031,9 +3041,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     using namespace decls_block;
     TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
     unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
-      .map([](unsigned index) { return index + 1; }).getValueOr(0);
+      .transform([](unsigned index) { return index + 1; }).value_or(0);
     unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
-      .map([](unsigned index) { return index + 1; }).getValueOr(0);
+      .transform([](unsigned index) { return index + 1; }).value_or(0);
     auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
     ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                              completionHandlerTypeID,
@@ -4286,6 +4296,46 @@ public:
     writeInlinableBodyTextIfNeeded(dtor);
   }
 
+  void visitMacroDecl(const MacroDecl *macro) {
+    using namespace decls_block;
+    verifyAttrSerializable(macro);
+
+    auto contextID = S.addDeclContextRef(macro->getDeclContext());
+
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(
+        S.addDeclBaseNameRef(macro->getName().getBaseName()));
+    for (auto argName : macro->getName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
+
+    Type ty = macro->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
+
+    uint8_t rawAccessLevel =
+      getRawStableAccessLevel(macro->getFormalAccess());
+
+    Type resultType = macro->getResultInterfaceType();
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];
+    MacroLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                            contextID.getOpaqueValue(),
+                            macro->isImplicit(),
+                            S.addGenericSignatureRef(
+                                        macro->getGenericSignature()),
+                            macro->parameterList != nullptr,
+                            S.addTypeRef(resultType),
+                            rawAccessLevel,
+                            macro->getName().getArgumentNames().size(),
+                            S.addDeclBaseNameRef(macro->externalModuleName),
+                            S.addDeclBaseNameRef(macro->externalMacroTypeName),
+                            nameComponentsAndDependencies);
+
+    writeGenericParams(macro->getGenericParams());
+    if (macro->parameterList)
+      writeParameterList(macro->parameterList);
+  }
+
   void visitTopLevelCodeDecl(const TopLevelCodeDecl *) {
     // Top-level code is ignored; external clients don't need to know about it.
   }
@@ -4312,10 +4362,6 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
-  }
-
-  void visitMacroDecl(const MacroDecl *) {
-    llvm_unreachable("macro decls shouldn't be serialized");
   }
 
   void visitMacroExpansionDecl(const MacroExpansionDecl *) {
@@ -5138,7 +5184,7 @@ bool Serializer::writeASTBlockEntitiesIfNeeded(
   if (!entities.hasMoreToSerialize())
     return false;
   while (auto next = entities.popNext(Out.GetCurrentBitNo()))
-    writeASTBlockEntity(next.getValue());
+    writeASTBlockEntity(next.value());
   return true;
 }
 
@@ -5210,6 +5256,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubscriptLayout>();
   registerDeclTypeAbbr<ExtensionLayout>();
   registerDeclTypeAbbr<DestructorLayout>();
+  registerDeclTypeAbbr<MacroLayout>();
 
   registerDeclTypeAbbr<ParameterListLayout>();
 
@@ -5947,9 +5994,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeDerivativeFunctionConfigs(*this, DerivativeConfigTable,
                                    derivativeConfigs);
 
-    if (entryPointClassID.hasValue()) {
+    if (entryPointClassID.has_value()) {
       index_block::EntryPointLayout EntryPoint(Out);
-      EntryPoint.emit(ScratchRecord, entryPointClassID.getValue());
+      EntryPoint.emit(ScratchRecord, entryPointClassID.value());
     }
 
     {

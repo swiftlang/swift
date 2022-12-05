@@ -1,3 +1,6 @@
+# Don't build the libraries for 64-bit watchOS targets;
+# there is no back-deployment to them.
+list(REMOVE_ITEM SWIFT_SDK_WATCHOS_ARCHITECTURES "arm64" "arm64e")
 
 set(library_name "swiftCompatibility51")
 

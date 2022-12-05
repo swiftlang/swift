@@ -198,7 +198,7 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
     CKind = constraints::ConstraintKind::Conversion;
     break;
   }
-  assert(CKind.hasValue());
+  assert(CKind.has_value());
   return TypeChecker::typesSatisfyConstraint(Owner.Pair.FirstTy,
                                              Owner.Pair.SecondTy,
                                              Owner.OpenArchetypes,

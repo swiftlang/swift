@@ -29,6 +29,16 @@ set_target_properties(libSwiftScan
     PROPERTIES
     OUTPUT_NAME ${SWIFT_SCAN_LIB_NAME})
 
+if(SWIFT_SWIFT_PARSER)
+  # Ensure that we can find the host shared libraries.
+  set_property(
+    TARGET libSwiftScan
+    APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
+  set_property(
+    TARGET libSwiftScan
+    APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
+endif()
+
 add_llvm_symbol_exports(libSwiftScan ${LLVM_EXPORTED_SYMBOL_FILE})
 
 # Adds -dead_strip option

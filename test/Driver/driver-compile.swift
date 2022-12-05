@@ -48,9 +48,8 @@
 // RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin/)
 // RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/lib/)
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
-// RUN: %copy-plugin-support-library(%t/DISTINCTIVE-PATH/usr/lib/)
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -c -update-code -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
+// RUN: %host-library-env %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -c -update-code -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
 // RUN: %FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
