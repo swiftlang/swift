@@ -23,9 +23,9 @@ using namespace dependencies;
 using namespace module_dependency_cache_serialization;
 
 // MARK: Deserialization
-namespace {
+namespace swift {
 
-class Deserializer {
+class ModuleDependenciesCacheDeserializer {
   std::vector<std::string> Identifiers;
   std::vector<std::vector<uint64_t>> ArraysOfIdentifierIDs;
   llvm::BitstreamCursor Cursor;
@@ -42,14 +42,14 @@ class Deserializer {
   llvm::Optional<std::vector<std::string>> getArray(unsigned n);
 
 public:
-  Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
+  ModuleDependenciesCacheDeserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
   bool readInterModuleDependenciesCache(GlobalModuleDependenciesCache &cache);
 };
 
 } // end namespace
 
 /// Read in the expected signature: IMDC
-bool Deserializer::readSignature() {
+bool ModuleDependenciesCacheDeserializer::readSignature() {
   for (unsigned char byte : MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE) {
     if (Cursor.AtEndOfStream())
       return true;
@@ -65,7 +65,7 @@ bool Deserializer::readSignature() {
 
 /// Read in the info block and enter the top-level block which represents the
 /// graph
-bool Deserializer::enterGraphBlock() {
+bool ModuleDependenciesCacheDeserializer::enterGraphBlock() {
   // Read the BLOCKINFO_BLOCK, which contains metadata used when dumping
   // the binary data with llvm-bcanalyzer.
   {
@@ -110,7 +110,7 @@ bool Deserializer::enterGraphBlock() {
 
 /// Read in the serialized file's format version, error/exit if not matching
 /// current version.
-bool Deserializer::readMetadata() {
+bool ModuleDependenciesCacheDeserializer::readMetadata() {
   using namespace graph_block;
 
   auto entry = Cursor.advance();
@@ -146,7 +146,7 @@ bool Deserializer::readMetadata() {
 /// all of the file's identifiers and arrays of identifiers, followed by
 /// consuming individual module info records and registering them into the
 /// cache.
-bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
+bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCache &cache) {
   using namespace graph_block;
 
   bool hasCurrentModule = false;
@@ -498,7 +498,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
   return false;
 }
 
-bool Deserializer::readInterModuleDependenciesCache(
+bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
     GlobalModuleDependenciesCache &cache) {
   using namespace graph_block;
 
@@ -517,7 +517,7 @@ bool Deserializer::readInterModuleDependenciesCache(
   return false;
 }
 
-llvm::Optional<std::string> Deserializer::getIdentifier(unsigned n) {
+llvm::Optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(unsigned n) {
   if (n == 0)
     return std::string();
 
@@ -528,7 +528,7 @@ llvm::Optional<std::string> Deserializer::getIdentifier(unsigned n) {
   return Identifiers[n];
 }
 
-llvm::Optional<std::vector<std::string>> Deserializer::getArray(unsigned n) {
+llvm::Optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::getArray(unsigned n) {
   if (n == 0)
     return std::vector<std::string>();
 
@@ -554,7 +554,7 @@ llvm::Optional<std::vector<std::string>> Deserializer::getArray(unsigned n) {
 bool swift::dependencies::module_dependency_cache_serialization::
     readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
                                      GlobalModuleDependenciesCache &cache) {
-  Deserializer deserializer(buffer.getMemBufferRef());
+  ModuleDependenciesCacheDeserializer deserializer(buffer.getMemBufferRef());
   return deserializer.readInterModuleDependenciesCache(cache);
 }
 
@@ -627,9 +627,9 @@ struct hash<ModuleDependencyID> {
 };
 } // namespace std
 
-namespace {
+namespace swift {
 
-class Serializer {
+class ModuleDependenciesCacheSerializer {
   llvm::StringMap<unsigned, llvm::BumpPtrAllocator> IdentifierIDs;
   std::unordered_map<ModuleDependencyID,
                      llvm::DenseMap<ModuleIdentifierArrayKind, unsigned>>
@@ -685,7 +685,7 @@ class Serializer {
                        const ModuleDependencies &dependencyInfo);
 
 public:
-  Serializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
+  ModuleDependenciesCacheSerializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
 
 public:
   void
@@ -695,7 +695,7 @@ public:
 } // end namespace
 
 /// Record the name of a block.
-void Serializer::emitBlockID(unsigned ID, StringRef name,
+void ModuleDependenciesCacheSerializer::emitBlockID(unsigned ID, StringRef name,
                              SmallVectorImpl<unsigned char> &nameBuffer) {
   SmallVector<unsigned, 1> idBuffer;
   idBuffer.push_back(ID);
@@ -710,7 +710,7 @@ void Serializer::emitBlockID(unsigned ID, StringRef name,
 }
 
 /// Record the name of a record.
-void Serializer::emitRecordID(unsigned ID, StringRef name,
+void ModuleDependenciesCacheSerializer::emitRecordID(unsigned ID, StringRef name,
                               SmallVectorImpl<unsigned char> &nameBuffer) {
   assert(ID < 256 && "can't fit record ID in next to name");
   nameBuffer.resize(name.size() + 1);
@@ -719,7 +719,7 @@ void Serializer::emitRecordID(unsigned ID, StringRef name,
   Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
-void Serializer::writeBlockInfoBlock() {
+void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
   llvm::BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
   SmallVector<unsigned char, 64> nameBuffer;
@@ -739,12 +739,12 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, CLANG_MODULE_DETAILS_NODE);
 }
 
-void Serializer::writeSignature() {
+void ModuleDependenciesCacheSerializer::writeSignature() {
   for (auto c : MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE)
     Out.Emit((unsigned)c, 8);
 }
 
-void Serializer::writeMetadata() {
+void ModuleDependenciesCacheSerializer::writeMetadata() {
   using namespace graph_block;
 
   MetadataLayout::emitRecord(Out, ScratchRecord,
@@ -754,7 +754,7 @@ void Serializer::writeMetadata() {
                              version::getSwiftFullVersion());
 }
 
-void Serializer::writeIdentifiers() {
+void ModuleDependenciesCacheSerializer::writeIdentifiers() {
   using namespace graph_block;
   for (auto str : Identifiers) {
     IdentifierNodeLayout::emitRecord(
@@ -762,7 +762,7 @@ void Serializer::writeIdentifiers() {
   }
 }
 
-void Serializer::writeArraysOfIdentifiers() {
+void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
   using namespace graph_block;
   for (auto vec : ArraysOfIdentifiers) {
     IdentifierArrayLayout::emitRecord(
@@ -770,7 +770,7 @@ void Serializer::writeArraysOfIdentifiers() {
   }
 }
 
-void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
+void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID moduleID,
                                  Optional<std::string> contextHash,
                                  const ModuleDependencies &dependencyInfo) {
   using namespace graph_block;
@@ -874,7 +874,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
   }
 }
 
-unsigned Serializer::addIdentifier(const std::string &str) {
+unsigned ModuleDependenciesCacheSerializer::addIdentifier(const std::string &str) {
   if (str.empty())
     return 0;
 
@@ -891,7 +891,7 @@ unsigned Serializer::addIdentifier(const std::string &str) {
   return iter->getValue();
 }
 
-unsigned Serializer::getIdentifier(const std::string &str) const {
+unsigned ModuleDependenciesCacheSerializer::getIdentifier(const std::string &str) const {
   if (str.empty())
     return 0;
 
@@ -901,7 +901,7 @@ unsigned Serializer::getIdentifier(const std::string &str) const {
   return iter->second;
 }
 
-void Serializer::addArray(ModuleDependencyID moduleID,
+void ModuleDependenciesCacheSerializer::addArray(ModuleDependencyID moduleID,
                           ModuleIdentifierArrayKind arrayKind,
                           const std::vector<std::string> &vec) {
   if (ArrayIDs.find(moduleID) != ArrayIDs.end()) {
@@ -931,7 +931,7 @@ void Serializer::addArray(ModuleDependencyID moduleID,
   return;
 }
 
-unsigned Serializer::getArray(ModuleDependencyID moduleID,
+unsigned ModuleDependenciesCacheSerializer::getArray(ModuleDependencyID moduleID,
                               ModuleIdentifierArrayKind arrayKind) const {
   auto iter = ArrayIDs.find(moduleID);
   assert(iter != ArrayIDs.end());
@@ -941,7 +941,7 @@ unsigned Serializer::getArray(ModuleDependencyID moduleID,
   return arrayIter->second;
 }
 
-void Serializer::collectStringsAndArrays(
+void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const GlobalModuleDependenciesCache &cache) {
   for (auto &moduleID : cache.getAllSourceModules()) {
     assert(moduleID.second == ModuleDependenciesKind::SwiftSource &&
@@ -973,20 +973,20 @@ void Serializer::collectStringsAndArrays(
   for (auto &contextHash : cache.getAllContextHashes()) {
     addIdentifier(contextHash);
     for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
-          moduleID.first, moduleID.second);
-      assert(dependencyInfos.has_value() && "Expected dependency info.");
-      for (auto &dependencyInfo : *dependencyInfos) {
-        // Add the module's name
-        addIdentifier(moduleID.first);
-        // Add the module's dependencies
-        addArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies,
-                 dependencyInfo.getModuleDependencies());
+      auto dependencyInfo = cache.findDependencies(moduleID.first, moduleID.second);
 
-        // Add the dependency-kind-specific data
-        switch (dependencyInfo.getKind()) {
+
+      assert(dependencyInfo.has_value() && "Expected dependency info.");
+      // Add the module's name
+      addIdentifier(moduleID.first);
+      // Add the module's dependencies
+      addArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies,
+               dependencyInfo->getModuleDependencies());
+
+      // Add the dependency-kind-specific data
+      switch (dependencyInfo->getKind()) {
         case swift::ModuleDependenciesKind::SwiftInterface: {
-          auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
+          auto swiftTextDeps = dependencyInfo->getAsSwiftInterfaceModule();
           assert(swiftTextDeps);
           addIdentifier(swiftTextDeps->moduleOutputPath);
           addIdentifier(swiftTextDeps->swiftInterfaceFile);
@@ -1000,18 +1000,18 @@ void Serializer::collectStringsAndArrays(
           addIdentifier(swiftTextDeps->contextHash);
           if (swiftTextDeps->textualModuleDetails.bridgingHeaderFile.has_value())
             addIdentifier(swiftTextDeps->textualModuleDetails.bridgingHeaderFile
-                              .value());
+                          .value());
           addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
                    std::vector<std::string>());
           addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
                    swiftTextDeps->textualModuleDetails.bridgingSourceFiles);
           addArray(
-              moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies,
-              swiftTextDeps->textualModuleDetails.bridgingModuleDependencies);
+                   moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies,
+                   swiftTextDeps->textualModuleDetails.bridgingModuleDependencies);
           break;
         }
         case swift::ModuleDependenciesKind::SwiftBinary: {
-          auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
+          auto swiftBinDeps = dependencyInfo->getAsSwiftBinaryModule();
           assert(swiftBinDeps);
           addIdentifier(swiftBinDeps->compiledModulePath);
           addIdentifier(swiftBinDeps->moduleDocPath);
@@ -1019,7 +1019,7 @@ void Serializer::collectStringsAndArrays(
           break;
         }
         case swift::ModuleDependenciesKind::SwiftPlaceholder: {
-          auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
+          auto swiftPHDeps = dependencyInfo->getAsPlaceholderDependencyModule();
           assert(swiftPHDeps);
           addIdentifier(swiftPHDeps->compiledModulePath);
           addIdentifier(swiftPHDeps->moduleDocPath);
@@ -1027,7 +1027,7 @@ void Serializer::collectStringsAndArrays(
           break;
         }
         case swift::ModuleDependenciesKind::Clang: {
-          auto clangDeps = dependencyInfo.getAsClangModule();
+          auto clangDeps = dependencyInfo->getAsClangModule();
           assert(clangDeps);
           addIdentifier(clangDeps->pcmOutputPath);
           addIdentifier(clangDeps->moduleMapFile);
@@ -1042,13 +1042,12 @@ void Serializer::collectStringsAndArrays(
         }
         default:
           llvm_unreachable("Unhandled dependency kind.");
-        }
       }
     }
   }
 }
 
-void Serializer::writeInterModuleDependenciesCache(
+void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
     const GlobalModuleDependenciesCache &cache) {
   // Write the header
   writeSignature();
@@ -1096,12 +1095,9 @@ void Serializer::writeInterModuleDependenciesCache(
   // has been used with
   for (auto &contextHash : cache.getAllContextHashes()) {
     for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
-          moduleID.first, moduleID.second);
-      assert(dependencyInfos.has_value() && "Expected dependency info.");
-      for (auto &dependencyInfo : *dependencyInfos) {
-        writeModuleInfo(moduleID, contextHash, dependencyInfo);
-      }
+      auto dependencyInfo = cache.findDependencies(moduleID.first, moduleID.second);
+      assert(dependencyInfo.has_value() && "Expected dependency info.");
+      writeModuleInfo(moduleID, contextHash, *dependencyInfo);
     }
   }
 
@@ -1112,7 +1108,7 @@ void swift::dependencies::module_dependency_cache_serialization::
     writeInterModuleDependenciesCache(
         llvm::BitstreamWriter &Out,
         const GlobalModuleDependenciesCache &cache) {
-  Serializer serializer{Out};
+  ModuleDependenciesCacheSerializer serializer{Out};
   serializer.writeInterModuleDependenciesCache(cache);
 }
 

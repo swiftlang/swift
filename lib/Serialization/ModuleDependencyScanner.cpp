@@ -167,20 +167,16 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
 
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
-           moduleName,
-           {ModuleDependenciesKind::SwiftInterface, currentSearchPathSet}))
+           moduleName, ModuleDependenciesKind::SwiftInterface))
     return found;
   if (auto found = cache.findDependencies(
-           moduleName,
-           {ModuleDependenciesKind::SwiftSource, currentSearchPathSet}))
+           moduleName, ModuleDependenciesKind::SwiftSource))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftBinary, currentSearchPathSet}))
+            moduleName, ModuleDependenciesKind::SwiftBinary))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftPlaceholder, currentSearchPathSet}))
+            moduleName, ModuleDependenciesKind::SwiftPlaceholder))
     return found;
 
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');

@@ -76,12 +76,6 @@ struct ModuleDependenciesKindHash {
   }
 };
 
-/// Details of a given module used for dependency scanner cache queries.
-struct ModuleLookupSpecifics {
-  Optional<ModuleDependenciesKind> kind;
-  llvm::StringSet<> currentSearchPaths;
-};
-
 /// Base class for the variant storage of ModuleDependencies.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
@@ -331,6 +325,7 @@ private:
     : storage(std::move(storage)) { }
 
 public:
+  ModuleDependencies() = default;
   ModuleDependencies(const ModuleDependencies &other)
     : storage(other.storage->clone()) { }
   ModuleDependencies(ModuleDependencies &&other) = default;
@@ -481,9 +476,10 @@ public:
 
 using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;
 using ModuleDependenciesVector = llvm::SmallVector<ModuleDependencies, 1>;
+using ModuleNameToDependencyMap = llvm::StringMap<ModuleDependencies>;
 using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependenciesKind,
-                       llvm::StringMap<ModuleDependenciesVector>,
+                       ModuleNameToDependencyMap,
                        ModuleDependenciesKindHash>;
 using ModuleDependenciesKindRefMap =
     std::unordered_map<ModuleDependenciesKind,
@@ -497,9 +493,6 @@ using ModuleDependenciesKindRefMap =
 /// `DependencyScanningTool`). It is not to be queried directly, but is rather
 /// meant to be wrapped in an instance of `ModuleDependenciesCache`, responsible
 /// for recording new dependencies and answering cache queries in a given scan.
-/// Queries to this cache must be disambiguated with a set of search paths to
-/// ensure that the returned cached dependency was one that can be found in the
-/// current scanning action's filesystem view.
 class GlobalModuleDependenciesCache {
   /// Global cache contents specific to a specific scanner invocation context
   struct ContextSpecificGlobalCacheState {
@@ -508,9 +501,7 @@ class GlobalModuleDependenciesCache {
     std::vector<ModuleDependencyID> AllModules;
 
     /// Dependencies for modules that have already been computed.
-    /// This maps a dependency kind to a map of a module's name to a vector of Dependency objects,
-    /// which correspond to instances of the same module that may have been found
-    /// in different sets of search paths.
+    /// This maps a dependency kind to a map of a module's name to a Dependency object
     ModuleDependenciesKindMap ModuleDependenciesMap;
   };
 
@@ -522,7 +513,7 @@ class GlobalModuleDependenciesCache {
 
   /// Dependencies for all Swift source-based modules discovered. Each one is the main
   /// module of a prior invocation of the scanner.
-  llvm::StringMap<ModuleDependencies> SwiftSourceModuleDependenciesMap;
+  ModuleNameToDependencyMap SwiftSourceModuleDependenciesMap;
 
   /// A map from a String representing the target triple of a scanner invocation to the corresponding
   /// cached dependencies discovered so far when using this triple.
@@ -536,9 +527,9 @@ class GlobalModuleDependenciesCache {
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
-  llvm::StringMap<ModuleDependenciesVector> &
+  ModuleNameToDependencyMap &
   getDependenciesMap(ModuleDependenciesKind kind);
-  const llvm::StringMap<ModuleDependenciesVector> &
+  const ModuleNameToDependencyMap &
   getDependenciesMap(ModuleDependenciesKind kind) const;
 
 public:
@@ -548,27 +539,26 @@ public:
   operator=(const GlobalModuleDependenciesCache &) = delete;
   virtual ~GlobalModuleDependenciesCache() {}
 
-  void configureForContextHash(std::string scanningContextHash);
-
-  const std::vector<std::string>& getAllContextHashes() const {
-    return AllContextHashes;
-  }
-
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
   friend class ModuleDependenciesCache;
+  friend class ModuleDependenciesCacheDeserializer;
+  friend class ModuleDependenciesCacheSerializer;
+
+  /// Configure the current state of the cache to respond to queries
+  /// for the specified scanning context hash.
+  void configureForContextHash(std::string scanningContextHash);
+
+  /// Return context hashes of all scanner invocations that have used
+  /// this cache instance.
+  const std::vector<std::string>& getAllContextHashes() const {
+    return AllContextHashes;
+  }
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependencies(StringRef moduleName,
-                       ModuleLookupSpecifics details) const;
-
-  /// Look for module dependencies for a module with the given name given
-  /// current search paths.
-  ///
-  /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<ModuleDependencies>
-  findDependencies(StringRef moduleName, ModuleLookupSpecifics details) const;
+                       Optional<ModuleDependenciesKind> kind) const;
 
   /// Return a pointer to the context-specific cache state of the current scanning action.
   ContextSpecificGlobalCacheState* getCurrentCache() const;
@@ -576,19 +566,16 @@ private:
   /// Return a pointer to the cache state of the specified context hash.
   ContextSpecificGlobalCacheState* getCacheForScanningContextHash(StringRef scanningContextHash) const;
 
-public:
-  /// Look for module dependencies for a module with the given name.
-  /// This method has a deliberately-obtuse name to indicate that it is not to
-  /// be used for general queries.
-  ///
-  /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<ModuleDependenciesVector>
-  findAllDependenciesIrrespectiveOfSearchPaths(
-      StringRef moduleName, Optional<ModuleDependenciesKind> kind) const;
-
   /// Look for source-based module dependency details
   Optional<ModuleDependencies>
   findSourceModuleDependency(StringRef moduleName) const;
+
+  /// Look for module dependencies for a module with the given name
+  ///
+  /// \returns the cached result, or \c None if there is no cached entry.
+  Optional<ModuleDependencies>
+  findDependencies(StringRef moduleName,
+                   Optional<ModuleDependenciesKind> kind) const;
 
   /// Record dependencies for the given module.
   const ModuleDependencies *recordDependencies(StringRef moduleName,
@@ -616,8 +603,7 @@ public:
 /// scanning action, and wraps an instance of a `GlobalModuleDependenciesCache`
 /// which may carry cached scanning information from prior scanning actions.
 /// This cache maintains a store of references to all dependencies found within
-/// the current scanning action (with their values stored in the global Cache),
-/// since these do not require clients to disambiguate them with search paths.
+/// the current scanning action (with their values stored in the global Cache).
 class ModuleDependenciesCache {
 private:
   GlobalModuleDependenciesCache &globalCache;
@@ -628,12 +614,14 @@ private:
   ModuleDependenciesKindRefMap ModuleDependenciesMap;
   
   /// Name of the module under scan
-  StringRef mainScanModuleName;
+  std::string mainScanModuleName;
+  /// The context hash of the current scanning invocation
+  std::string scannerContextHash;
+
   /// Set containing all of the Clang modules that have already been seen.
   llvm::StringSet<> alreadySeenClangModules;
   /// The Clang dependency scanner tool
   clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
-
   /// Discovered Clang modules are only cached locally.
   llvm::StringMap<ModuleDependenciesVector> clangModuleDependencies;
 
@@ -646,25 +634,26 @@ private:
 
   /// Local cache results lookup, only for modules which were discovered during
   /// the current scanner invocation.
-  bool hasDependencies(StringRef moduleName,
-                       Optional<ModuleDependenciesKind> kind) const;
+  bool hasDependenciesLocalOnly(StringRef moduleName,
+                                Optional<ModuleDependenciesKind> kind) const;
 
   /// Local cache results lookup, only for modules which were discovered during
   /// the current scanner invocation.
   Optional<const ModuleDependencies *>
-  findDependencies(StringRef moduleName,
-                   Optional<ModuleDependenciesKind> kind) const;
+  findDependenciesLocalOnly(StringRef moduleName,
+                            Optional<ModuleDependenciesKind> kind) const;
 
 public:
   ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache,
-                          StringRef mainScanModuleName);
+                          std::string mainScanModuleName,
+                          std::string scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
 
 public:
   /// Whether we have cached dependency information for the given module.
   bool hasDependencies(StringRef moduleName,
-                       ModuleLookupSpecifics details) const;
+                       Optional<ModuleDependenciesKind> kind) const;
 
   /// Produce a reference to the Clang scanner tool associated with this cache
   clang::tooling::dependencies::DependencyScanningTool& getClangScannerTool() {
@@ -674,24 +663,12 @@ public:
     return alreadySeenClangModules;
   }
   
-  /// Look for module dependencies for a module with the given name given
-  /// current search paths.
+  /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
   Optional<ModuleDependencies>
-  findDependencies(StringRef moduleName, ModuleLookupSpecifics details) const;
-
-  /// Look for module dependencies for a module with the given name.
-  /// This method has a deliberately-obtuse name to indicate that it is not to
-  /// be used for general queries.
-  ///
-  /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<ModuleDependenciesVector>
-  findAllDependenciesIrrespectiveOfSearchPaths(
-      StringRef moduleName, Optional<ModuleDependenciesKind> kind) const {
-    return globalCache.findAllDependenciesIrrespectiveOfSearchPaths(moduleName,
-                                                                    kind);
-  }
+  findDependencies(StringRef moduleName,
+                   Optional<ModuleDependenciesKind> kind) const;
 
   /// Record dependencies for the given module.
   void recordDependencies(StringRef moduleName,
