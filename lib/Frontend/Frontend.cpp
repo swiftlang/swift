@@ -202,8 +202,10 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 Lowering::TypeConverter &CompilerInstance::getSILTypes() {
   if (auto *tc = TheSILTypes.get())
     return *tc;
-  
-  auto *tc = new Lowering::TypeConverter(*getMainModule());
+
+  auto *tc = new Lowering::TypeConverter(
+      *getMainModule(),
+      /*loweredAddresses=*/!Context->SILOpts.EnableSILOpaqueValues);
   TheSILTypes.reset(tc);
   return *tc;
 }

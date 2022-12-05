@@ -874,7 +874,12 @@ public:
   /// True if SIL conventions force address-only to be passed by address.
   bool useLoweredAddresses() const { return loweredAddresses; }
 
-  void setLoweredAddresses(bool val) { loweredAddresses = val; }
+  void setLoweredAddresses(bool val) {
+    loweredAddresses = val;
+    if (val) {
+      Types.setLoweredAddresses();
+    }
+  }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 

@@ -1,0 +1,48 @@
+// RUN: %target-sil-opt  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -type-lowering-force-opaque-value-lowering 2>&1 | %FileCheck %s
+
+// Test ExistentialSpecializer with OpaqueValueTypeLowerings.
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol P {}
+
+public struct S : P {
+  init()
+
+  var o: AnyObject // nontrivial to check ownership conventions
+}
+
+// Verify that the opened existential type used in thunk building is properly
+// address lowered even though it has an OpaqueValueTypeLowering.
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[IN_ADDR:%[^,]+]] : $*any P, [[OUT_ADDR:%[^,]+]] : $*any P):
+// CHECK:         [[OPENED_IN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[IN_ADDR]] : $*any P to $*@opened([[UUID:".*"]], any P) Self 
+// CHECK:         [[OPENED_OUT_ADDR:%[^,]+]] = alloc_stack $@opened([[UUID]], any P) Self 
+// CHECK:         copy_addr [[OPENED_IN_ADDR]] to [init] [[OPENED_OUT_ADDR]] : $*@opened([[UUID]], any P) Self 
+// CHECK:         apply {{%[^,]+}}<@opened([[UUID]], any P) Self>([[OPENED_OUT_ADDR]], [[OUT_ADDR]])
+// CHECK:         destroy_addr [[IN_ADDR]]
+// CHECK:         dealloc_stack [[OPENED_OUT_ADDR]]
+// CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztF'
+sil hidden [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> () {
+bb0(%0 : $*P, %1 : $*P):
+  copy_addr %0 to [init] %1 : $*P
+  destroy_addr %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @$s6test2_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+bb0(%0 : $S, %1 : $*P):
+  %4 = alloc_stack $P
+  %5 = init_existential_addr %4 : $*P, $S
+  store %0 to %5 : $*S
+  %7 = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> ()
+  %8 = apply %7(%4, %1) : $@convention(thin) (@in P, @inout P) -> ()
+  dealloc_stack %4 : $*P
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_witness_table S: P module test {}
