@@ -40,7 +40,8 @@ extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
-    void *macro, void *sourceFile, const void *sourceLocation,
+    void *diagEngine, void *macro, void *sourceFile,
+    const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 /// Produce the mangled name for the nominal type descriptor of a type
@@ -175,6 +176,7 @@ Expr *swift::expandMacroExpr(
       const char *evaluatedSourceAddress;
       ptrdiff_t evaluatedSourceLength;
       swift_ASTGen_evaluateMacro(
+          &ctx.Diags,
           macroDef.getAsBuiltin(),
           astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
           &evaluatedSourceAddress, &evaluatedSourceLength);
