@@ -491,7 +491,7 @@ struct UseState {
 } // namespace
 
 //===----------------------------------------------------------------------===//
-//                          MARK: Liveness Processor
+//                          MARK: Global Block State
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -522,180 +522,7 @@ struct BlockState {
       : userUp(userUp), isInitDown(isInitDown) {}
 };
 
-/// Post process the found liveness and emit errors if needed. TODO: Better
-/// name.
-struct LivenessChecker {
-  MarkMustCheckInst *markedAddress;
-  FieldSensitiveAddressPrunedLiveness &liveness;
-  SmallBitVector livenessVector;
-  bool hadAnyErrorUsers = false;
-  SmallPtrSetImpl<SILInstruction *> &inoutTermUsers;
-  BlockState::Map &blockToState;
-
-  DiagnosticEmitter &diagnosticEmitter;
-
-  LivenessChecker(MarkMustCheckInst *markedAddress,
-                  FieldSensitiveAddressPrunedLiveness &liveness,
-                  SmallPtrSetImpl<SILInstruction *> &inoutTermUsers,
-                  BlockState::Map &blockToState,
-                  DiagnosticEmitter &diagnosticEmitter)
-      : markedAddress(markedAddress), liveness(liveness),
-        inoutTermUsers(inoutTermUsers), blockToState(blockToState),
-        diagnosticEmitter(diagnosticEmitter) {}
-
-  /// Returns true if we emitted any errors.
-  bool
-  compute(SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-              &takeUpInsts,
-          SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-              &takeDownInsts);
-
-  void clear() {
-    livenessVector.clear();
-    hadAnyErrorUsers = false;
-  }
-
-  std::pair<bool, bool> testInstVectorLiveness(
-      SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-          &takeInsts);
-};
-
 } // namespace
-
-std::pair<bool, bool> LivenessChecker::testInstVectorLiveness(
-    SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-        &takeInsts) {
-  bool emittedDiagnostic = false;
-  bool foundSingleBlockTakeDueToInitDown = false;
-
-  for (auto takeInstAndValue : takeInsts) {
-    LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
-
-    // Check if we are in the boundary...
-    liveness.isWithinBoundary(takeInstAndValue.first, livenessVector);
-
-    // If the bit vector does not contain any set bits, then we know that we did
-    // not have any boundary violations for any leaf node of our root value.
-    if (!livenessVector.any()) {
-      // TODO: Today, we don't tell the user the actual field itself where the
-      // violation occured and just instead just shows the two instructions. We
-      // could be more specific though...
-      LLVM_DEBUG(llvm::dbgs() << "        Not within the boundary.\n");
-      continue;
-    }
-    LLVM_DEBUG(llvm::dbgs()
-               << "        Within the boundary! Emitting an error\n");
-
-    // Ok, we have an error and via the bit vector know which specific leaf
-    // elements of our root type were within the per field boundary. We need to
-    // go find the next reachable use that overlap with its sub-element. We only
-    // emit a single error per use even if we get multiple sub elements that
-    // match it. That helps reduce the amount of errors.
-    //
-    // DISCUSSION: It is important to note that this follows from the separation
-    // of concerns behind this pass: we have simplified how we handle liveness
-    // by losing this information. That being said, since we are erroring it is
-    // ok that we are taking a little more time since we are not going to
-    // codegen this code.
-    //
-    // That being said, set the flag that we saw at least one error, so we can
-    // exit early after this loop.
-    hadAnyErrorUsers = true;
-
-    // B/c of the separation of concerns with our liveness, we now need to walk
-    // blocks to go find the specific later takes that are reachable from this
-    // take. It is ok that we are doing a bit more work here since we are going
-    // to exit and not codegen.
-    auto *errorUser = takeInstAndValue.first;
-
-    // Before we do anything, grab the state for our errorUser's block from the
-    // blockState and check if it is an init block. If so, we have no further
-    // work to do since we already found correctness due to our single basic
-    // block check. So, we have nothing further to do.
-    if (blockToState.find(errorUser->getParent())->second.isInitDown) {
-      // Set the flag that we saw an init down so that our assert later that we
-      // actually emitted an error doesn't trigger.
-      foundSingleBlockTakeDueToInitDown = true;
-      continue;
-    }
-
-    BasicBlockWorklist worklist(errorUser->getFunction());
-    for (auto *succBlock : errorUser->getParent()->getSuccessorBlocks())
-      worklist.pushIfNotVisited(succBlock);
-
-    LLVM_DEBUG(llvm::dbgs() << "Performing forward traversal from errorUse "
-                               "looking for the cause of liveness!\n");
-
-    while (auto *block = worklist.pop()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Visiting block: bb" << block->getDebugID() << "\n");
-      auto iter = blockToState.find(block);
-      if (iter == blockToState.end()) {
-        LLVM_DEBUG(llvm::dbgs() << "    No State! Skipping!\n");
-        for (auto *succBlock : block->getSuccessorBlocks())
-          worklist.pushIfNotVisited(succBlock);
-        continue;
-      }
-
-      auto *blockUser = iter->second.userUp;
-
-      if (blockUser) {
-        LLVM_DEBUG(llvm::dbgs() << "    Found userUp: " << *blockUser);
-        auto info = liveness.isInterestingUser(blockUser);
-        // Make sure that it overlaps with our range...
-        if (info.second->contains(*info.second)) {
-          LLVM_DEBUG(llvm::dbgs() << "    Emitted diagnostic for it!\n");
-          // and if it does... emit our diagnostic and continue to see if we
-          // find errors along other paths.
-          // if (invalidUsesWithDiagnostics.insert(errorUser
-          bool isConsuming =
-              info.first ==
-              FieldSensitiveAddressPrunedLiveness::LifetimeEndingUse;
-          diagnosticEmitter.emitAddressDiagnostic(
-              markedAddress, blockUser, errorUser, isConsuming,
-              inoutTermUsers.count(blockUser));
-          emittedDiagnostic = true;
-          continue;
-        }
-      }
-
-      // Otherwise, add successors and continue! We didn't overlap with this
-      // use.
-      LLVM_DEBUG(llvm::dbgs() << "    Does not overlap at the type level, no "
-                                 "diagnostic! Visiting successors!\n");
-      for (auto *succBlock : block->getSuccessorBlocks())
-        worklist.pushIfNotVisited(succBlock);
-    }
-  }
-
-  return {emittedDiagnostic, foundSingleBlockTakeDueToInitDown};
-}
-
-bool LivenessChecker::compute(
-    SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-        &takeUpInsts,
-    SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-        &takeDownInsts) {
-  // Then revisit our takes, this time checking if we are within the boundary
-  // and if we are, emit an error.
-  LLVM_DEBUG(llvm::dbgs() << "Checking takes for errors!\n");
-  bool emittedDiagnostic = false;
-  bool foundSingleBlockTakeDueToInitDown = false;
-
-  auto pair = testInstVectorLiveness(takeUpInsts);
-  emittedDiagnostic |= pair.first;
-  foundSingleBlockTakeDueToInitDown |= pair.second;
-
-  pair = testInstVectorLiveness(takeDownInsts);
-  emittedDiagnostic |= pair.first;
-  foundSingleBlockTakeDueToInitDown |= pair.second;
-
-  // If we emitted an error user, we should always emit at least one
-  // diagnostic. If we didn't there is a bug in the implementation.
-  assert(!hadAnyErrorUsers || emittedDiagnostic ||
-         foundSingleBlockTakeDueToInitDown);
-  return hadAnyErrorUsers;
-}
 
 //===----------------------------------------------------------------------===//
 //                 MARK: Forward Declaration of Main Checker
@@ -1472,6 +1299,174 @@ void BlockSummaries::initializeLiveness(
 }
 
 //===----------------------------------------------------------------------===//
+//                           MARK: Global Dataflow
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Post process the found liveness and emit errors if needed. TODO: Better
+/// name.
+struct GlobalDataflow {
+  BlockSummaries &summaries;
+  FieldSensitiveAddressPrunedLiveness &liveness;
+  SmallPtrSetImpl<SILInstruction *> &inoutTermInstUsers;
+  SmallBitVector livenessVector;
+  bool hadAnyErrorUsers = false;
+
+  GlobalDataflow(BlockSummaries &summaries,
+                 FieldSensitiveAddressPrunedLiveness &liveness,
+                 SmallPtrSetImpl<SILInstruction *> &inoutTermInstUsers)
+      : summaries(summaries), liveness(liveness),
+        inoutTermInstUsers(inoutTermInstUsers) {}
+
+  /// Returns true if we emitted any errors.
+  bool compute();
+
+  void clear() {
+    livenessVector.clear();
+    hadAnyErrorUsers = false;
+  }
+
+  std::pair<bool, bool> testInstVectorLiveness(
+      SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
+          &instsToTest);
+  BlockState::Map &getBlockToState() const { return summaries.blockToState; }
+};
+
+} // namespace
+
+std::pair<bool, bool> GlobalDataflow::testInstVectorLiveness(
+    SmallVectorImpl<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
+        &instsToTest) {
+  bool emittedDiagnostic = false;
+  bool foundSingleBlockTakeDueToInitDown = false;
+
+  for (auto takeInstAndValue : instsToTest) {
+    LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
+
+    // Check if we are in the boundary...
+    liveness.isWithinBoundary(takeInstAndValue.first, livenessVector);
+
+    // If the bit vector does not contain any set bits, then we know that we did
+    // not have any boundary violations for any leaf node of our root value.
+    if (!livenessVector.any()) {
+      // TODO: Today, we don't tell the user the actual field itself where the
+      // violation occured and just instead just shows the two instructions. We
+      // could be more specific though...
+      LLVM_DEBUG(llvm::dbgs() << "        Not within the boundary.\n");
+      continue;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "        Within the boundary! Emitting an error\n");
+
+    // Ok, we have an error and via the bit vector know which specific leaf
+    // elements of our root type were within the per field boundary. We need to
+    // go find the next reachable use that overlap with its sub-element. We only
+    // emit a single error per use even if we get multiple sub elements that
+    // match it. That helps reduce the amount of errors.
+    //
+    // DISCUSSION: It is important to note that this follows from the separation
+    // of concerns behind this pass: we have simplified how we handle liveness
+    // by losing this information. That being said, since we are erroring it is
+    // ok that we are taking a little more time since we are not going to
+    // codegen this code.
+    //
+    // That being said, set the flag that we saw at least one error, so we can
+    // exit early after this loop.
+    hadAnyErrorUsers = true;
+
+    // B/c of the separation of concerns with our liveness, we now need to walk
+    // blocks to go find the specific later takes that are reachable from this
+    // take. It is ok that we are doing a bit more work here since we are going
+    // to exit and not codegen.
+    auto *errorUser = takeInstAndValue.first;
+
+    // Before we do anything, grab the state for our errorUser's block from the
+    // blockState and check if it is an init block. If so, we have no further
+    // work to do since we already found correctness due to our single basic
+    // block check. So, we have nothing further to do.
+    if (getBlockToState().find(errorUser->getParent())->second.isInitDown) {
+      // Set the flag that we saw an init down so that our assert later that we
+      // actually emitted an error doesn't trigger.
+      foundSingleBlockTakeDueToInitDown = true;
+      continue;
+    }
+
+    BasicBlockWorklist worklist(errorUser->getFunction());
+    for (auto *succBlock : errorUser->getParent()->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succBlock);
+
+    LLVM_DEBUG(llvm::dbgs() << "Performing forward traversal from errorUse "
+                               "looking for the cause of liveness!\n");
+
+    while (auto *block = worklist.pop()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Visiting block: bb" << block->getDebugID() << "\n");
+      auto iter = getBlockToState().find(block);
+      if (iter == getBlockToState().end()) {
+        LLVM_DEBUG(llvm::dbgs() << "    No State! Skipping!\n");
+        for (auto *succBlock : block->getSuccessorBlocks())
+          worklist.pushIfNotVisited(succBlock);
+        continue;
+      }
+
+      auto *blockUser = iter->second.userUp;
+
+      if (blockUser) {
+        LLVM_DEBUG(llvm::dbgs() << "    Found userUp: " << *blockUser);
+        auto info = liveness.isInterestingUser(blockUser);
+        // Make sure that it overlaps with our range...
+        if (info.second->contains(*info.second)) {
+          LLVM_DEBUG(llvm::dbgs() << "    Emitted diagnostic for it!\n");
+          // and if it does... emit our diagnostic and continue to see if we
+          // find errors along other paths.
+          // if (invalidUsesWithDiagnostics.insert(errorUser
+          bool isConsuming =
+              info.first ==
+              FieldSensitiveAddressPrunedLiveness::LifetimeEndingUse;
+          summaries.diagnosticEmitter.emitAddressDiagnostic(
+              summaries.markedAddress, blockUser, errorUser, isConsuming,
+              inoutTermInstUsers.count(blockUser));
+          emittedDiagnostic = true;
+          continue;
+        }
+      }
+
+      // Otherwise, add successors and continue! We didn't overlap with this
+      // use.
+      LLVM_DEBUG(llvm::dbgs() << "    Does not overlap at the type level, no "
+                                 "diagnostic! Visiting successors!\n");
+      for (auto *succBlock : block->getSuccessorBlocks())
+        worklist.pushIfNotVisited(succBlock);
+    }
+  }
+
+  return {emittedDiagnostic, foundSingleBlockTakeDueToInitDown};
+}
+
+bool GlobalDataflow::compute() {
+  // Then revisit our takes, this time checking if we are within the boundary
+  // and if we are, emit an error.
+  LLVM_DEBUG(llvm::dbgs() << "Checking takes for errors!\n");
+  bool emittedDiagnostic = false;
+  bool foundSingleBlockTakeDueToInitDown = false;
+
+  auto pair = testInstVectorLiveness(summaries.takeUpInsts);
+  emittedDiagnostic |= pair.first;
+  foundSingleBlockTakeDueToInitDown |= pair.second;
+
+  pair = testInstVectorLiveness(summaries.takeDownInsts);
+  emittedDiagnostic |= pair.first;
+  foundSingleBlockTakeDueToInitDown |= pair.second;
+
+  // If we emitted an error user, we should always emit at least one
+  // diagnostic. If we didn't there is a bug in the implementation.
+  assert(!hadAnyErrorUsers || emittedDiagnostic ||
+         foundSingleBlockTakeDueToInitDown);
+  return hadAnyErrorUsers;
+}
+
+//===----------------------------------------------------------------------===//
 //                       MARK: Main Pass Implementation
 //===----------------------------------------------------------------------===//
 
@@ -1649,7 +1644,6 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   FieldSensitiveAddressPrunedLiveness liveness(fn, markedAddress,
                                                &discoveredBlocks);
   SmallPtrSet<SILInstruction *, 8> inoutTermUsers;
-
   summaries.initializeLiveness(liveness, inoutTermUsers);
 
   // If we have multiple blocks in the function, now run the global pruned
@@ -1657,11 +1651,10 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   if (std::next(fn->begin()) != fn->end()) {
     // Then compute the takes that are within the cumulative boundary of
     // liveness that we have computed. If we find any, they are the errors ones.
-    LivenessChecker emitter(markedAddress, liveness, inoutTermUsers,
-                            summaries.blockToState, diagnosticEmitter);
+    GlobalDataflow emitter(summaries, liveness, inoutTermUsers);
 
     // If we had any errors, we do not want to modify the SIL... just bail.
-    if (emitter.compute(summaries.takeUpInsts, summaries.takeDownInsts)) {
+    if (emitter.compute()) {
       // TODO: Remove next line.
       valuesWithDiagnostics.insert(markedAddress);
       return true;
