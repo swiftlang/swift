@@ -141,16 +141,11 @@ PackExpansionType *PackExpansionType::expand() {
 }
 
 CanType PackExpansionType::getReducedShape() {
-  if (auto *archetypeType = countType->getAs<PackArchetypeType>()) {
-    auto shape = archetypeType->getReducedShape();
-    return CanType(PackExpansionType::get(shape, shape));
-  } else if (auto *packType = countType->getAs<PackType>()) {
-    auto shape = packType->getReducedShape();
-    return CanType(PackExpansionType::get(shape, shape));
-  }
+  auto reducedShape = countType->getReducedShape();
+  if (reducedShape == getASTContext().TheEmptyTupleType)
+    return reducedShape;
 
-  assert(countType->is<PlaceholderType>());
-  return getASTContext().TheEmptyTupleType;
+  return CanType(PackExpansionType::get(reducedShape, reducedShape));
 }
 
 bool TupleType::containsPackExpansionType() const {
