@@ -1598,6 +1598,9 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// prespecializations.
     HasCanonicalMetadataPrespecializations = 3,
 
+    /// Set if the metadata contains a pointer to a layout string
+    HasLayoutString = 4,
+
     // Type-specific flags:
 
     /// Set if the class is an actor.
@@ -1679,6 +1682,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
+                                hasLayoutString,
+                                setHasLayoutString)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

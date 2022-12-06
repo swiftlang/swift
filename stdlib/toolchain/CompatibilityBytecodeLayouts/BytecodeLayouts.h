@@ -127,14 +127,15 @@ const Metadata *swift_getTypeByMangledNameInContext(
     const void *const *genericArgs);
 
 SWIFT_RUNTIME_EXPORT
-void swift_generic_destroy(void *address, void *metadata,
-                           const uint8_t *typeLayout);
+void swift_generic_destroy(void *address, void *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_generic_assign(void *dest, void *src, void *metadata,
-                          const uint8_t *typeLayout, bool isTake);
+void swift_generic_assignWithCopy(void *dest, void *src, void *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_generic_initialize(void *dest, void *src, void *metadata,
-                              const uint8_t *typeLayout, bool isTake);
+void swift_generic_assignWithTake(void *dest, void *src, void *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_initWithCopy(void *dest, void *src, void *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_initWithTake(void *dest, void *src, void *metadata);
 } // namespace swift
 
 /// A simple version of swift/Basic/ClusteredBitVector that doesn't use

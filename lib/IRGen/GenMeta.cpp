@@ -1520,11 +1520,15 @@ namespace {
     }
 
     Size FieldVectorOffset;
+    bool hasLayoutString;
 
   public:
     StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type,
-                                   RequireMetadata_t requireMetadata)
-        : super(IGM, Type, requireMetadata) {
+                                   RequireMetadata_t requireMetadata,
+                                   bool hasLayoutString)
+      : super(IGM, Type, requireMetadata)
+      , hasLayoutString(hasLayoutString)
+    {
       auto &layout = IGM.getMetadataLayout(getType());
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
     }
@@ -1550,6 +1554,8 @@ namespace {
       TypeContextDescriptorFlags flags;
 
       setCommonFlags(flags);
+      flags.setHasLayoutString(hasLayoutString);
+      
       return flags.getOpaqueValue();
     }
 
@@ -2558,7 +2564,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   eraseExistingTypeContextDescriptor(IGM, type);
 
   if (auto sd = dyn_cast<StructDecl>(type)) {
-    StructContextDescriptorBuilder(IGM, sd, requireMetadata).emit();
+    StructContextDescriptorBuilder(IGM, sd, requireMetadata,
+                                   /*hasLayoutString*/ false).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
     EnumContextDescriptorBuilder(IGM, ed, requireMetadata).emit();
   } else if (auto cd = dyn_cast<ClassDecl>(type)) {
@@ -4756,8 +4763,10 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
+      auto hasLayoutString = !!getLayoutString();
       auto descriptor =
-          StructContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+        StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
+                                       hasLayoutString).emit();
       return descriptor;
     }
 
@@ -4931,8 +4940,8 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata)
-          .emit();
+      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
+                                            /*hasLayoutString*/ false).emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {

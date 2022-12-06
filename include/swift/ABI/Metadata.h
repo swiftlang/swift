@@ -119,7 +119,7 @@ struct MetadataDependency {
 /// Prefix of a metadata header, containing a pointer to the
 /// type layout string.
 struct TargetTypeMetadataLayoutPrefix {
-  const uint8_t *typeLayout;
+  const uint8_t *layoutString;
 };
 
 /// The header before a metadata object which appears on all type
@@ -302,6 +302,10 @@ public:
   /// Is this either type metadata or a class object for any kind of class?
   bool isAnyClass() const {
     return isAnyKindOfClass(getKind());
+  }
+
+  const uint8_t *getLayoutString() const {
+    return asFullMetadata(this)->layoutString;
   }
 
   const ValueWitnessTable *getValueWitnesses() const {

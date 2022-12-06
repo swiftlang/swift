@@ -869,11 +869,12 @@ uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
   return tag;
 }
 
-__attribute__((weak)) extern "C" void
-swift_generic_destroy(void *address, void *metadata,
-                      const uint8_t *typeLayout) {
+__attribute__((weak)) extern "C" void swift_generic_destroy(void *address,
+                                                            void *metadata) {
   uint8_t *addr = (uint8_t *)address;
   Metadata *typedMetadata = (Metadata *)metadata;
+
+  const uint8_t *typeLayout = typedMetadata->getLayoutString();
 
   switch ((LayoutType)typeLayout[0]) {
   case LayoutType::AlignedGroup: {
@@ -926,7 +927,7 @@ swift_generic_destroy(void *address, void *metadata,
         uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
         uint64_t alignMask = shiftValue - 1;
         addr = (uint8_t *)(((uint64_t)addr + alignMask) & (~alignMask));
-        swift_generic_destroy(addr, metadata, fields[fieldIdx].fieldPtr);
+        swift_generic_destroy(addr, metadata);
         addr += computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
       }
     }
@@ -981,7 +982,7 @@ swift_generic_destroy(void *address, void *metadata,
     uint32_t enumTag = getEnumTag(addr, typeLayout, typedMetadata);
     if (enumTag == 0) {
       auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
-      swift::swift_generic_destroy((void *)addr, metadata, e.payloadLayoutPtr);
+      swift::swift_generic_destroy((void *)addr, metadata);
     }
     return;
   }
@@ -992,8 +993,7 @@ swift_generic_destroy(void *address, void *metadata,
     // Enum indices count payload cases first, then non payload cases. Thus a
     // payload index will always be in 0...numPayloadCases-1
     if (index < e.payloadLayoutPtr.size()) {
-      swift::swift_generic_destroy((void *)addr, metadata,
-                                   e.payloadLayoutPtr[index]);
+      swift::swift_generic_destroy((void *)addr, metadata);
     }
     return;
   }
@@ -1022,13 +1022,13 @@ swift_generic_destroy(void *address, void *metadata,
   }
 }
 
-__attribute__((weak)) extern "C" void
-swift_generic_initialize(void *dest, void *src, void *metadata,
-                         const uint8_t *typeLayout, bool isTake) {
+void swift_generic_initialize(void *dest, void *src, void *metadata,
+                              bool isTake) {
   uint8_t *destAddr = (uint8_t *)dest;
   uint8_t *srcAddr = (uint8_t *)src;
   size_t offset = 0;
   Metadata *typedMetadata = (Metadata *)metadata;
+  const uint8_t *typeLayout = typedMetadata->getLayoutString();
 
   switch ((LayoutType)typeLayout[offset]) {
   case LayoutType::AlignedGroup: {
@@ -1106,8 +1106,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
         uint64_t alignMask = shiftValue - 1;
         srcAddr = (uint8_t *)(((uint64_t)srcAddr + alignMask) & (~alignMask));
         destAddr = (uint8_t *)(((uint64_t)destAddr + alignMask) & (~alignMask));
-        swift_generic_initialize(destAddr, srcAddr, metadata,
-                                 fields[fieldIdx].fieldPtr, isTake);
+        swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
         unsigned size = computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
         srcAddr += size;
         destAddr += size;
@@ -1188,8 +1187,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     // We have a payload iff the enum tag is 0
     auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
     if (getEnumTag(src, typeLayout, typedMetadata) == 0) {
-      swift::swift_generic_initialize(destAddr, srcAddr, metadata,
-                                      e.payloadLayoutPtr, isTake);
+      swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
     }
     memcpy(destAddr, srcAddr, e.size);
     return;
@@ -1233,8 +1231,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     // Enum indices count payload cases first, then non payload cases. Thus a
     // payload index will always be in 0...numPayloadCases-1
     if (index < e.payloadLayoutPtr.size()) {
-      swift::swift_generic_initialize(destAddr, srcAddr, metadata,
-                                      e.payloadLayoutPtr[index], isTake);
+      swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
     }
     // The initialize is only going to copy the contained payload. If the enum
     // is actually larger than that because e.g. it has another case that is
@@ -1289,10 +1286,25 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
 }
 
 __attribute__((weak)) extern "C" void
-swift_generic_assign(void *dest, void *src, void *metadata,
-                     const uint8_t *typeLayout, bool isTake) {
-  swift_generic_destroy(dest, metadata, typeLayout);
-  swift_generic_initialize(dest, src, metadata, typeLayout, isTake);
+swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
+  swift_generic_initialize(dest, src, metadata, /*isTake*/ false);
+}
+
+__attribute__((weak)) extern "C" void
+swift_generic_initWithTake(void *dest, void *src, void *metadata) {
+  swift_generic_initialize(dest, src, metadata, /*isTake*/ true);
+}
+
+__attribute__((weak)) extern "C" void
+swift_generic_assignWithCopy(void *dest, void *src, void *metadata) {
+  swift_generic_destroy(dest, metadata);
+  swift_generic_initWithCopy(dest, src, metadata);
+}
+
+__attribute__((weak)) extern "C" void
+swift_generic_assignWithTake(void *dest, void *src, void *metadata) {
+  swift_generic_destroy(dest, metadata);
+  swift_generic_initWithTake(dest, src, metadata);
 }
 
 // Allow this library to get force-loaded by autolinking
