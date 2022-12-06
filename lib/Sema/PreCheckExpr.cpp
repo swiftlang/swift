@@ -2018,6 +2018,15 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(CompRepr);
   }
 
+  // Fold 'T...' into a pack expansion type when 'T' is a TypeExpr.
+  if (auto *operand = isPostfixEllipsisOperator(E)) {
+    if (auto *pattern = dyn_cast<TypeExpr>(operand)) {
+      auto *repr = new (Ctx) PackExpansionTypeRepr(pattern->getTypeRepr(),
+                                                   E->getLoc());
+      return new (Ctx) TypeExpr(repr);
+    }
+  }
+
   return nullptr;
 }
 
