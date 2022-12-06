@@ -3652,15 +3652,18 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     case DeclKind::Class:
     case DeclKind::Struct:
     case DeclKind::Enum: {
-      // protocols are not accepted because they are
-      // generic over `Self`.
-
       auto *NTD = cast<NominalTypeDecl>(D);
 
       // Non-generic types only.
       if (isGenericContext(NTD))
         break;
 
+      return;
+    }
+
+    case DeclKind::Protocol: {
+      // Allow on protocols because they are sources
+      // of inference.
       return;
     }
 
@@ -7280,26 +7283,66 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
   auto &ctx = decl->getASTContext();
 
   llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> attrs;
-  forEachCustomAttribute<RuntimeMetadataAttr>(
-      decl, [&](CustomAttr *attr, NominalTypeDecl *attrType) {
-        if (attrs.count(attrType)) {
-          ctx.Diags
-              .diagnose(attr->getLocation(),
-                        diag::duplicate_runtime_discoverable_attr)
-              .highlight(attr->getRange());
-          attr->setInvalid();
-          return;
-        }
 
-        (void)attrs.insert({attrType, attr});
-      });
+  enum class GatheringMode { Direct, Inference };
 
-  auto result = ctx.AllocateUninitialized<CustomAttr *>(attrs.size());
-  {
-    unsigned index = 0;
-    for (const auto &entry : attrs)
-      result[index++] = entry.second;
+  auto gatherRuntimeAttrsOnDecl =
+      [&](ValueDecl *decl,
+          llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> &attrs,
+          GatheringMode mode) {
+        forEachCustomAttribute<RuntimeMetadataAttr>(
+            decl, [&](CustomAttr *attr, NominalTypeDecl *attrType) {
+              // Ignore duplicate attrs if they are inferred from
+              // protocols.
+              if (attrs.count(attrType) && mode == GatheringMode::Direct) {
+                ctx.Diags
+                    .diagnose(attr->getLocation(),
+                              diag::duplicate_runtime_discoverable_attr)
+                    .highlight(attr->getRange());
+                attr->setInvalid();
+                return;
+              }
+
+              (void)attrs.insert({attrType, attr});
+            });
+      };
+
+  auto copyAttrs =
+      [&](llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> &attrs)
+      -> ArrayRef<CustomAttr *> {
+    auto copy = ctx.AllocateUninitialized<CustomAttr *>(attrs.size());
+    {
+      unsigned index = 0;
+      for (const auto &entry : attrs)
+        copy[index++] = entry.second;
+    }
+    return copy;
+  };
+
+  // First, gather all of the runtime attributes directly on the decl.
+  gatherRuntimeAttrsOnDecl(decl, attrs, GatheringMode::Direct);
+
+  auto *NTD = dyn_cast<NominalTypeDecl>(decl);
+  // Attribute inference is only possible from protocol conformances.
+  if (!NTD || isa<ProtocolDecl>(NTD))
+    return copyAttrs(attrs);
+
+  // Gather any attributes inferred from (explicit) protocol conformances
+  // associated with the declaration of the type.
+  for (unsigned i : indices(NTD->getInherited())) {
+    auto inheritedType = evaluateOrDefault(
+        ctx.evaluator,
+        InheritedTypeRequest{NTD, i, TypeResolutionStage::Interface}, Type());
+
+    if (!(inheritedType && inheritedType->isConstraintType()))
+      continue;
+
+    auto *protocol = inheritedType->getAnyNominal();
+    if (!protocol)
+      continue;
+
+    gatherRuntimeAttrsOnDecl(protocol, attrs, GatheringMode::Inference);
   }
 
-  return result;
+  return copyAttrs(attrs);
 }

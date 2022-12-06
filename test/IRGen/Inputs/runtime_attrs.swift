@@ -7,3 +7,7 @@ public struct Ignore<T> {
 public struct TestAmbiguity {
   public init<Args, Result>(attachedTo: (Args) -> Result) {}
 }
+
+@Ignore
+public protocol Ignored {
+}

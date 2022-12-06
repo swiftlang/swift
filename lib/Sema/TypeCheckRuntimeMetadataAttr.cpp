@@ -56,13 +56,16 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     Evaluator &evaluator, CustomAttr *attr, ValueDecl *attachedTo) const {
   auto &ctx = attachedTo->getASTContext();
 
-  auto *attrTypeDecl = evaluateOrDefault(
+  auto attrType = evaluateOrDefault(
       ctx.evaluator,
-      CustomAttrNominalRequest{attr, attachedTo->getDeclContext()}, nullptr);
+      CustomAttrTypeRequest{attr, attachedTo->getDeclContext(),
+                            CustomAttrTypeKind::RuntimeMetadata},
+      nullptr);
 
-  if (!attrTypeDecl)
+  if (!attrType)
     return nullptr;
 
+  auto *attrTypeDecl = attrType->getAnyNominal();
   assert(attrTypeDecl->getAttrs().hasAttribute<RuntimeMetadataAttr>());
 
   auto *initContext = new (ctx) RuntimeAttributeInitializer(attr, attachedTo);
@@ -151,17 +154,7 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
   if (auto *repr = attr->getTypeRepr())
     reprRange = repr->getSourceRange();
 
-  auto attrTy = attrTypeDecl->getDeclaredInterfaceType();
-  // Drop all of the generic parameters from the type and
-  // let type-checker open them while solving.
-  attrTy = attrTy.transform([&](Type type) -> Type {
-    if (auto *BGT = type->getAs<BoundGenericType>()) {
-      return UnboundGenericType::get(BGT->getDecl(), BGT->getParent(), ctx);
-    }
-    return type;
-  });
-
-  auto typeExpr = TypeExpr::createImplicitHack(reprRange.Start, attrTy, ctx);
+  auto typeExpr = TypeExpr::createImplicitHack(reprRange.Start, attrType, ctx);
 
   // Add the initializer argument at the front of the argument list
   SmallVector<Argument, 4> newArgs;

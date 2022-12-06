@@ -16,6 +16,24 @@ struct OnlyPropsTest<B, V> {
 
 @Flag("global") func gloabalFn() {}
 
+@runtimeMetadata
+struct WithOuterParam<T> {
+  init<U>(attachedTo: U.Type) {}
+  init<U>(attachedTo: U.Type, otherData: T) {}
+}
+
+@WithOuterParam<Int>
+struct ExplicitGenericParamsTest1 {} // Ok
+
+@WithOuterParam<Int>(otherData: 42)
+struct ExplicitGenericParamsTest3 {} // Ok
+
+@WithOuterParam(otherData: "")
+struct ExplicitGenericParamsTest4 {} // Ok
+
+@WithOuterParam<Int>(otherData: "") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+struct ExplicitGenericParamsTest5 {}
+
 @Flag
 struct A { // Ok
   @Flag("v1") var v1: String = "" // Ok
@@ -87,3 +105,13 @@ struct TestNoAmbiguity {
   @Flag func testInst(_: Int, _: String) {} // Ok
   @Flag func testInst(_: Int, _: Int) {} // Ok
 }
+
+@Flag("flag from protocol")
+protocol Flagged {}
+
+struct Inference1 : Flagged {} // Ok
+class Inference2 : Flagged {}  // Ok
+enum Inference3 : Flagged {}   // Ok
+
+@Flag("direct flag")
+struct Inference4 : Flagged {} // Ok (because @Flag inferred from Flagged is ignored)
