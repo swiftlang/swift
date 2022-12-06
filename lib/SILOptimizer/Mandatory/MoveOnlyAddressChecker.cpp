@@ -1266,6 +1266,12 @@ struct BlockSummaries {
   }
 
   void summarize(SILBasicBlock &block);
+
+  /// After we have summarized all of our blocks, initialize the given pruned
+  /// liveness with the information needed from our summaries to perform
+  /// multi-block liveness dataflow.
+  void initializeLiveness(FieldSensitiveAddressPrunedLiveness &liveness,
+                          SmallPtrSetImpl<SILInstruction *> &inoutTermUsers);
 };
 
 } // anonymous namespace
@@ -1430,6 +1436,48 @@ void BlockSummaries::summarize(SILBasicBlock &block) {
     blockToState.try_emplace(&block, BlockState(nullptr, false));
   } else {
     LLVM_DEBUG(llvm::dbgs() << "    No Take Down!\n");
+  }
+}
+
+void BlockSummaries::initializeLiveness(
+    FieldSensitiveAddressPrunedLiveness &liveness,
+    SmallPtrSetImpl<SILInstruction *> &inoutTermUsers) {
+  // At this point, we have handled all of the single block cases and have
+  // simplified the remaining cases to global cases that we compute using
+  // liveness. We begin by using all of our init down blocks as def blocks.
+  for (auto initInstAndValue : initDownInsts)
+    liveness.initializeDefBlock(initInstAndValue.first->getParent(),
+                                initInstAndValue.second);
+
+  // Then add all of the takes that we saw propagated up to the top of our
+  // block. Since we have done this for all of our defs
+  for (auto takeInstAndValue : takeUpInsts)
+    liveness.updateForUse(takeInstAndValue.first, takeInstAndValue.second,
+                          true /*lifetime ending*/);
+  // Do the same for our borrow and liveness insts.
+  for (auto livenessInstAndValue : livenessUpInsts)
+    liveness.updateForUse(livenessInstAndValue.first,
+                          livenessInstAndValue.second,
+                          false /*lifetime ending*/);
+
+  // Finally, if we have an inout argument, add a liveness use of the entire
+  // value on terminators in blocks that are exits from the function. This
+  // ensures that along all paths, if our inout is not reinitialized before we
+  // exit the function, we will get an error. We also stash these users into
+  // inoutTermUser so we can quickly recognize them later and emit a better
+  // error msg.
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(markedAddress->getOperand())) {
+    if (fArg->getArgumentConvention() ==
+        SILArgumentConvention::Indirect_Inout) {
+      SmallVector<SILBasicBlock *, 8> exitBlocks;
+      markedAddress->getFunction()->findExitingBlocks(exitBlocks);
+      for (auto *block : exitBlocks) {
+        inoutTermUsers.insert(block->getTerminator());
+        liveness.updateForUse(block->getTerminator(),
+                              TypeTreeLeafTypeRange(markedAddress),
+                              false /*lifetime ending*/);
+      }
+    }
   }
 }
 
@@ -1607,66 +1655,23 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   // Multi-Block Liveness Dataflow
   //
 
-  SmallVectorImpl<InstLeafTypePair> &initDownInsts = summaries.initDownInsts;
-  SmallVectorImpl<InstLeafTypePair> &takeDownInsts = summaries.takeDownInsts;
-  SmallVectorImpl<InstLeafTypePair> &takeUpInsts = summaries.takeUpInsts;
-  SmallVectorImpl<InstLeafTypePair> &livenessUpInsts =
-      summaries.livenessUpInsts;
-  BlockState::Map &blockToState = summaries.blockToState;
-
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
   FieldSensitiveAddressPrunedLiveness liveness(fn, markedAddress,
                                                &discoveredBlocks);
+  SmallPtrSet<SILInstruction *, 8> inoutTermUsers;
 
-  // At this point, we have handled all of the single block cases and have
-  // simplified the remaining cases to global cases that we compute using
-  // liveness. We begin by using all of our init down blocks as def blocks.
-  for (auto initInstAndValue : initDownInsts)
-    liveness.initializeDefBlock(initInstAndValue.first->getParent(),
-                                initInstAndValue.second);
-
-  // Then add all of the takes that we saw propagated up to the top of our
-  // block. Since we have done this for all of our defs
-  for (auto takeInstAndValue : takeUpInsts)
-    liveness.updateForUse(takeInstAndValue.first, takeInstAndValue.second,
-                          true /*lifetime ending*/);
-  // Do the same for our borrow and liveness insts.
-  for (auto livenessInstAndValue : livenessUpInsts)
-    liveness.updateForUse(livenessInstAndValue.first,
-                          livenessInstAndValue.second,
-                          false /*lifetime ending*/);
-
-  // Finally, if we have an inout argument, add a liveness use of the entire
-  // value on terminators in blocks that are exits from the function. This
-  // ensures that along all paths, if our inout is not reinitialized before we
-  // exit the function, we will get an error. We also stash these users into
-  // inoutTermUser so we can quickly recognize them later and emit a better
-  // error msg.
-  SmallPtrSet<SILInstruction *, 8> inoutTermUser;
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(markedAddress->getOperand())) {
-    if (fArg->getArgumentConvention() ==
-        SILArgumentConvention::Indirect_Inout) {
-      SmallVector<SILBasicBlock *, 8> exitBlocks;
-      markedAddress->getFunction()->findExitingBlocks(exitBlocks);
-      for (auto *block : exitBlocks) {
-        inoutTermUser.insert(block->getTerminator());
-        liveness.updateForUse(block->getTerminator(),
-                              TypeTreeLeafTypeRange(markedAddress),
-                              false /*lifetime ending*/);
-      }
-    }
-  }
+  summaries.initializeLiveness(liveness, inoutTermUsers);
 
   // If we have multiple blocks in the function, now run the global pruned
   // liveness dataflow.
   if (std::next(fn->begin()) != fn->end()) {
     // Then compute the takes that are within the cumulative boundary of
     // liveness that we have computed. If we find any, they are the errors ones.
-    LivenessChecker emitter(markedAddress, liveness, inoutTermUser,
-                            blockToState, diagnosticEmitter);
+    LivenessChecker emitter(markedAddress, liveness, inoutTermUsers,
+                            summaries.blockToState, diagnosticEmitter);
 
     // If we had any errors, we do not want to modify the SIL... just bail.
-    if (emitter.compute(takeUpInsts, takeDownInsts)) {
+    if (emitter.compute(summaries.takeUpInsts, summaries.takeDownInsts)) {
       // TODO: Remove next line.
       valuesWithDiagnostics.insert(markedAddress);
       return true;
