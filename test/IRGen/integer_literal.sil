@@ -354,3 +354,37 @@ entry(%0 : $Builtin.IntLiteral):
   %result = builtin "itofp_with_overflow_IntLiteral_FPIEEE128"(%0 : $Builtin.IntLiteral) : $Builtin.FPIEEE128
   return %result : $Builtin.FPIEEE128
 }
+
+
+
+/***************************************************************************/
+/* bitWidth, isNegative, wordAtIndex                                       */
+/***************************************************************************/
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @test_bitWidth(i32* %0, i32 %1)
+sil @test_bitWidth : $(Builtin.IntLiteral) -> Builtin.Word {
+entry(%value : $Builtin.IntLiteral):
+  // CHECK:      %2 = lshr i32 %1, 8
+  // CHECK-NEXT: ret i32 %2
+  %result = builtin "bitWidth_IntLiteral"(%value : $Builtin.IntLiteral) : $Builtin.Word
+  return %result : $Builtin.Word
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @test_isNegative(i32* %0, i32 %1)
+sil @test_isNegative : $(Builtin.IntLiteral) -> Builtin.Int1 {
+entry(%value : $Builtin.IntLiteral):
+  // CHECK:      %2 = trunc i32 %1 to i1
+  // CHECK-NEXT: ret i1 %2
+  %result = builtin "isNegative_IntLiteral"(%value : $Builtin.IntLiteral) : $Builtin.Int1
+  return %result : $Builtin.Int1
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @test_wordAtIndex(i32* %0, i32 %1, i32 %2)
+sil @test_wordAtIndex : $(Builtin.IntLiteral, Builtin.Word) -> Builtin.Word {
+entry(%value : $Builtin.IntLiteral, %index : $Builtin.Word):
+  // CHECK:      %3 = getelementptr inbounds i32, i32* %0, i32 %2
+  // CHECK-NEXT: %4 = load i32, i32* %3, align 4
+  // CHECK-NEXT: ret i32 %4
+  %result = builtin "wordAtIndex_IntLiteral"(%value : $Builtin.IntLiteral, %index : $Builtin.Word) : $Builtin.Word
+  return %result : $Builtin.Word
+}
