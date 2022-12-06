@@ -1933,9 +1933,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         if (!braceCharRange.contains(Loc))
           return Action::SkipChildren(S);
 
-        // Reset the node found in a parent context.
-        if (!brace->isImplicit())
-          FoundNode = nullptr;
+        // Reset the node found in a parent context if it's not part of this
+        // brace statement.
+        // We must not reset FoundNode if it's inside thei BraceStmt's source
+        // range because the found node could be inside a capture list, which is
+        // syntactically part of the brace stmt's range but won't be walked as
+        // a child of the brace stmt.
+        if (!brace->isImplicit() && FoundNode) {
+          auto foundNodeCharRange = Lexer::getCharSourceRangeFromSourceRange(
+              SM, FoundNode->getSourceRange());
+          if (!braceCharRange.contains(foundNodeCharRange)) {
+            FoundNode = nullptr;
+          }
+        }
 
         for (ASTNode &node : brace->getElements()) {
           if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
@@ -1992,6 +2002,18 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *newDC = dyn_cast<DeclContext>(D))
         DC = newDC;
+
+      if (!SM.isBeforeInBuffer(Loc, D->getStartLoc())) {
+        // NOTE: We need to check the character loc here because the target
+        // loc can be inside the last token of the node. i.e. interpolated
+        // string.
+        SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, D->getEndLoc());
+        if (!(SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)) {
+          if (!isa<TopLevelCodeDecl>(D)) {
+            FoundNode = new ASTNode(D);
+          }
+        }
+      }
       return Action::Continue();
     }
 
@@ -2005,7 +2027,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   }
 
   // Nothing found at the location, or the decl context does not own the 'Loc'.
-  if (finder.isNull())
+  if (finder.isNull() || !finder.getDeclContext())
     return true;
 
   DeclContext *DC = finder.getDeclContext();
