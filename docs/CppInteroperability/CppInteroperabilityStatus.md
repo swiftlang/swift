@@ -77,7 +77,7 @@ This status table describes which of the following C++ language features can be 
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
 | Inline Namespaces                           | Yes, with some known issues ([#58217](https://github.com/apple/swift/issues/58217)) |
-| Exceptions                                  | No  |
+| Exceptions                                  | No. Uncaught exceptions that propagate into Swift frames are UB.  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
 | Virtual Member Functions                    | No |
