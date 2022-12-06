@@ -1227,12 +1227,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         if (argStat.isErrorOrHasCompletion())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
 
-        // The result can be empty in error cases.
-        if (!args.empty()) {
-          Result = makeParserResult(
-              Result, UnresolvedSpecializeExpr::create(
-                          Context, Result.get(), LAngleLoc, args, RAngleLoc));
-        }
+        Result = makeParserResult(
+            Result, UnresolvedSpecializeExpr::create(
+                        Context, Result.get(), LAngleLoc, args, RAngleLoc));
       }
 
       continue;
@@ -2241,8 +2238,7 @@ ParserResult<Expr> Parser::parseExprIdentifier() {
     if (argStatus.isErrorOrHasCompletion())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     
-    // The result can be empty in error cases.
-    hasGenericArgumentList = !args.empty();
+    hasGenericArgumentList = true;
   }
   
   if (name.getBaseName().isEditorPlaceholder()) {

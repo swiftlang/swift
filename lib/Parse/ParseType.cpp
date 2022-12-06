@@ -1365,13 +1365,18 @@ bool Parser::canParseGenericArguments() {
   if (!startsWithLess(Tok))
     return false;
   consumeStartingLess();
-  
+
+  if (startsWithGreater(Tok)) {
+    consumeStartingGreater();
+    return true;
+  }
+
   do {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
-  
+
   if (!startsWithGreater(Tok)) {
     return false;
   } else {
@@ -1454,19 +1459,20 @@ bool Parser::canParseType() {
     break;
   }
 
-  if (!isAtFunctionTypeArrow())
+  if (isAtFunctionTypeArrow()) {
+    // Handle type-function if we have an '->' with optional
+    // 'async' and/or 'throws'.
+    while (isEffectsSpecifier(Tok))
+      consumeToken();
+
+    if (!consumeIf(tok::arrow))
+      return false;
+    
+    if (!canParseType())
+      return false;
+    
     return true;
-
-  // Handle type-function if we have an '->' with optional
-  // 'async' and/or 'throws'.
-  while (isEffectsSpecifier(Tok))
-    consumeToken();
-
-  if (!consumeIf(tok::arrow))
-    return false;
-  
-  if (!canParseType())
-    return false;
+  }
 
   // Parse pack expansion 'T...'.
   if (Tok.isEllipsis()) {
