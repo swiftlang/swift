@@ -153,7 +153,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                              MARK: Utilities
+//                         MARK: Diagnostic Utilities
 //===----------------------------------------------------------------------===//
 
 template <typename... T, typename... U>
@@ -341,6 +341,10 @@ void DiagnosticEmitter::emitAddressDiagnosticNoCopy(
   diagnose(astContext, consumingUse->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_consuming_use_here);
 }
+
+//===----------------------------------------------------------------------===//
+//                           MARK: Memory Utilities
+//===----------------------------------------------------------------------===//
 
 static bool memInstMustInitialize(Operand *memOper) {
   SILValue address = memOper->get();
