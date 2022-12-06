@@ -162,7 +162,9 @@ do {
   
   // CHECK-ABI: library: [5, 43, 3]
   // CHECK-BD: client: [5, 43, 3]
-  print(array.rawValues.print())
+  array.rawValues.print()
+
+  precondition(array.removeLast() == 3)
 }
 
 do {
@@ -194,5 +196,7 @@ do {
   
   // CHECK-ABI: library: [7, 40, 1]
   // CHECK-BD: client: [7, 40, 1]
-  print(array.rawValues.print())
+  array.rawValues.print()
+
+  precondition(array.removeLast() == 1)
 }
