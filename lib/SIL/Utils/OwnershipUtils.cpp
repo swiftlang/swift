@@ -1822,11 +1822,12 @@ bool swift::visitForwardedGuaranteedOperands(
 ///                ^^^^^^^^^^^^^^^^^^^^^^^
 /// one of whose reaching values is a borrow of a reaching value of %value.
 ///
-/// Finding these is more complicated than merely looking for guaranteed
-/// operands adjacent to the incoming operands to phi and which are borrows of
-/// the value consumed there.  The reason is that they might not be borrows of
-/// that incoming value _directly_ but rather reborrows of some other reborrow
-/// if the incoming value is itself a phi argument:
+/// In both cases, finding an adjacent phi may be more complicated than merely
+/// looking for guaranteed operands adjacent to the incoming operands to phi
+/// and which are borrows of the value whose lifetime ends there. The reason is
+/// that they might not be borrows of that incoming value _directly_ but rather
+/// reborrows of some other reborrow:
+///
 ///         %lifetime = begin_borrow %value
 ///         br one(%value, %lifetime)
 ///     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
@@ -1835,9 +1836,30 @@ bool swift::visitForwardedGuaranteedOperands(
 ///         end_borrow %lifetime_2
 ///         destroy_value %value_2
 ///
-/// When called with %value_2, \p visitor is invoked with both:
+/// When called with %value_2, \p visitor is invoked with:
 ///     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
 ///                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+///
+/// FIXME: this does not correctly handle dominated phis:
+///
+///         %value = ...
+///         %borrow = begin_borrow %value
+///         br one(%borrow)
+///     one(%reborrow_1 : @guaranteed)
+///         br two(%value, %reborrow_1)
+///     two(%phi_2 : @owned, %reborrow_2 : @guaranteed)
+///         br three(%value, %reborrow_1)
+///
+/// Instead, just call findEnclosingDefs for each guaranteed phi in the same
+/// block and visit any that match.
+///
+/// FIXME: this does not correctly handle guaranteed phis
+///
+///         %borrow = begin_borrow %value
+///         %field = struct_extract %borrow
+///         br one(%borrow, %field)
+///     one(%reborrow : @guaranteed, %forwardingphi : @guaranteed)
+///
 bool swift::visitAdjacentReborrowsOfPhi(
     SILPhiArgument *phi, function_ref<bool(SILPhiArgument *)> visitor) {
   assert(phi->isPhi());
@@ -1993,6 +2015,364 @@ bool swift::visitAdjacentReborrowsOfPhi(
   } while (changed);
 
   return true;
+}
+
+namespace {
+
+// Find the definitions of the scopes that enclose guaranteed values, handling
+// all combinations of aggregation, guaranteed forwarding phis, and reborrows.
+class FindEnclosingDefs {
+  // A separately allocated set-vector is used for each level of recursion
+  // across block boudndaries (NodeSet cannot be used recursively).
+  using LocalValueSetVector = SmallPtrSetVector<SILValue, 8>;
+
+  SILFunction *function;
+  ValueSet visitedPhis;
+
+public:
+  FindEnclosingDefs(SILFunction *function) : function(function),
+                                             visitedPhis(function) {}
+
+  // Visit each definition of a scope that immediately encloses a guaranteed
+  // value. The guaranteed value effectively keeps these scopes alive.
+  //
+  // This means something different depending on whether \p value is itself a
+  // borrow introducer vs. a forwarded guaranteed value. If \p value is an
+  // introducer, then this disovers the enclosing borrow scope and visits all
+  // introducers of that scope. If \p value is a forwarded value, then this
+  // visits the introducers of the current borrow scope.
+  bool visitEnclosingDefs(SILValue value,
+                          function_ref<bool(SILValue)> visitor) && {
+    if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
+      return true;
+
+    if (auto borrowedValue = BorrowedValue(value)) {
+      switch (borrowedValue.kind) {
+      case BorrowedValueKind::Invalid:
+        llvm_unreachable("checked above");
+
+      case BorrowedValueKind::Phi: {
+        StackList<SILValue> enclosingDefs(function);
+        recursivelyFindDefsOfReborrow(SILArgument::asPhi(value), enclosingDefs);
+        for (SILValue def : enclosingDefs) {
+          if (!visitor(def))
+            return false;
+        }
+        return true;
+      }
+      case BorrowedValueKind::BeginBorrow:
+        return std::move(*this).visitBorrowIntroducers(
+            cast<BeginBorrowInst>(value)->getOperand(), visitor);
+
+      case BorrowedValueKind::LoadBorrow:
+      case BorrowedValueKind::SILFunctionArgument:
+        // There is no enclosing def on this path.
+        return true;
+      }
+    }
+    // Handle forwarded guaranteed values.
+    return std::move(*this).visitBorrowIntroducers(value, visitor);
+  }
+
+  // Visit the values that introduce the borrow scopes that includes \p
+  // value. If value is owned, or introduces a borrow scope, then this only
+  // visits \p value.
+  bool visitBorrowIntroducers(SILValue value,
+                              function_ref<bool(SILValue)> visitor) && {
+    StackList<SILValue> introducers(function);
+    LocalValueSetVector visitedValues;
+    recursivelyFindBorrowIntroducers(value, introducers, visitedValues);
+    for (SILValue introducer : introducers) {
+      if (!visitor(introducer))
+        return false;
+    }
+    return true;
+  }
+
+protected:
+  // This is the identity function (i.e. just adds \p value to \p introducers)
+  // when:
+  // - \p value is owned
+  // - \p value introduces a borrow scope (begin_borrow, load_borrow, reborrow)
+  //
+  // Otherwise recurse up the use-def chain to find all introducers.
+  //
+  // Returns false if \p forwardingPhi was already encountered, either because
+  // of a phi cycle or because of reconvergent control flow. Similarly, return
+  // false if all incoming values were encountered.
+  bool recursivelyFindBorrowIntroducers(SILValue value,
+                                        StackList<SILValue> &introducers,
+                                        LocalValueSetVector &visitedValues) {
+    // Check if this value's introducers have already been added to
+    // 'introducers' to avoid duplicates and avoid exponential recursion on
+    // aggregates.
+    if (!visitedValues.insert(value))
+      return false;
+
+    switch (value->getOwnershipKind()) {
+    case OwnershipKind::Any:
+    case OwnershipKind::None:
+    case OwnershipKind::Unowned:
+      return false;
+
+    case OwnershipKind::Owned:
+      introducers.push_back(value);
+      return true;
+
+    case OwnershipKind::Guaranteed:
+      break;
+    }
+    // BorrowedValue handles the initial scope introducers: begin_borrow,
+    // load_borrow, & reborrow.
+    if (BorrowedValue(value)) {
+      introducers.push_back(value);
+      return true;
+    }
+    bool foundNewIntroducer = false;
+    // Handle forwarding phis.
+    if (auto *phi = SILArgument::asPhi(value)) {
+      foundNewIntroducer = recursivelyFindForwardingPhiIntroducers(
+          phi, introducers, visitedValues);
+    } else {
+      // Recurse through guaranteed forwarding instructions.
+      visitForwardedGuaranteedOperands(value, [&](Operand *operand) {
+        SILValue forwardedVal = operand->get();
+        if (forwardedVal->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          foundNewIntroducer |=
+            recursivelyFindBorrowIntroducers(forwardedVal, introducers,
+                                             visitedValues);
+        }
+      });
+    }
+    return foundNewIntroducer;
+  }
+
+  // Given the enclosing definition on a predecessor path, identify the
+  // enclosing definitions on the successor block. Each enclosing predecessor
+  // def is either used by an outer-adjacent phi in the successor block, or it
+  // must dominate the successor block.
+  static SILValue findSuccessorDefFromPredDef(SILBasicBlock *predecessor,
+                                              SILValue enclosingPredDef) {
+
+    SILBasicBlock *successor = predecessor->getSingleSuccessorBlock();
+    assert(successor && "phi predecessor must have a single successor in OSSA");
+
+    for (auto *candidatePhi : successor->getArguments()) {
+      SILValue candidateValue =
+        candidatePhi->getIncomingPhiValue(predecessor);
+
+      // Find the outer adjacent phi in the successor block.
+      // the 'enclosingDef' from the 'pred' block.
+      if (candidateValue == enclosingPredDef)
+        return candidatePhi;
+    }
+    // No candidates phi are outer-adjacent phis. The incoming enclosingDef
+    // must dominate the current guaranteed phi. So it remains the enclosing
+    // scope.
+    return enclosingPredDef;
+  }
+
+  // Given the enclosing definitions on a predecessor path, identify the
+  // enclosing definitions on the successor block.
+  void findSuccessorDefsFromPredDefs(
+      SILBasicBlock *predecessor, const StackList<SILValue> &predDefs,
+      StackList<SILValue> &successorDefs,
+      LocalValueSetVector &visitedSuccessorValues) {
+
+    // Gather the new introducers for the successor block.
+    for (SILValue predDef : predDefs) {
+      SILValue succDef = findSuccessorDefFromPredDef(predecessor, predDef);
+      if (visitedSuccessorValues.insert(succDef))
+        successorDefs.push_back(succDef);
+    }
+  }
+
+  // Find the introducers of a forwarding phi's borrow scope. The introducers
+  // are either dominating values, or reborrows in the same block as the
+  // forwarding phi.
+  //
+  // Recurse along the use-def phi web until a begin_borrow is reached. At each
+  // level, find the outer-adjacent phi, if one exists, otherwise return the
+  // dominating definition.
+  //
+  // Returns false if \p forwardingPhi was already encountered, either because
+  // of a phi cycle or because of reconvergent control flow. Similarly, returns
+  // false if all incoming values were encountered.
+  //
+  //     one(%reborrow_1 : @guaranteed)
+  //         %field = struct_extract %reborrow_1
+  //         br two(%reborrow_1, %field)
+  //     two(%reborrow_2 : @guaranteed, %forward_2 : @guaranteed)
+  //         end_borrow %reborrow_2
+  //
+  // Calling recursivelyFindForwardingPhiIntroducers(%forward_2)
+  // recursively computes these introducers:
+  //
+  //    %field is the only value incoming to %forward_2.
+  //
+  //    %field is introduced by %reborrow_1 via
+  //    recursivelyFindBorrowIntroducers(%field).
+  //
+  //    %reborrow_1 is introduced by %reborrow_2 in block "two" via
+  //    findSuccessorDefsFromPredDefs(%reborrow_1)).
+  //
+  //    %reborrow_2 is returned.
+  //
+  bool
+  recursivelyFindForwardingPhiIntroducers(SILPhiArgument *forwardingPhi,
+                                          StackList<SILValue> &introducers,
+                                          LocalValueSetVector &visitedValues) {
+    // Phi cycles are skipped. They cannot contribute any new enclosing defs.
+    if (!visitedPhis.insert(forwardingPhi))
+      return false;
+
+    bool foundIntroducer = false;
+    SILBasicBlock *block = forwardingPhi->getParent();
+    for (auto *pred : block->getPredecessorBlocks()) {
+      SILValue incomingValue = forwardingPhi->getIncomingPhiValue(pred);
+
+      // Each phi operand requires a new introducer list and visited values
+      // set. These values will be remapped to successor phis before adding them
+      // to the caller's introducer list. It may be necessary to revisit a value
+      // that was already visited by the caller before remapping to phis.
+      StackList<SILValue> incomingIntroducers(function);
+      LocalValueSetVector incomingVisitedValues;
+      if (!recursivelyFindBorrowIntroducers(incomingValue, incomingIntroducers,
+                                            incomingVisitedValues))
+        continue;
+
+      foundIntroducer = true;
+      findSuccessorDefsFromPredDefs(pred, incomingIntroducers, introducers,
+                                    visitedValues);
+    }
+    return foundIntroducer;
+  }
+
+  // Given a reborrow operand's incoming value, find the enclosing definition.
+  void recursivelyFindDefsOfReborrowOperand(
+    SILValue incomingValue,
+    StackList<SILValue> &enclosingDefs) {
+
+    if (incomingValue->getOwnershipKind() == OwnershipKind::None)
+      return;
+
+    assert(incomingValue->getOwnershipKind() == OwnershipKind::Guaranteed);
+
+    // Avoid repeatedly constructing BorrowedValue during use-def
+    // traversal. That would be quadratic if it checks all uses for reborrows.
+    if (auto *predPhi = dyn_cast<SILPhiArgument>(incomingValue)) {
+      recursivelyFindDefsOfReborrow(predPhi, enclosingDefs);
+      return;
+    }
+
+    // Handle non-phi borrow introducers.
+    BorrowedValue borrowedValue(incomingValue);
+
+    switch (borrowedValue.kind) {
+    case BorrowedValueKind::Phi:
+      llvm_unreachable("phis are short-curcuited above");
+    case BorrowedValueKind::Invalid:
+      llvm_unreachable("A reborrow immediate operand must be a BorrowedValue.");
+    case BorrowedValueKind::BeginBorrow: {
+      LocalValueSetVector visitedValues;
+      recursivelyFindBorrowIntroducers(
+        cast<BeginBorrowInst>(incomingValue)->getOperand(), enclosingDefs,
+        visitedValues);
+      break;
+    }
+    case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::SILFunctionArgument:
+      // There is no enclosing def on this path.
+      break;
+    }
+  }
+
+  // Given a reborrow, find the definitions of the enclosing borrow scopes. Each
+  // enclosing borrow scope is represented by one of the following cases, which
+  // refer to the example below:
+  //
+  // dominating owned value -> %value encloses %reborrow_1
+  // owned outer-adjacent phi -> %phi_3 encloses %reborrow_3
+  // dominating outer borrow introducer -> %outerBorrowB encloses %reborrow
+  // outer-adjacent reborrow -> %outerReborrow encloses %reborrow
+  //
+  // Recurse along the use-def phi web until a begin_borrow is reached. Then
+  // find all introducers of the begin_borrow's operand. At each level, find
+  // the outer adjacent phi, if one exists, otherwise return the most recently
+  // found dominating definition.
+  //
+  // If \p reborrow was already encountered because of a phi cycle, then no
+  // enclosingDefs are added.
+  //
+  // Example:
+  //
+  //         %value = ...
+  //         %borrow = begin_borrow %value
+  //         br one(%borrow)
+  //     one(%reborrow_1 : @guaranteed)
+  //         br two(%value, %reborrow_1)
+  //     two(%phi_2 : @owned, %reborrow_2 : @guaranteed)
+  //         br three(%value, %reborrow_1)
+  //     three(%phi_3 : @owned, %reborrow_3 : @guaranteed)
+  //         end_borrow %reborrow_3
+  //         destroy_value %phi_3
+  //
+  // recursivelyFindDefsOfReborrow(%reborrow_3) returns %phi_3 by
+  // computing enclosing defs (inner -> outer) in this order:
+  //
+  //     %reborrow_1 -> %value
+  //     %reborrow_2 -> %phi_2
+  //     %reborrow_3 -> %phi_3
+  //
+  // Example:
+  //
+  //         %outerBorrowA = begin_borrow
+  //         %outerBorrowB = begin_borrow
+  //         %struct = struct (%outerBorrowA, outerBorrowB)
+  //         %borrow = begin_borrow %struct
+  //         br one(%outerBorrowA, %borrow)
+  //     one(%outerReborrow : @guaranteed, %reborrow : @guaranteed)
+  //
+  // recursivelyFindDefsOfReborrow(%reborrow) returns
+  // (%outerReborrow, %outerBorrowB).
+  //
+  void recursivelyFindDefsOfReborrow(SILPhiArgument *reborrow,
+                                     StackList<SILValue> &enclosingDefs) {
+    assert(enclosingDefs.empty());
+    LocalValueSetVector visitedDefs;
+
+    // phi cycles can be skipped. They cannot contribute any new enclosing defs.
+    if (!visitedPhis.insert(reborrow))
+      return;
+
+    SILBasicBlock *block = reborrow->getParent();
+    for (auto *pred : block->getPredecessorBlocks()) {
+      SILValue incomingValue = reborrow->getIncomingPhiValue(pred);
+
+      // Each phi operand requires a new enclosing def list. These values will
+      // be remapped to successor phis before adding them to the caller's
+      // enclosing def list. It may be necessary to revisit a value that was
+      // already visited by the caller before remapping to phis.
+      StackList<SILValue> enclosingPredDefs(function);
+      recursivelyFindDefsOfReborrowOperand(incomingValue, enclosingPredDefs);
+      findSuccessorDefsFromPredDefs(pred, enclosingPredDefs, enclosingDefs,
+                                    visitedDefs);
+    }
+  }
+};
+
+} // end namespace
+
+bool swift::visitEnclosingDefs(SILValue value,
+                               function_ref<bool(SILValue)> visitor) {
+  return FindEnclosingDefs(value->getFunction())
+    .visitEnclosingDefs(value, visitor);
+}
+
+bool swift::visitBorrowIntroducers(SILValue value,
+                                   function_ref<bool(SILValue)> visitor) {
+  return FindEnclosingDefs(value->getFunction())
+    .visitBorrowIntroducers(value, visitor);
 }
 
 void swift::visitTransitiveEndBorrows(

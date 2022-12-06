@@ -8500,9 +8500,14 @@ public:
   /// example, a switch forwards ownership of the enum type into ownership of
   /// the payload.
   ///
-  /// Postcondition: each successor has zero or one block arguments which
-  /// represents the forwaded result.
+  /// Postcondition: if the result is non-null, then each successor has zero or
+  /// one block arguments which represents the forwaded result.
   const Operand *forwardedOperand() const;
+
+  Operand *forwardedOperand() {
+    return const_cast<Operand *>(
+      static_cast<const TermInst *>(this)->forwardedOperand());
+  }
 };
 
 // Forwards the first operand to a result in each successor block.

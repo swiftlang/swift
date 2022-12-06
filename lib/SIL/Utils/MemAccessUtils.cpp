@@ -862,7 +862,7 @@ SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
   return ref;
 }
 
-void swift::findGuaranteedReferenceRoots(SILValue value,
+void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
                                          bool lookThroughNestedBorrows,
                                          SmallVectorImpl<SILValue> &roots) {
   ValueWorklist worklist(referenceValue->getFunction());
