@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sourcekitd/Internal.h"
+#include "sourcekitd/Service.h"
 
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
