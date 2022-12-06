@@ -25,7 +25,7 @@ struct A { // Ok
     @Flag set {} // expected-error {{@Flag can only be applied to non-generic types, methods, instance properties, and global functions}}
   }
 
-  @Flag static var v2: String = "" // Ok
+  @Flag static var v2: String = ""
   // expected-error@-1 {{@Flag can only be applied to non-generic types, methods, instance properties, and global functions}}
 
   @Flag static func test1() -> Int { 42 } // Ok
@@ -60,3 +60,30 @@ do {
 }
 
 @Flag @Flag func test() {} // expected-error {{duplicate runtime discoverable attribute}}
+
+extension A.Inner {
+  @Flag("B type") struct B { // Ok
+    @Flag static func extInnerStaticTest() {} // Ok
+    @Flag static func extInnerTest() {} // Ok
+
+    @Flag let stored: Int = 42 // Ok
+  }
+
+  @Flag static func extStaticTest() {} // Ok
+  @Flag static func extTest() {} // Ok
+
+  @OnlyPropsTest @Flag("computed in extension") var extComputed: Int { // Ok
+    get { 42 }
+  }
+}
+
+@Flag func test(_: Int) {} // Ok
+@Flag func test(_: String) {} // Ok
+
+struct TestNoAmbiguity {
+  @Flag static func testStatic() -> Int {} // Ok
+  @Flag static func testStatic() {} // Ok
+
+  @Flag func testInst(_: Int, _: String) {} // Ok
+  @Flag func testInst(_: Int, _: Int) {} // Ok
+}
