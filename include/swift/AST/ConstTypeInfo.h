@@ -13,9 +13,10 @@
 #ifndef SWIFT_AST_CONST_TYPE_INFO_H
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
+#include "swift/AST/Type.h"
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace swift {
 class NominalTypeDecl;
@@ -55,13 +56,9 @@ private:
 };
 
 struct FunctionParameter {
-public:
-  std::string getLabel() { return Label; }
-  swift::Type *getType() { return Type; }
-
-private:
   std::string Label;
-  swift::Type *Type;
+  swift::Type Type;
+  std::shared_ptr<CompileTimeValue> Value;
 };
 
 /// A representation of a call to a type's initializer
@@ -77,6 +74,7 @@ public:
   }
 
   std::string getName() const { return Name; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
 
 private:
   std::string Name;
