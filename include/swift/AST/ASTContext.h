@@ -132,7 +132,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class CompilerPlugin;
 
   enum class KnownProtocolKind : uint8_t;
 
