@@ -172,6 +172,10 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
       return {Unsupported, UnrepresentableAsync};
+    // Don't expose @_alwaysEmitIntoClient functions as they require their
+    // bodies to be emitted into client.
+    if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return {Unsupported, UnrepresentableRequiresClientEmission};
   }
   return {Representable, llvm::None};
 }
