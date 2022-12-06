@@ -33,7 +33,6 @@ add_swift_host_library(swiftAST STATIC
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
-  CompilerPlugin.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
