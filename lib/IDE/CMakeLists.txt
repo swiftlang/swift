@@ -29,6 +29,7 @@ add_swift_host_library(swiftIDE STATIC
   ModuleInterfacePrinting.cpp
   PostfixCompletion.cpp
   REPLCodeCompletion.cpp
+  SelectedOverloadInfo.cpp
   SourceEntityWalker.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
