@@ -496,16 +496,6 @@ struct UseState {
 
 namespace {
 
-struct PerBlockLivenessState {
-  using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
-  SmallVector<InstLeafTypePair, 32> initDownInsts;
-  SmallVector<InstLeafTypePair, 32> takeUpInsts;
-  SmallVector<InstLeafTypePair, 32> livenessUpInsts;
-  llvm::DenseMap<SILBasicBlock *,
-                 std::pair<SILInstruction *, TypeTreeLeafTypeRange>>
-      blockToState;
-};
-
 struct BlockState {
   using Map = llvm::DenseMap<SILBasicBlock *, BlockState>;
 
