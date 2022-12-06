@@ -92,7 +92,7 @@ public:
   /// was emitted.
   bool diagnoseMissingAvailability(DeclAttribute *attr, PlatformKind platform) {
     auto IntroVer = D->getIntroducedOSVersion(platform);
-    if (IntroVer.hasValue())
+    if (IntroVer.has_value())
       return false;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -336,6 +336,8 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
+
+  void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
 };
 
 } // end anonymous namespace
@@ -825,7 +827,7 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 
   bool isArray = false;
   if (auto isError = isAcceptableOutletType(type, isArray, Ctx))
-    diagnoseAndRemoveAttr(attr, isError.getValue(),
+    diagnoseAndRemoveAttr(attr, isError.value(),
                                  /*array=*/isArray, type);
 
   // Skip remaining diagnostics if the property has an
@@ -1145,6 +1147,17 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD->getName());
+        }
+      }
+    }
+
+    // Forbid enum elements marked SPI in frozen types.
+    if (auto elt = dyn_cast<EnumElementDecl>(VD)) {
+      if (auto ED = dyn_cast<EnumDecl>(D->getDeclContext())) {
+        if (ED->getAttrs().hasAttribute<FrozenAttr>(/*allowInvalid*/ true) &&
+            !ED->isSPI()) {
+          diagnoseAndRemoveAttr(attr, diag::spi_attribute_on_frozen_enum_case,
+                                VD->getDescriptiveKind(), VD->getName());
         }
       }
     }
@@ -1790,7 +1803,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
 
   while (attr->IsSPI) {
-    if (attr->hasPlatform() && attr->Introduced.hasValue())
+    if (attr->hasPlatform() && attr->Introduced.has_value())
       break;
     diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
     break;
@@ -1846,7 +1859,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 
   if (!attr->hasPlatform() || !attr->isActivePlatform(Ctx) ||
-      !attr->Introduced.hasValue()) {
+      !attr->Introduced.has_value()) {
     return;
   }
 
@@ -1879,14 +1892,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     EnclosingAnnotatedRange =
         AvailabilityInference::annotatedAvailableRange(EnclosingDecl, Ctx);
 
-    if (EnclosingAnnotatedRange.hasValue())
+    if (EnclosingAnnotatedRange.has_value())
       break;
 
     EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
   }
 
   AvailabilityContext AttrRange{
-      VersionRange::allGTE(attr->Introduced.getValue())};
+      VersionRange::allGTE(attr->Introduced.value())};
 
   if (EnclosingDecl) {
     if (EnclosingDeclIsUnavailable) {
@@ -1895,7 +1908,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
                D->getDescriptiveKind());
       diagnose(EnclosingDecl->getLoc(),
                diag::availability_decl_more_than_unavailable_enclosing_here);
-    } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+    } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.value())) {
       diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
                diag::availability_decl_more_than_enclosing,
                D->getDescriptiveKind());
@@ -1914,14 +1927,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   Optional<Diag<>> MaybeNotAllowed =
       TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
-  if (MaybeNotAllowed.hasValue()) {
+  if (MaybeNotAllowed.has_value()) {
     AvailabilityContext DeploymentRange
         = AvailabilityContext::forDeploymentTarget(Ctx);
-    if (EnclosingAnnotatedRange.hasValue())
+    if (EnclosingAnnotatedRange.has_value())
       DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
 
     if (!DeploymentRange.isContainedIn(AttrRange))
-      diagnose(attrLoc, MaybeNotAllowed.getValue());
+      diagnose(attrLoc, MaybeNotAllowed.value());
   }
 }
 
@@ -3597,7 +3610,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   }
 
   if (nominal->getAttrs().hasAttribute<TypeWrapperAttr>()) {
-    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D))) {
+    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D) || isa<ProtocolDecl>(D))) {
       diagnose(attr->getLocation(),
                diag::type_wrapper_attribute_not_allowed_here,
                nominal->getName());
@@ -4366,7 +4379,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
 
     auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.getValue() > Attr->MovedVersion) {
+    if (IntroVer.value() > Attr->MovedVersion) {
       diagnose(AtLoc,
                diag::originally_definedin_must_not_before_available_version);
       return;
@@ -4389,19 +4402,14 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
   if (Attrs.empty())
     return;
 
-  // Diagnose conflicting attributes. @_alwaysEmitIntoClient, @inlinable, and
-  // @_transparent all conflict with back deployment because they each cause the
-  // body of a function to be copied into the client under certain conditions
-  // and would defeat the goal of back deployment, which is to always use the
-  // ABI version of the declaration when it is available.
+  // Diagnose conflicting attributes. @_alwaysEmitIntoClient and @_transparent
+  // conflict with back deployment because they each cause the body of a
+  // function to always be copied into the client and would defeat the goal of
+  // back deployment, which is to use the ABI version of the declaration when it
+  // is available.
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
     diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deploy,
                           AEICA, D->getDescriptiveKind());
-  }
-
-  if (auto *IA = D->getAttrs().getAttribute<InlinableAttr>()) {
-    diagnoseAndRemoveAttr(IA, diag::attr_incompatible_with_back_deploy, IA,
-                          D->getDescriptiveKind());
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
@@ -4467,7 +4475,7 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
     // If it's not, the attribute doesn't make sense since the back deployment
     // fallback could never be executed at runtime.
     auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (Attr->Version <= IntroVer.getValue()) {
+    if (Attr->Version <= IntroVer.value()) {
       diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before, Attr,
                VD->getName(), prettyPlatformString(Platform), Attr->Version);
       continue;
@@ -5052,7 +5060,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     if (auto *asd = dyn_cast<AbstractStorageDecl>(decl)) {
       // If accessor kind is specified, use corresponding accessor from the
       // candidate. Otherwise, use the getter by default.
-      auto accessorKind = maybeAccessorKind.getValueOr(AccessorKind::Get);
+      auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
       candidate = asd->getOpaqueAccessor(accessorKind);
       // Error if candidate is missing the requested accessor.
       if (!candidate) {
@@ -5063,7 +5071,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     }
     // Error if the candidate is not an `AbstractStorageDecl` but an accessor is
     // requested.
-    else if (maybeAccessorKind.hasValue()) {
+    else if (maybeAccessorKind.has_value()) {
       invalidCandidates.push_back(
           {decl, LookupErrorKind::CandidateMissingAccessor});
       continue;
@@ -5076,7 +5084,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     }
     // Error if candidate is not valid.
     auto invalidCandidateKind = isValidCandidate(candidate);
-    if (invalidCandidateKind.hasValue()) {
+    if (invalidCandidateKind.has_value()) {
       invalidCandidates.push_back({candidate, *invalidCandidateKind});
       continue;
     }
@@ -5129,7 +5137,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
                        declKind);
         break;
       case AbstractFunctionDeclLookupErrorKind::CandidateMissingAccessor: {
-        auto accessorKind = maybeAccessorKind.getValueOr(AccessorKind::Get);
+        auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
         auto accessorDeclKind = getAccessorDescriptiveDeclKind(accessorKind);
         diags.diagnose(invalidCandidate,
                        diag::autodiff_attr_original_decl_missing_accessor,
@@ -5881,7 +5889,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
 
   // Diagnose unsupported original accessor kinds.
   // Currently, only getters and setters are supported.
-  if (originalName.AccessorKind.hasValue()) {
+  if (originalName.AccessorKind.has_value()) {
     if (*originalName.AccessorKind != AccessorKind::Get &&
         *originalName.AccessorKind != AccessorKind::Set) {
       attr->setInvalid();
@@ -6930,6 +6938,15 @@ void AttributeChecker::visitCompilerInitializedAttr(
   // focus just on the initialization in the init.
   if (!(var->getDeclContext()->getSelfClassDecl() && var->isInstanceMember())) {
     diagnose(attr->getLocation(), diag::instancemember_compilerinitialized);
+    return;
+  }
+}
+
+void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs)) {
+    diagnose(attr->getLocation(),
+             diag::runtime_discoverable_attrs_are_experimental);
+    attr->setInvalid();
     return;
   }
 }

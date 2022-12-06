@@ -1619,7 +1619,7 @@ namespace {
 
         // First, we need to find index of the current field in `_storage.
         auto fieldIdx = getTupleFieldIndex(localVar, field->getName());
-        assert(fieldIdx.hasValue());
+        assert(fieldIdx.has_value());
 
         // Load `_storage.<name>`
         auto localVarRef =
@@ -1689,7 +1689,7 @@ namespace {
           // First, we need to find index of the backing storage field in
           // `_storage`.
           auto fieldIdx = getTupleFieldIndex(localVar, backingVar->getName());
-          assert(fieldIdx.hasValue());
+          assert(fieldIdx.has_value());
 
           // Load `_storage.<name>`
           auto localVarRef =
@@ -1871,7 +1871,7 @@ namespace {
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "MaterializeToTemporaryComponent";
+      OS.indent(indent) << "MaterializeToTemporaryComponent\n";
     }
 
   private:
@@ -1904,6 +1904,10 @@ namespace {
                                       getSubstFormalType(),
                                       /*actorIsolation=*/None);
         }
+      }
+      
+      if (lv.getTypeOfRValue() != getTypeOfRValue()) {
+        lv.addOrigToSubstComponent(getTypeOfRValue());
       }
 
       return lv;
@@ -3500,6 +3504,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                                BaseFormalType, typeData, varStorageType,
                                ArgListForDiagnostics, std::move(Indices),
                                IsOnSelfParameter);
+    
   }
 
   void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,

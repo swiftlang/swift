@@ -897,7 +897,7 @@ public:
                          SILDebugVariable VarInfo,
                          llvm::Optional<Alignment> _Align, bool Init,
                          bool WasMoved) {
-    auto Align = _Align.getValueOr(IGM.getPointerAlignment());
+    auto Align = _Align.value_or(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
 
@@ -914,6 +914,10 @@ public:
       if (nonPtrAllocaType != Storage->getType())
         Address = Builder.CreateElementBitCast(Address, Storage->getType());
     }
+
+    // This might happen because of non-loadable types.
+    if (Storage->stripPointerCasts()->getType() == Alloca.getElementType())
+      Storage = Storage->stripPointerCasts();
 
     assert(canAllocaStoreValue(Address, Storage, VarInfo, Scope) &&
            "bad scope?");
@@ -1390,6 +1394,8 @@ public:
   void visitTestSpecificationInst(TestSpecificationInst *i) {
     llvm_unreachable("test-only instruction in Lowered SIL?!");
   }
+
+  void visitHasSymbolInst(HasSymbolInst *i);
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -2609,6 +2615,15 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
 
   setLoweredFunctionPointer(
       i, FunctionPointer::createUnsigned(fnType, diffWitness, signature, true));
+}
+
+void IRGenSILFunction::visitHasSymbolInst(HasSymbolInst *i) {
+  auto fn = IGM.emitHasSymbolFunction(i->getDecl());
+  llvm::CallInst *call = Builder.CreateCall(fn->getFunctionType(), fn, {});
+
+  Explosion e;
+  e.add(call);
+  setLoweredValue(i, e);
 }
 
 FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
@@ -5433,7 +5448,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       shadowTy = IGM.Int8Ty;
     }
     assert(!IGM.getLLVMContext().supportsTypedPointers() ||
-           shadowTy == shadow->getType()->getPointerElementType());
+           shadowTy == shadow->getType()->getNonOpaquePointerElementType());
     addr = builder.CreateLoad(shadowTy, shadow);
   }
 

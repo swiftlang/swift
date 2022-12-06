@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/USRGeneration.h"
-#include "swift/Syntax/TokenKinds.h"
+#include "swift/Parse/Token.h"
 #include "DeclarationFragmentPrinter.h"
 #include "SymbolGraphASTWalker.h"
 

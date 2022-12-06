@@ -506,7 +506,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,
                                                                 /*TimeCompareFilePath=*/filename, error);
-  if (!isUptodateOpt.hasValue()) {
+  if (!isUptodateOpt.has_value()) {
     diags.diagnose(SourceLoc(), diag::error_index_failed_status_check, error);
     return true;
   }

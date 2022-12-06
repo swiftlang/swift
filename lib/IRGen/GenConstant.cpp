@@ -143,11 +143,11 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
   for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     Optional<unsigned> index = nextIndex(IGM, type, i);
-    if (index.hasValue()) {
-      assert(elts[index.getValue()] == nullptr &&
+    if (index.has_value()) {
+      assert(elts[index.value()] == nullptr &&
              "Unexpected constant struct field overlap");
 
-      elts[index.getValue()] = emitConstantValue(IGM, operand);
+      elts[index.value()] = emitConstantValue(IGM, operand);
     }
   }
   insertPadding(elts, sTy);

@@ -1648,6 +1648,9 @@ synthesizeTypeWrappedTypeStorageWrapperInitializerBody(
 
 ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(
     Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
+  if (isa<ProtocolDecl>(wrappedType))
+    return nullptr;
+
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
@@ -1675,8 +1678,11 @@ synthesizeTypeWrappedTypeMemberwiseInitializerBody(AbstractFunctionDecl *decl,
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
+  assert(!isa<ProtocolDecl>(parent));
+
   // self.$storage = .init(storage: $Storage(...))
-  auto *storageType = parent->getTypeWrapperStorageDecl();
+  auto *storageType =
+      cast<NominalTypeDecl>(parent->getTypeWrapperStorageDecl());
   assert(storageType);
 
   auto *typeWrapperVar = parent->getTypeWrapperProperty();
@@ -1777,6 +1783,9 @@ synthesizeTypeWrappedTypeMemberwiseInitializerBody(AbstractFunctionDecl *decl,
 
 ConstructorDecl *SynthesizeTypeWrappedTypeMemberwiseInitializer::evaluate(
     Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
+  if (isa<ProtocolDecl>(wrappedType))
+    return nullptr;
+
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
@@ -1788,33 +1797,4 @@ ConstructorDecl *SynthesizeTypeWrappedTypeMemberwiseInitializer::evaluate(
 
   ctor->setBodySynthesizer(synthesizeTypeWrappedTypeMemberwiseInitializerBody);
   return ctor;
-}
-
-FuncDecl *ValueDecl::getHasSymbolQueryDecl() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           SynthesizeHasSymbolQueryRequest{this}, nullptr);
-}
-
-FuncDecl *
-SynthesizeHasSymbolQueryRequest::evaluate(Evaluator &evaluator,
-                                          const ValueDecl *decl) const {
-  auto &ctx = decl->getASTContext();
-  auto dc = decl->getModuleContext();
-
-  Mangle::ASTMangler mangler;
-  auto mangledName = ctx.AllocateCopy(mangler.mangleHasSymbolQuery(decl));
-
-  ParameterList *params = ParameterList::createEmpty(ctx);
-
-  DeclName funcName =
-      DeclName(ctx, DeclBaseName(ctx.getIdentifier(mangledName)),
-               /*argumentNames=*/ArrayRef<Identifier>());
-
-  auto i1 = BuiltinIntegerType::get(1, ctx);
-  FuncDecl *func = FuncDecl::createImplicit(
-      ctx, swift::StaticSpellingKind::None, funcName, SourceLoc(),
-      /*async=*/false, /*throws=*/false, nullptr, params, i1, dc);
-
-  func->getAttrs().add(new (ctx) SILGenNameAttr(mangledName, IsImplicit));
-  return func;
 }

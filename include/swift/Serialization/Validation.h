@@ -93,6 +93,7 @@ struct ValidationInfo {
   StringRef sdkName = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
+  std::vector<StringRef> allowableClients;
 };
 
 /// A collection of options that can be used to set up a new AST context
@@ -186,6 +187,12 @@ public:
   }
 };
 
+struct SearchPath {
+  std::string Path;
+  bool IsFramework;
+  bool IsSystem;
+};
+
 /// Returns info about the serialized AST in the given data.
 ///
 /// If the returned status is anything but Status::Valid, the serialized data
@@ -215,7 +222,8 @@ ValidationInfo validateSerializedAST(
     bool requiresRevisionMatch = true,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
-        nullptr);
+        nullptr,
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

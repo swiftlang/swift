@@ -100,7 +100,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
           errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
           assert(false && "non-constant control flow in the test driver");
         }
-        currI = nextInstOpt.getValue();
+        currI = nextInstOpt.value();
         continue;
       }
 
@@ -120,7 +120,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       }
 
       if (nextInstOpt) {
-        currI = nextInstOpt.getValue();
+        currI = nextInstOpt.value();
         continue;
       }
 

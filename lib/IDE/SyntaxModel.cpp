@@ -153,7 +153,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 #undef KEYWORD
       case tok::contextual_keyword:
         Kind = SyntaxNodeKind::Keyword;
@@ -190,20 +190,20 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
 
 #define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
         Kind = SyntaxNodeKind::BuildConfigKeyword;
         break;
 
 #define POUND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
 #define POUND_COND_DIRECTIVE_KEYWORD(Name)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
         Kind = SyntaxNodeKind::PoundDirectiveKeyword;
         break;
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)
 #define POUND_DIRECTIVE_KEYWORD(Name)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:
@@ -289,7 +289,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     assert(Loc.isValid());
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
                                                 Loc));
-    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.getValue()));
+    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.value()));
   }
 
   Impl.TokenNodes = std::move(Nodes);
@@ -387,7 +387,7 @@ public:
       : AllTokensInFile(File.getAllTokens()),
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
-        BufferID(File.getBufferID().getValue()),
+        BufferID(File.getBufferID().value()),
         Ctx(File.getASTContext()),
         Walker(Walker) { }
 
@@ -1077,8 +1077,8 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
 
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
-    if (!EnumCaseD->getElements().empty()) {
-      if (!handleAttrs(EnumCaseD->getElements().front()->getAttrs()))
+    if (auto *element = EnumCaseD->getFirstElement()) {
+      if (!handleAttrs(element->getAttrs()))
         return Action::SkipChildren();
     }
     if (pushStructureNode(SN, D)) {
@@ -1711,8 +1711,8 @@ bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {
     return true;
 
   auto FieldNode = parseFieldNode(Text, OrigText, OrigLoc);
-  if (FieldNode.hasValue())
-    passNode(FieldNode.getValue());
+  if (FieldNode.has_value())
+    passNode(FieldNode.value());
   else
     searchForURL(Node.Range);
   return true;
@@ -1757,8 +1757,8 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
     if (Line.size() < Indent)
       continue;
     auto FieldNode = parseFieldNode(Line.drop_front(Indent), OrigText, OrigLoc);
-    if (FieldNode.hasValue())
-      passNode(FieldNode.getValue());
+    if (FieldNode.has_value())
+      passNode(FieldNode.value());
     else
       searchForURL(CharSourceRange(Node.Range.getStart().
         getAdvancedLoc(Line.data() - OrigText.data()),

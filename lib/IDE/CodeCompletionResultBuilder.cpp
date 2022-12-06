@@ -151,7 +151,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
             ContextFreeDiagnosticMessage);
     break;
   case CodeCompletionResultKind::Literal:
-    assert(LiteralKind.hasValue());
+    assert(LiteralKind.has_value());
     ContextFreeResult = ContextFreeCodeCompletionResult::createLiteralResult(
         Sink, *LiteralKind, CCS, ResultType);
     break;

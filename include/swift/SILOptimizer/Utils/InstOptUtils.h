@@ -288,8 +288,15 @@ void insertDeallocOfCapturedArguments(
 /// users of the looked through builtin expect instruction i.e it presents a
 /// view that shows all users as if there were no builtin expect instructions
 /// interposed.
-class IgnoreExpectUseIterator
-    : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
+class IgnoreExpectUseIterator {
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
+private:
   ValueBaseUseIterator origUseChain;
   ValueBaseUseIterator currentIter;
 

@@ -46,7 +46,7 @@ ERROR(error_upcoming_feature_on_by_default, none,
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
-      "expected one of 'api', 'spi' or 'other'", (StringRef))
+      "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
 
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
@@ -399,7 +399,7 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         "public %0 %1 shadows module %2, which may cause failures when "
         "importing %3 or its clients in some configurations; please rename "
         "either the %0 %1 or the module %2, or see "
-        "https://bugs.swift.org/browse/SR-14195 for workarounds",
+        "https://github.com/apple/swift/issues/56573 for workarounds",
         (DescriptiveDeclKind, FullyQualified<Type>,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
@@ -478,10 +478,6 @@ REMARK(warning_in_access_notes_file,none,
 
 WARNING(compiler_plugin_not_loaded,none,
         "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
-WARNING(compiler_plugin_missing_macro_declaration,none,
-        "compiler plugin module '%0' (in %1) is missing a top-level computed "
-        "property 'public var %2: [Any.Type]' to declare all macros; "
-        "undeclared macros will be ignored", (StringRef, StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

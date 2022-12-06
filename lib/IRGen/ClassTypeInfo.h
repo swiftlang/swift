@@ -49,7 +49,7 @@ public:
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
                 ReferenceCounting refcount, llvm::StructType *classLayoutType)
-      : HeapTypeInfo(irType, size, std::move(spareBits), align),
+      : HeapTypeInfo(refcount, irType, size, std::move(spareBits), align),
         TheClass(theClass), classLayoutType(classLayoutType),
         Refcount(refcount) {}
 

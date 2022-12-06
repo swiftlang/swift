@@ -86,3 +86,13 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 - `swift/release/x.y` (the *latest* release branch) is automerged into `swift/main`
 - llvm.org's `main` is automerged into `swift/next`
 - llvm.org's release branch *may* be automerged into `swift/release/x.y`, if they are in sync
+
+
+## Updating Branch/Tag
+
+To update the Branch/Tag requirements, please follow these steps:
+
+  1. Create pull requests to update the branch/tag in the following repositories:
+     - in `apple/swift` modify [`update-checkout-config.json`](https://github.com/apple/swift/blob/main/utils/update_checkout/update-checkout-config.json)
+     - in `apple/swift-source-compat-suite` repository modify [`common.py`](https://github.com/apple/swift-source-compat-suite/blob/main/common.py)
+  1. Notify @shahmishal after creating the pull requests

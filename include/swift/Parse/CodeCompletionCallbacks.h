@@ -192,9 +192,15 @@ public:
   /// Complete 'async' and 'throws' at effects specifier position.
   virtual void completeEffectsSpecifier(bool hasAsync, bool hasThrows) {};
 
+  enum class PrecedenceGroupCompletionKind {
+    Relation,
+    Associativity,
+    AttributeList,
+    Assignment,
+  };
   /// Complete within a precedence group decl or after a colon in an
   /// operator decl.
-  virtual void completeInPrecedenceGroup(SyntaxKind SK) {};
+  virtual void completeInPrecedenceGroup(PrecedenceGroupCompletionKind SK) {};
 
   /// Complete the platform names inside #available statements.
   virtual void completePoundAvailablePlatform() {};
@@ -248,7 +254,7 @@ public:
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
-  virtual void doneParsing() = 0;
+  virtual void doneParsing(SourceFile *SrcFile) = 0;
 };
 
 /// A factory to create instances of \c CodeCompletionCallbacks.

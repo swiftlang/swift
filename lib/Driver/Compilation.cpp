@@ -515,7 +515,7 @@ namespace driver {
         return {};
       }
       return getFineGrainedDepGraph()
-          .findJobsToRecompileWhenNodesChange(changedNodes.getValue());
+          .findJobsToRecompileWhenNodesChange(changedNodes.value());
     }
 
     void handleDependenciesReloadFailure(const bool cmdFailed,
@@ -662,7 +662,7 @@ namespace driver {
                                        ProcInfo);
       }
 
-      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().hasValue())
+      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().has_value())
         Comp.getStatsReporter()->recordJobMaxRSS(
             ProcInfo.getResourceUsage()->Maxrss);
 
@@ -792,7 +792,7 @@ namespace driver {
           llvm::errs() << Output;
       }
 
-      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().hasValue())
+      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().has_value())
         Comp.getStatsReporter()->recordJobMaxRSS(
             ProcInfo.getResourceUsage()->Maxrss);
 
@@ -801,10 +801,10 @@ namespace driver {
                                  diag::error_unable_to_execute_command,
                                  ErrorMsg);
 
-      if (Signal.hasValue()) {
+      if (Signal.has_value()) {
         Comp.getDiags().diagnose(SourceLoc(), diag::error_command_signalled,
                                  SignalledCmd->getSource().getClassName(),
-                                 Signal.getValue());
+                                 Signal.value());
       } else {
         Comp.getDiags()
             .diagnose(SourceLoc(),
@@ -943,7 +943,7 @@ namespace driver {
       Job::Condition Cond;
       bool HasDependenciesFileName;
       std::tie(Cond, HasDependenciesFileName) =
-          CondAndHasDepsIfNoError.getValue();
+          CondAndHasDepsIfNoError.value();
 
       const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName);
@@ -1187,8 +1187,8 @@ namespace driver {
     size_t pickNumberOfPartitions() {
 
       // If the user asked for something, use that.
-      if (Comp.getBatchCount().hasValue())
-        return Comp.getBatchCount().getValue();
+      if (Comp.getBatchCount().has_value())
+        return Comp.getBatchCount().value();
 
       // This is a long comment to justify a simple calculation.
       //
@@ -1297,7 +1297,7 @@ namespace driver {
       size_t DefaultSizeLimit = 25;
       size_t NumTasks = TQ->getNumberOfParallelTasks();
       size_t NumFiles = PendingExecution.size();
-      size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
+      size_t SizeLimit = Comp.getBatchSizeLimit().value_or(DefaultSizeLimit);
       return std::max(NumTasks, DivideRoundingUp(NumFiles, SizeLimit));
     }
 
@@ -1547,7 +1547,7 @@ namespace driver {
     bool loadDepGraphFromPath(const Job *Cmd, const StringRef DependenciesFile) {
       const auto changes = getFineGrainedDepGraph().loadFromPath(
           Cmd, DependenciesFile, Comp.getDiags());
-      const bool didDependencyLoadSucceed = changes.hasValue();
+      const bool didDependencyLoadSucceed = changes.has_value();
       return !didDependencyLoadSucceed;
     }
 

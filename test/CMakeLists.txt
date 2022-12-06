@@ -65,8 +65,7 @@ function(get_test_dependencies SDK result_var_name)
       swift-llvm-opt
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test
-      swift-syntax-test)
+      swift-remoteast-test)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)

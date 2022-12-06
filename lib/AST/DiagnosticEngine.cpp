@@ -25,6 +25,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
@@ -804,6 +805,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
     break;
 
+  case DiagnosticArgumentKind::DescriptiveStmtKind:
+    assert(Modifier.empty() && "Improper modifier for StmtKind argument");
+    Out << Stmt::getDescriptiveKindName(Arg.getAsDescriptiveStmtKind());
+    break;
+
   case DiagnosticArgumentKind::DeclAttribute:
     assert(Modifier.empty() &&
            "Improper modifier for DeclAttribute argument");
@@ -1178,6 +1184,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
             case DeclContextKind::AbstractFunctionDecl:
             case DeclContextKind::SubscriptDecl:
             case DeclContextKind::EnumElementDecl:
+            case DeclContextKind::MacroDecl:
               break;
             }
 

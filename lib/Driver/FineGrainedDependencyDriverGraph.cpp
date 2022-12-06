@@ -92,7 +92,7 @@ ModuleDepGraph::loadFromBuffer(const Job *job, llvm::MemoryBuffer &buffer,
       SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
     return None;
-  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.getValue(), diags);
+  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.value(), diags);
 }
 
 ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
@@ -136,7 +136,7 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   const auto fileKey = DependencyKey::createKeyForWholeSourceFile(
       DeclAspect::interface, swiftDeps);
   if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
-    if (fileNode && fileNode.getValue()->getHasBeenTraced())
+    if (fileNode && fileNode.value()->getHasBeenTraced())
       return true;
   }
 
@@ -249,8 +249,8 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
     auto preexistingMatch = findPreexistingMatch(swiftDepsOfJob, integrand);
-    if (preexistingMatch.hasValue() &&
-        preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
+    if (preexistingMatch.has_value() &&
+        preexistingMatch.value().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
 
     Optional<NullablePtr<ModuleDepGraphNode>> newNodeOrChangedNode =
@@ -261,22 +261,22 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
       changedNodes = None;
     else if (!changedNodes)
       ;
-    else if (auto *n = newNodeOrChangedNode.getValue().getPtrOrNull())
-      changedNodes.getValue().insert(n);
+    else if (auto *n = newNodeOrChangedNode.value().getPtrOrNull())
+      changedNodes.value().insert(n);
   });
   if (!changedNodes)
     return None;
 
   for (auto &p : disappearedNodes) {
-    changedNodes.getValue().insert(p.second);
+    changedNodes.value().insert(p.second);
     eraseNodeFromJob(p.second);
   }
 
   // Make sure the changes can be retraced:
-  for (auto *n : changedNodes.getValue())
+  for (auto *n : changedNodes.value())
     n->clearHasBeenTraced();
 
-  return changedNodes.getValue();
+  return changedNodes.value();
 }
 
 ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
@@ -334,15 +334,15 @@ ModuleDepGraph::integrateSourceFileDeclNode(
     const SourceFileDepGraphNode *integrand, StringRef swiftDepsOfJob,
     const PreexistingNodeIfAny preexistingMatch) {
 
-  if (!preexistingMatch.hasValue()) {
+  if (!preexistingMatch.has_value()) {
     // The driver will be accessing nodes by the swiftDeps of the job,
     // so pass that in.
     auto *newNode =
         integrateByCreatingANewNode(integrand, swiftDepsOfJob.str());
     return std::make_pair(true, newNode); // New node
   }
-  const auto where = preexistingMatch.getValue().first;
-  auto *match = preexistingMatch.getValue().second;
+  const auto where = preexistingMatch.value().first;
+  auto *match = preexistingMatch.value().second;
   switch (where) {
   case LocationOfPreexistingNode::here:
     return std::make_pair(match->integrateFingerprintFrom(integrand), match);
@@ -426,14 +426,14 @@ void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
     function_ref<void(ModuleDepGraphNode *)> fn) const {
   if (!interfaceNode->getKey().isInterface() || !interfaceNode->getIsProvides())
     return;
-  const auto swiftDeps = interfaceNode->getSwiftDeps().getValue();
+  const auto swiftDeps = interfaceNode->getSwiftDeps().value();
   const auto &interfaceKey = interfaceNode->getKey();
   const DependencyKey implementationKey(
       interfaceKey.getKind(), DeclAspect::implementation,
       interfaceKey.getContext().str(), interfaceKey.getName().str());
   if (const auto implementationNode =
           nodeMap.find(swiftDeps, implementationKey))
-    fn(implementationNode.getValue());
+    fn(implementationNode.value());
 }
 
 void ModuleDepGraph::forEachNode(
@@ -496,9 +496,9 @@ void ModuleDepGraph::findPreviouslyUntracedDependents(
 }
 
 size_t ModuleDepGraph::traceArrival(const ModuleDepGraphNode *visitedNode) {
-  if (!currentPathIfTracing.hasValue())
+  if (!currentPathIfTracing.has_value())
     return 0;
-  auto &currentPath = currentPathIfTracing.getValue();
+  auto &currentPath = currentPathIfTracing.value();
   currentPath.push_back(visitedNode);
   const auto visitedSwiftDepsIfAny = visitedNode->getSwiftDeps();
   recordDependencyPathToJob(currentPath, getJob(visitedSwiftDepsIfAny));
@@ -514,7 +514,7 @@ void ModuleDepGraph::recordDependencyPathToJob(
 void ModuleDepGraph::traceDeparture(size_t pathLengthAfterArrival) {
   if (!currentPathIfTracing)
     return;
-  auto &currentPath = currentPathIfTracing.getValue();
+  auto &currentPath = currentPathIfTracing.value();
   assert(pathLengthAfterArrival == currentPath.size() &&
          "Path must be maintained throughout recursive visits.");
   currentPath.pop_back();
@@ -661,7 +661,7 @@ void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
 /// TODO: break up
 void ModuleDepGraph::printPath(raw_ostream &out,
                                const driver::Job *jobToBeBuilt) const {
-  assert(currentPathIfTracing.hasValue() &&
+  assert(currentPathIfTracing.has_value() &&
          "Cannot print paths of paths weren't tracked.");
 
   for (auto paths = dependencyPathsToJobs.find(jobToBeBuilt);
@@ -696,7 +696,7 @@ StringRef ModuleDepGraph::getProvidingFilename(
       llvm::sys::path::filename(getJob(swiftDeps)->getFirstSwiftPrimaryInput());
   // FineGrainedDependencyGraphTests work with simulated jobs with empty
   // input names.
-  return !inputName.empty() ? inputName : StringRef(swiftDeps.getValue());
+  return !inputName.empty() ? inputName : StringRef(swiftDeps.value());
 }
 
 void ModuleDepGraph::printOneNodeOfPath(raw_ostream &out,

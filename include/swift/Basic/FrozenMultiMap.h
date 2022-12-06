@@ -80,7 +80,7 @@ public:
     // If we did not find that first element or that key has a .none value
     // (signaling that we erased it), return None.
     if (start == storage.end() || start->first != key ||
-        !start->second.hasValue()) {
+        !start->second.has_value()) {
       return None;
     }
 
@@ -110,7 +110,7 @@ public:
     // If we did not find that first element or that key has a .none value
     // (signaling that we erased it), return false.
     if (start == storage.end() || start->first != key ||
-        !start->second.hasValue()) {
+        !start->second.has_value()) {
       return false;
     }
 
@@ -143,9 +143,12 @@ public:
   unsigned size() const { return storage.size(); }
   bool empty() const { return storage.empty(); }
 
-  struct iterator
-      : std::iterator<std::forward_iterator_tag,
-                      std::pair<Key, Optional<PairToSecondEltRange>>> {
+  struct iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::pair<Key, Optional<PairToSecondEltRange>>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
     using base_iterator = typename decltype(storage)::iterator;
 
     FrozenMultiMap &map;
@@ -174,7 +177,7 @@ public:
                            });
 
       Optional<PairToSecondEltRange> resultRange;
-      if (baseIter->second.hasValue()) {
+      if (baseIter->second.has_value()) {
         unsigned count = std::distance(baseIter, rangeEnd);
         ArrayRef<std::pair<Key, Optional<Value>>> slice(&*baseIter, count);
         resultRange.emplace(slice, PairToSecondElt());
@@ -218,7 +221,7 @@ public:
   struct ToNonErasedValues {
     Optional<std::pair<Key, Optional<PairToSecondEltRange>>>
     operator()(std::pair<Key, Optional<PairToSecondEltRange>> pair) const {
-      if (!pair.second.hasValue())
+      if (!pair.second.has_value())
         return None;
       return pair;
     }

@@ -4,11 +4,13 @@
 // RUN: %target-swift-autolink-extract %t/import_experimental.o -o - | %FileCheck --check-prefix CHECK-%target-object-format %s
 // RUN: %target-swiftc_driver -c %s -I %t -o %t/import_experimental_again.o
 // RUN: %target-swift-autolink-extract %t/import_experimental.o %t/import_experimental_again.o -o - | %FileCheck --check-prefix CHECK-%target-object-format %s
-// RUN: %target-swift-autolink-extract %t/import_experimental.o %t/import_experimental_again.o -o - | %FileCheck --check-prefix UNIQUE %s
+// RUN: %target-swift-autolink-extract %t/import_experimental.o %t/import_experimental_again.o -o - | %FileCheck --check-prefix UNIQUECORE %s
+// RUN: %target-swift-autolink-extract %t/import_experimental.o %t/import_experimental_again.o -o - | %FileCheck --check-prefix UNIQUESTRING %s
 
 // REQUIRES: autolink-extract
 
-// UNIQUE-COUNT-1: -lswiftCore
+// UNIQUECORE-COUNT-1: -lswiftCore
+// UNIQUESTRING-COUNT-1: -lswift_StringProcessing
 
 // CHECK-elf-DAG: -lswiftCore
 // CHECK-elf-DAG: -lempty

@@ -18,7 +18,6 @@
 #ifndef SWIFT_MIGRATOR_MIGRATIONSTATE_H
 #define SWIFT_MIGRATOR_MIGRATIONSTATE_H
 
-#include "swift/Syntax/References.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -78,19 +77,19 @@ struct MigrationState : public llvm::ThreadSafeRefCountedBase<MigrationState> {
     return InputBufferID == OutputBufferID;
   }
 
-  static RC<MigrationState>
+  static llvm::IntrusiveRefCntPtr<MigrationState>
   start(SourceManager &SrcMgr, const unsigned InputBufferID) {
-    return RC<MigrationState> {
+    return llvm::IntrusiveRefCntPtr<MigrationState> {
       new MigrationState {
         MigrationKind::Start, SrcMgr, InputBufferID, InputBufferID
       }
     };
   }
 
-  static RC<MigrationState>
+  static llvm::IntrusiveRefCntPtr<MigrationState>
   make(MigrationKind Kind, SourceManager &SrcMgr, const unsigned InputBufferID,
        const unsigned OutputBufferID) {
-    return RC<MigrationState> {
+    return llvm::IntrusiveRefCntPtr<MigrationState> {
       new MigrationState {
         Kind,
         SrcMgr,

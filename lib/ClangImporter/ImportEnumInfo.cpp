@@ -70,11 +70,12 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // name for the Swift type.
   if (!decl->hasNameForLinkage()) {
     // If this enum comes from a typedef, we can find a name.
-    if (!isa<clang::TypedefType>(decl->getIntegerType().getTypePtr()) ||
+    const clang::Type *underlyingType = getUnderlyingType(decl);
+    if (!isa<clang::TypedefType>(underlyingType) ||
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         !importer::isUnavailableInSwift(
-            cast<clang::TypedefType>(decl->getIntegerType().getTypePtr())->getDecl(),
+            cast<clang::TypedefType>(underlyingType)->getDecl(),
             nullptr, true)) {
       kind = EnumKind::Constants;
       return;
@@ -241,6 +242,13 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
   return commonPrefix;
 }
 
+const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
+  const clang::Type *underlyingType = decl->getIntegerType().getTypePtr();
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(underlyingType))
+    underlyingType = elaborated->desugar().getTypePtr();
+  return underlyingType;
+}
+
 /// Determine the prefix to be stripped from the names of the enum constants
 /// within the given enum.
 void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
@@ -350,8 +358,8 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     StringRef enumNameStr;
     // If there's no name, this must be typedef. So use the typedef's name.
     if (!decl->hasNameForLinkage()) {
-      auto typedefDecl = cast<clang::TypedefType>(
-                             decl->getIntegerType().getTypePtr())->getDecl();
+      const clang::Type *underlyingType = getUnderlyingType(decl);
+      auto typedefDecl = cast<clang::TypedefType>(underlyingType)->getDecl();
       enumNameStr = typedefDecl->getName();
     } else {
       enumNameStr = decl->getName();

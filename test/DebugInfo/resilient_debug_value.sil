@@ -1,0 +1,27 @@
+// RUN: %empty-directory(%t)
+//
+// Compile the external swift module.
+// RUN: %target-swift-frontend -g -emit-module -enable-library-evolution \
+// RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
+// RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+//
+// RUN: %target-swift-frontend -g -I %t -emit-ir %s  -o - | %FileCheck %s
+
+// REQUIRES: CPU=arm64 || CPU=x86_64
+
+import resilient_struct
+
+// This test case used to crash/assert.
+
+sil @test_debug_value_resilient : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Size, var, name "assertions", implicit
+  debug_value %0 : $*Size, var, name "assertions", implicit
+  dealloc_stack %0: $*Size
+  %1 = tuple ()
+  return %1 : $()
+}
+// CHECK: define{{.*}} swiftcc void @test_debug_value_resilient()
+// CHECK:  [[ASSERTIONSDBG:%.*]] = alloca i8*
+// CHECK:  [[ASSERTIONS:%.*]] = alloca i8, i64 %size
+// CHECK:  store i8* [[ASSERTIONS]], i8** [[ASSERTIONSDBG]]

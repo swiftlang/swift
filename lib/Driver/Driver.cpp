@@ -106,8 +106,8 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Default(None);
 
-  if (Kind.hasValue())
-    driverKind = Kind.getValue();
+  if (Kind.has_value())
+    driverKind = Kind.value();
   else if (!OptName.empty())
     Diags.diagnose({}, diag::error_invalid_arg_value, OptName, DriverName);
 }
@@ -1460,7 +1460,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
             .Case("llvm-full", OutputInfo::LTOKind::LLVMFull)
             .Default(llvm::None);
     if (LTOVariant)
-      OI.LTOVariant = LTOVariant.getValue();
+      OI.LTOVariant = LTOVariant.value();
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
@@ -1602,7 +1602,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
-    case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
@@ -2834,7 +2833,7 @@ static void handleCompileJobCondition(Job *J,
   auto output = J->getOutput().getPrimaryOutputFilename();
   bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (input.hasValue() && !llvm::sys::fs::status(*input, inputStatus)) {
+  if (input.has_value() && !llvm::sys::fs::status(*input, inputStatus)) {
     J->setInputModTime(inputStatus.getLastModificationTime());
     hasValidModTime = J->getInputModTime() == inputInfo.previousModTime;
   } else if (!llvm::sys::fs::status(output, inputStatus)) {
@@ -3237,7 +3236,7 @@ static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
   if (hasExistingAdditionalOutput(*Output, fileID))
     return;
   // Honor driver option for this path if it's given
-  if (optId.hasValue()) {
+  if (optId.has_value()) {
     if (const Arg *A = C.getArgs().getLastArg(*optId)) {
       Output->setAdditionalOutputForType(fileID, StringRef(A->getValue()));
       return;

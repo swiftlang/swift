@@ -1409,7 +1409,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(DeclContext const *refCxt,
     // Otherwise, it's definitely going to be illegal, so warn and permit.
     auto &diags = refCxt->getASTContext().Diags;
     auto useKindInt = static_cast<unsigned>(
-        useKind.getValueOr(VarRefUseEnv::Read));
+        useKind.value_or(VarRefUseEnv::Read));
 
     diags.diagnose(
         memberLoc, diag::actor_isolated_non_self_reference,
@@ -2303,7 +2303,7 @@ namespace {
 
         ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
                            decl->getDescriptiveKind(), decl->getName(),
-                           call->isImplicitlyAsync().hasValue());
+                           call->isImplicitlyAsync().has_value());
         decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
         result = true;
         return;
@@ -2631,7 +2631,7 @@ namespace {
         if (diagnoseNonSendableTypes(
                 param.getParameterType(), getDeclContext(), argLoc,
                 diag::non_sendable_call_param_type,
-                apply->isImplicitlyAsync().hasValue(),
+                apply->isImplicitlyAsync().has_value(),
                 *unsatisfiedIsolation))
           return true;
       }
@@ -2640,7 +2640,7 @@ namespace {
       if (diagnoseNonSendableTypes(
              fnType->getResult(), getDeclContext(), apply->getLoc(),
              diag::non_sendable_call_result_type,
-             apply->isImplicitlyAsync().hasValue(),
+             apply->isImplicitlyAsync().has_value(),
              *unsatisfiedIsolation))
         return true;
 
@@ -2906,7 +2906,7 @@ namespace {
       case AsyncMarkingResult::NotFound:
         // Complain about access outside of the isolation domain.
         auto useKind = static_cast<unsigned>(
-            kindOfUsage(decl, context).getValueOr(VarRefUseEnv::Read));
+            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
         ReferencedActor::Kind refKind;
         Type refGlobalActor;
@@ -3456,6 +3456,7 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::Destructor:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
   case DeclKind::MacroExpansion:
     return None;
 
@@ -4480,9 +4481,9 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
           available->Platform,
           available->Message,
           "", nullptr,
-          available->Introduced.getValueOr(noVersion), SourceRange(),
-          available->Deprecated.getValueOr(noVersion), SourceRange(),
-          available->Obsoleted.getValueOr(noVersion), SourceRange(),
+          available->Introduced.value_or(noVersion), SourceRange(),
+          available->Deprecated.value_or(noVersion), SourceRange(),
+          available->Obsoleted.value_or(noVersion), SourceRange(),
           PlatformAgnosticAvailabilityKind::Unavailable,
           /*implicit=*/true,
           available->IsSPI);
@@ -5137,6 +5138,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Accessor:
   case DeclKind::Func:
   case DeclKind::Subscript:
+  case DeclKind::Macro:
     return false;
 
   case DeclKind::BuiltinTuple:

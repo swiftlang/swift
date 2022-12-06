@@ -1,5 +1,7 @@
 // UNSUPPORTED: OS=windows-msvc
-// REQUIRES: SR13034
+
+// FIXME: Disabled due to https://github.com/apple/swift/issues/55480.
+// REQUIRES: issue_55480
 
 // 1) If there is no swiftmodule, use the swiftinterface
 //

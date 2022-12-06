@@ -24,6 +24,12 @@
 // RUN: %target-swift-emit-module-interface(%t/ClientFixed.swiftinterface)  %t/clientFileA-Swift5.swift %t/clientFileB.swift -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/ClientFixed.swiftinterface) -I %t
 
+/// The inserted missing imports should be aliased.
+// RUN: %target-swift-emit-module-interface(%t/ClientFixed.swiftinterface) %t/clientFileA-Swift5.swift %t/clientFileB.swift -I %t -alias-module-names-in-module-interface
+// RUN: %target-swift-typecheck-module-from-interface(%t/ClientFixed.swiftinterface) -I %t
+// RUN: cat %t/ClientFixed.swiftinterface | %FileCheck -check-prefix ALIASED %s
+// ALIASED: import Module___libB
+
 // REQUIRES: asserts
 
 // BEGIN empty.swift

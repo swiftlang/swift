@@ -94,7 +94,8 @@ enum class DeclContextKind : unsigned {
   EnumElementDecl,
   AbstractFunctionDecl,
   SerializedLocal,
-  Last_LocalDeclContextKind = SerializedLocal,
+  MacroDecl,
+  Last_LocalDeclContextKind = MacroDecl,
 
   Module,
   FileUnit,
@@ -277,6 +278,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::MacroDecl:
       return ASTHierarchy::Decl;
     }
     llvm_unreachable("Unhandled DeclContextKind");

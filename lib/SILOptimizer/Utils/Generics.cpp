@@ -265,7 +265,7 @@ public:
 
   void setResultType(SILType type) { resultType = type; }
 
-  bool hasResultType() const { return resultType.hasValue(); }
+  bool hasResultType() const { return resultType.has_value(); }
 
   const llvm::MapVector<unsigned, CanType> &getIndirectResultTypes() const {
     return indirectResultTypes;

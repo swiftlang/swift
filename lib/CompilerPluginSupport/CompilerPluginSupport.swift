@@ -25,6 +25,45 @@ public struct _CompilerPluginKind {
   }
 }
 
+// Do not modify without modifying swift::CompilerPlugin::DiagnosticSeverity in
+// include/swift/AST/CompilerPlugin.h.
+@frozen
+public struct _DiagnosticSeverity {
+  @usableFromInline
+  enum RawValue: UInt8 {
+    case note = 0
+    case warning = 1
+    case error = 2
+  }
+  @usableFromInline var rawValue: RawValue
+
+  public static var note: Self { Self(rawValue: .note) }
+  public static var warning: Self { Self(rawValue: .warning) }
+  public static var error: Self { Self(rawValue: .error) }
+}
+
+public typealias _Diagnostic = (
+  message: UnsafePointer<UInt8>,
+  count: Int,
+  position: Int,
+  severity: _DiagnosticSeverity
+)
+
+public func _makeDiagnostic(
+  message: String, position: Int, severity: _DiagnosticSeverity
+) -> _Diagnostic {
+  var message = message
+  return message.withUTF8 { buffer in
+    let resultBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(
+      capacity: buffer.count)
+    _ = resultBuffer.initialize(from: buffer)
+    return (
+      message: UnsafePointer(resultBuffer.baseAddress!),
+      count: resultBuffer.count, position: position, severity: severity
+    )
+  }
+}
+
 /// A compiler plugin that can be loaded by the Swift compiler for code rewrite
 /// and custom compilation.
 public protocol _CompilerPlugin {
@@ -33,8 +72,6 @@ public protocol _CompilerPlugin {
   //   `CompilerPlugin::WitnessTableEntry`.
   // - Use C-compatible types and tuples thereof to ensure that we can invoke
   //   these methods from C.
-
-  static func _name() -> (UnsafePointer<UInt8>, count: Int)
 
   static func _kind() -> _CompilerPluginKind
 
@@ -56,33 +93,7 @@ public protocol _CompilerPlugin {
     sourceFileTextCount: Int,
     localSourceText: UnsafePointer<UInt8>,
     localSourceTextCount: Int
-  ) -> (UnsafePointer<UInt8>?, count: Int)
-
-  /// Returns the generic signature of the plugin.
-  ///
-  /// - Returns: A newly allocated buffer containing the generic signature.
-  ///   The caller is responsible for managing the memory.
-  static func _genericSignature() -> (UnsafePointer<UInt8>?, count: Int)
-
-  /// Returns the type signature of the plugin.
-  ///
-  /// - Returns: A newly allocated buffer containing the type signature. The
-  ///   caller is responsible for managing the memory.
-  static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int)
-
-
-  /// Returns the module that owns this macro.
-  ///
-  /// - Returns: A newly allocated buffer containing the owning module name. The
-  ///   caller is responsible for managing the memory.
-  static func _owningModule() -> (UnsafePointer<UInt8>, count: Int)
-
-  /// Returns the set of modules that are needed (beyond the owning module) to
-  /// process the module signature.
-  ///
-  /// - Returns: A newly allocated buffer containing a string with all of the
-  /// supplemental signature module names, separated by semicolons. The caller
-  /// is responsible for managing the memory.
-  static func _supplementalSignatureModules()
-      -> (UnsafePointer<UInt8>, count: Int)
+  ) -> (code: UnsafePointer<UInt8>?, codeLength: Int,
+        diagnostics: UnsafePointer<_Diagnostic>?,
+        diagnosticCount: Int)
 }

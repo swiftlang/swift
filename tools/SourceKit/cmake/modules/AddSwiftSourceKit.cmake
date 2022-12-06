@@ -157,7 +157,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
 
   if(SWIFT_SWIFT_PARSER)
     # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
 
     # For the "end step" of bootstrapping configurations on Darwin, need to be
     # able to fall back to the SDK directory for libswiftCore et al.
@@ -430,6 +430,10 @@ macro(add_sourcekit_framework name)
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set(RPATH_LIST)
     add_sourcekit_swift_runtime_link_flags(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}/swift/host")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -461,6 +465,10 @@ macro(add_sourcekit_framework name)
         LIBRARY_DIR ${framework_location})
     set(RPATH_LIST)
     add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}/swift/host")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -547,7 +555,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   set(RPATH_LIST)
   add_sourcekit_swift_runtime_link_flags(${name} ${xpc_bin_dir} ${SOURCEKITXPC_HAS_SWIFT_MODULES})
 
-  file(RELATIVE_PATH relative_lib_path "${xpc_bin_dir}" "${lib_dir}")
+  file(RELATIVE_PATH relative_lib_path "${xpc_bin_dir}" "${lib_dir}/swift/host")
   list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
 
   # Add rpath for sourcekitdInProc

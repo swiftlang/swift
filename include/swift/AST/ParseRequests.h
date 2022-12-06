@@ -21,7 +21,6 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
 
@@ -90,7 +89,6 @@ struct SourceFileParsingResult {
   ArrayRef<ASTNode> TopLevelItems;
   Optional<ArrayRef<Token>> CollectedTokens;
   Optional<StableHasher> InterfaceHasher;
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
 /// Parse the top-level items of a SourceFile.

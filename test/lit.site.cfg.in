@@ -152,6 +152,9 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 if "@BOOTSTRAPPING_MODE@" != "OFF":
   config.available_features.add('swift_in_compiler')
 
+if "@SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR@" != "":
+  config.available_features.add('swift_swift_parser')
+
 if "@BOOTSTRAPPING_MODE@" == 'HOSTTOOLS':
   config.available_features.add('hosttools_mode')
 elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':

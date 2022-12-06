@@ -46,45 +46,92 @@ if (SWIFT_SWIFT_PARSER)
 
     target_compile_options(swiftASTGen PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
 
-  # Link against the SwiftSyntax parser and libraries it depends on. The actual
-  # formulation of this is a hack to work around a CMake bug in Ninja file
-  # generation that results in multiple Ninja targets producing the same file in
-  # a downstream SourceKit target. This should be expressed as:
-  #
-  #   target_link_libraries(swiftASTGen
-  #     PRIVATE
-  #     SwiftSyntax::SwiftCompilerSupport
-  #   )
-  target_link_libraries(swiftASTGen
-    PRIVATE
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftParserDiagnostics>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntaxBuilder>
-    $<TARGET_OBJECTS:SwiftSyntax::_SwiftSyntaxMacros>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+  # Workaround a cmake bug, see the corresponding function in swift-syntax
+  function(force_target_link_libraries TARGET)
+    cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
 
-    swiftAST
+    foreach(DEPENDENCY ${ARGS_PUBLIC})
+      target_link_libraries(${TARGET} PRIVATE
+        ${DEPENDENCY}
+      )
+      add_dependencies(${TARGET} ${DEPENDENCY})
+
+      add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+        DEPENDS ${DEPENDENCY}
+        )
+      target_sources(${TARGET} PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+      )
+    endforeach()
+  endfunction()
+
+  set(SWIFT_SYNTAX_MODULES
+    SwiftBasicFormat
+    SwiftParser
+    SwiftParserDiagnostics
+    SwiftDiagnostics
+    SwiftSyntax
+    SwiftOperators
+    SwiftSyntaxBuilder
+    _SwiftSyntaxMacros
+    SwiftCompilerSupport
   )
+
+  # Compute the list of SwiftSyntax targets
+  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND "SwiftSyntax::"
+       OUTPUT_VARIABLE SWIFT_SYNTAX_TARGETS)
+
+  # TODO: Change to target_link_libraries when cmake is fixed
+  force_target_link_libraries(swiftASTGen PUBLIC
+    ${SWIFT_SYNTAX_TARGETS}
+  )
+  target_link_libraries(swiftASTGen PUBLIC
+    swiftAST
+    swift_CompilerPluginSupport
+  )
+
+  set(SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR
+      "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
+  set(SWIFT_SYNTAX_LIBRARIES_DEST_DIR
+      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
+
+  # Determine the SwiftSyntax shared library files that were built as
+  # part of earlyswiftsyntax.
+  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND ${CMAKE_SHARED_LIBRARY_PREFIX}
+       OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
+  list(TRANSFORM SWIFT_SYNTAX_SHARED_LIBRARIES APPEND
+       ${CMAKE_SHARED_LIBRARY_SUFFIX}
+       OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
+
+  # Copy over all of the shared libraries from earlyswiftsyntax so they can
+  # be found via RPATH.
+  foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
+    add_custom_command(
+      TARGET swiftASTGen PRE_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib} ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${sharedlib}
+      COMMENT "Copying ${sharedlib}"
+    )
+  endforeach()
+
+  # Copy all of the Swift modules from earlyswiftsyntax so they can be found
+  # in the same relative place within the build directory as in the final
+  # toolchain.
+  list(TRANSFORM SWIFT_SYNTAX_MODULES APPEND ".swiftmodule"
+       OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
+  foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
+    file(GLOB module_files
+         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swiftinterface")
+    add_custom_command(
+      TARGET swiftASTGen PRE_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${module_files} ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}/
+      COMMENT "Copying ${module_dir}"
+    )
+  endforeach()
 
   target_include_directories(swiftASTGen PUBLIC
-    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
-
-  add_dependencies(swiftASTGen
-    SwiftSyntax::SwiftBasicFormat
-    SwiftSyntax::SwiftParser
-    SwiftSyntax::SwiftParserDiagnostics
-    SwiftSyntax::SwiftDiagnostics
-    SwiftSyntax::SwiftSyntax
-    SwiftSyntax::SwiftOperators
-    SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::_SwiftSyntaxMacros
-    SwiftSyntax::SwiftCompilerSupport
-    swiftAST
-  )
+    ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR})
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()

@@ -757,7 +757,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     SGFContext eltCtxt =
-      (outputEltTemp ? SGFContext(&outputEltTemp.getValue()) : SGFContext());
+      (outputEltTemp ? SGFContext(&outputEltTemp.value()) : SGFContext());
     auto outputElt = transform(inputElt,
                                inputEltOrigType, inputEltSubstType,
                                outputEltOrigType, outputEltSubstType,
@@ -773,7 +773,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     // Otherwise, make sure we emit into the slot.
-    auto &temp = outputEltTemp.getValue();
+    auto &temp = outputEltTemp.value();
     auto outputEltAddr = temp.getManagedAddress();
 
     // That might involve storing directly.
@@ -4483,6 +4483,8 @@ void SILGenFunction::emitProtocolWitness(
                                           ->getCanonicalType());
   }
 
+  assert(!witnessSubstTy->hasError());
+
   if (auto genericFnType = dyn_cast<GenericFunctionType>(reqtSubstTy)) {
     auto forwardingSubs = F.getForwardingSubstitutionMap();
     reqtSubstTy = cast<FunctionType>(genericFnType
@@ -4492,6 +4494,8 @@ void SILGenFunction::emitProtocolWitness(
     reqtSubstTy = cast<FunctionType>(F.mapTypeIntoContext(reqtSubstTy)
                                           ->getCanonicalType());
   }
+
+  assert(!reqtSubstTy->hasError());
 
   // Get the lowered type of the witness.
   auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,

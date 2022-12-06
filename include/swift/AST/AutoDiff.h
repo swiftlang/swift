@@ -218,7 +218,7 @@ struct AutoDiffConfig {
     return AutoDiffConfig(parameterIndices, resultIndices, signature);
   }
 
-  // TODO(SR-13506): Use principled mangling for AD-generated symbols.
+  // TODO(https://github.com/apple/swift/issues/52204): Use principled mangling for AD-generated symbols.
   std::string mangle() const {
     std::string result = "src_";
     interleave(

@@ -1070,14 +1070,14 @@ The minimal OS-version where the function is available.
 ::
 
   sil-function-attribute ::= '[' sil-function-inlining ']'
-  sil-function-inlining ::= 'never'
+  sil-function-inlining ::= 'noinline'
 
 The function is never inlined.
 ::
 
-  sil-function-inlining ::= 'always'
+  sil-function-inlining ::= 'always_inline'
 
-The function is always inlined, even in a ``Onone`` build.
+The function is always inlined.
 ::
 
   sil-function-attribute ::= '[' sil-function-optimization ']'
@@ -7882,3 +7882,16 @@ IRGen will replace the application by the constant representing Debug mode (0).
 This happens we can build the standard library .dylib. The generate sil will
 retain the function call but the generated .dylib will contain code with
 assertions enabled.
+
+Weak linking support
+~~~~~~~~~~~~~~~~~~~~~~~
+
+has_symbol
+```````````````````````````
+::
+
+  sil-instruction ::= 'has_symbol' sil-decl-ref
+
+Returns true if each of the underlying symbol addresses associated with the
+given declaration are non-null. This can be used to determine whether a
+weakly-imported declaration is available at runtime.

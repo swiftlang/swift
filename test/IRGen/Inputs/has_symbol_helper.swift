@@ -21,6 +21,11 @@ public func asyncFunc() async {}
 
 public protocol P {
   func requirement()
+  func requirementWithDefaultImpl()
+}
+
+extension P {
+  public func requirementWithDefaultImpl() {}
 }
 
 public struct S {

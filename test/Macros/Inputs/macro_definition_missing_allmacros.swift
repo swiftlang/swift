@@ -60,8 +60,9 @@ struct DummyMacro: _CompilerPlugin {
     sourceFileTextCount: Int,
     localSourceText: UnsafePointer<UInt8>,
     localSourceTextCount: Int
-  ) -> (UnsafePointer<UInt8>?, count: Int) {
-    (nil, 0)
+  ) -> (code: UnsafePointer<UInt8>?, codeLength: Int,
+        diagnostics: UnsafePointer<_Diagnostic>?, diagnosticCount: Int) {
+    (nil, 0, nil, 0)
   }
 }
 

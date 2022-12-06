@@ -5,10 +5,25 @@
 # Owners of ASTGen
 lib/ASTGen @zoecarver @CodaFi
 
+# Dependency scanning
+include/swift/DependencyScan                 @artemcm
+lib/AST/ModuleLoader.cpp                     @artemcm
+lib/DependencyScan                           @artemcm
+lib/Frontend/ModuleInterfaceLoader.cpp       @artemcm
+lib/Serialization/SerializedModuleLoader.cpp @artemcm
+test/ScanDependencies                        @artemcm
+
+# Driver
+include/swift/Driver @artemcm
+lib/Driver           @artemcm
+test/Driver          @artemcm
+
 # Owners of the parser
 include/swift/Parse @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 lib/Parse           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 test/Parse          @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+
+SwiftCompilerSources @eeckstein
 
 # C++ Interop
 include/swift/ClangImporter @zoecarver @hyp @egorzhdan
@@ -17,3 +32,13 @@ lib/ClangImporter           @zoecarver @hyp @egorzhdan
 lib/PrintAsClang            @zoecarver @hyp @egorzhdan
 stdlib/public/Cxx           @zoecarver @hyp @egorzhdan
 test/Interop                @zoecarver @hyp @egorzhdan
+
+# Threading implementation
+include/swift/Threading @al45tair
+lib/Threading           @al45tair
+
+# Windows support
+cmake/**/*Windows*    @compnerd
+lib/Basic/Windows     @compnerd
+stdlib/public/Windows @compnerd
+utils/*windows*       @compnerd

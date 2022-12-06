@@ -27,7 +27,7 @@
 // CHECK-PCM109-NEXT:      "clang": "G"
 // CHECK-PCM109-NEXT:    },
 // CHECK-PCM109-NEXT:    {
-// CHECK-PCM109-NEXT:      "modulePath": "G.pcm",
+// CHECK-PCM109-NEXT:      "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.pcm",
 // CHECK-PCM109:       "directDependencies": [
 // CHECK-PCM109-NEXT:    {
 // CHECK-PCM109-NEXT:      "clang": "X"
@@ -42,7 +42,7 @@
 // CHECK-PCM110-NEXT:      "clang": "G"
 // CHECK-PCM110-NEXT:    },
 // CHECK-PCM110-NEXT:    {
-// CHECK-PCM110-NEXT:      "modulePath": "G.pcm",
+// CHECK-PCM110-NEXT:      "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.pcm",
 // CHECK-PCM110:       "directDependencies": [
 // CHECK-PCM110-NEXT:  ],
 // CHECK-PCM110-NOT: "clang": "X"

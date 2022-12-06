@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
@@ -195,10 +196,12 @@ class MandatoryGenericSpecializer : public SILModuleTransform {
 
   void run() override;
 
-  bool optimize(SILFunction *func, ClassHierarchyAnalysis *cha);
+  bool optimize(SILFunction *func, ClassHierarchyAnalysis *cha,
+                bool &invalidatedStackNesting);
 
   bool optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
-                    InstructionDeleter &deleter, ClassHierarchyAnalysis *cha);
+                    InstructionDeleter &deleter, ClassHierarchyAnalysis *cha,
+                    bool &invalidatedStackNesting);
 };
 
 
@@ -220,7 +223,7 @@ void MandatoryGenericSpecializer::run() {
       visited.insert(&function);
     }
   }
-  
+
   while (!workList.empty()) {
     SILFunction *func = workList.pop_back_val();
     module->linkFunction(func, SILModule::LinkingMode::LinkAll);
@@ -229,18 +232,24 @@ void MandatoryGenericSpecializer::run() {
 
     // Perform generic specialization and other related optimization.
 
+    bool invalidatedStackNesting = false;
+
     // To avoid phase ordering problems of the involved optimizations, iterate
     // until we reach a fixed point.
-    // This should always happen, but to be on the save side, limit the number
+    // This should always happen, but to be on the safe side, limit the number
     // of iterations to 10 (which is more than enough - usually the loop runs
     // 1 to 3 times).
     for (int i = 0; i < 10; i++) {
-      bool changed = optimize(func, cha);
+      bool changed = optimize(func, cha, invalidatedStackNesting);
       if (changed) {
         invalidateAnalysis(func, SILAnalysis::InvalidationKind::FunctionBody);
       } else {
         break;
       }
+    }
+
+    if (invalidatedStackNesting) {
+      StackNesting::fixNesting(func);
     }
 
     // Continue specializing called functions.
@@ -260,7 +269,8 @@ void MandatoryGenericSpecializer::run() {
 /// Specialize generic calls in \p func and do some other related optimizations:
 /// devirtualization and constant-folding of the Builtin.canBeClass.
 bool MandatoryGenericSpecializer::optimize(SILFunction *func,
-                                           ClassHierarchyAnalysis *cha) {
+                                           ClassHierarchyAnalysis *cha,
+                                           bool &invalidatedStackNesting) {
   bool changed = false;
   SILOptFunctionBuilder funcBuilder(*this);
   InstructionDeleter deleter;
@@ -282,7 +292,7 @@ bool MandatoryGenericSpecializer::optimize(SILFunction *func,
       continue;
   
     for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
-      changed |= optimizeInst(inst, funcBuilder, deleter, cha);
+      changed |= optimizeInst(inst, funcBuilder, deleter, cha, invalidatedStackNesting);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -295,7 +305,8 @@ bool MandatoryGenericSpecializer::optimize(SILFunction *func,
 
 bool MandatoryGenericSpecializer::
 optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
-             InstructionDeleter &deleter, ClassHierarchyAnalysis *cha) {
+             InstructionDeleter &deleter, ClassHierarchyAnalysis *cha,
+             bool &invalidatedStackNesting) {
   if (auto as = ApplySite::isa(inst)) {
 
     bool changed = false;
@@ -307,10 +318,22 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
       as = newAS;
     }
 
-    auto fas = FullApplySite::isa(as.getInstruction());
-    if (!fas)
+    if (auto *pai = dyn_cast<PartialApplyInst>(as)) {
+      SILBuilderContext builderCtxt(funcBuilder.getModule());
+      if (tryOptimizeApplyOfPartialApply(pai, builderCtxt, deleter.getCallbacks())) {
+        // Try to delete the partial_apply.
+        // We don't need to copy all arguments again (to extend their lifetimes),
+        // because it was already done in tryOptimizeApplyOfPartialApply.
+        tryDeleteDeadClosure(pai, deleter.getCallbacks(), /*needKeepArgsAlive=*/ false);
+        invalidatedStackNesting = true;
+        return true;
+      }
       return changed;
-      
+    }
+
+    auto fas = FullApplySite::isa(as.getInstruction());
+    assert(fas);
+
     SILFunction *callee = fas.getReferencedFunctionOrNull();
     if (!callee)
       return changed;

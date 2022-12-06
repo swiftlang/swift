@@ -515,11 +515,9 @@ public:
                                  const std::string &mangledName,
                                  MangledNameKind kind,
                                  Demangler &dem) {
-    size_t stringSize = mangledName.size() + 1; // + 1 for terminating NUL.
-
-    char *copiedString = dem.Allocate<char>(stringSize);
-    memcpy(copiedString, mangledName.data(), stringSize);
-    return demangle(RemoteRef<char>(remoteAddress, copiedString), kind, dem);
+    StringRef mangledNameCopy = dem.copyString(mangledName);
+    return demangle(RemoteRef<char>(remoteAddress, mangledNameCopy.data()),
+                    kind, dem);
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
@@ -1495,7 +1493,12 @@ public:
   
     return demangledSymbol;
   }
-  
+
+  Demangle::NodePointer buildContextManglingForSymbol(const std::string &symbol,
+                                                      Demangler &dem) {
+    return buildContextManglingForSymbol(dem.copyString(symbol), dem);
+  }
+
   /// Given a read context descriptor, attempt to build a demangling tree
   /// for it.
   Demangle::NodePointer

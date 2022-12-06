@@ -81,6 +81,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -169,6 +170,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -316,6 +318,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::ApplicableFunction:
@@ -360,7 +363,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned indent, bool skipLocator) const {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
+                       unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
@@ -395,19 +399,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned inden
                  return false;
                });
 
-    interleave(sortedConstraints,
-               [&](Constraint *constraint) {
-                Out.indent(indent);
-                 if (constraint->isDisabled())
-                   Out << ">  [disabled] ";
-                 else if (constraint->isFavored())
-                   Out << ">  [favored]  ";
-                 else
-                   Out << ">             ";
-                 constraint->print(Out, sm, indent,
-                   /*skipLocator=*/constraint->getLocator() == Locator);
-               },
-               [&] { Out << "\n"; });
+    interleave(
+        sortedConstraints,
+        [&](Constraint *constraint) {
+          Out.indent(indent + 2);
+          if (constraint->isDisabled())
+            Out << ">  [disabled] ";
+          else if (constraint->isFavored())
+            Out << ">  [favored]  ";
+          else
+            Out << ">             ";
+          constraint->print(Out, sm, indent,
+                            /*skipLocator=*/constraint->getLocator() ==
+                                Locator);
+        },
+        [&] { Out << "\n"; });
     return;
   }
 
@@ -558,6 +564,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned inden
 
   case ConstraintKind::ShapeOf:
     Out << " shape of ";
+    break;
+
+  case ConstraintKind::ExplicitGenericArguments:
+    Out << " explicit generic argument binding ";
     break;
 
   case ConstraintKind::Disjunction:
@@ -726,6 +736,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;

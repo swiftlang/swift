@@ -109,6 +109,7 @@ SHOULD_NEVER_VISIT_INST(PreviousDynamicFunctionRef)
 SHOULD_NEVER_VISIT_INST(GlobalAddr)
 SHOULD_NEVER_VISIT_INST(GlobalValue)
 SHOULD_NEVER_VISIT_INST(BaseAddrForOffset)
+SHOULD_NEVER_VISIT_INST(HasSymbol)
 SHOULD_NEVER_VISIT_INST(IntegerLiteral)
 SHOULD_NEVER_VISIT_INST(Metatype)
 SHOULD_NEVER_VISIT_INST(ObjCProtocol)
@@ -453,6 +454,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
 
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
+  case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Direct_Owned:
     return OperandOwnership::ForwardingConsume;
 
@@ -463,7 +465,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   // borrow scope in the caller. In contrast, a begin_apply /does/ have an
   // explicit borrow scope in the caller so we must treat arguments passed to it
   // as being borrowed for the entire region of coroutine execution.
-  case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
     // For an apply that begins a borrow scope, its arguments are borrowed

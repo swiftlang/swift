@@ -576,7 +576,7 @@ Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
         auto otherTerm = other.getSubstitutions()[i];
 
         Optional<int> result = term.compare(otherTerm, ctx);
-        if (!result.hasValue() || *result != 0)
+        if (!result.has_value() || *result != 0)
           return result;
       }
 

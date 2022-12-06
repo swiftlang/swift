@@ -176,7 +176,8 @@ void SwiftLangSupport::getConformingMethodList(
   }
 
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
+      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
         ParmsResult.mapAsync<ConformingMethodListResults>(
             [&](auto &Params, auto DeliverTransformed) {

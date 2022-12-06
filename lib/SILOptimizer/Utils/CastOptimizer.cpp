@@ -630,7 +630,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     auto result = findBridgeToObjCFunc(functionBuilder, dynamicCast);
     if (!result)
       return nullptr;
-    std::tie(bridgedFunc, subMap) = result.getValue();
+    std::tie(bridgedFunc, subMap) = result.value();
   }
 
   SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(

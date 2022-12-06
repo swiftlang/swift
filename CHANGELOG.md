@@ -4,6 +4,32 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.8
 
+* [#56139][]:
+
+  Сollection downcasts in cast patterns are now supported. For example:
+
+  ```swift
+  func collectionDowncast(_ arr: [Any]) {
+    switch arr {
+    case let ints as [Int]:
+      // ...
+    case is [Bool]:
+      // ...
+    }
+  }
+  ``` 
+* [SE-0370][]:
+
+  The API of `UnsafeMutableRawPointer`, `UnsafeMutableBufferPointer`, `UnsafeMutableRawBufferPointer` were improved, adding previously missing initialization (and deinitialization) methods, including more performant initialization from `Collection` types.
+
+  For `UnsafeMutablePointer<T>` and `UnsafeMutableBufferPointer<T>`, method names containing the word "assign" were renamed to use the word "update", and many more were added. Every multi-element initialization method of `UnsafeMutablePointer` and `UnsafeMutableBufferPointer` now has a corresponding "update" method.
+
+  Slices of `UnsafeBufferPointer`, `UnsafeRawBufferPointer`, `UnsafeMutableBufferPointer` and `UnsafeMutableRawBufferPointer` now share the collection-like API of their base type. For example, given an initialized `b: UnsafeMutableBufferPointer<Int>`, the following lines are synonymous:
+  ```swift
+  b.update(repeating: 0)
+  b[b.startIndex..<b.endIndex].update(repeating: 0)
+  ```
+
 * [SE-0365][]:
  
   Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
@@ -9584,6 +9610,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 [SE-0362]: <https://github.com/apple/swift-evolution/blob/main/proposals/0362-piecemeal-future-features.md>
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
+[SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
 
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
@@ -9624,3 +9651,4 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#54246]: <https://github.com/apple/swift/issues/54246>
 [#57081]: <https://github.com/apple/swift/issues/57081>
 [#57225]: <https://github.com/apple/swift/issues/57225>
+[#56139]: <https://github.com/apple/swift/issues/56139>

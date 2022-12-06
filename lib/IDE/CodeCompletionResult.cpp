@@ -285,6 +285,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
+  case DeclKind::Macro:
+    return CodeCompletionDeclKind::Macro;
   }
   llvm_unreachable("invalid DeclKind");
 }
@@ -435,6 +437,9 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     case CodeCompletionDeclKind::PrecedenceGroup:
       Prefix.append("[PrecedenceGroup]");
       break;
+    case CodeCompletionDeclKind::Macro:
+      Prefix.append("[Macro]");
+      break;
     }
     break;
   case CodeCompletionResultKind::Keyword:
@@ -450,7 +455,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case CodeCompletionKeywordKind::pound_##X:                                   \
     Prefix.append("[#" #X "]");                                                \
     break;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
     }
     break;
   case CodeCompletionResultKind::Pattern:

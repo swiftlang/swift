@@ -698,6 +698,8 @@ namespace {
         printGenericParameters(OS, AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getParsedGenericParams());
+      if (auto *MD = dyn_cast<MacroDecl>(VD))
+        printGenericParameters(OS, MD->getParsedGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
@@ -1307,6 +1309,11 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitMacroDecl(MacroDecl *MD) {
+      printCommon(MD, "macro_decl");
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
       printCommon(MED, "macro_expansion_decl ");
       OS << MED->getMacro();
@@ -1424,6 +1431,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
 
   case DeclContextKind::EnumElementDecl:
     printName(os, cast<EnumElementDecl>(dc)->getName());
+    break;
+
+  case DeclContextKind::MacroDecl:
+    printName(os, cast<MacroDecl>(dc)->getName());
     break;
   }
 }
@@ -1691,8 +1702,6 @@ public:
       OS << ")\n";
       Indent -= 2;
     }
-    printRec(S->getPattern());
-    OS << '\n';
     printRec(S->getParsedSequence());
     OS << '\n';
     if (S->getIteratorVar()) {

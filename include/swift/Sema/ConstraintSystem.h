@@ -1708,7 +1708,7 @@ public:
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
-  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
+  void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
 };
 
 /// Describes the differences between several solutions to the same
@@ -4229,12 +4229,12 @@ public:
       return Type();
 
     // No need to generate a new type variable if there's only one type to join
-    if ((begin + 1 == end) && !supertype.hasValue())
+    if ((begin + 1 == end) && !supertype.has_value())
       return getType(begin).first;
 
     // The type to capture the result of the join, which is either the specified supertype,
     // or a new type variable.
-    Type resultTy = supertype.hasValue() ? supertype.getValue() :
+    Type resultTy = supertype.has_value() ? supertype.value() :
                     createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
 
     using RawExprKind = uint8_t;
@@ -4906,14 +4906,6 @@ public:
                           ConstraintLocator *locator,
                           OpenedTypeMap *replacements = nullptr);
 
-#if SWIFT_SWIFT_PARSER
-  /// Retrieve the opened type of a macro with the given name.
-  ///
-  /// \returns The opened type of the macro with this name, or the null \c Type
-  /// if no such macro exists.
-  Type getTypeOfMacroReference(Identifier macroName, Expr *anchor);
-#endif
-
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
   ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {
@@ -5050,15 +5042,7 @@ public:
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
-  /// Generate constraints for the body of the given closure.
-  ///
-  /// \param closure the closure expression
-  ///
-  /// \returns \c true if constraint generation failed, \c false otherwise
-  LLVM_NODISCARD
-  bool generateConstraints(ClosureExpr *closure);
-
-  /// Generate constraints for the body of the given function.
+  /// Generate constraints for the body of the given function or closure.
   ///
   /// \param fn The function or closure expression
   /// \param body The body of the given function that should be
@@ -5624,6 +5608,13 @@ private:
   /// Simplify a shape constraint by binding the reduced shape of the
   /// left hand side to the right hand side.
   SolutionKind simplifyShapeOfConstraint(
+      Type type1, Type type2, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
+  /// Simplify an explicit generic argument constraint by equating the
+  /// opened generic types of the bound left-hand type variable to the
+  /// pack type on the right-hand side.
+  SolutionKind simplifyExplicitGenericArgumentsConstraint(
       Type type1, Type type2, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
@@ -6433,9 +6424,10 @@ public:
   bool isSymmetricOperator() const;
   bool isUnaryOperator() const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent = 0) const {
+  void print(llvm::raw_ostream &Out, SourceManager *SM,
+             unsigned indent = 0) const {
     Out << "disjunction choice ";
-    Choice->print(Out, SM);
+    Choice->print(Out, SM, indent);
   }
 
   operator Constraint *() { return Choice; }

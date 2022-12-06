@@ -146,20 +146,20 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
         unsigned offset = 0;
         auto elementCount = tupleTy->getNumElements();
         while (elements.size() < elementCount) {
-          if (mutableDirectResult[index + offset].hasValue()) {
-            auto val = mutableDirectResult[index + offset].getValue();
+          if (mutableDirectResult[index + offset].has_value()) {
+            auto val = mutableDirectResult[index + offset].value();
             elements.push_back(val);
             mutableDirectResult[index + offset].reset();
           }
           ++offset;
         }
-        assert(!mutableDirectResult[index].hasValue());
+        assert(!mutableDirectResult[index].has_value());
         auto tuple = SGF.B.createTuple(loc, ty, elements);
         mutableDirectResult[index] = tuple;
       }
     });
-    assert(mutableDirectResult[0].hasValue());
-    return mutableDirectResult[0].getValue();
+    assert(mutableDirectResult[0].has_value());
+    return mutableDirectResult[0].value();
   }
 
   SmallVector<TupleTypeElt, 4> eltTypes;
@@ -269,7 +269,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   // actually unreachable and we can just return early.
   auto returnLoc =
       prepareForEpilogBlockEmission(*this, topLevel, epilogBB, directResults);
-  if (!returnLoc.hasValue()) {
+  if (!returnLoc.has_value()) {
     return {None, topLevel};
   }
 

@@ -319,8 +319,8 @@ protected:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.hasValue()
-               ? Loc.getValue()
+    return Loc.has_value()
+               ? Loc.value()
                : MandatoryInlinedLocation();
   }
 
@@ -417,7 +417,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.getValue(), &getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc.value(), &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
@@ -989,6 +989,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::HasSymbolInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

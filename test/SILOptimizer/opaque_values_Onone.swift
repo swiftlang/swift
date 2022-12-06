@@ -180,3 +180,73 @@ func give_a_generic_tuple<This>(of ty: This.Type) -> (This, This)
 func get_a_generic_tuple<This>(ty: This.Type) {
   let p = give_a_generic_tuple(of: ty)
 }
+
+// CHECK-LABEL: sil hidden @castAnyObjectToMeta {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [[SRC_ADDR]]
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
+// CHECK:         dealloc_stack [[DEST_ADDR]]
+// CHECK:         dealloc_stack [[SRC_ADDR]]
+// CHECK:         return [[DEST]]
+// CHECK-LABEL: } // end sil function 'castAnyObjectToMeta'
+@_silgen_name("castAnyObjectToMeta")
+func castAnyObjectToMeta(_ ao: any AnyObject) -> AnyObject.Type {
+  ao as! AnyObject.Type
+}
+
+// CHECK-LABEL: sil hidden @castGenericToMeta : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr [[SRC]] to [init] [[SRC_ADDR]]
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
+// CHECK:         dealloc_stack [[DEST_ADDR]]
+// CHECK:         dealloc_stack [[SRC_ADDR]]
+// CHECK:         return [[DEST]]
+// CHECK-LABEL: } // end sil function 'castGenericToMeta'
+@_silgen_name("castGenericToMeta")
+func castGenericToMeta<T>(_ t: T) -> AnyObject.Type {
+  t as! AnyObject.Type
+}
+
+// CHECK-LABEL: sil hidden @maybeCastAnyObjectToMeta : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
+// CHECK:         store [[SRC]] to [[SRC_ADDR]] : $*AnyObject
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         checked_cast_addr_br take_on_success AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
+// CHECK:         load [[DEST_ADDR]] : $*@thick any AnyObject.Type
+// CHECK:       [[FAILURE]]:
+// CHECK:         load [[SRC_ADDR]] : $*AnyObject
+// CHECK-LABEL: } // end sil function 'maybeCastAnyObjectToMeta'
+@_silgen_name("maybeCastAnyObjectToMeta")
+func maybeCastAnyObjectToMeta(_ ao: any AnyObject) -> AnyObject.Type? {
+  if let m = ao as? AnyObject.Type {
+    return m
+  }
+  return nil
+}
+
+// CHECK-LABEL: sil hidden @maybeCastGenericToMeta : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[SRC:%[^,]+]] :
+// CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr [[SRC]] to [init] [[SRC_ADDR]]
+// CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
+// CHECK:         checked_cast_addr_br take_on_success T in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]] {{.*}}, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
+// CHECK:         load [[DEST_ADDR]]
+// CHECK:       [[FAILURE]]:
+// CHECK:         destroy_addr [[SRC_ADDR]]
+// CHECK-LABEL: } // end sil function 'maybeCastGenericToMeta'
+@_silgen_name("maybeCastGenericToMeta")
+func maybeCastGenericToMeta<T>(_ t: T) -> AnyObject.Type? {
+  if let m = t as? AnyObject.Type {
+    return m
+  }
+  return nil
+}

@@ -73,8 +73,8 @@ public:
     }
     // If a common path component was found, recursively look for the result.
     if (commonDefinition) {
-      if (commonDefinition.getValue()) {
-        useDefVisitor.reenterUseDef(commonDefinition.getValue());
+      if (commonDefinition.value()) {
+        useDefVisitor.reenterUseDef(commonDefinition.value());
       } else {
         // Divergent paths were found; invalidate any previously discovered
         // storage.
@@ -95,7 +95,7 @@ public:
       commonDefinition = def;
       return;
     }
-    if (commonDefinition.getValue() != def)
+    if (commonDefinition.value() != def)
       commonDefinition = SILValue();
   }
 
@@ -281,7 +281,7 @@ public:
   // Returns the accessed address or an invalid SILValue.
   SILValue findPossibleBaseAddress(SILValue sourceAddr) && {
     reenterUseDef(sourceAddr);
-    return baseVal.getValueOr(SILValue());
+    return baseVal.value_or(SILValue());
   }
 
   AccessBase findBase(SILValue sourceAddr) && {
@@ -289,20 +289,20 @@ public:
     if (!baseVal || !kindVal)
       return AccessBase();
 
-    return AccessBase(baseVal.getValue(), kindVal.getValue());
+    return AccessBase(baseVal.value(), kindVal.value());
   }
 
   void setResult(SILValue foundBase) {
     if (!baseVal)
       baseVal = foundBase;
-    else if (baseVal.getValue() != foundBase)
+    else if (baseVal.value() != foundBase)
       baseVal = SILValue();
   }
 
   // MARK: AccessPhiVisitor::UseDefVisitor implementation.
 
   // Keep going as long as baseVal is valid regardless of kindVal.
-  bool isResultValid() const { return baseVal && bool(baseVal.getValue()); }
+  bool isResultValid() const { return baseVal && bool(baseVal.value()); }
 
   void invalidateResult() {
     baseVal = SILValue();
@@ -319,10 +319,10 @@ public:
 
   SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
     setResult(base);
-    if (!baseVal.getValue()) {
+    if (!baseVal.value()) {
       kindVal = None;
     } else {
-      assert(!kindVal || kindVal.getValue() == kind);
+      assert(!kindVal || kindVal.value() == kind);
       kindVal = kind;
     }
     return SILValue();
@@ -1129,7 +1129,7 @@ public:
   void findStorage(SILValue sourceAddr) { this->reenterUseDef(sourceAddr); }
 
   AccessStorage getStorage() const {
-    return result.storage.getValueOr(AccessStorage());
+    return result.storage.value_or(AccessStorage());
   }
   // getBase may return an invalid value for valid Global storage because there
   // may be multiple global_addr bases for identical storage.
@@ -1141,7 +1141,7 @@ public:
 
   // A valid result requires valid storage, but not a valid base.
   bool isResultValid() const {
-    return result.storage && bool(result.storage.getValue());
+    return result.storage && bool(result.storage.value());
   }
 
   void invalidateResult() { setResult(AccessStorage(), SILValue()); }
@@ -2465,7 +2465,7 @@ static void visitApplyAccesses(ApplySite apply,
 static void visitBuiltinAddress(BuiltinInst *builtin,
                                 llvm::function_ref<void(Operand *)> visitor) {
   if (auto kind = builtin->getBuiltinKind()) {
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     default:
       builtin->dump();
       llvm_unreachable("unexpected builtin memory access.");
@@ -2566,7 +2566,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     }
   }
   if (auto ID = builtin->getIntrinsicID()) {
-    switch (ID.getValue()) {
+    switch (ID.value()) {
       // Exhaustively verifying all LLVM intrinsics that access memory is
       // impractical. Instead, we call out the few common cases and return in
       // the default case.
@@ -2705,6 +2705,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::GlobalAddrInst:
+  case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
   case SILInstructionKind::InitExistentialValueInst:

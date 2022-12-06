@@ -534,7 +534,7 @@ class BuildScriptInvocation(object):
                 "SWIFT_TEST_TARGETS": " ".join(
                     config.swift_test_run_targets),
                 "SWIFT_FLAGS": config.swift_flags,
-                "SWIFT_TARGET_CMAKE_OPTIONS": config.cmake_options,
+                "SWIFT_TARGET_CMAKE_OPTIONS": " ".join(config.cmake_options),
             }
 
         return options
@@ -571,6 +571,12 @@ class BuildScriptInvocation(object):
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
 
+        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
+        # Swift still needs a few LLVM targets like tblgen to be built for it to be
+        # configured. Instead, handle this in the product for now.
+        builder.add_product(products.LLVM,
+                            is_enabled=True)
+
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
 
@@ -588,11 +594,6 @@ class BuildScriptInvocation(object):
         # test, install like a normal build-script product.
         builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
-        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
-        # Swift still needs a few LLVM targets like tblgen to be built for it to be
-        # configured. Instead, handle this in build-script-impl for now.
-        builder.add_impl_product(products.LLVM,
-                                 is_enabled=True)
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
         builder.add_impl_product(products.LibICU,

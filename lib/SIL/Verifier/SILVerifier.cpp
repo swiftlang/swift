@@ -79,6 +79,7 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 // Allow unit tests to gradually migrate toward -allow-critical-edges=false.
 static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
+extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -5801,6 +5802,7 @@ public:
       return;
 
     const SILDebugScope *LastSeenScope = nullptr;
+    SILInstruction *LastSeenScopeInst = nullptr;
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
@@ -5814,6 +5816,7 @@ public:
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;
+        LastSeenScopeInst = &SI;
         continue;
       }
 
@@ -5821,14 +5824,12 @@ public:
       // the scope is an ancestor of the scope we're currently leaving.
       auto isAncestorScope = [](const SILDebugScope *Cur,
                                 const SILDebugScope *Previous) {
+        assert(Cur && "null current scope queried");
+        assert(Previous && "null previous scope queried");
         const SILDebugScope *Tmp = Previous;
-        assert(Tmp && "scope can't be null");
         while (Tmp) {
-          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
-              Tmp->Parent;
+          auto Parent = Tmp->Parent;
           auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
-          if (!ParentScope)
-            break;
           if (ParentScope == Cur)
             return true;
           Tmp = ParentScope;
@@ -5838,13 +5839,28 @@ public:
 
       if (isAncestorScope(DS, LastSeenScope)) {
         LastSeenScope = DS;
+        LastSeenScopeInst = &SI;
         continue;
       }
       if (DS != LastSeenScope) {
-        LLVM_DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
-        LLVM_DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
-        LLVM_DEBUG(llvm::dbgs() <<
-          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
+        llvm::errs() << "Broken instruction!\n"; 
+        SI.dump();
+#ifndef NDEBUG
+        llvm::errs() << "in scope\n";
+        DS->print(SI.getFunction()->getModule());
+#endif
+        llvm::errs() << "Previous, non-contiguous scope set by";
+        LastSeenScopeInst->dump();
+#ifndef NDEBUG
+        llvm::errs() << "in scope\n";
+        LastSeenScope->print(SI.getFunction()->getModule());
+#endif
+        llvm::errs() << "Please report a bug on bugs.swift.org\n";
+        llvm::errs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n";
+        // Turn on debug info printing so that the log actually shows the bad
+        // scopes.
+        SILPrintDebugInfo.setValue(true);
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");

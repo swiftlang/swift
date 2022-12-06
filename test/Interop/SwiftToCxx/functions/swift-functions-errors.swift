@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-experimental-cxx-interop -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -Wno-shadow -Wno-unused-function)
 
 // CHECK-LABEL: namespace Functions __attribute__((swift_private)) {
 
@@ -31,7 +31,7 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::Error(opaqueError))
+// CHECK: throw (Swift::Error(opaqueError))
 // CHECK: }
 
 class TestDestroyed {
@@ -53,7 +53,7 @@ public func testDestroyedError() throws { throw DestroyedError() }
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18testDestroyedErroryyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::Error(opaqueError))
+// CHECK: throw (Swift::Error(opaqueError))
 // CHECK: }
 
 @_expose(Cxx)
@@ -67,7 +67,7 @@ public func throwFunction() throws {
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions13throwFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::Error(opaqueError))
+// CHECK: throw (Swift::Error(opaqueError))
 // CHECK: }
 
 @_expose(Cxx)
@@ -82,6 +82,6 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: void* _ctx = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::Error(opaqueError))
+// CHECK: throw (Swift::Error(opaqueError))
 // CHECK: return returnValue;
 // CHECK: }

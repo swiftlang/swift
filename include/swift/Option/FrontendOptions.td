@@ -119,9 +119,6 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
-def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
-  HelpText<"Verify that no unknown nodes exist in the libSyntax tree">;
-
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
   
@@ -342,6 +339,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
+
+def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
+  HelpText<"Dumps the results of each macro expansion">;
 
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -831,9 +831,6 @@ def ignore_always_inline : Flag<["-"], "ignore-always-inline">,
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
-
-def emit_syntax : Flag<["-"], "emit-syntax">,
-  HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
 
 def cxx_interop_getters_setters_as_properties :
   Flag<["-"], "cxx-interop-getters-setters-as-properties">,

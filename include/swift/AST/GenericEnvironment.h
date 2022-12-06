@@ -64,9 +64,10 @@ struct OpenedExistentialEnvironmentData {
   UUID uuid;
 };
 
-/// Extra data in a generic environment for an opened element.
+/// Extra data in a generic environment for an opened pack element.
 struct OpenedElementEnvironmentData {
   UUID uuid;
+  SubstitutionMap outerSubstitutions;
 };
 
 /// Describes the mapping between archetypes and interface types for the
@@ -139,7 +140,8 @@ private:
       Type existential, GenericSignature parentSig, UUID uuid);
 
   /// Private constructor for opened element environments.
-  explicit GenericEnvironment(GenericSignature signature, UUID uuid);
+  explicit GenericEnvironment(GenericSignature signature, UUID uuid,
+                              SubstitutionMap outerSubs);
 
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
@@ -181,8 +183,22 @@ public:
   /// create a generic environment.
   SubstitutionMap getOpaqueSubstitutions() const;
 
+  /// Retrieve the substitutions for the outer generic parameters of an
+  /// opened pack element generic environment.
+  SubstitutionMap getPackElementContextSubstitutions() const;
+
   /// Retrieve the UUID for an opened element environment.
   UUID getOpenedElementUUID() const;
+
+  using PackElementBinding =
+      std::pair<ElementArchetypeType *, PackArchetypeType *>;
+
+  /// Retrieve the bindings for the opened pack element archetypes in this
+  /// generic environment to the pack archetypes that contain them.
+  ///
+  /// \param bindings The vector to populate with the pack element bindings.
+  void getPackElementBindings(
+      SmallVectorImpl<PackElementBinding> &bindings) const;
 
   /// Create a new, primary generic environment.
   static GenericEnvironment *forPrimary(GenericSignature signature);
@@ -206,8 +222,11 @@ public:
   /// signature of the context whose element type is being opened, but with
   /// the pack parameter bit erased from one or more generic parameters
   /// \param uuid The unique identifier for this opened element
+  /// \param outerSubs The substitution map containing archetypes from the
+  /// outer generic context.
   static GenericEnvironment *
-  forOpenedElement(GenericSignature signature, UUID uuid);
+  forOpenedElement(GenericSignature signature, UUID uuid,
+                   SubstitutionMap outerSubs);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -219,8 +238,9 @@ public:
     return Mem; 
   }
 
-  /// For an opaque archetype environment, apply the substitutions.
-  Type maybeApplyOpaqueTypeSubstitutions(Type type) const;
+  /// For an opaque or pack element archetype environment, apply the
+  /// substitutions.
+  Type maybeApplyOuterContextSubstitutions(Type type) const;
 
   /// Compute the canonical interface type within this environment.
   Type getCanonicalInterfaceType(Type interfaceType);

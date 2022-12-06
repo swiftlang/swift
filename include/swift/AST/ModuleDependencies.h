@@ -125,6 +125,9 @@ struct CommonSwiftTextualModuleDependencyDetails {
 class SwiftInterfaceModuleDependenciesStorage :
   public ModuleDependenciesStorageBase {
 public:
+  /// Destination output path
+  const std::string moduleOutputPath;
+
   /// The Swift interface file to be used to generate the module file.
   const std::string swiftInterfaceFile;
 
@@ -145,6 +148,7 @@ public:
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
   SwiftInterfaceModuleDependenciesStorage(
+      const std::string moduleOutputPath,
       const std::string swiftInterfaceFile,
       ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
@@ -152,6 +156,7 @@ public:
       StringRef contextHash,
       bool isFramework
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftInterface),
+      moduleOutputPath(moduleOutputPath),
       swiftInterfaceFile(swiftInterfaceFile),
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
@@ -237,6 +242,9 @@ public:
 /// This class is mostly an implementation detail for \c ModuleDependencies.
 class ClangModuleDependenciesStorage : public ModuleDependenciesStorageBase {
 public:
+  /// Destination output path
+  const std::string pcmOutputPath;
+  
   /// The module map file used to generate the Clang module.
   const std::string moduleMapFile;
 
@@ -254,12 +262,14 @@ public:
   const std::vector<std::string> capturedPCMArgs;
 
   ClangModuleDependenciesStorage(
+      const std::string &pcmOutputPath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang),
+      pcmOutputPath(pcmOutputPath),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
       nonPathCommandLine(nonPathCommandLine),
@@ -335,7 +345,8 @@ public:
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterfaceModule(
-      std::string swiftInterfaceFile,
+      const std::string &moduleOutputPath,
+      const std::string &swiftInterfaceFile,
       ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
@@ -343,7 +354,7 @@ public:
       bool isFramework) {
     return ModuleDependencies(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
-          swiftInterfaceFile, compiledCandidates, buildCommands,
+          moduleOutputPath, swiftInterfaceFile, compiledCandidates, buildCommands,
           extraPCMArgs, contextHash, isFramework));
   }
 
@@ -367,6 +378,7 @@ public:
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencies forClangModule(
+      const std::string &pcmOutputPath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
@@ -374,8 +386,8 @@ public:
       const std::vector<std::string> &capturedPCMArgs) {
     return ModuleDependencies(
         std::make_unique<ClangModuleDependenciesStorage>(
-          moduleMapFile, contextHash, nonPathCommandLine,
-          fileDependencies, capturedPCMArgs));
+          pcmOutputPath, moduleMapFile, contextHash,
+          nonPathCommandLine, fileDependencies, capturedPCMArgs));
   }
 
   /// Describe a placeholder dependency swift module.

@@ -196,7 +196,7 @@ class Verifier : public ASTWalker {
   SmallVector<ScopeLike, 4> Scopes;
 
   /// The stack of generic contexts.
-  using GenericLike = llvm::PointerUnion<DeclContext *, GenericSignature>;
+  using GenericLike = llvm::PointerUnion<DeclContext *, GenericEnvironment *>;
   SmallVector<GenericLike, 2> Generics;
 
   /// The stack of optional evaluations active at this point.
@@ -634,10 +634,21 @@ public:
 
           auto genericCtx = Generics.back();
           GenericSignature genericSig;
-          if (auto *genericDC = genericCtx.dyn_cast<DeclContext *>())
+          if (auto *genericDC = genericCtx.dyn_cast<DeclContext *>()) {
             genericSig = genericDC->getGenericSignatureOfContext();
-          else
-            genericSig = genericCtx.get<GenericSignature>();
+          } else {
+            auto *genericEnv = genericCtx.get<GenericEnvironment *>();
+            genericSig = genericEnv->getGenericSignature();
+
+            // Check whether this archetype is a substitution from the
+            // outer generic context of an opened element environment.
+            if (genericEnv->getKind() == GenericEnvironment::Kind::OpenedElement) {
+              auto contextSubs = genericEnv->getPackElementContextSubstitutions();
+              QuerySubstitutionMap isInContext{contextSubs};
+              if (isInContext(root->getInterfaceType()->castTo<GenericTypeParamType>()))
+                return false;
+            }
+          }
 
           if (genericSig.getPointer() != archetypeSig.getPointer()) {
             Out << "Archetype " << root->getString() << " not allowed "
@@ -824,7 +835,7 @@ public:
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
-      Generics.push_back(expr->getGenericEnvironment()->getGenericSignature());
+      Generics.push_back(expr->getGenericEnvironment());
 
       for (auto *placeholder : expr->getOpaqueValues()) {
         assert(!OpaqueValues.count(placeholder));
@@ -837,8 +848,8 @@ public:
     void verifyCheckedAlways(PackExpansionExpr *E) {
       // Remove the element generic environment before verifying
       // the pack expansion type, which contains pack archetypes.
-      assert(Generics.back().get<GenericSignature>().getPointer() ==
-             E->getGenericEnvironment()->getGenericSignature().getPointer());
+      assert(Generics.back().get<GenericEnvironment *>() ==
+             E->getGenericEnvironment());
       Generics.pop_back();
       verifyCheckedAlwaysBase(E);
     }

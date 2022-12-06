@@ -950,9 +950,9 @@ private:
     auto conditionalKind = classifyFunctionBodyImpl(fn, fn->getBody(),
                                                     /*allowNone*/ false,
                                                     kind);
-    if (conditionalKind.hasValue()) {
+    if (conditionalKind.has_value()) {
       return Classification::forEffect(kind,
-                                       conditionalKind.getValue(),
+                                       conditionalKind.value(),
                                        reason);
     }
     return Classification::forInvalidCode();
@@ -980,9 +980,9 @@ private:
     auto conditionalKind = classifyFunctionBodyImpl(closure, body,
                                                     /*allowNone*/ isAutoClosure,
                                                     kind);
-    if (conditionalKind.hasValue()) {
+    if (conditionalKind.has_value()) {
       return Classification::forEffect(kind,
-                                       conditionalKind.getValue(),
+                                       conditionalKind.value(),
                                        reason);
     }
     return Classification::forInvalidCode();
@@ -1888,10 +1888,10 @@ public:
     if (forAwait)
       return 2;
 
-    if (!maybeReason.hasValue())
+    if (!maybeReason.has_value())
       return 0; // Unspecified
 
-    switch(maybeReason.getValue().getKind()) {
+    switch(maybeReason.value().getKind()) {
     case PotentialEffectReason::Kind::ByClosure:
     case PotentialEffectReason::Kind::ByDefaultClosure:
     case PotentialEffectReason::Kind::ByConformance:

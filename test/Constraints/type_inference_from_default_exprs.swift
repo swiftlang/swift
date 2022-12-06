@@ -208,7 +208,7 @@ protocol StorageType {
   var identifier: String { get }
 }
 
-class Storage {
+class Storage { // expected-note {{class 'Storage' is not public}}
 }
 
 extension Storage {
@@ -252,4 +252,17 @@ struct S61061_2<T> where T:Hashable {
 
 struct S61061_3<T> where T:Hashable {
   init(x:[(T, T)] = [(1, 1)]) {} // OK
+}
+
+// https://github.com/apple/swift/issues/62025
+// Syntactic checks are not run on the default argument expressions
+public struct MyStruct {} // expected-note {{initializer 'init()' is not public}}
+public func issue62025_with_init<T>(_: T = MyStruct()) {}
+// expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
+public func issue62025_with_type<T>(_: T = Storage.self) {}
+// expected-error@-1 {{class 'Storage' is internal and cannot be referenced from a default argument value}}
+do {
+  func default_with_dup_keys<T>(_: T = ["a": 1, "a": 2]) {}
+  // expected-warning@-1 {{dictionary literal of type '[String : Int]' has duplicate entries for string literal key 'a'}}
+  // expected-note@-2 2 {{duplicate key declared here}}
 }

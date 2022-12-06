@@ -38,7 +38,7 @@ static bool requiresLinkerDirective(Decl *D) {
   for (auto *attr : D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.hasValue())
+      if (Active.has_value())
         return true;
     }
   }
@@ -320,15 +320,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     // Metaclasses and ObjC classes (duh) are an ObjC thing, and so are not
     // needed in build artifacts/for classes which can't touch ObjC.
     if (objCCompatible) {
-      if (isObjC)
+      if (isObjC || CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
         Visitor.addObjCInterface(CD);
-
-      if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC) {
-        // If an ObjCInterface was not added, ObjC Metaclass may still need to
-        // be included.
-        if (!isObjC)
-          Visitor.addObjCMetaclass(CD);
-      } else
+      else
         Visitor.addSwiftMetaclassStub(CD);
     }
 
@@ -713,6 +707,7 @@ public:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::Macro:
     case DeclKind::MacroExpansion:
       return false;
     case DeclKind::BuiltinTuple:

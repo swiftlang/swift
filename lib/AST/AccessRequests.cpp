@@ -127,6 +127,9 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   }
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
+  case DeclContextKind::MacroDecl:
+    // There are no declarations inside a macro.
+    return AccessLevel::Private;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -243,7 +246,7 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
       maxScope = maxScope->intersectWith(scope);
     }
 
-    if (!maxScope.hasValue()) {
+    if (!maxScope.has_value()) {
       // This is an error case and will be diagnosed elsewhere.
       maxAccess = AccessLevel::Public;
     } else if (maxScope->isPublic()) {
@@ -325,8 +328,8 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
   std::pair<AccessLevel, AccessLevel> value) const {
   auto extensionDecl = std::get<0>(getStorage());
   extensionDecl->setDefaultAndMaxAccessLevelBits(value.first, value.second);
-  assert(getCachedResult().getValue().first == value.first);
-  assert(getCachedResult().getValue().second == value.second);
+  assert(getCachedResult().value().first == value.first);
+  assert(getCachedResult().value().second == value.second);
 }
 
 // Define request evaluation functions for each of the access requests.

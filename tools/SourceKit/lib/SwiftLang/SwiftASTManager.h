@@ -161,7 +161,7 @@ public:
   void requestCancellation() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
     IsCancelled = true;
-    if (CancellationRequestCallback.hasValue()) {
+    if (CancellationRequestCallback.has_value()) {
       (*CancellationRequestCallback)(shared_from_this());
       CancellationRequestCallback = None;
     }
@@ -177,7 +177,7 @@ public:
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    assert(!CancellationRequestCallback.hasValue() &&
+    assert(!CancellationRequestCallback.has_value() &&
            "Can't set two cancellation callbacks on a SwiftASTConsumer");
     if (IsCancelled) {
       NewCallback(shared_from_this());
@@ -262,8 +262,10 @@ public:
                   SourceKitCancellationToken CancellationToken,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
-  std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
-                                                      std::string &Error);
+  std::unique_ptr<llvm::MemoryBuffer>
+  getMemoryBuffer(StringRef Filename,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                  std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
                               ArrayRef<const char *> Args,

@@ -150,7 +150,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     bool isValid = false;
     if (auto Version = VersionParser::parseVersionString(
             SwiftVersion, SourceLoc(), nullptr)) {
-      if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+      if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
         Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
         isValid = true;
       }
@@ -172,7 +172,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_skip_inherited_docs),
       ParsedArgs.hasArg(OPT_include_spi_symbols),
       /*IncludeClangDocs=*/false,
-      ParsedArgs.hasArg(OPT_emit_extension_block_symbols),
+      ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
+                         OPT_omit_extension_block_symbols, /*default=*/false),
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {

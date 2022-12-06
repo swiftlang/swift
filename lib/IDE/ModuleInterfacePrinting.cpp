@@ -80,9 +80,8 @@ private:
                     PrintNameContext NameContext) override {
     return OtherPrinter.printTypeRef(T, TD, Name, NameContext);
   }
-  void printModuleRef(ModuleEntity Mod, Identifier Name,
-                      const PrintOptions &Options) override {
-    return OtherPrinter.printModuleRef(Mod, Name, Options);
+  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
+    return OtherPrinter.printModuleRef(Mod, Name);
   }
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     TypeOrExtensionDecl Target,
@@ -700,9 +699,9 @@ void swift::ide::printModuleInterface(
       if (!GroupNames.empty()){
         if (auto TargetGroup = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        TargetGroup.getValue()) != GroupNames.end()) {
+                        TargetGroup.value()) != GroupNames.end()) {
             FileRangedDecls.insert({
-              D->getSourceFileName().getValue(),
+              D->getSourceFileName().value(),
               std::vector<Decl*>()
             }).first->getValue().push_back(D);
           }
@@ -719,10 +718,10 @@ void swift::ide::printModuleInterface(
       auto &DeclsInFile = Entry.getValue();
       std::sort(DeclsInFile.begin(), DeclsInFile.end(),
                 [](Decl* LHS, Decl *RHS) {
-                  assert(LHS->getSourceOrder().hasValue());
-                  assert(RHS->getSourceOrder().hasValue());
-                  return LHS->getSourceOrder().getValue() <
-                         RHS->getSourceOrder().getValue();
+                  assert(LHS->getSourceOrder().has_value());
+                  assert(RHS->getSourceOrder().has_value());
+                  return LHS->getSourceOrder().value() <
+                         RHS->getSourceOrder().value();
                 });
 
       for (auto D : DeclsInFile) {
@@ -840,7 +839,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
 }
 
 static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
-  if (!File.getBufferID().hasValue())
+  if (!File.getBufferID().has_value())
     return;
   auto BufferID = *File.getBufferID();
 

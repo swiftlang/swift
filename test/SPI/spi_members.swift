@@ -14,7 +14,7 @@ public class Bar {
   public init() {}
 }
 
-public struct Resilient {
+public struct ResilientStructSPIMembers {
   public init() {}
 
   @_spi(Foo) public func method(_: Bar) {}
@@ -28,7 +28,7 @@ public struct Resilient {
   @_spi(Foo) @Wrapper public var wrappedProperty2 = Bar()
 }
 
-@frozen public struct Good {
+@frozen public struct FrozenStructSPIMembers {
   public init() {}
 
   @_spi(Foo) public func method(_: Bar) {}
@@ -55,7 +55,7 @@ public struct Resilient {
   // expected-error@-1 {{stored property 'wrappedProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
 }
 
-@frozen public struct Bad {
+@frozen public struct FrozenStructPublicMembers {
   public init() {}
 
   public func method(_: Bar) {} // expected-error {{cannot use class 'Bar' here; it is SPI}}
@@ -83,7 +83,7 @@ public struct Resilient {
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 }
 
-@frozen public struct BadPrivate {
+@frozen public struct FrozenStructPrivateMembers {
   private init() {}
 
   private func method(_: Bar) {}
@@ -109,4 +109,25 @@ public struct Resilient {
   // expected-error@-1 {{cannot use class 'Bar' here; it is SPI}}
   // expected-error@-2 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
+}
+
+public enum ResilientEnum {
+  @_spi(S)
+  case okSpiCase
+
+  @_spi(S)
+  case okSpiCaseWithPayload(_: Int)
+}
+
+@frozen
+public enum FrozenEnum {
+  case okCase
+
+  @_spi(S) // expected-error {{enum case 'spiCase' cannot be declared '@_spi' in a '@frozen' enum}}
+  case spiCase
+
+  case okCaseWithPayload(_: Int)
+
+  @_spi(S) // expected-error {{enum case 'spiCaseWithPayload' cannot be declared '@_spi' in a '@frozen' enum}}
+  case spiCaseWithPayload(_: Int)
 }

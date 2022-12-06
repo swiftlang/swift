@@ -847,14 +847,16 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
 
 bool RefactoringActionLocalRename::
 isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
-  if (CursorInfo.Kind != CursorInfoKind::ValueRef)
+  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (!ValueRefInfo)
     return false;
 
   Optional<RenameRefInfo> RefInfo;
-  if (CursorInfo.IsRef)
-    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+  if (ValueRefInfo->isRef())
+    RefInfo = {CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+               ValueRefInfo->isKeywordArgument()};
 
-  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
+  auto RenameOp = getAvailableRenameForDecl(ValueRefInfo->getValueD(), RefInfo);
   return RenameOp.hasValue() &&
     RenameOp.getValue() == RefactoringKind::LocalRename;
 }
@@ -884,6 +886,7 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::MacroDecl:
     break;
   }
 
@@ -907,13 +910,15 @@ bool RefactoringActionLocalRename::performChange() {
   CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
                           CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
                                  ResolvedCursorInfo());
-  if (CursorInfo.isValid() && CursorInfo.ValueD) {
-    ValueDecl *VD = CursorInfo.typeOrValue();
+  auto ValueRefCursorInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (ValueRefCursorInfo && ValueRefCursorInfo->getValueD()) {
+    ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
     SmallVector<DeclContext *, 8> Scopes;
 
     Optional<RenameRefInfo> RefInfo;
-    if (CursorInfo.IsRef)
-      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+    if (ValueRefCursorInfo->isRef())
+      RefInfo = {CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+                 ValueRefCursorInfo->isKeywordArgument()};
 
     analyzeRenameScope(VD, RefInfo, DiagEngine, Scopes);
     if (Scopes.empty())
@@ -1074,6 +1079,7 @@ ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
   case swift::DeclContextKind::FileUnit:
   case swift::DeclContextKind::GenericTypeDecl:
   case swift::DeclContextKind::ExtensionDecl:
+  case swift::DeclContextKind::MacroDecl:
     return ExtractCheckResult();
   }
   return ExtractCheckResult(AllReasons);
@@ -1815,11 +1821,12 @@ bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
 
 static std::pair<IfStmt *, IfStmt *>
 findCollapseNestedIfTarget(const ResolvedCursorInfo &CursorInfo) {
-  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+  auto StmtStartInfo = dyn_cast<ResolvedStmtStartCursorInfo>(&CursorInfo);
+  if (!StmtStartInfo)
     return {};
 
   // Ensure the statement is 'if' statement. It must not have 'else' clause.
-  IfStmt *OuterIf = dyn_cast<IfStmt>(CursorInfo.TrailingStmt);
+  IfStmt *OuterIf = dyn_cast<IfStmt>(StmtStartInfo->getTrailingStmt());
   if (!OuterIf)
     return {};
   if (OuterIf->getElseStmt())
@@ -2907,12 +2914,16 @@ FillProtocolStubContext FillProtocolStubContext::
 getContextFromCursorInfo(const ResolvedCursorInfo &CursorInfo) {
   if(!CursorInfo.isValid())
     return FillProtocolStubContext();
-  if (!CursorInfo.IsRef) {
+  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (!ValueRefInfo) {
+    return FillProtocolStubContext();
+  }
+  if (!ValueRefInfo->isRef()) {
     // If the type name is on the declared nominal, e.g. "class A {}"
-    if (auto ND = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD)) {
+    if (auto ND = dyn_cast<NominalTypeDecl>(ValueRefInfo->getValueD())) {
       return FillProtocolStubContext(ND);
     }
-  } else if (auto *ED = CursorInfo.ExtTyRef) {
+  } else if (auto *ED = ValueRefInfo->getExtTyRef()) {
     // If the type ref is on a declared extension, e.g. "extension A {}"
     return FillProtocolStubContext(ED);
   }
@@ -3061,12 +3072,12 @@ isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
       Diag.diagnose(SourceLoc(), diag::invalid_default_location);
     return Applicable;
   };
-  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
+  auto StmtStartInfo = dyn_cast<ResolvedStmtStartCursorInfo>(&CursorInfo);
+  if (!StmtStartInfo)
     return Exit(false);
-  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
-    auto EnclosingSwitchStmt = findEnclosingSwitchStmt(CS,
-                                                       CursorInfo.SF,
-                                                       Diag);
+  if (auto *CS = dyn_cast<CaseStmt>(StmtStartInfo->getTrailingStmt())) {
+    auto EnclosingSwitchStmt =
+        findEnclosingSwitchStmt(CS, CursorInfo.getSourceFile(), Diag);
     if (!EnclosingSwitchStmt)
       return false;
     auto EnumD = getEnumDeclFromSwitchStmt(EnclosingSwitchStmt);
@@ -3079,7 +3090,8 @@ isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
 bool RefactoringActionExpandDefault::performChange() {
   // If we've not seen the default statement inside the switch statement, issue
   // error.
-  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
+  auto StmtStartInfo = cast<ResolvedStmtStartCursorInfo>(CursorInfo);
+  auto *CS = static_cast<CaseStmt *>(StmtStartInfo.getTrailingStmt());
   auto *SwitchS = findEnclosingSwitchStmt(CS, TheFile, DiagEngine);
   assert(SwitchS);
   EditorConsumerInsertStream OS(EditConsumer, SM,
@@ -3093,16 +3105,18 @@ bool RefactoringActionExpandDefault::performChange() {
 
 bool RefactoringActionExpandSwitchCases::
 isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &DiagEngine) {
-  if (!CursorInfo.TrailingStmt)
+  auto StmtStartInfo = dyn_cast<ResolvedStmtStartCursorInfo>(&CursorInfo);
+  if (!StmtStartInfo || !StmtStartInfo->getTrailingStmt())
     return false;
-  if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
+  if (auto *Switch = dyn_cast<SwitchStmt>(StmtStartInfo->getTrailingStmt())) {
     return getEnumDeclFromSwitchStmt(Switch);
   }
   return false;
 }
 
 bool RefactoringActionExpandSwitchCases::performChange() {
-  auto *SwitchS = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt);
+  auto StmtStartInfo = cast<ResolvedStmtStartCursorInfo>(CursorInfo);
+  auto *SwitchS = dyn_cast<SwitchStmt>(StmtStartInfo.getTrailingStmt());
   assert(SwitchS);
 
   auto InsertRange = CharSourceRange();
@@ -3130,7 +3144,8 @@ bool RefactoringActionExpandSwitchCases::performChange() {
 }
 
 static Expr *findLocalizeTarget(const ResolvedCursorInfo &CursorInfo) {
-  if (CursorInfo.Kind != CursorInfoKind::ExprStart)
+  auto ExprStartInfo = dyn_cast<ResolvedExprStartCursorInfo>(&CursorInfo);
+  if (!ExprStartInfo)
     return nullptr;
   struct StringLiteralFinder: public SourceEntityWalker {
     SourceLoc StartLoc;
@@ -3147,8 +3162,8 @@ static Expr *findLocalizeTarget(const ResolvedCursorInfo &CursorInfo) {
       }
       return true;
     }
-  } Walker(CursorInfo.TrailingExpr->getStartLoc());
-  Walker.walk(CursorInfo.TrailingExpr);
+  } Walker(ExprStartInfo->getTrailingExpr()->getStartLoc());
+  Walker.walk(ExprStartInfo->getTrailingExpr());
   return Walker.Target;
 }
 
@@ -3236,13 +3251,14 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
 static SourceLoc
 collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
                       SmallVectorImpl<MemberwiseParameter> &memberVector) {
-
-  if (!CursorInfo.ValueD)
+  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (!ValueRefInfo || !ValueRefInfo->getValueD())
     return SourceLoc();
-  
-  NominalTypeDecl *nominalDecl = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD);
+
+  NominalTypeDecl *nominalDecl =
+      dyn_cast<NominalTypeDecl>(ValueRefInfo->getValueD());
   if (!nominalDecl || nominalDecl->getStoredProperties().empty() ||
-      CursorInfo.IsRef) {
+      ValueRefInfo->isRef()) {
     return SourceLoc();
   }
 
@@ -3517,14 +3533,15 @@ getProtocolRequirements() {
 
 AddEquatableContext AddEquatableContext::
 getDeclarationContextFromInfo(const ResolvedCursorInfo &Info) {
-  if (Info.isInvalid()) {
+  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&Info);
+  if (!ValueRefInfo) {
     return AddEquatableContext();
   }
-  if (!Info.IsRef) {
-    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(Info.ValueD)) {
+  if (!ValueRefInfo->isRef()) {
+    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(ValueRefInfo->getValueD())) {
       return AddEquatableContext(NomDecl);
     }
-  } else if (auto *ExtDecl = Info.ExtTyRef) {
+  } else if (auto *ExtDecl = ValueRefInfo->getExtTyRef()) {
     if (ExtDecl->getExtendedNominal()) {
       return AddEquatableContext(ExtDecl);
     }
@@ -3715,11 +3732,12 @@ void AddCodableContext::printInsertionText(const ResolvedCursorInfo &CursorInfo,
 
 AddCodableContext AddCodableContext::getDeclarationContextFromInfo(
     const ResolvedCursorInfo &Info) {
-  if (Info.isInvalid()) {
+  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&Info);
+  if (!ValueRefInfo) {
     return AddCodableContext();
   }
-  if (!Info.IsRef) {
-    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(Info.ValueD)) {
+  if (!ValueRefInfo->isRef()) {
+    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(ValueRefInfo->getValueD())) {
       return AddCodableContext(NomDecl);
     }
   }
@@ -3746,10 +3764,9 @@ bool RefactoringActionAddExplicitCodableImplementation::performChange() {
 }
 
 static CharSourceRange
-findSourceRangeToWrapInCatch(const ResolvedCursorInfo &CursorInfo,
-                             SourceFile *TheFile,
-                             SourceManager &SM) {
-  Expr *E = CursorInfo.TrailingExpr;
+findSourceRangeToWrapInCatch(const ResolvedExprStartCursorInfo &CursorInfo,
+                             SourceFile *TheFile, SourceManager &SM) {
+  Expr *E = CursorInfo.getTrailingExpr();
   if (!E)
     return CharSourceRange();
   auto Node = ASTNode(E);
@@ -3777,15 +3794,17 @@ findSourceRangeToWrapInCatch(const ResolvedCursorInfo &CursorInfo,
 
 bool RefactoringActionConvertToDoCatch::
 isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
-  if (!Tok.TrailingExpr)
+  auto ExprStartInfo = dyn_cast<ResolvedExprStartCursorInfo>(&Tok);
+  if (!ExprStartInfo || !ExprStartInfo->getTrailingExpr())
     return false;
-  return isa<ForceTryExpr>(Tok.TrailingExpr);
+  return isa<ForceTryExpr>(ExprStartInfo->getTrailingExpr());
 }
 
 bool RefactoringActionConvertToDoCatch::performChange() {
-  auto *TryExpr = dyn_cast<ForceTryExpr>(CursorInfo.TrailingExpr);
+  auto ExprStartInfo = cast<ResolvedExprStartCursorInfo>(CursorInfo);
+  auto *TryExpr = dyn_cast<ForceTryExpr>(ExprStartInfo.getTrailingExpr());
   assert(TryExpr);
-  auto Range = findSourceRangeToWrapInCatch(CursorInfo, TheFile, SM);
+  auto Range = findSourceRangeToWrapInCatch(ExprStartInfo, TheFile, SM);
   if (!Range.isValid())
     return true;
   // Wrap given range in do catch block.
@@ -3805,7 +3824,8 @@ bool RefactoringActionConvertToDoCatch::performChange() {
 static NumberLiteralExpr *getTrailingNumberLiteral(
     const ResolvedCursorInfo &Tok) {
   // This cursor must point to the start of an expression.
-  if (Tok.Kind != CursorInfoKind::ExprStart)
+  auto ExprStartInfo = dyn_cast<ResolvedExprStartCursorInfo>(&Tok);
+  if (!ExprStartInfo)
     return nullptr;
 
   // For every sub-expression, try to find the literal expression that matches
@@ -3832,7 +3852,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(
     }
   };
 
-  auto parent = Tok.TrailingExpr;
+  auto parent = ExprStartInfo->getTrailingExpr();
   FindLiteralNumber finder(parent);
   parent->walk(finder);
   return finder.found;
@@ -3903,16 +3923,15 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
 
 static CallExpr *findTrailingClosureTarget(
     SourceManager &SM, const ResolvedCursorInfo &CursorInfo) {
-  if (CursorInfo.Kind == CursorInfoKind::StmtStart)
+  if (CursorInfo.getKind() == CursorInfoKind::StmtStart)
     // StmtStart postion can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr
-  ContextFinder
-  Finder(*CursorInfo.SF, CursorInfo.Loc,
-         [](ASTNode N) {
-           return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
-         });
+  ContextFinder Finder(
+      *CursorInfo.getSourceFile(), CursorInfo.getLoc(), [](ASTNode N) {
+        return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
+      });
   Finder.resolve();
   auto contexts = Finder.getContexts();
   if (contexts.empty())
@@ -3944,7 +3963,7 @@ static CallExpr *findTrailingClosureTarget(
 
 bool RefactoringActionTrailingClosure::
 isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
-  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  SourceManager &SM = CursorInfo.getSourceFile()->getASTContext().SourceMgr;
   return findTrailingClosureTarget(SM, CursorInfo);
 }
 
@@ -4145,7 +4164,8 @@ CallExpr *findOuterCall(const ResolvedCursorInfo &CursorInfo) {
   // TODO: Bit pointless using the "ContextFinder" here. Ideally we would have
   //       already generated a slice of the AST for anything that contains
   //       the cursor location
-  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc, IncludeInContext);
+  ContextFinder Finder(*CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+                       IncludeInContext);
   Finder.resolve();
   auto Contexts = Finder.getContexts();
   if (Contexts.empty())
@@ -4155,8 +4175,8 @@ CallExpr *findOuterCall(const ResolvedCursorInfo &CursorInfo) {
   if (!CE)
     return nullptr;
 
-  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
-  if (!SM.rangeContains(CE->getFn()->getSourceRange(), CursorInfo.Loc))
+  SourceManager &SM = CursorInfo.getSourceFile()->getASTContext().SourceMgr;
+  if (!SM.rangeContains(CE->getFn()->getSourceRange(), CursorInfo.getLoc()))
     return nullptr;
   return CE;
 }
@@ -4170,7 +4190,8 @@ FuncDecl *findFunction(const ResolvedCursorInfo &CursorInfo) {
     return false;
   };
 
-  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc, IncludeInContext);
+  ContextFinder Finder(*CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+                       IncludeInContext);
   Finder.resolve();
 
   auto Contexts = Finder.getContexts();
@@ -4188,10 +4209,10 @@ FuncDecl *findFunction(const ResolvedCursorInfo &CursorInfo) {
   if (!Body && !isa<ProtocolDecl>(FD->getDeclContext()))
     return nullptr;
 
-  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  SourceManager &SM = CursorInfo.getSourceFile()->getASTContext().SourceMgr;
   SourceLoc DeclEnd = Body ? Body->getLBraceLoc() : FD->getEndLoc();
   if (!SM.rangeContains(SourceRange(FD->getStartLoc(), DeclEnd),
-                        CursorInfo.Loc))
+                        CursorInfo.getLoc()))
     return nullptr;
 
   return FD;
@@ -8261,10 +8282,9 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
          "Should not run performChange when refactoring is not applicable");
 
   // Find the scope this call is in
-  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc,
-                      [](ASTNode N) {
-    return N.isStmt(StmtKind::Brace) && !N.isImplicit();
-  });
+  ContextFinder Finder(
+      *CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+      [](ASTNode N) { return N.isStmt(StmtKind::Brace) && !N.isImplicit(); });
   Finder.resolve();
   auto Scopes = Finder.getContexts();
   BraceStmt *Scope = nullptr;
@@ -8570,23 +8590,27 @@ void swift::ide::collectRenameAvailabilityInfo(
 void swift::ide::collectAvailableRefactorings(
     const ResolvedCursorInfo &CursorInfo,
     SmallVectorImpl<RefactoringKind> &Kinds, bool ExcludeRename) {
-  DiagnosticEngine DiagEngine(CursorInfo.SF->getASTContext().SourceMgr);
+  DiagnosticEngine DiagEngine(
+      CursorInfo.getSourceFile()->getASTContext().SourceMgr);
 
   if (!ExcludeRename) {
     if (RefactoringActionLocalRename::isApplicable(CursorInfo, DiagEngine))
       Kinds.push_back(RefactoringKind::LocalRename);
 
-    switch (CursorInfo.Kind) {
+    switch (CursorInfo.getKind()) {
     case CursorInfoKind::ModuleRef:
     case CursorInfoKind::Invalid:
     case CursorInfoKind::StmtStart:
     case CursorInfoKind::ExprStart:
       break;
     case CursorInfoKind::ValueRef: {
+      auto ValueRefInfo = cast<ResolvedValueRefCursorInfo>(CursorInfo);
       Optional<RenameRefInfo> RefInfo;
-      if (CursorInfo.IsRef)
-        RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
-      auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
+      if (ValueRefInfo.isRef())
+        RefInfo = {CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+                   ValueRefInfo.isKeywordArgument()};
+      auto RenameOp =
+          getAvailableRenameForDecl(ValueRefInfo.getValueD(), RefInfo);
       if (RenameOp.hasValue() &&
           RenameOp.getValue() == RefactoringKind::GlobalRename)
         Kinds.push_back(RenameOp.getValue());
@@ -8800,14 +8824,16 @@ int swift::ide::findLocalRenameRanges(
     evaluateOrDefault(SF->getASTContext().evaluator,
                       CursorInfoRequest{CursorInfoOwner(SF, StartLoc)},
                       ResolvedCursorInfo());
-  if (!CursorInfo.isValid() || !CursorInfo.ValueD) {
+  auto ValueRefCursorInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+  if (!ValueRefCursorInfo || !ValueRefCursorInfo->getValueD()) {
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;
   }
-  ValueDecl *VD = CursorInfo.typeOrValue();
+  ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
   Optional<RenameRefInfo> RefInfo;
-  if (CursorInfo.IsRef)
-    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+  if (ValueRefCursorInfo->isRef())
+    RefInfo = {CursorInfo.getSourceFile(), CursorInfo.getLoc(),
+               ValueRefCursorInfo->isKeywordArgument()};
 
   llvm::SmallVector<DeclContext *, 8> Scopes;
   analyzeRenameScope(VD, RefInfo, Diags, Scopes);

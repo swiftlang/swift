@@ -980,6 +980,7 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
                                                         unsigned depth) {
   DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Node *ProtoOrClass = node->getChild(1);
+  DEMANGLER_ASSERT(ProtoOrClass->hasChildren(), ProtoOrClass);
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     RETURN_IF_ERROR(manglePureProtocol(ProtoOrClass, depth + 1));
     auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
@@ -2857,6 +2858,12 @@ ManglingError Remangler::mangleStructure(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleSubscript(Node *node, unsigned depth) {
   return mangleAbstractStorage(node, "p", depth + 1);
+}
+
+ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "fm";
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {

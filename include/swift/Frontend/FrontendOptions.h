@@ -97,6 +97,9 @@ public:
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
 
+  /// A set of modules allowed to import this module.
+  std::set<std::string> AllowableClients;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -126,7 +129,6 @@ public:
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
-    EmitSyntax,        ///< Parse and dump Syntax tree as JSON
     DumpAST,           ///< Parse, type-check, and dump AST
     PrintAST,          ///< Parse, type-check, and pretty-print AST
     PrintASTDecl,      ///< Parse, type-check, and pretty-print AST declarations

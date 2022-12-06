@@ -132,7 +132,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
-      CI->getOperandBundle(LLVMContext::OB_ptrauth).hasValue()) {
+      CI->getOperandBundle(LLVMContext::OB_ptrauth).has_value()) {
     // The operand is the callee and it has already been signed. Ignore this
     // because we cannot add another ptrauth bundle to the call instruction.
     return false;
@@ -1271,15 +1271,15 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
     auto paramTy = fnType->getParamType(i);
     auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
     if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
       attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getPointerElementType());
+          paramTy->getNonOpaquePointerElementType());
     if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getPointerElementType() != attrList.getParamByValType(i))
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
       attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getPointerElementType());
+          paramTy->getNonOpaquePointerElementType());
   }
   return attrList;
 }

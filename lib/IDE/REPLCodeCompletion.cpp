@@ -159,6 +159,10 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::GlobalVar:
           OS << ": ";
           break;
+
+        case CodeCompletionDeclKind::Macro:
+          OS << ": ";
+          break;
         }
       } else {
         OS << ": ";
@@ -302,11 +306,11 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
 StringRef REPLCompletions::getRoot() const {
   if (Root)
-    return Root.getValue();
+    return Root.value();
 
   if (CookedResults.empty()) {
     Root = std::string();
-    return Root.getValue();
+    return Root.value();
   }
 
   std::string RootStr = CookedResults[0].InsertableString.str();
@@ -320,7 +324,7 @@ StringRef REPLCompletions::getRoot() const {
     RootStr.resize(MismatchPlace.first - RootStr.begin());
   }
   Root = RootStr;
-  return Root.getValue();
+  return Root.value();
 }
 
 REPLCompletions::CookedResult REPLCompletions::getPreviousStem() const {

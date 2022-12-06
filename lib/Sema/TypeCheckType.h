@@ -131,6 +131,9 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this type is the value carried in an enum case.
   EnumElementDecl,
 
+  /// Whether this type is a part of a macro declaration.
+  MacroDecl,
+
   /// Whether this is the payload subpattern of an enum pattern.
   EnumPatternPayload,
 
@@ -251,6 +254,7 @@ public:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -300,6 +304,7 @@ public:
     case Context::FunctionResult:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
@@ -344,6 +349,7 @@ public:
     case Context::FunctionResult:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
@@ -386,6 +392,7 @@ public:
     case Context::FunctionResult:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::ProtocolMetatypeBase:
     case Context::ImmediateOptionalTypeArgument:

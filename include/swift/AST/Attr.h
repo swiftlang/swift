@@ -2377,9 +2377,15 @@ public:
                     const Decl *D = nullptr);
 
   template <typename T, typename DERIVED>
-  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
+  class iterator_base {
     T *Impl;
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     explicit iterator_base(T *Impl) : Impl(Impl) {}
     DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
     bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
@@ -2628,13 +2634,13 @@ public:
     return true;
   }
 
-  bool hasConvention() const { return ConventionArguments.hasValue(); }
+  bool hasConvention() const { return ConventionArguments.has_value(); }
 
   /// Returns the primary calling convention string.
   ///
   /// Note: For C conventions, this may not represent the full convention.
   StringRef getConventionName() const {
-    return ConventionArguments.getValue().Name;
+    return ConventionArguments.value().Name;
   }
 
   /// Show the string enclosed between @convention(..)'s parentheses.
@@ -2658,10 +2664,10 @@ public:
 #include "swift/AST/ReferenceStorage.def"
   }
 
-  bool hasOpenedID() const { return OpenedID.hasValue(); }
+  bool hasOpenedID() const { return OpenedID.has_value(); }
   UUID getOpenedID() const { return *OpenedID; }
 
-  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  bool hasConstraintType() const { return ConstraintType.has_value(); }
   TypeRepr *getConstraintType() const { return *ConstraintType; }
 
   /// Given a name like "autoclosure", return the type attribute ID that
@@ -2678,11 +2684,16 @@ public:
   }
 
   // Iterator for the custom type attributes.
-  class iterator
-      : public std::iterator<std::forward_iterator_tag, CustomAttr *> {
+  class iterator {
     CustomAttr *attr;
 
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = CustomAttr*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     iterator() : attr(nullptr) { }
     explicit iterator(CustomAttr *attr) : attr(attr) { }
 

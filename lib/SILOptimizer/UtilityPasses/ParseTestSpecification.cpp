@@ -399,7 +399,7 @@ private:
       }
       auto index = subscript->get<unsigned long long>();
       return getInstructionAtIndex(index,
-                                   within.getValueOr(context->getFunction()));
+                                   within.value_or(context->getFunction()));
     }
     llvm_unreachable("bad suffix after 'instruction'!?");
   }
@@ -544,7 +544,6 @@ static TraceValueMap traceValues;
 
 class ParseTestSpecification {
   friend class ParseArgumentSpecification;
-  SILFunction *function;
   SmallVectorImpl<StringRef> &components;
 
   SILValue getTraceValue(unsigned index, SILFunction *function) {
@@ -561,9 +560,8 @@ class ParseTestSpecification {
   }
 
 public:
-  ParseTestSpecification(SILFunction *function,
-                         SmallVectorImpl<StringRef> &components)
-      : function(function), components(components) {}
+  ParseTestSpecification(SmallVectorImpl<StringRef> &components)
+      : components(components) {}
 
   void parse(UnparsedSpecification const &specification, Arguments &arguments) {
     StringRef specificationString = specification.string;
@@ -607,6 +605,6 @@ void swift::test::getTestSpecifications(
 void swift::test::parseTestArgumentsFromSpecification(
     SILFunction *function, UnparsedSpecification const &specification,
     Arguments &arguments, SmallVectorImpl<StringRef> &argumentStrings) {
-  ParseTestSpecification parser(function, argumentStrings);
+  ParseTestSpecification parser(argumentStrings);
   parser.parse(specification, arguments);
 }

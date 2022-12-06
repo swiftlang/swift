@@ -2625,7 +2625,7 @@ public:
       IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     SILValue jvpAndVJPArray[2];
-    if (JVPAndVJPFunctions.hasValue()) {
+    if (JVPAndVJPFunctions.has_value()) {
       jvpAndVJPArray[0] = JVPAndVJPFunctions->first;
       jvpAndVJPArray[1] = JVPAndVJPFunctions->second;
     }
@@ -2635,7 +2635,7 @@ public:
         JVPAndVJPFunctions,
         hasOwnership()
             ? DifferentiableFunctionInst::getMergedOwnershipKind(
-                  OriginalFunction, JVPAndVJPFunctions.hasValue()
+                  OriginalFunction, JVPAndVJPFunctions.has_value()
                                         ? ArrayRef<SILValue>(jvpAndVJPArray, 2)
                                         : ArrayRef<SILValue>())
             : ValueOwnershipKind(OwnershipKind::None));
@@ -2723,6 +2723,14 @@ public:
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
         getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
         FunctionType));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Weak linking support
+  //===--------------------------------------------------------------------===//
+  HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
+    return insert(new (getModule()) HasSymbolInst(
+        getModule(), getSILDebugLocation(Loc), Decl));
   }
 
   //===--------------------------------------------------------------------===//

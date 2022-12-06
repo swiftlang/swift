@@ -4086,6 +4086,32 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+/// HasSymbolInst - Determines whether a weakly-imported declaration is
+/// available at runtime. Produces true if each of the underlying symbol
+/// addresses associated with a given declaration are non-null, false otherwise.
+class HasSymbolInst final : public LiteralInst {
+private:
+  friend SILBuilder;
+
+  ValueDecl *Decl;
+
+public:
+  HasSymbolInst(SILModule &M, SILDebugLocation Loc, ValueDecl *Decl)
+      : LiteralInst(SILInstructionKind::HasSymbolInst, Loc,
+                    SILType::getBuiltinIntegerType(1, Decl->getASTContext())),
+        Decl{Decl} {}
+
+  ValueDecl *getDecl() const { return Decl; }
+  void getReferencedFunctions(llvm::SmallVector<SILFunction *, 4> &fns) const;
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(SILNodePointer node) {
+    return node->getKind() == SILNodeKind::HasSymbolInst;
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Memory instructions.
 //===----------------------------------------------------------------------===//
@@ -5826,7 +5852,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -5837,11 +5863,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 
   StructDecl *getStructDecl() const {
@@ -6116,7 +6142,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -6127,11 +6153,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 };
 
@@ -6172,7 +6198,7 @@ public:
     return index;
   }
 
-  bool hasOperand() const { return OptionalOperand.hasValue(); }
+  bool hasOperand() const { return OptionalOperand.has_value(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
 
   Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
@@ -8974,7 +9000,7 @@ protected:
       cases[i] = CaseBBs[i].first;
       if (Counts) {
         ::new (succs + i)
-            SILSuccessor(this, CaseBBs[i].second, Counts.getValue()[i]);
+            SILSuccessor(this, CaseBBs[i].second, Counts.value()[i]);
       } else {
         ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
       }
@@ -9628,6 +9654,34 @@ public:
     }
     llvm_unreachable("invalid derivative kind");
   }
+
+  
+  /// Returns true iff the operand corresponding to the given extractee kind
+  /// exists.
+  bool hasExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      return true;
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      return hasDerivativeFunctions();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
+
+  /// Returns the operand corresponding to the given extractee kind.
+  SILValue
+  getExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      return getOriginalFunction();
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      return getJVPFunction();
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      return getVJPFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
 };
 
 /// LinearFunctionInst - given a function, its derivative and transpose functions,
@@ -9667,6 +9721,31 @@ public:
   SILValue getTransposeFunction() const {
     assert(HasTransposeFunction);
     return getOperand(1);
+  }
+
+  
+  /// Returns true iff the operand corresponding to the given extractee kind
+  /// exists.
+  bool hasExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return true;
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      return hasTransposeFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
+
+  /// Returns the operand corresponding to the given extractee kind.
+  SILValue
+  getExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return getOriginalFunction();
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      return getTransposeFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
   }
 };
 

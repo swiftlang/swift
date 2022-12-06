@@ -50,7 +50,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/Syntax/SyntaxKind.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Comment.h"
@@ -124,7 +123,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  SyntaxKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -257,7 +256,7 @@ public:
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
-  void completeInPrecedenceGroup(SyntaxKind SK) override;
+  void completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -288,7 +287,7 @@ public:
   void completeTypeAttrBeginning() override;
   void completeOptionalBinding() override;
 
-  void doneParsing() override;
+  void doneParsing(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -467,7 +466,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
   AttTargetIsIndependent = isIndependent;
 }
 
-void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
+void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -787,11 +786,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     // FIXME: This should use canUseAttributeOnDecl.
 
     // Remove user inaccessible keywords.
-    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK))
+    if (DAK.has_value() && DeclAttribute::isUserInaccessible(*DAK))
       return;
 
     // Remove keywords only available when concurrency is enabled.
-    if (DAK.hasValue() && !IsConcurrencyEnabled &&
+    if (DAK.has_value() && !IsConcurrencyEnabled &&
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
 
@@ -806,7 +805,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 
 #define DECL_KEYWORD(kw)                                                       \
   AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   // Manually add "actor" because it's a contextual keyword.
   AddDeclKeyword("actor", CodeCompletionKeywordKind::None, None);
 
@@ -843,7 +842,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     addKeyword(Sink, Name, Kind, "", flair);
   };
 #define STMT_KEYWORD(kw) AddStmtKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 }
 
 static void addCaseStmtKeywords(CodeCompletionResultSink &Sink) {
@@ -1333,7 +1332,7 @@ void swift::ide::deliverCompletionResults(
         if (!Result.second)
           return; // already handled.
         RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups});
+          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
 
         auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
@@ -1351,7 +1350,7 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes);
+      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();
@@ -1553,7 +1552,7 @@ static void undoSingleExpressionReturn(DeclContext *DC) {
   }
 }
 
-void CodeCompletionCallbacksImpl::doneParsing() {
+void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
   if (Kind == CompletionKind::None) {

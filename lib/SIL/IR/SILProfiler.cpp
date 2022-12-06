@@ -191,8 +191,8 @@ namespace {
 template <typename F>
 ASTWalker::PreWalkAction
 visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
-  assert(AFD->hasBody());
   if (Walker.Parent.isNull()) {
+    assert(AFD->hasBody());
     Func();
     return ASTWalker::Action::Continue();
   }
@@ -207,14 +207,14 @@ shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
   // Profiling for closures should be handled separately. Do not visit
   // closure expressions twice.
   if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-    assert(CE->hasBody());
-
     // A non-null parent means we have a closure child, which we will visit
     // separately. Even if the parent is null, don't walk into a closure if the
     // SILDeclRef is not for a closure, as it could be for a property
     // initializer instead.
     if (!Parent.isNull() || !Constant || !Constant.getAbstractClosureExpr())
       return Action::SkipChildren(E);
+
+    assert(CE->hasBody());
   }
   return Action::Continue(E);
 }
@@ -525,7 +525,7 @@ public:
     return Iter->second;
   }
 
-  bool hasStartLoc() const { return StartLoc.hasValue(); }
+  bool hasStartLoc() const { return StartLoc.has_value(); }
 
   void setStartLoc(SourceLoc Loc) {
     assert(Loc.isValid());
@@ -537,7 +537,7 @@ public:
     return *StartLoc;
   }
 
-  bool hasEndLoc() const { return EndLoc.hasValue(); }
+  bool hasEndLoc() const { return EndLoc.has_value(); }
 
   void setEndLoc(SourceLoc Loc) {
     assert(Loc.isValid());

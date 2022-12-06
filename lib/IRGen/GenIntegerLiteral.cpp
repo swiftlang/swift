@@ -54,7 +54,11 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
+                                                      ScalarKind::POD);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -90,7 +94,7 @@ public:
     auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
     mask.appendSetBits(pointerSize.getValueInBits());
     mask.appendClearBits(pointerSize.getValueInBits());
-    return mask.build().getValue();
+    return mask.build().value();
   }
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,

@@ -178,6 +178,8 @@ static bool areConservativelyCompatibleArgumentLabels(
     if (!varTy->mayBeCallable(cs.DC))
       return false;
     fnType = varTy->getAs<AnyFunctionType>();
+  } else if (auto *MD = dyn_cast<MacroDecl>(decl)) {
+    fnType = MD->getInterfaceType()->getAs<AnyFunctionType>();
   }
 
   // Given we want to be conservative with this checking, if there's any case
@@ -192,7 +194,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
                             /*allow fixes*/ false, listener,
-                            None).hasValue();
+                            None).has_value();
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -1040,7 +1042,7 @@ constraints::matchCallArguments(
       !requiresBothTrailingClosureDirections(
           args, params, paramInfo, unlabeledTrailingClosureArgIndex)) {
     return singleMatchCall(
-        trailingClosureMatching.getValueOr(TrailingClosureMatching::Forward));
+        trailingClosureMatching.value_or(TrailingClosureMatching::Forward));
   }
 
   MatchCallArgumentListener noOpListener;
@@ -1896,6 +1898,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       auto argLabel = argument.getLabel();
       if (paramInfo.hasExternalPropertyWrapper(argIdx) || argLabel.hasDollarPrefix()) {
         auto *param = getParameterAt(callee, argIdx);
+        assert(param);
         if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
                                                argLabel, subKind, loc).isFailure()) {
           return cs.getTypeMatchFailure(loc);
@@ -2110,7 +2113,7 @@ public:
       if (elt1.getName() != elt2.getName())
         return true;
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2139,7 +2142,7 @@ public:
       if (elt1.hasName() && elt1.getName() != elt2.getName())
         return true;
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2177,7 +2180,7 @@ public:
           hasLabelMismatch = true;
       }
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
 
     return false;
@@ -2206,7 +2209,7 @@ public:
       auto lhs = tuple1->getElementType(idx1);
       auto rhs = tuple2->getElementType(idx2);
 
-      pairs.emplace_back(lhs, rhs, idx1);
+      pairs.emplace_back(lhs, rhs, idx1, idx2);
     }
 
     return false;
@@ -2303,6 +2306,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2311,7 +2315,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   for (auto pair : matcher.pairs) {
     auto result = matchTypes(pair.lhs, pair.rhs, subkind, subflags,
                              locator.withPathElement(
-                                       LocatorPathElt::TupleElement(pair.idx)));
+                                    LocatorPathElt::TupleElement(pair.lhsIdx)));
     if (result.isFailure())
       return result;
   }
@@ -2333,7 +2337,7 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   for (auto pair : matcher.pairs) {
     auto result = matchTypes(pair.lhs, pair.rhs, kind, subflags,
                              locator.withPathElement(
-                                 LocatorPathElt::PackElement(pair.idx)));
+                                 LocatorPathElt::PackElement(pair.lhsIdx)));
     if (result.isFailure())
       return result;
   }
@@ -2421,14 +2425,17 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
       // wrapping a pack type variable. Otherwise, create a new scalar
       // type variable.
       //
-      // FIXME: Locator for diagnostics
       // FIXME: Other TVO_* flags for type variables?
+      auto elementLoc = cs.getConstraintLocator(loc,
+          LocatorPathElt::PackElement(freshTypeVars.size()));
       if (packExpansionElt != nullptr) {
-        auto *freshTypeVar = cs.createTypeVariable(loc, TVO_CanBindToPack);
+        auto *freshTypeVar =
+            cs.createTypeVariable(elementLoc, TVO_CanBindToPack);
         freshTypeVars.push_back(PackExpansionType::get(
             freshTypeVar, packExpansionElt->getCountType()));
       } else {
-        freshTypeVars.push_back(cs.createTypeVariable(loc, /*options=*/0));
+        freshTypeVars.push_back(
+            cs.createTypeVariable(elementLoc, /*options=*/0));
       }
     }
   }
@@ -2481,7 +2488,6 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
   // Bind each pack type variable occurring in the pattern type to its
   // binding pack that was constructed above.
   for (const auto &pair : typeVars) {
-    // FIXME: Locator for diagnostics
     cs.addConstraint(ConstraintKind::Bind,
                      pair.first, PackType::get(ctx, pair.second), locator);
   }
@@ -2496,10 +2502,9 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   // The count types of two pack expansion types must have the same shape.
-  //
-  // FIXME: Locator for diagnostics.
-  auto *loc = getConstraintLocator(locator);
-  auto *shapeTypeVar = createTypeVariable(loc, TVO_CanBindToPack);
+  auto *shapeLoc = getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::PackShape));
+  auto *shapeTypeVar = createTypeVariable(shapeLoc, TVO_CanBindToPack);
   addConstraint(ConstraintKind::ShapeOf,
                 expansion1->getCountType(), shapeTypeVar, locator);
   addConstraint(ConstraintKind::ShapeOf,
@@ -2520,7 +2525,6 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
     if (auto *pack2 = pattern2->getAs<PackType>()) {
       if (auto *pack1 = replaceTypeVariablesWithFreshPacks(
              *this, pattern1, pack2, locator)) {
-        // FIXME: Locator for diagnostics.
         addConstraint(kind, pack1, pack2, locator);
         return getTypeMatchSuccess();
       }
@@ -2536,7 +2540,6 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
     if (auto *pack1 = pattern1->getAs<PackType>()) {
       if (auto *pack2 = replaceTypeVariablesWithFreshPacks(
               *this, pattern2, pack1, locator)) {
-        // FIXME: Locator for diagnostics.
         addConstraint(kind, pack1, pack2, locator);
         return getTypeMatchSuccess();
       }
@@ -2664,6 +2667,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     return true;
   }
 
@@ -3082,6 +3086,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -3298,7 +3303,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                (func1Params.size() == 1
                                 ? argumentLocator
                                 : argumentLocator.withPathElement(
-                                      LocatorPathElt::TupleElement(pair.idx))));
+                                  LocatorPathElt::TupleElement(pair.lhsIdx))));
       if (result.isFailure())
         return result;
     }
@@ -4356,11 +4361,11 @@ static ConstraintFix *fixPropertyWrapperFailure(
     case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
       return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
-                                        baseTy, toType.getValueOr(type),
+                                        baseTy, toType.value_or(type),
                                         locator);
 
     case Fix::WrappedValue:
-      return UseWrappedValue::create(cs, decl, baseTy, toType.getValueOr(type),
+      return UseWrappedValue::create(cs, decl, baseTy, toType.value_or(type),
                                      locator);
     }
     llvm_unreachable("Unhandled Fix type in switch");
@@ -5539,10 +5544,12 @@ bool ConstraintSystem::repairFailures(
 
       if (auto overload = findSelectedOverloadFor(calleeLocator)) {
         if (auto *decl = overload->choice.getDeclOrNull()) {
-          if (getParameterList(decl)->get(paramIdx)->getTypeOfDefaultExpr()) {
-            conversionsOrFixes.push_back(
-                IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
-            break;
+          if (auto paramList = getParameterList(decl)) {
+            if (paramList->get(paramIdx)->getTypeOfDefaultExpr()) {
+              conversionsOrFixes.push_back(
+                  IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
+              break;
+            }
           }
         }
       }
@@ -6455,6 +6462,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::PackElementOf:
     case ConstraintKind::ShapeOf:
+    case ConstraintKind::ExplicitGenericArguments:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -6848,8 +6856,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             kind, subflags, packLoc);
     }
     case TypeKind::PackExpansion: {
-      // FIXME: Need a new locator element
-
       auto expansion1 = cast<PackExpansionType>(desugar1);
       auto expansion2 = cast<PackExpansionType>(desugar2);
 
@@ -7558,9 +7564,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::SubclassOf, packExpansionType->getPatternType(),
-                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      classType, patternLoc);
       } else {
         addConstraint(ConstraintKind::SubclassOf, eltType,
                       classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
@@ -7676,11 +7683,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
       auto eltType = packType->getElementType(i);
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
-        // FIXME: Locator element for pack expansion pattern
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
         addConstraint(ConstraintKind::ConformsTo,
                       packExpansionType->getPatternType(),
                       protocol->getDeclaredInterfaceType(),
-                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+                      patternLoc);
       } else {
         addConstraint(ConstraintKind::ConformsTo, eltType,
                       protocol->getDeclaredInterfaceType(),
@@ -10531,6 +10539,8 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     return Type();
 
   auto *PD = getParameterAt(choice, argToParamElt->getParamIdx());
+  assert(PD);
+
   auto builderType = PD->getResultBuilderType();
   if (!builderType)
     return Type();
@@ -10795,7 +10805,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   setSolutionApplicationTarget(closure, target);
 
   // Generate constraints from the body of this closure.
-  return !generateConstraints(closure);
+  return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
 }
 
 ConstraintSystem::SolutionKind
@@ -12209,7 +12219,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // backward scanning for the unlabeled trailing closure. Create a
       // disjunction so that we explore both paths, and can diagnose
       // ambiguities later.
-      assert(!trailingClosureMatching.hasValue());
+      assert(!trailingClosureMatching.has_value());
 
       auto applyLocator = getConstraintLocator(locator);
       auto forwardConstraint = Constraint::createApplicableFunction(
@@ -12635,6 +12645,78 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
 
   auto shape = type1->getReducedShape();
   addConstraint(ConstraintKind::Bind, shape, type2, locator);
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *shapeOf = Constraint::create(
+          *this, ConstraintKind::ShapeOf, type1, type2,
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(shapeOf);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  // Bail out if we haven't selected an overload yet.
+  auto simplifiedBoundType = simplifyType(type1, flags);
+  if (simplifiedBoundType->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // If the overload hasn't been resolved, we can't simplify this constraint.
+  auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+  auto selectedOverload = findSelectedOverloadFor(overloadLocator);
+  if (!selectedOverload)
+    return formUnsolved();
+
+  auto overloadChoice = selectedOverload->choice;
+  if (!overloadChoice.isDecl()) {
+    return SolutionKind::Error;
+  }
+
+  auto decl = overloadChoice.getDecl();
+  auto genericContext = decl->getAsGenericContext();
+  if (!genericContext)
+    return SolutionKind::Error;
+
+  auto genericParams = genericContext->getGenericParams();
+  if (!genericParams || genericParams->size() == 0) {
+    // FIXME: Record an error here that we're ignoring the parameters.
+    return SolutionKind::Solved;
+  }
+
+  // Map the generic parameters we have over to their opened types.
+  SmallVector<Type, 2> openedGenericParams;
+  auto genericParamDepth = genericParams->getParams()[0]->getDepth();
+  for (const auto &openedType : getOpenedTypes(overloadLocator)) {
+    if (openedType.first->getDepth() == genericParamDepth) {
+      openedGenericParams.push_back(Type(openedType.second));
+    }
+  }
+  assert(openedGenericParams.size() == genericParams->size());
+
+  // Match the opened generic parameters to the specialized arguments.
+  auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
+  PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext());
+  if (matcher.match())
+    return SolutionKind::Error;
+
+  // Bind the opened generic parameters to the specialization arguments.
+  for (const auto &pair : matcher.pairs) {
+    addConstraint(
+        ConstraintKind::Bind, pair.lhs, pair.rhs,
+        getConstraintLocator(
+            locator, LocatorPathElt::GenericArgument(pair.lhsIdx)));
+  }
+
   return SolutionKind::Solved;
 }
 
@@ -13987,6 +14069,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ExplicitGenericArguments:
+    return simplifyExplicitGenericArgumentsConstraint(
+        first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14154,8 +14240,9 @@ void ConstraintSystem::addConstraint(Requirement req,
     auto type1 = req.getFirstType();
     auto type2 = req.getSecondType();
 
-    // FIXME: Locator for diagnostics
-    auto typeVar = createTypeVariable(getConstraintLocator(locator),
+    auto *shapeLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::PackShape));
+    auto typeVar = createTypeVariable(shapeLoc,
                                       TVO_CanBindToPack);
 
     addConstraint(ConstraintKind::ShapeOf, type1, typeVar, locator);
@@ -14541,7 +14628,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
-    // {Dis, Con}junction constraints are never solved here.
+    // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;
 
   case ConstraintKind::OneWayEqual:
@@ -14576,6 +14663,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyShapeOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
         constraint.getLocator());
+
+  case ConstraintKind::ExplicitGenericArguments:
+    return simplifyExplicitGenericArgumentsConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ None, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

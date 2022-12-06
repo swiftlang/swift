@@ -26,6 +26,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -196,8 +197,8 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                bool wasMoved)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
-                                 Var ? Var->Type.hasValue() : false,
-                                 Var ? Var->Loc.hasValue() : false,
+                                 Var ? Var->Type.has_value() : false,
+                                 Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
       // Initialize VarInfo with a temporary raw value of 0. The real
       // initialization can only be done after `numOperands` is set (see below).
@@ -362,7 +363,7 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                bool wasMoved, bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
+                                 Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
       VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
               getTrailingObjects<SILLocation>(),
@@ -517,8 +518,8 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
   
   SILFunctionConventions Conv(SubstCalleeTy,
-                              ModuleConventions.hasValue()
-                                  ? ModuleConventions.getValue()
+                              ModuleConventions.has_value()
+                                  ? ModuleConventions.value()
                                   : SILModuleConventions(F.getModule()));
   SILType Result = Conv.getSILResultType(F.getTypeExpansionContext());
 
@@ -564,8 +565,8 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   auto substCalleeType = substCalleeSILType.castTo<SILFunctionType>();
 
   SILFunctionConventions conv(substCalleeType,
-                              moduleConventions.hasValue()
-                                  ? moduleConventions.getValue()
+                              moduleConventions.has_value()
+                                  ? moduleConventions.value()
                                   : SILModuleConventions(F.getModule()));
 
   SmallVector<SILType, 8> resultTypes;
@@ -577,7 +578,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(ValueOwnershipKind(
         F, yieldType, argConvention,
-        moduleConventions.hasValue() ? moduleConventions.getValue()
+        moduleConventions.has_value() ? moduleConventions.value()
                                      : SILModuleConventions(F.getModule())));
   }
 
@@ -753,7 +754,7 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
     Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
     ValueOwnershipKind forwardingOwnershipKind) {
   auto derivativeFunctions =
-      VJPAndJVPFunctions.hasValue()
+      VJPAndJVPFunctions.has_value()
           ? ArrayRef<SILValue>(
                 reinterpret_cast<SILValue *>(VJPAndJVPFunctions.getPointer()),
                 2)
@@ -781,19 +782,19 @@ LinearFunctionInst::LinearFunctionInst(
     ValueOwnershipKind forwardingOwnershipKind)
     : InstructionBaseWithTrailingOperands(
           OriginalFunction,
-          TransposeFunction.hasValue()
+          TransposeFunction.has_value()
               ? ArrayRef<SILValue>(TransposeFunction.getPointer(), 1)
               : ArrayRef<SILValue>(),
           Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
           forwardingOwnershipKind),
       ParameterIndices(ParameterIndices),
-      HasTransposeFunction(TransposeFunction.hasValue()) {}
+      HasTransposeFunction(TransposeFunction.has_value()) {}
 
 LinearFunctionInst *LinearFunctionInst::create(
     SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
     SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
     ValueOwnershipKind forwardingOwnershipKind) {
-  size_t size = totalSizeToAlloc<Operand>(TransposeFunction.hasValue() ? 2 : 1);
+  size_t size = totalSizeToAlloc<Operand>(TransposeFunction.has_value() ? 2 : 1);
   void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
   return ::new (buffer)
       LinearFunctionInst(Loc, ParameterIndices, OriginalFunction,
@@ -831,7 +832,7 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
                                ? *extracteeType
                                : getExtracteeType(function, extractee, module),
                            forwardingOwnershipKind),
-      Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
+      Extractee(extractee), HasExplicitExtracteeType(extracteeType.has_value()) {
 }
 
 SILType LinearFunctionExtractInst::
@@ -897,7 +898,7 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
       hasExplicitFunctionType(functionType) {
   assert(witness && "Differentiability witness must not be null");
 #ifndef NDEBUG
-  if (functionType.hasValue()) {
+  if (functionType.has_value()) {
     assert(module.getStage() == SILStage::Lowered &&
            "Explicit type is valid only in lowered SIL");
   }
@@ -2992,4 +2993,14 @@ SILPhiArgument *SwitchEnumInst::createOptionalSomeResult() {
   auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
   auto someBB = getCaseDestination(someDecl);
   return createResult(someBB, getOperand()->getType().unwrapOptionalType());
+}
+
+void HasSymbolInst::getReferencedFunctions(
+    llvm::SmallVector<SILFunction *, 4> &fns) const {
+  auto &M = getModule();
+  enumerateFunctionsForHasSymbol(M, getDecl(), [&M, &fns](SILDeclRef declRef) {
+    SILFunction *fn = M.lookUpFunction(declRef);
+    assert(fn);
+    fns.push_back(fn);
+  });
 }

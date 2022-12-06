@@ -1,20 +1,49 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Share an idea
 title: ''
-labels: New Feature
+labels: feature request, triage needed
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+<!--
+This repository tracks issues and requests related to the implementation of the
+Swift compiler, standard library, runtime, and tools that provide IDE support
+for Swift (e.g. code completion). If your feature request relates to the
+implementation of a proprietary (closed-source) Apple framework such as UIKit,
+SwiftUI, Combine, etc., please report it to https://feedbackassistant.apple.com
+instead.
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+If you haven't found or started a thread on the Swift forums yet, consider
+socializing your idea in the "Discussion" subcategory
+(https://forums.swift.org/c/evolution/discuss) after submitting this request.
+This is an essential step toward the official review of any proposal concerning
+language or library design, and while GitHub issues do great for tracking
+purposes, the forums are far better ground for drawing attention to ideas and
+gauging interest from the community.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+For more information on how ideas are proposed, discussed, and reviewed, see
+https://swift.org/swift-evolution
+-->
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**Motivation**
+<!-- Describe the problem that your feature seeks to address. -->
+
+**Solution**
+<!--
+Describe your solution to the problem. Provide examples and describe how
+they work.
+-->
+
+**Alternatives considered**
+<!--
+Describe any alternative approaches or features that you have considered in
+addressing the problem, and why you chose this approach instead.
+-->
+
+<!--
+Add any other context about your feature as appropriate. For example, link out
+to a discussion on the Swift forums (https://forums.swift.org).
+-->
+<!-- **Additional context** -->

@@ -269,7 +269,7 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
-      Printer.printModuleRef(MD, getNameRef().getBaseIdentifier(), Opts);
+      Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
     else
       Printer.printTypeRef(Type(), TD, getNameRef().getBaseIdentifier());
   } else {

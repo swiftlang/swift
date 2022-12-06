@@ -953,3 +953,9 @@ SourceLoc swift::extractNearestSourceLoc(const SILModule *M) {
     return SourceLoc();
   return extractNearestSourceLoc(M->getSwiftModule());
 }
+
+bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
+  // If the root class was implemented in Objective-C, use Objective-C's
+  // allocation methods because they may have been overridden.
+  return theClass->getObjectModel() == ReferenceCounting::ObjC;
+}

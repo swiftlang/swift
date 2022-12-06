@@ -120,6 +120,10 @@ bool ArgsToFrontendOptionsConverter::convert(
     }
   }
 
+  for (auto A : Args.getAllArgValues(options::OPT_allowable_client)) {
+    Opts.AllowableClients.insert(StringRef(A).str());
+  }
+
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
@@ -190,7 +194,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     assert(!inputsAndOutputs->hasInputs());
   } else {
     HaveNewInputsAndOutputs = true;
-    Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+    Opts.InputsAndOutputs = std::move(inputsAndOutputs).value();
     if (Opts.AllowModuleWithCompilerErrors)
       Opts.InputsAndOutputs.setShouldRecoverMissingInputs();
   }
@@ -488,8 +492,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpParse;
   if (Opt.matches(OPT_dump_ast))
     return FrontendOptions::ActionType::DumpAST;
-  if (Opt.matches(OPT_emit_syntax))
-    return FrontendOptions::ActionType::EmitSyntax;
   if (Opt.matches(OPT_merge_modules))
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))

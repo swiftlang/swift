@@ -1200,17 +1200,24 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto openedType = CS.getTypeOfMacroReference(
-            ctx.getIdentifier(kind), expr);
-        if (!openedType)
-          return Type();
+        auto macroIdent = ctx.getIdentifier(kind);
+        auto macros = lookupMacros(
+            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied);
+        if (!macros.empty()) {
+          // Introduce an overload set for the macro reference.
+          auto locator = CS.getConstraintLocator(expr);
+          auto macroRefType = Type(CS.createTypeVariable(locator, 0));
+          CS.addOverloadSet(macroRefType, macros, CurDC, locator);
 
-        CS.addConstraint(ConstraintKind::LiteralConformsTo, openedType,
-                         protocol->getDeclaredInterfaceType(),
-                         CS.getConstraintLocator(expr));
+          // FIXME: Can this be encoded in the macro definition somehow?
+          CS.addConstraint(ConstraintKind::LiteralConformsTo, macroRefType,
+                           protocol->getDeclaredInterfaceType(),
+                           CS.getConstraintLocator(expr));
 
-        return openedType;
+          return macroRefType;
+        }
       }
+
       // Fall through to use old implementation.
 #endif
 
@@ -1634,6 +1641,36 @@ namespace {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
                                      expr->getFunctionRefKind(),
                                      expr->getOuterAlternatives());
+    }
+
+    /// Given a set of specialization arguments, resolve those arguments and
+    /// introduce them as an explicit generic arguments constraint.
+    ///
+    /// \returns true if resolving any of the specialization types failed.
+    bool addSpecializationConstraint(
+        ConstraintLocator *locator, Type boundType,
+        ArrayRef<TypeRepr *> specializationArgs) {
+      // Resolve each type.
+      SmallVector<Type, 2> specializationArgTypes;
+      const auto options =
+          TypeResolutionOptions(TypeResolverContext::InExpression);
+      for (auto specializationArg : specializationArgs) {
+        const auto result = TypeResolution::resolveContextualType(
+            specializationArg, CurDC, options,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(CS, locator),
+            HandlePlaceholderType(CS, locator));
+        if (result->hasError())
+          return true;
+
+        specializationArgTypes.push_back(result);
+      }
+
+      CS.addConstraint(
+          ConstraintKind::ExplicitGenericArguments, boundType,
+          PackType::get(CS.getASTContext(), specializationArgTypes),
+          locator);
+      return false;
     }
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -2912,27 +2949,27 @@ namespace {
         CS.setType(binding, type);
       }
 
-      auto elementResultType = CS.getType(expr->getPatternExpr());
-      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto *patternLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
+      auto patternTy = CS.createTypeVariable(patternLoc,
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
+      auto elementResultType = CS.getType(expr->getPatternExpr());
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
 
-      // FIXME: Use a ShapeOf constraint here.
-      Type shapeType;
-      auto *binding = expr->getBindings().front();
-      auto type = CS.simplifyType(CS.getType(binding));
-      type.visit([&](Type type) {
-        if (shapeType)
-          return;
+      auto *shapeLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
+      auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
+                                                 TVO_CanBindToPack |
+                                                 TVO_CanBindToHole);
+      auto packReference = expr->getBindings().front();
+      auto packType = CS.simplifyType(CS.getType(packReference))
+          ->castTo<PackExpansionType>()->getPatternType();
+      CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
+                       CS.getConstraintLocator(expr));
 
-        if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = archetype->getReducedShape();
-        }
-      });
-
-      return PackExpansionType::get(patternTy, shapeType);
+      return PackExpansionType::get(patternTy, shapeTypeVar);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3629,41 +3666,85 @@ namespace {
       return resultTy;
     }
 
+    /// Lookup all macros with the given macro name.
+    SmallVector<OverloadChoice, 1>
+    lookupMacros(
+        Identifier macroName, SourceLoc loc, FunctionRefKind functionRefKind
+    ) {
+      auto result = TypeChecker::lookupUnqualified(
+          CurDC, DeclNameRef(macroName), loc,
+          (defaultUnqualifiedLookupOptions |
+           NameLookupFlags::IncludeOuterResults));
+
+      SmallVector<OverloadChoice, 1> choices;
+      for (const auto &found : result.allResults()) {
+        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+          OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
+          choices.push_back(choice);
+        }
+      }
+
+      // FIXME: At some point, we need to check for function-like macros without
+      // arguments and vice-versa.
+
+      return choices;
+    }
+
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        // Look up the macros with this name.
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
-        auto refType = CS.getTypeOfMacroReference(macroIdent, expr);
-        if (!refType) {
+        bool isCall = expr->getArgs() != nullptr;
+        FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
+                                                 : FunctionRefKind::Unapplied;
+        auto macros = lookupMacros(
+            macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
+            functionRefKind);
+        if (macros.empty()) {
           ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                              macroIdent)
               .highlight(expr->getMacroNameLoc().getSourceRange());
           return Type();
         }
-        if (expr->getArgs()) {
-          CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
-          // FIXME: Do we have object-like vs. function-like macros?
-          if (auto fnType = dyn_cast<FunctionType>(refType.getPointer())) {
-            SmallVector<AnyFunctionType::Param, 8> params;
-            getMatchingParams(expr->getArgs(), params);
 
-            Type resultType = CS.createTypeVariable(
-                CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-                TVO_CanBindToNoEscape);
+        // Introduce an overload set for the macro reference.
+        auto locator = CS.getConstraintLocator(expr);
+        auto macroRefType = Type(CS.createTypeVariable(locator, 0));
+        CS.addOverloadSet(macroRefType, macros, CurDC, locator);
 
-            CS.addConstraint(
-                ConstraintKind::ApplicableFunction,
-                FunctionType::get(params, resultType),
-                fnType,
-                CS.getConstraintLocator(
-                  expr, ConstraintLocator::ApplyFunction));
-
-            return resultType;
-          }
+        // Add explicit generic arguments, if there were any.
+        if (expr->getGenericArgsRange().isValid()) {
+          if (addSpecializationConstraint(
+                CS.getConstraintLocator(expr), macroRefType,
+                expr->getGenericArgs()))
+            return Type();
         }
 
-        return refType;
+        // For non-calls, the type variable is the result.
+        if (!isCall)
+          return macroRefType;
+
+        // For calls, set up the argument list and form the applicable-function
+        // constraint. The result type is the result of that call.
+        CS.associateArgumentList(locator, expr->getArgs());
+
+        SmallVector<AnyFunctionType::Param, 8> params;
+        getMatchingParams(expr->getArgs(), params);
+
+        Type resultType = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            TVO_CanBindToNoEscape);
+
+        CS.addConstraint(
+            ConstraintKind::ApplicableFunction,
+            FunctionType::get(params, resultType),
+            macroRefType,
+            CS.getConstraintLocator(
+              expr, ConstraintLocator::ApplyFunction));
+
+        return resultType;
       }
 #endif
       return Type();
@@ -4651,10 +4732,10 @@ ResolvedMemberResult::operator bool() const {
 }
 
 bool ResolvedMemberResult::
-hasBestOverload() const { return Impl->BestIdx.hasValue(); }
+hasBestOverload() const { return Impl->BestIdx.has_value(); }
 
 ValueDecl* ResolvedMemberResult::
-getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.getValue()]; }
+getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.value()]; }
 
 ArrayRef<ValueDecl*> ResolvedMemberResult::
 getMemberDecls(InterestedMemberKind Kind) {
@@ -4706,8 +4787,8 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   CS.addOverloadSet(TV, LookupResult.ViableCandidates, &DC, Locator);
   Optional<Solution> OpSolution = CS.solveSingle();
   ValueDecl *Selected = nullptr;
-  if (OpSolution.hasValue()) {
-    Selected = OpSolution.getValue().overloadChoices[Locator].choice.getDecl();
+  if (OpSolution.has_value()) {
+    Selected = OpSolution.value().overloadChoices[Locator].choice.getDecl();
   }
   for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
     ValueDecl *VD = Choice.getDecl();

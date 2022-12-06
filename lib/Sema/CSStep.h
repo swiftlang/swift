@@ -707,7 +707,8 @@ public:
 
   void print(llvm::raw_ostream &Out) override {
     Out << "DisjunctionStep for ";
-    Disjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Disjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 
@@ -1013,7 +1014,8 @@ public:
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ConjunctionStep for ";
-    Conjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Conjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 

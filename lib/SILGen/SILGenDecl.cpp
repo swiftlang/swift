@@ -366,7 +366,7 @@ public:
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
-      Box = SGF.B.createMarkUninitialized(decl, Box, kind.getValue());
+      Box = SGF.B.createMarkUninitialized(decl, Box, kind.value());
 
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getType()).getLoweredType();
@@ -1485,9 +1485,9 @@ emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
                     llvm::VersionTuple Vers) {
   unsigned major = Vers.getMajor();
   unsigned minor =
-      (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
+      (Vers.getMinor().has_value() ? Vers.getMinor().value() : 0);
   unsigned subminor =
-      (Vers.getSubminor().hasValue() ? Vers.getSubminor().getValue() : 0);
+      (Vers.getSubminor().has_value() ? Vers.getSubminor().value() : 0);
 
   SILType wordType = SILType::getBuiltinWordType(ctx);
 
@@ -1616,43 +1616,17 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       assert(declRef);
 
       auto decl = declRef.getDecl();
-      getModule().addHasSymbolDecl(decl);
-
-      SILFunction *silFn = SGM.getFunction(
-          SILDeclRef(decl->getHasSymbolQueryDecl(), SILDeclRef::Kind::Func),
-          NotForDefinition);
-      SILValue fnRef = B.createFunctionRefFor(loc, silFn);
-      booleanTestValue = B.createApply(loc, fnRef, {}, {});
+      booleanTestValue = B.createHasSymbol(expr, decl);
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
 
       // Ensure that function declarations for each function associated with
       // the decl are emitted so that they can be referenced during IRGen.
-      class SymbolVisitor : public SILSymbolVisitor {
-        SILGenModule &SGM;
+      enumerateFunctionsForHasSymbol(
+          getModule(), decl, [this](SILDeclRef declRef) {
+            (void)SGM.getFunction(declRef, NotForDefinition);
+          });
 
-      public:
-        SymbolVisitor(SILGenModule &SGM) : SGM{SGM} {};
-
-        void addFunction(SILDeclRef declRef) override {
-          (void)SGM.getFunction(declRef, NotForDefinition);
-        }
-
-        virtual void addFunction(StringRef name, SILDeclRef declRef) override {
-          // The kinds of functions which go through this callback (e.g.
-          // differentiability witnesses) can't be forward declared with a
-          // SILDeclRef alone. For now, just ignore them.
-          //
-          // Ideally, this callback will be removed entirely in favor of
-          // SILDeclRef being able to represent all function variants.
-        }
-      };
-
-      SILSymbolVisitorOptions opts;
-      opts.VisitMembers = false;
-      auto visitorCtx =
-          SILSymbolVisitorContext(getModule().getSwiftModule(), opts);
-      SymbolVisitor(SGM).visitDecl(decl, visitorCtx);
       break;
     }
     }
