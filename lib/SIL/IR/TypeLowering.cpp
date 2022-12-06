@@ -1950,7 +1950,7 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      if (B.getModule().useLoweredAddresses()) {
+      if (LoweredType.isAddress()) {
         B.createCopyAddr(loc, src, dest, isTake, isInit);
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
