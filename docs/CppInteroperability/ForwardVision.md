@@ -10,9 +10,20 @@ This document is a prospective feature vision document, as described in the [dra
 
 ## Goals
 
+The goal of allowing C++ APIs to be used from Swift is to remove a barrier to writing more code in Swift rather than C++. This overarching goal addresses two primary use cases: 1) programmers who are already using Swift and C++ together through a bridging layer and 2) programmers who consider Swift as a successor language for their C++ projects (especially those looking to move to a memory safe language).
+
+Many Swift programmers work on mixed-language codebases that directly link Swift code with code written in other languages, most commonly C, Objective-C, and C++. To use C++ APIs from Swift today, the C++ APIs must be wrapped in a C or Objecive-C bridging layer that can be imported into Swift. Allowing Swift to directly use C++ APIs will allow programmers to *incrementally* remove these (potentially huge) bridging layer that are often the source of bugs, performance problems, and expressivity restrictions. 
+
+Increasingly, C++ projects are looking for successor languages that are memory safe, more expressive, and popular in the modern age. Unfortunately, many C++ programmers forgo the adoption of Swift (or any new language) because the cost of adoption is too high. C++ interoperability aims to address this case and make Swift a viable option for these projects.
+
+[John, what do you think about removing this paragraph?]
+Importing C++ APIs into Swift should not degrade the experience of programming in Swift. The experience of using imported C++ APIs must still satisfy the Swift project's [goals for the Swift language](https://www.swift.org/about/) and existing C and Objective-C interoperability and bridging code cannot be broken. 
+
+Importing C++ APIs into Swift is an extemely difficult task that must be handled with care. Almost every goal of C++ interoperability will be in tension with Swift's safety requirements. Swift must strike a careful balance in order to maintain Swift's safety without reintroducing the development, performance, or expressivity costs of an intermediate wrapper API.
+
 Safety is a top priority for the Swift programming language, which creates a tension with C++. While Swift enforces strong rules around things like memory safety, mutability, and nullability, C++ largely makes the programmer responsible for handling them correctly, on the pain of undefined behavior. Simply using C++ APIs should not completely undermine Swift's lanaguage guarantees, especially guarantees around safety. At a minimum, imported C++ APIs should generally not be less safe to use from Swift than they would be in C++, and C++ interoperability should strive to make imported APIs *safer* in Swift than they are in C++ by providing safe API interfaces for common, unsafe C++ API patterns (such as iterators). When it is possible for the Swift compiler to statically derive safety properties and API semantics (i.e., how to safely use an API in Swift) from the C++ API interface, C++ interoperability should take advantage of this information. When that is not possible, C++ interoperability should provide annotations to communicate the necessary information to use these APIs safely in Swift. When APIs cannot be used safely or need careful management, Swift should make that clear to the programmer. As a last resort, Swift should make an API unavailable if there's no reasonable path to a sufficiently safe Swift interface for it.
 
-C++ interoperability should strive to have good diagnostics. Swift should provide diagnostics about incorrect C++ API uses that are at least as good as Clang, and Swift should stive to do better than Clang when possible. When an API cannot be imported, this needs to be communicated to the programmer. The compiler should produce a clear error any time an API that could not be imported is used, and it should suggest ways that the interface could be changed to make it importable (for example, by adding annotations). The compiler should also warn users about incorrect API usage, including potentially slow or unsafe patterns. 
+C++ interoperability should strive to have good diagnostics. Diagnostics that report source locations for a C++ API should refer to the API's original declaration in a C++ header, not to a location in a synthesized interface file. When a C++ API can be imported into Swift, diagnostics from misusing it (e.g. type errors when passing it an argument of the wrong type) should be similar to the diagnostics for analogous misuses of a Swift API. When a C++ API cannot be imported, attempts to use it should result in a clear error indicating why the API could not be imported, and the diagnostics should suggest specific ways that the programmer could make it importable (for example, by adding annotations).
 
 C++ provides tools to create high-performance APIs. The Swift compiler should embrace this. Interop should not be a significant source of overhead, and performance concerns should not be a reason to continue using C++ to call C++ APIs rather than Swift.
 
@@ -36,9 +47,6 @@ If `StatefulObject` were written idiomatically in Swift, it would be defined as 
 To achieve that, the compiler should map C++ APIs to one of these specific Swift programming patterns. In cases where the most appropriate Swift pattern can be inferred by the Swift compiler, it should map the API automatically. Otherwise, Swift should ask programmers to annotate their C++ APIs to guide how they are imported. For example, Swift imports C++ types as structs with value semantics by default. Because `StatefulObject` cannot be copied, Swift cannot import it via the default approach. To be able to use `StatefulObject`, the user should annotate it as a reference type so that the compiler can import it as a Swift `class`. Information on how to import APIs, such as `StatefulObject`, cannot always be statically determined (for example, `StatefulObject` might have been a move-only type, a singleton, or RAII-style API). The Swift compiler should not import APIs like `StatefulObject` for which it does not have sufficent semantic information. It is not a goal to import every C++ API into Swift, especially without additional, required information to present the API in an idiomatic way that promotes a cohesive Swift expirence.
 
 Because of the difference in idioms between the two languages, and because of the safety concerns when exposing certain APIs to Swift, a C++ API might look quite different in Swift than it does in C++. It is a goal of C++ interoperability to provide a clear, well-defined mapping for whether and how APIs are imported into Swift. Users should be able to read the C++ interoperability documentation to have a good idea of how much of their API will be able to imported and what it will look like. Swift should also provide tools for inspecting what a C++ API will look like in Swift, and these tools should call out notable parts of the API that were not imported.
-
-Finally, Swift programmers have used C++ APIs since Swift 1.0 through an Objective-C or C bridging layer. It is important that programmers are able to *incrementally* remove these (potentially huge) bridging layers and start using their C++ APIs directly. To make this transition incremental, C++ interoperability must not change the way Swift imports any existing C or Objective-C APIs, even when C++ interoperability is enabled. 
-
 
 ## The approach
 
@@ -188,7 +196,7 @@ const StatefulObject &makeAppState(); // OK
 
 **Immortal Reference Types**
 
-Instances of StatefulObject above are manually managed by the programmer, they create it with the create method and are responsible for destroying it once it is no longer needed. However, some reference types need to exist for the duration of the program, these references types are known as “immortal.” Examples of these immortal reference types might be pool allocators or app contexts. Let’s look at a GameContext object which allocates (and owns) various game elements:
+Instances of `StatefulObject` above are manually managed by the programmer, they create it with the create method and are responsible for destroying it once it is no longer needed. However, some reference types need to exist for the duration of the program, these references types are known as “immortal.” Examples of these immortal reference types might be pool allocators or app contexts. Let’s look at a `GameContext` object which allocates (and owns) various game elements:
 
 ```
 struct GameContext {
@@ -202,7 +210,7 @@ struct GameContext {
 };
 ```
 
-Here the GameContext is meant to last for the entire game as a global allocator/state. Because the context will never be deallocated, it is known as an “immortal reference type” and the Swift compiler can make certain assumptions about it. 
+Here the `GameContext` is meant to last for the entire game as a global allocator/state. Because the context will never be deallocated, it is known as an “immortal reference type” and the Swift compiler can make certain assumptions about it. 
 
 **Automatically Managed Reference Types**
 
