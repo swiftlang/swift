@@ -1002,16 +1002,28 @@ namespace {
 /// function in postorder. If the definition is an argument of this function,
 /// simply replace the function argument with an address representing the
 /// caller's storage.
-///
-/// TODO: shrink lifetimes by inserting alloc_stack at the dominance LCA and
-/// finding the lifetime boundary with a simple backward walk from uses.
 class OpaqueStorageAllocation {
   AddressLoweringState &pass;
+  /// The alloc_stacks that have been created which eventually need to have
+  /// corresponding dealloc_stacks created.
+  ///
+  /// Supports erasure because created alloc_stacks may be erased when block
+  /// arguments are coalesced.
+  SmallBlotSetVector<AllocStackInst *, 16> allocs;
+  /// The alloc_stacks that have been created which eventually need to be
+  /// positioned appropriately.
+  ///
+  /// The subset of allocs which aren't for opened existentials.
+  InstructionSet allocsToReposition;
 
 public:
-  explicit OpaqueStorageAllocation(AddressLoweringState &pass) : pass(pass) {}
+  explicit OpaqueStorageAllocation(AddressLoweringState &pass)
+      : pass(pass), allocsToReposition(pass.function) {}
 
   void allocateOpaqueStorage();
+  /// Position alloc_stacks according to uses and create dealloc_stacks that
+  /// jointly postdominate.
+  void finalizeOpaqueStorage();
 
 protected:
   void allocateValue(SILValue value);
@@ -1036,6 +1048,8 @@ protected:
   void removeAllocation(SILValue value);
 
   AllocStackInst *createStackAllocation(SILValue value);
+
+  SILBasicBlock *getLeastCommonAncestorOfUses(SILValue value);
 
   void createStackAllocationStorage(SILValue value) {
     pass.valueStorageMap.getStorage(value).storageAddress =
@@ -1226,7 +1240,18 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   for (Operand *use : uses) {
     pass.deleter.forceDelete(cast<DeallocStackInst>(use->getUser()));
   }
+  allocs.erase(allocInst);
   pass.deleter.forceDelete(allocInst);
+}
+
+SILBasicBlock *
+OpaqueStorageAllocation::getLeastCommonAncestorOfUses(SILValue value) {
+  SILBasicBlock *lca = nullptr;
+  for (auto *use : value->getUses()) {
+    auto *block = use->getParentBlock();
+    lca = lca ? pass.domInfo->findNearestCommonDominator(lca, block) : block;
+  }
+  return lca;
 }
 
 // Create alloc_stack that dominates an owned value \p value. Create
@@ -1250,8 +1275,8 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
 
   // For opened existential types, allocate stack space at the type
   // definition. Allocating as early as possible provides more opportunity for
-  // creating use projections into value. But allocation must be no earlier then
-  // the latest type definition.
+  // creating use projections into value. But allocation must be no earlier
+  // then the latest type definition.
   SILInstruction *latestOpeningInst = nullptr;
   allocTy.getASTType().visit([&](CanType type) {
     auto archetype = dyn_cast<ArchetypeType>(type);
@@ -1274,31 +1299,44 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
       latestOpeningInst = openingInst;
     }
   });
-  auto allocPt = latestOpeningInst ? std::next(latestOpeningInst->getIterator())
-                                   : pass.function->begin()->begin();
+
+  auto allocPt = latestOpeningInst
+                     ? latestOpeningInst->getNextInstruction()->getIterator()
+                     : pass.function->getEntryBlock()->front().getIterator();
   auto allocBuilder = pass.getBuilder(allocPt);
   AllocStackInst *alloc = allocBuilder.createAllocStack(pass.genLoc(), allocTy);
+  allocs.insert(alloc);
+  if (latestOpeningInst == nullptr) {
+    allocsToReposition.insert(alloc);
+  }
+  return alloc;
+}
 
-  auto dealloc = [&](SILBasicBlock::iterator insertPt) {
-    auto deallocBuilder = pass.getBuilder(insertPt);
-    deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
-  };
-  if (latestOpeningInst) {
+void OpaqueStorageAllocation::finalizeOpaqueStorage() {
+  SmallVector<SILBasicBlock *, 4> boundary;
+  for (auto maybeAlloc : allocs) {
+    // An allocation may be erased when coalescing block arguments.
+    if (!maybeAlloc.hasValue())
+      continue;
+
+    auto *alloc = maybeAlloc.value();
+
+    if (allocsToReposition.contains(alloc)) {
+      auto allocPt = &*getLeastCommonAncestorOfUses(alloc)->begin();
+      alloc->moveBefore(allocPt);
+    }
+
     // Deallocate at the predecessors of dominance frontier blocks that are
     // dominated by the alloc to ensure that allocation encloses not only the
     // uses of the current value, but also of any values reusing this storage as
     // a use projection.
-    SmallVector<SILBasicBlock *, 4> boundary;
     computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
     for (SILBasicBlock *deallocBlock : boundary) {
-      dealloc(deallocBlock->getTerminator()->getIterator());
+      auto deallocBuilder = pass.getBuilder(deallocBlock->back().getIterator());
+      deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
     }
-  } else {
-    for (SILInstruction *deallocPoint : pass.exitingInsts) {
-      dealloc(deallocPoint->getIterator());
-    }
+    boundary.clear();
   }
-  return alloc;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3849,6 +3887,8 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   // address from the 'valueStorageMap'. This materializes projections in
   // forward order, setting 'storageAddress' for each projection as it goes.
   rewriteFunction(pass);
+
+  allocator.finalizeOpaqueStorage();
 
   deleteRewrittenInstructions(pass);
 
