@@ -115,3 +115,24 @@ enum Inference3 : Flagged {}   // Ok
 
 @Flag("direct flag")
 struct Inference4 : Flagged {} // Ok (because @Flag inferred from Flagged is ignored)
+
+@available(macOS, introduced: 42.0)
+@Flag("with availability")
+func testWithAvailability(_: Int) {} // Ok
+
+@available(macOS, introduced: 100.0)
+class TypeWithAvailability : Flagged {} // Ok
+
+class MembersWithAvailability {
+  @Flag
+  @available(macOS, introduced: 100.0)
+  static func staticFn() {} // Ok
+
+  @Flag
+  @available(macOS, introduced: 100.0)
+  func instFn() {} // Ok
+
+  @Flag
+  @available(macOS, introduced: 100.0)
+  var prop: Int { get { 0 } } // Ok
+}

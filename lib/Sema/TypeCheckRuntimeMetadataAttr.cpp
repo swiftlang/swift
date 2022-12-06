@@ -27,6 +27,7 @@
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
+using namespace constraints;
 
 ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
   auto *mutableSelf = const_cast<ValueDecl *>(this);
@@ -173,7 +174,12 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
                             /*implicit=*/true),
       ArgumentList::forImplicitSingle(ctx, /*label=*/Identifier(), init));
 
-  auto resultTy = TypeChecker::typeCheckExpression(result, initContext);
+  // Note that the availability checking is disabled for generator expression
+  // because availability checker cannot handle synthesized code without any
+  // source information (and no declaration for context).
+  auto resultTy = TypeChecker::typeCheckExpression(
+      result, initContext, ContextualTypeInfo(),
+      TypeCheckExprFlags::DisableExprAvailabilityChecking);
   if (!resultTy)
     return nullptr;
 
@@ -192,8 +198,6 @@ BraceStmt *SynthesizeRuntimeMetadataAttrGeneratorBody::evaluate(
       nullptr);
   if (!init)
     return nullptr;
-
-  auto resultTy = init->getType();
 
   SmallVector<ASTNode, 4> body;
 
@@ -217,11 +221,12 @@ BraceStmt *SynthesizeRuntimeMetadataAttrGeneratorBody::evaluate(
     auto *wildcardSpec =
         new (ctx) OtherPlatformAvailabilitySpec(/*StarLoc=*/SourceLoc());
 
-    StmtConditionElement platformCond(PoundAvailableInfo::create(
+    auto *availabilityInfo = PoundAvailableInfo::create(
         ctx, /*PoundLoc=*/SourceLoc(),
         /*LParenLoc=*/SourceLoc(), {platformSpec, wildcardSpec},
         /*RParenLoc=*/SourceLoc(),
-        /*isUnavailability=*/false));
+        /*isUnavailability=*/false);
+    { availabilityInfo->setAvailableRange(declAvailability.getOSVersion()); }
 
     NullablePtr<Stmt> thenStmt;
     {
@@ -236,10 +241,11 @@ BraceStmt *SynthesizeRuntimeMetadataAttrGeneratorBody::evaluate(
 
     NullablePtr<Stmt> elseStmt;
     {
-      // return nil as Optional<<#attribute type#>>
+      // return nil
+
       auto *nil =
           new (ctx) NilLiteralExpr(/*Loc=*/SourceLoc(), /*implicit=*/true);
-      nil->setType(resultTy);
+      nil->setType(init->getType());
 
       auto *returnNil = new (ctx) ReturnStmt(/*loc=*/SourceLoc(), nil,
                                              /*isImplicit=*/true);
@@ -248,11 +254,11 @@ BraceStmt *SynthesizeRuntimeMetadataAttrGeneratorBody::evaluate(
                                    /*rbloc=*/SourceLoc(), /*implicit=*/true);
     }
 
-    auto *ifStmt = new (ctx)
-        IfStmt(LabeledStmtInfo(), /*ifLoc=*/SourceLoc(),
-               ctx.AllocateCopy(ArrayRef<StmtConditionElement>(platformCond)),
-               thenStmt.get(),
-               /*ElseLoc=*/SourceLoc(), elseStmt.get(), /*Implicit=*/true);
+    auto *ifStmt = new (ctx) IfStmt(
+        LabeledStmtInfo(), /*ifLoc=*/SourceLoc(),
+        ctx.AllocateCopy(ArrayRef<StmtConditionElement>({availabilityInfo})),
+        thenStmt.get(),
+        /*ElseLoc=*/SourceLoc(), elseStmt.get(), /*Implicit=*/true);
 
     body.push_back(ifStmt);
   } else {
