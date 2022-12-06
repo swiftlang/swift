@@ -15,9 +15,9 @@ enum Maybe1<T : Equatable> {
   case yep(T)
   // CHECK-LABEL: sil hidden @maybe1_compare {{.*}} {
   // CHECK:         [[LHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
-  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe1.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
+  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
   // CHECK:         unchecked_take_enum_data_addr [[LHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_AND_R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
@@ -42,9 +42,9 @@ enum Maybe2<T : Equatable> {
 
   // CHECK-LABEL: sil hidden @maybe2_compare {{.*}} {
   // CHECK:         [[LHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
-  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe2.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
+  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
   // CHECK:         unchecked_take_enum_data_addr [[LHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
