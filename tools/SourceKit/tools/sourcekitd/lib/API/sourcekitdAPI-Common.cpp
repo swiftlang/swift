@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "DictionaryKeys.h"
+#include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/Logging.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
