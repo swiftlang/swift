@@ -1299,6 +1299,18 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair);
 
+/// If \p value is a guaranteed non-phi value forwarded from it's instruction's
+/// operands, visit each forwarded operand.
+///
+/// Returns true if \p visitOperand was called (for convenience).
+///
+/// Precondition: \p value is not a phi. The client must handle phis first by
+/// checking if they are reborrows (using BorrowedValue). Reborrows have no
+/// forwarded operands. Guaranteed forwarding need to be handled by recursing
+/// through the phi operands.
+bool visitForwardedGuaranteedOperands(
+  SILValue value, function_ref<void(Operand *)> visitOperand);
+
 /// Visit the phis in the same block as \p phi which are reborrows of a borrow
 /// of one of the values reaching \p phi.
 ///

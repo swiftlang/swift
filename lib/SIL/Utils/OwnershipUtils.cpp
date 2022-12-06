@@ -1721,6 +1721,63 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
   }
 }
 
+/// If \p instruction forwards guaranteed values to its results, visit each
+/// forwarded operand. The visitor must check whether the forwarded value is
+/// guaranteed.
+///
+/// Return true \p visitOperand was called at least once.
+///
+/// \p visitOperand should always recheck for Guaranteed owernship if it
+/// matters, in case a cast forwards a trivial type to a nontrivial type.
+///
+/// This intentionally does not handle phis, which require recursive traversal
+/// to determine `isGuaranteedForwardingPhi`.
+bool swift::visitForwardedGuaranteedOperands(
+  SILValue value, function_ref<void(Operand *)> visitOperand) {
+
+  assert(!SILArgument::asPhi(value) && "phis are handled separately");
+
+  if (auto *termResult = SILArgument::isTerminatorResult(value)) {
+    if (auto *oper = termResult->forwardedTerminatorResultOperand()) {
+      visitOperand(oper);
+      return true;
+    }
+    return false;
+  }
+  auto *inst = value->getDefiningInstruction();
+  if (!inst)
+    return false;
+
+  // Bypass conversions that produce a guarantee value out of thin air.
+  if (inst->getNumRealOperands() == 0) {
+    return false;
+  }
+  if (isa<FirstArgOwnershipForwardingSingleValueInst>(inst)
+      || isa<OwnershipForwardingConversionInst>(inst)
+      || isa<OwnershipForwardingSelectEnumInstBase>(inst)
+      || isa<OwnershipForwardingMultipleValueInstruction>(inst)
+      || isa<MoveOnlyWrapperToCopyableValueInst>(inst)
+      || isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+    assert(inst->getNumRealOperands() == 1
+           && "forwarding instructions must have a single real operand");
+    assert(!isa<SingleValueInstruction>(inst)
+           || !BorrowedValue(cast<SingleValueInstruction>(inst))
+                  && "forwarded operand cannot begin a borrow scope");
+    visitOperand(&inst->getOperandRef(0));
+    return true;
+  }
+  if (isa<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+    assert(inst->getNumOperands() > 0 && "checked above");
+    assert(inst->getNumOperands() == inst->getNumRealOperands() &&
+           "mixin expects all readl operands");
+    for (auto &operand : inst->getAllOperands()) {
+      visitOperand(&operand);
+    }
+    return true;
+  }
+  return false;
+}
+
 /// Visit the phis in the same block as \p phi which are reborrows of a borrow
 /// of one of the values reaching \p phi.
 ///

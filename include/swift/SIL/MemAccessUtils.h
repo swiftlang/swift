@@ -206,6 +206,10 @@ SILValue findOwnershipReferenceRoot(SILValue ref);
 
 /// Look through all ownership forwarding instructions to find the values which
 /// were originally borrowed.
+///
+/// Note: This treats guaranteed forwarding phis like roots even though they do
+/// not introduce the borrow scope. This ensures that all roots dominate \p
+/// reference Value. But the client will need to handle forwarding phis.
 void findGuaranteedReferenceRoots(SILValue referenceValue,
                                   bool lookThroughNestedBorrows,
                                   SmallVectorImpl<SILValue> &roots);

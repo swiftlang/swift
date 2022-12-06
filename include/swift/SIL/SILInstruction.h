@@ -599,6 +599,10 @@ public:
     return getTypeDependentOperands().size();
   }
 
+  unsigned getNumRealOperands() const {
+    return getAllOperands().size() - getNumTypeDependentOperands();
+  }
+
   bool isTypeDependentOperand(unsigned i) const {
     return i >= getNumOperands() - getNumTypeDependentOperands();
   }
