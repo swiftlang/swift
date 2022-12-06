@@ -80,8 +80,8 @@ void IRGenModule::emitCoverageMapping() {
 
   std::vector<StringRef> Files;
   for (const auto &M : Mappings)
-    if (std::find(Files.begin(), Files.end(), M->getFile()) == Files.end())
-      Files.push_back(M->getFile());
+    if (std::find(Files.begin(), Files.end(), M->getFilename()) == Files.end())
+      Files.push_back(M->getFilename());
 
   auto remapper = getOptions().CoveragePrefixMap;
 
@@ -115,7 +115,7 @@ void IRGenModule::emitCoverageMapping() {
     std::string FuncRecordName = "__covrec_" + llvm::utohexstr(NameHash);
 
     unsigned FileID =
-        std::find(Files.begin(), Files.end(), M->getFile()) - Files.begin();
+        std::find(Files.begin(), Files.end(), M->getFilename()) - Files.begin();
     std::vector<CounterMappingRegion> Regions;
     for (const auto &MR : M->getMappedRegions())
       Regions.emplace_back(CounterMappingRegion::makeRegion(
