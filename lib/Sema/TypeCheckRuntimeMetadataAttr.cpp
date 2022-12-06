@@ -35,12 +35,21 @@ ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
                            nullptr);
 }
 
-Expr *
+std::pair<BraceStmt *, Type>
 ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
   auto *mutableSelf = const_cast<ValueDecl *>(this);
-  return evaluateOrDefault(
+  auto *body = evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeRuntimeMetadataAttrGeneratorBody{attr, mutableSelf}, nullptr);
+  if (!body)
+    return std::make_pair(nullptr, Type());
+
+  auto *init = evaluateOrDefault(
       getASTContext().evaluator,
       SynthesizeRuntimeMetadataAttrGenerator{attr, mutableSelf}, nullptr);
+  assert(init);
+
+  return std::make_pair(body, init->getType()->mapTypeOutOfContext());
 }
 
 Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
@@ -179,4 +188,89 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
   TypeChecker::checkInitializerEffects(initContext, result);
 
   return result;
+}
+
+BraceStmt *SynthesizeRuntimeMetadataAttrGeneratorBody::evaluate(
+    Evaluator &evaluator, CustomAttr *attr, ValueDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+
+  Expr *init = evaluateOrDefault(
+      ctx.evaluator, SynthesizeRuntimeMetadataAttrGenerator{attr, attachedTo},
+      nullptr);
+  if (!init)
+    return nullptr;
+
+  auto resultTy = init->getType();
+
+  SmallVector<ASTNode, 4> body;
+
+  auto declAvailability = attachedTo->getAvailabilityForLinkage();
+  auto attrAvailability = attachedTo->getRuntimeDiscoverableAttrTypeDecl(attr)
+                              ->getAvailabilityForLinkage();
+  declAvailability.intersectWith(attrAvailability);
+
+  if (!declAvailability.isAlwaysAvailable()) {
+
+    // if #available(...) {
+    //  return <#initializer call#>
+    // }
+    // return nil
+
+    auto availableOn = declAvailability.getOSVersion().getLowerEndpoint();
+    auto *platformSpec = new (ctx) PlatformVersionConstraintAvailabilitySpec(
+        targetPlatform(ctx.LangOpts), /*PlatformLoc=*/SourceLoc(), availableOn,
+        availableOn, /*VersionSrcRange=*/SourceRange());
+
+    auto *wildcardSpec =
+        new (ctx) OtherPlatformAvailabilitySpec(/*StarLoc=*/SourceLoc());
+
+    StmtConditionElement platformCond(PoundAvailableInfo::create(
+        ctx, /*PoundLoc=*/SourceLoc(),
+        /*LParenLoc=*/SourceLoc(), {platformSpec, wildcardSpec},
+        /*RParenLoc=*/SourceLoc(),
+        /*isUnavailability=*/false));
+
+    NullablePtr<Stmt> thenStmt;
+    {
+      SmallVector<ASTNode, 4> thenBody;
+
+      thenBody.push_back(new (ctx) ReturnStmt(/*loc=*/SourceLoc(), init,
+                                              /*isImplicit=*/true));
+
+      thenStmt = BraceStmt::create(ctx, /*lbloc=*/SourceLoc(), thenBody,
+                                   /*rbloc=*/SourceLoc(), /*implicit=*/true);
+    }
+
+    NullablePtr<Stmt> elseStmt;
+    {
+      // return nil as Optional<<#attribute type#>>
+      auto *nil =
+          new (ctx) NilLiteralExpr(/*Loc=*/SourceLoc(), /*implicit=*/true);
+      nil->setType(resultTy);
+
+      auto *returnNil = new (ctx) ReturnStmt(/*loc=*/SourceLoc(), nil,
+                                             /*isImplicit=*/true);
+
+      elseStmt = BraceStmt::create(ctx, /*lbloc=*/SourceLoc(), {returnNil},
+                                   /*rbloc=*/SourceLoc(), /*implicit=*/true);
+    }
+
+    auto *ifStmt = new (ctx)
+        IfStmt(LabeledStmtInfo(), /*ifLoc=*/SourceLoc(),
+               ctx.AllocateCopy(ArrayRef<StmtConditionElement>(platformCond)),
+               thenStmt.get(),
+               /*ElseLoc=*/SourceLoc(), elseStmt.get(), /*Implicit=*/true);
+
+    body.push_back(ifStmt);
+  } else {
+    // just `return <#initializer value#>`
+    body.push_back(new (ctx) ReturnStmt(/*loc=*/SourceLoc(), init,
+                                        /*isImplicit=*/true));
+  }
+
+  ASTNode braceStmt =
+      BraceStmt::create(ctx, /*lbloc=*/attr->getLocation(), body,
+                        /*rbloc=*/attr->getLocation(), /*implicit=*/true);
+
+  return cast<BraceStmt>(braceStmt.get<Stmt *>());
 }

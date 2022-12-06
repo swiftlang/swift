@@ -1881,7 +1881,7 @@ public:
         if (!runtimeDiscoverableAttrs.empty()) {
           // Register the declaration only if all of its attributes are valid.
           if (llvm::all_of(runtimeDiscoverableAttrs, [&](CustomAttr *attr) {
-                return VD->getRuntimeDiscoverableAttributeGenerator(attr);
+                return VD->getRuntimeDiscoverableAttributeGenerator(attr).first;
               }))
             SF->addDeclWithRuntimeDiscoverableAttrs(VD);
         }

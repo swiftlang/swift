@@ -2805,9 +2805,11 @@ public:
   ///        to place it for maximum impact.
   NominalTypeDecl *getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const;
 
-  /// Given a runtime discoverable attribute, return a generator call
-  /// which could be used to instantiate it for this declaration.
-  Expr *getRuntimeDiscoverableAttributeGenerator(CustomAttr *) const;
+  /// Given a runtime discoverable attribute, return a generator
+  /// which could be used to instantiate it for this declaration
+  /// together with its result type.
+  std::pair<BraceStmt *, Type>
+  getRuntimeDiscoverableAttributeGenerator(CustomAttr *) const;
 };
 
 /// This is a common base class for declarations which declare a type.

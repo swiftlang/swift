@@ -3830,6 +3830,23 @@ public:
   bool isCached() const { return true; }
 };
 
+class SynthesizeRuntimeMetadataAttrGeneratorBody
+    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGeneratorBody,
+                           BraceStmt *(CustomAttr *, ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, CustomAttr *attr,
+                      ValueDecl *attachedTo) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Compute the local discriminators for the given declaration context.
 ///
 /// This is a state-changing operation for closures within the context, which

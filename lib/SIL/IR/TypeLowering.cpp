@@ -3235,11 +3235,10 @@ getRuntimeAttributeGeneratorInterfaceType(TypeConverter &TC, SILDeclRef c) {
   auto *attachedToDecl = c.getDecl();
   auto *attr = c.pointer.get<CustomAttr *>();
   auto *attrType = attachedToDecl->getRuntimeDiscoverableAttrTypeDecl(attr);
-  auto *generator =
+  auto generator =
       attachedToDecl->getRuntimeDiscoverableAttributeGenerator(attr);
 
-  auto resultTy =
-      generator->getType()->mapTypeOutOfContext()->getCanonicalType();
+  auto resultTy = generator.second->getCanonicalType();
 
   CanType canResultTy = resultTy->getReducedType(
       attrType->getInnermostDeclContext()->getGenericSignatureOfContext());
