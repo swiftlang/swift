@@ -1637,12 +1637,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // Don't expose async functions or @_alwaysEmitIntoClient functions
-      // because they're currently unsupported
-      if (FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
-        return;
-      }
-
       // FIXME: Support static methods.
       if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
         return;
