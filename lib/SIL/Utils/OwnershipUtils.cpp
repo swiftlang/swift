@@ -53,8 +53,6 @@ bool swift::hasPointerEscape(BorrowedValue value) {
     case OperandOwnership::InteriorPointer:
     case OperandOwnership::BitwiseEscape:
       break;
-
-    case OperandOwnership::GuaranteedForwardingPhi:
     case OperandOwnership::Reborrow: {
       SILArgument *phi = cast<BranchInst>(op->getUser())
                              ->getDestBB()
@@ -219,6 +217,11 @@ bool swift::findInnerTransitiveGuaranteedUses(
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
+        if (auto *phi = SILArgument::asPhi(result)) {
+          leafUse(use);
+          foundPointerEscape = true;
+          return true;
+        }
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
             nonLeaf = true;
@@ -232,11 +235,6 @@ bool swift::findInnerTransitiveGuaranteedUses(
       if (!nonLeaf) {
         leafUse(use);
       }
-      break;
-    }
-    case OperandOwnership::GuaranteedForwardingPhi: {
-      leafUse(use);
-      foundPointerEscape = true;
       break;
     }
     case OperandOwnership::Borrow:
@@ -336,17 +334,6 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       }
       recordUse(use);
       break;
-    // \p borrowedValue will dominate this GuaranteedForwardingPhi, because we
-    // return false in the case of Reborrow.
-    case OperandOwnership::GuaranteedForwardingPhi: {
-      SILArgument *phi = PhiOperand(use).getValue();
-      for (auto *use : phi->getUses()) {
-        if (use->getOperandOwnership() != OperandOwnership::NonUse)
-          worklist.insert(use);
-      }
-      recordUse(use);
-      break;
-    }
     case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
@@ -419,15 +406,12 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // GuaranteedForwardingPhi uses.
   for (auto *use : value->getUses()) {
     if (use->getOperandOwnership() == OperandOwnership::GuaranteedForwarding) {
-      guaranteedForwardingOps.insert(use);
-      continue;
-    }
-    if (use->getOperandOwnership() ==
-        OperandOwnership::GuaranteedForwardingPhi) {
-      if (!visitor(use)) {
-        return false;
+      if (PhiOperand(use)) {
+        if (!visitor(use)) {
+          return false;
+        }
       }
-      continue;
+      guaranteedForwardingOps.insert(use);
     }
   }
 
@@ -437,15 +421,12 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
       for (auto *valUse : val->getUses()) {
         if (valUse->getOperandOwnership() ==
             OperandOwnership::GuaranteedForwarding) {
-          guaranteedForwardingOps.insert(valUse);
-          continue;
-        }
-        if (valUse->getOperandOwnership() ==
-            OperandOwnership::GuaranteedForwardingPhi) {
-          if (!visitor(valUse)) {
-            return false;
+          if (PhiOperand(valUse)) {
+            if (!visitor(valUse)) {
+              return false;
+            }
           }
-          continue;
+          guaranteedForwardingOps.insert(valUse);
         }
       }
     }
@@ -1395,31 +1376,16 @@ ForwardingOperand::ForwardingOperand(Operand *use) {
   if (use->isTypeDependent())
     return;
 
-  if (!OwnershipForwardingMixin::isa(use->getUser())) {
-    return;
-  }
-#ifndef NDEBUG
   switch (use->getOperandOwnership()) {
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::GuaranteedForwarding:
+    this->use = use;
     break;
-  case OperandOwnership::NonUse:
-  case OperandOwnership::TrivialUse:
-  case OperandOwnership::InstantaneousUse:
-  case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::PointerEscape:
-  case OperandOwnership::BitwiseEscape:
-  case OperandOwnership::Borrow:
-  case OperandOwnership::DestroyingConsume:
-  case OperandOwnership::InteriorPointer:
-  case OperandOwnership::GuaranteedForwardingPhi:
-  case OperandOwnership::EndBorrow:
-  case OperandOwnership::Reborrow:
-    llvm_unreachable("this isn't the operand being forwarding!");
+  default:
+    this->use = nullptr;
+    return;
   }
-#endif
-  this->use = use;
 }
 
 ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
@@ -1625,15 +1591,22 @@ bool ForwardingOperand::visitForwardedValues(
   // "transforming terminators"... We know that this means that we should at
   // most have a single phi argument.
   auto *ti = cast<TermInst>(user);
-  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
-    // If we do not have any arguments, then continue.
-    if (succBlock->args_empty())
-      return true;
+  if (ti->mayHaveTerminatorResult()) {
+    return llvm::all_of(
+        ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+          // If we do not have any arguments, then continue.
+          if (succBlock->args_empty())
+            return true;
 
-    auto args = succBlock->getSILPhiArguments();
-    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
-    return visitor(args[0]);
-  });
+          auto args = succBlock->getSILPhiArguments();
+          assert(args.size() == 1 &&
+                 "Transforming terminator with multiple args?!");
+          return visitor(args[0]);
+        });
+  }
+
+  auto *succArg = PhiOperand(use).getValue();
+  return visitor(succArg);
 }
 
 void swift::visitExtendedReborrowPhiBaseValuePairs(

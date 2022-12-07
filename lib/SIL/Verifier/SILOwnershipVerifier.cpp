@@ -308,8 +308,8 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    if (op->getOperandOwnership() ==
-        OperandOwnership::GuaranteedForwardingPhi) {
+    if (PhiOperand(op) &&
+        op->getOperandOwnership() == OperandOwnership::GuaranteedForwarding) {
       LLVM_DEBUG(llvm::dbgs() << "Regular User: " << *user);
       nonLifetimeEndingUsers.push_back(op);
       continue;

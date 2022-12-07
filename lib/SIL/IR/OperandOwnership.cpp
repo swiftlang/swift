@@ -428,7 +428,7 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
 
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
     return isGuaranteedForwarding(getValue())
-               ? OperandOwnership::GuaranteedForwardingPhi
+               ? OperandOwnership::GuaranteedForwarding
                : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
