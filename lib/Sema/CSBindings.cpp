@@ -1070,6 +1070,17 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
     if (forClosureResult() || forGenericParameter())
       return false;
   }
+
+  // If type variable's binding set is incomplete, let's not
+  // bind it to a type inferred from conformance constraint
+  // (that's the action of last resort because not all
+  // protocols can conform to themselves), instead let's solve
+  // conjunctions first which could end up providing actual
+  // type to convert to a contextual existential.
+  if ((isPotentiallyIncomplete() || isDelayed()) &&
+      isSubtypeOfExistentialType())
+    return false;
+
   return true;
 }
 

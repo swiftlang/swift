@@ -626,3 +626,26 @@ do {
     }
   }
 }
+
+protocol MyDataProtocol {}
+
+// Make sure that closure is allowed to infer a result type for the body in presence of
+// existential conversion.
+func test_inference_with_existential_result() {
+  struct MyData : MyDataProtocol {}
+
+  func fn<T: MyDataProtocol>(_ fn: () -> T) -> T { fn() }
+
+  func test_single() -> any MyDataProtocol {
+    return fn { // Ok - result is inferred as MyData which is converted to any MyDataProtocol
+      MyData()
+    }
+  }
+
+  func test_multi() -> any MyDataProtocol {
+    return fn { // Ok - result is inferred as MyData which is converted to any MyDataProtocol
+      print("in closure")
+      return MyData()
+    }
+  }
+}
