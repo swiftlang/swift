@@ -3806,6 +3806,11 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   attr->setInvalid();
 }
 
+static bool isMemberLessAccessibleThanType(NominalTypeDecl *typeDecl,
+                                           ValueDecl *member) {
+  return member->getFormalAccess() <
+         std::min(typeDecl->getFormalAccess(), AccessLevel::Public);
+}
 
 void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
@@ -3828,11 +3833,6 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
     return;
 
   auto &ctx = D->getASTContext();
-
-  auto isLessAccessibleThanType = [&](ValueDecl *decl) {
-    return decl->getFormalAccess() <
-           std::min(nominal->getFormalAccess(), AccessLevel::Public);
-  };
 
   enum class UnviabilityReason {
     Failable,
@@ -3891,7 +3891,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
       if (init->isFailable())
         nonViableInits[init].push_back(UnviabilityReason::Failable);
 
-      if (isLessAccessibleThanType(init))
+      if (isMemberLessAccessibleThanType(nominal, init))
         nonViableInits[init].push_back(UnviabilityReason::Inaccessible);
     }
 
@@ -4112,7 +4112,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
               UnviabilityReason::InvalidStorageType);
         }
 
-        if (isLessAccessibleThanType(subscript))
+        if (isMemberLessAccessibleThanType(nominal, subscript))
           nonViableSubscripts[subscript].push_back(
               UnviabilityReason::Inaccessible);
       }
@@ -4198,7 +4198,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
         if (!hasKeyPathType(storageKeyPathParam))
           diagnoseSubscript(subscript, UnviabilityReason::InvalidStorageType);
 
-        if (isLessAccessibleThanType(subscript))
+        if (isMemberLessAccessibleThanType(nominal, subscript))
           diagnoseSubscript(subscript, UnviabilityReason::Inaccessible);
       }
     }
@@ -7027,6 +7027,73 @@ void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
              diag::runtime_discoverable_attrs_are_experimental);
     attr->setInvalid();
     return;
+  }
+
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  enum class UnviabilityReason { Failable, Inaccessible };
+
+  llvm::SmallVector<ConstructorDecl *, 2> matchingInits;
+  llvm::SmallDenseMap<ConstructorDecl *, SmallVector<UnviabilityReason, 2>, 2>
+      nonViableInits;
+
+  // Check whether type marked as runtime attribute capable has an initializer
+  // with first parameter labeled as `attachedTo:`.
+  for (auto *member : nominal->getMembers()) {
+    auto *init = dyn_cast<ConstructorDecl>(member);
+    if (!init)
+      continue;
+
+    auto *params = init->getParameters();
+    if (!params || params->size() == 0)
+      continue;
+
+    if (params->get(0)->getArgumentName() != Ctx.Id_attachedTo)
+      continue;
+
+    matchingInits.push_back(init);
+
+    if (init->isFailable())
+      nonViableInits[init].push_back(UnviabilityReason::Failable);
+
+    if (isMemberLessAccessibleThanType(nominal, init))
+      nonViableInits[init].push_back(UnviabilityReason::Inaccessible);
+  }
+
+  // If there are no matching initializers, let's complain.
+  if (matchingInits.empty()) {
+    diagnose(nominal->getLoc(), diag::runtime_attribute_requires_init,
+             nominal->getName());
+    attr->setInvalid();
+    return;
+  }
+
+  // If there are matching initializers but none of them are viable.
+  if (matchingInits.size() - nonViableInits.size() == 0) {
+    for (const auto &entry : nonViableInits) {
+      auto *init = entry.first;
+
+      for (auto reason : entry.second) {
+        switch (reason) {
+        case UnviabilityReason::Failable:
+          diagnose(init, diag::runtime_attribute_type_failable_init,
+                   init->getName());
+          break;
+
+        case UnviabilityReason::Inaccessible:
+          diagnose(init,
+                   diag::runtime_attribute_type_requirement_not_accessible,
+                   init->getFormalAccess(), init->getDescriptiveKind(),
+                   init->getName(), nominal->getDeclaredType(),
+                   nominal->getFormalAccess());
+          break;
+        }
+      }
+    }
+
+    attr->setInvalid();
   }
 }
 

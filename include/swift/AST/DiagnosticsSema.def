@@ -6810,6 +6810,21 @@ ERROR(invalid_decl_for_runtime_discoverable_attr,none,
 ERROR(duplicate_runtime_discoverable_attr,none,
       "duplicate runtime discoverable attribute", ())
 
+ERROR(runtime_attribute_requires_init,none,
+      "runtime attribute type %0 does not contain a required initializer"
+      " - init(attachedTo:)",
+      (DeclName))
+
+ERROR(runtime_attribute_type_failable_init,none,
+      "runtime attribute type initializer %0 cannot be failable", (DeclName))
+
+ERROR(runtime_attribute_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing runtime attribute type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 

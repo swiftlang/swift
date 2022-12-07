@@ -14,6 +14,23 @@ struct OnlyPropsTest<B, V> {
   init(attachedTo: KeyPath<B, V>) {}
 }
 
+@runtimeMetadata
+struct NoInitAttr { // expected-error {{runtime attribute type 'NoInitAttr' does not contain a required initializer - init(attachedTo:)}}
+}
+
+@runtimeMetadata
+struct FailiableInit {
+  init?(attachedTo: Any) {} // expected-error {{runtime attribute type initializer 'init(attachedTo:)' cannot be failable}}
+}
+
+@runtimeMetadata
+public struct AccessMismatchInAttr {
+  private init(attachedTo: Any) {}
+  // expected-error@-1 {{private initializer 'init(attachedTo:)' cannot have more restrictive access than its enclosing runtime attribute type 'AccessMismatchInAttr' (which is public)}}
+  internal init<T>(attachedTo: T.Type, other: Int) {}
+  // expected-error@-1 {{internal initializer 'init(attachedTo:other:)' cannot have more restrictive access than its enclosing runtime attribute type 'AccessMismatchInAttr' (which is public)}}
+}
+
 @Flag("global") func gloabalFn() {}
 
 @runtimeMetadata
