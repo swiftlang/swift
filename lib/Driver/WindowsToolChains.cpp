@@ -118,18 +118,13 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   for (auto path : RuntimeLibPaths) {
     Arguments.push_back("-L");
-    // Since Windows has separate libraries per architecture, link against the
-    // architecture specific version of the static library.
-    Arguments.push_back(context.Args.MakeArgString(path + "/" +
-                                                   getTriple().getArchName()));
+    Arguments.push_back(context.Args.MakeArgString(path));
   }
 
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 

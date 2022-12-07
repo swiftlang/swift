@@ -116,8 +116,6 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/false);
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.o");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 

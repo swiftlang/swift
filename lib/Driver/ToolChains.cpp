@@ -1400,8 +1400,8 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
                                          : getPlatformNameForTriple(T));
 }
 
-/// Get the runtime library link path, which is platform-specific and found
-/// relative to the compiler.
+/// Get the runtime library link path, which is platform-specific and arch-
+/// specific, found relative to the compiler.
 void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
                                    const llvm::opt::ArgList &args,
                                    bool shared) const {
@@ -1423,6 +1423,9 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
   if (tripleIsMacCatalystEnvironment(getTriple()))
     libSubDir = "maccatalyst";
   llvm::sys::path::append(resourceDirPath, libSubDir);
+  if (!getTriple().isOSDarwin())
+    llvm::sys::path::append(resourceDirPath,
+                            getMajorArchitectureName(getTriple()));
 }
 
 // Get the secondary runtime library link path given the primary path.
@@ -1431,6 +1434,15 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
 void ToolChain::getSecondaryResourceDirPath(
     SmallVectorImpl<char> &secondaryResourceDirPath,
     StringRef primaryPath) const {
+  if (!getTriple().isOSDarwin()) {
+    // For non-Darwin platforms, the secondary runtime library path is the
+    // non arch-specific library path. The compiler will find bundled Swift
+    // frameworks and other arch-irrelevant resources here.
+    secondaryResourceDirPath.append(primaryPath.begin(), primaryPath.end());
+    llvm::sys::path::remove_filename(secondaryResourceDirPath);
+    return;
+  }
+ 
   if (!tripleIsMacCatalystEnvironment(getTriple()))
     return;
 
