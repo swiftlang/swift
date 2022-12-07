@@ -162,8 +162,20 @@ public:
       auto calleeYields = yield->getYieldedValues();
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
+      SmallVector<BeginBorrowInst *, 2> guaranteedYields;
       for (auto i : indices(calleeYields)) {
         auto remappedYield = getMappedValue(calleeYields[i]);
+        // When owned values are yielded @guaranteed, the mapped value must be
+        // borrowed and the result be substituted in place of the originally
+        // yielded value.  Otherwise, there could be uses of the original value
+        // which require an @guaranteed operand into which we'd be attempting to
+        // substitute an @owned operand.
+        if (calleeYields[i]->getOwnershipKind() == OwnershipKind::Owned &&
+            !yield->getOperandRef(i).isConsuming()) {
+          auto *bbi = Builder->createBeginBorrow(Loc, remappedYield);
+          guaranteedYields.push_back(bbi);
+          remappedYield = bbi;
+        }
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
       Builder->createBranch(Loc, returnToBB);
@@ -172,11 +184,17 @@ public:
       if (EndApply) {
         SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
         SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
         auto unwindBB = remapBlock(yield->getUnwindBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
