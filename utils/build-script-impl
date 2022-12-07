@@ -266,7 +266,6 @@ KNOWN_SETTINGS=(
 )
 
 components=(
-  cmark
   foundation
   libcxx
   libdispatch
@@ -284,9 +283,6 @@ components=(
 )
 for component in ${components[@]} ; do
   component_skip_test_default=""
-  if [[ "${component}" == "cmark" ]]; then
-    component_skip_test_default="1"
-  fi
   KNOWN_SETTINGS+=(
     ${component}-build-type                       "Debug"                              "the build variant for ${component}"
     ${component}-cmake-options                    ""                                   "CMake options used for ${component}"
@@ -494,7 +490,6 @@ function verify_host_is_supported() {
 function set_build_options_for_host() {
     llvm_cmake_options=()
     swift_cmake_options=()
-    cmark_cmake_options=()
     lldb_cmake_options=()
     llbuild_cmake_options=()
     SWIFT_HOST_VARIANT=
@@ -613,11 +608,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="arm64"
 
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
@@ -649,11 +639,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="arm64"
 
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 appletvos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
@@ -685,11 +670,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="arm64"
 
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 watchos-armv7k)
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
@@ -725,13 +705,6 @@ function set_build_options_for_host() {
 
             cmake_os_sysroot="$(xcrun --sdk ${platform} --show-sdk-path)"
 
-            cmark_cmake_options=(
-                -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
-                -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
-                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
-            )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
@@ -1233,7 +1206,6 @@ SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 # like tblgen that Swift relies on for building and testing. See the LLVM
 # configure rules.
 PRODUCTS=(llvm)
-[[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
@@ -1298,9 +1270,6 @@ function build_directory_bin() {
     root="$(build_directory ${host} ${product})"
     if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
         case ${product} in
-            cmark)
-                echo "${root}/${CMARK_BUILD_TYPE}/bin"
-                ;;
             llvm)
                 echo "${root}/${LLVM_BUILD_TYPE}/bin"
                 ;;
@@ -1396,10 +1365,6 @@ function llvm_c_flags() {
     fi
 }
 
-function cmark_c_flags() {
-    echo -n " $(common_cross_c_flags $1 ${CMARK_BUILD_TYPE})"
-}
-
 function swift_c_flags() {
     # Don't pass common_cross_c_flags to Swift because CMake code in the Swift
     # project is itself aware of cross-compilation for the host tools and
@@ -1424,9 +1389,6 @@ function cmake_config_opt() {
         # CMake automatically adds --target ALL_BUILD if we don't pass this.
         echo "--target ZERO_CHECK "
         case ${product} in
-            cmark)
-                echo "--config ${CMARK_BUILD_TYPE}"
-                ;;
             llvm)
                 echo "--config ${LLVM_BUILD_TYPE}"
                 ;;
@@ -1725,18 +1687,6 @@ for host in "${ALL_HOSTS[@]}"; do
         cmake_options+=("${product_cmake_options[@]}")
 
         case ${product} in
-            cmark)
-                cmake_options=(
-                  "${cmake_options[@]}"
-                  -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
-                  "${cmark_cmake_options[@]}"
-                )
-                if [[ $(is_cross_tools_host ${host}) ]] ; then
-                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
-                fi
-                build_targets=(all)
-                ;;
-
             llvm)
                 if [[ -n "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" && $(is_cross_tools_host ${host}) ]] ; then
                     build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
@@ -2893,17 +2843,6 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         case ${product} in
-            cmark)
-                if [[ "${SKIP_TEST_CMARK}" ]]; then
-                    continue
-                fi
-                executable_target=api_test
-                results_targets=(test)
-                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-                    # Xcode generator uses "RUN_TESTS" instead of "test".
-                    results_targets=(RUN_TESTS)
-                fi
-                ;;
             llvm)
                 continue # We don't test LLVM
                 ;;
@@ -3229,11 +3168,6 @@ for host in "${ALL_HOSTS[@]}"; do
         INSTALL_TARGETS="install"
 
         case ${product} in
-            cmark)
-                if [[ -z "${INSTALL_CMARK}" ]] ; then
-                    continue
-                fi
-                ;;
             llvm)
                 if [[ -z "${INSTALL_LLVM}" ]] ; then
                     continue

@@ -104,7 +104,6 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
-            "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
@@ -256,7 +255,6 @@ class BuildScriptInvocation(object):
         # if we are going to build them and install_all is set, we also install
         # them.
         conditional_subproject_configs = [
-            (args.build_cmark, "cmark"),
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
@@ -296,7 +294,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += [
-                "--skip-test-cmark",
                 "--skip-test-lldb",
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
