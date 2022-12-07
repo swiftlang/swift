@@ -167,7 +167,8 @@
     "Integers": [
       "Integers.swift",
       "IntegerTypes.swift",
-      "IntegerParsing.swift"],
+      "IntegerParsing.swift",
+      "StaticBigInt.swift"],
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",

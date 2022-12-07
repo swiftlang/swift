@@ -12,10 +12,10 @@
 
 #include "sourcekitd/ExpressionTypeArray.h"
 #include "sourcekitd/CompactArray.h"
+#include "sourcekitd/DictionaryKeys.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/UIdent.h"
-#include "DictionaryKeys.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 

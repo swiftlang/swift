@@ -21,6 +21,7 @@ if (SWIFT_SWIFT_PARSER)
   add_library(swiftASTGen STATIC
     Sources/ASTGen/ASTGen.swift
     Sources/ASTGen/Decls.swift
+    Sources/ASTGen/Diagnostics.swift
     Sources/ASTGen/Exprs.swift
     Sources/ASTGen/Generics.swift
     Sources/ASTGen/Literals.swift
@@ -88,7 +89,6 @@ if (SWIFT_SWIFT_PARSER)
   )
   target_link_libraries(swiftASTGen PUBLIC
     swiftAST
-    swift_CompilerPluginSupport
   )
 
   set(SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR

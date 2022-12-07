@@ -132,7 +132,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class CompilerPlugin;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -288,6 +287,11 @@ public:
   std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
   ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
+
+  /// A callback that will be called when the constraint system found a
+  /// solution. Called multiple times if the constraint system has ambiguous
+  /// solutions.
+  ide::TypeCheckCompletionCallback *SolutionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;

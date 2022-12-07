@@ -8282,11 +8282,12 @@ public:
 
 /// Provides a declaration of a macro.
 ///
+/// Macros are declared within the source code with the `macro` introducer.
+///
 /// Macros are defined externally via conformances to the 'Macro' type
 /// that is part of swift-syntax, and are introduced into the compiler via
-/// various mechanisms (built-in macros are linked in directly, plugin macros
-/// are introduced via compiler plugins, and so on). They have no explicit
-/// representation in the source code, but are still declarations.
+/// various mechanisms (e.g., in-process macros provided as builtins or
+/// loaded via shared library, and so on).
 class MacroDecl : public GenericContext, public ValueDecl {
 public:
   /// The location of the 'macro' keyword.

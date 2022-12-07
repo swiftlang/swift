@@ -146,27 +146,34 @@ foreach(sdk ${SWIFT_SDKS})
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
 
-    if(SWIFT_BUILD_STATIC_STDLIB)
-      add_custom_command_target(
-        copy_glibc_modulemap_static
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy" ${glibc_modulemap_out} ${glibc_modulemap_out_static}
-        OUTPUT ${glibc_modulemap_out_static}
-        DEPENDS
-          "${glibc_modulemap_target}"
-        COMMENT "Copying Glibc modulemap to static resources")
-
-      list(APPEND glibc_modulemap_target_list ${copy_glibc_modulemap_static})
-    endif()
-
     set(glibc_header_out "${module_dir}/SwiftGlibc.h")
+    set(glibc_header_out_static "${module_dir_static}/SwiftGlibc.h")
     handle_gyb_source_single(glibc_header_target
         SOURCE "SwiftGlibc.h.gyb"
         OUTPUT "${glibc_header_out}"
         FLAGS "-DCMAKE_SDK=${sdk}")
     list(APPEND glibc_modulemap_target_list ${glibc_header_target})
+
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      add_custom_command_target(
+        copy_glibc_modulemap_header_static
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy"
+            ${glibc_modulemap_out} ${glibc_modulemap_out_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy"
+            ${glibc_header_out} ${glibc_header_out_static}
+        OUTPUT ${glibc_modulemap_out_static} ${glibc_header_out_static}
+        DEPENDS
+          "${glibc_modulemap_target}"
+          "${glibc_header_target}"
+        COMMENT "Copying Glibc modulemap and header to static resources")
+
+      list(APPEND glibc_modulemap_target_list
+        ${copy_glibc_modulemap_header_static})
+    endif()
 
     # If this SDK is a target for a non-native host, except if it's for Android
     # with its own native sysroot, create a native modulemap without a sysroot

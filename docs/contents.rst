@@ -6,8 +6,6 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   ErrorHandling
-   ErrorHandlingRationale
    Generics
    StoredAndComputedVariables
    SIL

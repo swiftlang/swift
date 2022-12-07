@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -129,6 +129,9 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::SToSCheckedTrunc:
     case BuiltinValueKind::UToUCheckedTrunc:
     case BuiltinValueKind::IntToFPWithOverflow:
+    case BuiltinValueKind::BitWidth:
+    case BuiltinValueKind::IsNegative:
+    case BuiltinValueKind::WordAtIndex:
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:

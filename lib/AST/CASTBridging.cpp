@@ -3,6 +3,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
@@ -21,6 +22,95 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
 static SourceLoc getSourceLocFromPointer(void *loc) {
   auto smLoc = llvm::SMLoc::getFromPointer((const char *)loc);
   return SourceLoc(smLoc);
+}
+
+namespace {
+  struct BridgedDiagnosticImpl {
+    InFlightDiagnostic inFlight;
+    std::vector<StringRef> textBlobs;
+
+    BridgedDiagnosticImpl(const BridgedDiagnosticImpl&) = delete;
+    BridgedDiagnosticImpl(BridgedDiagnosticImpl &&) = delete;
+    BridgedDiagnosticImpl &operator=(const BridgedDiagnosticImpl&) = delete;
+    BridgedDiagnosticImpl &operator=(BridgedDiagnosticImpl &&) = delete;
+
+    ~BridgedDiagnosticImpl() {
+      inFlight.flush();
+      for (auto text: textBlobs) {
+        free((void*)text.data());
+      }
+    }
+  };
+}
+
+BridgedDiagnostic SwiftDiagnostic_create(
+    void *diagnosticEngine, BridgedDiagnosticSeverity severity,
+    void *sourceLocPtr,
+    const uint8_t *textPtr, long textLen
+) {
+  StringRef origText{
+    reinterpret_cast<const char *>(textPtr), size_t(textLen)};
+  llvm::MallocAllocator mallocAlloc;
+  StringRef text = origText.copy(mallocAlloc);
+
+  SourceLoc loc = getSourceLocFromPointer(sourceLocPtr);
+
+  Diag<StringRef> diagID;
+  switch (severity) {
+  case BridgedDiagnosticSeverity::BridgedError:
+    diagID = diag::bridged_error;
+    break;
+  case BridgedDiagnosticSeverity::BridgedFatalError:
+    diagID = diag::bridged_fatal_error;
+    break;
+  case BridgedDiagnosticSeverity::BridgedNote:
+    diagID = diag::bridged_note;
+    break;
+  case BridgedDiagnosticSeverity::BridgedRemark:
+    diagID = diag::bridged_remark;
+    break;
+  case BridgedDiagnosticSeverity::BridgedWarning:
+    diagID = diag::bridged_warning;
+    break;
+  }
+
+  DiagnosticEngine &diags = *static_cast<DiagnosticEngine *>(diagnosticEngine);
+  return new BridgedDiagnosticImpl{diags.diagnose(loc, diagID, text), {text}};
+}
+
+/// Highlight a source range as part of the diagnostic.
+void SwiftDiagnostic_highlight(
+    BridgedDiagnostic diagPtr, void *startLocPtr, void *endLocPtr
+) {
+  SourceLoc startLoc = getSourceLocFromPointer(startLocPtr);
+  SourceLoc endLoc = getSourceLocFromPointer(endLocPtr);
+
+  BridgedDiagnosticImpl *impl = static_cast<BridgedDiagnosticImpl *>(diagPtr);
+  impl->inFlight.highlightChars(startLoc, endLoc);
+}
+
+/// Add a Fix-It to replace a source range as part of the diagnostic.
+void SwiftDiagnostic_fixItReplace(
+    BridgedDiagnostic diagPtr, void *replaceStartLocPtr, void *replaceEndLocPtr,
+    const uint8_t *newTextPtr, long newTextLen) {
+
+  SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);
+  SourceLoc endLoc = getSourceLocFromPointer(replaceEndLocPtr);
+
+  StringRef origReplaceText{
+    reinterpret_cast<const char *>(newTextPtr), size_t(newTextLen)};
+  llvm::MallocAllocator mallocAlloc;
+  StringRef replaceText = origReplaceText.copy(mallocAlloc);
+
+  BridgedDiagnosticImpl *impl = static_cast<BridgedDiagnosticImpl *>(diagPtr);
+  impl->textBlobs.push_back(replaceText);
+  impl->inFlight.fixItReplaceChars(startLoc, endLoc, replaceText);
+}
+
+/// Finish the given diagnostic and emit it.
+void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
+  BridgedDiagnosticImpl *impl = static_cast<BridgedDiagnosticImpl *>(diagPtr);
+  delete impl;
 }
 
 BridgedIdentifier SwiftASTContext_getIdentifier(void *ctx,

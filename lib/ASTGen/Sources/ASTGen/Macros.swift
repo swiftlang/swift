@@ -97,6 +97,7 @@ extension String {
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroPtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafePointer<UInt8>,
   sourceLocationPtr: UnsafePointer<UInt8>?,
@@ -147,10 +148,20 @@ func evaluateMacro(
         return ExprSyntax(parentExpansion)
       }
 
-      return exprMacro.expand(parentExpansion, in: &context)
+      return exprMacro.expansion(of: parentExpansion, in: &context)
     }
 
-    // FIXME: Emit diagnostics accumulated in the
+    // Emit diagnostics accumulated in the context.
+    for diag in context.diagnostics {
+      // FIXME: Consider tacking on a note that says that this diagnostic
+      // came from a macro expansion.
+      emitDiagnostic(
+        diagEnginePtr: diagEnginePtr,
+        sourceFileBuffer: .init(mutating: sourceFile.pointee.buffer),
+        nodeStartOffset: parentSyntax.position.utf8Offset,
+        diagnostic: diag
+      )
+    }
 
     var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
     evaluatedSyntaxStr.withUTF8 { utf8 in
