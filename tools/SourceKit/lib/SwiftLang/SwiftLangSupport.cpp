@@ -126,6 +126,7 @@ public:
   UID_FOR(Destructor)
   UID_FOR(Subscript)
   UID_FOR(OpaqueType)
+  UID_FOR(Macro)
 #undef UID_FOR
 };
 
