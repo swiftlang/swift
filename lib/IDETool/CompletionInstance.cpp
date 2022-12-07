@@ -541,7 +541,7 @@ void swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    DiagnosticConsumer *DiagC,
+    DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
         Callback) {
@@ -563,9 +563,7 @@ void swift::ide::CompletionInstance::performOperation(
     return;
   }
 
-  // Always disable source location resolutions from .swiftsourceinfo file
-  // because they're somewhat heavy operations and aren't needed for completion.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = IgnoreSwiftSourceInfo;
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
@@ -617,9 +615,11 @@ void swift::ide::CompletionInstance::codeComplete(
     }
   };
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they're somewhat heavy operations and aren't needed for completion.
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      CancellationFlag,
+      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<CodeCompleteResult>(
             [&CompletionContext, &CancellationFlag](auto &Result,
@@ -696,7 +696,7 @@ void swift::ide::CompletionInstance::typeContextInfo(
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      CancellationFlag,
+      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<TypeContextInfoResult>(
             [&CancellationFlag](auto &Result, auto DeliverTransformed) {
@@ -764,7 +764,7 @@ void swift::ide::CompletionInstance::conformingMethodList(
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      CancellationFlag,
+      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<ConformingMethodListResults>(
             [&ExpectedTypeNames, &CancellationFlag](auto &Result,
@@ -830,7 +830,7 @@ void swift::ide::CompletionInstance::cursorInfo(
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      CancellationFlag,
+      /*IgnoreSwiftSourceInfo=*/false, CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
             [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {

@@ -161,7 +161,7 @@ class CompletionInstance {
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      DiagnosticConsumer *DiagC,
+      DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
