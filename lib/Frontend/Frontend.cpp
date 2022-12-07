@@ -66,6 +66,20 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
 
+std::string CompilerInvocation::getModuleScanningHash() const {
+  using llvm::hash_combine;
+
+  auto Code = hash_combine(LangOpts.getModuleScanningHashComponents(),
+                           FrontendOpts.getModuleScanningHashComponents(),
+                           ClangImporterOpts.getModuleScanningHashComponents(),
+                           SearchPathOpts.getModuleScanningHashComponents(),
+                           DiagnosticOpts.getModuleScanningHashComponents(),
+                           SILOpts.getModuleScanningHashComponents(),
+                           IRGenOpts.getModuleScanningHashComponents());
+
+  return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
+}
+
 const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();

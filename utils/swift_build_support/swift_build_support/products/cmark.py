@@ -54,22 +54,10 @@ class CMark(cmake_product.CMakeProduct):
 
         self.cmake_options.define('CMARK_THREADING', 'ON')
 
-        (platform, arch) = host_target.split('-')
+        host_toolchain = self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
-        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
-        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
-        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
-
-        if host_target.startswith("macosx") or \
-           host_target.startswith("iphone") or \
-           host_target.startswith("appletv") or \
-           host_target.startswith("watch"):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "linux":
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "openbsd":
+        (platform, _) = host_target.split('-')
+        if not host_toolchain and platform == "openbsd":
             toolchain_file = self.get_openbsd_toolchain_file()
             if toolchain_file:
                 self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)

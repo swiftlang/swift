@@ -1,4 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// FIXME: Cannot use target-run-simple-swift as it causes a runtime crash (https://github.com/apple/swift/issues/52881)
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/std-string-overlay -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none
+// RUN: %target-codesign %t/std-string-overlay
+// RUN: %target-run %t/std-string-overlay
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu

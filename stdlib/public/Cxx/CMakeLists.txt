@@ -1,4 +1,9 @@
-add_swift_target_library(swiftCxx ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+set(SWIFT_CXX_LIBRARY_KIND STATIC)
+if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  set(SWIFT_CXX_LIBRARY_KIND SHARED)
+endif()
+
+add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB
     CxxConvertibleToCollection.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
@@ -10,7 +15,8 @@ add_swift_target_library(swiftCxx ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
     -Xcc -nostdinc++
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    INSTALL_IN_COMPONENT sdk-overlay)
+    INSTALL_IN_COMPONENT sdk-overlay
+    INSTALL_WITH_SHARED)
 
 add_subdirectory(std)
 add_subdirectory(cxxshim)

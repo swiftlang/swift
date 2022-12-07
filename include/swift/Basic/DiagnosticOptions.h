@@ -86,6 +86,12 @@ public:
     // Nothing here that contributes anything significant when emitting the PCH.
     return llvm::hash_value(0);
   }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
+    return llvm::hash_value(0);
+  }
 };
 
 } // end namespace swift

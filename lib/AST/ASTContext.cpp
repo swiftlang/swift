@@ -1879,21 +1879,23 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-using ModuleDependencyIDSet = std::unordered_set<ModuleDependencyID, llvm::pair_hash<std::string, ModuleDependenciesKind>>;
+using ModuleDependencyIDSet =
+    std::unordered_set<ModuleDependencyID,
+                       llvm::pair_hash<std::string,
+                                       ModuleDependenciesKind>>;
 static void findPath_dfs(ModuleDependencyID X,
                          ModuleDependencyID Y,
                          ModuleDependencyIDSet &visited,
                          std::vector<ModuleDependencyID> &stack,
                          std::vector<ModuleDependencyID> &result,
-                         const ModuleDependenciesCache &cache,
-                         const llvm::StringSet<> &searchPathSet) {
+                         const ModuleDependenciesCache &cache) {
   stack.push_back(X);
   if (X == Y) {
     copy(stack.begin(), stack.end(), std::back_inserter(result));
     return;
   }
   visited.insert(X);
-  auto node = cache.findDependencies(X.first, {X.second, searchPathSet});
+  auto node = cache.findDependencies(X.first, X.second);
   assert(node.has_value() && "Expected cache value for dependency.");
   for (const auto &dep : node->getModuleDependencies()) {
     Optional<ModuleDependenciesKind> lookupKind = None;
@@ -1902,12 +1904,12 @@ static void findPath_dfs(ModuleDependencyID X,
     if ((dep == X.first && node->isSwiftModule()) || node->isClangModule())
       lookupKind = ModuleDependenciesKind::Clang;
 
-    auto depNode = cache.findDependencies(dep, {lookupKind, searchPathSet});
+    auto depNode = cache.findDependencies(dep, lookupKind);
     if (!depNode.has_value())
       continue;
     auto depID = std::make_pair(dep, depNode->getKind());
     if (!visited.count(depID)) {
-      findPath_dfs(depID, Y, visited, stack, result, cache, searchPathSet);
+      findPath_dfs(depID, Y, visited, stack, result, cache);
     }
   }
   stack.pop_back();
@@ -1915,11 +1917,9 @@ static void findPath_dfs(ModuleDependencyID X,
 
 static std::vector<ModuleDependencyID>
 findPathToDependency(ModuleDependencyID dependency,
-                     const ModuleDependenciesCache &cache,
-                     const llvm::StringSet<> &searchPathSet) {
+                     const ModuleDependenciesCache &cache) {
   auto mainModuleDep = cache.findDependencies(cache.getMainModuleName(),
-                                              {ModuleDependenciesKind::SwiftSource,
-                                               searchPathSet});
+                                              ModuleDependenciesKind::SwiftSource);
   // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
     return {};
@@ -1928,7 +1928,7 @@ findPathToDependency(ModuleDependencyID dependency,
   auto visited = ModuleDependencyIDSet();
   auto stack = std::vector<ModuleDependencyID>();
   auto dependencyPath = std::vector<ModuleDependencyID>();
-  findPath_dfs(mainModuleID, dependency, visited, stack, dependencyPath, cache, searchPathSet);
+  findPath_dfs(mainModuleID, dependency, visited, stack, dependencyPath, cache);
   return dependencyPath;
 }
 
@@ -1937,11 +1937,10 @@ findPathToDependency(ModuleDependencyID dependency,
 static void diagnoseScannerFailure(StringRef moduleName,
                                    DiagnosticEngine &Diags,
                                    const ModuleDependenciesCache &cache,
-                                   const llvm::StringSet<> &searchPathSet,
                                    llvm::Optional<ModuleDependencyID> dependencyOf) {
   Diags.diagnose(SourceLoc(), diag::dependency_scan_module_not_found, moduleName);
   if (dependencyOf.has_value()) {
-    auto path = findPathToDependency(dependencyOf.value(), cache, searchPathSet);
+    auto path = findPathToDependency(dependencyOf.value(), cache);
     // We may fail to construct a path in some cases, such as a Swift overlay of a Clang
     // module dependnecy.
     if (path.empty())
@@ -1949,7 +1948,7 @@ static void diagnoseScannerFailure(StringRef moduleName,
     
     for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
       const auto &entry = *it;
-      auto entryNode = cache.findDependencies(entry.first, {entry.second, searchPathSet});
+      auto entryNode = cache.findDependencies(entry.first, entry.second);
       assert(entryNode.has_value());
       std::string moduleFilePath = "";
       bool isClang = false;
@@ -1992,23 +1991,20 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     // Check whether we've cached this result.
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftSource, searchPathSet}))
+              moduleName, ModuleDependenciesKind::SwiftSource))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftInterface, searchPathSet}))
+              moduleName, ModuleDependenciesKind::SwiftInterface))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
+              moduleName, ModuleDependenciesKind::SwiftBinary))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftPlaceholder, searchPathSet}))
+              moduleName, ModuleDependenciesKind::SwiftPlaceholder))
         return found;
     }
     if (auto found = cache.findDependencies(
-            moduleName, {ModuleDependenciesKind::Clang, searchPathSet}))
+            moduleName, ModuleDependenciesKind::Clang))
       return found;
   } else {
     for (auto &loader : getImpl().ModuleLoaders) {
@@ -2021,7 +2017,7 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
         return dependencies;
     }
     
-    diagnoseScannerFailure(moduleName, Diags, cache, searchPathSet,
+    diagnoseScannerFailure(moduleName, Diags, cache,
                            dependencyOf);
   }
 
