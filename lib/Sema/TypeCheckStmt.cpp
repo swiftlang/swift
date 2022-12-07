@@ -1876,10 +1876,17 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         auto i = patternInit->getBindingIndex();
         PBD->getPattern(i)->forEachVariable(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (PBD->getInit(i)) {
+        if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
             typeCheckPatternBinding(PBD, i,
                                     /*LeaveClosureBodyUnchecked=*/true);
+            // Retrieve the accessor's body to trigger RecontextualizeClosures
+            // This is important to get the correct USR of variables defined
+            // in closures initializing lazy variables.
+            PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+              VD->visitEmittedAccessors(
+                  [&](AccessorDecl *accessor) { (void)accessor->getBody(); });
+            });
             return false;
           }
         }
