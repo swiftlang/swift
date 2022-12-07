@@ -1584,7 +1584,15 @@ public:
     // If so, let's put a fresh generic parameter in the substituted signature
     // here.
     unsigned paramIndex = substGenericParams.size();
-    auto gp = GenericTypeParamType::get(false, 0, paramIndex, TC.Context);
+
+    bool isParameterPack = false;
+    if (substTy->isParameterPack() || substTy->is<PackArchetypeType>())
+      isParameterPack = true;
+    else if (pattern.isTypeParameterPack())
+      isParameterPack = true;
+
+    auto gp = GenericTypeParamType::get(isParameterPack, 0, paramIndex,
+                                        TC.Context);
     substGenericParams.push_back(gp);
     substReplacementTypes.push_back(substTy);
     
@@ -1881,11 +1889,30 @@ public:
   }
 
   CanType visitPackType(PackType *pack, AbstractionPattern pattern) {
-    llvm_unreachable("Unimplemented!");
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, pack))
+      return gp;
+
+    // Break down the pack.
+    SmallVector<Type, 4> packElts;
+    for (unsigned i = 0; i < pack->getNumElements(); ++i) {
+      packElts.push_back(visit(pack->getElementType(i),
+                               pattern.getPackElementType(i)));
+    }
+
+    return CanType(PackType::get(TC.Context, packElts));
   }
 
-  CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
-    llvm_unreachable("Unimplemented!");
+  CanType visitPackExpansionType(PackExpansionType *pack,
+                                 AbstractionPattern pattern) {
+    // Avoid walking into the pattern and count type if we can help it.
+    if (!pack->hasTypeParameter() && !pack->hasArchetype() &&
+        !pack->hasOpaqueArchetype()) {
+      return CanType(pack);
+    }
+
+    return CanType(PackExpansionType::get(
+        visit(pack->getPatternType(), pattern.getPackExpansionPatternType()),
+        visit(pack->getCountType(), pattern.getPackExpansionCountType())));
   }
 
   CanType visitExistentialType(ExistentialType *exist,

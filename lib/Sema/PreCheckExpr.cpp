@@ -399,22 +399,6 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
   return nullptr;
 }
 
-/// Whether the given expression "looks like" a (possibly sugared) type. For
-/// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
-static bool exprLooksLikeAType(Expr *expr) {
-  return isa<OptionalEvaluationExpr>(expr) ||
-      isa<BindOptionalExpr>(expr) ||
-      isa<ForceValueExpr>(expr) ||
-      isa<ParenExpr>(expr) ||
-      isa<ArrowExpr>(expr) ||
-      isa<TupleExpr>(expr) ||
-      (isa<ArrayExpr>(expr) &&
-       cast<ArrayExpr>(expr)->getElements().size() == 1) ||
-      (isa<DictionaryExpr>(expr) &&
-       cast<DictionaryExpr>(expr)->getElements().size() == 1) ||
-      getCompositionExpr(expr);
-}
-
 static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
   struct PackReferenceFinder : public ASTWalker {
     DeclContext *dc;
@@ -1024,6 +1008,10 @@ namespace {
     /// resolution failure, or `nullptr` if transformation is not applicable.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
+    /// Whether the given expression "looks like" a (possibly sugared) type. For
+    /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
+    bool exprLooksLikeAType(Expr *expr);
+
     /// Whether the current expression \p E is in a context that might turn out
     /// to be a \c TypeExpr after \c simplifyTypeExpr is called up the tree.
     /// This function allows us to make better guesses about whether invalid
@@ -1039,141 +1027,16 @@ namespace {
     /// In Swift < 5, diagnose and correct invalid multi-argument or
     /// argument-labeled interpolations. Returns \c true if the AST walk should
     /// continue, or \c false if it should be aborted.
-    bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
-      // These expressions are valid in Swift 5+.
-      if (getASTContext().isSwiftVersionAtLeast(5))
-        return true;
-
-      /// Diagnoses appendInterpolation(...) calls with multiple
-      /// arguments or argument labels and corrects them.
-      class StrangeInterpolationRewriter : public ASTWalker {
-        ASTContext &Context;
-
-      public:
-        StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
-
-        virtual PreWalkAction walkToDeclPre(Decl *D) override {
-          // We don't want to look inside decls.
-          return Action::SkipChildren();
-        }
-
-        virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-          // One InterpolatedStringLiteralExpr should never be nested inside
-          // another except as a child of a CallExpr, and we don't recurse into
-          // the children of CallExprs.
-          assert(!isa<InterpolatedStringLiteralExpr>(E) &&
-                 "StrangeInterpolationRewriter found nested interpolation?");
-
-          // We only care about CallExprs.
-          if (!isa<CallExpr>(E))
-            return Action::Continue(E);
-
-          auto *call = cast<CallExpr>(E);
-          auto *args = call->getArgs();
-
-          auto lParen = args->getLParenLoc();
-          auto rParen = args->getRParenLoc();
-
-          if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
-            if (callee->getName().getBaseName() ==
-                Context.Id_appendInterpolation) {
-
-              Optional<Argument> newArg;
-              if (args->size() > 1) {
-                auto *secondArg = args->get(1).getExpr();
-                Context.Diags
-                    .diagnose(secondArg->getLoc(),
-                              diag::string_interpolation_list_changing)
-                    .highlightChars(secondArg->getLoc(), rParen);
-                Context.Diags
-                    .diagnose(secondArg->getLoc(),
-                              diag::string_interpolation_list_insert_parens)
-                    .fixItInsertAfter(lParen, "(")
-                    .fixItInsert(rParen, ")");
-
-                // Make sure we don't have an inout arg somewhere, as that's
-                // invalid even with the compatibility fix.
-                for (auto arg : *args) {
-                  if (arg.isInOut()) {
-                    Context.Diags.diagnose(arg.getExpr()->getStartLoc(),
-                                           diag::extraneous_address_of);
-                    return Action::Stop();
-                  }
-                }
-
-                // Form a new argument tuple from the argument list.
-                auto *packed = args->packIntoImplicitTupleOrParen(Context);
-                newArg = Argument::unlabeled(packed);
-              } else if (args->size() == 1 &&
-                         args->front().getLabel() != Identifier()) {
-                // Form a new argument that drops the label.
-                auto *argExpr = args->front().getExpr();
-                newArg = Argument::unlabeled(argExpr);
-
-                SourceLoc argLabelLoc = args->front().getLabelLoc(),
-                          argLoc = argExpr->getStartLoc();
-
-                Context.Diags
-                    .diagnose(argLabelLoc,
-                              diag::string_interpolation_label_changing)
-                    .highlightChars(argLabelLoc, argLoc);
-                Context.Diags
-                    .diagnose(argLabelLoc,
-                              diag::string_interpolation_remove_label,
-                              args->front().getLabel())
-                    .fixItRemoveChars(argLabelLoc, argLoc);
-              }
-
-              // If newArg is no longer null, we need to build a new
-              // appendInterpolation(_:) call that takes it to replace the bad
-              // appendInterpolation(...) call.
-              if (newArg) {
-                auto newCallee = new (Context) UnresolvedDotExpr(
-                    callee->getBase(), /*dotloc=*/SourceLoc(),
-                    DeclNameRef(Context.Id_appendInterpolation),
-                    /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
-
-                auto *newArgList =
-                    ArgumentList::create(Context, lParen, {*newArg}, rParen,
-                                         /*trailingClosureIdx*/ None,
-                                         /*implicit*/ false);
-                E = CallExpr::create(Context, newCallee, newArgList,
-                                     /*implicit=*/false);
-              }
-            }
-          }
-
-          // There is never a CallExpr between an InterpolatedStringLiteralExpr
-          // and an un-typechecked appendInterpolation(...) call, so whether we
-          // changed E or not, we don't need to recurse any deeper.
-          return Action::SkipChildren(E);
-        }
-      };
-
-      return ISLE->getAppendingExpr()->walk(
-          StrangeInterpolationRewriter(getASTContext()));
-    }
+    bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE);
 
     /// Scout out the specified destination of an AssignExpr to recursively
     /// identify DiscardAssignmentExpr in legal places.  We can only allow them
     /// in simple pattern-like expressions, so we reject anything complex here.
-    void markAcceptableDiscardExprs(Expr *E) {
-      if (!E) return;
+    void markAcceptableDiscardExprs(Expr *E);
 
-      if (auto *PE = dyn_cast<ParenExpr>(E))
-        return markAcceptableDiscardExprs(PE->getSubExpr());
-      if (auto *TE = dyn_cast<TupleExpr>(E)) {
-        for (auto &elt : TE->getElements())
-          markAcceptableDiscardExprs(elt);
-        return;
-      }
-      if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
-        return markAcceptableDiscardExprs(BOE->getSubExpr());
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
-        CorrectDiscardAssignmentExprs.insert(DAE);
-
-      // Otherwise, we can't support this.
-    }
+    /// Check if this is a postfix '...' operator, which might denote a pack
+    /// expansion expression.
+    Expr *isPostfixEllipsisOperator(Expr *E);
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
@@ -1189,28 +1052,7 @@ namespace {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
-      auto *methodContext = DC->getInnermostMethodContext();
-      if (!methodContext) {
-        Ctx.Diags.diagnose(Loc, diag::super_not_in_class_method);
-        return nullptr;
-      }
-
-      // Do an actual lookup for 'self' in case it shows up in a capture list.
-      auto *methodSelf = methodContext->getImplicitSelfDecl();
-      auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                         Ctx.Id_self, Loc);
-      if (lookupSelf && lookupSelf != methodSelf) {
-        // FIXME: This is the wrong diagnostic for if someone manually declares a
-        // variable named 'self' using backticks.
-        Ctx.Diags.diagnose(Loc, diag::super_in_closure_with_capture);
-        Ctx.Diags.diagnose(lookupSelf->getLoc(),
-                           diag::super_in_closure_with_capture_here);
-        return nullptr;
-      }
-
-      return methodSelf;
-    }
+    VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) ;
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // FIXME(diagnostics): `InOutType` could appear here as a result
@@ -1367,14 +1209,9 @@ namespace {
 
       // Rewrite postfix unary '...' expressions containing pack
       // references to PackExpansionExpr.
-      if (auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr)) {
-        auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
-        if (op && Ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-            op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
-          auto *operand = postfixExpr->getOperand();
-          if (auto *expansion = getPackExpansion(DC, operand, op->getLoc())) {
-            return Action::Continue(expansion);
-          }
+      if (auto *operand = isPostfixEllipsisOperator(expr)) {
+        if (auto *expansion = getPackExpansion(DC, operand, expr->getLoc())) {
+          return Action::Continue(expansion);
         }
       }
 
@@ -1667,6 +1504,23 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   return nullptr;
 }
 
+/// Whether the given expression "looks like" a (possibly sugared) type. For
+/// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
+bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
+  return isa<OptionalEvaluationExpr>(expr) ||
+      isa<BindOptionalExpr>(expr) ||
+      isa<ForceValueExpr>(expr) ||
+      isa<ParenExpr>(expr) ||
+      isa<ArrowExpr>(expr) ||
+      isPostfixEllipsisOperator(expr) ||
+      isa<TupleExpr>(expr) ||
+      (isa<ArrayExpr>(expr) &&
+       cast<ArrayExpr>(expr)->getElements().size() == 1) ||
+      (isa<DictionaryExpr>(expr) &&
+       cast<DictionaryExpr>(expr)->getElements().size() == 1) ||
+      getCompositionExpr(expr);
+}
+
 bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
   // Walk back up the stack of parents looking for a valid type context.
   for (auto *ParentExpr : llvm::reverse(ExprStack)) {
@@ -1693,6 +1547,192 @@ bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
          possiblyInTypeContext(DAE);
 }
 
+
+/// In Swift < 5, diagnose and correct invalid multi-argument or
+/// argument-labeled interpolations. Returns \c true if the AST walk should
+/// continue, or \c false if it should be aborted.
+bool PreCheckExpression::correctInterpolationIfStrange(
+    InterpolatedStringLiteralExpr *ISLE) {
+  // These expressions are valid in Swift 5+.
+  if (getASTContext().isSwiftVersionAtLeast(5))
+    return true;
+
+  /// Diagnoses appendInterpolation(...) calls with multiple
+  /// arguments or argument labels and corrects them.
+  class StrangeInterpolationRewriter : public ASTWalker {
+    ASTContext &Context;
+
+  public:
+    StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
+
+    virtual PreWalkAction walkToDeclPre(Decl *D) override {
+      // We don't want to look inside decls.
+      return Action::SkipChildren();
+    }
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // One InterpolatedStringLiteralExpr should never be nested inside
+      // another except as a child of a CallExpr, and we don't recurse into
+      // the children of CallExprs.
+      assert(!isa<InterpolatedStringLiteralExpr>(E) &&
+             "StrangeInterpolationRewriter found nested interpolation?");
+
+      // We only care about CallExprs.
+      if (!isa<CallExpr>(E))
+        return Action::Continue(E);
+
+      auto *call = cast<CallExpr>(E);
+      auto *args = call->getArgs();
+
+      auto lParen = args->getLParenLoc();
+      auto rParen = args->getRParenLoc();
+
+      if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+        if (callee->getName().getBaseName() ==
+            Context.Id_appendInterpolation) {
+
+          Optional<Argument> newArg;
+          if (args->size() > 1) {
+            auto *secondArg = args->get(1).getExpr();
+            Context.Diags
+                .diagnose(secondArg->getLoc(),
+                          diag::string_interpolation_list_changing)
+                .highlightChars(secondArg->getLoc(), rParen);
+            Context.Diags
+                .diagnose(secondArg->getLoc(),
+                          diag::string_interpolation_list_insert_parens)
+                .fixItInsertAfter(lParen, "(")
+                .fixItInsert(rParen, ")");
+
+            // Make sure we don't have an inout arg somewhere, as that's
+            // invalid even with the compatibility fix.
+            for (auto arg : *args) {
+              if (arg.isInOut()) {
+                Context.Diags.diagnose(arg.getExpr()->getStartLoc(),
+                                       diag::extraneous_address_of);
+                return Action::Stop();
+              }
+            }
+
+            // Form a new argument tuple from the argument list.
+            auto *packed = args->packIntoImplicitTupleOrParen(Context);
+            newArg = Argument::unlabeled(packed);
+          } else if (args->size() == 1 &&
+                     args->front().getLabel() != Identifier()) {
+            // Form a new argument that drops the label.
+            auto *argExpr = args->front().getExpr();
+            newArg = Argument::unlabeled(argExpr);
+
+            SourceLoc argLabelLoc = args->front().getLabelLoc(),
+                      argLoc = argExpr->getStartLoc();
+
+            Context.Diags
+                .diagnose(argLabelLoc,
+                          diag::string_interpolation_label_changing)
+                .highlightChars(argLabelLoc, argLoc);
+            Context.Diags
+                .diagnose(argLabelLoc,
+                          diag::string_interpolation_remove_label,
+                          args->front().getLabel())
+                .fixItRemoveChars(argLabelLoc, argLoc);
+          }
+
+          // If newArg is no longer null, we need to build a new
+          // appendInterpolation(_:) call that takes it to replace the bad
+          // appendInterpolation(...) call.
+          if (newArg) {
+            auto newCallee = new (Context) UnresolvedDotExpr(
+                callee->getBase(), /*dotloc=*/SourceLoc(),
+                DeclNameRef(Context.Id_appendInterpolation),
+                /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
+
+            auto *newArgList =
+                ArgumentList::create(Context, lParen, {*newArg}, rParen,
+                                     /*trailingClosureIdx*/ None,
+                                     /*implicit*/ false);
+            E = CallExpr::create(Context, newCallee, newArgList,
+                                 /*implicit=*/false);
+          }
+        }
+      }
+
+      // There is never a CallExpr between an InterpolatedStringLiteralExpr
+      // and an un-typechecked appendInterpolation(...) call, so whether we
+      // changed E or not, we don't need to recurse any deeper.
+      return Action::SkipChildren(E);
+    }
+  };
+
+  return ISLE->getAppendingExpr()->walk(
+      StrangeInterpolationRewriter(getASTContext()));
+}
+
+/// Scout out the specified destination of an AssignExpr to recursively
+/// identify DiscardAssignmentExpr in legal places.  We can only allow them
+/// in simple pattern-like expressions, so we reject anything complex here.
+void PreCheckExpression::markAcceptableDiscardExprs(Expr *E) {
+  if (!E) return;
+
+  if (auto *PE = dyn_cast<ParenExpr>(E))
+    return markAcceptableDiscardExprs(PE->getSubExpr());
+  if (auto *TE = dyn_cast<TupleExpr>(E)) {
+    for (auto &elt : TE->getElements())
+      markAcceptableDiscardExprs(elt);
+    return;
+  }
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
+    return markAcceptableDiscardExprs(BOE->getSubExpr());
+  if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+    CorrectDiscardAssignmentExprs.insert(DAE);
+
+  // Otherwise, we can't support this.
+}
+
+VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
+  auto *methodContext = DC->getInnermostMethodContext();
+  if (!methodContext) {
+    Ctx.Diags.diagnose(Loc, diag::super_not_in_class_method);
+    return nullptr;
+  }
+
+  // Do an actual lookup for 'self' in case it shows up in a capture list.
+  auto *methodSelf = methodContext->getImplicitSelfDecl();
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                     Ctx.Id_self, Loc);
+  if (lookupSelf && lookupSelf != methodSelf) {
+    // FIXME: This is the wrong diagnostic for if someone manually declares a
+    // variable named 'self' using backticks.
+    Ctx.Diags.diagnose(Loc, diag::super_in_closure_with_capture);
+    Ctx.Diags.diagnose(lookupSelf->getLoc(),
+                       diag::super_in_closure_with_capture_here);
+    return nullptr;
+  }
+
+  return methodSelf;
+}
+
+/// Check if this is a postfix '...' operator, which might denote a pack
+/// expansion expression.
+Expr *PreCheckExpression::isPostfixEllipsisOperator(Expr *E) {
+  if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics))
+    return nullptr;
+
+  auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(E);
+  if (!postfixExpr)
+    return nullptr;
+
+  if (auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn())) {
+    if (op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
+      return postfixExpr->getOperand();
+    }
+  } else if (auto *op = dyn_cast<UnresolvedDeclRefExpr>(postfixExpr->getFn())) {
+    if (op->getName().getBaseName().getIdentifier().isExpansionOperator())
+      return postfixExpr->getOperand();
+  }
+
+  return nullptr;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -1706,8 +1746,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
     if (canSimplifyDiscardAssignmentExpr(DAE)) {
       auto *placeholderRepr =
-          new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
-      return new (getASTContext()) TypeExpr(placeholderRepr);
+          new (Ctx) PlaceholderTypeRepr(DAE->getLoc());
+      return new (Ctx) TypeExpr(placeholderRepr);
     }
   }
 
@@ -1734,8 +1774,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return TyExpr;
 
     auto *NewTypeRepr =
-        new (getASTContext()) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+        new (Ctx) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
   // Fold T! into an IUO type when T is a TypeExpr.
@@ -1748,10 +1788,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
 
-    auto *NewTypeRepr = new (getASTContext())
+    auto *NewTypeRepr = new (Ctx)
         ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
                                             FVE->getExclaimLoc());
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
   // Fold (T) into a type T with parens around it.
@@ -1764,9 +1804,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
 
-    auto *NewTypeRepr = TupleTypeRepr::create(getASTContext(), InnerTypeRepr,
+    auto *NewTypeRepr = TupleTypeRepr::create(Ctx, InnerTypeRepr,
                                               PE->getSourceRange());
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
@@ -1794,8 +1834,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       ++EltNo;
     }
     auto *NewTypeRepr = TupleTypeRepr::create(
-        getASTContext(), Elts, TE->getSourceRange());
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+        Ctx, Elts, TE->getSourceRange());
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
 
@@ -1808,10 +1848,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!TyExpr)
       return nullptr;
 
-    auto *NewTypeRepr = new (getASTContext())
+    auto *NewTypeRepr = new (Ctx)
         ArrayTypeRepr(TyExpr->getTypeRepr(),
                       SourceRange(AE->getLBracketLoc(), AE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
   // Fold [K : V] into a dictionary type.
@@ -1846,11 +1886,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       valueTypeRepr = TRE->getElementType(1);
     }
 
-    auto *NewTypeRepr = new (getASTContext()) DictionaryTypeRepr(
+    auto *NewTypeRepr = new (Ctx) DictionaryTypeRepr(
         keyTypeRepr, valueTypeRepr,
         /*FIXME:colonLoc=*/SourceLoc(),
         SourceRange(DE->getLBracketLoc(), DE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(NewTypeRepr);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
@@ -1877,7 +1917,6 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       }
     };
 
-    auto &ctx = getASTContext();
     auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
       if (!E)
         return nullptr;
@@ -1885,13 +1924,12 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = TyE->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(ctx, ArgRepr);
-        return TupleTypeRepr::create(ctx, {ArgRepr}, ArgRepr->getSourceRange());
+        diagnoseMissingParens(Ctx, ArgRepr);
+        return TupleTypeRepr::create(Ctx, {ArgRepr}, ArgRepr->getSourceRange());
       }
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return TupleTypeRepr::createEmpty(getASTContext(),
-                                            TE->getSourceRange());
+          return TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange());
 
       // When simplifying a type expr like "(P1 & P2) -> (P3 & P4) -> Int",
       // it may have been folded at the same time; recursively simplify it.
@@ -1899,8 +1937,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = ArgsTypeExpr->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(ctx, ArgRepr);
-        return TupleTypeRepr::create(ctx, {ArgRepr}, ArgRepr->getSourceRange());
+        diagnoseMissingParens(Ctx, ArgRepr);
+        return TupleTypeRepr::create(Ctx, {ArgRepr}, ArgRepr->getSourceRange());
       }
       return nullptr;
     };
@@ -1912,7 +1950,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return TyE->getTypeRepr();
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return TupleTypeRepr::createEmpty(ctx, TE->getSourceRange());
+          return TupleTypeRepr::createEmpty(Ctx, TE->getSourceRange());
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
@@ -1923,26 +1961,26 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
-      ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
+      Ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
                          diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = new (ctx) ErrorTypeRepr(ArgRange);
+      auto ErrRepr = new (Ctx) ErrorTypeRepr(ArgRange);
       ArgsTypeRepr =
-          TupleTypeRepr::create(ctx, {ErrRepr}, ArgRange);
+          TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
     }
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
-      ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
+      Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
                          diag::expected_type_after_arrow);
-      ResultTypeRepr = new (ctx)
+      ResultTypeRepr = new (Ctx)
           ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
     }
 
-    auto NewTypeRepr = new (ctx)
+    auto NewTypeRepr = new (Ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
                          AE->getThrowsLoc(), AE->getArrowLoc(), ResultTypeRepr);
-    return new (ctx) TypeExpr(NewTypeRepr);
+    return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
   // Fold 'P & Q' into a composition type
@@ -1974,10 +2012,19 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!rhs) return nullptr;
     Types.push_back(rhs->getTypeRepr());
 
-    auto CompRepr = CompositionTypeRepr::create(getASTContext(), Types,
+    auto CompRepr = CompositionTypeRepr::create(Ctx, Types,
                                                 lhsExpr->getStartLoc(),
                                                 binaryExpr->getSourceRange());
-    return new (getASTContext()) TypeExpr(CompRepr);
+    return new (Ctx) TypeExpr(CompRepr);
+  }
+
+  // Fold 'T...' into a pack expansion type when 'T' is a TypeExpr.
+  if (auto *operand = isPostfixEllipsisOperator(E)) {
+    if (auto *pattern = dyn_cast<TypeExpr>(operand)) {
+      auto *repr = new (Ctx) PackExpansionTypeRepr(pattern->getTypeRepr(),
+                                                   E->getLoc());
+      return new (Ctx) TypeExpr(repr);
+    }
   }
 
   return nullptr;
