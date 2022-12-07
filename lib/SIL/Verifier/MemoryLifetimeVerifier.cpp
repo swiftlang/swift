@@ -401,6 +401,39 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::BeginApplyInst: {
+        auto *BAI = cast<BeginApplyInst>(&I);
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            genBits(state, yieldedValues[index]);
+          }
+        }
+        break;
+      }
+      case SILInstructionKind::EndApplyInst:
+      case SILInstructionKind::AbortApplyInst: {
+        auto *BAI = [&]() {
+          if (auto *EAI = dyn_cast<EndApplyInst>(&I)) {
+            return EAI->getBeginApply();
+          }
+          auto *AAI = dyn_cast<AbortApplyInst>(&I);
+          return AAI->getBeginApply();
+        }();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            killBits(state, yieldedValues[index]);
+          }
+        }
+        break;
+      }
       case SILInstructionKind::YieldInst: {
         auto *YI = cast<YieldInst>(&I);
         for (Operand &op : YI->getAllOperands()) {
@@ -691,6 +724,48 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         for (Operand &op : I.getAllOperands()) {
           if (AS.isArgumentOperand(op))
             checkFuncArgument(bits, op, AS.getArgumentOperandConvention(op), &I);
+        }
+        break;
+      }
+      case SILInstructionKind::BeginApplyInst: {
+        auto *BAI = cast<BeginApplyInst>(&I);
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            requireBitsClear(bits, yieldedValues[index], &I);
+            locations.setBits(bits, yieldedValues[index]);
+          }
+        }
+        break;
+      }
+      case SILInstructionKind::EndApplyInst:
+      case SILInstructionKind::AbortApplyInst: {
+        auto *BAI = [&]() {
+          if (auto *EAI = dyn_cast<EndApplyInst>(&I)) {
+            return EAI->getBeginApply();
+          }
+          auto *AAI = dyn_cast<AbortApplyInst>(&I);
+          return AAI->getBeginApply();
+        }();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            if (argConv.isInoutConvention() ||
+                argConv.isGuaranteedConvention()) {
+              requireBitsSet(bits | ~nonTrivialLocations, yieldedValues[index],
+                             &I);
+            } else if (argConv.isOwnedConvention()) {
+              requireBitsClear(bits & nonTrivialLocations, yieldedValues[index],
+                               &I);
+            }
+            locations.clearBits(bits, yieldedValues[index]);
+          }
         }
         break;
       }

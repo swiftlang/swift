@@ -1506,8 +1506,8 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
 sil [ossa] @testBeginApply4YieldLoadableTrivial : $@convention(thin) () -> I {
 entry:
   (%instance, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
-  end_apply %token
   %extract = struct_extract %instance : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   return %extract : $I
 }
 
@@ -1521,9 +1521,9 @@ entry:
 sil [ossa] @testBeginApply5Yield2LoadableTrivial : $@convention(thin) () -> (I, I) {
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> (@yields @in_guaranteed U, @yields @in_guaranteed U)
-  end_apply %token
   %i_1 = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
   %i_2 = struct_extract %instance_2 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   %tuple = tuple (%i_1 : $I, %i_2 : $I)
   return %tuple : $(I, I)
 }
@@ -1540,8 +1540,8 @@ sil [ossa] @testBeginApply6Yield1LoadableTrivial1OpaqueGuaranteed : $@convention
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in_guaranteed U, @yields @in_guaranteed T)
   %copy = copy_value %instance_2 : $T
-  end_apply %token
   %i = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   %tuple = tuple (%i : $I, %copy : $T)
   return %tuple : $(I, T)
 }
@@ -1654,12 +1654,12 @@ entry:
 sil [ossa] @testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned : $@convention(thin) <T> () -> (@out Klass, @out T) {
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in U, @yields @in T)
-  end_apply %token
   %borrow_1 = begin_borrow %instance_1 : $LoadableNontrivial
   %extract_1 = struct_extract %borrow_1 : $LoadableNontrivial, #LoadableNontrivial.x
   %copy_1 = copy_value %extract_1 : $Klass
   end_borrow %borrow_1 : $LoadableNontrivial
   destroy_value %instance_1 : $LoadableNontrivial
+  end_apply %token
   %retval = tuple (%copy_1 : $Klass, %instance_2 : $T)
   return %retval : $(Klass, T)
 }
