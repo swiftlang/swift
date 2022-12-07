@@ -2468,6 +2468,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    OPT_disable_emit_generic_class_ro_t_list,
                    Opts.EmitGenericRODatas);
 
+  Opts.CollocatedMetadataFunctions =
+      Args.hasFlag(OPT_enable_collocate_metadata_functions,
+                   OPT_disable_collocate_metadata_functions,
+                   Opts.CollocatedMetadataFunctions);
   return false;
 }
 
