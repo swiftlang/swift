@@ -223,3 +223,8 @@ func closueWhichModifiesLocalVar() -> Int {
   return x
 }
 
+@_noAllocation
+func createEmptyArray() {
+  _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
+}
+
