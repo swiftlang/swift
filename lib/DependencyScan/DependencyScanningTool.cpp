@@ -120,7 +120,8 @@ DependencyScanningTool::getDependencies(
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(*SharedCache,
-                                Instance->getMainModule()->getNameStr());
+                                Instance->getMainModule()->getNameStr().str(),
+                                Instance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
@@ -161,7 +162,8 @@ DependencyScanningTool::getDependencies(
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(*SharedCache,
-                                Instance->getMainModule()->getNameStr());
+                                Instance->getMainModule()->getNameStr().str(),
+                                Instance->getInvocation().getModuleScanningHash());
   auto BatchScanResults = performBatchModuleScan(
       *Instance.get(), cache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
@@ -205,8 +207,6 @@ DependencyScanningTool::initScannerForAction(
   auto instanceOrErr = initCompilerInstanceForScan(Command);
   if (instanceOrErr.getError())
     return instanceOrErr;
-  SharedCache->configureForTriple((*instanceOrErr)->getInvocation()
-                                  .getLangOptions().Target.str());
   return instanceOrErr;
 }
 
