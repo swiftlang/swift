@@ -183,7 +183,6 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     return false;
 
   Cloner.cloneBranchTarget(SrcTerm);
-
   // We have copied the threaded block into the edge.
   auto *clonedSrc = Cloner.getNewBB();
   SmallVector<SILBasicBlock *, 4> clonedSuccessors(
@@ -207,7 +206,6 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                                                ThreadedSuccessorBlock, Args);
 
     CondTerm->eraseFromParent();
-
   } else {
     // Get the enum element and the destination block of the block we jump
     // thread.
@@ -217,18 +215,24 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     // Instantiate the payload if necessary.
     SILBuilderWithScope Builder(SEI);
     if (!ThreadedSuccessorBlock->args_empty()) {
-      auto EnumVal = SEI->getOperand();
-      auto EnumTy = EnumVal->getType();
-      auto Loc = SEI->getLoc();
-      auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
-                                          Builder.getTypeExpansionContext());
-      SILValue UED(
-          Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
-      assert(UED->getType()
-                 == (*ThreadedSuccessorBlock->args_begin())->getType()
-             && "Argument types must match");
-      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
-
+      if (ti.EnumCase->hasAssociatedValues() &&
+          (!SEI->hasDefault() ||
+           ThreadedSuccessorBlock != SEI->getDefaultBB())) {
+        auto EnumVal = SEI->getOperand();
+        auto EnumTy = EnumVal->getType();
+        auto Loc = SEI->getLoc();
+        auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
+                                            Builder.getTypeExpansionContext());
+        SILValue UED(
+            Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
+        assert(UED->getType() ==
+                   (*ThreadedSuccessorBlock->args_begin())->getType() &&
+               "Argument types must match");
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+      } else {
+        assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, SEI->getOperand());
+      }
     } else {
       Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
                            ArrayRef<SILValue>());
@@ -495,11 +499,14 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
       if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
         LLVM_DEBUG(llvm::dbgs() << "simplify threaded " << *SEI);
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
-        if (EI->hasOperand() && !LiveBlock->args_empty())
-          SILBuilderWithScope(SEI)
-              .createBranch(SEI->getLoc(), LiveBlock, EI->getOperand());
-        else
+        if (EI->hasOperand() && !LiveBlock->args_empty()) {
+          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock,
+                                                EI->getOperand());
+        } else if (!LiveBlock->args_empty()) {
+          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock, {EI});
+        } else {
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+        }
         SEI->eraseFromParent();
         if (EI->use_empty())
           EI->eraseFromParent();
