@@ -145,6 +145,8 @@ private:
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue value,
       const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
+  bool hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
+      SILPhiArgument *phi) const;
 };
 
 } // namespace swift
@@ -615,6 +617,38 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
   });
 }
 
+bool SILValueOwnershipChecker::
+    hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
+        SILPhiArgument *phi) const {
+  bool foundGuaranteedForwardingPhiOperand = false;
+  bool foundNonGuaranteedForwardingPhiOperand = false;
+  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *operand) -> bool {
+    auto value = operand->get();
+    if (canOpcodeForwardInnerGuaranteedValues(value) ||
+        isa<SILFunctionArgument>(value)) {
+      foundGuaranteedForwardingPhiOperand = true;
+      if (foundNonGuaranteedForwardingPhiOperand) {
+        return false; /* found error, stop visiting */
+      }
+      return true;
+    }
+    foundNonGuaranteedForwardingPhiOperand = true;
+    if (foundGuaranteedForwardingPhiOperand) {
+      return false; /* found error, stop visiting */
+    }
+    return true;
+  });
+  if (foundGuaranteedForwardingPhiOperand ^
+      foundNonGuaranteedForwardingPhiOperand) {
+    return true;
+  }
+  return errorBuilder.handleMalformedSIL([&] {
+    llvm::errs() << "Malformed @guaranteed phi!\n"
+                 << "Phi: " << *phi;
+    llvm::errs() << "Guaranteed forwarding operands not found on all paths!\n";
+  });
+}
+
 bool SILValueOwnershipChecker::checkUses() {
   LLVM_DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
 
@@ -674,6 +708,13 @@ bool SILValueOwnershipChecker::checkUses() {
   if (isGuaranteedForwarding(value)) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
+      return false;
+    }
+  }
+  auto *phi = dyn_cast<SILPhiArgument>(value);
+  if (phi && phi->isPhi() &&
+      phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (!hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(phi)) {
       return false;
     }
   }
