@@ -120,7 +120,6 @@ void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
     const FullDependenciesResult &clangDependencies) {
   auto &ctx = Impl.SwiftContext;
-  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
 
   // This scanner invocation's already-captured APINotes version
   std::vector<std::string> capturedPCMArgs = {
@@ -133,7 +132,7 @@ void ClangImporter::recordModuleDependencies(
     // If we've already cached this information, we're done.
     if (cache.hasDependencies(
                     clangModuleDep.ID.ModuleName,
-                    {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
+                    ModuleDependenciesKind::Clang))
       continue;
 
     // File dependencies for this module.
@@ -211,11 +210,9 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
   auto &ctx = Impl.SwiftContext;
-  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
   // Check whether there is already a cached result.
   if (auto found = cache.findDependencies(
-          moduleName,
-          {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
+          moduleName, ModuleDependenciesKind::Clang))
     return found;
 
   // Determine the command-line arguments for dependency scanning.
@@ -265,8 +262,7 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   // Record module dependencies for each module we found.
   recordModuleDependencies(cache, *clangDependencies);
             return cache.findDependencies(
-                    moduleName,
-                    {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet});
+                    moduleName, ModuleDependenciesKind::Clang);
 }
 
 bool ClangImporter::addBridgingHeaderDependencies(
@@ -274,12 +270,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
     ModuleDependenciesKind moduleKind,
     ModuleDependenciesCache &cache) {
   auto &ctx = Impl.SwiftContext;
-  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
-  
-  auto targetModule = *cache.findDependencies(
-              moduleName,
-              {moduleKind,
-               currentSwiftSearchPathSet});
+  auto targetModule = *cache.findDependencies(moduleName, moduleKind);
 
   // If we've already recorded bridging header dependencies, we're done.
   if (auto swiftInterfaceDeps = targetModule.getAsSwiftInterfaceModule()) {
