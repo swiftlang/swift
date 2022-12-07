@@ -1033,7 +1033,7 @@ public:
   SILCoverageMap *emitSourceRegions(
       SILModule &M, StringRef Name, StringRef PGOFuncName, uint64_t Hash,
       llvm::DenseMap<ProfileCounterRef, unsigned> &CounterIndices,
-      StringRef Filename) {
+      SourceFile *SF, StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
 
@@ -1051,8 +1051,8 @@ public:
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
                            Counter.expand(Builder, CounterIndices));
     }
-    return SILCoverageMap::create(M, Filename, Name, PGOFuncName, Hash, Regions,
-                                  Builder.getExpressions());
+    return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
+                                  Regions, Builder.getExpressions());
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -1331,13 +1331,6 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   llvm_unreachable("Unhandled FormalLinkage in switch.");
 }
 
-static StringRef getCurrentFileName(SILDeclRef forDecl) {
-  auto *DC = forDecl.getInnermostDeclContext();
-  if (auto *ParentFile = DC->getParentSourceFile())
-    return ParentFile->getFilename();
-  return {};
-}
-
 static void walkNode(NodeToProfile Node, ASTWalker &Walker) {
   if (auto N = Node.getAsNode()) {
     N.walk(Walker);
@@ -1350,8 +1343,11 @@ static void walkNode(NodeToProfile Node, ASTWalker &Walker) {
 
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
+  auto *DC = forDecl.getInnermostDeclContext();
+  auto *SF = DC->getParentSourceFile();
+  assert(SF && "Not within a SourceFile?");
 
-  CurrentFileName = getCurrentFileName(forDecl);
+  CurrentFileName = SF->getFilename();
 
   MapRegionCounters Mapper(forDecl, RegionCounterMap);
 
@@ -1387,7 +1383,7 @@ void SILProfiler::assignRegionCounters() {
     walkNode(Root, Coverage);
     CovMap =
         Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
-                                   RegionCounterMap, CurrentFileName);
+                                   RegionCounterMap, SF, CurrentFileName);
   }
 
   if (llvm::IndexedInstrProfReader *IPR = M.getPGOReader()) {
