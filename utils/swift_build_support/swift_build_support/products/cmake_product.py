@@ -91,13 +91,16 @@ class CMakeProduct(product.Product):
                 shell.call(["env"] + cmake_build + cmake_opts)
 
             shell.call(
-                ["env"] + cmake_build + cmake_opts + ["--"] + build_args + build_targets
+                ["env"] + cmake_build + cmake_opts + ["--"] + build_args
+                        + _cmake.build_args() + build_targets
             )
 
     def test_with_cmake(self, executable_target, results_targets,
                         build_type, build_args, test_env=None):
         assert self.toolchain.cmake is not None
         cmake_build = []
+        _cmake = cmake.CMake(self.args, self.toolchain,
+                             prefer_just_built_toolchain)
 
         if self.toolchain.distcc_pump:
             cmake_build.append(self.toolchain.distcc_pump)
@@ -110,7 +113,7 @@ class CMakeProduct(product.Product):
 
         cmake_args = [self.toolchain.cmake, "--build", self.build_dir,
                       "--config", build_type, "--"]
-        cmake_build.extend(cmake_args + build_args)
+        cmake_build.extend(cmake_args + build_args + _cmake.build_args())
 
         def target_flag(target):
             if self.args.cmake_generator == "Xcode":
