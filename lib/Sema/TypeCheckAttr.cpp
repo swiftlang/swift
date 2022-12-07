@@ -1984,6 +1984,11 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
                diag::expose_unsupported_actor_isolated_to_cxx,
                VD->getDescriptiveKind(), VD);
       break;
+    case UnrepresentableRequiresClientEmission:
+      diagnose(attr->getLocation(),
+               diag::expose_unsupported_client_emission_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
     }
   }
 
