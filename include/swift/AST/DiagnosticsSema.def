@@ -1548,6 +1548,8 @@ ERROR(expose_unsupported_async_decl_to_cxx,none,
       "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_actor_isolated_to_cxx,none,
       "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_unsupported_client_emission_to_cxx,none,
+      "%0 %1 can not be exposed to C++ as it requires code to be emitted into client", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
