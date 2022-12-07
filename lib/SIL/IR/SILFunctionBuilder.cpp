@@ -318,6 +318,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
 
+    if (auto *A = decl->getAttrs().getAttribute<GlobalConstructorAttr>())
+      F->setGlobalConstructorPriority(A->Priority);
+
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.

@@ -1285,6 +1285,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_GlobalConstructor: {
+    Printer.printAttrName("@globalConstructor");
+    Printer << "(priority: ";
+    auto Attr = cast<GlobalConstructorAttr>(this);
+    Printer << Attr->Priority;
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1459,6 +1468,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_expose";
   case DAK_Documentation:
     return "_documentation";
+  case DAK_GlobalConstructor:
+    return "globalConstructor";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

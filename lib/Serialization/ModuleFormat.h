@@ -1923,6 +1923,11 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
+  using GlobalConstructorDeclAttrLayout = BCRecordLayout<
+    GlobalConstructor_DECL_ATTR,
+    BCVBR<8> // priority
+  >;
+
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names

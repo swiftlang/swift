@@ -3056,6 +3056,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[available " << version.getAsString() << "] ";
   }
 
+  if (getIsGlobalConstructor())
+    OS << "[global_constructor " << getGlobalConstructorPriority() << "] ";
+
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;

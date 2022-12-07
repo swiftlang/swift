@@ -520,6 +520,27 @@ public:
   }
 };
 
+/// Defines the @globalConstructor attribute.
+class GlobalConstructorAttr : public DeclAttribute {
+public:
+  GlobalConstructorAttr(int Priority, SourceLoc AtLoc, SourceRange Range)
+    : DeclAttribute(DAK_GlobalConstructor, AtLoc, Range, false),
+      Priority(Priority) {}
+
+  GlobalConstructorAttr(SourceLoc AtLoc, SourceRange Range)
+    : GlobalConstructorAttr(DefaultPriority, AtLoc, Range) {}
+
+  GlobalConstructorAttr(int Priority)
+    : GlobalConstructorAttr(Priority, SourceLoc(), SourceRange()) {}
+
+  const int Priority;
+  static const int DefaultPriority = 65535;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_GlobalConstructor;
+  }
+};
+
 /// Defines the @_semantics attribute.
 class SemanticsAttr : public DeclAttribute {
 public:

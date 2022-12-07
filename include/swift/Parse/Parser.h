@@ -1098,6 +1098,11 @@ public:
   bool parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
                                            Optional<AccessLevel> &Visibility);
 
+  /// Parse the @globalConstructor attribute.
+  bool parseGlobalConstructorAttribute(DeclAttributes &Attributes,
+                                       SourceLoc AtLoc,
+                                       SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,

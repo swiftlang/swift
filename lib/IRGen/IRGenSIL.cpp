@@ -60,6 +60,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -2277,6 +2278,9 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
   }
+
+  if (CurSILFn->getIsGlobalConstructor())
+    llvm::appendToGlobalCtors(IGM.Module, CurFn, CurSILFn->getGlobalConstructorPriority(), nullptr);
 
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager

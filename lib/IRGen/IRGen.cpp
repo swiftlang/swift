@@ -178,6 +178,7 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
   TargetOpts.FunctionSections = Opts.FunctionSections;
+  TargetOpts.UseInitArray = true;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 

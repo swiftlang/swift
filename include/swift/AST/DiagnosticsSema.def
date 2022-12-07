@@ -1537,6 +1537,19 @@ ERROR(cdecl_empty_name,none,
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
 
+ERROR(global_constructor_not_at_top_level,none,
+      "@globalConstructor can only be applied to global functions", ())
+ERROR(global_constructor_no_async,none,
+      "@globalConstructor cannot be applied to async functions", ())
+ERROR(global_constructor_no_throws,none,
+      "@globalConstructor cannot be applied to throwing functions", ())
+ERROR(global_constructor_required_type,none,
+      "'@globalConstructor' can only be applied to functions of type '() -> Void'", ())
+ERROR(global_constructor_actor,none,
+      "'@MainActor' cannot be used on functions with '@globalConstructor'", ())
+ERROR(global_constructor_cdecl,none,
+      "'@_cdecl' cannot be used on functions with '@globalConstructor'", ())
+
 ERROR(expose_only_non_other_attr,none,
       "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
 ERROR(expose_inside_unexposed_decl,none,

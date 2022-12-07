@@ -293,6 +293,11 @@ private:
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
+  /// If the function is a global ctor
+  bool IsGlobalConstructor = false;
+  /// The priority of the global ctor, called in ascending order
+  int GlobalConstructorPriority = 0;
+
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
@@ -1080,6 +1085,14 @@ public:
   }
 
   void setSpecialPurpose(Purpose purpose) { specialPurpose = purpose; }
+
+  void setGlobalConstructorPriority(int priority) {
+    IsGlobalConstructor = true;
+    GlobalConstructorPriority = priority;
+  }
+
+  bool getIsGlobalConstructor() const { return IsGlobalConstructor; }
+  int getGlobalConstructorPriority() const { return GlobalConstructorPriority; }
 
   /// Return whether this function has a foreign implementation which can
   /// be emitted on demand.

@@ -92,6 +92,7 @@ actor MyGlobalActor {
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// KEYWORD2-NEXT:             Keyword/None:                       globalConstructor[#Func Attribute#]; name=globalConstructor
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -241,6 +242,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// ON_METHOD-DAG: Keyword/None:                       globalConstructor[#Func Attribute#]; name=globalConstructor
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -315,6 +317,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
 // ON_MEMBER_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
+// ON_MEMBER_LAST-DAG: Keyword/None:                       globalConstructor[#Declaration Attribute#]; name=globalConstructor
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -387,6 +390,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
 // KEYWORD_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
+// KEYWORD_LAST-DAG: Keyword/None:                       globalConstructor[#Declaration Attribute#]; name=globalConstructor
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper

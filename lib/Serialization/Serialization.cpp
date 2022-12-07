@@ -2551,6 +2551,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_GlobalConstructor: {
+      auto *theAttr = cast<GlobalConstructorAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[GlobalConstructorDeclAttrLayout::Code];
+      GlobalConstructorDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                  abbrCode, theAttr->Priority);
+      return;
+    }
+
     case DAK_SPIAccessControl: {
       auto theAttr = cast<SPIAccessControlAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];

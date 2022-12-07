@@ -227,6 +227,7 @@ public:
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
   void visitGKInspectableAttr(GKInspectableAttr *attr);
+  void visitGlobalConstructorAttr(GlobalConstructorAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
@@ -752,6 +753,26 @@ void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
                           attr->getAttrName());
+}
+
+void AttributeChecker::visitGlobalConstructorAttr(GlobalConstructorAttr *attr) {
+  auto *Func = cast<FuncDecl>(D);
+  if (Func->hasAsync())
+    diagnoseAndRemoveAttr(attr, diag::global_constructor_no_async);
+  if (Func->hasThrows())
+    diagnoseAndRemoveAttr(attr, diag::global_constructor_no_throws);
+  if (auto Result = Func->getResultInterfaceType())
+    if (!Result->isVoid())
+      diagnoseAndRemoveAttr(attr, diag::global_constructor_required_type);
+  if (Func->getAttrs().getAttribute<CDeclAttr>())
+    diagnoseAndRemoveAttr(attr, diag::global_constructor_cdecl);
+  if (D->getDeclContext()->isTypeContext())
+    diagnoseAndRemoveAttr(attr, diag::global_constructor_not_at_top_level);
+  else if (auto Pair = Func->getGlobalActorAttr())
+    diagnoseAndRemoveAttr(attr, diag::global_constructor_actor);
+  else if (auto Result = Func->getInterfaceType()->castTo<AnyFunctionType>())
+    if (!Result->getParams().empty())
+      diagnoseAndRemoveAttr(attr, diag::global_constructor_required_type);
 }
 
 static Optional<Diag<bool,Type>>

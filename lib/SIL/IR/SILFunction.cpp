@@ -196,6 +196,8 @@ void SILFunction::init(
   this->Linkage = unsigned(Linkage);
   this->HasCReferences = false;
   this->IsAlwaysWeakImported = false;
+  this->IsGlobalConstructor = false;
+  this->GlobalConstructorPriority = 0;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
@@ -275,6 +277,8 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->GlobalInitFlag = GlobalInitFlag;
   newSnapshot->HasCReferences = HasCReferences;
   newSnapshot->IsAlwaysWeakImported = IsAlwaysWeakImported;
+  newSnapshot->IsGlobalConstructor = IsGlobalConstructor;
+  newSnapshot->GlobalConstructorPriority = GlobalConstructorPriority;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
@@ -825,6 +829,9 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   if (isDistributed() && isThunk())
+    return true;
+
+  if (getIsGlobalConstructor())
     return true;
 
   // Declaration marked as `@_alwaysEmitIntoClient` that

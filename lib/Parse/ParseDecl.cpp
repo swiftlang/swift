@@ -2040,6 +2040,51 @@ bool Parser::parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
   return true;
 }
 
+bool Parser::parseGlobalConstructorAttribute(DeclAttributes &Attributes,
+                                      SourceLoc AtLoc,
+                                      SourceLoc Loc) {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      Attributes.add(new (Context) GlobalConstructorAttr(AtLoc, Loc));
+      return true;
+    }
+
+    if (Tok.is(tok::identifier) && Tok.getText() == "priority") {
+      consumeToken();
+      if (!consumeIf(tok::colon))
+        diagnose(Tok, diag::attr_global_constructor_expected_colon_after_priority)
+            .fixItInsertAfter(PreviousLoc, ": ");
+    } else {
+      diagnose(Tok, diag::attr_global_constructor_expected_priority_label)
+          .fixItInsertAfter(PreviousLoc, "priority: ");
+    }
+
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Tok, diag::attr_global_constructor_expected_int);
+      return false;
+    }
+
+    int priority = 0;
+    if (Tok.getText().getAsInteger(10, priority)) {
+      diagnose(Tok, diag::attr_global_constructor_expected_int);
+      return false;
+    }
+
+    SourceLoc PriorityLoc = consumeToken(tok::integer_literal);
+    SourceLoc RightLoc;
+    if (parseMatchingToken(tok::r_paren, RightLoc,
+                          diag::attr_global_constructor_missing_rparen, LeftLoc))
+      return false;
+
+    if (priority < 0 || priority > GlobalConstructorAttr::DefaultPriority) {
+      diagnose(PriorityLoc, diag::attr_global_constructor_expected_int);
+      return false;
+    }
+
+    Attributes.add(new (Context) GlobalConstructorAttr(priority, AtLoc, Loc));
+    return true;
+}
+
 ParserResult<DocumentationAttr>
 Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   StringRef AttrName = "_documentation";
@@ -3065,6 +3110,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
+      return false;
+    break;
+  }
+  case DAK_GlobalConstructor: {
+    if (!parseGlobalConstructorAttribute(Attributes, AtLoc, Loc))
       return false;
     break;
   }

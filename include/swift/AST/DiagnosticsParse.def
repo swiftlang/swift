@@ -700,6 +700,8 @@ ERROR(sil_specialize_target_func_not_found,none,
       "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
       "expected version number in 'available' attribute", ())
+ERROR(sil_global_constructor_expected_version,none,
+      "expected version number in 'global_constructor' attribute", ())
 
 // SIL Stage
 ERROR(expected_sil_stage_name, none,
@@ -1591,6 +1593,16 @@ ERROR(attr_back_deploy_expected_colon_after_before,none,
       "expected ':' after 'before' in '@_backDeploy' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
       "expected ')' in '@_backDeploy' argument list", ())
+
+// globalConstructor
+ERROR(attr_global_constructor_expected_priority_label,none,
+      "expected 'priority:' in '@globalConstructor' attribute", ())
+ERROR(attr_global_constructor_expected_colon_after_priority,none,
+      "expected ':' after 'priority' in '@globalConstructor' attribute", ())
+ERROR(attr_global_constructor_expected_int,none,
+      "expected 'priority' in '@globalConstructor' to be an integer value between 0 and 65535", ())
+ERROR(attr_global_constructor_missing_rparen,none,
+      "expected ')' after '@globalConstructor' priority", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
