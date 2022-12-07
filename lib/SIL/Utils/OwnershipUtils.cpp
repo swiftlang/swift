@@ -84,17 +84,23 @@ bool swift::hasPointerEscape(BorrowedValue value) {
   return false;
 }
 
-bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
-  if (auto *inst = value->getDefiningInstructionOrTerminator()) {
-    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
+bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
+  // If we have an argument from a transforming terminator, we can forward
+  // guaranteed.
+  if (auto *arg = dyn_cast<SILArgument>(value))
+    if (auto *ti = arg->getSingleTerminator())
+      if (ti->mayHaveTerminatorResult())
+        return OwnershipForwardingMixin::get(ti)->preservesOwnership();
+
+  if (auto *inst = value->getDefiningInstruction())
+    if (auto *mixin = OwnershipForwardingMixin::get(inst))
       return mixin->preservesOwnership() &&
-        !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
-    }
-  }
+             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
+
   return false;
 }
 
-bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
+bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
   if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
     return mixin->preservesOwnership() &&
            !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
@@ -1208,11 +1214,12 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
-  SmallVector<SILValue, 32> worklist;
-  worklist.emplace_back(inputValue);
+  SmallSetVector<SILValue, 32> worklist;
+  worklist.insert(inputValue);
 
-  while (!worklist.empty()) {
-    SILValue value = worklist.pop_back_val();
+  // worklist grows in this loop.
+  for (unsigned idx = 0; idx < worklist.size(); idx++) {
+    SILValue value = worklist[idx];
 
     // First check if v is an introducer. If so, stash it and continue.
     if (auto scopeIntroducer = BorrowedValue(value)) {
@@ -1230,11 +1237,26 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwarding(value)) {
-      if (auto *i = value->getDefiningInstructionOrTerminator()) {
-        llvm::copy(i->getNonTypeDependentOperandValues(),
-                   std::back_inserter(worklist));
+      if (auto *i = value->getDefiningInstruction()) {
+        for (SILValue opValue : i->getNonTypeDependentOperandValues()) {
+          worklist.insert(opValue);
+        }
         continue;
       }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(value);
+      if (arg->isTerminatorResult()) {
+        if (auto *forwardedOper = arg->forwardedTerminatorResultOperand()) {
+          worklist.insert(forwardedOper->get());
+          continue;
+        }
+      }
+      arg->visitIncomingPhiOperands([&](auto *operand) {
+        worklist.insert(operand->get());
+        return true;
+      });
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return

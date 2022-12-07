@@ -280,7 +280,7 @@ bool SILValueOwnershipChecker::gatherUsers(
   // this value forwards guaranteed ownership. In such a case, we are going to
   // validate it as part of the borrow introducer from which the forwarding
   // value originates. So we can just return true and continue.
-  if (isGuaranteedForwarding(value))
+  if (canOpcodeForwardInnerGuaranteedValues(value))
     return true;
 
   // Ok, we have some sort of borrow introducer. We need to recursively validate
@@ -554,10 +554,6 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     if (isGuaranteedForwarding(value)) {
       return true;
     }
-    auto *phi = dyn_cast<SILPhiArgument>(value);
-    if (phi && isGuaranteedForwardingPhi(phi)) {
-      return true;
-    }
   }
 
   // If we have an unowned value, then again there is nothing left to do.
@@ -675,8 +671,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
-  if (value->getOwnershipKind() == OwnershipKind::Guaranteed &&
-      isGuaranteedForwarding(value)) {
+  if (isGuaranteedForwarding(value)) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
       return false;

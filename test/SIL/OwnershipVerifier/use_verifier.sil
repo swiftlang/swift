@@ -1206,7 +1206,8 @@ bb1:
 
 bb2:
   %5 = struct_extract %1 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.owner
-  br bb3(%5 : $Builtin.NativeObject)
+  %6 = begin_borrow %5 : $Builtin.NativeObject
+  br bb3(%6 : $Builtin.NativeObject)
 
 bb3(%7 : @guaranteed $Builtin.NativeObject):
   end_borrow %7 : $Builtin.NativeObject
@@ -1366,7 +1367,6 @@ bb2:
   br bb3(%f2thick : $@callee_owned () -> ())
 
 bb3(%fUnknown : @guaranteed $@callee_owned () -> ()):
-  end_borrow %fUnknown : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
 }
