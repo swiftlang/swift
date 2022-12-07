@@ -116,6 +116,11 @@ bool CodeCompletionSecondPassRequest::evaluate(
   if (!parserState->hasCodeCompletionDelayedDeclState())
     return true;
 
+  // Decrement the closure discriminator index by one so a top-level closure
+  // gets the same discriminator as before when being re-parsed in the second
+  // pass.
+  parserState->getTopLevelContext().overrideNextClosureDiscriminator(
+      parserState->getTopLevelContext().claimNextClosureDiscriminator() - 1);
   auto state = parserState->takeCodeCompletionDelayedDeclState();
   auto &Ctx = SF->getASTContext();
 
