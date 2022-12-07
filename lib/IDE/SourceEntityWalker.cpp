@@ -607,10 +607,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return Action::Stop();
     }
 
-    if (auto rewritten = ME->getRewritten()) {
-      if (!rewritten->walk(*this))
-        return Action::Stop();
-    }
+    // Do not walk into ME->getRewritten() because it's not what the user wrote.
 
     // Already walked the children.
     return doSkipChildren();
