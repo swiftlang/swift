@@ -42,11 +42,14 @@ static std::string getInstrProfSection(IRGenModule &IGM,
   return llvm::getInstrProfSectionName(SK, IGM.Triple.getObjectFormat());
 }
 
-void IRGenModule::emitCoverageMapping() {
+void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
+  // If there aren't any coverage maps, there's nothing to emit.
+  if (Mappings.empty())
+    return;
+
   SmallVector<llvm::Constant *, 4> UnusedFuncNames;
-  std::vector<const SILCoverageMap *> Mappings;
-  for (const auto &M : getSILModule().getCoverageMaps()) {
-    auto FuncName = M.second->getPGOFuncName();
+  for (const auto *Mapping : Mappings) {
+    auto FuncName = Mapping->getPGOFuncName();
     auto VarLinkage = llvm::GlobalValue::LinkOnceAnyLinkage;
     auto FuncNameVarName = llvm::getPGOFuncNameVarName(FuncName, VarLinkage);
 
@@ -58,12 +61,7 @@ void IRGenModule::emitCoverageMapping() {
       auto *Var = llvm::createPGOFuncNameVar(Module, VarLinkage, FuncName);
       UnusedFuncNames.push_back(llvm::ConstantExpr::getBitCast(Var, Int8PtrTy));
     }
-    Mappings.push_back(M.second);
   }
-
-  // If there aren't any coverage maps, there's nothing to emit.
-  if (Mappings.empty())
-    return;
 
   // Emit the name data for any unused functions.
   if (!UnusedFuncNames.empty()) {
@@ -80,8 +78,8 @@ void IRGenModule::emitCoverageMapping() {
 
   std::vector<StringRef> Files;
   for (const auto &M : Mappings)
-    if (std::find(Files.begin(), Files.end(), M->getFile()) == Files.end())
-      Files.push_back(M->getFile());
+    if (std::find(Files.begin(), Files.end(), M->getFilename()) == Files.end())
+      Files.push_back(M->getFilename());
 
   auto remapper = getOptions().CoveragePrefixMap;
 
@@ -115,7 +113,7 @@ void IRGenModule::emitCoverageMapping() {
     std::string FuncRecordName = "__covrec_" + llvm::utohexstr(NameHash);
 
     unsigned FileID =
-        std::find(Files.begin(), Files.end(), M->getFile()) - Files.begin();
+        std::find(Files.begin(), Files.end(), M->getFilename()) - Files.begin();
     std::vector<CounterMappingRegion> Regions;
     for (const auto &MR : M->getMappedRegions())
       Regions.emplace_back(CounterMappingRegion::makeRegion(
@@ -194,6 +192,27 @@ void IRGenModule::emitCoverageMapping() {
 }
 
 void IRGenerator::emitCoverageMapping() {
-  for (auto &IGM : *this)
-    IGM.second->emitCoverageMapping();
+  if (SIL.getCoverageMaps().empty())
+    return;
+
+  // Shard the coverage maps across their designated IRGenModules. This is
+  // necessary to ensure we don't output N copies of a coverage map when doing
+  // parallel IRGen, where N is the number of output object files.
+  //
+  // Note we don't just dump all the coverage maps into the primary IGM as
+  // that would require creating unecessary name data entries, since the name
+  // data is likely to already be present in the IGM that contains the entity
+  // being profiled (unless it has been optimized out). Matching the coverage
+  // map to its originating SourceFile also matches the behavior of a debug
+  // build where the files are compiled separately.
+  llvm::DenseMap<IRGenModule *, std::vector<const SILCoverageMap *>> MapsToEmit;
+  for (const auto &M : SIL.getCoverageMaps()) {
+    auto &Mapping = M.second;
+    auto *SF = Mapping->getParentSourceFile();
+    MapsToEmit[getGenModule(SF)].push_back(Mapping);
+  }
+  for (auto &IGMPair : *this) {
+    auto *IGM = IGMPair.second;
+    IGM->emitCoverageMaps(MapsToEmit[IGM]);
+  }
 }
