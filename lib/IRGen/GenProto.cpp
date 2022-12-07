@@ -2920,14 +2920,6 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 void NecessaryBindings::addTypeMetadata(CanType type) {
   assert(!isa<InOutType>(type));
 
-  // If the bindings are for an async function, we will always need the type
-  // metadata.  The opportunities to reconstruct it available in the context of
-  // partial apply forwarders are not available here.
-  if (forAsyncFunction()) {
-    addRequirement({type, nullptr});
-    return;
-  }
-
   // Bindings are only necessary at all if the type is dependent.
   if (!type->hasArchetype())
     return;
@@ -2995,21 +2987,12 @@ void NecessaryBindings::addProtocolConformance(CanType type,
         dyn_cast<SpecializedProtocolConformance>(concreteConformance);
     // The partial apply forwarder does not have the context to reconstruct
     // abstract conditional conformance requirements.
-    if (forPartialApply() && specializedConf) {
+    if (specializedConf) {
       addAbstractConditionalRequirements(specializedConf);
-    } else if (forAsyncFunction()) {
-      ProtocolDecl *protocol = conf.getRequirement();
-      GenericRequirement requirement;
-      requirement.TypeParameter = type;
-      requirement.Protocol = protocol;
-      std::pair<GenericRequirement, ProtocolConformanceRef> pair{requirement,
-                                                                 conf};
-      Conformances.insert(pair);
-      addRequirement({type, concreteConformance->getProtocol()});
     }
     return;
   }
-  assert(isa<ArchetypeType>(type) || forAsyncFunction());
+  assert(isa<ArchetypeType>(type));
 
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
@@ -3204,29 +3187,20 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   }
 }
 
-NecessaryBindings NecessaryBindings::forAsyncFunctionInvocation(
-    IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs) {
-  return computeBindings(IGM, origType, subs,
-                         false /*forPartialApplyForwarder*/);
-}
-
 NecessaryBindings
 NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
                                           CanSILFunctionType origType,
                                           SubstitutionMap subs,
                                           bool considerParameterSources) {
   return computeBindings(IGM, origType, subs,
-                         true  /*forPartialApplyForwarder*/,
                          considerParameterSources);
 }
 
 NecessaryBindings NecessaryBindings::computeBindings(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
-    bool forPartialApplyForwarder, bool considerParameterSources) {
+    bool considerParameterSources) {
 
   NecessaryBindings bindings;
-  bindings.kind =
-      forPartialApplyForwarder ? Kind::PartialApply : Kind::AsyncFunction;
 
   // Bail out early if we don't have polymorphic parameters.
   if (!hasPolymorphicParameters(origType))
@@ -3249,9 +3223,7 @@ NecessaryBindings NecessaryBindings::computeBindings(
     case MetadataSource::Kind::SelfMetadata:
       // Async functions pass the SelfMetadata and SelfWitnessTable parameters
       // along explicitly.
-      if (forPartialApplyForwarder) {
-        bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
-      }
+      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:
