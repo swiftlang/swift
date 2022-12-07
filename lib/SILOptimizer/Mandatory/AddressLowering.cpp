@@ -141,6 +141,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -156,6 +157,7 @@
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -343,6 +345,22 @@ static bool isStoreCopy(SILValue value) {
 
   if (!copyInst->hasOneUse())
     return false;
+
+  auto source = copyInst->getOperand();
+  if (source->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // [in_guaranteed_begin_apply_results] If any root of the source is a
+    // begin_apply, we can't rely on projecting from the (rewritten) source:
+    // The store may not be in the coroutine's range. The result would be
+    // attempting to access invalid storage.
+    SmallVector<SILValue, 4> roots;
+    findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
+                                 roots);
+    if (llvm::any_of(roots, [](SILValue root) {
+          return isa<BeginApplyInst>(root->getDefiningInstruction());
+        })) {
+      return false;
+    }
+  }
 
   auto *user = value->getSingleUse()->getUser();
   return isa<StoreInst>(user);
@@ -928,8 +946,19 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   auto *defInst = value->getDefiningInstruction();
   if (!defInst)
     return false;
-
-  if (isa<LoadBorrowInst>(defInst) || isa<BeginApplyInst>(defInst))
+  // [in_guaranteed_begin_apply_results] OSSA ensures that every use of a
+  // guaranteed value resulting from a begin_apply will occur in the
+  // coroutine's range (i.e. "before" the end_apply/abort apply).
+  // AddressLowering takes advantage of this lack of uses outside of the
+  // coroutine's range to directly use the storage that is yielded by the
+  // coroutine rather than moving it to local storage.
+  //
+  // It is, however, valid in OSSA to have uses of an owned value produced by a
+  // begin_apply outside of the coroutine range.  So in that case, it is
+  // necessary to introduce new storage and move to it.
+  if (isa<LoadBorrowInst>(defInst) ||
+      (isa<BeginApplyInst>(defInst) &&
+       value.getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
 
   return false;
@@ -2223,9 +2252,32 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       continue;
     }
     if (oldResult.getType().isAddressOnly(*pass.function)) {
-      // Remap storage when an address-only type is yielded as an opaque value.
-      pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
-      pass.valueStorageMap.getStorage(&oldResult).markRewritten();
+      auto info = newCall->getSubstCalleeConv().getYieldInfoForOperandIndex(i);
+      assert(info.isFormalIndirect());
+      if (info.isConsumed()) {
+        // Because it is legal to have uses of an owned value produced by a
+        // begin_apply after a coroutine's range, AddressLowering must move the
+        // value into local storage so that such out-of-coroutine-range uses can
+        // be rewritten in terms of that address (instead of being rewritten in
+        // terms of the yielded owned storage which is no longer valid beyond
+        // the coroutine's range).
+        auto &storage = pass.valueStorageMap.getStorage(&oldResult);
+        auto destAddr = addrMat.materializeAddress(&oldResult);
+        storage.storageAddress = destAddr;
+        storage.markRewritten();
+        resultBuilder.createCopyAddr(callLoc, &newResult, destAddr,
+                                     info.isConsumed() ? IsTake : IsNotTake,
+                                     IsInitialization);
+      } else {
+        // [in_guaranteed_begin_apply_results] Because OSSA ensure that all uses
+        // of a guaranteed value produced by a begin_apply are used within the
+        // coroutine's range, AddressLowering will not introduce uses of
+        // invalid memory by rewriting the uses of a yielded guaranteed opaque
+        // value as uses of yielded guaranteed storage.  However, it must
+        // allocate storage for copies of [projections of] such values.
+        pass.valueStorageMap.setStorageAddress(&oldResult, &newResult);
+        pass.valueStorageMap.getStorage(&oldResult).markRewritten();
+      }
       continue;
     }
     assert(oldResult.getType().isObject());
