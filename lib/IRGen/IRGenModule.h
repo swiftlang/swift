@@ -1572,6 +1572,8 @@ public:
   void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                                       const ProtocolConformance *conformance);
 
+  void setColocateMetadataSection(llvm::Function *f);
+
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
                         TypeMetadataCanonicality canonicality =

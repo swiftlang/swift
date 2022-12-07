@@ -2472,7 +2472,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
+  Opts.CollocatedMetadataFunctions =
+      Args.hasFlag(OPT_enable_collocate_metadata_functions,
+                   OPT_disable_collocate_metadata_functions,
+                   Opts.CollocatedMetadataFunctions);
   return false;
 }
 
