@@ -47,8 +47,7 @@ typedef struct _RTL_CONDITION_VARIABLE *PRTL_CONDITION_VARIABLE;
 typedef PRTL_CONDITION_VARIABLE PCONDITION_VARIABLE;
 
 // These have to be #defines, to avoid problems with <windows.h>
-#define RTL_SRWLOCK_INIT                                                       \
-  { 0 }
+#define RTL_SRWLOCK_INIT {0}
 #define SRWLOCK_INIT RTL_SRWLOCK_INIT
 #define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
 
