@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -Xcc -fno-exceptions -enable-experimental-cxx-interop -emit-clang-header-path %t/functions.h
 
-// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-expected-execution.o
+// RUN: %target-interop-build-clangxx -c %s -I %t -fno-exceptions -o %t/swift-expected-execution.o
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-expected-execution -Xlinker %t/swift-expected-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-expected-execution
@@ -11,6 +11,7 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
 
+#include <cassert>
 #include <cstdio>
 #include "functions.h"
 
@@ -64,6 +65,26 @@ int main() {
     printf("Test operator bool\n");
   }
 
+  const auto constExpectedResult = Functions::throwFunctionWithPossibleReturn(0);
+  if (!constExpectedResult.has_value()) {
+    auto constError = constExpectedResult.error();
+    auto optionalError = constError.as<Functions::NaiveErrors>();
+    assert(optionalError.isSome());
+    auto valueError = optionalError.get();
+    assert(valueError == Functions::NaiveErrors::returnError);
+    valueError.getMessage();
+  }
+
+  auto expectedResult = Functions::throwFunctionWithPossibleReturn(0);
+  if (!expectedResult.has_value()) {
+    auto error = expectedResult.error();
+    auto optionalError = error.as<Functions::NaiveErrors>();
+    assert(optionalError.isSome());
+    auto valueError = optionalError.get();
+    assert(valueError == Functions::NaiveErrors::returnError);
+    valueError.getMessage();
+  }
+
   // Test get T's Value (const)
   const auto valueExp = testIntValue;
   if (valueExp.value() == 42)
@@ -87,6 +108,10 @@ int main() {
 // CHECK-NEXT: Test Reference to T's members (const)
 // CHECK-NEXT: Test Reference to T's members
 // CHECK-NEXT: Test operator bool
+// CHECK-NEXT: passThrowFunctionWithPossibleReturn
+// CHECK-NEXT: returnError
+// CHECK-NEXT: passThrowFunctionWithPossibleReturn
+// CHECK-NEXT: returnError
 // CHECK-NEXT: Test get T's Value (const)
 // CHECK-NEXT: Test get T's Value
 // CHECK-NEXT: testIntValue has a value

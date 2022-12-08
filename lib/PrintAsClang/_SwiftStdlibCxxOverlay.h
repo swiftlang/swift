@@ -352,4 +352,21 @@ private:
   alignas(alignof(Swift::Error)) char buffer[sizeof(Swift::Error)];
   bool has_val;
 };
+
+#ifdef __cpp_exceptions
+
+template<class T>
+using ThrowingResult = T;
+
+#define SWIFT_RETURN_THUNK(T, v) v
+
+#else
+
+template<class T>
+using ThrowingResult = Swift::Expected<T>;
+
+#define SWIFT_RETURN_THUNK(T, v) Swift::Expected<T>(v)
+
+#endif
+
 #endif

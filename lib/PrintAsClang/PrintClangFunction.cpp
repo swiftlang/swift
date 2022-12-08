@@ -688,6 +688,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       ClangRepresentation::representable;
 
   // Print out the return type.
+  if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
+    os << "Swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -740,7 +742,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
             .isUnsupported())
       return resultingRepresentation;
   }
-
+  if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
+    os << ">";
   os << ' ';
   if (const auto *typeDecl = modifiers.qualifierContext)
     ClangSyntaxPrinter(os).printNominalTypeQualifier(
@@ -1241,13 +1244,49 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // Create the condition and the statement to throw an exception.
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
+    os << "#ifdef __cpp_exceptions\n";
     os << "    throw (Swift::Error(opaqueError));\n";
+    os << "#else\n";
+    if (resultTy->isVoid()) {
+      os << "    return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));\n";
+    } else {
+      os << "    return SWIFT_RETURN_THUNK(";
+      auto directResultType = signature.getDirectResultType();
+      printDirectReturnOrParamCType(
+          *directResultType, resultTy, moduleContext, os, cPrologueOS,
+          typeMapping, interopContext, [&]() {
+            OptionalTypeKind retKind;
+            Type objTy;
+            std::tie(objTy, retKind) =
+                DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+
+            auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                                                  OutputLanguageMode::Cxx);
+            assert(!s.isUnsupported());
+          });
+      os << ", Swift::Error(opaqueError));\n";
+    }
+    os << "#endif\n";
   }
 
   // Return the function result value if it doesn't throw.
   if (!resultTy->isVoid() && hasThrows) {
     os << "\n";
-    os << "return returnValue;\n";
+    os << "  return SWIFT_RETURN_THUNK(";
+    auto directResultType = signature.getDirectResultType();
+    printDirectReturnOrParamCType(
+        *directResultType, resultTy, moduleContext, os, cPrologueOS,
+        typeMapping, interopContext, [&]() {
+          OptionalTypeKind retKind;
+          Type objTy;
+          std::tie(objTy, retKind) =
+              DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+
+          auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                                                OutputLanguageMode::Cxx);
+          assert(!s.isUnsupported());
+        });
+    os << ", returnValue);\n";
   }
 }
 
