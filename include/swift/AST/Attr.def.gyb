@@ -1,6 +1,5 @@
 %{
   # -*- mode: C++ -*-
-  from gyb_syntax_support import *
   from gyb_syntax_support.AttributeKinds import *
   # Ignore the following admonition; it applies to the resulting .def file only
 }%
