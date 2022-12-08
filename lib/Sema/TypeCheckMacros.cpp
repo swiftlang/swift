@@ -214,8 +214,9 @@ Expr *swift::expandMacroExpr(
 
   // Create a new source buffer with the contents of the expanded macro.
   auto macroBuffer =
-      llvm::MemoryBuffer::getMemBuffer(evaluatedSource, bufferName);
+      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  free((void*)evaluatedSource.data());
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.
