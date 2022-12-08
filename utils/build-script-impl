@@ -3566,6 +3566,16 @@ for host in "${ALL_HOSTS[@]}"; do
     build_and_test_installable_package ${host}
 done
 
+# Find all of the just-built shared libraries used by host tools, e.g.,
+# the swift-syntax shared libraries.
+function find_just_built_host_shared_libraries() {
+  if [[ "$(uname -s)" == "Darwin" ]] ; then
+      find $(get_host_install_prefix ${host})lib/swift/host -type f -name *.dylib -print
+  else
+      find $(get_host_install_prefix ${host})lib/swift/host -type f -name *.so -print
+  fi
+}
+
 # Lipo those products which require it, optionally build and test an installable package.
 mergedHost="merged-hosts"
 if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
@@ -3579,7 +3589,8 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
         else
             LIPO_PATH="${HOST_LIPO}"
         fi
-        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --explicit-src-files="$(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftScan.dylib" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+        swift_syntax_shared_libraries=$(find_just_built_host_shared_libraries)
+        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --explicit-src-files="$(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftScan.dylib ${swift_syntax_shared_libraries}" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
         if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
             # Build and test the lipo-ed package.
