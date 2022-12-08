@@ -15,6 +15,11 @@ extension Bar: BarProtocol {}
 
 let bar = Bar()
 
+let _ = Bar(value: 22)
+// CHECK: called -[Bar initWithValue:] with 22
+let _ = Bar.init(value: 33)
+// CHECK: called -[Bar initWithValue:] with 33
+
 bar.directProperty = 123
 print(bar.directProperty)
 // CHECK: 123
