@@ -365,8 +365,6 @@ endfunction()
 #     [EMBED_BITCODE]                   # Embed LLVM bitcode into the .o files
 #     [STATIC]                          # Also write .swiftmodule etc. to static
 #                                       # resource folder
-#     [NO_LINK_NAME]                    # Do not pass -module-link-name flag.
-#                                       # This disables emission of force load symbol.
 #     )
 function(_compile_swift_files
     dependency_target_out_var_name dependency_module_target_out_var_name
@@ -375,7 +373,7 @@ function(_compile_swift_files
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
-    "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR;NO_LINK_NAME"
+    "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
 
   # Check arguments.
