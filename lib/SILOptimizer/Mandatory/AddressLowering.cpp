@@ -149,6 +149,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -413,6 +414,9 @@ struct AddressLoweringState {
   // Dominators remain valid throughout this pass.
   DominanceInfo *domInfo;
 
+  // Dead-end blocks remain valid through this pass.
+  DeadEndBlocks *deBlocks;
+
   InstructionDeleter deleter;
 
   // All opaque values mapped to their associated storage.
@@ -441,9 +445,10 @@ struct AddressLoweringState {
   // Handle moves from a phi's operand storage to the phi storage.
   std::unique_ptr<PhiRewriter> phiRewriter;
 
-  AddressLoweringState(SILFunction *function, DominanceInfo *domInfo)
+  AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
+                       DeadEndBlocks *deBlocks)
       : function(function), loweredFnConv(getLoweredFnConv(function)),
-        domInfo(domInfo) {
+        domInfo(domInfo), deBlocks(deBlocks) {
     for (auto &block : *function) {
       if (block.getTerminator()->isFunctionExiting())
         exitingInsts.push_back(block.getTerminator());
@@ -1332,6 +1337,8 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     // a use projection.
     computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
     for (SILBasicBlock *deallocBlock : boundary) {
+      if (pass.deBlocks->isDeadEnd(deallocBlock))
+        continue;
       auto deallocBuilder = pass.getBuilder(deallocBlock->back().getIterator());
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
     }
@@ -3859,8 +3866,10 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   removeUnreachableBlocks(*function);
 
   auto *dominance = PM->getAnalysis<DominanceAnalysis>();
+  auto *deadEnds = PM->getAnalysis<DeadEndBlocksAnalysis>();
 
-  AddressLoweringState pass(function, dominance->get(function));
+  AddressLoweringState pass(function, dominance->get(function),
+                            deadEnds->get(function));
 
   // ## Step #1: Map opaque values
   //
