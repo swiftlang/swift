@@ -120,66 +120,67 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
   return true;
 }
 
-static std::string extractLiteralOutput(Expr *expr) {
-  std::string LiteralOutput;
-  llvm::raw_string_ostream OutputStream(LiteralOutput);
-  expr->printConstExprValue(&OutputStream, nullptr);
+static std::shared_ptr<CompileTimeValue>
+extractCompileTimeValue(Expr *expr) {
+  if (expr) {
+    switch (expr->getKind()) {
+      case ExprKind::Array:
+      case ExprKind::Dictionary:
+      case ExprKind::Tuple:
 
-  return LiteralOutput;
+      case ExprKind::BooleanLiteral:
+      case ExprKind::FloatLiteral:
+      case ExprKind::IntegerLiteral:
+      case ExprKind::NilLiteral:
+      case ExprKind::StringLiteral:
+      {
+        std::string literalOutput;
+        llvm::raw_string_ostream OutputStream(literalOutput);
+        expr->printConstExprValue(&OutputStream, nullptr);
+        if (!literalOutput.empty()) {
+          return std::make_shared<RawLiteralValue>(literalOutput);
+        }
+        break;
+      }
+
+      case ExprKind::Call:
+      {
+        auto callExpr = cast<CallExpr>(expr);
+        if (callExpr->getFn()->getKind() == ExprKind::ConstructorRefCall) {
+          std::vector<FunctionParameter> parameters;
+          const auto args = callExpr->getArgs();
+          for (auto arg : *args) {
+            auto argExpr = arg.getExpr();
+            const auto label = arg.getLabel().str().str();
+            const auto type = argExpr->getType();
+            if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+              auto *decl = defaultArgument->getParamDecl();
+              if (decl->hasDefaultExpr()) {
+                argExpr = decl->getTypeCheckedDefaultExpr();
+              }
+            }
+            parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
+          }
+          auto name = toFullyQualifiedTypeNameString(callExpr->getType());
+          return std::make_shared<InitCallValue>(name, parameters);
+        }
+        break;
+      }
+
+      default:
+      {
+        break;
+      }
+    }
+  }
+  return std::make_shared<RuntimeValue>();
 }
 
 static std::shared_ptr<CompileTimeValue>
 extractPropertyInitializationValue(VarDecl *propertyDecl) {
-  auto binding = propertyDecl->getParentPatternBinding();
-  if (binding) {
-    auto originalInit = binding->getOriginalInit(0);
-    if (originalInit) {
-      auto literalOutput = extractLiteralOutput(originalInit);
-      if (!literalOutput.empty()) {
-        return std::make_shared<RawLiteralValue>(literalOutput);
-      }
-
-      if (auto callExpr = dyn_cast<CallExpr>(originalInit)) {
-        if (callExpr->getFn()->getKind() != ExprKind::ConstructorRefCall) {
-          return std::make_shared<RuntimeValue>();
-        }
-
-        std::vector<FunctionParameter> parameters;
-        const auto args = callExpr->getArgs();
-        for (auto arg : *args) {
-          auto label = arg.getLabel().str().str();
-          auto expr = arg.getExpr();
-
-          switch (expr->getKind()) {
-          case ExprKind::DefaultArgument: {
-            auto defaultArgument = cast<DefaultArgumentExpr>(expr);
-            auto *decl = defaultArgument->getParamDecl();
-
-            if (decl->hasDefaultExpr()) {
-              literalOutput =
-                  extractLiteralOutput(decl->getTypeCheckedDefaultExpr());
-            }
-
-            break;
-          }
-          default:
-            literalOutput = extractLiteralOutput(expr);
-            break;
-          }
-
-          if (literalOutput.empty()) {
-            parameters.push_back(
-                {label, expr->getType(), std::make_shared<RuntimeValue>()});
-          } else {
-            parameters.push_back(
-                {label, expr->getType(),
-                 std::make_shared<RawLiteralValue>(literalOutput)});
-          }
-        }
-
-        auto name = toFullyQualifiedTypeNameString(callExpr->getType());
-        return std::make_shared<InitCallValue>(name, parameters);
-      }
+  if (auto binding = propertyDecl->getParentPatternBinding()) {
+    if (auto originalInit = binding->getOriginalInit(0)) {
+      return extractCompileTimeValue(originalInit);
     }
   }
 
@@ -187,10 +188,7 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
     auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
     if (node.is<Stmt *>()) {
       if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
-        auto expr = returnStmt->getResult();
-        std::string LiteralOutput = extractLiteralOutput(expr);
-        if (!LiteralOutput.empty())
-          return std::make_shared<RawLiteralValue>(LiteralOutput);
+        return extractCompileTimeValue(returnStmt->getResult());
       }
     }
   }
