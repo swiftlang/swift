@@ -126,7 +126,7 @@ public:
   unsigned getIndex() const;
 
   /// Return non-null if \p value is a phi.
-  static SILPhiArgument *isPhi(SILValue value);
+  static SILPhiArgument *asPhi(SILValue value);
 
   /// Return non-null if \p value is a terminator result.
   static SILPhiArgument *isTerminatorResult(SILValue value);
@@ -145,10 +145,15 @@ public:
   /// If this argument is a phi, populate `OutArray` with the incoming phi
   /// values for each predecessor BB. If this argument is not a phi, return
   /// false.
+  ///
+  /// If this block has no predecessors, returnedPhiValues will be empty.
   bool getIncomingPhiValues(SmallVectorImpl<SILValue> &returnedPhiValues) const;
 
   /// If this argument is a phi, populate `OutArray` with each predecessor block
   /// and its incoming phi value. If this argument is not a phi, return false.
+  ///
+  /// If this block has no predecessors, returnedPredAndPhiValuePairs will be
+  /// empty.
   bool
   getIncomingPhiValues(SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
                            &returnedPredAndPhiValuePairs) const;
@@ -188,20 +193,19 @@ public:
           &returnedSingleTermOperands) const;
 
   /// If this SILArgument's parent block has a single predecessor whose
-  /// terminator has a single operand, return the incoming operand of the
-  /// predecessor's terminator. Returns SILValue() otherwise.  Note that for
-  /// some predecessor terminators the incoming value is not exactly the
-  /// argument value. E.g. the incoming value for a switch_enum payload argument
-  /// is the enum itself (the operand of the switch_enum).
-  SILValue getSingleTerminatorOperand() const;
-
-  /// If this SILArgument's parent block has a single predecessor whose
   /// terminator has a single operand, return that terminator.
   TermInst *getSingleTerminator() const;
 
   /// Return the terminator instruction for which this argument is a result,
   /// otherwise return nullptr.
   TermInst *getTerminatorForResult() const;
+
+  /// If this terminator result forwards an operand, then return it.
+  ///
+  /// Precondition: this->isTerminatorResult()
+  ///
+  /// TODO: Move this and other APIs into a TerminatorResult abstraction.
+  const Operand *forwardedTerminatorResultOperand() const;
 
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
@@ -311,14 +315,6 @@ public:
           &returnedSingleTermOperands) const;
 
   /// If this SILArgument's parent block has a single predecessor whose
-  /// terminator has a single operand, return the incoming operand of the
-  /// predecessor's terminator. Returns SILValue() otherwise.  Note that for
-  /// some predecessor terminators the incoming value is not exactly the
-  /// argument value. E.g. the incoming value for a switch_enum payload argument
-  /// is the enum itself (the operand of the switch_enum).
-  SILValue getSingleTerminatorOperand() const;
-
-  /// If this SILArgument's parent block has a single predecessor whose
   /// terminator has a single operand, return that terminator.
   TermInst *getSingleTerminator() const;
 
@@ -406,7 +402,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 /// Return non-null if \p value is a real phi argument.
-inline SILPhiArgument *SILArgument::isPhi(SILValue value) {
+inline SILPhiArgument *SILArgument::asPhi(SILValue value) {
   if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
     if (arg->isPhi())
       return arg;

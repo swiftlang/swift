@@ -85,18 +85,12 @@ bool swift::hasPointerEscape(BorrowedValue value) {
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
-  // If we have an argument from a transforming terminator, we can forward
-  // guaranteed.
-  if (auto *arg = dyn_cast<SILArgument>(value))
-    if (auto *ti = arg->getSingleTerminator())
-      if (ti->isTransformationTerminator())
-        return OwnershipForwardingMixin::get(ti)->preservesOwnership();
-
-  if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+  if (auto *inst = value->getDefiningInstructionOrTerminator()) {
+    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
       return mixin->preservesOwnership() &&
-             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
-
+        !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
+    }
+  }
   return false;
 }
 
@@ -108,18 +102,12 @@ bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
-  // If we have a SILArgument and we are the successor block of a transforming
-  // terminator, we are fine.
-  if (auto *arg = dyn_cast<SILPhiArgument>(value))
-    if (auto *predTerm = arg->getSingleTerminator())
-      if (predTerm->isTransformationTerminator())
-        return OwnershipForwardingMixin::get(predTerm)->preservesOwnership();
-
-  if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+  if (auto *inst = value->getDefiningInstructionOrTerminator()) {
+    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
       return mixin->preservesOwnership() &&
              !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
-
+    }
+  }
   return false;
 }
 
@@ -1242,22 +1230,11 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwarding(value)) {
-      if (auto *i = value->getDefiningInstruction()) {
+      if (auto *i = value->getDefiningInstructionOrTerminator()) {
         llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(value);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transforming terminators should always have a single operand");
-      worklist.push_back(termInst->getAllOperands()[0].get());
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1287,7 +1264,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwarding(currentValue)) {
-      if (auto *i = currentValue->getDefiningInstruction()) {
+      if (auto *i = currentValue->getDefiningInstructionOrTerminator()) {
         auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
@@ -1299,17 +1276,6 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
         currentValue = *begin;
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(currentValue);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transformation terminators should only have single operands");
-      currentValue = termInst->getAllOperands()[0].get();
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1347,22 +1313,11 @@ bool swift::getAllOwnedValueIntroducers(
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isForwardingConsume(value)) {
-      if (auto *i = value->getDefiningInstruction()) {
+      if (auto *i = value->getDefiningInstructionOrTerminator()) {
         llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(value);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transforming terminators should always have a single operand");
-      worklist.push_back(termInst->getAllOperands()[0].get());
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1388,7 +1343,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isForwardingConsume(currentValue)) {
-      if (auto *i = currentValue->getDefiningInstruction()) {
+      if (auto *i = currentValue->getDefiningInstructionOrTerminator()) {
         auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
@@ -1400,18 +1355,6 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
         currentValue = *begin;
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator and is directly forwarding.
-      auto *arg = cast<SILPhiArgument>(currentValue);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands()
-             - termInst->getNumTypeDependentOperands() == 1 &&
-             "Transformation terminators should only have single operands");
-      currentValue = termInst->getAllOperands()[0].get();
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
