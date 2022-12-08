@@ -105,6 +105,7 @@ EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(ResultBuilderASTTransform, true)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
+EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.

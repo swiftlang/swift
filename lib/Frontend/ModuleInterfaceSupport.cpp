@@ -788,9 +788,18 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
   printImports(out, Opts, M);
 
+  static bool forceUseExportedModuleNameInPublicOnly =
+    getenv("SWIFT_DEBUG_USE_EXPORTED_MODULE_NAME_IN_PUBLIC_ONLY");
+  bool useExportedModuleNameInPublicOnly =
+    M->getASTContext().LangOpts.hasFeature(Feature::ModuleInterfaceExportAs) ||
+    forceUseExportedModuleNameInPublicOnly;
+  bool useExportedModuleNames = !(useExportedModuleNameInPublicOnly &&
+                                  Opts.PrintPrivateInterfaceContent);
+
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
       Opts.PrintPrivateInterfaceContent,
+      useExportedModuleNames,
       Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
