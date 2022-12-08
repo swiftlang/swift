@@ -80,7 +80,7 @@ The existing Swift to Objective-C bridging layer should still be supported even 
 
 ## The approach
 
-The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift functions that use the native Swift calling convention. The header also provides a suitable representation for Swift types. Typically, a single header file is generated for one Swift module or module interface file.
+The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift functions that use the native Swift calling convention. The header also provides a suitable representation for Swift types. Typically, a single header file is generated for one Swift module. This generation can be done retroactively, starting from a Swift module interface file, and does not need to be requested when the Swift module is built from source.
 
 Currently the generated header file depends on several LLVM and Clang compiler features for the Swift calling convention support, and thus it can only be compiled by Clang. The header does not depend on any other Clang-specific C++ language extensions. The header can use some other optional Clang-only features that improve developer experience for the C++ users, like specific attributes that improve diagnostics. These Clang-only features are enabled only when the Clang that is being used supports them, so older versions of Clang would still be able to consume the generated header.
 
