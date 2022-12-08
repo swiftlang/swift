@@ -129,8 +129,9 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
-  desired: AnyObject
-) -> Bool {
+  desired: AnyObject,
+  lostRaceHandler: () throws -> ()
+) rethrows -> Bool {
   var expected: UnsafeRawPointer?
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
@@ -140,9 +141,24 @@ func _stdlib_atomicInitializeARCRef(
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
-    Unmanaged.passUnretained(desired).release()
+    defer { Unmanaged.passUnretained(desired).release() }
+    try lostRaceHandler()
   }
   return wonRace
+}
+
+@_transparent
+@discardableResult
+public // @testable
+func _stdlib_atomicInitializeARCRef(
+  object target: UnsafeMutablePointer<AnyObject?>,
+  desired: AnyObject
+) -> Bool {
+  return _stdlib_atomicInitializeARCRef(
+    object: object,
+    desired: desired,
+    lostRaceHandler: {}
+  )
 }
 
 @_transparent

@@ -402,13 +402,19 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
         let objects = _nativeStorage._getNonVerbatimBridgingBuffer()
         
         // Atomically store a reference to that buffer in self.
-        if !_stdlib_atomicInitializeARCRef(
-          object: _heapBufferBridgedPtr, desired: objects.storage!) {
-
-          // Another thread won the race.  Throw out our buffer.
-          _destroyBridgedStorage(
-            unsafeDowncast(objects.storage!, to: __BridgingBufferStorage.self))
-        }
+        _stdlib_atomicInitializeARCRef(
+          object: _heapBufferBridgedPtr,
+          desired: objects.storage!,
+          lostRaceHandler: {
+            // Another thread won the race.  Throw out our buffer.
+            _destroyBridgedStorage(
+              unsafeDowncast(
+                objects.storage!,
+                to: __BridgingBufferStorage.self
+              )
+            )
+          }
+        )
         continue // Try again
       }
       
