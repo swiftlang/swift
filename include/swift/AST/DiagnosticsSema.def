@@ -5150,6 +5150,12 @@ ERROR(expansion_not_allowed,none,
       "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
       "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
+ERROR(pack_reference_outside_expansion,none,
+      "pack reference %0 can only appear in pack expansion or generic requirement",
+      (Type))
+ERROR(each_non_pack,none,
+      "'each' cannot be applied to non-pack type %0",
+      (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,

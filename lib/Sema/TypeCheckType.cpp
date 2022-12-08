@@ -2088,6 +2088,8 @@ namespace {
                                   TypeResolutionOptions options);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
+    NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
+                                       TypeResolutionOptions options);
     NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
@@ -2276,6 +2278,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
+
+  case TypeReprKind::PackReference:
+    return resolvePackReference(cast<PackReferenceTypeRepr>(repr), options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -4182,6 +4187,7 @@ std::pair<Type, Type>
 TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
                                             TypeResolutionOptions options) {
   auto elementOptions = options;
+  elementOptions |= TypeResolutionFlags::AllowPackReferences;
   auto patternTy = resolveType(repr->getPatternType(), elementOptions);
   if (patternTy->hasError())
     return std::make_pair(ErrorType::get(getASTContext()), Type());
@@ -4241,6 +4247,31 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   }
 
   return PackExpansionType::get(pair.first, pair.second);
+}
+
+NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
+                                                 TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+  auto packReference = resolveType(repr->getPackType(), options);
+
+  // If we already failed, don't diagnose again.
+  if (packReference->hasError())
+    return ErrorType::get(ctx);
+
+  if (!packReference->isParameterPack()) {
+    ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack,
+                       packReference);
+    return packReference;
+  }
+
+  if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+    ctx.Diags.diagnose(repr->getLoc(),
+                       diag::pack_reference_outside_expansion,
+                       packReference);
+    return packReference;
+  }
+
+  return packReference;
 }
 
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
@@ -4739,6 +4770,7 @@ public:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::PackExpansion:
+    case TypeReprKind::PackReference:
       return false;
     }
   }
