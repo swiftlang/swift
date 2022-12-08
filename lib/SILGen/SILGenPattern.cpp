@@ -1978,7 +1978,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         ManagedValue boxedValue =
             SGF.B.createProjectBox(loc, eltCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
-        if (eltTL->isLoadable()) {
+        if (eltTL->isLoadable() || !SGF.silConv.useLoweredAddresses()) {
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
           eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
