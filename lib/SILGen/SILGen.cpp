@@ -732,15 +732,16 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   emittedFunctions[constant] = F;
 
-  if (!delayedFunctions.count(constant)) {
+  auto foundDelayed = delayedFunctions.find(constant);
+  if (foundDelayed == delayedFunctions.end()) {
     if (isEmittedOnDemand(M, constant)) {
-      forcedFunctions.push_back(constant);
+      if (forcedFunctions.insert(constant).second)
+        pendingForcedFunctions.push_back(constant);
       return F;
     }
   }
 
   // If we delayed emitting this function previously, we need it now.
-  auto foundDelayed = delayedFunctions.find(constant);
   if (foundDelayed != delayedFunctions.end()) {
     // Move the function to its proper place within the module.
     M.functions.remove(F);
@@ -752,7 +753,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       M.functions.insertAfter(insertAfter->getIterator(), F);
     }
 
-    forcedFunctions.push_back(constant);
+    if (forcedFunctions.insert(constant).second)
+      pendingForcedFunctions.push_back(constant);
     delayedFunctions.erase(foundDelayed);
   } else {
     // We would have registered a delayed function as "last emitted" when we
@@ -770,7 +772,6 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
-
   if (!f->empty()) {
     diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
              f->getName());
@@ -1150,24 +1151,28 @@ static void emitOrDelayFunction(SILGenModule &SGM, SILDeclRef constant) {
                   !constant.isDynamicallyReplaceable() &&
                   !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule());
 
-  // Avoid emitting a delayable definition if it hasn't already been referenced.
-  SILFunction *f = nullptr;
-  if (mayDelay)
-    f = SGM.getEmittedFunction(constant, ForDefinition);
-  else
-    f = SGM.getFunction(constant, ForDefinition);
-
-  // If we don't want to emit now, remember how for later.
-  if (!f) {
-    SGM.delayedFunctions.insert({constant, emitAfter});
-    // Even though we didn't emit the function now, update the
-    // lastEmittedFunction so that we preserve the original ordering that
-    // the symbols would have been emitted in.
-    SGM.lastEmittedFunction = constant;
+  if (!mayDelay) {
+    SGM.emitFunctionDefinition(constant, SGM.getFunction(constant, ForDefinition));
     return;
   }
 
-  SGM.emitFunctionDefinition(constant, f);
+  // If the function is already forced then it was previously delayed and then
+  // referenced. We don't need to emit or delay it again.
+  if (SGM.forcedFunctions.contains(constant))
+    return;
+
+  if (auto *f = SGM.getEmittedFunction(constant, ForDefinition)) {
+    SGM.emitFunctionDefinition(constant, f);
+    return;
+  }
+
+  // This is a delayable function so remember how to emit it in case it gets
+  // referenced later.
+  SGM.delayedFunctions.insert({constant, emitAfter});
+  // Even though we didn't emit the function now, update the
+  // lastEmittedFunction so that we preserve the original ordering that
+  // the symbols would have been emitted in.
+  SGM.lastEmittedFunction = constant;
 }
 
 void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
@@ -2222,13 +2227,13 @@ public:
     // Emit any delayed definitions that were forced.
     // Emitting these may in turn force more definitions, so we have to take
     // care to keep pumping the queues.
-    while (!SGM.forcedFunctions.empty()
+    while (!SGM.pendingForcedFunctions.empty()
            || !SGM.pendingConformances.empty()) {
-      while (!SGM.forcedFunctions.empty()) {
-        auto &front = SGM.forcedFunctions.front();
+      while (!SGM.pendingForcedFunctions.empty()) {
+        auto &front = SGM.pendingForcedFunctions.front();
         SGM.emitFunctionDefinition(
             front, SGM.getEmittedFunction(front, ForDefinition));
-        SGM.forcedFunctions.pop_front();
+        SGM.pendingForcedFunctions.pop_front();
       }
       while (!SGM.pendingConformances.empty()) {
         SGM.getWitnessTable(SGM.pendingConformances.front());
