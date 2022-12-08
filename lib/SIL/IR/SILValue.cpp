@@ -80,6 +80,16 @@ SILInstruction *ValueBase::getDefiningInstruction() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getDefiningInstructionOrTerminator() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
+  if (auto *result = SILArgument::isTerminatorResult(this))
+    return result->getSingleTerminator();
+  return nullptr;
+}
+
 SILInstruction *ValueBase::getDefiningInsertionPoint() {
   if (auto *inst = getDefiningInstruction())
     return inst;
