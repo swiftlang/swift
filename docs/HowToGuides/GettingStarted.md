@@ -185,6 +185,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 * Run `cmake --version`: This should be 3.19.6 or higher.
 * Run `python3 --version`: Check that this succeeds.
+  * If you are on macOS and are building for both `arm64` and `x86_64` (e.g. when using `build-toolchain`), verify that both architectures are included in your python distribution using `file $(which python3)`. If you installed python via homebrew, it will likely only include the architecture of your build machine, resulting in `ld: symbol(s) not found` linker errors during the build.
 * Run `ninja --version`: Check that this succeeds.
 * Run `sccache --version`: Check that this succeeds.
 
