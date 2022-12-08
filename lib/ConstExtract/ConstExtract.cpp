@@ -120,57 +120,53 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
   return true;
 }
 
-static std::shared_ptr<CompileTimeValue>
-extractCompileTimeValue(Expr *expr) {
+static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
-      case ExprKind::Array:
-      case ExprKind::Dictionary:
-      case ExprKind::Tuple:
+    case ExprKind::Array:
+    case ExprKind::Dictionary:
+    case ExprKind::Tuple:
 
-      case ExprKind::BooleanLiteral:
-      case ExprKind::FloatLiteral:
-      case ExprKind::IntegerLiteral:
-      case ExprKind::NilLiteral:
-      case ExprKind::StringLiteral:
-      {
-        std::string literalOutput;
-        llvm::raw_string_ostream OutputStream(literalOutput);
-        expr->printConstExprValue(&OutputStream, nullptr);
-        if (!literalOutput.empty()) {
-          return std::make_shared<RawLiteralValue>(literalOutput);
-        }
-        break;
+    case ExprKind::BooleanLiteral:
+    case ExprKind::FloatLiteral:
+    case ExprKind::IntegerLiteral:
+    case ExprKind::NilLiteral:
+    case ExprKind::StringLiteral: {
+      std::string literalOutput;
+      llvm::raw_string_ostream OutputStream(literalOutput);
+      expr->printConstExprValue(&OutputStream, nullptr);
+      if (!literalOutput.empty()) {
+        return std::make_shared<RawLiteralValue>(literalOutput);
       }
+      break;
+    }
 
-      case ExprKind::Call:
-      {
-        auto callExpr = cast<CallExpr>(expr);
-        if (callExpr->getFn()->getKind() == ExprKind::ConstructorRefCall) {
-          std::vector<FunctionParameter> parameters;
-          const auto args = callExpr->getArgs();
-          for (auto arg : *args) {
-            auto argExpr = arg.getExpr();
-            const auto label = arg.getLabel().str().str();
-            const auto type = argExpr->getType();
-            if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
-              auto *decl = defaultArgument->getParamDecl();
-              if (decl->hasDefaultExpr()) {
-                argExpr = decl->getTypeCheckedDefaultExpr();
-              }
+    case ExprKind::Call: {
+      auto callExpr = cast<CallExpr>(expr);
+      if (callExpr->getFn()->getKind() == ExprKind::ConstructorRefCall) {
+        std::vector<FunctionParameter> parameters;
+        const auto args = callExpr->getArgs();
+        for (auto arg : *args) {
+          auto argExpr = arg.getExpr();
+          const auto label = arg.getLabel().str().str();
+          const auto type = argExpr->getType();
+          if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+            auto *decl = defaultArgument->getParamDecl();
+            if (decl->hasDefaultExpr()) {
+              argExpr = decl->getTypeCheckedDefaultExpr();
             }
-            parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
           }
-          auto name = toFullyQualifiedTypeNameString(callExpr->getType());
-          return std::make_shared<InitCallValue>(name, parameters);
+          parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
         }
-        break;
+        auto name = toFullyQualifiedTypeNameString(callExpr->getType());
+        return std::make_shared<InitCallValue>(name, parameters);
       }
+      break;
+    }
 
-      default:
-      {
-        break;
-      }
+    default: {
+      break;
+    }
     }
   }
   return std::make_shared<RuntimeValue>();
