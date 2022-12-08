@@ -122,6 +122,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
