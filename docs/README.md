@@ -353,7 +353,7 @@ provide greater clarity to contributors wanting to add new documentation.
 
 ### Archive
 
-- [FailableInitializers.rst](/docs/FailableInitializers.rst):
+- [FailableInitializers.md](/docs/FailableInitializers.md):
   Superseded by documentation in [The Swift Programming Language][].
 - [InitializerProblems.rst](/docs/InitializerProblems.rst):
   Describes some complexities around initialization in Swift.
