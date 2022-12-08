@@ -78,6 +78,11 @@ module ProtocolConformance {
   requires cplusplus
 }
 
+module StructuredBindingsGetMethod {
+  header "structured-bindings-get-method.h"
+  requires cplusplus
+}
+
 module SynthesizedInitializers {
   header "synthesized-initializers.h"
   requires cplusplus
