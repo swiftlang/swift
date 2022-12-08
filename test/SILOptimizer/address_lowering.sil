@@ -1740,6 +1740,19 @@ bb2:
   unwind
 }
 
+// CHECK-LABEL: sil [ossa] @testUnreachable1NoDestroy : {{.*}} {
+// CHECK:         [[STORAGE:%[^,]+]] = alloc_stack $T                             
+// CHECK:         apply undef<T>([[STORAGE]])
+// CHECK:         apply undef<T>([[STORAGE]])
+// CHECK:         unreachable                                     
+// CHECK-LABEL: } // end sil function 'testUnreachable1NoDestroy'
+sil [ossa] @testUnreachable1NoDestroy : $@convention(thin) <T> () -> () {
+bb0:
+    %instance = apply undef<T>() : $@convention(thin) <τ> () -> @out τ
+    apply undef<T>(%instance) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+    unreachable
+}
+
 sil [ossa] @use_T : $@convention(thin) <T> (@in T) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_checked_cast_br1 : $@convention(method) <T> (@in Any) -> () {
