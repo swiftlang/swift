@@ -3543,7 +3543,7 @@ function build_and_test_installable_package() {
                 call tar xzf "${package_for_host}"
 
             if python3 -c "import psutil" ; then
-              TIMEOUT_ARGS=--timeout=600 # 20 minutes
+              TIMEOUT_ARGS=--timeout=600 # 10 minutes
             fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
                 call python3 "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
