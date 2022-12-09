@@ -42,6 +42,10 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return String(_cxxString: stdString)
   }
 
+  final public var isDeleted: Bool {
+    return SILInstruction_isDeleted(bridged)
+  }
+
   final public var operands: OperandArray {
     return OperandArray(opArray: SILInstruction_getOperands(bridged))
   }

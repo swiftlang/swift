@@ -743,6 +743,10 @@ BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst) {
   return {i->getParent()};
 }
 
+bool SILInstruction_isDeleted(BridgedInstruction inst) {
+  return castToInst(inst)->isDeleted();
+}
+
 BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst) {
   auto operands = castToInst(inst)->getAllOperands();
   return {(const unsigned char *)operands.data(), operands.size()};
