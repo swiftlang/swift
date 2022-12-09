@@ -456,6 +456,7 @@ BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder builder,
 BridgedInstruction SILBuilder_createBranch(
           BridgedBuilder builder, BridgedBasicBlock destBlock,
           BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder builder);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

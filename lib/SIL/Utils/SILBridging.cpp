@@ -1184,3 +1184,9 @@ BridgedInstruction SILBuilder_createBranch(
                                castToBasicBlock(destBlock),
                                getSILValues(arguments, argValues))};
 }
+
+BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder b) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     b.loc.getScope());
+  return {builder.createUnreachable(RegularLocation(b.loc.getLocation()))};
+}
