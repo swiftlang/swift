@@ -31,10 +31,6 @@ class GlobalModuleDependenciesCache;
 
 namespace dependencies {
 
-//using CompilerArgInstanceCacheMap =
-//    llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
-//                              std::unique_ptr<ModuleDependenciesCache>>>;
-
 using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::tuple<std::unique_ptr<CompilerInstance>,
                                std::unique_ptr<GlobalModuleDependenciesCache>,
