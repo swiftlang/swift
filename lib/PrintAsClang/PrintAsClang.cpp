@@ -138,196 +138,50 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "  __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
          "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_PASTE)\n"
-         "# define SWIFT_PASTE_HELPER(x, y) x##y\n"
-         "# define SWIFT_PASTE(x, y) SWIFT_PASTE_HELPER(x, y)\n"
-         "#endif"
-         "\n"
-         "#if !defined(SWIFT_METATYPE)\n"
-         "# define SWIFT_METATYPE(X) Class\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS_PROPERTY)\n"
-         "# if __has_feature(objc_class_property)\n"
-         "#  define SWIFT_CLASS_PROPERTY(...) __VA_ARGS__\n"
-         "# else\n"
-         "#  define SWIFT_CLASS_PROPERTY(...)\n"
-         "# endif\n"
-         "#endif\n"
-         "\n"
-         "#if __has_attribute(objc_runtime_name)\n"
-         "# define SWIFT_RUNTIME_NAME(X) "
-         "__attribute__((objc_runtime_name(X)))\n"
-         "#else\n"
-         "# define SWIFT_RUNTIME_NAME(X)\n"
-         "#endif\n"
-         "#if __has_attribute(swift_name)\n"
-         "# define SWIFT_COMPILE_NAME(X) "
-         "__attribute__((swift_name(X)))\n"
-         "#else\n"
-         "# define SWIFT_COMPILE_NAME(X)\n"
-         "#endif\n"
-         "#if __has_attribute(objc_method_family)\n"
-         "# define SWIFT_METHOD_FAMILY(X) "
-         "__attribute__((objc_method_family(X)))\n"
-         "#else\n"
-         "# define SWIFT_METHOD_FAMILY(X)\n"
-         "#endif\n"
-         "#if __has_attribute(noescape)\n"
-         "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
-         "#else\n"
-         "# define SWIFT_NOESCAPE\n"
-         "#endif\n"
-         "#if __has_attribute(ns_consumed)\n"
-         "# define SWIFT_RELEASES_ARGUMENT __attribute__((ns_consumed))\n"
-         "#else\n"
-         "# define SWIFT_RELEASES_ARGUMENT\n"
-         "#endif\n"
-         "#if __has_attribute(warn_unused_result)\n"
-         "# define SWIFT_WARN_UNUSED_RESULT "
-         "__attribute__((warn_unused_result))\n"
-         "#else\n"
-         "# define SWIFT_WARN_UNUSED_RESULT\n"
-         "#endif\n"
-         "#if __has_attribute(noreturn)\n"
-         "# define SWIFT_NORETURN __attribute__((noreturn))\n"
-         "#else\n"
-         "# define SWIFT_NORETURN\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS_EXTRA)\n"
-         "# define SWIFT_CLASS_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
-         "# define SWIFT_PROTOCOL_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM_EXTRA)\n"
-         "# define SWIFT_ENUM_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS)\n"
-         "# if __has_attribute(objc_subclassing_restricted)\n"
-         "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "__attribute__((objc_subclassing_restricted)) "
-         "SWIFT_CLASS_EXTRA\n"
-         "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
-         "__attribute__((objc_subclassing_restricted)) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "# else\n"
-         "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_RESILIENT_CLASS)\n"
-         "# if __has_attribute(objc_class_stub)\n"
-         "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) SWIFT_CLASS(SWIFT_NAME) "
-         "__attribute__((objc_class_stub))\n"
-         "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
-         "__attribute__((objc_class_stub)) "
-         "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
-         "# else\n"
-         "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) "
-         "SWIFT_CLASS(SWIFT_NAME)\n"
-         "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
-         "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
-         "# endif\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_PROTOCOL)\n"
-         "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "SWIFT_PROTOCOL_EXTRA\n"
-         "# define SWIFT_PROTOCOL_NAMED(SWIFT_NAME) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_PROTOCOL_EXTRA\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_EXTENSION)\n"
-         "# define SWIFT_EXTENSION(M) SWIFT_PASTE(M##_Swift_, __LINE__)\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"
-         "# if __has_attribute(objc_designated_initializer)\n"
-         "#  define OBJC_DESIGNATED_INITIALIZER "
-         "__attribute__((objc_designated_initializer))\n"
-         "# else\n"
-         "#  define OBJC_DESIGNATED_INITIALIZER\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM_ATTR)\n"
-         "# if defined(__has_attribute) && "
-         "__has_attribute(enum_extensibility)\n"
-         "#  define SWIFT_ENUM_ATTR(_extensibility) "
-         "__attribute__((enum_extensibility(_extensibility)))\n"
-         "# else\n"
-         "#  define SWIFT_ENUM_ATTR(_extensibility)\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM)\n"
-         "# define SWIFT_ENUM(_type, _name, _extensibility) "
-         "enum _name : _type _name; "
-         "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA "
-         "_name : _type\n"
-         "# if __has_feature(generalized_swift_name)\n"
-         "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
-         "_extensibility) "
-         "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-         "enum SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n"
-         "# else\n"
-         "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
-         "_extensibility) SWIFT_ENUM(_type, _name, _extensibility)\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_UNAVAILABLE)\n"
-         "# define SWIFT_UNAVAILABLE __attribute__((unavailable))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_UNAVAILABLE_MSG)\n"
-         "# define SWIFT_UNAVAILABLE_MSG(msg) "
-         "__attribute__((unavailable(msg)))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_AVAILABILITY)\n"
-         "# define SWIFT_AVAILABILITY(plat, ...) "
-         "__attribute__((availability(plat, __VA_ARGS__)))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_WEAK_IMPORT)\n"
-         "# define SWIFT_WEAK_IMPORT __attribute__((weak_import))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_DEPRECATED)\n"
-         "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_DEPRECATED_MSG)\n"
-         "# define SWIFT_DEPRECATED_MSG(...) "
-         "__attribute__((deprecated(__VA_ARGS__)))\n"
-         "#endif\n"
-         "#if __has_feature(attribute_diagnose_if_objc)\n"
-         "# define SWIFT_DEPRECATED_OBJC(Msg) __attribute__((diagnose_if(1, "
-         "Msg, \"warning\")))\n"
-         "#else\n"
-         "# define SWIFT_DEPRECATED_OBJC(Msg) SWIFT_DEPRECATED_MSG(Msg)\n"
+         "\n";
+
+#define CLANG_MACRO_BODY(NAME, BODY) \
+  out << "#if !defined(" NAME ")\n" \
+         BODY "\n" \
          "#endif\n";
-  emitObjCConditional(out, [&] {
-    out << "#if !defined(IBSegueAction)\n"
-           "# define IBSegueAction\n"
-           "#endif\n";
-  });
-  out << "#if !defined(SWIFT_EXTERN)\n"
-         "# if defined(__cplusplus)\n"
-         "#  define SWIFT_EXTERN extern \"C\"\n"
-         "# else\n"
-         "#  define SWIFT_EXTERN extern\n"
-         "# endif\n"
+
+#define CLANG_MACRO(NAME, ARGS, VALUE) CLANG_MACRO_BODY(NAME, "# define " NAME ARGS " " VALUE)
+
+#define CLANG_MACRO_ALTERNATIVE(NAME, ARGS, CONDITION, VALUE, ALTERNATIVE) CLANG_MACRO_BODY(NAME, \
+  "# if " CONDITION "\n" \
+  "#  define " NAME ARGS " " VALUE "\n" \
+  "# else\n" \
+  "#  define " NAME ARGS " " ALTERNATIVE "\n" \
+  "# endif")
+
+#define CLANG_MACRO_OBJC(NAME, ARGS, VALUE) \
+  out << "#if defined(__OBJC__)\n" \
+         "#if !defined(" NAME ")\n" \
+         "# define " NAME ARGS " " VALUE "\n" \
+         "#endif\n" \
          "#endif\n";
+
+#define CLANG_MACRO_CXX(NAME, ARGS, VALUE, ALTERNATIVE) \
+  out << "#if defined(__cplusplus)\n" \
+         "# define " NAME ARGS " " VALUE "\n" \
+         "#else\n" \
+         "# define " NAME ARGS " " ALTERNATIVE "\n" \
+         "#endif\n";
+
+#define CLANG_MACRO_CXX_BODY(NAME, BODY) \
+  out << "#if defined(__cplusplus)\n" \
+         BODY "\n" \
+         "#endif\n";
+
+#include "swift/PrintAsClang/ClangMacros.def"
+
+  // SWIFT_IMPORT_STDLIB_SYMBOL's expansion can't be calculated in the
+  // preprocessor, so write its definition here
   auto emitMacro = [&](StringRef name, StringRef value = "") {
     out << "#if !defined(" << name << ")\n";
     out << "# define " << name << " " << value << "\n";
     out << "#endif\n";
   };
-  emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
-  emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
-  emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
-  emitMacro("SWIFT_ERROR_RESULT", "__attribute__((swift_error_result))");
   if (ctx.getStdlibModule()->isStaticLibrary()) {
     emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
   } else {
@@ -337,10 +191,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
     out << "#endif\n";
   }
-  // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
-  emitCxxConditional(
-      out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
-      [&] { emitMacro("SWIFT_NOEXCEPT"); });
+
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
