@@ -1743,10 +1743,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                 ErrorExpr(res.get()->getSourceRange()));
   }
 
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
-  case tok::pound_##Name:                                                      \
-    return parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic);
-#include "swift/AST/TokenKinds.def"
+  case tok::pound_colorLiteral:
+    return parseExprObjectLiteral(ObjectLiteralExpr::colorLiteral, isExprBasic);
+
+  case tok::pound_fileLiteral:
+    return parseExprObjectLiteral(ObjectLiteralExpr::fileLiteral, isExprBasic);
+
+  case tok::pound_imageLiteral:
+    return parseExprObjectLiteral(ObjectLiteralExpr::imageLiteral, isExprBasic);
 
   case tok::code_complete: {
     auto Result =
