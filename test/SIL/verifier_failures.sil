@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {}
+
+// CHECK:      Begin Error in function end_borrow_1_addr_alloc_stack
+// CHECK-NEXT: SIL verification failed: end_borrow of an address not produced by store_borrow
+sil [ossa] @end_borrow_1_addr_alloc_stack : $@convention(thin) () -> () {
+  %addr = alloc_stack $C
+  end_borrow %addr : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+}

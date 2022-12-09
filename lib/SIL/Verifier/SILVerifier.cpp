@@ -2243,6 +2243,10 @@ public:
     require(
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
+    if (EBI->getOperand()->getType().isAddress()) {
+      require(isa<StoreBorrowInst>(EBI->getOperand()),
+              "end_borrow of an address not produced by store_borrow");
+    }
   }
 
   void checkEndLifetimeInst(EndLifetimeInst *I) {
