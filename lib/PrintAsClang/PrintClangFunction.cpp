@@ -112,7 +112,7 @@ public:
   }
 
   void printTypeName(raw_ostream &os) const {
-    ClangSyntaxPrinter(os).printNominalClangTypeReference(typeDecl);
+    ClangSyntaxPrinter(os).printClangTypeReference(typeDecl);
   }
 
   static void
@@ -268,7 +268,7 @@ public:
                                      bool isInOutParam) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
-      ClangSyntaxPrinter(os).printNominalClangTypeReference(cd->getClangDecl());
+      ClangSyntaxPrinter(os).printClangTypeReference(cd->getClangDecl());
       os << " *"
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
