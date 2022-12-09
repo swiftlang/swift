@@ -126,7 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
-  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
+  llvm::DenseSet<const clang::Type *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -276,8 +276,13 @@ public:
     });
   }
 
-  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
-    auto it = seenClangTypes.insert(typeDecl);
+  void emitReferencedClangTypeMetadata(const TypeDecl *typeDecl) {
+    if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
+      return;
+    // Get the underlying clang type from a type alias decl or record decl.
+    clang::QualType clangType(
+        cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(), 0);
+    auto it = seenClangTypes.insert(clangType.getCanonicalType().getTypePtr());
     if (it.second)
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
@@ -295,6 +300,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
+      } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+        if (TAD->hasClangNode())
+          emitReferencedClangTypeMetadata(TAD);
       }
       return;
     }
