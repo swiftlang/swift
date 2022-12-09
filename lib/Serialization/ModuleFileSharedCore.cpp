@@ -360,11 +360,9 @@ static ValidationInfo validateControlBlock(
       static const char* forcedDebugRevision =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
-      bool isCompilerTagged = forcedDebugRevision ||
-        version::isCurrentCompilerTagged();
-
       StringRef moduleRevision = blobData;
-      if (isCompilerTagged) {
+      if (forcedDebugRevision ||
+          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getCurrentCompilerTag();
         if (moduleRevision != compilerRevision) {
