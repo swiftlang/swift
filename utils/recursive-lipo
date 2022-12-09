@@ -37,6 +37,44 @@ def merge_file_lists(src_root_dirs, explicit_src_files, skip_files,
     return file_list
 
 
+# Check whether the given file occurs in any of the subpaths provided.
+def in_any_subpath(file, subpaths):
+    current_path = file
+    while current_path != '':
+        current_dir = os.path.dirname(current_path)
+        if current_dir in subpaths:
+            return True
+        current_path = current_dir
+
+    return False
+
+# Determine if the file paths contain any overlapping architectures.
+def overlapping_lipo_architectures(file_paths, lipo_executable):
+    lipo_cmd = [lipo_executable, "-archs"]
+
+    known_archs=[]
+    for file in file_paths:
+        archs=shell.capture(lipo_cmd + [file], echo=False).split(' ')
+        for arch in archs:
+            arch=arch.strip()
+            if arch in known_archs:
+                return True
+            known_archs.append(arch)
+    return False
+
+# Copy the file
+def copy_file(file, src_root_dirs, dest_root_dir):
+    for dir in src_root_dirs:
+        orig_file=os.path.join(dir, file)
+        if os.path.exists(orig_file):
+            dest_file=os.path.join(
+                dest_root_dir, os.path.relpath(orig_file, dir))
+            print("-- Copying file %s" % dest_file)
+            shutil.copy2(orig_file, dest_file)
+            return
+
+    print("-- Warning: unable to copy file %s" % file)
+
 def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                      dest_root_dir, verbose=False, lipo_executable="lipo"):
     """Recursively merges and runs lipo on all files from file_list in
@@ -73,32 +111,33 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                 os.remove(dest_path)
             os.symlink(os.readlink(file_paths[0]), dest_path)
         elif all([os.path.isdir(item) for item in file_paths]):
-            # It's a subdir in all found instances.
-            # See if we should copy verbatim or create the destination subdir.
-            if file in copy_verbatim_subpaths:
-                print("-- Copying subdir verbatim %s" % dest_path)
-                if os.path.isdir(dest_path):
-                    shutil.rmtree(dest_path)
-                shutil.copytree(file_paths[0], dest_path, symlinks=True)
-            else:
-                print("-- Creating subdir %s" % dest_path)
-                if not os.path.isdir(dest_path):
-                    os.makedirs(dest_path)
+            # It's a subdir in all found instances. Create the destination
+            # subdir.
+            print("-- Creating subdir %s" % dest_path)
+            if not os.path.isdir(dest_path):
+                os.makedirs(dest_path)
         elif all([os.path.isfile(item) for item in file_paths]):
             # It's a regular file in all found instances, see if they're
             # identical.
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
                 # All instances are identical, just copy the unique file.
-                print("-- Copying file %s" % dest_path)
-                shutil.copy2(file_paths[0], dest_path)
+                copy_file(file, src_root_dirs, dest_root_dir)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
-                # Multiple instances are different and executable, try lipo.
-                if verbose:
-                    print("-- Running lipo %s to %s" % (file_paths, dest_path))
+                if (overlapping_lipo_architectures(file_paths,
+                                                   lipo_executable) and
+                    in_any_subpath(file, copy_verbatim_subpaths)):
+                    # We're allowed to copy verbatim from this subpath, and
+                    # lipo will fail due to overlapping architectures, so
+                    # copy the file directly.
+                    copy_file(file, src_root_dirs, dest_root_dir)
                 else:
-                    print("-- Running lipo %s" % dest_path)
-                shell.call(lipo_cmd + ["-output", dest_path] + file_paths,
-                           echo=verbose)
+                  # Multiple instances are different and executable, try lipo.
+                  if verbose:
+                      print("-- Running lipo %s to %s" % (file_paths, dest_path))
+                  else:
+                      print("-- Running lipo %s" % dest_path)
+                  shell.call(lipo_cmd + ["-output", dest_path] + file_paths,
+                             echo=verbose)
             else:
                 # Multiple instances are different, and they're not executable.
                 print(
@@ -164,7 +203,7 @@ binaries.
         subdir.strip('/') for subdir in args.copy_subdirs.split()]
 
     file_list = merge_file_lists(args.src_root_dirs, explicit_sources,
-                                 skip_files, copy_verbatim_subpaths)
+                                 skip_files, ())
 
     if args.verbose:
         print("Discovered files and dirs: %s" % file_list)
