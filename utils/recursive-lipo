@@ -27,17 +27,6 @@ def merge_file_lists(src_root_dirs, skip_files):
     return file_list
 
 
-# Check whether the given file occurs in any of the subpaths provided.
-def in_any_subpath(file, subpaths):
-    current_path = file
-    while current_path != '':
-        current_dir = os.path.dirname(current_path)
-        if current_dir in subpaths:
-            return True
-        current_path = current_dir
-
-    return False
-
 # Determine if the file paths contain any overlapping architectures.
 def overlapping_lipo_architectures(file_paths, lipo_executable):
     lipo_cmd = [lipo_executable, "-archs"]
@@ -65,8 +54,8 @@ def copy_file(file, src_root_dirs, dest_root_dir):
 
     print("-- Warning: unable to copy file %s" % file)
 
-def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
-                     dest_root_dir, verbose=False, lipo_executable="lipo"):
+def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
+                     lipo_executable="lipo"):
     """Recursively merges and runs lipo on all files from file_list in
     src_root_dirs to destRoorDir.
 
@@ -76,9 +65,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
     it's lipo'ed together from all src_root_dirs into a fat binary.
 
     Any path in file_list that's a directory in src_root_dirs results in a
-    corresponding subdirectory in dest_root_dir. If the subdirectory path
-    matches copy_verbatim_subpaths, the whole subdirectory is recursively
-    copied verbatim.
+    corresponding subdirectory in dest_root_dir.
     """
     lipo_cmd = [lipo_executable, "-create"]
 
@@ -113,10 +100,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                 # All instances are identical, just copy the unique file.
                 copy_file(file, src_root_dirs, dest_root_dir)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
-                if (overlapping_lipo_architectures(file_paths,
-                                                   lipo_executable) and
-                    in_any_subpath(file, copy_verbatim_subpaths)):
-                    # We're allowed to copy verbatim from this subpath, and
+                if overlapping_lipo_architectures(file_paths, lipo_executable):
                     # lipo will fail due to overlapping architectures, so
                     # copy the file directly.
                     copy_file(file, src_root_dirs, dest_root_dir)
@@ -148,10 +132,6 @@ If all the copies of the file in the source directories are the same,
 the file is copied directly to the destination. If there are different
 files in different directories, but the files are executable,
 lipo is run to merge the files together. Otherwise, a warning is produced.
-
-Use --copy-subdirs to override normal logic and copy certain sub directory
-paths verbatim. This is useful if some subdirectories already contain fat
-binaries.
 """)
 
     parser.add_argument("-v", "--verbose", action='store_true',
@@ -163,10 +143,6 @@ binaries.
                         default=".DS_Store",
                         help="Files to ignore and skip merge/copy, default " +
                              "is \".DS_Store\"")
-    parser.add_argument("--copy-subdirs", metavar="<subdirs-to-copy-verbatim>",
-                        default="",
-                        help="Optional list of subdirectory paths that " +
-                             "should be copied verbatim")
 
     required_group = parser.add_argument_group("required arguments")
     required_group.add_argument("--destination", metavar="<dest-path>",
@@ -179,8 +155,6 @@ binaries.
     args = parser.parse_args()
 
     skip_files = args.skip_files.split()
-    copy_verbatim_subpaths = [
-        subdir.strip('/') for subdir in args.copy_subdirs.split()]
 
     file_list = merge_file_lists(args.src_root_dirs, skip_files)
 
@@ -188,8 +162,8 @@ binaries.
         print("Discovered files and dirs: %s" % file_list)
 
     merge_lipo_files(
-        args.src_root_dirs, file_list, copy_verbatim_subpaths,
-        args.destination, args.verbose, args.lipo)
+        args.src_root_dirs, file_list, args.destination, args.verbose,
+        args.lipo)
 
     return 0
 
