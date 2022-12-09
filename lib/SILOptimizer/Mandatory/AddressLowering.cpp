@@ -3306,7 +3306,7 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
   SSAPrunedLiveness liveness(&discoveredBlocks);
   liveness.initializeDef(value);
   for (auto *use : usePoints) {
-    assert(!use->isLifetimeEnding());
+    assert(!use->isLifetimeEnding() || isa<EndBorrowInst>(use->getUser()));
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   PrunedLivenessBoundary guaranteedBoundary;

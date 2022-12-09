@@ -1753,6 +1753,33 @@ entry:
   return %retval : $()
 }
 
+// Verify that a copy_value that is a "copy-store" whose source is a borrow of an
+// @in_guaranteed yield generates storage.
+// testBeginApplyH2CopyStoreBorrowedInGuaranteedValue
+// CHECK-LABEL: sil [ossa] @testBeginApplyH2CopyStoreBorrowedInGuaranteedValue : {{.*}} {
+// CHECK:         [[COPY_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply undef
+// CHECK:         copy_addr [[YIELD_STORAGE]] to [init] [[COPY_STORAGE]] : $*T
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         [[PTR:%[^,]+]] = apply undef
+// CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[PTR]]
+// CHECK:         copy_addr [take] [[COPY_STORAGE]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyH2CopyStoreBorrowedInGuaranteedValue'
+sil [ossa] @testBeginApplyH2CopyStoreBorrowedInGuaranteedValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_guaranteed τ_0_0
+  %borrow = begin_borrow %yield : $T
+  apply undef<T>(%borrow) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+  %copy = copy_value %borrow : $T
+  end_borrow %borrow : $T
+  end_apply %token
+  %ptr = apply undef<T>() : $@convention(method) <τ_0_0> () -> Builtin.RawPointer
+  %addr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*T
+  store %copy to [assign] %addr : $*T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // sil [ossa] @testBeginApplyIConsumeInValue : {{.*}} {
 // bb0:
 //   [[IN_STORAGE:%[^,]+]] = alloc_stack $T
