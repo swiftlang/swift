@@ -3101,6 +3101,18 @@ protected:
     llvm::report_fatal_error("Unimplemented SelectValue use.");
   }
 
+  void visitStoreBorrowInst(StoreBorrowInst *sbi) {
+    auto addr = addrMat.materializeAddress(use->get());
+    SmallVector<Operand *, 4> uses(sbi->getUses());
+    for (auto *use : uses) {
+      if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+        pass.deleter.forceDelete(ebi);
+      }
+    }
+    sbi->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(sbi);
+  }
+
   void rewriteStore(SILValue srcVal, SILValue destAddr,
                     IsInitialization_t isInit);
 

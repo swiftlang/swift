@@ -2149,6 +2149,36 @@ bb0:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_store_borrow_1_copy_addr : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack
+// CHECK:         apply undef<T>([[ADDR]])
+// CHECK:         [[COPY:%[^,]+]] = alloc_stack
+// CHECK:         copy_addr [[ADDR]] to [init] [[COPY]]
+// CHECK:         apply undef<T>([[COPY]])
+// CHECK:         destroy_addr [[COPY]]
+// CHECK:         dealloc_stack [[COPY]]
+// CHECK-NOT:     end_borrow [[ADDR]]
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'test_store_borrow_1_copy_addr'
+sil [ossa] @test_store_borrow_1_copy_addr : $@convention(thin) <T> () -> () {
+entry:
+  %addr = alloc_stack $T
+  %instance = apply undef<T>() : $@convention(thin) <τ> () -> (@out τ)
+  %lifetime = begin_borrow %instance : $T
+  %borrow = store_borrow %lifetime to %addr : $*T
+  %copy = alloc_stack $T
+  copy_addr %borrow to [init] %copy : $*T
+  apply undef<T>(%copy) : $@convention(thin) <τ> (@inout τ) -> ()
+  destroy_addr %copy : $*T
+  dealloc_stack %copy : $*T
+  end_borrow %borrow : $*T
+  end_borrow %lifetime : $T
+  dealloc_stack %addr : $*T
+  destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
 // CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
 // CHECK:   [[STK:%.*]] = alloc_stack $T
