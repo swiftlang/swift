@@ -14,8 +14,61 @@
 // CHECK-NEXT:        "type": "[Swift.Int]",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "[1, 2, 3]"
+// CHECK-NEXT:        "valueKind": "Array",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "1"
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "2"
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "3"
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "array2",
+// CHECK-NEXT:        "type": "[ExtractGroups.Foo]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Array",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "InitCall",
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "type": "ExtractGroups.Bar",
+// CHECK-NEXT:              "arguments": []
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "1"
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "\"hi\""
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "array3",
+// CHECK-NEXT:        "type": "[ExtractGroups.Bar]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Array",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "valueKind": "InitCall",
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "type": "ExtractGroups.Bar",
+// CHECK-NEXT:              "arguments": []
+// CHECK-NEXT:            }
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
@@ -96,6 +149,8 @@ protocol MyProto {}
 
 public struct Arrays : MyProto {
     let array1: [Int] = [1, 2, 3]
+    let array2: [Foo] = [Bar(), 1, "hi"]
+    let array3: [Bar] = [Bar()]
 }
 
 public struct Dictionaries : MyProto {
@@ -108,4 +163,7 @@ public struct Tuples : MyProto {
     let tuple3: Void = ()
 }
 
-public struct Bar {}
+public protocol Foo {}
+public struct Bar: Foo {}
+extension Int: Foo {}
+extension String: Foo {}

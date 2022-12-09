@@ -123,7 +123,6 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
-    case ExprKind::Array:
     case ExprKind::Dictionary:
 
     case ExprKind::BooleanLiteral:
@@ -138,6 +137,15 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         return std::make_shared<RawLiteralValue>(literalOutput);
       }
       break;
+    }
+
+    case ExprKind::Array: {
+      auto arrayExpr = cast<ArrayExpr>(expr);
+      std::vector<std::shared_ptr<CompileTimeValue>> elementValues;
+      for (const auto elementExpr : arrayExpr->getElements()) {
+        elementValues.push_back(extractCompileTimeValue(elementExpr));
+      }
+      return std::make_shared<ArrayValue>(elementValues);
     }
 
     case ExprKind::Tuple: {
@@ -188,6 +196,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         return std::make_shared<InitCallValue>(name, parameters);
       }
       break;
+    }
+
+    case ExprKind::Erasure: {
+      auto erasureExpr = cast<ErasureExpr>(expr);
+      return extractCompileTimeValue(erasureExpr->getSubExpr());
     }
 
     default: {
@@ -370,6 +383,18 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Dictionary: {
     JSON.attribute("valueKind", "Dictionary");
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Array: {
+    auto arrayValue = cast<ArrayValue>(value);
+
+    JSON.attribute("valueKind", "Array");
+    JSON.attributeArray("value", [&] {
+      for (auto CTP : arrayValue->getElements()) {
+        JSON.object([&] { writeValue(JSON, CTP); });
+      }
+    });
     break;
   }
 
