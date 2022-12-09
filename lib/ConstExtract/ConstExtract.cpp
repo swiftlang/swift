@@ -205,6 +205,7 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
     Properties.push_back(
         {Property, extractPropertyInitializationValue(Property)});
   }
+
   for (auto Member : Decl->getMembers()) {
     auto *VD = dyn_cast<VarDecl>(Member);
     // Ignore plain stored properties collected above,
@@ -212,6 +213,14 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
     if (!VD || StoredPropertiesSet.count(VD))
       continue;
     Properties.push_back({VD, extractPropertyInitializationValue(VD)});
+  }
+
+  for (auto Extension: Decl->getExtensions()) {
+    for (auto Member : Extension->getMembers()) {
+      if (auto *VD = dyn_cast<VarDecl>(Member)) {
+        Properties.push_back({VD, extractPropertyInitializationValue(VD)});
+      }
+    }
   }
 
   return ConstValueTypeInfo{Decl, Properties};
