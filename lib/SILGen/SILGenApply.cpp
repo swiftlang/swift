@@ -2968,6 +2968,26 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
   return lvExpr;
 }
 
+Expr *
+ArgumentSource::findStorageReferenceExprForSelfBorrow(SILGenFunction &SGF) && {
+  if (!isExpr())
+    return nullptr;
+
+  auto argExpr = asKnownExpr();
+  auto *li = dyn_cast<LoadExpr>(argExpr);
+  if (!li)
+    return nullptr;
+
+  auto *lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
+
+  // Claim the value of this argument.
+  if (lvExpr) {
+    (void)std::move(*this).asKnownExpr();
+  }
+
+  return lvExpr;
+}
+
 Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   if (!isExpr()) return nullptr;
 
@@ -2989,6 +3009,7 @@ class ArgEmitter {
   SILFunctionTypeRepresentation Rep;
   bool IsYield;
   bool IsForCoroutine;
+  bool IsForSelf;
   ForeignInfo Foreign;
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
@@ -2999,13 +3020,13 @@ class ArgEmitter {
 
 public:
   ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
-             bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
-             SmallVectorImpl<ManagedValue> &args,
+             bool isYield, bool isForCoroutine, bool isForSelf,
+             ClaimedParamsRef paramInfos, SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const ForeignInfo &foreign)
       : SGF(SGF), Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
-        Foreign(foreign), ParamInfos(paramInfos), Args(args),
-        DelayedArguments(delayedArgs) {}
+        IsForSelf(isForSelf), Foreign(foreign), ParamInfos(paramInfos),
+        Args(args), DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
@@ -3052,6 +3073,7 @@ private:
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
       if (origParamType.isTuple()) {
+        assert(!IsForSelf && "self is never a tuple");
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -3097,18 +3119,28 @@ private:
       return;
     }
 
-    // If this is a yield, and the yield is borrowed, emit a borrowed r-value.
-    if (IsYield && param.isGuaranteed()) {
-      if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
-                          loweredSubstParamType, origParamType, paramSlice))
-        return;
-    }
-
-    // If we have a guaranteed paramter, see if we have a move only type and can
-    // emit it borrow.
-    //
-    // We check for move only in tryEmitBorrowedMoveOnly.
+    // If we have a guaranteed +0 parameter...
     if (param.isGuaranteed()) {
+      // And this is a yield, emit a borrowed r-value.
+      if (IsYield) {
+        if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
+                            loweredSubstParamType, origParamType, paramSlice))
+          return;
+      }
+
+      // If this is self, try to emit a borrowed r-value if we are loading from
+      // a var.
+      if (IsForSelf) {
+        if (tryEmitBorrowedSelf(std::move(arg), loweredSubstArgType,
+                                loweredSubstParamType, origParamType,
+                                paramSlice))
+          return;
+      }
+
+      // If we have a guaranteed paramter, see if we have a move only type and
+      // can emit it borrow.
+      //
+      // We check for move only in tryEmitBorrowedMoveOnly.
       if (tryEmitBorrowedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3293,6 +3325,23 @@ private:
 
     // Try to find an expression we can emit as a borrowed l-value.
     auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    if (!lvExpr)
+      return false;
+
+    emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
+                 origParamType, paramsSlice);
+
+    return true;
+  }
+
+  bool tryEmitBorrowedSelf(ArgumentSource &&arg, SILType loweredSubstArgType,
+                           SILType loweredSubstParamType,
+                           AbstractionPattern origParamType,
+                           ClaimedParamsRef paramsSlice) {
+    assert(paramsSlice.size() == 1);
+
+    // Try to find an expression we can emit as a borrowed l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForSelfBorrow(SGF);
     if (!lvExpr)
       return false;
 
@@ -3633,9 +3682,10 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
-  auto emitter = ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
-                            /*coroutine*/ false, info.paramsToEmit, loweredArgs,
-                            delayedArgs, ForeignInfo{});
+  auto emitter =
+      ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
+                 /*coroutine*/ false, /*for self*/ false, info.paramsToEmit,
+                 loweredArgs, delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
                         info.origResultType);
@@ -3919,12 +3969,12 @@ public:
             CanSILFunctionType substFnType, ParamLowering &lowering,
             SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
-            const ForeignInfo &foreign) && {
+            const ForeignInfo &foreign, bool isSelf = false) && {
     auto params = lowering.claimParams(origFormalType, getParams(), foreign);
 
     ArgEmitter emitter(SGF, lowering.Rep, /*yield*/ false,
-                       /*isForCoroutine*/ substFnType->isCoroutine(), params,
-                       args, delayedArgs, foreign);
+                       /*isForCoroutine*/ substFnType->isCoroutine(),
+                       /*for self*/ isSelf, params, args, delayedArgs, foreign);
     emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
 
@@ -4490,8 +4540,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       // Claim the foreign "self" with the self param.
       auto siteForeign = ForeignInfo{foreign.self, {}, {}};
       std::move(*selfArg).emit(SGF, origFormalType, substFnType, paramLowering,
-                               args.back(), delayedArgs,
-                               siteForeign);
+                               args.back(), delayedArgs, siteForeign, true);
 
       origFormalType = origFormalType.getFunctionResultType();
     }
@@ -5016,8 +5065,9 @@ void SILGenFunction::emitYield(SILLocation loc,
   }
 
   ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
-                     yieldArgs, delayedArgs, ForeignInfo{});
+                     /*isForCoroutine*/ false, /*is for self*/ false,
+                     ClaimedParamsRef(substYieldTys), yieldArgs, delayedArgs,
+                     ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
     emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
@@ -5827,8 +5877,9 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
 
   ArgEmitter emitter(SGF, SILFunctionTypeRepresentation::Thin,
                      /*yield*/ false,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
-                     argValues, delayedArgs, ForeignInfo{});
+                     /*isForCoroutine*/ false, /*isForSelf*/ false,
+                     ClaimedParamsRef(substParamTys), argValues, delayedArgs,
+                     ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType);
 
@@ -6514,6 +6565,7 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
   ArgEmitter emitter(*this, fnType->getRepresentation(),
                      /*yield*/ false,
                      /*isForCoroutine*/ false,
+                     /*isForSelf*/ false,
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 
