@@ -2994,12 +2994,12 @@ protected:
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(1, opAddr);
+      bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
     case BuiltinValueKind::ResumeThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(1, opAddr);
+      bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
     case BuiltinValueKind::Copy: {
