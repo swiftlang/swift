@@ -381,6 +381,40 @@ struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
   }
 };
 
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the enclosing defs
+struct FindEnclosingDefsTest : UnitTest {
+  FindEnclosingDefsTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    getFunction()->dump();
+    llvm::dbgs() << "Enclosing Defs:\n";
+    visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
+      def->dump();
+      return true;
+    });
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the borrow introducers
+struct FindBorrowIntroducers : UnitTest {
+  FindBorrowIntroducers(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    getFunction()->dump();
+    llvm::dbgs() << "Introducers:\n";
+    visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
+      def->dump();
+      return true;
+    });
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line. 
 ///             Please sort alphabetically by to help reduce merge conflicts.
 
@@ -406,6 +440,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum", SimplifyCFGCanonicalizeSwitchEnum)
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
+    ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
+    ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     /// [new_tests] Add the new mapping from string to subclass above this line.
     ///             Please sort alphabetically by name to help reduce merge
     ///             conflicts.
