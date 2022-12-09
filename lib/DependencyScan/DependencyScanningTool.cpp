@@ -217,6 +217,9 @@ DependencyScanningTool::initCompilerInstanceForScan(
   auto Instance = std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&CDC);
 
+  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
+  SharedCache->overlaySharedFilesystemCacheForCompilation(*Instance);
+
   // Basic error checking on the arguments
   if (CommandArgs.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);

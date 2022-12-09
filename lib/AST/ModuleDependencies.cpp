@@ -16,6 +16,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Frontend/Frontend.h"
 using namespace swift;
 
 ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() {}
@@ -226,14 +227,26 @@ void ModuleDependencies::addBridgingModuleDependency(
 }
 
 GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()
-  : clangScanningService(
-                         clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
+  : ClangScanningService(clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
                          clang::tooling::dependencies::ScanningOutputFormat::Full,
                          clang::CASOptions(),
                          /* Cache (llvm::cas::ActionCache) */ nullptr,
                          /* SharedFS */ nullptr,
                          /* ReuseFileManager */ false,
-                         /* OptimizeArgs */ false) {}
+                         /* OptimizeArgs */ false) {
+    SharedFilesystemCache.emplace();
+}
+
+void GlobalModuleDependenciesCache::overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance) {
+ auto existingFS = Instance.getSourceMgr().getFileSystem();
+ llvm::IntrusiveRefCntPtr<
+     clang::tooling::dependencies::DependencyScanningWorkerFilesystem>
+     depFS =
+         new clang::tooling::dependencies::DependencyScanningWorkerFilesystem(
+             getSharedFilesystemCache(), existingFS);
+ Instance.getSourceMgr().setFileSystem(depFS);
+}
+
 GlobalModuleDependenciesCache::ContextSpecificGlobalCacheState *
 GlobalModuleDependenciesCache::getCurrentCache() const {
   assert(CurrentContextHash.has_value() &&
@@ -429,7 +442,7 @@ ModuleDependenciesCache::ModuleDependenciesCache(
     std::string scanningContextHash)
     : globalCache(globalCache),
       mainScanModuleName(mainScanModuleName),
-      clangScanningTool(globalCache.clangScanningService) {
+      clangScanningTool(globalCache.ClangScanningService) {
   globalCache.configureForContextHash(scannerContextHash);
   for (auto kind = ModuleDependenciesKind::FirstKind;
        kind != ModuleDependenciesKind::LastKind; ++kind) {
