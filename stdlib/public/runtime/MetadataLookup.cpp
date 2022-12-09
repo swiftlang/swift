@@ -1105,13 +1105,11 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
       str += "_gatherGenericParameters: context: ";
 
-#if SWIFT_STDLIB_HAS_DLADDR
       SymbolInfo contextInfo;
       if (lookupSymbol(context, &contextInfo)) {
-        str += contextInfo.symbolName.get();
+        str += contextInfo.getSymbolName();
         str += " ";
       }
-#endif
 
       char *contextStr;
       swift_asprintf(&contextStr, "%p", context);

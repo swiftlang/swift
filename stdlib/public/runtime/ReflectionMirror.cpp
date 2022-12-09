@@ -1114,14 +1114,18 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
 }
 #endif
 
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERNAL const char *swift_keyPath_dladdr(void *address) {
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const char *swift_keyPath_copySymbolName(void *address) {
   SymbolInfo info;
-  if (lookupSymbol(address, &info) == 0) {
-    return 0;
-  } else {
-    return info.symbolName.get();
+  if (lookupSymbol(address, &info) && info.getSymbolName()) {
+    return strdup(info.getSymbolName());
   }
+  return 0;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift_keyPath_freeSymbolName(const char *symbolName) {
+  free(const_cast<char *>(symbolName));
 }
 
 SWIFT_CC(swift)
