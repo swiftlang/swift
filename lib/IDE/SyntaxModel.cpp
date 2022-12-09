@@ -200,8 +200,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         Kind = SyntaxNodeKind::PoundDirectiveKeyword;
         break;
 
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto)
 #define POUND_DIRECTIVE_KEYWORD(Name)
+#define POUND_OBJECT_LITERAL(Name)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
 #include "swift/AST/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;

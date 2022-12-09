@@ -28,7 +28,7 @@
 ///       PAT_KEYWORD(kw)
 ///     SIL_KEYWORD(kw)
 ///   POUND_KEYWORD(kw)
-///     POUND_OBJECT_LITERAL(kw, desc, proto)
+///     POUND_OBJECT_LITERAL(kw)
 ///     POUND_CONFIG(kw)
 ///     POUND_DIRECTIVE_KEYWORD(kw)
 ///       POUND_COND_DIRECTIVE_KEYWORD(kw)
@@ -96,10 +96,10 @@
 #define POUND_KEYWORD(kw) TOKEN(pound_ ## kw)
 #endif
 
-/// POUND_OBJECT_LITERAL(kw, desc, proto)
+/// POUND_OBJECT_LITERAL(kw)
 ///   Every keyword prefixed with a '#' representing an object literal.
 #ifndef POUND_OBJECT_LITERAL
-#define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
+#define POUND_OBJECT_LITERAL(kw) POUND_KEYWORD(kw)
 #endif
 
 /// POUND_CONFIG(kw)
@@ -147,8 +147,6 @@
 % for token in SYNTAX_TOKENS:
 %   if isinstance(token, Token.Punctuator):
 ${token.macro_name()}(${token.unprefixed_kind}, "${token.text}")
-%   elif isinstance(token, Token.PoundObjectLiteral):
-${token.macro_name()}(${token.unprefixed_kind}, "${token.description}", ${token.protocol})
 %   else:
 ${token.macro_name()}(${token.unprefixed_kind})
 %   end
@@ -169,6 +167,28 @@ SIL_KEYWORD(sil_default_witness_table)
 SIL_KEYWORD(sil_differentiability_witness)
 SIL_KEYWORD(sil_coverage_map)
 SIL_KEYWORD(sil_scope)
+
+// These should be treated as normal identifiers, not keywords.
+KEYWORD(__COLUMN__)
+KEYWORD(__DSO_HANDLE__)
+KEYWORD(__FILE__)
+KEYWORD(__FUNCTION__)
+KEYWORD(__LINE__)
+
+// These will eventually be subsumed by macros.
+POUND_KEYWORD(column)
+POUND_KEYWORD(dsohandle)
+POUND_KEYWORD(file)
+POUND_KEYWORD(fileID)
+POUND_KEYWORD(filePath)
+POUND_KEYWORD(function)
+POUND_KEYWORD(keyPath)
+POUND_KEYWORD(line)
+POUND_KEYWORD(selector)
+
+POUND_OBJECT_LITERAL(colorLiteral)
+POUND_OBJECT_LITERAL(fileLiteral)
+POUND_OBJECT_LITERAL(imageLiteral)
 
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.

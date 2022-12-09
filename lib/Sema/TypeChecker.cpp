@@ -142,11 +142,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
     switch (E->getLiteralKind()) {
-#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)                             \
-  case ObjectLiteralExpr::Name:                                                \
-    return TypeChecker::getProtocol(Context, expr->getLoc(),                   \
-                                    KnownProtocolKind::Protocol);
-#include "swift/AST/TokenKinds.def"
+    case ObjectLiteralExpr::colorLiteral:
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByColorLiteral);
+
+    case ObjectLiteralExpr::fileLiteral:
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByFileReferenceLiteral);
+
+    case ObjectLiteralExpr::imageLiteral:
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByImageLiteral);
     }
   }
 

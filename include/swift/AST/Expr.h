@@ -1107,8 +1107,9 @@ class ObjectLiteralExpr final : public LiteralExpr {
 public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
-#include "swift/AST/TokenKinds.def"
+    colorLiteral,
+    fileLiteral,
+    imageLiteral,
   };
 
 private:
