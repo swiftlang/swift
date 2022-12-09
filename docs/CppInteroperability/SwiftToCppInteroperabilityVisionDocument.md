@@ -104,9 +104,7 @@ Protocol types also get exposed to C++. They provide access to their protocol in
 
 Swift generic functions and types get bridged to C++ as C++ function and class templates. A generated C++ template instantiates a type-checked generic interface that uses the underlying polymorphic semantics that generics require when Swift APIs are called from the generated header. Type-checking is performed using the `requires` clause introduced in C++20. When C++17 and earlier is used, type-checking is performed using other legacy methods, like `enable_if` and `static_assert`. The two type-checking methods are compatible with the delayed template parsing compiler feature that Clang uses when building for Windows.
 
-To help achieve the performance goals outlined in the prior section, the generated class templates specialize the storage for the underlying Swift generic type when the Swift API that is exposed to C++ contains such a bounded Swift generic type. This ensures that non-resilient bounded generic values can be stored inline in a C++ type that represents the underlying Swift type, instead of being boxed on the heap.  
-
-The Swift compiler generates specializations for a specific template if the Swift module pre-specializes the specific generic declaration. These C++ specializations invoke pre-specialized Swift generic code.
+To help achieve the performance goals outlined in the prior section, the generated class templates specialize the storage for the underlying Swift generic type when the Swift API that is exposed to C++ contains such a bounded Swift generic type. This ensures that non-resilient bounded generic values can be stored inline in a C++ type that represents the underlying Swift type, instead of being boxed on the heap.
 
 ### Standard library support
 
