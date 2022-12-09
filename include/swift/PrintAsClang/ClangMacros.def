@@ -72,6 +72,14 @@
 #define CLANG_MACRO_CXX_BODY(NAME, BODY)
 #endif
 
+CLANG_MACRO_DEFINED("SWIFT_TYPEDEFS")
+
+#define MAP_SIMD_TYPE(C_TYPE, SCALAR_TYPE, _) \
+    CLANG_MACRO_DEFINED("swift_" #C_TYPE "2") \
+    CLANG_MACRO_DEFINED("swift_" #C_TYPE "3") \
+    CLANG_MACRO_DEFINED("swift_" #C_TYPE "4")
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+
 CLANG_MACRO_BODY("SWIFT_PASTE", \
     "# define SWIFT_PASTE_HELPER(x, y) x##y\n" \
     "# define SWIFT_PASTE(x, y) SWIFT_PASTE_HELPER(x, y)")
