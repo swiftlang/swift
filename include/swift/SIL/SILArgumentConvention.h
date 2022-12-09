@@ -94,12 +94,12 @@ struct SILArgumentConvention {
   bool isOwnedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Direct_Owned:
       return true;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:

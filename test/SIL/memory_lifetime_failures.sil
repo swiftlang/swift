@@ -648,3 +648,100 @@ bb0(%0 : $*Optional<String>):
   return %r : $() 
 }
 
+// CHECK: SIL memory lifetime failure in @begin_apply_in_no_destroy: memory is initialized, but shouldn't be
+sil [ossa] @begin_apply_in_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_in_use_after_end_apply: memory is initialized, but shouldn't be
+sil [ossa] @begin_apply_in_use_after_end_apply : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
+  end_apply %token
+  apply undef<Inner>(%instance) : $@convention(thin) <U> (@in U) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_in_constant_no_destroy: memory is initialized, but shouldn't be
+sil [ossa] @begin_apply_in_constant_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_in_constant_use_after_end_apply: memory is initialized, but shouldn't be
+sil [ossa] @begin_apply_in_constant_use_after_end_apply : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
+  end_apply %token
+  apply undef<Inner>(%instance) : $@convention(thin) <U> (@in_constant U) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_in_guaranteed_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_in_guaranteed_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  destroy_addr %instance : $*Inner
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_in_guaranteed_use_after_end_apply: memory is not initialized, but should be
+sil [ossa] @begin_apply_in_guaranteed_use_after_end_apply : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  end_apply %token
+  apply undef<Inner>(%instance) : $@convention(thin) <U> (@in_guaranteed U) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
+  destroy_addr %instance : $*Inner
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_use_after_end_apply: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_use_after_end_apply : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
+  end_apply %token
+  apply undef<Inner>(%instance) : $@convention(thin) <U> (@inout U) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_aliasable_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
+  destroy_addr %instance : $*Inner
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_use_after_end_apply: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_aliasable_use_after_end_apply : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
+  end_apply %token
+  apply undef<Inner>(%instance) : $@convention(thin) <U> (@inout_aliasable U) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}

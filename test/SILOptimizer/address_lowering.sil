@@ -1506,8 +1506,8 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
 sil [ossa] @testBeginApply4YieldLoadableTrivial : $@convention(thin) () -> I {
 entry:
   (%instance, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
-  end_apply %token
   %extract = struct_extract %instance : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   return %extract : $I
 }
 
@@ -1521,9 +1521,9 @@ entry:
 sil [ossa] @testBeginApply5Yield2LoadableTrivial : $@convention(thin) () -> (I, I) {
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable>() : $@yield_once @convention(thin) <U> () -> (@yields @in_guaranteed U, @yields @in_guaranteed U)
-  end_apply %token
   %i_1 = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
   %i_2 = struct_extract %instance_2 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   %tuple = tuple (%i_1 : $I, %i_2 : $I)
   return %tuple : $(I, I)
 }
@@ -1540,8 +1540,8 @@ sil [ossa] @testBeginApply6Yield1LoadableTrivial1OpaqueGuaranteed : $@convention
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableTrivialExtractable, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in_guaranteed U, @yields @in_guaranteed T)
   %copy = copy_value %instance_2 : $T
-  end_apply %token
   %i = struct_extract %instance_1 : $LoadableTrivialExtractable, #LoadableTrivialExtractable.i
+  end_apply %token
   %tuple = tuple (%i : $I, %copy : $T)
   return %tuple : $(I, T)
 }
@@ -1648,18 +1648,18 @@ entry:
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Klass, [[OPAQUE_OUT:%[^,]+]] : $*T):
 // CHECK:         ([[ADDR_1:%[^,]+]], [[ADDR_2:%[^,]+]], {{%[^,]+}}) = begin_apply
 // CHECK:         [[INSTANCE_1:%[^,]+]] = load [take] [[ADDR_1]]
-// CHECK:         begin_borrow [[INSTANCE_1]]
 // CHECK:         copy_addr [take] [[ADDR_2]] to [init] [[OPAQUE_OUT]]
+// CHECK:         begin_borrow [[INSTANCE_1]]
 // CHECK-LABEL: } // end sil function 'testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned'
 sil [ossa] @testBeginApplyCYield1LoadableNontrivialOwned1OpaqueOwned : $@convention(thin) <T> () -> (@out Klass, @out T) {
 entry:
   (%instance_1, %instance_2, %token) = begin_apply undef<LoadableNontrivial, T>() : $@yield_once @convention(thin) <U, T> () -> (@yields @in U, @yields @in T)
-  end_apply %token
   %borrow_1 = begin_borrow %instance_1 : $LoadableNontrivial
   %extract_1 = struct_extract %borrow_1 : $LoadableNontrivial, #LoadableNontrivial.x
   %copy_1 = copy_value %extract_1 : $Klass
   end_borrow %borrow_1 : $LoadableNontrivial
   destroy_value %instance_1 : $LoadableNontrivial
+  end_apply %token
   %retval = tuple (%copy_1 : $Klass, %instance_2 : $T)
   return %retval : $(Klass, T)
 }
@@ -1708,6 +1708,150 @@ entry:
   %retval = copy_value %instance : $T
   end_apply %token
   return %retval : $T
+}
+
+// Verify that a copy_value of a @in_guaranteed yield generates storage.
+// CHECK-LABEL: sil [ossa] @testBeginApplyGCopyConsumeInGuaranteedValue : {{.*}} {
+// CHECK:       bb0:
+// CHECK:         [[COPY_STORAGE:%[^,]+]] = alloc_stack $T                             
+// CHECK:         ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply
+// CHECK:         copy_addr [[YIELD_STORAGE]] to [init] [[COPY_STORAGE]]
+// CHECK:         end_apply [[TOKEN]]                                    
+// CHECK:         apply undef<T>([[COPY_STORAGE]])
+// CHECK:         dealloc_stack [[COPY_STORAGE]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyGCopyConsumeInGuaranteedValue'
+sil [ossa] @testBeginApplyGCopyConsumeInGuaranteedValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_guaranteed τ_0_0
+  %copy = copy_value %yield : $T
+  end_apply %token
+  apply undef<T>(%copy) : $@convention(thin) <T> (@in T) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that a copy_value that is a "copy-store" whose source is an
+// @in_guaranteed storage generates storage.
+// CHECK-LABEL: sil [ossa] @testBeginApplyH1CopyStoreInGuaranteedValue : {{.*}} {
+// CHECK:         [[COPY_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply
+// CHECK:         copy_addr [[YIELD_STORAGE]] to [init] [[COPY_STORAGE]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         [[PTR:%[^,]+]] = apply undef
+// CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[PTR:%[^,]+]]
+// CHECK:         copy_addr [take] [[COPY_STORAGE]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyH1CopyStoreInGuaranteedValue'
+sil [ossa] @testBeginApplyH1CopyStoreInGuaranteedValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_guaranteed τ_0_0
+  %copy = copy_value %yield : $T
+  end_apply %token
+  %ptr = apply undef<T>() : $@convention(method) <τ_0_0> () -> Builtin.RawPointer
+  %addr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*T
+  store %copy to [assign] %addr : $*T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that a copy_value that is a "copy-store" whose source is a borrow of an
+// @in_guaranteed yield generates storage.
+// testBeginApplyH2CopyStoreBorrowedInGuaranteedValue
+// CHECK-LABEL: sil [ossa] @testBeginApplyH2CopyStoreBorrowedInGuaranteedValue : {{.*}} {
+// CHECK:         [[COPY_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply undef
+// CHECK:         copy_addr [[YIELD_STORAGE]] to [init] [[COPY_STORAGE]] : $*T
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         [[PTR:%[^,]+]] = apply undef
+// CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[PTR]]
+// CHECK:         copy_addr [take] [[COPY_STORAGE]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testBeginApplyH2CopyStoreBorrowedInGuaranteedValue'
+sil [ossa] @testBeginApplyH2CopyStoreBorrowedInGuaranteedValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_guaranteed τ_0_0
+  %borrow = begin_borrow %yield : $T
+  apply undef<T>(%borrow) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+  %copy = copy_value %borrow : $T
+  end_borrow %borrow : $T
+  end_apply %token
+  %ptr = apply undef<T>() : $@convention(method) <τ_0_0> () -> Builtin.RawPointer
+  %addr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*T
+  store %copy to [assign] %addr : $*T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// sil [ossa] @testBeginApplyIConsumeInValue : {{.*}} {
+// bb0:
+//   [[IN_STORAGE:%[^,]+]] = alloc_stack $T
+//   ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply undef<T>()
+//   copy_addr [take] [[YIELD_STORAGE]] to [init] [[IN_STORAGE]]
+//   end_apply [[TOKEN]]
+//   apply undef<T>([[IN_STORAGE]])
+// } // end sil function 'testBeginApplyIConsumeInValue'
+sil [ossa] @testBeginApplyIConsumeInValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in τ_0_0
+  end_apply %token
+  apply undef<T>(%yield) : $@convention(thin) <T> (@in T) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// sil [ossa] @testBeginApplyJStoreInValue : {{.*}} {
+//   [[IN_STORAGE:%[^,]+]] = alloc_stack $T
+//   ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply
+//   copy_addr [take] [[YIELD_STORAGE]] to [init] [[IN_STORAGE]]
+//   end_apply [[TOKEN]]
+//   [[PTR:%[^,]+]] = apply
+//   [[ADDR:%[^,]+]] = pointer_to_address [[PTR:%[^,]+]]
+//   copy_addr [take] [[IN_STORAGE]] to [[ADDR]]
+// } // end sil function 'testBeginApplyJStoreInValue'
+sil [ossa] @testBeginApplyJStoreInValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in τ_0_0
+  end_apply %token
+  %ptr = apply undef<T>() : $@convention(method) <τ_0_0> () -> Builtin.RawPointer
+  %addr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*T
+  store %yield to [assign] %addr : $*T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// sil [ossa] @testBeginApplyKConsumeInConstantValue : {{.*}} {
+// bb0:
+//   [[IN_CONSTANT_STORAGE:%[^,]+]] = alloc_stack $T
+//   ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply undef<T>()
+//   copy_addr [take] [[YIELD_STORAGE]] to [init] [[IN_CONSTANT_STORAGE]]
+//   end_apply [[TOKEN]]
+//   apply undef<T>([[IN_CONSTANT_STORAGE]])
+// } // end sil function 'testBeginApplyKConsumeInConstantValue'
+sil [ossa] @testBeginApplyKConsumeInConstantValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_constant τ_0_0
+  end_apply %token
+  apply undef<T>(%yield) : $@convention(thin) <T> (@in_constant T) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// sil [ossa] @testBeginApplyLStoreInConstantValue : {{.*}} {
+//   [[IN_CONSTANT_STORAGE:%[^,]+]] = alloc_stack $T
+//   ([[YIELD_STORAGE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply
+//   copy_addr [take] [[YIELD_STORAGE]] to [init] [[IN_CONSTANT_STORAGE]]
+//   end_apply [[TOKEN]]
+//   [[PTR:%[^,]+]] = apply
+//   [[ADDR:%[^,]+]] = pointer_to_address [[PTR:%[^,]+]]
+//   copy_addr [take] [[IN_CONSTANT_STORAGE]] to [[ADDR]]
+// } // end sil function 'testBeginApplyLStoreInConstantValue'
+sil [ossa] @testBeginApplyLStoreInConstantValue : $@convention(thin) <T> () -> () {
+entry:
+  (%yield, %token) = begin_apply undef<T>() : $@yield_once @convention(thin) <τ_0_0> () -> @yields @in_constant τ_0_0
+  end_apply %token
+  %ptr = apply undef<T>() : $@convention(method) <τ_0_0> () -> Builtin.RawPointer
+  %addr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*T
+  store %yield to [assign] %addr : $*T
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :

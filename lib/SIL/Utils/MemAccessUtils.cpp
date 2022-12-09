@@ -861,6 +861,7 @@ SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
 }
 
 void swift::findGuaranteedReferenceRoots(SILValue value,
+                                         bool lookThroughNestedBorrows,
                                          SmallVectorImpl<SILValue> &roots) {
   GraphNodeWorklist<SILValue, 4> worklist;
   auto addAllOperandsToWorklist = [&worklist](SILInstruction *inst) -> bool {
@@ -882,7 +883,16 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
         }
       }
     } else if (auto *inst = value->getDefiningInstruction()) {
-      if (auto *result =
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(inst)) {
+        auto borrowee = bbi->getOperand();
+        if (lookThroughNestedBorrows &&
+            borrowee->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          // A nested borrow, the root guaranteed earlier in the use-def chain.
+          worklist.insert(borrowee);
+        }
+        // The borrowee isn't guaranteed or we aren't looking through nested
+        // borrows.  Fall through to add the begin_borrow to roots.
+      } else if (auto *result =
               dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(inst)) {
         if (result->getNumOperands() > 0) {
           worklist.insert(result->getOperand(0));
