@@ -147,7 +147,6 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
     SILFunctionArgument *funcArg = cast<SILFunctionArgument>(arg);
     switch (funcArg->getArgumentConvention()) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Out:
       // These are not SIL addresses under -enable-sil-opaque-values

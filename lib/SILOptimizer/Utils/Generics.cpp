@@ -893,7 +893,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
         hasConvertedResilientParams = true;
       }
       break;
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       break;

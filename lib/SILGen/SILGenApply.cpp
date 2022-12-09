@@ -4686,7 +4686,6 @@ RValue SILGenFunction::emitApply(
 
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       // We may need to support this at some point, but currently only imported
@@ -5663,10 +5662,6 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
     return true;
-
-  // Should not show up here.
-  case ParameterConvention::Indirect_In_Constant:
-    break;
   }
   llvm_unreachable("bad convention");
 }

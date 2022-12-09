@@ -1115,7 +1115,6 @@ static bool hasOnlyStoreUses(SingleValueInstruction *addressInst) {
         return false;
       SILArgumentConvention convention = applySite.getArgumentConvention(*use);
       if (convention == SILArgumentConvention::Indirect_In ||
-          convention == SILArgumentConvention::Indirect_In_Constant ||
           convention == SILArgumentConvention::Indirect_In_Guaranteed) {
         if (numWritableArguments > 0)
           return false;

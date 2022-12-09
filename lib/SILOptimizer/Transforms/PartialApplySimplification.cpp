@@ -162,7 +162,6 @@ static bool isSimplePartialApply(SILModule &M,
   if (isOnStack) {
     switch (contextParam.getConvention()) {
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       // Indirect arguments are trivially word sized.
@@ -450,7 +449,6 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
       boxFields.push_back(SILField(param.getInterfaceType(), /*mutable*/false));
       break;
@@ -602,8 +600,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           // Load a copy of the value from the box.
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Copy);
           break;
-        case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant: {
+        case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
           // cloned body.
@@ -644,8 +641,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Unqualified);
           B.createRetainValue(loc, projectedArg, Atomicity::Atomic);
           break;
-        case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant: {
+        case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
           // cloned body.
@@ -777,7 +773,6 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
         break;
           
       case ParameterConvention::Indirect_In_Guaranteed:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In:
         // Move the value from its current memory location to the box.
         B.createCopyAddr(loc, arg, proj, IsTake, IsInitialization);

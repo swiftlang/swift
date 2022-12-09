@@ -186,7 +186,6 @@ typedef enum {
 
 typedef enum {
   ArgumentConvention_Indirect_In,
-  ArgumentConvention_Indirect_In_Constant,
   ArgumentConvention_Indirect_In_Guaranteed,
   ArgumentConvention_Indirect_Inout,
   ArgumentConvention_Indirect_InoutAliasable,

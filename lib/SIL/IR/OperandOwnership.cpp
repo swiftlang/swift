@@ -454,7 +454,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
 
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Direct_Owned:
     return OperandOwnership::ForwardingConsume;
 

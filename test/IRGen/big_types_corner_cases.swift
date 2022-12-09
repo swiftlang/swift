@@ -46,9 +46,9 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}) %0, %T22big_types_corner_cases21OptionalInoutFuncTypeC* %1, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_Sg* nocapture dereferenceable({{.*}})
-// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOe
-// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOy
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}) %0, %T22big_types_corner_cases21OptionalInoutFuncTypeC* %1, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegig_Sg* nocapture dereferenceable({{.*}})
+// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegig_SgWOe
+// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegig_SgWOy
 // CHECK: ret void
 
 public func f1_returns_BigType(_ x: BigStruct) -> BigStruct {

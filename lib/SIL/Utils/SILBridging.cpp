@@ -214,8 +214,6 @@ BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention
       return ArgumentConvention_Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
       return ArgumentConvention_Indirect_In;
-    case SILArgumentConvention::Indirect_In_Constant:
-      return ArgumentConvention_Indirect_In_Constant;
     case SILArgumentConvention::Indirect_Out:
       return ArgumentConvention_Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:
@@ -392,8 +390,6 @@ static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention 
       return ArgumentConvention_Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
       return ArgumentConvention_Indirect_In;
-    case SILArgumentConvention::Indirect_In_Constant:
-      return ArgumentConvention_Indirect_In_Constant;
     case SILArgumentConvention::Indirect_Out:
       return ArgumentConvention_Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:

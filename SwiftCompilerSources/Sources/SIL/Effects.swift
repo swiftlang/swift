@@ -491,7 +491,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         result.ownership = SideEffects.Ownership()
       }
       switch convention {
-      case .indirectIn, .indirectInConstant:
+      case .indirectIn:
         result.memory.write = false
       case .indirectInGuaranteed:
         result.memory.write = false

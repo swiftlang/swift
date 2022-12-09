@@ -519,7 +519,6 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
     return false;
 
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     return (loweredAddresses ||
             param.getInterfaceType()->isOpenedExistentialWithError());

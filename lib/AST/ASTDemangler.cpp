@@ -422,9 +422,8 @@ static ParameterConvention
 getParameterConvention(ImplParameterConvention conv) {
   switch (conv) {
   case Demangle::ImplParameterConvention::Indirect_In:
-    return ParameterConvention::Indirect_In;
   case Demangle::ImplParameterConvention::Indirect_In_Constant:
-    return ParameterConvention::Indirect_In_Constant;
+    return ParameterConvention::Indirect_In;
   case Demangle::ImplParameterConvention::Indirect_In_Guaranteed:
     return ParameterConvention::Indirect_In_Guaranteed;
   case Demangle::ImplParameterConvention::Indirect_Inout:

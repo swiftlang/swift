@@ -464,7 +464,6 @@ struct ImmutableAddressUseVerifier {
 
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Inout:
       return true;
 
@@ -5459,7 +5458,6 @@ public:
                          default:
                            return false;
                          case ParameterConvention::Indirect_In:
-                         case ParameterConvention::Indirect_In_Constant:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
