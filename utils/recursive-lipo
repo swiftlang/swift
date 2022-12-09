@@ -31,28 +31,30 @@ def merge_file_lists(src_root_dirs, skip_files):
 def overlapping_lipo_architectures(file_paths, lipo_executable):
     lipo_cmd = [lipo_executable, "-archs"]
 
-    known_archs=[]
+    known_archs = []
     for file in file_paths:
-        archs=shell.capture(lipo_cmd + [file], echo=False).split(' ')
+        archs = shell.capture(lipo_cmd + [file], echo=False).split(' ')
         for arch in archs:
-            arch=arch.strip()
+            arch = arch.strip()
             if arch in known_archs:
                 return True
             known_archs.append(arch)
     return False
 
+
 # Copy the file
 def copy_file(file, src_root_dirs, dest_root_dir):
     for dir in src_root_dirs:
-        orig_file=os.path.join(dir, file)
+        orig_file = os.path.join(dir, file)
         if os.path.exists(orig_file):
-            dest_file=os.path.join(
+            dest_file = os.path.join(
                 dest_root_dir, os.path.relpath(orig_file, dir))
             print("-- Copying file %s" % dest_file)
             shutil.copy2(orig_file, dest_file)
             return
 
     print("-- Warning: unable to copy file %s" % file)
+
 
 def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
                      lipo_executable="lipo"):
@@ -105,13 +107,15 @@ def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
                     # copy the file directly.
                     copy_file(file, src_root_dirs, dest_root_dir)
                 else:
-                  # Multiple instances are different and executable, try lipo.
-                  if verbose:
-                      print("-- Running lipo %s to %s" % (file_paths, dest_path))
-                  else:
-                      print("-- Running lipo %s" % dest_path)
-                  shell.call(lipo_cmd + ["-output", dest_path] + file_paths,
-                             echo=verbose)
+                    # Multiple instances are different and executable, try lipo.
+                    if verbose:
+                        print("-- Running lipo %s to %s" %
+                              (file_paths, dest_path))
+                    else:
+                        print("-- Running lipo %s" % dest_path)
+                        shell.call((lipo_cmd + ["-output", dest_path] +
+                                    file_paths),
+                                   echo=verbose)
             else:
                 # Multiple instances are different, and they're not executable.
                 print(
