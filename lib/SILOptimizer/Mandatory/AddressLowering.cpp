@@ -3101,9 +3101,6 @@ protected:
     llvm::report_fatal_error("Unimplemented SelectValue use.");
   }
 
-  // Opaque enum operand to a switch_enum.
-  void visitSwitchEnumInst(SwitchEnumInst *SEI);
-
   void rewriteStore(SILValue srcVal, SILValue destAddr,
                     IsInitialization_t isInit);
 
@@ -3133,6 +3130,9 @@ protected:
   // loadable elements that compose a struct can be handled. An address-only
   // member implies an address-only Struct.
   void visitStructInst(StructInst *structInst) {}
+
+  // Opaque enum operand to a switch_enum.
+  void visitSwitchEnumInst(SwitchEnumInst *SEI);
 
   // Opaque call argument.
   void visitTryApplyInst(TryApplyInst *tryApplyInst) {
