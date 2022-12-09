@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -26,6 +25,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/Basic/Module.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/Utils.h"
 
 using namespace swift;
 
@@ -93,19 +94,6 @@ private:
   bool passCallArgNames(Expr *Fn, ArgumentList *ArgList);
 
   bool shouldIgnore(Decl *D);
-
-  ValueDecl *extractDecl(Expr *Fn) const {
-    Fn = Fn->getSemanticsProvidingExpr();
-    if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
-      return DRE->getDecl();
-    if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
-      return extractDecl(ApplyE->getFn());
-    if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
-      if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
-        return extractDecl(Unwrapped);
-    }
-    return nullptr;
-  }
 };
 
 } // end anonymous namespace
@@ -800,7 +788,11 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     if (!CtorRefs.empty() && BaseNameLoc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
       if (Fn->getLoc() == BaseNameLoc) {
-        D = extractDecl(Fn);
+        D = ide::getReferencedDecl(Fn).second.getDecl();
+        if (D == nullptr) {
+          assert(false && "Unhandled constructor reference");
+          return true;
+        }
         CtorTyRef = TD;
       }
     }
@@ -813,12 +805,6 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
         ExtDecl = ExtDecls.back();
       }
     }
-  }
-
-  if (D == nullptr) {
-    // FIXME: When does this happen?
-    assert(false && "unhandled reference");
-    return true;
   }
 
   CharSourceRange CharRange =
@@ -839,7 +825,7 @@ bool SemaAnnotator::passReference(ModuleEntity Mod,
 }
 
 bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
-  ValueDecl *D = extractDecl(Fn);
+  ValueDecl *D = ide::getReferencedDecl(Fn).second.getDecl();
   if (!D)
     return true; // continue.
 
