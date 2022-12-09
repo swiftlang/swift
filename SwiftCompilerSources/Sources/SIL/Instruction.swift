@@ -17,7 +17,7 @@ import SILBridging
 //                       Instruction base classes
 //===----------------------------------------------------------------------===//
 
-public class Instruction : ListNode, CustomStringConvertible, Hashable {
+public class Instruction : CustomStringConvertible, Hashable {
   final public var next: Instruction? {
     SILInstruction_next(bridged).instruction
   }
@@ -25,11 +25,6 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   final public var previous: Instruction? {
     SILInstruction_previous(bridged).instruction
   }
-
-  // Needed for ReverseList<Instruction>.reversed(). Never use directly.
-  public var _firstInList: Instruction { SILBasicBlock_firstInst(block.bridged).instruction! }
-  // Needed for List<Instruction>.reversed(). Never use directly.
-  public var _lastInList: Instruction { SILBasicBlock_lastInst(block.bridged).instruction! }
 
   final public var block: BasicBlock {
     SILInstruction_getParent(bridged).block

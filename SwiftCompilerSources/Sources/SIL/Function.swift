@@ -42,8 +42,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SILFunction_firstBlock(bridged).block!
   }
 
-  public var blocks : List<BasicBlock> {
-    return List(first: SILFunction_firstBlock(bridged).block)
+  public var blocks : BasicBlockList {
+    BasicBlockList(first: SILFunction_firstBlock(bridged).block)
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
@@ -51,7 +51,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   /// All instructions of all blocks.
-  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<List<BasicBlock>, List<Instruction>>>> {
+  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<BasicBlockList, InstructionList>>> {
     blocks.lazy.flatMap { $0.instructions }
   }
 
@@ -357,4 +357,44 @@ public extension SideEffects.GlobalEffects {
     case (true, true): return MayReadWriteBehavior
     }
   }
+}
+
+public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.next
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
+
+  public func reversed() -> ReverseBasicBlockList {
+    if let block = currentBlock {
+      let lastBlock = SILFunction_lastBlock(block.function.bridged).block
+      return ReverseBasicBlockList(first: lastBlock)
+    }
+    return ReverseBasicBlockList(first: nil)
+  }
+}
+
+public struct ReverseBasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.previous
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
 }

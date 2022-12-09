@@ -94,7 +94,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   var isValid: Bool {
     blockRange.isValid &&
     // Check if there are any inserted instructions before the begin instruction in its block.
-    !ReverseList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
+    !ReverseInstructionList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
   }
 
   /// Returns the end instructions.
@@ -115,7 +115,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   /// Returns the interior instructions.
   var interiors: LazySequence<FlattenSequence<
                    LazyMapSequence<Stack<BasicBlock>,
-                                   LazyFilterSequence<ReverseList<Instruction>>>>> {
+                                   LazyFilterSequence<ReverseInstructionList>>>> {
     blockRange.inserted.lazy.flatMap {
       var include = blockRange.contains($0)
       return $0.instructions.reversed().lazy.filter {
