@@ -160,7 +160,11 @@
 // CHECK-NEXT:        "type": "fields.Foo.Boo",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "fields.Foo.Boo",
+// CHECK-NEXT:          "arguments": []
+// CHECK-NEXT:        }
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }

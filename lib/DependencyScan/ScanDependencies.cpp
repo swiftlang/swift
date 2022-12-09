@@ -1242,13 +1242,13 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   GlobalModuleDependenciesCache globalCache;
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
-
-  auto ModuleCachePath = getModuleCachePathFromClang(
-               Context.getClangModuleLoader()->getClangInstance());
-
+  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
+  globalCache.overlaySharedFilesystemCacheForCompilation(instance);
   ModuleDependenciesCache cache(globalCache,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
+  auto ModuleCachePath = getModuleCachePathFromClang(
+               Context.getClangModuleLoader()->getClangInstance());
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1312,6 +1312,9 @@ bool swift::dependencies::batchScanDependencies(
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   GlobalModuleDependenciesCache singleUseGlobalCache;
+  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
+  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
+  singleUseGlobalCache.overlaySharedFilesystemCacheForCompilation(instance);
   ModuleDependenciesCache cache(singleUseGlobalCache,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
