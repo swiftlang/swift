@@ -173,6 +173,16 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
           }
         }
       }
+      if (auto *BAI = dyn_cast<BeginApplyInst>(&I)) {
+        auto convention = BAI->getSubstCalleeConv();
+        auto yields = convention.getYields();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yields)) {
+          if (convention.isSILIndirect(yields[index])) {
+            analyzeLocation(yieldedValues[index]);
+          }
+        }
+      }
     }
   }
 }
