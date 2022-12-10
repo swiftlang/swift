@@ -102,7 +102,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     self.defaultValue = defaultValue
   }
 
-  @usableFromInline
+  @_alwaysEmitIntoClient
   var key: Builtin.RawPointer {
     unsafeBitCast(self, to: Builtin.RawPointer.self)
   }
@@ -136,10 +136,10 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
   @discardableResult
-  @inline(__always)
+  @inlinable
   @_unsafeInheritExecutor
   @available(SwiftStdlib 5.1, *) // back deploy requires we declare the availability explicitly on this method
-  @_backDeploy(before: macOS 9999, iOS 9999, watchOS 9999, tvOS 9999) // SwiftStdlib 5.8 but it doesn't work with _backDeploy
+  @_backDeploy(before: SwiftStdlib 5.8)
   public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
                            file: String = #file, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
@@ -164,8 +164,8 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
+  @inlinable
   @discardableResult
-  @inline(__always)
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
                            file: String = #file, line: UInt = #line) rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
@@ -177,7 +177,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     return try operation()
   }
 
-  @inline(__always)
   public var projectedValue: TaskLocal<Value> {
     get {
       self
@@ -219,7 +218,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
+@_alwaysEmitIntoClient
 @_silgen_name("swift_task_localValuePush")
 func _taskLocalValuePush<Value>(
   key: Builtin.RawPointer/*: Key*/,
@@ -227,19 +226,17 @@ func _taskLocalValuePush<Value>(
 ) // where Key: TaskLocal
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
+@_alwaysEmitIntoClient
 @_silgen_name("swift_task_localValuePop")
 func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_silgen_name("swift_task_localsCopyTo")
 func _taskLocalsCopy(
   to target: Builtin.NativeObject
