@@ -1903,11 +1903,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   if (EnclosingDecl) {
     if (EnclosingDeclIsUnavailable) {
-      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
-               diag::availability_decl_more_than_unavailable_enclosing,
-               D->getDescriptiveKind());
-      diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_unavailable_enclosing_here);
+      if (!AttrRange.isKnownUnreachable()) {
+        diagnose(D->isImplicit() ? EnclosingDecl->getLoc()
+                                 : attr->getLocation(),
+                 diag::availability_decl_more_than_unavailable_enclosing,
+                 D->getDescriptiveKind());
+        diagnose(EnclosingDecl->getLoc(),
+                 diag::availability_decl_more_than_unavailable_enclosing_here);
+      }
     } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.value())) {
       diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
                diag::availability_decl_more_than_enclosing,

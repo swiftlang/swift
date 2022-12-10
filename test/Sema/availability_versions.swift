@@ -625,6 +625,12 @@ class ClassAvailableOn10_51 { // expected-note {{enclosing scope requires availa
   @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func someMethodAvailableOn10_9() { }
 
+  @available(OSX, unavailable)
+  func someMethodUnavailable() { }
+
+  @available(*, unavailable)
+  func someMethodUniversallyUnavailable() { }
+
   @available(OSX, introduced: 10.52)
   var propWithGetter: Int { // expected-note{{enclosing scope requires availability of macOS 10.52 or newer}}
     @available(OSX, introduced: 10.51) // expected-error {{getter cannot be more available than enclosing scope}}
