@@ -42,18 +42,16 @@ def overlapping_lipo_architectures(file_paths, lipo_executable):
     return False
 
 
-# Copy the file
-def copy_file(file, src_root_dirs, dest_root_dir):
+# Determine the path to the first file and where it should be installed.
+def get_first_file_and_dest_path(file, src_root_dirs, dest_root_dir):
     for dir in src_root_dirs:
         orig_file = os.path.join(dir, file)
         if os.path.exists(orig_file):
-            dest_file = os.path.join(
+            dest_path = os.path.join(
                 dest_root_dir, os.path.relpath(orig_file, dir))
-            print("-- Copying file %s" % dest_file)
-            shutil.copy2(orig_file, dest_file)
-            return
+            return (orig_file, dest_path)
 
-    print("-- Warning: unable to copy file %s" % file)
+    return None
 
 
 def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
@@ -79,8 +77,10 @@ def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
             print("-- Warning: Can't locate source file %s" % file)
             continue
 
-        dest_path = os.path.join(
-            dest_root_dir, os.path.relpath(file_paths[0], src_root_dirs[0]))
+        first_file_and_dest = get_first_file_and_dest_path(
+            file, src_root_dirs, dest_root_dir)
+        orig_file = first_file_and_dest[0]
+        dest_path = first_file_and_dest[1]
 
         if all([os.path.islink(item) for item in file_paths]):
             # It's a symlink in all found instances, copy the link.
@@ -100,12 +100,14 @@ def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
             # identical.
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
                 # All instances are identical, just copy the unique file.
-                copy_file(file, src_root_dirs, dest_root_dir)
+                print("-- Copying file %s" % dest_path)
+                shutil.copy2(orig_file, dest_path)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
                 if overlapping_lipo_architectures(file_paths, lipo_executable):
                     # lipo will fail due to overlapping architectures, so
                     # copy the file directly.
-                    copy_file(file, src_root_dirs, dest_root_dir)
+                    print("-- Copying file verbatim %s" % dest_path)
+                    shutil.copy2(orig_file, dest_path)
                 else:
                     # Multiple instances are different and executable, try lipo.
                     if verbose:
