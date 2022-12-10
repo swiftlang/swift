@@ -963,7 +963,7 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   // necessary to introduce new storage and move to it.
   if (isa<LoadBorrowInst>(defInst) ||
       (isa<BeginApplyInst>(defInst) &&
-       value.getOwnershipKind() == OwnershipKind::Guaranteed))
+       value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
 
   return false;
