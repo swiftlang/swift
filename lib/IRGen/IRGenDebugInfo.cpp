@@ -1780,8 +1780,16 @@ private:
       return createType(DbgTy, "", TheCU, MainFile);
 
     // Look in the cache first.
-    if (auto *DITy = getTypeOrNull(DbgTy.getType()))
+    if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
+      // FIXME: Enable this assertion.
+#if SWIFT_DEBUGINFO_CACHE_VERIFICATION
+      if (auto CachedSize = DbgTy.getTypeSize()) {
+        if (unsigned Size = getSizeInBits(DITy))
+          assert(llvm::alignTo(Size, 8) / 8 == CachedSize->getValue());
+      }
+#endif
       return DITy;
+    }
 
     // Second line of defense: Look up the mangled name. TypeBase*'s are
     // not necessarily unique, but name mangling is too expensive to do
@@ -2084,7 +2092,6 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
     Scope = DBuilder.createLexicalBlockFile(Scope, File);
   }
 
-  // FIXME: Enable this assertion.
   assert(lineEntryIsSane(L, DS) &&
          "non-contiguous debug location in same scope at -Onone");
   LastFilenameAndLocation = L;
