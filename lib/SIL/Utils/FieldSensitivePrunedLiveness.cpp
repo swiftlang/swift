@@ -16,6 +16,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 
@@ -183,116 +184,54 @@ void FieldSensitiveAddressPrunedLiveness::updateForUse(
     iterAndSuccess.first->second &= lifetimeEnding;
 }
 
-void FieldSensitiveAddressPrunedLiveness::isWithinBoundary(
-    SILInstruction *inst, SmallBitVector &outVector) const {
-  SILBasicBlock *block = inst->getParent();
+bool FieldSensitiveAddressPrunedLiveRange::isWithinBoundary(
+    SILInstruction *inst, TypeTreeLeafTypeRange span) {
+  // If we do not have any span, return true since we have no counter examples.
+  if (span.empty())
+    return true;
 
-  SmallVector<PrunedLiveBlocks::IsLive, 8> fieldLiveness;
-  getBlockLiveness(block, fieldLiveness);
-  outVector.resize(fieldLiveness.size());
-
-  for (auto pair : llvm::enumerate(fieldLiveness)) {
-    auto isLive = pair.value();
-    unsigned subEltNumber = pair.index();
-    switch (isLive) {
-    case PrunedLiveBlocks::Dead:
-      outVector[subEltNumber] = false;
-      continue;
-    case PrunedLiveBlocks::LiveOut:
-      outVector[subEltNumber] = true;
-      continue;
-    case PrunedLiveBlocks::LiveWithin:
-      // The boundary is within this block. This instruction is before the
-      // boundary iff any interesting uses occur after it.
-      bool foundValue = false;
-      for (SILInstruction &it :
-           make_range(std::next(inst->getIterator()), block->end())) {
-        auto interestingUser = isInterestingUser(&it);
-        switch (interestingUser.first) {
-        case FieldSensitiveAddressPrunedLiveness::NonUser:
-          break;
-        case FieldSensitiveAddressPrunedLiveness::NonLifetimeEndingUse:
-        case FieldSensitiveAddressPrunedLiveness::LifetimeEndingUse:
-          // Check the overlap in between the sub element number and
-          // interestingUser.second. If we don't overlap, just break. We aren't
-          // effected by this.
-          //
-          // TODO: Hoist this out! We should only be visited blocks like this
-          // once!
-          if (!interestingUser.second->contains(subEltNumber))
-            break;
-          outVector[subEltNumber] = true;
-          foundValue = true;
-          break;
-        }
-      }
-      if (foundValue)
-        continue;
-      outVector[subEltNumber] = false;
-    }
-  }
-}
-
-// Use \p liveness to find the last use in \p bb and add it to \p
-// boundary.lastUsers.
-void FieldSensitiveAddressPrunedLivenessBoundary::findLastUserInBlock(
-    SILBasicBlock *bb, FieldSensitiveAddressPrunedLivenessBoundary &boundary,
-    const FieldSensitiveAddressPrunedLiveness &liveness,
-    unsigned subElementNumber) {
-  // TODO: We should move this loop into the caller and only visit a block once
-  // for each sub-element of a type.
-  for (auto &inst : llvm::reverse(*bb)) {
-    auto pair = liveness.isInterestingUser(&inst);
-    if (pair.first == FieldSensitiveAddressPrunedLiveness::NonUser)
-      continue;
-
-    // Do an intersection in between the range associated with this address and
-    // the sub-element number we are checking for.
-    auto &range = *pair.second;
-    if (!range.contains(subElementNumber))
-      continue;
-    boundary.lastUsers.push_back({&inst, range});
-    return;
-  }
-  llvm_unreachable("No user in LiveWithin block");
-}
-
-void FieldSensitiveAddressPrunedLivenessBoundary::compute(
-    const FieldSensitiveAddressPrunedLiveness &liveness) {
   using IsLive = PrunedLiveBlocks::IsLive;
-  SmallVector<IsLive, 8> perSubElementblockLivenessInfo;
-  SmallVector<IsLive, 8> boundaryBlockLiveness;
 
-  for (SILBasicBlock *bb : liveness.getDiscoveredBlocks()) {
-    SWIFT_DEFER { perSubElementblockLivenessInfo.clear(); };
+  auto *block = inst->getParent();
+  SmallVector<IsLive, 8> outVector;
+  getBlockLiveness(block, span, outVector);
+  for (auto pair : llvm::enumerate(outVector)) {
+    bool isLive = false;
+    switch (pair.value()) {
+    case PrunedLiveBlocks::Dead:
+      // If any of our bits are dead, then we are not in the boundary.
+      return false;
+    case PrunedLiveBlocks::LiveOut:
+      // If this bit is live out and we are not in a def block for this inst, we
+      // continue. Otherwise, we fall through to live within.
+      if (!isDefBlock(block, pair.index()))
+        return false;
+      isLive = true;
+      [[clang::fallthrough]];
+    case PrunedLiveBlocks::LiveWithin:
+      // Now check if the instruction is between a last use and a definition.
+      for (auto &blockInst : llvm::reverse(*block)) {
+        if (isDef(&blockInst, pair.index()))
+          isLive = false;
 
-    // Process each block that has not been visited and is not LiveOut.
-    liveness.getBlockLiveness(bb, perSubElementblockLivenessInfo);
-
-    // TODO: We should do this for all sub-element LiveWithin at the same time
-    // so that we can avoid iterating over the block multiple times.
-    for (auto pair : llvm::enumerate(perSubElementblockLivenessInfo)) {
-      switch (pair.value()) {
-      case PrunedLiveBlocks::LiveOut:
-        for (SILBasicBlock *succBB : bb->getSuccessors()) {
-          liveness.getBlockLiveness(succBB, boundaryBlockLiveness);
-          if (llvm::all_of(boundaryBlockLiveness, [](IsLive isDead) {
-                return isDead == PrunedLiveBlocks::Dead;
-              })) {
-            boundaryEdges.push_back(succBB);
+        if (&blockInst == inst) {
+          if (isLive) {
+            break;
           }
+
+          return false;
         }
-        break;
-      case PrunedLiveBlocks::LiveWithin: {
-        // The liveness boundary is inside this block. Find the last user. This
-        // is where we would insert a destroy to end the values lifetime for the
-        // specific subelementnumber
-        findLastUserInBlock(bb, *this, liveness, pair.index());
-        break;
+
+        if (!isLive) {
+          auto interestingUser = isInterestingUser(&blockInst);
+          isLive |= interestingUser.first &&
+                    interestingUser.second->contains(pair.index());
+        }
       }
-      case PrunedLiveBlocks::Dead:
-        break;
-      }
+      llvm_unreachable("Inst not in parent block?!");
     }
   }
+
+  // We succeeded in proving we are within the boundary for all bits.
+  return true;
 }

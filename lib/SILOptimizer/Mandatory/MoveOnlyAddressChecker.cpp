@@ -1092,7 +1092,7 @@ struct BlockSummaries {
   /// After we have summarized all of our blocks, initialize the given pruned
   /// liveness with the information needed from our summaries to perform
   /// multi-block liveness dataflow.
-  void initializeLiveness(FieldSensitiveAddressPrunedLiveness &liveness,
+  void initializeLiveness(FieldSensitiveAddressPrunedLiveRange &liveness,
                           SmallPtrSetImpl<SILInstruction *> &inoutTermUsers);
 };
 
@@ -1262,7 +1262,7 @@ void BlockSummaries::summarize(SILBasicBlock &block) {
 }
 
 void BlockSummaries::initializeLiveness(
-    FieldSensitiveAddressPrunedLiveness &liveness,
+    FieldSensitiveAddressPrunedLiveRange &liveness,
     SmallPtrSetImpl<SILInstruction *> &inoutTermUsers) {
   // At this point, we have handled all of the single block cases and have
   // simplified the remaining cases to global cases that we compute using
@@ -1313,13 +1313,13 @@ namespace {
 /// name.
 struct GlobalDataflow {
   BlockSummaries &summaries;
-  FieldSensitiveAddressPrunedLiveness &liveness;
+  FieldSensitiveAddressPrunedLiveRange &liveness;
   SmallPtrSetImpl<SILInstruction *> &inoutTermInstUsers;
   SmallBitVector livenessVector;
   bool hadAnyErrorUsers = false;
 
   GlobalDataflow(BlockSummaries &summaries,
-                 FieldSensitiveAddressPrunedLiveness &liveness,
+                 FieldSensitiveAddressPrunedLiveRange &liveness,
                  SmallPtrSetImpl<SILInstruction *> &inoutTermInstUsers)
       : summaries(summaries), liveness(liveness),
         inoutTermInstUsers(inoutTermInstUsers) {}
@@ -1350,11 +1350,11 @@ std::pair<bool, bool> GlobalDataflow::testInstVectorLiveness(
     LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
 
     // Check if we are in the boundary...
-    liveness.isWithinBoundary(takeInstAndValue.first, livenessVector);
 
     // If the bit vector does not contain any set bits, then we know that we did
     // not have any boundary violations for any leaf node of our root value.
-    if (!livenessVector.any()) {
+    if (!liveness.isWithinBoundary(takeInstAndValue.first,
+                                   takeInstAndValue.second)) {
       // TODO: Today, we don't tell the user the actual field itself where the
       // violation occured and just instead just shows the two instructions. We
       // could be more specific though...
@@ -1428,7 +1428,7 @@ std::pair<bool, bool> GlobalDataflow::testInstVectorLiveness(
           // if (invalidUsesWithDiagnostics.insert(errorUser
           bool isConsuming =
               info.first ==
-              FieldSensitiveAddressPrunedLiveness::LifetimeEndingUse;
+              FieldSensitiveAddressPrunedLiveRange::LifetimeEndingUse;
           summaries.diagnosticEmitter.emitAddressDiagnostic(
               summaries.markedAddress, blockUser, errorUser, isConsuming,
               inoutTermInstUsers.count(blockUser));
@@ -1646,8 +1646,8 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   //
 
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
-  FieldSensitiveAddressPrunedLiveness liveness(fn, markedAddress,
-                                               &discoveredBlocks);
+  FieldSensitiveAddressPrunedLiveRange liveness(fn, markedAddress,
+                                                &discoveredBlocks);
   SmallPtrSet<SILInstruction *, 8> inoutTermUsers;
   summaries.initializeLiveness(liveness, inoutTermUsers);
 

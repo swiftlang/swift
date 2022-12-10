@@ -149,7 +149,10 @@ namespace swift {
 /// the original enum and its payload since that would be a verifier caught
 /// leak.
 struct SubElementNumber {
-  unsigned number;
+  /// Our internal sub element representation number. We force 32 bits so that
+  /// our type tree span is always pointer width. This is convenient for storing
+  /// it in other data structures.
+  uint32_t number;
 
   SubElementNumber(unsigned number) : number(number) {}
 
@@ -256,6 +259,12 @@ public:
     // Othrwise, see if endEltOffset - 1 is within the range.
     return startEltOffset <= rangeLastElt && rangeLastElt < endEltOffset;
   }
+
+  IntRange<unsigned> getRange() const {
+    return range(startEltOffset, endEltOffset);
+  }
+
+  bool empty() const { return startEltOffset == endEltOffset; }
 };
 
 /// This is exactly like pruned liveness except that instead of tracking a
@@ -396,49 +405,57 @@ public:
   }
 
   unsigned getNumSubElements() const { return liveBlocks.getNumBitsToTrack(); }
-
-  /// Return true if \p inst occurs before the liveness boundary. Used when the
-  /// client already knows that inst occurs after the start of liveness.
-  void isWithinBoundary(SILInstruction *inst, SmallBitVector &outVector) const;
 };
 
-/// Record the last use points and CFG edges that form the boundary of
-/// FieldSensitiveAddressPrunedLiveness. It does this on a per type tree leaf
-/// node basis.
-struct FieldSensitiveAddressPrunedLivenessBoundary {
-  /// The list of last users and an associated SILValue that is the address that
-  /// is being used. The address can be used to determine the start sub element
-  /// number of the user in the type tree and the end sub element number.
-  ///
-  /// TODO (MG): If we don't eventually need to store the SILValue here (I am
-  /// not sure yet...), just store a tuple with the start/end sub element
-  /// number.
-  SmallVector<std::tuple<SILInstruction *, TypeTreeLeafTypeRange>, 8> lastUsers;
+class FieldSensitiveAddressPrunedLiveRange
+    : public FieldSensitiveAddressPrunedLiveness {
+  // TODO: See if we can make this more efficient.
+  llvm::SmallMapVector<SILNode *, TypeTreeLeafTypeRange, 8> defs;
+  llvm::SmallMapVector<SILBasicBlock *, TypeTreeLeafTypeRange, 8> defBlocks;
 
-  /// Blocks where the value was live out but had a successor that was dead.
-  SmallVector<SILBasicBlock *, 8> boundaryEdges;
-
-  void clear() {
-    lastUsers.clear();
-    boundaryEdges.clear();
+public:
+  FieldSensitiveAddressPrunedLiveRange(
+      SILFunction *fn, SILValue rootAddress,
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : FieldSensitiveAddressPrunedLiveness(fn, rootAddress, discoveredBlocks) {
   }
 
-  /// Compute the boundary from the blocks discovered during liveness analysis.
-  ///
-  /// Precondition: \p liveness.getDiscoveredBlocks() is a valid list of all
-  /// live blocks with no duplicates.
-  ///
-  /// The computed boundary will completely post-dominate, including dead end
-  /// paths. The client should query DeadEndBlocks to ignore those dead end
-  /// paths.
-  void compute(const FieldSensitiveAddressPrunedLiveness &liveness);
+  void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+    defs.insert({def, span});
+    auto *block = def->getParentBlock();
+    defBlocks.insert({block, span});
+    initializeDefBlock(block, span);
+  }
 
-private:
-  void
-  findLastUserInBlock(SILBasicBlock *bb,
-                      FieldSensitiveAddressPrunedLivenessBoundary &boundary,
-                      const FieldSensitiveAddressPrunedLiveness &liveness,
-                      unsigned subElementNumber);
+  bool isInitialized() const { return !defs.empty(); }
+
+  /// Check if \p inst occurs in between the definition of a def and the
+  /// liveness boundary for bits in \p span.
+  ///
+  /// NOTE: It is assumed that \p inst is correctly described by span.
+  bool isWithinBoundary(SILInstruction *inst, TypeTreeLeafTypeRange span);
+
+  /// Return true if this block is a def block for this specific bit.
+  bool isDefBlock(SILBasicBlock *block, unsigned bit) {
+    auto iter = defBlocks.find(block);
+    if (iter == defBlocks.end())
+      return false;
+    return iter->second.contains(bit);
+  }
+
+  bool isDef(SILInstruction *inst, unsigned bit) {
+    auto iter = defs.find(cast<SILNode>(inst));
+    if (iter == defs.end())
+      return false;
+    return iter->second.contains(bit);
+  }
+
+  bool isDef(SILValue value, unsigned bit) {
+    auto iter = defs.find(cast<SILNode>(value));
+    if (iter == defs.end())
+      return false;
+    return iter->second.contains(bit);
+  }
 };
 
 } // namespace swift
