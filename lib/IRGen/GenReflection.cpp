@@ -1175,10 +1175,12 @@ public:
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
       // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].Protocol != nullptr)
+      if (Bindings[i].isWitnessTable())
         continue;
 
-      if (Bindings[i].TypeParameter->hasOpenedExistential())
+      assert(Bindings[i].isMetadata());
+
+      if (Bindings[i].getTypeParameter()->hasOpenedExistential())
         return true;
     }
 
@@ -1219,11 +1221,13 @@ public:
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
       // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].Protocol != nullptr)
+      if (Bindings[i].isWitnessTable())
         continue;
 
+      assert(Bindings[i].isMetadata());
+
       auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Bindings[i].TypeParameter;
+      auto BindingType = Bindings[i].getTypeParameter();
       auto InterfaceType = BindingType->mapTypeOutOfContext();
       SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
     }

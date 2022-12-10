@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
-#include "swift/AST/GenericRequirement.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringRef.h"

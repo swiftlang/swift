@@ -14,9 +14,9 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 
 #include "OutputLanguageMode.h"
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 

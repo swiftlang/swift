@@ -2486,10 +2486,11 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   auto substitutions =
       theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
   for (auto requirement : requirements.getRequirements()) {
-    if (requirement.Protocol) {
+    if (requirement.isWitnessTable()) {
       continue;
     }
-    auto parameter = requirement.TypeParameter;
+    assert(requirement.isMetadata());
+    auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
     if (auto *classDecl = argument->getClassOrBoundGenericClass()) {

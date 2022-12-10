@@ -238,15 +238,15 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
     auto archetype = Generics.getGenericEnvironment()
-                        ->mapTypeIntoContext(reqt.TypeParameter)
+                        ->mapTypeIntoContext(reqt.getTypeParameter())
                         ->getAs<ArchetypeType>();
     assert(archetype && "did not get an archetype by mapping param?");
     auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
     Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
-                         reqt.TypeParameter, erasedTypeParam);
+                         reqt.getTypeParameter(), erasedTypeParam);
 
     MetadataPath path;
-    Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
+    Fulfillments.addFulfillment({reqt.getTypeParameter(), reqt.getProtocol()},
                                 Sources.size() - 1, std::move(path),
                                 MetadataState::Complete);
   });
@@ -260,7 +260,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   // Get all of the type metadata.
   signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (canonical)
-      callback({CanType(gp), nullptr});
+      callback(GenericRequirement::forMetadata(CanType(gp)));
   });
 
   // Get the protocol conformances.
@@ -277,7 +277,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
         auto type = CanType(reqt.getFirstType());
         auto protocol = reqt.getProtocolDecl();
         if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol)) {
-          callback({type, protocol});
+          callback(GenericRequirement::forWitnessTable(type, protocol));
         }
         continue;
       }
@@ -294,13 +294,15 @@ PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback
 void PolymorphicConvention::
 enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
   enumerateRequirements([&](GenericRequirement requirement) {
-    if (requirement.Protocol) {
-      if (!Fulfillments.getWitnessTable(requirement.TypeParameter,
-                                        requirement.Protocol)) {
+    if (requirement.isWitnessTable()) {
+      if (!Fulfillments.getWitnessTable(requirement.getTypeParameter(),
+                                        requirement.getProtocol())) {
         callback(requirement);
       }
     } else {
-      if (!Fulfillments.getTypeMetadata(requirement.TypeParameter)) {
+      assert(requirement.isMetadata());
+
+      if (!Fulfillments.getTypeMetadata(requirement.getTypeParameter())) {
         callback(requirement);
       }
     }
@@ -2532,14 +2534,14 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     auto module = IGF.getSwiftModule();
     auto subs = sourceKey.Type->getContextSubstitutionMap(module, nominal);
-    auto sub = requirement.TypeParameter.subst(subs)->getCanonicalType();
+    auto sub = requirement.getTypeParameter().subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.
     sourceKey.Type = sub;
 
     // If this is a type argument, we've fully updated sourceKey.
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
-      assert(!requirement.Protocol && "index mismatch!");
+      assert(requirement.isMetadata() && "index mismatch!");
 
       if (!source) return MetadataResponse();
 
@@ -2560,10 +2562,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     // Otherwise, we need to switch sourceKey.Kind to the appropriate
     // conformance kind.
     } else {
-      assert(requirement.Protocol && "index mismatch!");
-      auto conformance = subs.lookupConformance(requirement.TypeParameter,
-                                                requirement.Protocol);
-      assert(conformance.getRequirement() == requirement.Protocol);
+      assert(requirement.isWitnessTable() && "index mismatch!");
+      auto conformance = subs.lookupConformance(requirement.getTypeParameter(),
+                                                requirement.getProtocol());
+      assert(conformance.getRequirement() == requirement.getProtocol());
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
       if (!source) return MetadataResponse();
@@ -2880,8 +2882,9 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
   emitInitOfGenericRequirementsBuffer(
       IGF, bindings.getRequirements(), buffer,
       [&](GenericRequirement requirement) -> llvm::Value * {
-        CanType type = requirement.TypeParameter;
-        if (auto protocol = requirement.Protocol) {
+        if (requirement.isWitnessTable()) {
+          CanType type = requirement.getTypeParameter();
+          auto protocol = requirement.getProtocol();
           CanArchetypeType archetype;
           ProtocolConformanceRef conformance =
               bindings.getConformance(requirement);
@@ -2894,6 +2897,8 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
             return transform(requirement, wtable);
           }
         } else {
+          assert(requirement.isMetadata());
+          CanType type = requirement.getTypeParameter();
           auto metadata = IGF.emitTypeMetadataRef(type);
           return transform(requirement, metadata);
         }
@@ -2948,7 +2953,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   // Generic types are trickier, because they can require conformances.
 
   // Otherwise, just record the need for this metadata.
-  addRequirement({type, nullptr});
+  addRequirement(GenericRequirement::forMetadata(type));
 }
 
 /// Add all the abstract conditional conformances in the specialized
@@ -2965,7 +2970,7 @@ void NecessaryBindings::addAbstractConditionalRequirements(
     auto archetype = dyn_cast<ArchetypeType>(ty);
     if (!archetype)
       continue;
-    addRequirement({ty, proto});
+    addRequirement(GenericRequirement::forWitnessTable(ty, proto));
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {
@@ -2996,7 +3001,7 @@ void NecessaryBindings::addProtocolConformance(CanType type,
 
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
-  addRequirement({type, conf.getAbstract()});
+  addRequirement(GenericRequirement::forWitnessTable(type, conf.getAbstract()));
 }
 
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
@@ -3240,13 +3245,15 @@ NecessaryBindings NecessaryBindings::computeBindings(
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
                                         [&](GenericRequirement requirement) {
-    CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
+    CanType type = requirement.getTypeParameter().subst(subs)
+        ->getCanonicalType();
 
-    if (requirement.Protocol) {
-      auto conf = subs.lookupConformance(requirement.TypeParameter,
-                                         requirement.Protocol);
+    if (requirement.isWitnessTable()) {
+      auto conf = subs.lookupConformance(requirement.getTypeParameter(),
+                                         requirement.getProtocol());
       bindings.addProtocolConformance(type, conf);
     } else {
+      assert(requirement.isMetadata());
       bindings.addTypeMetadata(type);
     }
   });
@@ -3283,7 +3290,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
-    assert(generics->isReducedType(reqt.TypeParameter));
+    assert(generics->isReducedType(reqt.getTypeParameter()));
     Requirements.push_back(reqt);
   });
 
@@ -3298,12 +3305,13 @@ GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
 
   for (auto reqtIndex : indices(getRequirements())) {
     auto &reqt = getRequirements()[reqtIndex];
-    CanType type = reqt.TypeParameter.subst(subs)->getCanonicalType();
-    if (reqt.Protocol) {
+    CanType type = reqt.getTypeParameter().subst(subs)->getCanonicalType();
+    if (reqt.isWitnessTable()) {
       auto conformance =
-          subs.lookupConformance(reqt.TypeParameter, reqt.Protocol);
+          subs.lookupConformance(reqt.getTypeParameter(), reqt.getProtocol());
       callback(reqtIndex, type, conformance);
     } else {
+      assert(reqt.isMetadata());
       callback(reqtIndex, type, ProtocolConformanceRef::forInvalid());
     }
   }
@@ -3339,8 +3347,10 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     llvm::Value *value = emitRequirement(requirements[index]);
-    if (requirements[index].Protocol) {
+    if (requirements[index].isWitnessTable()) {
       slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
+    } else {
+      assert(requirements[index].isMetadata());
     }
     IGF.Builder.CreateStore(value, slot);
   }
@@ -3351,15 +3361,17 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
                                                GenericRequirement requirement,
                                                SubstitutionMap subs) {
-  CanType depTy = requirement.TypeParameter;
+  CanType depTy = requirement.getTypeParameter();
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
-  if (!requirement.Protocol) {
+  if (requirement.isMetadata()) {
     auto argMetadata = IGF.emitTypeMetadataRef(argType);
     return argMetadata;
   }
 
-  auto proto = requirement.Protocol;
+  assert(requirement.isWitnessTable());
+
+  auto proto = requirement.getProtocol();
   auto conformance = subs.lookupConformance(depTy, proto);
   assert(conformance.getRequirement() == proto);
   llvm::Value *metadata = nullptr;
@@ -3394,8 +3406,10 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     // Cast if necessary.
-    if (requirements[index].Protocol) {
+    if (requirements[index].isWitnessTable()) {
       slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
+    } else {
+      assert(requirements[index].isMetadata());
     }
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);
@@ -3410,15 +3424,17 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    MetadataState metadataState,
                                    GetTypeParameterInContextFn getInContext) {
   // Get the corresponding context type.
-  auto type = getInContext(requirement.TypeParameter);
+  auto type = getInContext(requirement.getTypeParameter());
 
-  if (auto proto = requirement.Protocol) {
+  if (requirement.isWitnessTable()) {
+    auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
     assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
     IGF.setUnscopedLocalTypeData(type, kind, value);
   } else {
+    assert(requirement.isMetadata());
     assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
     setTypeMetadataName(IGF.IGM, value, type);
     IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
@@ -3445,11 +3461,13 @@ namespace {
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
           reqs->push_back(reqt);
-        out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
-                                    : IGM.TypeMetadataPtrTy);
+        out.push_back(reqt.isWitnessTable() ? IGM.WitnessTablePtrTy
+                                            : IGM.TypeMetadataPtrTy);
 
-        if (!reqt.Protocol)
+        if (reqt.isMetadata())
           ++numTypeMetadataPtrs;
+        else
+          assert(reqt.isWitnessTable());
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
