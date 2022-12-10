@@ -1029,7 +1029,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
       // as typed patterns, such as "var x: [Int]()".
       // Disable this tentative parse when in code-completion mode, otherwise
       // code-completion may enter the delayed-decl state twice.
-      if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
+      if (Tok.isFollowingLParen() && !SourceMgr.hasCodeCompletionBuffer()) {
         CancellableBacktrackingScope backtrack(*this);
 
         // Create a local context if needed so we can parse trailing closures.
