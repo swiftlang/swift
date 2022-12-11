@@ -93,11 +93,11 @@ do {
   #column // expected-warning {{#column literal is unused}}
   #function // expected-warning {{#function literal is unused}}
   #dsohandle // expected-warning {{#dsohandle literal is unused}}
-  __FILE__ // expected-error {{__FILE__ has been replaced with #file in Swift 3}} expected-warning {{#file literal is unused}}
-  __LINE__ // expected-error {{__LINE__ has been replaced with #line in Swift 3}} expected-warning {{#line literal is unused}}
-  __COLUMN__ // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}} expected-warning {{#column literal is unused}}
-  __FUNCTION__ // expected-error {{__FUNCTION__ has been replaced with #function in Swift 3}} expected-warning {{#function literal is unused}}
-  __DSO_HANDLE__ // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}} expected-warning {{#dsohandle literal is unused}}
+  __FILE__ // expected-error {{cannot find '__FILE__' in scope}}
+  __LINE__ // expected-error {{cannot find '__LINE__' in scope}}
+  __COLUMN__ // expected-error {{cannot find '__COLUMN__' in scope}}
+  __FUNCTION__ // expected-error {{cannot find '__FUNCTION__' in scope}}
+  __DSO_HANDLE__ // expected-error {{cannot find '__DSO_HANDLE__' in scope}}
 
   nil // expected-error {{'nil' requires a contextual type}}
   #fileLiteral(resourceName: "what.txt") // expected-error {{could not infer type of file reference literal}} expected-note * {{}}
@@ -172,7 +172,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}} expected-note {{did you mean 'a'?}} expected-note {{did you mean 'b'?}}
+func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}}
  _ = a+b
  a+b+c // expected-error{{cannot find 'c' in scope}}
  return a+b
@@ -530,7 +530,7 @@ func testSingleQuoteStringLiterals() {
 }
 
 // <rdar://problem/17128913>
-var s = "" // expected-note {{did you mean 's'?}}
+var s = ""
 s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
@@ -611,7 +611,7 @@ var ruleVar: Rule
 ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
 // expected-error@-1 {{missing argument for parameter 'dependencies' in call}}
 
-class C { // expected-note {{did you mean 'C'?}}
+class C {
   var x: C?
   init(other: C?) { x = other }
 
@@ -659,11 +659,6 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__  // expected-error {{__FILE__ has been replaced with #file in Swift 3}}
-  _ = __LINE__  // expected-error {{__LINE__ has been replaced with #line in Swift 3}}
-  _ = __COLUMN__  // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}}
-  _ = __DSO_HANDLE__  // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}}
-
   _ = #file
   _ = #line + #column
   var _: UInt8 = #line + #column

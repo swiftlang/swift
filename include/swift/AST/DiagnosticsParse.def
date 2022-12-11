@@ -1034,10 +1034,6 @@ ERROR(invalid_label_on_stmt,none,
 ERROR(labeled_block_needs_do,none,
       "labeled block needs 'do'", ())
 
-ERROR(snake_case_deprecated,none,
-      "%0 has been replaced with %1 in Swift 3",
-      (StringRef, StringRef))
-
 // Assignment statement
 ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())
