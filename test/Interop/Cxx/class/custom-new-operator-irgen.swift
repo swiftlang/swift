@@ -1,5 +1,7 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
 
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 import CustomNewOperator
 
 var x = callsCustomNew()
