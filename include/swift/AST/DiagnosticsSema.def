@@ -3821,6 +3821,8 @@ ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 ERROR(single_quoted_invalid_cast,none,
       "invalid cast of joined Character to %0", (Type))
+ERROR(single_quoted_string,none,
+      "single quoted literal cannot represent a %0", (Type))
 WARNING(single_quoted_migration,none,
        "double quotes deprecated in favour of single quotes to express %0",
        (Type))

@@ -2716,6 +2716,9 @@ namespace {
 
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
+
+        if (stringLiteral && stringLiteral->isSingleQuoted())
+            ctx.Diags.diagnose(expr->getLoc(), diag::single_quoted_string, type);
       } else if (isGraphemeClusterLiteral) {
         literalType = ctx.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName = DeclName(ctx, DeclBaseName::createConstructor(),
