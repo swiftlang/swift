@@ -1569,22 +1569,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                 BooleanLiteralExpr(isTrue, consumeToken()));
   }
 
-  // Cases for deprecated magic identifier tokens
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
-#include "swift/AST/MagicIdentifierKinds.def"
-  {
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
-    auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
-
-    diagnose(Tok.getLoc(), diag::snake_case_deprecated,
-             Tok.getText(), replacement)
-      .fixItReplace(Tok.getLoc(), replacement);
-    LLVM_FALLTHROUGH;
-  }
-
   // Cases for non-deprecated magic identifier tokens
   case tok::pound_file:
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
 #include "swift/AST/MagicIdentifierKinds.def"
   {
@@ -1593,7 +1579,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
         Kind, Loc, /*implicit=*/false));
   }
-      
+
+  case tok::kw___FILE__:
+  case tok::kw___LINE__:
+  case tok::kw___COLUMN__:
+  case tok::kw___FUNCTION__:
+  case tok::kw___DSO_HANDLE__:
+    llvm_unreachable("Lexer doesn't produce these tokens any more");
+
   case tok::identifier:  // foo
   case tok::kw_self:     // self
 
