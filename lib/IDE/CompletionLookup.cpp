@@ -2590,7 +2590,6 @@ void CompletionLookup::addPoundLiteralCompletions(bool needPound) {
   case MagicIdentifierLiteralExpr::NAME:                                       \
     kwKind = CodeCompletionKeywordKind::TOKEN;                                 \
     break;
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
 #include "swift/AST/MagicIdentifierKinds.def"
     }
 
