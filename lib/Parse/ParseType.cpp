@@ -1049,16 +1049,17 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 
   // Parse the type-composition-list.
   ParserStatus Status;
-  SmallVector<TypeRepr *, 4> Protocols;
+  SmallVector<TypeRepr *, 4> Components;
   bool IsEmpty = startsWithGreater(Tok);
   if (!IsEmpty) {
     do {
-      // Parse the type-identifier.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
-      Status |= Protocol;
-      if (auto *DeclRefTR =
-              dyn_cast_or_null<DeclRefTypeRepr>(Protocol.getPtrOrNull()))
-        Protocols.push_back(DeclRefTR);
+      // Parse the type.
+      ParserResult<TypeRepr> TR =
+          parseTypeSimple(diag::expected_type, ParseTypeReason::Unspecified);
+      Status |= TR;
+
+      if (TR.isNonNull())
+        Components.push_back(TR.get());
     } while (consumeIf(tok::comma));
   }
 
@@ -1078,12 +1079,12 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   }
 
   auto composition = CompositionTypeRepr::create(
-    Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
+    Context, Components, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
   if (Status.isSuccess() && !Status.hasCodeCompletion()) {
     // Only if we have complete protocol<...> construct, diagnose deprecated.
     SmallString<32> replacement;
-    if (Protocols.empty()) {
+    if (Components.empty()) {
       replacement = "Any";
     } else {
       auto extractText = [&](TypeRepr *Ty) -> StringRef {
@@ -1091,15 +1092,15 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
         return SourceMgr.extractText(
           Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
       };
-      auto Begin = Protocols.begin();
+      auto Begin = Components.begin();
       replacement += extractText(*Begin);
-      while (++Begin != Protocols.end()) {
+      while (++Begin != Components.end()) {
         replacement += " & ";
         replacement += extractText(*Begin);
       }
     }
 
-    if (Protocols.size() > 1) {
+    if (Components.size() > 1) {
       // Need parenthesis if the next token looks like postfix TypeRepr.
       // i.e. '?', '!', '.Type', '.Protocol'
       bool needParen = false;
@@ -1122,9 +1123,9 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 
     // Replace 'protocol<T1, T2>' with 'T1 & T2'
     diagnose(ProtocolLoc,
-      IsEmpty              ? diag::deprecated_any_composition :
-      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
-                             diag::deprecated_protocol_composition_single)
+      IsEmpty               ? diag::deprecated_any_composition :
+      Components.size() > 1 ? diag::deprecated_protocol_composition :
+                              diag::deprecated_protocol_composition_single)
       .highlight(composition->getSourceRange())
       .fixItReplace(composition->getSourceRange(), replacement);
   }
@@ -1714,7 +1715,7 @@ bool Parser::canParseOldStyleProtocolComposition() {
   
   // Parse the type-composition-list.
   do {
-    if (!canParseTypeIdentifier()) {
+    if (!canParseType()) {
       return false;
     }
   } while (consumeIf(tok::comma));
