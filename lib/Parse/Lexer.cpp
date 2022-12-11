@@ -641,13 +641,6 @@ bool Lexer::isOperator(StringRef string) {
 
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
-  // Temporary: treat the deprecated __FILE__, __LINE__, etc. as normal
-  // identifiers. This can go away when we remove them as keywords.
-  if (Str.startswith("__") &&
-      (Str == "__FILE__" || Str == "__LINE__" || Str == "__COLUMN__" ||
-       Str == "__FUNCTION__" || Str == "__DSO_HANDLE__"))
-    return tok::identifier;
-
 #define SIL_KEYWORD(kw)
 #define KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/AST/TokenKinds.def"
