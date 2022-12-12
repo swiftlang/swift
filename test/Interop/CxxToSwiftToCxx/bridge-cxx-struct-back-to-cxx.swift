@@ -73,6 +73,8 @@ namespace ns {
     using NonTrivialTemplateTrivial = NonTrivialTemplate<TrivialinNS>;
 }
 
+using SimpleTypedef = int;
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -110,6 +112,11 @@ public func retNonTrivialImplicitMove() -> ns.NonTrivialImplicitMove {
 @_expose(Cxx)
 public func retNonTrivialTypeAlias() -> ns.TypeAlias {
     return ns.TypeAlias()
+}
+
+@_expose(Cxx)
+public func retSimpleTypedef() -> SimpleTypedef {
+    return SimpleTypedef()
 }
 
 @_expose(Cxx)
