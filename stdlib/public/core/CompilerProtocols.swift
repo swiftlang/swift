@@ -402,10 +402,10 @@ public protocol ExpressibleByBooleanLiteral {
 /// These have @_marker attribute in the hope that adding them
 /// will not alter the witness table layout and hence the ABI of the
 /// pre-existing "ExpressableBy" protocols for double quoted literals.
-@_marker public protocol ExpressibleByASCIILiteral {
+@_marker public protocol _ExpressibleByASCIILiteral {
 }
 
-@_marker public protocol ExpressibleBySingleQuotedLiteral: ExpressibleByASCIILiteral {
+@_marker public protocol _ExpressibleBySingleQuotedLiteral: _ExpressibleByASCIILiteral {
 }
 
 public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
@@ -429,7 +429,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol ExpressibleByUnicodeScalarLiteral: ExpressibleBySingleQuotedLiteral {
+public protocol ExpressibleByUnicodeScalarLiteral: _ExpressibleBySingleQuotedLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,

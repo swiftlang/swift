@@ -101,9 +101,9 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleQuoted())
       return TypeChecker::getProtocol(
-          Context, expr->getLoc(), SLE->getValue().data()[0] > 0 ?
-          KnownProtocolKind::ExpressibleByASCIILiteral :
-          KnownProtocolKind::ExpressibleBySingleQuotedLiteral);
+          Context, expr->getLoc(), SLE->getValue().data()[0] < 0 ?
+          KnownProtocolKind::_ExpressibleBySingleQuotedLiteral :
+          KnownProtocolKind::_ExpressibleByASCIILiteral);
 
     if (SLE->isSingleUnicodeScalar())
       return TypeChecker::getProtocol(

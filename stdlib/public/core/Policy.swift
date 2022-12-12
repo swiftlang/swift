@@ -99,8 +99,9 @@ public typealias FloatLiteralType = Double
 /// `ExpressibleByBooleanLiteral` protocol.
 public typealias BooleanLiteralType = Bool
 
-/// The default type for an otherwise-unconstrained unicode scalar literal.
+/// The default type for an otherwise-unconstrained single quoted literal.
 public typealias SingleQuotedType = Character
+/// The default type for an otherwise-unconstrained unicode scalar literal.
 public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended
 /// grapheme cluster literal.

@@ -1701,7 +1701,7 @@ extension ${Self}: _HasCustomAnyHashableRepresentation {
 /// single 7 bit ASCII codepoint.
 extension ${Self} :
      _ExpressibleByBuiltinUnicodeScalarLiteral,
-     ExpressibleByASCIILiteral {
+     _ExpressibleByASCIILiteral {
    @_transparent
    public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
      self = ${Self}(UInt32(value))
@@ -1710,7 +1710,7 @@ extension ${Self} :
    public init(unicodeScalarLiteral value: ${Self}) {
      self = value
    }
- }
+}
 
 // FIXME(integers): this section here is to help the typechecker,
 // as it seems to have problems with a pattern where the nonmutating operation
