@@ -667,21 +667,6 @@ public:
     return Value->getDefiningInstruction();
   }
 
-  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
-  /// semantics if the SILValue has ownership semantics. Returns is a value
-  /// without any Ownership Semantics.
-  ///
-  /// An example of a SILValue without ownership semantics is a
-  /// struct_element_addr.
-  ///
-  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ///
-  /// FIXME: remove this redundant API from SILValue.
-  [[deprecated("Please use ValueBase::getOwnershipKind()")]] ValueOwnershipKind
-  getOwnershipKind() const {
-    return Value->getOwnershipKind();
-  };
-
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
