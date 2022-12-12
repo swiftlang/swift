@@ -331,7 +331,6 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return SGF.emitManagedRValueWithCleanup(value, valueTL);
     }
 
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("unexpected convention");
   }
@@ -432,7 +431,6 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
         break;
         
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -2185,8 +2183,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = emitManagedRValueWithCleanup(tmp);
           break;
         }
-        case ParameterConvention::Indirect_In_Constant:
-          llvm_unreachable("unsupported convention");
         }
 
         while (maybeAddForeignArg());

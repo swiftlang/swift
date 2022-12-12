@@ -1175,8 +1175,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               }
 
               switch (convention.getSILArgumentConvention(argIdx)) {
-              case SILArgumentConvention::Indirect_In:
-              case SILArgumentConvention::Indirect_In_Constant: {
+              case SILArgumentConvention::Indirect_In: {
                 // The only way to load opaque type is to allocate a temporary
                 // variable on the stack for it and initialize from the element
                 // address.

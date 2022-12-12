@@ -5553,7 +5553,8 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Indirect_Inout)
   CASE(Indirect_InoutAliasable)
   CASE(Indirect_In_Guaranteed)
-  CASE(Indirect_In_Constant)
+  case serialization::ParameterConvention::Indirect_In_Constant: \
+    return swift::ParameterConvention::Indirect_In;
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)

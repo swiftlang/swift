@@ -2203,8 +2203,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
       ApplySite applySite(applyInst);
       SILArgumentConvention convention =
         applySite.getArgumentConvention(operand);
-      if (convention == SILArgumentConvention::Indirect_In_Guaranteed ||
-          convention == SILArgumentConvention::Indirect_In_Constant) {
+      if (convention == SILArgumentConvention::Indirect_In_Guaranteed) {
         continue;
       }
     }

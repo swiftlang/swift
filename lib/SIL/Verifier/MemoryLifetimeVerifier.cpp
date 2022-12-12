@@ -492,7 +492,6 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         bool isTryApply) {
   switch (convention) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
       killBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -562,15 +561,16 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
         require(expectedReturnBits & ~bs.data.exitSet,
           "indirect argument is not alive at function return", term);
         require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
-          "memory is initialized at function return but shouldn't", term,
-           /*excludeTrivialEnums*/ true);
+                "memory is initialized at function return but shouldn't be",
+                term,
+                /*excludeTrivialEnums*/ true);
         break;
       case SILInstructionKind::ThrowInst:
         require(expectedThrowBits & ~bs.data.exitSet,
           "indirect argument is not alive at throw", term);
         require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
-          "memory is initialized at throw but shouldn't", term,
-           /*excludeTrivialEnums*/ true);
+                "memory is initialized at throw but shouldn't be", term,
+                /*excludeTrivialEnums*/ true);
         break;
       default:
         break;
@@ -803,7 +803,6 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
       requireBitsSet(bits, argumentOp.get(), applyInst);
       locations.clearBits(bits, argumentOp.get());
       break;
