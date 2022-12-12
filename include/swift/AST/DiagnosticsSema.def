@@ -6746,7 +6746,7 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
 ERROR(external_macro_not_found,none,
-      "external implementation struct '%0.%1' could not be found in for "
+      "external macro implementation type '%0.%1' could not be found for "
       "macro %2; the type must be public and provided via "
       "'-load-plugin-library'", (StringRef, StringRef, DeclName))
 NOTE(macro_note, none,

@@ -2,6 +2,8 @@
 // REQUIRES: OS=macosx
 
 macro stringify<T>(_ value: T) -> (T, String) = _SwiftSyntaxMacros.StringifyMacro
+macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
+macro missingMacro2(_: Any) = MissingModule.MissingType
 
 protocol P { }
 
@@ -37,4 +39,8 @@ func test(a: Int, b: Int) {
 
 func shadow(a: Int, b: Int, stringify: Int) {
   _ = #stringify(a + b)
+}
+
+func testMissing() {
+  #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; the type must be public and provided via '-load-plugin-library'}}
 }
