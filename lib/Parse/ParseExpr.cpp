@@ -1580,13 +1580,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         Kind, Loc, /*implicit=*/false));
   }
 
-  case tok::kw___FILE__:
-  case tok::kw___LINE__:
-  case tok::kw___COLUMN__:
-  case tok::kw___FUNCTION__:
-  case tok::kw___DSO_HANDLE__:
-    llvm_unreachable("Lexer doesn't produce these tokens any more");
-
   case tok::identifier:  // foo
   case tok::kw_self:     // self
 
