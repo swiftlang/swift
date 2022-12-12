@@ -13,7 +13,9 @@
 #ifndef SWIFT_AST_GENERIC_REQUIREMENT_H
 #define SWIFT_AST_GENERIC_REQUIREMENT_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -64,6 +66,7 @@ public:
   }
 
   static GenericRequirement forShape(CanType type) {
+    assert(type->isParameterPack());
     return GenericRequirement(Kind::Shape, type, nullptr);
   }
 
@@ -82,6 +85,20 @@ public:
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
     assert(proto != nullptr);
     return GenericRequirement(Kind::WitnessTable, type, proto);
+  }
+
+  void dump(llvm::raw_ostream &out) const {
+    switch (kind) {
+    case Kind::Shape:
+      out << "shape: " << type;
+      break;
+    case Kind::Metadata:
+      out << "metadata: " << type;
+      break;
+    case Kind::WitnessTable:
+      out << "witness_table: " << type << " : " << proto->getName();
+      break;
+    }
   }
 };
 

@@ -246,7 +246,7 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
                          reqt.getTypeParameter(), erasedTypeParam);
 
     MetadataPath path;
-    Fulfillments.addFulfillment({reqt.getTypeParameter(), reqt.getProtocol()},
+    Fulfillments.addFulfillment(reqt,
                                 Sources.size() - 1, std::move(path),
                                 MetadataState::Complete);
   });
@@ -256,6 +256,17 @@ void
 irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
                                           const RequirementCallback &callback) {
   if (!signature) return;
+
+  // Get all unique pack generic parameter shapes.
+  SmallSetVector<CanType, 2> packs;
+  for (auto gp : signature.getGenericParams()) {
+    if (gp->isParameterPack()) {
+      packs.insert(signature->getReducedShape(gp)->getCanonicalType());
+    }
+  }
+
+  for (auto type : packs)
+    callback(GenericRequirement::forShape(type));
 
   // Get all of the type metadata.
   signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
@@ -442,7 +453,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
 
 void PolymorphicConvention::addSelfMetadataFulfillment(CanType arg) {
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, nullptr},
+  Fulfillments.addFulfillment(GenericRequirement::forMetadata(arg),
                               source, MetadataPath(), MetadataState::Complete);
 }
 
@@ -450,7 +461,7 @@ void PolymorphicConvention::addSelfWitnessTableFulfillment(
     CanType arg, ProtocolConformanceRef conformance) {
   auto proto = conformance.getRequirement();
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, proto},
+  Fulfillments.addFulfillment(GenericRequirement::forWitnessTable(arg, proto),
                               source, MetadataPath(), MetadataState::Complete);
 
   if (conformance.isConcrete()) {
