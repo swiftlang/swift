@@ -64,9 +64,10 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
-      if (requirement.Protocol) {
+      if (requirement.isWitnessTable()) {
         Types.push_back(IGM.WitnessTablePtrTy);
       } else {
+        assert(requirement.isMetadata());
         Types.push_back(IGM.TypeMetadataPtrTy);
       }
     }

@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "MetadataPath.h"
 
 namespace swift {
@@ -48,9 +49,7 @@ struct Fulfillment {
 };
 
 class FulfillmentMap {
-  using FulfillmentKey = std::pair<Type, ProtocolDecl*>;
-
-  llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
+  llvm::DenseMap<GenericRequirement, Fulfillment> Fulfillments;
 
 public:
   struct InterestingKeysCallback {
@@ -115,11 +114,11 @@ public:
   ///
   /// \return true if the fulfillment was added, which won't happen if there's
   ///   already a fulfillment that was at least as good
-  bool addFulfillment(FulfillmentKey key, unsigned source,
+  bool addFulfillment(GenericRequirement key, unsigned source,
                       MetadataPath &&path, MetadataState state);
 
-  const Fulfillment *getTypeMetadata(CanType type) const {
-    auto it = Fulfillments.find({type, nullptr});
+  const Fulfillment *getFulfillment(GenericRequirement key) const {
+    auto it = Fulfillments.find(key);
     if (it != Fulfillments.end()) {
       return &it->second;
     } else {
@@ -127,13 +126,16 @@ public:
     }
   }
 
+  const Fulfillment *getShape(CanType type) const {
+    return getFulfillment(GenericRequirement::forShape(type));
+  }
+
+  const Fulfillment *getTypeMetadata(CanType type) const {
+    return getFulfillment(GenericRequirement::forMetadata(type));
+  }
+
   const Fulfillment *getWitnessTable(CanType type, ProtocolDecl *proto) const {
-    auto it = Fulfillments.find({type, proto});
-    if (it != Fulfillments.end()) {
-      return &it->second;
-    } else {
-      return nullptr;
-    }
+    return getFulfillment(GenericRequirement::forWitnessTable(type, proto));
   }
 
   void dump() const;

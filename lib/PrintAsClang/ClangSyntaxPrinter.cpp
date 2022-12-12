@@ -342,8 +342,8 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(!requirement.Protocol && "protocol requirements not supported yet!");
-  auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
+  assert(requirement.isMetadata() && "protocol requirements not supported yet!");
+  auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
   os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
