@@ -571,8 +571,13 @@ public:
 
     auto numGenericArgs = genericParamsPerLevel[shapeIndex];
 
+    auto startOffsetFromEnd = argsIndex + numGenericArgs;
+    auto endOffsetFromEnd = argsIndex;
+    if (startOffsetFromEnd > args.size() || endOffsetFromEnd > args.size())
+      return nullptr;
+
     std::vector<const TypeRef *> genericParams(
-        args.end() - argsIndex - numGenericArgs, args.end() - argsIndex);
+        args.end() - startOffsetFromEnd, args.end() - endOffsetFromEnd);
 
     const BoundGenericTypeRef *parent = nullptr;
     if (node->hasChildren()) {
