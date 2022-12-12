@@ -18,7 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -260,8 +260,8 @@ ParserStatus Parser::parseGenericWhereClause(
   bool HasNextReq;
   do {
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeGenericRequirement();
+      if (IDECallbacks)
+        IDECallbacks->completeGenericRequirement();
       EndLoc = consumeToken(tok::code_complete);
       Status.setHasCodeCompletionAndIsError();
       break;

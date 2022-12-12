@@ -1996,7 +1996,7 @@ void SwiftLangSupport::getCursorInfo(
           [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
             ParmsResult.mapAsync<CursorInfoResults>(
                 [&](auto &Params, auto DeliverTransformed) {
-                  getCompletionInstance()->cursorInfo(
+                  getIDEInspectionInstance()->cursorInfo(
                       Params.Invocation, Args, fileSystem,
                       Params.completionBuffer, Offset, Params.DiagC,
                       Params.CancellationFlag, DeliverTransformed);

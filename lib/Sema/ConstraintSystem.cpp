@@ -352,19 +352,19 @@ ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
   return scratch;
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(ASTNode node) const {
+bool ConstraintSystem::containsIDEInspectionTarget(ASTNode node) const {
   SourceRange range = node.getSourceRange();
   if (range.isInvalid())
     return false;
-  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(
+bool ConstraintSystem::containsIDEInspectionTarget(
     const ArgumentList *args) const {
   SourceRange range = args->getSourceRange();
   if (range.isInvalid())
     return false;
-  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
@@ -3467,7 +3467,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // contains the completion location
     auto SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
     if (!isForCodeCompletion() ||
-        (SE && !containsCodeCompletionLoc(SE->getArgs()))) {
+        (SE && !containsIDEInspectionTarget(SE->getArgs()))) {
       increaseScore(SK_KeyPathSubscript);
     }
     break;

@@ -18,7 +18,7 @@
 #include "swift/IDE/Utils.h"
 
 namespace swift {
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 
 namespace ide {
 
@@ -30,7 +30,7 @@ public:
 };
 
 /// Create a factory for code completion callbacks.
-CodeCompletionCallbacksFactory *
+IDEInspectionCallbacksFactory *
 makeCursorInfoCallbacksFactory(CursorInfoConsumer &Consumer,
                                SourceLoc RequestedLoc);
 

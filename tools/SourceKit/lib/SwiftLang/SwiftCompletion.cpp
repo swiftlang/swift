@@ -23,7 +23,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -111,7 +111,7 @@ static void swiftCodeCompleteImpl(
               ParamsResult) {
         ParamsResult.mapAsync<CodeCompleteResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
-              Lang.getCompletionInstance()->codeComplete(
+              Lang.getIDEInspectionInstance()->codeComplete(
                   CIParams.Invocation, Args, FileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
                   CompletionContext, CIParams.CancellationFlag,

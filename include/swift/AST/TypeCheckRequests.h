@@ -3340,8 +3340,8 @@ public:
 /// Retrieve the file being used for code completion in the main module.
 // FIXME: This isn't really a type-checking request, if we ever split off a
 // zone for more basic AST requests, this should be moved there.
-class CodeCompletionFileRequest
-    : public SimpleRequest<CodeCompletionFileRequest,
+class IDEInspectionFileRequest
+    : public SimpleRequest<IDEInspectionFileRequest,
                            SourceFile *(ModuleDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;

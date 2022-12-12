@@ -564,7 +564,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   {
     auto range = target.getSourceRange();
     if (range.isInvalid() ||
-        !Context.SourceMgr.rangeContainsCodeCompletionLoc(range))
+        !Context.SourceMgr.rangeContainsIDEInspectionTarget(range))
       return false;
   }
 
