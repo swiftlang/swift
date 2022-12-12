@@ -1116,9 +1116,8 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const char *swift_keyPath_copySymbolName(void *address) {
-  SymbolInfo info;
-  if (lookupSymbol(address, &info) && info.getSymbolName()) {
-    return strdup(info.getSymbolName());
+  if (auto info = SymbolInfo::lookup(address) && info->getSymbolName()) {
+    return strdup(info->getSymbolName());
   }
   return 0;
 }
