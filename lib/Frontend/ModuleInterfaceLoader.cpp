@@ -1993,6 +1993,24 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   if (it == Impl.ExplicitModuleMap.end()) {
     return false;
   }
+
+  // If the caller doesn't want version info we're done.
+  if (!versionInfo)
+    return true;
+
+  // Open .swiftmodule file and read out the version
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(it->second.modulePath);
+  if (!moduleBuf) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                       it->second.modulePath);
+    return false;
+  }
+  auto metaData = serialization::validateSerializedAST(
+      (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+      Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
+  versionInfo->setVersion(metaData.userModuleVersion,
+                          ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
 }
 
