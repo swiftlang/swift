@@ -1780,15 +1780,15 @@ private:
     if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
       // FIXME: Enable this assertion.
 #if SWIFT_DEBUGINFO_CACHE_VERIFICATION
-      if (auto CachedSizeInBits = DbgTy.getTypeSizeInBits()) {
-        if (unsigned SizeInBits = getSizeInBits(DITy)) {
-          if (SizeInBits != *CachedSizeInBits) {
+      if (auto SizeInBits = DbgTy.getTypeSizeInBits()) {
+        if (unsigned CachedSizeInBits = getSizeInBits(DITy)) {
+          if (llvm::alignTo(CachedSizeInBits, 8) != *SizeInBits) {
             DITy->dump();
             DbgTy.dump();
-            llvm::errs() << "SizeInBits = " << SizeInBits << "\n";
-            llvm::errs() << "CachedSizeInBits = " << *CachedSizeInBits << "\n";
+            llvm::errs() << "SizeInBits = " << *SizeInBits << "\n";
+            llvm::errs() << "CachedSizeInBits = " << CachedSizeInBits << "\n";
           }
-          assert(SizeInBits == *CachedSizeInBits);
+          assert(llvm::alignTo(CachedSizeInBits, 8) == *SizeInBits);
         }
       }
 #endif
