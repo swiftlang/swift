@@ -138,10 +138,15 @@ internal func _getMetadataSection(_ index: UInt) -> UnsafeRawPointer?
 @_silgen_name("swift_getMetadataSectionCount")
 internal func _getMetadataSectionCount() -> UInt
 
-@_silgen_name("swift_getMetadataSectionName")
-internal func _getMetadataSectionName(
+@_silgen_name("swift_copyMetadataSectionName")
+internal func _copyMetadataSectionName(
   _ metadata_section: UnsafeRawPointer
-) -> UnsafePointer<CChar>
+) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("swift_freeMetadataSectionName")
+internal func _freeMetadataSectionName(
+  _ name: UnsafeMutablePointer<CChar>
+) -> Void
 #endif
 
 extension Section {
@@ -154,9 +159,13 @@ extension Section {
 internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
 #if INTERNAL_CHECKS_ENABLED
   return _getMetadataSection(UInt(i)).map { rawPointer in
-    let name = _getMetadataSectionName(rawPointer)
+    let cName = _copyMetadataSectionName(rawPointer)
+    defer {
+      _freeMetadataSectionName(cName)
+    }
+    let name = cName.flatMap { String(validatingUTF8: $0) } ?? "<unavailable>"
     let metadataSection = rawPointer.bindMemory(to: MetadataSections.self, capacity: 1).pointee
-    return ReflectionInfo(imageName: String(validatingUTF8: name)!,
+    return ReflectionInfo(imageName: name,
             fieldmd: Section(range: metadataSection.swift5_fieldmd),
             assocty: Section(range: metadataSection.swift5_assocty),
             builtin: Section(range: metadataSection.swift5_builtin),

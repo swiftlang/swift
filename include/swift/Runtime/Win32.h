@@ -21,15 +21,16 @@
 
 #include "swift/shims/Visibility.h"
 
+#include <cwchar>
 #include <functional>
 #include <type_traits>
 
 // For HANDLE
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <windows.h>
+#include <Windows.h>
 
-#include <wchar.h>
+#pragma mark - Wide-character string conversion
 
 /// Convert a wide string to UTF-8.
 ///
@@ -52,6 +53,8 @@ char *_swift_win32_copyUTF8FromWide(const wchar_t *str);
 /// If @a str cannot be converted to UTF-16, @c nullptr is returned.
 SWIFT_RUNTIME_STDLIB_SPI
 wchar_t *_swift_win32_copyWideFromUTF8(const char *str);
+
+#pragma mark - DbgHelp library thread-safety
 
 /// Configure the environment to allow calling into the Debug Help library.
 ///

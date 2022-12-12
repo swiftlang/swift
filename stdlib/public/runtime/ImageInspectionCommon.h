@@ -89,8 +89,11 @@ void swift_enumerateAllMetadataSections(
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
-const char *
-swift_getMetadataSectionName(const struct swift::MetadataSections *section);
+char *
+swift_copyMetadataSectionName(const struct swift::MetadataSections *section);
+
+SWIFT_RUNTIME_EXPORT
+void swift_freeMetadataSectionName(char *name);
 
 SWIFT_RUNTIME_EXPORT
 void swift_getMetadataSectionBaseAddress(

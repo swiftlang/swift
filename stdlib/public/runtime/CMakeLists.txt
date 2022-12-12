@@ -50,8 +50,6 @@ set(swift_runtime_sources
     HeapObject.cpp
     ImageInspectionCommon.cpp
     ImageInspectionMachO.cpp
-    ImageInspectionELF.cpp
-    ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
     ImageInspectionWasm.cpp
     SymbolInfo.cpp

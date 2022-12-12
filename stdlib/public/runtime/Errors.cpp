@@ -79,8 +79,7 @@ enum: uint32_t {
 using namespace swift;
 
 #if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
-static bool getSymbolNameAddr(llvm::StringRef libraryName,
-                              const SymbolInfo &syminfo,
+static bool getSymbolNameAddr(const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
@@ -150,12 +149,14 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     return;
   }
 
-  // If SymbolInfo:lookup succeeded then fileName is non-null. Thus, we find the
+  // If SymbolInfo:lookup succeeded and fileName is non-null, we can find the
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  llvm::StringRef libraryName{syminfo->getFilename()};
-  libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
+  const char *libraryName = syminfo->getImageFilename();
+  if (!libraryName) {
+    libraryName = "<unavailable>";
+  }
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -164,12 +165,12 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // we just get HexAddr + 0.
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
-      getSymbolNameAddr(libraryName, syminfo.value(), symbolName, symbolAddr);
+      getSymbolNameAddr(syminfo.value(), symbolName, symbolAddr);
   ptrdiff_t offset = 0;
   if (foundSymbol) {
     offset = ptrdiff_t(uintptr_t(framePC) - symbolAddr);
   } else {
-    auto baseAddress = syminfo->getBaseAddress();
+    const void *baseAddress = syminfo->getImageBaseAddress();
     offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(baseAddress));
     symbolAddr = uintptr_t(framePC);
     symbolName = "<unavailable>";
@@ -183,12 +184,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // This gives enough info to reconstruct identical debugging target after
   // this process terminates.
   if (shortOutput) {
-    fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
-            offset);
+    fprintf(stderr, "%s`%s + %td", libraryName, symbolName.c_str(), offset);
   } else {
     constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
-    fprintf(stderr, format, index, libraryName.data(), symbolAddr,
-            symbolName.c_str(), offset);
+    fprintf(stderr, format, index, libraryName, symbolAddr, symbolName.c_str(),
+            offset);
   }
 #else
   if (shortOutput) {

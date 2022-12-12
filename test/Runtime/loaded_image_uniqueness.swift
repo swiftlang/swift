@@ -12,10 +12,15 @@ internal func _getMetadataSection(_ index: UInt) -> UnsafeRawPointer?
 @_silgen_name("swift_getMetadataSectionCount")
 internal func _getMetadataSectionCount() -> UInt
 
-@_silgen_name("swift_getMetadataSectionName")
-internal func _getMetadataSectionName(
-  _ metadata_section: UnsafeRawPointer
-) -> UnsafePointer<CChar>
+@_silgen_name("swift_copyMetadataSectionName")
+internal func _copyMetadataSectionName(
+    _ metadata_section: UnsafeRawPointer
+) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("swift_freeMetadataSectionName")
+internal func _freeMetadataSectionName(
+  _ name: UnsafeMutablePointer<CChar>
+) -> Void
 
 @_silgen_name("swift_getMetadataSectionBaseAddress")
 internal func _getMetadataSectionBaseAddress(
@@ -34,7 +39,11 @@ do {
     guard let section = _getMetadataSection(i) else {
       fatalError("Section \(i) failed to resolve.")
     }
-    let name = String(cString: _getMetadataSectionName(section))
+    let cName = _copyMetadataSectionName(rawPointer)
+    defer {
+      _freeMetadataSectionName(cName)
+    }
+    let name = cName.flatMap { String(validatingUTF8: $0) } ?? "<unavailable>"
 
     var actual: UnsafeRawPointer? = nil
     var expected: UnsafeRawPointer? = nil
