@@ -280,9 +280,14 @@ public:
     if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
       return;
     // Get the underlying clang type from a type alias decl or record decl.
-    clang::QualType clangType(
-        cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(), 0);
-    auto it = seenClangTypes.insert(clangType.getCanonicalType().getTypePtr());
+    auto clangType =
+        clang::QualType(
+            cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(),
+            0)
+            .getCanonicalType();
+    if (!isa<clang::RecordType>(clangType.getTypePtr()))
+      return;
+    auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
