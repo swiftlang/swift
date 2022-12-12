@@ -153,3 +153,10 @@ func test() {
     onSomeGlobalActor()
   }
 }
+
+// https://github.com/apple/swift/issues/61436
+let x: @MainActor () -> Void
+
+let y: () -> Void = {}
+
+x = true ? y : y // Ok
