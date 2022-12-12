@@ -2243,6 +2243,10 @@ public:
     require(
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
+    if (EBI->getOperand()->getType().isAddress()) {
+      require(isa<StoreBorrowInst>(EBI->getOperand()),
+              "end_borrow of an address not produced by store_borrow");
+    }
   }
 
   void checkEndLifetimeInst(EndLifetimeInst *I) {
@@ -2446,6 +2450,8 @@ public:
   }
 
   void checkStoreBorrowInst(StoreBorrowInst *SI) {
+    // A store_borrow must be to an alloc_stack.  That alloc_stack can only be
+    // used by store_borrows (and dealloc_stacks).
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
     require(!fnConv.useLoweredAddresses()
@@ -2453,15 +2459,12 @@ public:
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
-    require(isa<AllocStackInst>(SI->getDest()),
-            "store_borrow destination should be alloc_stack");
-    requireSameType(SI->getDest()->getType().getObjectType(),
-                    SI->getSrc()->getType(),
-                    "Store operand type and dest type mismatch");
-
     // Note: This is the current implementation and the design is not final.
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
+    requireSameType(SI->getDest()->getType().getObjectType(),
+                    SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
 
     SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
