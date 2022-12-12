@@ -252,11 +252,7 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(GenericRequirement requirement, ClassDecl *forClass) {
-    addPointer();
-  }
-  void addGenericWitnessTable(GenericRequirement requirement,
-                              ClassDecl *forClass) {
+  void addGenericRequirement(GenericRequirement requirement, ClassDecl *forClass) {
     addPointer();
   }
   void addPlaceholder(MissingMemberDecl *MMD) {
