@@ -37,6 +37,8 @@
 #include <dlfcn.h>
 #endif
 
+#include "llvm/ADT/Optional.h"
+
 namespace swift {
 struct SymbolInfo {
 private:
@@ -50,22 +52,49 @@ public:
   SymbolInfo() {}
 
   /// Get the file name of the image where the symbol was found.
-  const char *getFileName() const;
+  ///
+  /// The resulting C string is only valid for the lifetime of \c this.
+  const char *getFilename() const;
 
   /// Get the base address of the image where the symbol was found.
   const void *getBaseAddress() const;
 
   /// Get the name of the symbol.
+  ///
+  /// The resulting C string is only valid for the lifetime of \c this.
   const char *getSymbolName() const;
 
   /// Get the address of the symbol.
   const void *getSymbolAddress() const;
 
-  static int lookup(const void *address, SymbolInfo *outInfo);
+  /// Look up a symbol by address.
+  ///
+  /// \param address The address where the symbol is located.
+  ///
+  /// \returns On success, an instance of \c SymbolInfo containing information
+  ///   about the symbol at \a address. On failure, \c llvm::None.
+  static llvm::Optional<SymbolInfo> lookup(const void *address);
 };
 
+/// Look up a symbol by address and store the result in a locally-declared
+/// \c SymbolInfo value.
+///
+/// \param address The address where the symbol is located.
+/// \param outInfo On successful return, populated with information about the
+///   symbol at \a address. On failure, unspecified.
+///
+/// \returns On success, a non-zero integer. On failure, zero.
+///
+/// \note This function will be replaced with \c SymbolInfo::lookup() in a
+///   future update.
 static inline int lookupSymbol(const void *address, SymbolInfo *outInfo) {
-  return SymbolInfo::lookup(address, outInfo);
+  auto info = SymbolInfo::lookup(address);
+  if (info.has_value()) {
+    *outInfo = info.value();
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 } // end namespace swift

@@ -21,11 +21,13 @@
 #include <dlfcn.h>
 #endif
 
+#include <utility>
+
 #include "ImageInspection.h"
 
 using namespace swift;
 
-const char *swift::SymbolInfo::getFileName() const {
+const char *swift::SymbolInfo::getFilename() const {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   return nullptr;
 #elif SWIFT_STDLIB_HAS_DLADDR
@@ -65,31 +67,32 @@ const void *swift::SymbolInfo::getSymbolAddress() const {
 #endif
 }
 
-int swift::SymbolInfo::lookup(const void *address, SymbolInfo *outInfo) {
-  int result = 0;
+llvm::Optional<SymbolInfo> swift::SymbolInfo::lookup(const void *address) {
+  llvm::Optional<SymbolInfo> result;
 
 #if defined(__wasm__)
   // Currently, Wasm doesn't have a standard stable ABI for exporting address <->
   // symbol table, it's work in progress. Also, there is no API to access such
   // information from Wasm binary side. It's accessible only from host VM.
   // See https://github.com/WebAssembly/tool-conventions/blob/main/DynamicLinking.md
-
 #elif defined(_WIN32) && !defined(__CYGWIN__)
   _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) {
     if (!hProcess) {
-      return;
+      return 0;
     }
 
-    outInfo->_package.si.SizeOfStruct = sizeof(SYMBOL_INFO);
-    outInfo->_package.si.MaxNameLen = MAX_SYM_NAME;
+    SymbolInfo info;
+    info._package.si.SizeOfStruct = sizeof(SYMBOL_INFO);
+    info._package.si.MaxNameLen = MAX_SYM_NAME;
     if (SymFromAddr(hProcess, reinterpret_cast<const DWORD64>(address),
-                    nullptr, &outInfo->_package.si)) {
-      result = 1;
+                    nullptr, &info._package.si)) {
+      result = std::move(info);
     }
   });
 #elif SWIFT_STDLIB_HAS_DLADDR
-  if (dladdr(address, &outInfo->_info)) {
-    result = 1;
+  SymbolInfo info;
+  if (dladdr(address, &info._info)) {
+    result = std::move(info);
   }
 #endif
 

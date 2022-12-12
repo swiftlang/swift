@@ -155,7 +155,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  llvm::StringRef libraryName{syminfo.getFileName()};
+  llvm::StringRef libraryName{syminfo.getFilename()};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.

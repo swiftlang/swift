@@ -192,8 +192,8 @@ const char *
 swift_getMetadataSectionName(const swift::MetadataSections *section) {
   swift::SymbolInfo info;
   if (lookupSymbol(section, &info)) {
-    if (info.getFileName()) {
-      return info.getFileName();
+    if (info.getFilename()) {
+      return info.getFilename();
     }
   }
   return "";
