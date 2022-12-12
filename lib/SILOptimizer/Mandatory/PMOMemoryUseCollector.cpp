@@ -390,7 +390,6 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         Uses.emplace_back(User, PMOUseKind::IndirectIn);
         continue;

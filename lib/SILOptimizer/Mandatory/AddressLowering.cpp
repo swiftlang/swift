@@ -963,7 +963,7 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   // necessary to introduce new storage and move to it.
   if (isa<LoadBorrowInst>(defInst) ||
       (isa<BeginApplyInst>(defInst) &&
-       value.getOwnershipKind() == OwnershipKind::Guaranteed))
+       value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
 
   return false;
@@ -2833,7 +2833,6 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   case ParameterConvention::Indirect_InoutAliasable:
     return;
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     ownership = OwnershipKind::Owned;
     break;
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -3101,8 +3100,17 @@ protected:
     llvm::report_fatal_error("Unimplemented SelectValue use.");
   }
 
-  // Opaque enum operand to a switch_enum.
-  void visitSwitchEnumInst(SwitchEnumInst *SEI);
+  void visitStoreBorrowInst(StoreBorrowInst *sbi) {
+    auto addr = addrMat.materializeAddress(use->get());
+    SmallVector<Operand *, 4> uses(sbi->getUses());
+    for (auto *use : uses) {
+      if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+        pass.deleter.forceDelete(ebi);
+      }
+    }
+    sbi->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(sbi);
+  }
 
   void rewriteStore(SILValue srcVal, SILValue destAddr,
                     IsInitialization_t isInit);
@@ -3133,6 +3141,9 @@ protected:
   // loadable elements that compose a struct can be handled. An address-only
   // member implies an address-only Struct.
   void visitStructInst(StructInst *structInst) {}
+
+  // Opaque enum operand to a switch_enum.
+  void visitSwitchEnumInst(SwitchEnumInst *SEI);
 
   // Opaque call argument.
   void visitTryApplyInst(TryApplyInst *tryApplyInst) {
