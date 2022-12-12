@@ -3426,31 +3426,46 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   // Get the corresponding context type.
   auto type = getInContext(requirement.getTypeParameter());
 
-  if (requirement.isWitnessTable()) {
+  switch (requirement.getKind()) {
+  case GenericRequirement::Kind::Shape: {
+    assert(isa<ArchetypeType>(type));
+    assert(value->getType() == IGF.IGM.SizeTy);
+    auto kind = LocalTypeDataKind::forPackShapeExpression();
+    IGF.setUnscopedLocalTypeData(type, kind, value);
+    break;
+  }
+
+  case GenericRequirement::Kind::Metadata: {
+    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
+    setTypeMetadataName(IGF.IGM, value, type);
+    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
+    break;
+  }
+
+  case GenericRequirement::Kind::WitnessTable: {
     auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
     assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
     IGF.setUnscopedLocalTypeData(type, kind, value);
-  } else {
-    assert(requirement.isMetadata());
-    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
-    setTypeMetadataName(IGF.IGM, value, type);
-    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
+    break;
+  }
   }
 }
 
 namespace {
   /// A class for expanding a polymorphic signature.
   class ExpandPolymorphicSignature : public PolymorphicConvention {
+    unsigned numShapes = 0;
     unsigned numTypeMetadataPtrs = 0;
+    unsigned numWitnessTablePtrs = 0;
 
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(IGM, fn) {}
 
-    unsigned
+    ExpandedSignature
     expand(SmallVectorImpl<llvm::Type *> &out,
            SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
       auto outStartSize = out.size();
@@ -3461,17 +3476,24 @@ namespace {
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
           reqs->push_back(reqt);
-        out.push_back(reqt.isWitnessTable() ? IGM.WitnessTablePtrTy
-                                            : IGM.TypeMetadataPtrTy);
-
-        if (reqt.isMetadata())
+        switch (reqt.getKind()) {
+        case GenericRequirement::Kind::Shape:
+          out.push_back(IGM.SizeTy);
+          ++numShapes;
+          break;
+        case GenericRequirement::Kind::Metadata:
+          out.push_back(IGM.TypeMetadataPtrTy);
           ++numTypeMetadataPtrs;
-        else
-          assert(reqt.isWitnessTable());
+          break;
+        case GenericRequirement::Kind::WitnessTable:
+          out.push_back(IGM.WitnessTablePtrTy);
+          ++numWitnessTablePtrs;
+          break;
+        }
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
-      return numTypeMetadataPtrs;
+      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs};
     }
 
   private:
@@ -3499,7 +3521,7 @@ namespace {
 } // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
-unsigned irgen::expandPolymorphicSignature(
+ExpandedSignature irgen::expandPolymorphicSignature(
     IRGenModule &IGM, CanSILFunctionType polyFn,
     SmallVectorImpl<llvm::Type *> &out,
     SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs) {
