@@ -1,3 +1,5 @@
+// REQUIRES: rdar103268363
+
 // RUN: %empty-directory(%t/split)
 // RUN: %{python} %utils/split_file.py -o %t/split %s
 // RUN: %empty-directory(%t/build)
