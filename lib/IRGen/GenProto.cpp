@@ -3364,19 +3364,22 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
   CanType depTy = requirement.getTypeParameter();
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
-  if (requirement.isMetadata()) {
-    auto argMetadata = IGF.emitTypeMetadataRef(argType);
-    return argMetadata;
+  switch (requirement.getKind()) {
+  case GenericRequirement::Kind::Shape:
+    return IGF.emitPackShapeExpression(argType);
+
+  case GenericRequirement::Kind::Metadata:
+    return IGF.emitTypeMetadataRef(argType);
+
+  case GenericRequirement::Kind::WitnessTable: {
+    auto proto = requirement.getProtocol();
+    auto conformance = subs.lookupConformance(depTy, proto);
+    assert(conformance.getRequirement() == proto);
+    llvm::Value *metadata = nullptr;
+    auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);
+    return wtable;
   }
-
-  assert(requirement.isWitnessTable());
-
-  auto proto = requirement.getProtocol();
-  auto conformance = subs.lookupConformance(depTy, proto);
-  assert(conformance.getRequirement() == proto);
-  llvm::Value *metadata = nullptr;
-  auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);
-  return wtable;
+  }
 }
 
 void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,

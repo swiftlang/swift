@@ -33,6 +33,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenMeta.cpp
   GenObjC.cpp
   GenOpaque.cpp
+  GenPack.cpp
   GenPointerAuth.cpp
   GenPoly.cpp
   GenProto.cpp
