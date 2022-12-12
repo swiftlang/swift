@@ -305,18 +305,8 @@ PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback
 void PolymorphicConvention::
 enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
   enumerateRequirements([&](GenericRequirement requirement) {
-    if (requirement.isWitnessTable()) {
-      if (!Fulfillments.getWitnessTable(requirement.getTypeParameter(),
-                                        requirement.getProtocol())) {
-        callback(requirement);
-      }
-    } else {
-      assert(requirement.isMetadata());
-
-      if (!Fulfillments.getTypeMetadata(requirement.getTypeParameter())) {
-        callback(requirement);
-      }
-    }
+    if (!Fulfillments.getFulfillment(requirement))
+      callback(requirement);
   });
 }
 
