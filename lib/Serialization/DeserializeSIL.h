@@ -15,7 +15,7 @@
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/SaveAndRestore.h"

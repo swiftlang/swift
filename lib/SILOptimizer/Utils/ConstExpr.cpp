@@ -27,9 +27,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SerializedSILLoader.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Support/TrailingObjects.h"
 

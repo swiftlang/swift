@@ -27,10 +27,10 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SerializedSILLoader.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
 
 using namespace swift;

@@ -26,7 +26,7 @@
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SerializedSILLoader.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"

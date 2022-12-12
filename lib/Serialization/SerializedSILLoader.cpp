@@ -18,8 +18,8 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
+#include "swift/SIL/SerializedSILLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
