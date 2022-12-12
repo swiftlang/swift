@@ -4858,6 +4858,10 @@ void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
   visit(expr->getPatternExpr());
 }
 
+void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
+  visit(expr->getPackRefExpr());
+}
+
 void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {
 }
 

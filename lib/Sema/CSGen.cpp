@@ -2984,6 +2984,10 @@ namespace {
       return PackExpansionType::get(patternTy, shapeTypeVar);
     }
 
+    Type visitPackElementExpr(PackElementExpr *expr) {
+      llvm_unreachable("not implemented for PackElementExpr");
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);

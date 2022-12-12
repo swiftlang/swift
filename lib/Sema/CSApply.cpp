@@ -3829,6 +3829,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitPackElementExpr(PackElementExpr *expr) {
+      llvm_unreachable("not implemented for PackElementExpr");
+    }
+
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       Expr *base = expr->getBase();
       base = cs.coerceToRValue(base);
