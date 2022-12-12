@@ -898,7 +898,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:

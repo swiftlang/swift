@@ -459,8 +459,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   }
 
   switch (param.getConvention()) {
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant: {
+  case ParameterConvention::Indirect_In: {
     // The only way to load opaque type is to allocate a temporary
     // variable on the stack for it and initialize from the given address
     // either at +0 or +1 depending on convention.

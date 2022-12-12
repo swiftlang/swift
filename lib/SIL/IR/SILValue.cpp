@@ -215,7 +215,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
     value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
                                                     : OwnershipKind::Owned;
     break;
