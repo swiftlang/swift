@@ -3154,8 +3154,8 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   // For now, treat all archetypes independently.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
     llvm::Value *requiredValue =
-      emitGenericRequirementFromSubstitutions(IGF, Generics,
-                                              requirement, subs);
+      emitGenericRequirementFromSubstitutions(IGF, requirement, subs,
+                                              MetadataState::Complete);
     out.add(requiredValue);
   });
 
@@ -3277,7 +3277,6 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
-  Generics = generics;
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
@@ -3297,26 +3296,6 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // We do not need to consider extra sources.
 }
 
-void
-GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
-                                               SubstitutionMap subs,
-                                               FulfillmentCallback callback) {
-  if (empty()) return;
-
-  for (auto reqtIndex : indices(getRequirements())) {
-    auto &reqt = getRequirements()[reqtIndex];
-    CanType type = reqt.getTypeParameter().subst(subs)->getCanonicalType();
-    if (reqt.isWitnessTable()) {
-      auto conformance =
-          subs.lookupConformance(reqt.getTypeParameter(), reqt.getProtocol());
-      callback(reqtIndex, type, conformance);
-    } else {
-      assert(reqt.isMetadata());
-      callback(reqtIndex, type, ProtocolConformanceRef::forInvalid());
-    }
-  }
-}
-
 void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
                                                SubstitutionMap subs,
                                                Address buffer) {
@@ -3324,8 +3303,8 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
 
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {
-    return emitGenericRequirementFromSubstitutions(IGF, Generics,
-                                                   requirement, subs);
+    return emitGenericRequirementFromSubstitutions(IGF, requirement, subs,
+                                                   MetadataState::Complete);
   });
 }
 
@@ -3358,9 +3337,9 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
 
 llvm::Value *
 irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
-                                               CanGenericSignature generics,
                                                GenericRequirement requirement,
-                                               SubstitutionMap subs) {
+                                               SubstitutionMap subs,
+                                               DynamicMetadataRequest request) {
   CanType depTy = requirement.getTypeParameter();
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
@@ -3369,7 +3348,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
     return IGF.emitPackShapeExpression(argType);
 
   case GenericRequirement::Kind::Metadata:
-    return IGF.emitTypeMetadataRef(argType);
+    return IGF.emitTypeMetadataRef(argType, request).getMetadata();
 
   case GenericRequirement::Kind::WitnessTable: {
     auto proto = requirement.getProtocol();

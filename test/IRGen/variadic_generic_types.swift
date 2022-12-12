@@ -17,3 +17,12 @@ struct G<T...> {
     callee()
   }
 }
+
+func blackHole<T>(_: T) {}
+
+blackHole(G< >.self)
+blackHole(G<Int, String>.self)
+
+func genericMetadata<T...>(_: T...) {
+  blackHole(G<T... >.self)
+}

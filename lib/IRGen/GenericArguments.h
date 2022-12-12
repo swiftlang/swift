@@ -29,6 +29,7 @@
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -50,13 +51,7 @@ struct GenericArguments {
   SmallVector<llvm::Value *, 8> Values;
   SmallVector<llvm::Type *, 8> Types;
 
-  static unsigned getNumGenericArguments(IRGenModule &IGM,
-                                         NominalTypeDecl *nominal) {
-    GenericTypeRequirements requirements(IGM, nominal);
-    return requirements.getNumTypeRequirements();
-  }
-
-  void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
+ void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
     GenericTypeRequirements requirements(IGM, nominal);
     collectTypes(IGM, requirements);
   }
@@ -87,15 +82,10 @@ struct GenericArguments {
   void collect(IRGenFunction &IGF, SubstitutionMap subs) {
     GenericTypeRequirements requirements(IGF.IGM, subs.getGenericSignature());
 
-    requirements.enumerateFulfillments(
-        IGF.IGM, subs,
-        [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
-          if (conf) {
-            Values.push_back(emitWitnessTableRef(IGF, type, conf));
-          } else {
-            Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-          }
-        });
+    for (auto requirement : requirements.getRequirements()) {
+      Values.push_back(emitGenericRequirementFromSubstitutions(
+          IGF, requirement, subs, MetadataState::Abstract));
+    }
 
     collectTypes(IGF.IGM, requirements);
     assert(Types.size() == Values.size());
