@@ -439,9 +439,10 @@ ModuleDependenciesCache::getDependencyReferencesMap(
 ModuleDependenciesCache::ModuleDependenciesCache(
     GlobalModuleDependenciesCache &globalCache,
     std::string mainScanModuleName,
-    std::string scanningContextHash)
+    std::string scannerContextHash)
     : globalCache(globalCache),
       mainScanModuleName(mainScanModuleName),
+      scannerContextHash(scannerContextHash),
       clangScanningTool(globalCache.ClangScanningService) {
   globalCache.configureForContextHash(scannerContextHash);
   for (auto kind = ModuleDependenciesKind::FirstKind;
