@@ -61,7 +61,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SerializedSILLoader.h"
 #include <functional>
 
 using namespace swift;
