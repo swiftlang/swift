@@ -21,13 +21,11 @@
 #include <dlfcn.h>
 #endif
 
-#include <utility>
-
 #include "ImageInspection.h"
 
 using namespace swift;
 
-const char *swift::SymbolInfo::getFilename() const {
+const char *SymbolInfo::getFilename() const {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   return nullptr;
 #elif SWIFT_STDLIB_HAS_DLADDR
@@ -37,7 +35,7 @@ const char *swift::SymbolInfo::getFilename() const {
 #endif
 }
 
-const void *swift::SymbolInfo::getBaseAddress() const {
+const void *SymbolInfo::getBaseAddress() const {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   return reinterpret_cast<const void *>(_package.si.ModBase);
 #elif SWIFT_STDLIB_HAS_DLADDR
@@ -47,7 +45,7 @@ const void *swift::SymbolInfo::getBaseAddress() const {
 #endif
 }
 
-const char *swift::SymbolInfo::getSymbolName() const {
+const char *SymbolInfo::getSymbolName() const {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   return _package.si.Name;
 #elif SWIFT_STDLIB_HAS_DLADDR
@@ -57,7 +55,7 @@ const char *swift::SymbolInfo::getSymbolName() const {
 #endif
 }
 
-const void *swift::SymbolInfo::getSymbolAddress() const {
+const void *SymbolInfo::getSymbolAddress() const {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   return reinterpret_cast<const void *>(_package.si.Address);
 #elif SWIFT_STDLIB_HAS_DLADDR
@@ -67,7 +65,7 @@ const void *swift::SymbolInfo::getSymbolAddress() const {
 #endif
 }
 
-llvm::Optional<SymbolInfo> swift::SymbolInfo::lookup(const void *address) {
+llvm::Optional<SymbolInfo> SymbolInfo::lookup(const void *address) {
   llvm::Optional<SymbolInfo> result;
 
 #if defined(__wasm__)
@@ -78,7 +76,7 @@ llvm::Optional<SymbolInfo> swift::SymbolInfo::lookup(const void *address) {
 #elif defined(_WIN32) && !defined(__CYGWIN__)
   _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) {
     if (!hProcess) {
-      return 0;
+        return;
     }
 
     SymbolInfo info;
@@ -86,13 +84,13 @@ llvm::Optional<SymbolInfo> swift::SymbolInfo::lookup(const void *address) {
     info._package.si.MaxNameLen = MAX_SYM_NAME;
     if (SymFromAddr(hProcess, reinterpret_cast<const DWORD64>(address),
                     nullptr, &info._package.si)) {
-      result = std::move(info);
+      result = info;
     }
   });
 #elif SWIFT_STDLIB_HAS_DLADDR
   SymbolInfo info;
   if (dladdr(address, &info._info)) {
-    result = std::move(info);
+    result = info;
   }
 #endif
 
