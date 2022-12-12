@@ -845,12 +845,12 @@ private:
     return cast<llvm::DIFile>(Scope);
   }
 
-  static Size getStorageSize(const llvm::DataLayout &DL,
-                             ArrayRef<llvm::Value *> Storage) {
-    unsigned size = 0;
+  static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
+                                       ArrayRef<llvm::Value *> Storage) {
+    unsigned SizeInBits = 0;
     for (llvm::Value *Piece : Storage)
-      size += DL.getTypeSizeInBits(Piece->getType());
-    return Size(size);
+      SizeInBits += DL.getTypeSizeInBits(Piece->getType());
+    return SizeInBits;
   }
 
   StringRef getMangledName(DebugTypeInfo DbgTy) {
@@ -948,10 +948,9 @@ private:
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
     auto *Ty = getOrCreateType(DbgTy);
-    auto *DITy = DBuilder.createMemberType(
-        Scope, Name, File, 0,
-        SizeOfByte * DbgTy.getSizeValue(), 0, OffsetInBits,
-        Flags, Ty);
+    auto *DITy =
+        DBuilder.createMemberType(Scope, Name, File, 0, DbgTy.getSizeInBits(),
+                                  0, OffsetInBits, Flags, Ty);
     OffsetInBits += getSizeInBits(Ty);
     OffsetInBits = llvm::alignTo(OffsetInBits,
                                  SizeOfByte * DbgTy.getAlignment().getValue());
@@ -1017,8 +1016,7 @@ private:
                                         llvm::DIFile *File, unsigned Line,
                                         llvm::DINode::DIFlags Flags) {
     StringRef Name = Decl->getName().str();
-    unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
-    unsigned SizeInBits = DbgTy.getSizeValue() * SizeOfByte;
+    unsigned SizeInBits = DbgTy.getSizeInBits();
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
@@ -1050,8 +1048,8 @@ private:
         // the storage size from the enum.
         ElemDbgTy = CompletedDebugTypeInfo::get(
             DebugTypeInfo(Decl->getRawType(), DbgTy.getFragmentStorageType(),
-                          DbgTy.getRawSize(), DbgTy.getAlignment(), true, false,
-                          DbgTy.isSizeFragmentSize()));
+                          DbgTy.getRawSizeInBits(), DbgTy.getAlignment(), true,
+                          false, DbgTy.isSizeFragmentSize()));
       else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A discriminated union. This should really be described as a
         // DW_TAG_variant_type. For now only describing the data.
@@ -1089,15 +1087,14 @@ private:
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
     DebugTypeInfo BlandDbgTy(
-        Ty, DbgTy.getFragmentStorageType(), DbgTy.getRawSize(),
+        Ty, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
         DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
         DbgTy.isMetadataType(), DbgTy.isSizeFragmentSize());
     return getOrCreateType(BlandDbgTy);
   }
 
   uint64_t getSizeOfBasicType(CompletedDebugTypeInfo DbgTy) {
-    uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    uint64_t BitWidth = DbgTy.getSizeValue() * SizeOfByte;
+    uint64_t BitWidth = DbgTy.getSizeInBits();
     llvm::Type *StorageType = DbgTy.getFragmentStorageType()
                                   ? DbgTy.getFragmentStorageType()
                                   : IGM.DataLayout.getSmallestLegalIntType(
@@ -1332,8 +1329,8 @@ private:
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
     // FIXME: SizeInBits is redundant with DbgTy, remove it.
     uint64_t SizeInBits = 0;
-    if (DbgTy.getTypeSize())
-      SizeInBits = DbgTy.getTypeSize()->getValue() * SizeOfByte;
+    if (DbgTy.getTypeSizeInBits())
+      SizeInBits = *DbgTy.getTypeSizeInBits();
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
@@ -1448,7 +1445,7 @@ private:
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       StringRef Name = Decl->getName().str();
-      if (DbgTy.getTypeSize())
+      if (DbgTy.getTypeSizeInBits())
         return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
                                   AlignInBits, Flags, MangledName);
       return DBuilder.createForwardDecl(
@@ -1688,7 +1685,7 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.getFragmentStorageType(),
-                                 DbgTy.getRawSize(), DbgTy.getAlignment(),
+                                 DbgTy.getRawSizeInBits(), DbgTy.getAlignment(),
                                  DbgTy.hasDefaultAlignment(), false,
                                  DbgTy.isSizeFragmentSize());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
@@ -1783,9 +1780,16 @@ private:
     if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
       // FIXME: Enable this assertion.
 #if SWIFT_DEBUGINFO_CACHE_VERIFICATION
-      if (auto CachedSize = DbgTy.getTypeSize()) {
-        if (unsigned Size = getSizeInBits(DITy))
-          assert(llvm::alignTo(Size, 8) / 8 == CachedSize->getValue());
+      if (auto CachedSizeInBits = DbgTy.getTypeSizeInBits()) {
+        if (unsigned SizeInBits = getSizeInBits(DITy)) {
+          if (SizeInBits != *CachedSizeInBits) {
+            DITy->dump();
+            DbgTy.dump();
+            llvm::errs() << "SizeInBits = " << SizeInBits << "\n";
+            llvm::errs() << "CachedSizeInBits = " << *CachedSizeInBits << "\n";
+          }
+          assert(SizeInBits == *CachedSizeInBits);
+        }
       }
 #endif
       return DITy;
@@ -2530,8 +2534,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (DbgTy.getType()->hasOpenedExistential())
     return;
 
-  if (!DbgTy.getTypeSize())
-    DbgTy.setSize(getStorageSize(IGM.DataLayout, Storage));
+  if (!DbgTy.getTypeSizeInBits())
+    DbgTy.setSizeInBits(getStorageSizeInBits(IGM.DataLayout, Storage));
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");

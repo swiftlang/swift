@@ -43,14 +43,19 @@ protected:
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   llvm::Type *FragmentStorageType = nullptr;
-  Optional<Size> size;
-  Alignment align;
+  Optional<Size::int_type> SizeInBits;
+  Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
   bool SizeIsFragmentSize;
 
 public:
   DebugTypeInfo() = default;
+  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
+                Optional<Size::int_type> SizeInBits = {},
+                Alignment AlignInBytes = Alignment(1),
+                bool HasDefaultAlignment = true, bool IsMetadataType = false,
+                bool IsFragmentTypeInfo = false);
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
                 Optional<Size> SizeInBytes, Alignment AlignInBytes,
                 bool HasDefaultAlignment, bool IsMetadataType,
@@ -99,16 +104,16 @@ public:
   }
 
   llvm::Type *getFragmentStorageType() const {
-    if (size && size->isZero())
+    if (SizeInBits && *SizeInBits == 0)
       assert(FragmentStorageType && "only defined types may have a size");
     return FragmentStorageType;
   }
-  Optional<Size> getTypeSize() const {
-    return SizeIsFragmentSize ? llvm::None : size;
+  Optional<Size::int_type> getTypeSizeInBits() const {
+    return SizeIsFragmentSize ? llvm::None : SizeInBits;
   }
-  Optional<Size> getRawSize() const { return size; }
-  void setSize(Size NewSize) { size = NewSize; }
-  Alignment getAlignment() const { return align; }
+  Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
+  void setSizeInBits(Size::int_type NewSize) { SizeInBits = NewSize; }
+  Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
   bool isMetadataType() const { return IsMetadataType; }
@@ -128,7 +133,7 @@ class CompletedDebugTypeInfo : public DebugTypeInfo {
 
 public:
   static Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
-    if (!DbgTy.getRawSize() || DbgTy.isSizeFragmentSize())
+    if (!DbgTy.getRawSizeInBits() || DbgTy.isSizeFragmentSize())
       return {};
     return CompletedDebugTypeInfo(DbgTy);
   }
@@ -139,7 +144,7 @@ public:
         DebugTypeInfo::getFromTypeInfo(Ty, Info, /*IsFragment*/ false));
   }
 
-  Size::int_type getSizeValue() const { return size->getValue(); }
+  Size::int_type getSizeInBits() const { return *SizeInBits; }
 };
 
 }

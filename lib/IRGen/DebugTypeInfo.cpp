@@ -25,13 +25,26 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *FragmentStorageTy,
-                             Optional<Size> size, Alignment align,
+                             Optional<Size::int_type> SizeInBits,
+                             Alignment Align, bool HasDefaultAlignment,
+                             bool IsMetadata, bool SizeIsFragmentSize)
+    : Type(Ty.getPointer()), FragmentStorageType(FragmentStorageTy),
+      SizeInBits(SizeInBits), Align(Align),
+      DefaultAlignment(HasDefaultAlignment), IsMetadataType(IsMetadata),
+      SizeIsFragmentSize(SizeIsFragmentSize) {
+  assert(Align.getValue() != 0);
+}
+
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *FragmentStorageTy,
+                             Optional<Size> SizeInBytes, Alignment Align,
                              bool HasDefaultAlignment, bool IsMetadata,
                              bool SizeIsFragmentSize)
-    : Type(Ty.getPointer()), FragmentStorageType(FragmentStorageTy), size(size),
-      align(align), DefaultAlignment(HasDefaultAlignment),
+    : Type(Ty.getPointer()), FragmentStorageType(FragmentStorageTy),
+      Align(Align), DefaultAlignment(HasDefaultAlignment),
       IsMetadataType(IsMetadata), SizeIsFragmentSize(SizeIsFragmentSize) {
-  assert(align.getValue() != 0);
+  if (SizeInBytes)
+    SizeInBits = SizeInBytes->getValue() * 8;
+  assert(Align.getValue() != 0);
 }
 
 /// Determine whether this type has a custom @_alignment attribute.
@@ -99,8 +112,7 @@ DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty,
 }
 
 DebugTypeInfo DebugTypeInfo::getForwardDecl(swift::Type Ty) {
-  DebugTypeInfo DbgTy(Ty.getPointer(), nullptr, {}, Alignment(1), true,
-                      false, false);
+  DebugTypeInfo DbgTy(Ty.getPointer());
   return DbgTy;
 }
 
@@ -144,9 +156,9 @@ DebugTypeInfo DebugTypeInfo::getErrorResult(swift::Type Ty,
 }
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  return (getType() == T.getType() &&
-          size == T.size &&
-          align == T.align);
+  return getType() == T.getType() &&
+         SizeInBits == T.SizeInBits &&
+         Align == T.Align;
 }
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const { return !operator==(T); }
@@ -168,9 +180,9 @@ TypeDecl *DebugTypeInfo::getDecl() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
-  if (size)
-    llvm::errs() << "Size " << size->getValue() << " ";
-  llvm::errs() << "Alignment " << align.getValue() << "] ";
+  if (SizeInBits)
+    llvm::errs() << "SizeInBits " << *SizeInBits << " ";
+  llvm::errs() << "Alignment " << Align.getValue() << "] ";
   getType()->dump(llvm::errs());
 
   if (FragmentStorageType) {
