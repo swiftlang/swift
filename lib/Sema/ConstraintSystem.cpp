@@ -1403,6 +1403,15 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
     return functionType;
   }
 
+  // This transform is not applicable to pattern matching context.
+  //
+  // Note: If the transform is ever enabled for patterns - new branch
+  // would have to be added to `nameLoc` selection.
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::PatternMatch>())
+      return functionType;
+  }
+
   auto *paramList = funcDecl->getParameters();
   auto paramTypes = functionType->getParams();
   SmallVector<AnyFunctionType::Param, 4> adjustedParamTypes;
