@@ -3409,10 +3409,16 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     // Cast if necessary.
-    if (requirements[index].isWitnessTable()) {
+    switch (requirements[index].getKind()) {
+    case GenericRequirement::Kind::Shape:
+      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.SizeTy);
+      break;
+    case GenericRequirement::Kind::Metadata:
+      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.TypeMetadataPtrTy);
+      break;
+    case GenericRequirement::Kind::WitnessTable:
       slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
-    } else {
-      assert(requirements[index].isMetadata());
+      break;
     }
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);

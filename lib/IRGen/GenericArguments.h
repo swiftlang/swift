@@ -64,11 +64,16 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
-      if (requirement.isWitnessTable()) {
-        Types.push_back(IGM.WitnessTablePtrTy);
-      } else {
-        assert(requirement.isMetadata());
+      switch (requirement.getKind()) {
+      case GenericRequirement::Kind::Shape:
+        Types.push_back(IGM.SizeTy);
+        break;
+      case GenericRequirement::Kind::Metadata:
         Types.push_back(IGM.TypeMetadataPtrTy);
+        break;
+      case GenericRequirement::Kind::WitnessTable:
+        Types.push_back(IGM.WitnessTablePtrTy);
+        break;
       }
     }
   }
