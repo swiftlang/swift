@@ -2350,15 +2350,39 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 Constraint *ConstraintSystem::selectConjunction() {
+  SmallVector<Constraint *, 4> conjunctions;
   for (auto &constraint : InactiveConstraints) {
     if (constraint.isDisabled())
       continue;
 
     if (constraint.getKind() == ConstraintKind::Conjunction)
-      return &constraint;
+      conjunctions.push_back(&constraint);
   }
 
-  return nullptr;
+  if (conjunctions.empty())
+    return nullptr;
+
+  auto &SM = getASTContext().SourceMgr;
+
+  // All of the multi-statement closures should be solved in order of their
+  // apperance in the source.
+  llvm::sort(
+      conjunctions, [&](Constraint *conjunctionA, Constraint *conjunctionB) {
+        auto *locA = conjunctionA->getLocator();
+        auto *locB = conjunctionB->getLocator();
+
+        if (!(locA && locB))
+          return false;
+
+        auto *closureA = getAsExpr<ClosureExpr>(locA->getAnchor());
+        auto *closureB = getAsExpr<ClosureExpr>(locB->getAnchor());
+
+        return closureA && closureB
+                   ? SM.isBeforeInBuffer(closureA->getLoc(), closureB->getLoc())
+                   : false;
+      });
+
+  return conjunctions.front();
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
