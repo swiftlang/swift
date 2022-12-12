@@ -93,3 +93,5 @@ print(\Controller[int: 0, str: "", 0])
 print(\Controller.thirdLabel)
 // CHECK: {{\\Controller\.subscript\(\)|\\Controller\.<computed 0x.* \(Int\)>}}
 print(\Controller.[])
+// CHECK: \Controller.self
+print(\Controller.self)
