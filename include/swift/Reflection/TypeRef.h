@@ -1024,6 +1024,10 @@ class TypeRefVisitor {
 public:
 
   RetTy visit(const TypeRef *typeRef, Args... args) {
+    // We shouldn't get a NULL typeRef, but handle it gracefully if we do.
+    if (!typeRef)
+      return RetTy();
+
     switch (typeRef->getKind()) {
 #define TYPEREF(Id, Parent) \
     case TypeRefKind::Id: \
@@ -1033,7 +1037,9 @@ public:
 #include "swift/Reflection/TypeRefs.def"
     }
 
-    swift_unreachable("Unhandled TypeRefKind in switch.");
+    // We shouldn't get an unknown kind, but bad data might result in an unknown
+    // value showing up here. Handle it gracefully when that happens.
+    return RetTy();
   }
 };
 
