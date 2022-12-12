@@ -440,7 +440,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
   return f
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 == (τ_0_2, τ_0_3)> (@in_guaranteed τ_0_0) -> @out Optional<(τ_0_2, τ_0_3)> for <T, (T, T), T, T>
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> @out Optional<(τ_0_1, τ_0_2)> for <T, T, T>
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>):
 // CHECK:          [[FN:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:     [[FN_CONV:%.*]] = convert_function [[FN]]
