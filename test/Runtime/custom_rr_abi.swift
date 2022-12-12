@@ -1,12 +1,14 @@
-// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/custom_rr_abi_utilities.h)
+// RUN: %empty-directory(%t)
+// RUN: %target-clang -x c %S/Inputs/custom_rr_abi_utilities.c -c -o %t/custom_rr_abi_utilities.o
+// RUN: %target-build-swift -import-objc-header %S/Inputs/custom_rr_abi_utilities.h -Xlinker %t/custom_rr_abi_utilities.o %s -o %t/main
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main
 
 // REQUIRES: CPU=arm64 || CPU=arm64e
 
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// REQUIRES: rdar102912772
 
 import StdlibUnittest
 
@@ -54,17 +56,21 @@ class RetainReleaseChecker {
 var CustomRRABITestSuite = TestSuite("CustomRRABI")
 
 CustomRRABITestSuite.test("retain") {
+ installSignalHandlers()
   foreachRRFunction { function, cname, register, isRetain in
     let name = String(cString: cname!)
     let fullname = "\(name)_x\(register)"
+    print("Testing \(fullname)")
 
     // Create a set of RR checker objects.
     var checkers = (0..<NUM_REGS).map{ _ in RetainReleaseChecker() }
 
     // Fill out a registers array with the pointers from the RR checkers.
     var regs: [UnsafeMutableRawPointer?] = checkers.map{ $0.pointerValue }
+//   regs[10] = UnsafeMutableRawPointer(bitPattern: 0xdeadbeef)
 
     // Call the RR function.
+    print(regs)
     function!(&regs)
 
     // Make sure all the checkers report what they're supposed to. All registers

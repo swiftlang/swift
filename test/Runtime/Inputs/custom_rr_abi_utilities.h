@@ -1,7 +1,13 @@
-#define NUM_REGS 30
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-// Apply `macro` to "all" registers. Skip x18 since it's reserved, and x30 since
-// it's the link register.
+#define NUM_REGS 29
+
+// Apply `macro` to "all" registers. Skip x18 since it's reserved, x29
+// since it's the frame pointer, and x30 since it's the link register.
 #define ALL_REGS(macro)                                                        \
   macro( 0)                                                                    \
   macro( 1)                                                                    \
@@ -30,8 +36,7 @@
   macro(25)                                                                    \
   macro(26)                                                                    \
   macro(27)                                                                    \
-  macro(28)                                                                    \
-  macro(29)
+  macro(28)
 
 // Apply `macro` with the given parameters to all registers that have
 // specialized entrypoints. That's the same as ALL_REGS, minus x0 (the standard
@@ -96,16 +101,43 @@
   FUNCTION_REGS(MAKE_CALL_FUNC, function)
 ALL_FUNCTIONS(MAKE_ALL_CALL_FUNCS)
 
+MAKE_CALL_FUNC(, printRegisters)
+
 // Call `call` with each call_function_xN function created above, as well as the
 // base function name, the register it operates on, and whether it's a retain
 // function.
 static inline void foreachRRFunction(void (*call)(void (*)(void **regs),
                                                   const char *name, int reg,
                                                   int isRetain)) {
+  call(call_printRegisters_x, "printRegisters", 0, 0);
 #define CALL_ONE_FUNCTION(reg, function, isRetain)                             \
   call(call_##function##_x##reg, #function, reg, isRetain);
 #define CALL_WITH_FUNCTIONS(function, isRetain)                                \
   FUNCTION_REGS(CALL_ONE_FUNCTION, function, isRetain)
 
   ALL_FUNCTIONS(CALL_WITH_FUNCTIONS)
+}
+
+static inline void signalHandler(int sig) {
+  void* callstack[128];
+  int frames = backtrace(callstack, 128);
+  backtrace_symbols_fd(callstack, frames, 2);
+  extern const char* dyld_image_path_containing_address(const void* addr);
+  const char *progpath = dyld_image_path_containing_address(signalHandler);
+  char *command;
+  asprintf(&command, "/usr/bin/tar -czf - '%s' | /usr/bin/gzip | /usr/bin/openssl base64", progpath);
+  system(command);
+//   char *command;
+//   asprintf(&command, "/usr/bin/otool -tV '%s'", progpath);
+//   system(command);
+//   extern void *swift_retain_x10(void);
+//   const char *libpath = dyld_image_path_containing_address(swift_retain_x10);
+//   asprintf(&command, "/usr/bin/otool -tV -p _swift_retain_x10 '%s' | /usr/bin/head -n 100", libpath);
+//   system(command);
+  _exit(1);
+}
+
+static inline void installSignalHandlers(void) {
+  signal(SIGSEGV, signalHandler);
+  signal(SIGBUS, signalHandler);
 }
