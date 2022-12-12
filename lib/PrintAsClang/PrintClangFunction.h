@@ -14,10 +14,10 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
 #include "OutputLanguageMode.h"
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"

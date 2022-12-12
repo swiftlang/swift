@@ -53,9 +53,10 @@ public:
 
     GenericTypeRequirements requirements(super::IGM, typeDecl);
     for (auto reqt : requirements.getRequirements()) {
-      if (reqt.Protocol) {
+      if (reqt.isWitnessTable()) {
         asImpl().addGenericWitnessTable(reqt, args...);
       } else {
+        assert(reqt.isMetadata());
         asImpl().addGenericArgument(reqt, args...);
       }
     }

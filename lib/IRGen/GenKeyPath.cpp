@@ -886,7 +886,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         enumerateGenericSignatureRequirements(
             componentCanSig, [&](GenericRequirement reqt) {
               auto substType =
-                  reqt.TypeParameter.subst(subs)->getCanonicalType();
+                  reqt.getTypeParameter().subst(subs)->getCanonicalType();
 
               // FIXME: This seems wrong. We used to just mangle opened archetypes as
               // their interface type. Let's make that explicit now.
@@ -896,14 +896,17 @@ emitKeyPathComponent(IRGenModule &IGM,
                 return None;
               })->getCanonicalType();
 
-              if (!reqt.Protocol) {
+              if (reqt.isMetadata()) {
                 // Type requirement.
                 externalSubArgs.push_back(emitMetadataTypeRefForKeyPath(
                     IGM, substType, componentCanSig));
               } else {
+                assert(reqt.isWitnessTable());
+
                 // Protocol requirement.
                 auto conformance = subs.lookupConformance(
-                    reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+                    reqt.getTypeParameter()->getCanonicalType(),
+                    reqt.getProtocol());
                 externalSubArgs.push_back(IGM.emitWitnessTableRefString(
                     substType, conformance,
                     genericEnv ? genericEnv->getGenericSignature() : nullptr,

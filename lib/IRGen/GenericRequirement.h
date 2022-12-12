@@ -19,8 +19,8 @@
 #ifndef SWIFT_IRGEN_GENERICREQUIREMENT_H
 #define SWIFT_IRGEN_GENERICREQUIREMENT_H
 
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -114,14 +114,14 @@ public:
   unsigned getNumTypeRequirements() const {
     unsigned count = 0;
     for (auto i = Requirements.begin(), e = Requirements.end(); i != e; ++i) {
-      if (!i->Protocol) {
+      if (i->isMetadata()) {
         count++;
       } else {
 #ifndef NDEBUG
         // Assert that the rest of the requirements are conformance
         // requirements.
         for (++i; i != e; ++i) {
-          assert(i->Protocol && "type requirement followed conformance!");
+          assert(i->isWitnessTable() && "type requirement followed conformance!");
         }
 #endif
         break;

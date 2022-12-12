@@ -150,7 +150,7 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     }
 
     // Add the fulfillment.
-    hadFulfillment |= addFulfillment({type, nullptr},
+    hadFulfillment |= addFulfillment(GenericRequirement::forMetadata(type),
                                      source, std::move(path), metadataState);
     return hadFulfillment;
   }
@@ -251,8 +251,9 @@ bool FulfillmentMap::searchWitnessTable(
   // If we're not limiting the set of interesting conformances, or if
   // this is an interesting conformance, record it.
   if (!interestingConformances || interestingConformances->count(protocol)) {
-    hadFulfillment |= addFulfillment({type, protocol}, source,
-                                     std::move(path), MetadataState::Complete);
+    hadFulfillment |= addFulfillment(
+        GenericRequirement::forWitnessTable(type, protocol), source,
+        std::move(path), MetadataState::Complete);
   }
 
   return hadFulfillment;
@@ -315,7 +316,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 }
 
 /// Testify that there's a fulfillment at the given path.
-bool FulfillmentMap::addFulfillment(FulfillmentKey key,
+bool FulfillmentMap::addFulfillment(GenericRequirement key,
                                     unsigned source,
                                     MetadataPath &&path,
                                     MetadataState metadataState) {
@@ -360,10 +361,8 @@ static StringRef getStateName(MetadataState state) {
 void FulfillmentMap::dump() const {
   auto &out = llvm::errs();
   for (auto &entry : Fulfillments) {
-    out << "(" << entry.first.first;
-    if (auto proto = entry.first.second) {
-      out << ", " << proto->getNameStr();
-    }
+    out << "(";
+    entry.first.dump(out);
     out << ") => " << getStateName(entry.second.getState())
         << " at sources[" << entry.second.SourceIndex
         << "]." << entry.second.Path << "\n";
