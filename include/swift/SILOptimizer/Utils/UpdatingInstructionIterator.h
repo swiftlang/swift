@@ -177,8 +177,8 @@ class UpdatingInstructionIteratorRegistry {
 
 
 public:
-  UpdatingInstructionIteratorRegistry() :
-    callbacks(InstModCallbacks()
+  UpdatingInstructionIteratorRegistry() {
+    callbacks = std::move(InstModCallbacks()
                     .onDelete([this](SILInstruction *toDelete) {
                       notifyDelete(toDelete);
                       toDelete->eraseFromParent();
@@ -186,15 +186,15 @@ public:
                     .onCreateNewInst(
                         [this](SILInstruction *newlyCreatedInst) {
                           notifyNew(newlyCreatedInst);
-                        }))
-  {}
+                        }));
+  }
 
   UpdatingInstructionIteratorRegistry(InstModCallbacks &&chainedCallbacks) :
     // Copy the two std::functions that we need. The rest of the callbacks are
     // copied implicitly by assignment.
     chainedDelete(std::move(chainedCallbacks.deleteInstFunc)),
-    chainedNew(std::move(chainedCallbacks.createdNewInstFunc)),
-    callbacks(std::move(chainedCallbacks
+    chainedNew(std::move(chainedCallbacks.createdNewInstFunc)) {
+    callbacks = std::move(chainedCallbacks
                     .onDelete([this](SILInstruction *toDelete) {
                       notifyDelete(toDelete);
                       if (chainedDelete) {
@@ -209,8 +209,8 @@ public:
                           if (chainedNew) {
                             chainedNew(newlyCreatedInst);
                           }
-                        })))
-  {}
+                        }));
+  }
 
   // The callbacks capture 'this'. So copying is invalid.
   UpdatingInstructionIteratorRegistry(
