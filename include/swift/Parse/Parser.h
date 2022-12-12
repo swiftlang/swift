@@ -192,7 +192,7 @@ public:
   }
 
   bool isCodeCompletionFirstPass() const {
-    return SourceMgr.hasCodeCompletionBuffer() && !CodeCompletion;
+    return L->isCodeCompletion() && !CodeCompletion;
   }
 
   bool allowTopLevelCode() const;

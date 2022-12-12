@@ -541,7 +541,7 @@ void swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
+    DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
         Callback) {
@@ -563,7 +563,9 @@ void swift::ide::CompletionInstance::performOperation(
     return;
   }
 
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = IgnoreSwiftSourceInfo;
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
@@ -615,11 +617,9 @@ void swift::ide::CompletionInstance::codeComplete(
     }
   };
 
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they're somewhat heavy operations and aren't needed for completion.
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<CodeCompleteResult>(
             [&CompletionContext, &CancellationFlag](auto &Result,
@@ -696,7 +696,7 @@ void swift::ide::CompletionInstance::typeContextInfo(
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<TypeContextInfoResult>(
             [&CancellationFlag](auto &Result, auto DeliverTransformed) {
@@ -764,7 +764,7 @@ void swift::ide::CompletionInstance::conformingMethodList(
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<ConformingMethodListResults>(
             [&ExpectedTypeNames, &CancellationFlag](auto &Result,
@@ -789,73 +789,6 @@ void swift::ide::CompletionInstance::conformingMethodList(
                 // here.
                 DeliverTransformed(
                     ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
-              }
-            },
-            Callback);
-      });
-}
-
-void swift::ide::CompletionInstance::cursorInfo(
-    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    DiagnosticConsumer *DiagC,
-    std::shared_ptr<std::atomic<bool>> CancellationFlag,
-    llvm::function_ref<void(CancellableResult<CursorInfoResults>)> Callback) {
-  using ResultType = CancellableResult<CursorInfoResults>;
-
-  struct ConsumerToCallbackAdapter : public swift::ide::CursorInfoConsumer {
-    bool ReusingASTContext;
-    std::shared_ptr<std::atomic<bool>> CancellationFlag;
-    llvm::function_ref<void(ResultType)> Callback;
-    bool HandleResultsCalled = false;
-
-    ConsumerToCallbackAdapter(
-        bool ReusingASTContext,
-        std::shared_ptr<std::atomic<bool>> CancellationFlag,
-        llvm::function_ref<void(ResultType)> Callback)
-        : ReusingASTContext(ReusingASTContext),
-          CancellationFlag(CancellationFlag), Callback(Callback) {}
-
-    void handleResults(const ResolvedCursorInfo &result) override {
-      HandleResultsCalled = true;
-      if (CancellationFlag &&
-          CancellationFlag->load(std::memory_order_relaxed)) {
-        Callback(ResultType::cancelled());
-      } else {
-        Callback(ResultType::success({&result, ReusingASTContext}));
-      }
-    }
-  };
-
-  performOperation(
-      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/false, CancellationFlag,
-      [&](CancellableResult<CompletionInstanceResult> CIResult) {
-        CIResult.mapAsync<CursorInfoResults>(
-            [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {
-              auto &Mgr = Result.CI->getSourceMgr();
-              auto RequestedLoc =
-                  Mgr.getLocForOffset(Mgr.getCodeCompletionBufferID(), Offset);
-              ConsumerToCallbackAdapter Consumer(
-                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
-              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-                  ide::makeCursorInfoCallbacksFactory(Consumer, RequestedLoc));
-
-              if (!Result.DidFindCodeCompletionToken) {
-                return DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
-              }
-
-              performCodeCompletionSecondPass(
-                  *Result.CI->getCodeCompletionFile(), *callbacksFactory);
-              if (!Consumer.HandleResultsCalled) {
-                // If we didn't receive a handleResult call from the second
-                // pass, we didn't receive any results. To make sure Callback
-                // gets called exactly once, call it manually with no results
-                // here.
-                DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
               }
             },
             Callback);

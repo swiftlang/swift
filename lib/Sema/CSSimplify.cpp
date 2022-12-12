@@ -5297,7 +5297,7 @@ bool ConstraintSystem::repairFailures(
         // other (explicit) argument's so source range containment alone isn't
         // sufficient.
         bool isSynthesizedArg = arg->isImplicit() && isa<DeclRefExpr>(arg);
-        if (!isSynthesizedArg && isForCodeCompletion() && containsCodeCompletionLoc(arg) &&
+        if (!isSynthesizedArg && containsCodeCompletionLoc(arg) &&
             !lhs->isVoid() && !lhs->isUninhabited())
           return true;
       }

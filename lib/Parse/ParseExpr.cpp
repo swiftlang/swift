@@ -1388,7 +1388,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
       auto expr = activeElements[0].get<Expr *>();
       ParserStatus status(ICD);
-      if (SourceMgr.rangeContainsCodeCompletionLoc(expr->getSourceRange()) && L->isCodeCompletion())
+      if (SourceMgr.getCodeCompletionLoc().isValid() &&
+          SourceMgr.rangeContainsTokenLoc(expr->getSourceRange(),
+                                          SourceMgr.getCodeCompletionLoc()))
         status.setHasCodeCompletion();
       hasBindOptional |= exprsWithBindOptional.contains(expr);
       Result = makeParserResult(status, expr);
@@ -2802,12 +2804,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // Ignore 'CodeCompletionDelayedDeclState' inside closures.
     // Completions inside functions body inside closures at top level should
     // be considered top-level completions.
-    if (State->hasCodeCompletionDelayedDeclState()) {
+    if (State->hasCodeCompletionDelayedDeclState())
       (void)State->takeCodeCompletionDelayedDeclState();
-    }
-    if (L->isCodeCompletion()) {
-      Status.setHasCodeCompletionAndIsError();
-    }
+    Status.setHasCodeCompletionAndIsError();
   }
 
   // Parse the closing '}'.
