@@ -96,7 +96,7 @@ namespace swift {
   class BraceStmt;
   class CanType;
   class GeneratedModule;
-  struct GenericRequirement;
+  class GenericRequirement;
   class LinkLibrary;
   class SILFunction;
   class IRGenOptions;

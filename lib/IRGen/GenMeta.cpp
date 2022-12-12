@@ -4250,7 +4250,7 @@ namespace {
     }
 
     void addGenericArgument(GenericRequirement requirement) {
-      auto t = requirement.TypeParameter.subst(genericSubstitutions());
+      auto t = requirement.getTypeParameter().subst(genericSubstitutions());
       ConstantReference ref = IGM.getAddrOfTypeMetadata(
           CanType(t), SymbolReferenceKind::Relative_Direct);
       this->B.add(ref.getDirectValue());
@@ -4258,12 +4258,13 @@ namespace {
 
     void addGenericWitnessTable(GenericRequirement requirement) {
       auto conformance = genericSubstitutions().lookupConformance(
-          requirement.TypeParameter->getCanonicalType(), requirement.Protocol);
+          requirement.getTypeParameter()->getCanonicalType(),
+          requirement.getProtocol());
       ProtocolConformance *concreteConformance = conformance.getConcrete();
 
       llvm::Constant *addr;
 
-      Type argument = requirement.TypeParameter.subst(genericSubstitutions());
+      Type argument = requirement.getTypeParameter().subst(genericSubstitutions());
       auto argumentNominal = argument->getAnyNominal();
       if (argumentNominal && argumentNominal->isGenericContext()) {
         // TODO: Statically specialize the witness table pattern for t's
