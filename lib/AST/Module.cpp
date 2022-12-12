@@ -1997,15 +1997,20 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 }
 
 bool ModuleDecl::isSDKModule() const {
-  if (getASTContext().SearchPathOpts.getSDKPath().empty())
+  auto sdkPath = getASTContext().SearchPathOpts.getSDKPath();
+  if (sdkPath.empty())
     return false;
 
-  auto sdkPath = SmallString<8>(),
-       modulePath = SmallString<8>();
-  llvm::sys::path::native(getASTContext().SearchPathOpts.getSDKPath(), sdkPath);
-  llvm::sys::path::native(getModuleSourceFilename(), modulePath);
-
-  return modulePath.startswith(sdkPath);
+  auto modulePath = getModuleSourceFilename();
+  auto si = llvm::sys::path::begin(sdkPath),
+       se = llvm::sys::path::end(sdkPath);
+  for (auto mi = llvm::sys::path::begin(modulePath),
+       me = llvm::sys::path::end(modulePath);
+       si != se && mi != me; ++si, ++mi) {
+    if (*si != *mi)
+      return false;
+  }
+  return si == se;
 }
 
 bool ModuleDecl::isStdlibModule() const {
