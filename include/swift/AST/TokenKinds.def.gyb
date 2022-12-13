@@ -172,6 +172,7 @@ SIL_KEYWORD(sil_scope)
 
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
+PUNCTUATOR(period_prefix, ".")
 
 MISC(eof)
 MISC(code_complete)
