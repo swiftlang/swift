@@ -48,7 +48,7 @@ class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
-struct MacroDefinition;
+class MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
