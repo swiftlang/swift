@@ -1528,24 +1528,37 @@ const ValueBase *SILInstructionResultArray::back() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                           SingleValueInstruction
+//                          Defined opened archetypes
 //===----------------------------------------------------------------------===//
 
-CanOpenedArchetypeType
-SingleValueInstruction::getDefinedOpenedArchetype() const {
+bool SILInstruction::definesOpenedArchetypes() const {
+  bool definesAny = false;
+  forEachDefinedOpenedArchetype([&](CanOpenedArchetypeType type,
+                                    SILValue dependency) {
+    definesAny = true;
+  });
+  return definesAny;
+}
+
+void SILInstruction::forEachDefinedOpenedArchetype(
+      llvm::function_ref<void(CanOpenedArchetypeType, SILValue)> fn) const {
   switch (getKind()) {
-  case SILInstructionKind::OpenExistentialAddrInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::OpenExistentialBoxInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-  case SILInstructionKind::OpenExistentialMetatypeInst:
-  case SILInstructionKind::OpenExistentialValueInst: {
-    const auto Ty = getOpenedArchetypeOf(getType().getASTType());
-    assert(Ty && Ty->isRoot() && "Type should be a root opened archetype");
-    return Ty;
+#define SINGLE_VALUE_SINGLE_OPEN(TYPE)                                    \
+  case SILInstructionKind::TYPE: {                                        \
+    auto I = cast<TYPE>(this);                                            \
+    auto archetype = I->getDefinedOpenedArchetype();                      \
+    assert(archetype);                                                    \
+    return fn(archetype, I);                                              \
   }
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialValueInst)
+#undef SINGLE_VALUE_SINGLE_OPEN
   default:
-    return CanOpenedArchetypeType();
+    return;
   }
 }
 

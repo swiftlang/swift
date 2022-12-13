@@ -463,4 +463,37 @@ struct HasNoPlusEqualOperator {
   }
 };
 
+// MARK: Templated iterators
+
+template <typename T>
+struct TemplatedIterator {
+  T value;
+
+  using iterator_category = std::input_iterator_tag;
+  using value_type = T;
+  using pointer = T *;
+  using reference = const T &;
+  using difference_type = int;
+
+  TemplatedIterator(int value) : value(value) {}
+  TemplatedIterator(const TemplatedIterator &other) = default;
+
+  const int &operator*() const { return value; }
+
+  TemplatedIterator &operator++() {
+    value++;
+    return *this;
+  }
+  TemplatedIterator operator++(int) {
+    auto tmp = ConstIterator(value);
+    value++;
+    return tmp;
+  }
+  bool operator==(const TemplatedIterator &other) const {
+    return value == other.value;
+  }
+};
+
+using TemplatedIteratorInt = TemplatedIterator<int>;
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H
