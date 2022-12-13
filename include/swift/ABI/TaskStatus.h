@@ -203,7 +203,7 @@ public:
 
     auto oldLastChild = LastChild;
     LastChild = child;
-    
+
     if (!FirstChild) {
       // This is the first child we ever attach, so store it as FirstChild.
       FirstChild = child;
@@ -222,7 +222,7 @@ public:
       }
       return;
     }
-    
+
     AsyncTask *prev = FirstChild;
     // Remove the child from the linked list, i.e.:
     //     prev -> afterPrev -> afterChild
@@ -313,6 +313,85 @@ public:
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::EscalationNotification;
+  }
+};
+
+
+// TODO (rokhinip): This should probably be part of every task instead of being
+// allocated on demand.
+class TaskDependencyStatusRecord : public TaskStatusRecord {
+  // Enum specifying the type of dependency this task has
+  enum {
+    WaitingOnContinuation,
+    WaitingOnTask,
+    WaitingOnTaskGroup,
+    WaitingOnActor
+  } DependencyKind;
+
+  // A word sized storage which references what this task is suspended waiting
+  // for. Note that this is different from the waitQueue in the future fragment
+  // of a task since that denotes all the tasks which this specific task, will
+  // unblock.
+  //
+  // This field is only really pointing to something valid when the
+  // ActiveTaskStatus specifies that the task is suspended. It can be accessed
+  // asynchronous to the task due to escalation which will therefore require the
+  // task status record lock for synchronization.
+  //
+  // The type of thing we are waiting on, is specified in the enum above
+  union {
+    // This task is suspended waiting on a continuation resumption - most
+    // likely from from a non-swift-async callback API which will resume it
+    // The continuation it is waiting on, is really in this task itself. There
+    // are no ref counts managed here - this is just a convenience pointer to
+    // the ContinuationAsyncContext in the current task.
+    ContinuationAsyncContext *Continuation;
+
+    // This task is suspended waiting on another task. This could be an async
+    // let child task or it could be another unstructured task.
+    //
+    // When this is set, a +1 is taken on the task that we are waiting on.
+    // The only fields we can reasonably look at in the task, is the
+    // ActiveTaskStatus and its TaskStatusRecords if any.
+    AsyncTask *Task;
+
+    // This task is suspended on the task group that it has spawned - we hit
+    // this case if the parent task is waiting on pending child tasks in the
+    // task group to return results. See also TaskGroupImpl::poll.
+    TaskGroup *TaskGroup;
+
+    // This task is suspended waiting on an actor. This implies that
+    // we hit contention while trying to access an actor.
+    //
+    // This field is set for as long as the task is in the actor's job queue
+    // - therefore we shouldn't need a separate +1 on the actor, we are
+    // borrowing the task's reference on the actor
+    DefaultActor *Actor;
+  } WaitingOn;
+
+public:
+  TaskDependencyStatusRecord(ContinuationAsyncContext *continuation) :
+    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnContinuation) {
+      WaitingOn.Continuation = continuation;
+  }
+
+  TaskDependencyStatusRecord(AsyncTask *task) :
+    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnTask) {
+      WaitingOn.Task = task;
+  }
+
+  TaskDependencyStatusRecord(TaskGroup *taskGroup) :
+    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnTaskGroup) {
+      WaitingOn.TaskGroup = taskGroup;
+  }
+
+  TaskDependencyStatusRecord(DefaultActor *actor) :
+    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(WaitingOnActor) {
+      WaitingOn.Actor = actor;
   }
 };
 

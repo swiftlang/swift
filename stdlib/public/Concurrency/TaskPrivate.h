@@ -787,16 +787,23 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
-inline void AsyncTask::flagAsSuspended() {
+// Always and only called by the task on itself
+inline
+void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *__unused dependencyStatusRecord) {
   SWIFT_TASK_DEBUG_LOG("%p->flagAsSuspended()", this);
+
+  /// TODO (rokhinip): Add the task status record to the active task status and
+  /// remove any running and priority escalation bits
+
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
+
   while (true) {
     // We can only be suspended if we were previously running. See state
     // transitions listed out in Task.h
     assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
 
-    newStatus = oldStatus.withRunning(false);
+    newStatus = newStatus.withRunning(false);
     newStatus = newStatus.withoutStoredPriorityEscalation();
 
     if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
@@ -819,6 +826,10 @@ inline void AsyncTask::flagAsSuspended() {
   swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
   restoreTaskVoucher(this);
   return;
+}
+
+inline void AsyncTask::flagAsSuspended() {
+  this->flagAsSuspended(NULL);
 }
 
 // READ ME: This is not a dead function! Do not remove it! This is a function

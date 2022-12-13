@@ -37,6 +37,7 @@ class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
+class TaskDependencyStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
 
@@ -319,6 +320,11 @@ public:
   /// Flag that this task is now suspended.
   void flagAsSuspended();
 
+private:
+  // Helper function
+  void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
+
+public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it
   void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);

@@ -456,6 +456,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::EscalationNotification:
     return;
 
+  // Cancellation doesn't propagate to anything we are dependent on
+  case TaskStatusRecordKind::TaskDependency:
+    return;
+
   // Record locks shouldn't be found this way, but they don't have
   // anything to do anyway.
   case TaskStatusRecordKind::Private_RecordLock:
@@ -547,6 +551,11 @@ static void performEscalationAction(TaskStatusRecord *record,
     notification->run(newPriority);
     return;
   }
+
+  // TODO (rokhinip): These should support having escalation. For now,
+  // shortcircuit
+  case TaskStatusRecordKind::TaskDependency:
+    return;
 
   // Record locks shouldn't be found this way, but they don't have
   // anything to do anyway.
