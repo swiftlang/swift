@@ -470,7 +470,7 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
-  SourceMgr.setCodeCompletionPoint(BufferID, 6);
+  SourceMgr.setIDEInspectionTarget(BufferID, 6);
 
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 

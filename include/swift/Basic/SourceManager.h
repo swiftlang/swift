@@ -39,8 +39,8 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
-  unsigned CodeCompletionBufferID = 0U;
-  unsigned CodeCompletionOffset;
+  unsigned IDEInspectionTargetBufferID = 0U;
+  unsigned IDEInspectionTargetOffset;
 
   /// Associates buffer identifiers to buffer IDs.
   llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
@@ -84,26 +84,26 @@ public:
     return FileSystem;
   }
 
-  void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
+  void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {
     assert(BufferID != 0U && "Buffer should be valid");
 
-    CodeCompletionBufferID = BufferID;
-    CodeCompletionOffset = Offset;
+    IDEInspectionTargetBufferID = BufferID;
+    IDEInspectionTargetOffset = Offset;
   }
 
-  bool hasCodeCompletionBuffer() const {
-    return CodeCompletionBufferID != 0U;
+  bool hasIDEInspectionTargetBuffer() const {
+    return IDEInspectionTargetBufferID != 0U;
   }
 
-  unsigned getCodeCompletionBufferID() const {
-    return CodeCompletionBufferID;
+  unsigned getIDEInspectionTargetBufferID() const {
+    return IDEInspectionTargetBufferID;
   }
 
-  unsigned getCodeCompletionOffset() const {
-    return CodeCompletionOffset;
+  unsigned getIDEInspectionTargetOffset() const {
+    return IDEInspectionTargetOffset;
   }
 
-  SourceLoc getCodeCompletionLoc() const;
+  SourceLoc getIDEInspectionTargetLoc() const;
 
   const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
     return ReplacedRanges;
@@ -142,9 +142,9 @@ public:
   }
 
   /// Returns true if range \p R contains the code-completion location, if any.
-  bool rangeContainsCodeCompletionLoc(SourceRange R) const {
-    return CodeCompletionBufferID
-               ? rangeContainsTokenLoc(R, getCodeCompletionLoc())
+  bool rangeContainsIDEInspectionTarget(SourceRange R) const {
+    return IDEInspectionTargetBufferID
+               ? rangeContainsTokenLoc(R, getIDEInspectionTargetLoc())
                : false;
   }
 

@@ -1,4 +1,4 @@
-//===--- CompletionInstance.cpp -------------------------------------------===//
+//===--- IDEInspectionInstance.cpp ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 
 #include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
@@ -174,17 +174,17 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
 } // namespace
 
-bool CompletionInstance::performCachedOperationIfPossible(
+bool IDEInspectionInstance::performCachedOperationIfPossible(
     llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const SearchPathOptions &SearchPathOpts,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
-    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+    llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
         Callback) {
   llvm::PrettyStackTraceString trace(
-      "While performing cached completion if possible");
+      "While performing cached IDE inspection if possible");
 
   // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
   // the flag will remain 'true' even after 'CachedCI' is populated.
@@ -197,15 +197,15 @@ bool CompletionInstance::performCachedOperationIfPossible(
   if (CachedArgHash != ArgsHash)
     return false;
 
-  auto *oldSF = CachedCI->getCodeCompletionFile();
+  auto *oldSF = CachedCI->getIDEInspectionFile();
   assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
-  assert(oldState->hasCodeCompletionDelayedDeclState());
-  auto &oldInfo = oldState->getCodeCompletionDelayedDeclState();
+  assert(oldState->hasIDEInspectionDelayedDeclState());
+  auto &oldInfo = oldState->getIDEInspectionDelayedDeclState();
 
   auto &SM = CachedCI->getSourceMgr();
-  auto bufferName = completionBuffer->getBufferIdentifier();
+  auto bufferName = ideInspectionTargetBuffer->getBufferIdentifier();
   if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
     return false;
 
@@ -229,8 +229,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   // Parse the new buffer into temporary SourceFile.
   SourceManager tmpSM;
-  auto tmpBufferID = tmpSM.addMemBufferCopy(completionBuffer);
-  tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
+  auto tmpBufferID = tmpSM.addMemBufferCopy(ideInspectionTargetBuffer);
+  tmpSM.setIDEInspectionTarget(tmpBufferID, Offset);
 
   LangOptions langOpts = CachedCI->getASTContext().LangOpts;
   TypeCheckerOptions typeckOpts = CachedCI->getASTContext().TypeCheckerOpts;
@@ -256,19 +256,18 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
-  // interface hash change and prevents fast-completion.
+  // interface hash change and prevents reuse of AST context.
 
-  // Parse and get the completion context.
+  // Parse and get the IDE inspection context.
   auto *newState = tmpSF->getDelayedParserState();
-  // Couldn't find any completion token?
-  if (!newState->hasCodeCompletionDelayedDeclState())
+  if (!newState->hasIDEInspectionDelayedDeclState())
     return false;
 
-  auto &newInfo = newState->getCodeCompletionDelayedDeclState();
+  auto &newInfo = newState->getIDEInspectionDelayedDeclState();
   unsigned newBufferID;
   DeclContext *traceDC = nullptr;
   switch (newInfo.Kind) {
-  case CodeCompletionDelayedDeclKind::FunctionBody: {
+  case IDEInspectionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
     // See if the inteface of the function and types visible from a function
     // body has changed since the last completion. If they haven't changed,
@@ -322,7 +321,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
       newInfo.PrevOffset -= startOffset;
 
     auto sourceText =
-        completionBuffer->getBuffer().slice(startOffset, endOffset);
+        ideInspectionTargetBuffer->getBuffer().slice(startOffset, endOffset);
     auto newOffset = Offset - startOffset;
 
     newBufferID = SM.addMemBufferCopy(sourceText, bufferName);
@@ -330,13 +329,13 @@ bool CompletionInstance::performCachedOperationIfPossible(
                        tmpSM.getDisplayNameForLoc(startLoc),
                        tmpSM.getPresumedLineAndColumnForLoc(startLoc).first -
                            1);
-    SM.setCodeCompletionPoint(newBufferID, newOffset);
+    SM.setIDEInspectionTarget(newBufferID, newOffset);
 
     oldInfo.ParentContext = DC;
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;
     oldInfo.PrevOffset = newInfo.PrevOffset;
-    oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
+    oldState->restoreIDEInspectionDelayedDeclState(oldInfo);
 
     auto newBufferStart = SM.getRangeForBuffer(newBufferID).getStart();
     SourceRange newBodyRange(newBufferStart.getAdvancedLoc(newInfo.StartOffset),
@@ -350,8 +349,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     traceDC = AFD;
     break;
   }
-  case CodeCompletionDelayedDeclKind::Decl:
-  case CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+  case IDEInspectionDelayedDeclKind::Decl:
+  case IDEInspectionDelayedDeclKind::TopLevelCodeDecl: {
     // Support decl/top-level code only if the completion happens in a single
     // file 'main' script (e.g. playground).
     auto *oldM = oldInfo.ParentContext->getParentModule();
@@ -361,8 +360,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // Perform fast completion.
 
     // Prepare the new buffer in the source manager.
-    auto sourceText = completionBuffer->getBuffer();
-    if (newInfo.Kind == CodeCompletionDelayedDeclKind::TopLevelCodeDecl) {
+    auto sourceText = ideInspectionTargetBuffer->getBuffer();
+    if (newInfo.Kind == IDEInspectionDelayedDeclKind::TopLevelCodeDecl) {
       // We don't need the source text after the top-level code.
       auto endOffset = newInfo.EndOffset;
       auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
@@ -371,7 +370,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
       sourceText = sourceText.slice(0, endOffset);
     }
     newBufferID = SM.addMemBufferCopy(sourceText, bufferName);
-    SM.setCodeCompletionPoint(newBufferID, Offset);
+    SM.setIDEInspectionTarget(newBufferID, Offset);
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
@@ -393,10 +392,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
     traceDC = newM;
 #ifndef NDEBUG
     const auto *reparsedState = newSF->getDelayedParserState();
-    assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
-           "Didn't find completion token?");
+    assert(reparsedState->hasIDEInspectionDelayedDeclState() &&
+           "Didn't find IDE inspection point?");
 
-    auto &reparsedInfo = reparsedState->getCodeCompletionDelayedDeclState();
+    auto &reparsedInfo = reparsedState->getIDEInspectionDelayedDeclState();
     assert(reparsedInfo.Kind == newInfo.Kind);
 #endif
     break;
@@ -404,7 +403,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   {
-    PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
+    PrettyStackTraceDeclContext trace("performing cached IDE inspection",
+                                      traceDC);
 
     // The diagnostic engine is keeping track of state which might modify
     // parsing and type checking behaviour. Clear the flags.
@@ -415,11 +415,11 @@ bool CompletionInstance::performCachedOperationIfPossible(
       CachedCI->addDiagnosticConsumer(DiagC);
 
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
-      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+      Callback(CancellableResult<IDEInspectionInstanceResult>::cancelled());
     } else {
-      Callback(CancellableResult<CompletionInstanceResult>::success(
+      Callback(CancellableResult<IDEInspectionInstanceResult>::success(
           {CachedCI, /*reusingASTContext=*/true,
-           /*DidFindCodeCompletionToken=*/true}));
+           /*DidFindIDEInspectionTarget=*/true}));
     }
 
     if (DiagC)
@@ -431,15 +431,15 @@ bool CompletionInstance::performCachedOperationIfPossible(
   return true;
 }
 
-void CompletionInstance::performNewOperation(
+void IDEInspectionInstance::performNewOperation(
     Optional<llvm::hash_code> ArgsHash, swift::CompilerInvocation &Invocation,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
-    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+    llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
         Callback) {
-  llvm::PrettyStackTraceString trace("While performing new completion");
+  llvm::PrettyStackTraceString trace("While performing new IDE inspection");
 
   // If ArgsHash is None we shouldn't cache the compiler instance.
   bool ShouldCacheCompilerInstance = ArgsHash.hasValue();
@@ -463,11 +463,11 @@ void CompletionInstance::performNewOperation(
     if (FileSystem != llvm::vfs::getRealFileSystem())
       CI->getSourceMgr().setFileSystem(FileSystem);
 
-    Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+    Invocation.setIDEInspectionTarget(ideInspectionTargetBuffer, Offset);
 
     std::string InstanceSetupError;
     if (CI->setup(Invocation, InstanceSetupError)) {
-      Callback(CancellableResult<CompletionInstanceResult>::failure(
+      Callback(CancellableResult<IDEInspectionInstanceResult>::failure(
           InstanceSetupError));
       return;
     }
@@ -476,20 +476,20 @@ void CompletionInstance::performNewOperation(
 
     CI->performParseAndResolveImportsOnly();
 
-    bool DidFindCodeCompletionToken = CI->getCodeCompletionFile()
-                                          ->getDelayedParserState()
-                                          ->hasCodeCompletionDelayedDeclState();
-    ShouldCacheCompilerInstance &= DidFindCodeCompletionToken;
+    bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()
+                                        ->getDelayedParserState()
+                                        ->hasIDEInspectionDelayedDeclState();
+    ShouldCacheCompilerInstance &= DidFindIDEInspectionTarget;
 
     auto CancellationFlag = CI->getASTContext().CancellationFlag;
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
-      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+      Callback(CancellableResult<IDEInspectionInstanceResult>::cancelled());
       // The completion instance may be in an invalid state when it's been
       // cancelled. Don't cache it.
       ShouldCacheCompilerInstance = false;
     } else {
-      Callback(CancellableResult<CompletionInstanceResult>::success(
-          {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+      Callback(CancellableResult<IDEInspectionInstanceResult>::success(
+          {CI, /*ReuisingASTContext=*/false, DidFindIDEInspectionTarget}));
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
         ShouldCacheCompilerInstance = false;
@@ -505,7 +505,7 @@ void CompletionInstance::performNewOperation(
     cacheCompilerInstance(std::move(CI), *ArgsHash);
 }
 
-void CompletionInstance::cacheCompilerInstance(
+void IDEInspectionInstance::cacheCompilerInstance(
     std::shared_ptr<CompilerInstance> CI, llvm::hash_code ArgsHash) {
   CachedCI = std::move(CI);
   CachedArgHash = ArgsHash;
@@ -515,11 +515,11 @@ void CompletionInstance::cacheCompilerInstance(
   InMemoryDependencyHash.clear();
   cacheDependencyHashIfNeeded(
       *CachedCI,
-      CachedCI->getASTContext().SourceMgr.getCodeCompletionBufferID(),
+      CachedCI->getASTContext().SourceMgr.getIDEInspectionTargetBufferID(),
       InMemoryDependencyHash);
 }
 
-bool CompletionInstance::shouldCheckDependencies() const {
+bool IDEInspectionInstance::shouldCheckDependencies() const {
   assert(CachedCI);
   using namespace std::chrono;
   auto now = system_clock::now();
@@ -528,22 +528,22 @@ bool CompletionInstance::shouldCheckDependencies() const {
   return threshold <= now;
 }
 
-void CompletionInstance::markCachedCompilerInstanceShouldBeInvalidated() {
+void IDEInspectionInstance::markCachedCompilerInstanceShouldBeInvalidated() {
   CachedCIShouldBeInvalidated = true;
 }
 
-void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
+void IDEInspectionInstance::setOptions(IDEInspectionInstance::Options NewOpts) {
   std::lock_guard<std::mutex> lock(mtx);
   Opts = NewOpts;
 }
 
-void swift::ide::CompletionInstance::performOperation(
+void swift::ide::IDEInspectionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
-    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+    llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
         Callback) {
   // Compute the signature of the invocation.
   llvm::hash_code ArgsHash(0);
@@ -556,7 +556,7 @@ void swift::ide::CompletionInstance::performOperation(
 
   if (performCachedOperationIfPossible(ArgsHash, FileSystem,
                                        Invocation.getSearchPathOptions(),
-                                       completionBuffer, Offset, DiagC,
+                                       ideInspectionTargetBuffer, Offset, DiagC,
                                        CancellationFlag, Callback)) {
     // We were able to reuse a cached AST. Callback has already been invoked
     // and we don't need to build a new AST. We are done.
@@ -568,14 +568,15 @@ void swift::ide::CompletionInstance::performOperation(
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 
-  performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                      Offset, DiagC, CancellationFlag, Callback);
+  performNewOperation(ArgsHash, Invocation, FileSystem,
+                      ideInspectionTargetBuffer, Offset, DiagC,
+                      CancellationFlag, Callback);
 }
 
-void swift::ide::CompletionInstance::codeComplete(
+void swift::ide::IDEInspectionInstance::codeComplete(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
@@ -618,9 +619,9 @@ void swift::ide::CompletionInstance::codeComplete(
   // Disable source location resolutions from .swiftsourceinfo file because
   // they're somewhat heavy operations and aren't needed for completion.
   performOperation(
-      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
       /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
-      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CodeCompleteResult>(
             [&CompletionContext, &CancellationFlag](auto &Result,
                                                     auto DeliverTransformed) {
@@ -631,11 +632,11 @@ void swift::ide::CompletionInstance::codeComplete(
               ConsumerToCallbackAdapter Consumer(ImportDep, CancellationFlag,
                                                  DeliverTransformed);
 
-              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
                   ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                           Consumer));
 
-              if (!Result.DidFindCodeCompletionToken) {
+              if (!Result.DidFindIDEInspectionTarget) {
                 SwiftCompletionInfo Info{CI, &CompletionContext};
                 CodeCompletionResultSink ResultSink;
                 DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
@@ -643,8 +644,8 @@ void swift::ide::CompletionInstance::codeComplete(
               }
 
               Consumer.setContext(CI, &CompletionContext);
-              performCodeCompletionSecondPass(*CI->getCodeCompletionFile(),
-                                              *callbacksFactory);
+              performIDEInspectionSecondPass(*CI->getIDEInspectionFile(),
+                                             *callbacksFactory);
               Consumer.clearContext();
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
@@ -660,10 +661,10 @@ void swift::ide::CompletionInstance::codeComplete(
       });
 }
 
-void swift::ide::CompletionInstance::typeContextInfo(
+void swift::ide::IDEInspectionInstance::typeContextInfo(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
@@ -695,25 +696,25 @@ void swift::ide::CompletionInstance::typeContextInfo(
   };
 
   performOperation(
-      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
       /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
-      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<TypeContextInfoResult>(
             [&CancellationFlag](auto &Result, auto DeliverTransformed) {
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
-              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
                   ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-              if (!Result.DidFindCodeCompletionToken) {
+              if (!Result.DidFindIDEInspectionTarget) {
                 // Deliver empty results if we didn't find a code completion
                 // token.
                 DeliverTransformed(
                     ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
 
-              performCodeCompletionSecondPass(
-                  *Result.CI->getCodeCompletionFile(), *callbacksFactory);
+              performIDEInspectionSecondPass(
+                  *Result.CI->getIDEInspectionFile(), *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback
@@ -727,10 +728,10 @@ void swift::ide::CompletionInstance::typeContextInfo(
       });
 }
 
-void swift::ide::CompletionInstance::conformingMethodList(
+void swift::ide::IDEInspectionInstance::conformingMethodList(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
@@ -763,25 +764,25 @@ void swift::ide::CompletionInstance::conformingMethodList(
   };
 
   performOperation(
-      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
       /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
-      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<ConformingMethodListResults>(
             [&ExpectedTypeNames, &CancellationFlag](auto &Result,
                                                     auto DeliverTransformed) {
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
-              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
                   ide::makeConformingMethodListCallbacksFactory(
                       ExpectedTypeNames, Consumer));
 
-              if (!Result.DidFindCodeCompletionToken) {
+              if (!Result.DidFindIDEInspectionTarget) {
                 DeliverTransformed(
                     ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
 
-              performCodeCompletionSecondPass(
-                  *Result.CI->getCodeCompletionFile(), *callbacksFactory);
+              performIDEInspectionSecondPass(
+                  *Result.CI->getIDEInspectionFile(), *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback
@@ -795,10 +796,10 @@ void swift::ide::CompletionInstance::conformingMethodList(
       });
 }
 
-void swift::ide::CompletionInstance::cursorInfo(
+void swift::ide::IDEInspectionInstance::cursorInfo(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CursorInfoResults>)> Callback) {
@@ -829,26 +830,26 @@ void swift::ide::CompletionInstance::cursorInfo(
   };
 
   performOperation(
-      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
       /*IgnoreSwiftSourceInfo=*/false, CancellationFlag,
-      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
             [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {
               auto &Mgr = Result.CI->getSourceMgr();
-              auto RequestedLoc =
-                  Mgr.getLocForOffset(Mgr.getCodeCompletionBufferID(), Offset);
+              auto RequestedLoc = Mgr.getLocForOffset(
+                  Mgr.getIDEInspectionTargetBufferID(), Offset);
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
-              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
                   ide::makeCursorInfoCallbacksFactory(Consumer, RequestedLoc));
 
-              if (!Result.DidFindCodeCompletionToken) {
+              if (!Result.DidFindIDEInspectionTarget) {
                 return DeliverTransformed(ResultType::success(
                     {/*Results=*/nullptr, Result.DidReuseAST}));
               }
 
-              performCodeCompletionSecondPass(
-                  *Result.CI->getCodeCompletionFile(), *callbacksFactory);
+              performIDEInspectionSecondPass(
+                  *Result.CI->getIDEInspectionFile(), *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback

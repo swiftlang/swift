@@ -631,30 +631,31 @@ bool CompilerInstance::setUpModuleLoaders() {
   return false;
 }
 
-Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
-  Optional<unsigned> codeCompletionBufferID;
-  auto codeCompletePoint = Invocation.getCodeCompletionPoint();
-  if (codeCompletePoint.first) {
-    auto memBuf = codeCompletePoint.first;
+Optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
+  Optional<unsigned> ideInspectionTargetBufferID;
+  auto ideInspectionTarget = Invocation.getIDEInspectionTarget();
+  if (ideInspectionTarget.first) {
+    auto memBuf = ideInspectionTarget.first;
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    codeCompletionBufferID = SourceMgr.addMemBufferCopy(memBuf);
-    InputSourceCodeBufferIDs.push_back(*codeCompletionBufferID);
-    SourceMgr.setCodeCompletionPoint(*codeCompletionBufferID,
-                                     codeCompletePoint.second);
+    ideInspectionTargetBufferID = SourceMgr.addMemBufferCopy(memBuf);
+    InputSourceCodeBufferIDs.push_back(*ideInspectionTargetBufferID);
+    SourceMgr.setIDEInspectionTarget(*ideInspectionTargetBufferID,
+                                    ideInspectionTarget.second);
   }
-  return codeCompletionBufferID;
+  return ideInspectionTargetBufferID;
 }
 
-SourceFile *CompilerInstance::getCodeCompletionFile() const {
+SourceFile *CompilerInstance::getIDEInspectionFile() const {
   auto *mod = getMainModule();
   auto &eval = mod->getASTContext().evaluator;
-  return evaluateOrDefault(eval, CodeCompletionFileRequest{mod}, nullptr);
+  return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
 }
 
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
-  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
+  const Optional<unsigned> ideInspectionTargetBufferID =
+      setUpIDEInspectionTargetBuffer();
 
   const auto &Inputs =
       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
@@ -676,11 +677,11 @@ bool CompilerInstance::setUpInputs() {
   if (hasFailed)
     return true;
 
-  // Set the primary file to the code-completion point if one exists.
-  if (codeCompletionBufferID.has_value() &&
-      !isPrimaryInput(*codeCompletionBufferID)) {
+  // Set the primary file to the IDE inspection point if one exists.
+  if (ideInspectionTargetBufferID.has_value() &&
+      !isPrimaryInput(*ideInspectionTargetBufferID)) {
     assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
-    recordPrimaryInputBuffer(*codeCompletionBufferID);
+    recordPrimaryInputBuffer(*ideInspectionTargetBufferID);
   }
 
   return false;

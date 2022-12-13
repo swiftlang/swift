@@ -29,7 +29,7 @@ enum class BodyInitKind;
 struct BodyInitKindAndExpr;
 class BraceStmt;
 class ClosureExpr;
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 class ConstructorDecl;
 class CustomAttr;
 class Decl;

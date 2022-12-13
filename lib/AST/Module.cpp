@@ -665,15 +665,15 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
 }
 
-SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
-                                                ModuleDecl *mod) const {
+SourceFile *IDEInspectionFileRequest::evaluate(Evaluator &evaluator,
+                                               ModuleDecl *mod) const {
   const auto &SM = mod->getASTContext().SourceMgr;
   assert(mod->isMainModule() && "Can only do completion in the main module");
-  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+  assert(SM.hasIDEInspectionTargetBuffer() && "Not in IDE inspection mode?");
 
   for (auto *file : mod->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
-    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+    if (SF && SF->getBufferID() == SM.getIDEInspectionTargetBufferID())
       return SF;
   }
   llvm_unreachable("Couldn't find the completion file?");

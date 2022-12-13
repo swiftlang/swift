@@ -17,7 +17,7 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 
 namespace ide {
 
@@ -45,7 +45,7 @@ public:
 };
 
 /// Create a factory for code completion callbacks.
-CodeCompletionCallbacksFactory *makeConformingMethodListCallbacksFactory(
+IDEInspectionCallbacksFactory *makeConformingMethodListCallbacksFactory(
     ArrayRef<const char *> expectedTypeNames,
     ConformingMethodListConsumer &Consumer);
 
