@@ -99,6 +99,26 @@ struct OSSACanonicalizer {
   bool foundConsumingUseRequiringCopy() const {
     return consumingUsesNeedingCopy.size();
   }
+
+  bool hasPartialApplyConsumingUse() const {
+    return llvm::any_of(consumingUsesNeedingCopy,
+                        [](Operand *use) {
+                          return isa<PartialApplyInst>(use->getUser());
+                        }) ||
+           llvm::any_of(finalConsumingUses, [](Operand *use) {
+             return isa<PartialApplyInst>(use->getUser());
+           });
+  }
+
+  bool hasNonPartialApplyConsumingUse() const {
+    return llvm::any_of(consumingUsesNeedingCopy,
+                        [](Operand *use) {
+                          return !isa<PartialApplyInst>(use->getUser());
+                        }) ||
+           llvm::any_of(finalConsumingUses, [](Operand *use) {
+             return !isa<PartialApplyInst>(use->getUser());
+           });
+  }
 };
 
 } // anonymous namespace
@@ -147,7 +167,12 @@ struct DiagnosticEmitter {
   }
 
 private:
-  void emitDiagnosticsForFoundUses() const;
+  /// Emit diagnostics for the final consuming uses and consuming uses needing
+  /// copy. If filter is non-null, allow for the caller to pre-process operands
+  /// and emit their own diagnostic. If filter returns true, then we assume that
+  /// the caller processed it correctly. false, then we continue to process it.
+  void emitDiagnosticsForFoundUses(bool ignorePartialApply = false) const;
+  void emitDiagnosticsForPartialApplyUses() const;
 };
 
 } // anonymous namespace
@@ -172,11 +197,24 @@ void DiagnosticEmitter::emitGuaranteedDiagnostic(
   auto &astContext = fn->getASTContext();
   StringRef varName = getVariableNameForValue(markedValue);
 
+  // See if we have any closure capture uses and emit a better diagnostic.
+  if (canonicalizer.hasPartialApplyConsumingUse()) {
+    diagnose(astContext,
+             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+             diag::sil_moveonlychecker_guaranteed_value_captured_by_closure,
+             varName);
+    emitDiagnosticsForPartialApplyUses();
+    valuesWithDiagnostics.insert(markedValue);
+  }
+
+  // If we do not have any non-partial apply consuming uses... just exit early.
+  if (!canonicalizer.hasNonPartialApplyConsumingUse())
+    return;
+
   diagnose(astContext,
            markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
-
-  emitDiagnosticsForFoundUses();
+  emitDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
   valuesWithDiagnostics.insert(markedValue);
 }
 
@@ -193,7 +231,8 @@ void DiagnosticEmitter::emitOwnedDiagnostic(MarkMustCheckInst *markedValue) {
   valuesWithDiagnostics.insert(markedValue);
 }
 
-void DiagnosticEmitter::emitDiagnosticsForFoundUses() const {
+void DiagnosticEmitter::emitDiagnosticsForFoundUses(
+    bool ignorePartialApplyUses) const {
   auto &astContext = fn->getASTContext();
 
   for (auto *consumingUse : canonicalizer.consumingUsesNeedingCopy) {
@@ -209,6 +248,9 @@ void DiagnosticEmitter::emitDiagnosticsForFoundUses() const {
       }
     }
 
+    if (ignorePartialApplyUses &&
+        isa<PartialApplyInst>(consumingUse->getUser()))
+      continue;
     diagnose(astContext, loc.getSourceLoc(),
              diag::sil_moveonlychecker_consuming_use_here);
   }
@@ -226,8 +268,55 @@ void DiagnosticEmitter::emitDiagnosticsForFoundUses() const {
       }
     }
 
+    if (ignorePartialApplyUses &&
+        isa<PartialApplyInst>(consumingUse->getUser()))
+      continue;
+
     diagnose(astContext, loc.getSourceLoc(),
              diag::sil_moveonlychecker_consuming_use_here);
+  }
+}
+
+void DiagnosticEmitter::emitDiagnosticsForPartialApplyUses() const {
+  auto &astContext = fn->getASTContext();
+
+  for (auto *consumingUse : canonicalizer.consumingUsesNeedingCopy) {
+    // See if the consuming use is an owned moveonly_to_copyable whose only
+    // user is a return. In that case, use the return loc instead. We do this
+    // b/c it is illegal to put a return value location on a non-return value
+    // instruction... so we have to hack around this slightly.
+    auto *user = consumingUse->getUser();
+    auto loc = user->getLoc();
+    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
+        loc = ri->getLoc();
+      }
+    }
+
+    if (!isa<PartialApplyInst>(consumingUse->getUser()))
+      continue;
+    diagnose(astContext, loc.getSourceLoc(),
+             diag::sil_moveonlychecker_consuming_closure_use_here);
+  }
+
+  for (auto *consumingUse : canonicalizer.finalConsumingUses) {
+    // See if the consuming use is an owned moveonly_to_copyable whose only
+    // user is a return. In that case, use the return loc instead. We do this
+    // b/c it is illegal to put a return value location on a non-return value
+    // instruction... so we have to hack around this slightly.
+    auto *user = consumingUse->getUser();
+    auto loc = user->getLoc();
+    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
+        loc = ri->getLoc();
+      }
+    }
+
+    if (!isa<PartialApplyInst>(consumingUse->getUser()))
+      continue;
+
+    diagnose(astContext, loc.getSourceLoc(),
+             diag::sil_moveonlychecker_consuming_closure_use_here);
   }
 }
 

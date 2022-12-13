@@ -520,34 +520,47 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto &lowering = SGF.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);
-
-    bool NeedToDestroyValueAtExit = false;
+    ManagedValue val = ManagedValue::forUnmanaged(
+        SGF.F.begin()->createFunctionArgument(ty, VD));
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
     // allow formation of the address for this captured value.  Create a
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
-      auto addr = SGF.emitTemporaryAllocation(VD, ty);
+      auto addr = SGF.emitTemporary(VD, lowering);
       // We have created a copy that needs to be destroyed.
       val = SGF.B.emitCopyValueOperation(Loc, val);
-      NeedToDestroyValueAtExit = true;
-      lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
-      val = addr;
+      // We use the SILValue version of this because the SILGenBuilder version
+      // will create a cloned cleanup, which we do not want since our temporary
+      // already has a cleanup.
+      //
+      // MG: Is this the right semantics for createStore? Seems like that
+      // should be potentially a different API.
+      SGF.B.emitStoreValueOperation(VD, val.forward(SGF), addr->getAddress(),
+                                    StoreOwnershipQualifier::Init);
+      addr->finishInitialization(SGF);
+      val = addr->getManagedAddress();
     }
 
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
-    if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
+    // If this constant is a move only type, we need to add no_copy checking to
+    // ensure that we do not consume this captured value in the function. This
+    // is because closures can be invoked multiple times which is inconsistent
+    // with consuming the move only type.
+    if (val.getType().isMoveOnly()) {
+      val = val.ensurePlusOne(SGF, Loc);
+      val = SGF.B.createMarkMustCheckInst(Loc, val,
+                                          MarkMustCheckInst::CheckKind::NoCopy);
+    }
+
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val.getValue());
+    if (auto *AllocStack = dyn_cast<AllocStackInst>(val.getValue())) {
       AllocStack->setArgNo(ArgNo);
-    else {
+    } else {
       SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-      SGF.B.createDebugValue(Loc, val, DbgVar);
+      SGF.B.createDebugValue(Loc, val.getValue(), DbgVar);
     }
 
-    // TODO: Closure contexts should always be guaranteed.
-    if (NeedToDestroyValueAtExit && !lowering.isTrivial())
-      SGF.enterDestroyCleanup(val);
     break;
   }
 
