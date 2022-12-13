@@ -47,7 +47,7 @@
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/IDETool/CompilerInvocation.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/Index/Index.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/ParseVersion.h"
@@ -890,7 +890,7 @@ struct CompletionLikeOperationParams {
 };
 
 /// Run \p PerformOperation with the parameters that are needed to perform a
-/// completion like operation on a \c CompletionInstance. This function will
+/// completion like operation on a \c IDEInspectionInstance. This function will
 /// return the same value as \p PerformOperation.
 /// In case there was an error setting up the parameters for the operation,
 /// this method returns \c true and does not call \p PerformOperation.
@@ -1003,9 +1003,9 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        CompletionInstance CompletionInst;
+        IDEInspectionInstance IDEInspectionInst;
         int ExitCode = 2;
-        CompletionInst.typeContextInfo(
+        IDEInspectionInst.typeContextInfo(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
             /*CancellationFlag=*/nullptr,
@@ -1075,9 +1075,9 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        CompletionInstance CompletionInst;
+        IDEInspectionInstance IDEInspectionInst;
         int ExitCode = 2;
-        CompletionInst.conformingMethodList(
+        IDEInspectionInst.conformingMethodList(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
             /*CancellationFlag=*/nullptr,
@@ -1222,7 +1222,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        CompletionInstance Inst;
+        IDEInspectionInstance Inst;
         int ExitCode = 2;
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1488,7 +1488,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   auto FileSystem = llvm::vfs::getRealFileSystem();
 
-  CompletionInstance CompletionInst;
+  IDEInspectionInstance IDEInspectionInst;
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty())
@@ -1556,7 +1556,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     bool wasASTContextReused = false;
     std::string completionError = "";
     bool CallbackCalled = false;
-    CompletionInst.codeComplete(
+    IDEInspectionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         CodeCompletionDiagnostics ? &PrintDiags : nullptr, CompletionContext,
         /*CancellationFlag=*/nullptr,

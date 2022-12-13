@@ -21,18 +21,18 @@ GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
                      Optional<unsigned> CompletionCheckDependencyInterval) {
   llvm::sys::ScopedLock L(Mtx);
   if (CompletionMaxASTContextReuseCount.has_value())
-    State.CompletionOpts.MaxASTContextReuseCount =
+    State.IDEInspectionOpts.MaxASTContextReuseCount =
         *CompletionMaxASTContextReuseCount;
   if (CompletionCheckDependencyInterval.has_value())
-    State.CompletionOpts.CheckDependencyInterval =
+    State.IDEInspectionOpts.CheckDependencyInterval =
         *CompletionCheckDependencyInterval;
   return State;
 }
 
-GlobalConfig::Settings::CompletionOptions
-GlobalConfig::getCompletionOpts() const {
+GlobalConfig::Settings::IDEInspectionOptions
+GlobalConfig::getIDEInspectionOpts() const {
   llvm::sys::ScopedLock L(Mtx);
-  return State.CompletionOpts;
+  return State.IDEInspectionOpts;
 }
 
 SourceKit::Context::Context(

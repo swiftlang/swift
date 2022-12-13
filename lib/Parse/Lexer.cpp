@@ -207,8 +207,8 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
-  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
-    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
+  if (BufferID == SourceMgr.getIDEInspectionTargetBufferID()) {
+    const char *Ptr = BufferStart + SourceMgr.getIDEInspectionTargetOffset();
     // If the pointer points to a null byte, it's the null byte that was
     // inserted to mark the code completion token. If the IDE inspection offset
     // points to a normal character, no code completion token should be

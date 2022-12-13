@@ -28,7 +28,7 @@
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -261,11 +261,11 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
 };
 }
 
-static void
-configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
-                            std::shared_ptr<GlobalConfig> GlobalConfig) {
-  auto Opts = GlobalConfig->getCompletionOpts();
-  CompletionInst->setOptions({
+static void configureIDEInspectionInstance(
+    std::shared_ptr<IDEInspectionInstance> IDEInspectionInst,
+    std::shared_ptr<GlobalConfig> GlobalConfig) {
+  auto Opts = GlobalConfig->getIDEInspectionOpts();
+  IDEInspectionInst->setOptions({
     Opts.MaxASTContextReuseCount,
     Opts.CheckDependencyInterval
   });
@@ -287,9 +287,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
       SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
 
-  CompletionInst = std::make_shared<CompletionInstance>();
+  IDEInspectionInst = std::make_shared<IDEInspectionInstance>();
 
-  configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
+  configureIDEInspectionInstance(IDEInspectionInst,
+                                 SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -303,11 +304,11 @@ SwiftLangSupport::~SwiftLangSupport() {
 
 void SwiftLangSupport::globalConfigurationUpdated(
     std::shared_ptr<GlobalConfig> Config) {
-  configureCompletionInstance(CompletionInst, Config);
+  configureIDEInspectionInstance(IDEInspectionInst, Config);
 }
 
 void SwiftLangSupport::dependencyUpdated() {
-  CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
+  IDEInspectionInst->markCachedCompilerInstanceShouldBeInvalidated();
 }
 
 UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {
@@ -1079,7 +1080,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   }
 
   // Pin completion instance.
-  auto CompletionInst = getCompletionInstance();
+  auto CompletionInst = getIDEInspectionInstance();
 
   auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
   ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {

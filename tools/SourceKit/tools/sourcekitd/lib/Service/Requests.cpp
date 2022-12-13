@@ -505,9 +505,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
 
     dict.set(KeyCompletionMaxASTContextReuseCount,
-             UpdatedConfig.CompletionOpts.MaxASTContextReuseCount);
+             UpdatedConfig.IDEInspectionOpts.MaxASTContextReuseCount);
     dict.set(KeyCompletionCheckDependencyInterval,
-             UpdatedConfig.CompletionOpts.CheckDependencyInterval);
+             UpdatedConfig.IDEInspectionOpts.CheckDependencyInterval);
 
     return Rec(RB.createResponse());
   }

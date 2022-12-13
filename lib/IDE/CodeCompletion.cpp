@@ -46,7 +46,7 @@
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -103,7 +103,7 @@ std::string swift::ide::removeCodeCompletionTokens(
 
 namespace {
 
-class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
+class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -123,7 +123,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
+  IDEInspectionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -236,7 +236,7 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
+      : IDEInspectionCallbacks(P), CompletionContext(CompletionContext),
         Consumer(Consumer) {
   }
 
@@ -275,7 +275,8 @@ public:
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
-  void completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
+  void completeInPrecedenceGroup(
+      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -485,7 +486,8 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
   AttTargetIsIndependent = isIndependent;
 }
 
-void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
+void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
+    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -1409,8 +1411,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   assert(ParsedExpr || CurDeclContext);
 
   SourceLoc CompletionLoc = ParsedExpr
-    ? ParsedExpr->getLoc()
-    : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc();
+                                ? ParsedExpr->getLoc()
+                                : CurDeclContext->getASTContext()
+                                      .SourceMgr.getIDEInspectionTargetLoc();
 
   auto typeCheckWithLookup = [this, &CompletionLoc](
                                  TypeCheckCompletionCallback &Lookup) {
@@ -1470,7 +1473,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::KeyPathExprSwift: {
     assert(CurDeclContext);
 
-    // CodeCompletionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
+    // IDEInspectionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
     // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
     auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
@@ -1516,7 +1519,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-    SourceLoc CCLoc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc CCLoc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.deliverResults(CCLoc, CompletionContext, Consumer);
     return true;
   }
@@ -1599,9 +1602,9 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     // Type member completion does not need a type-checked AST.
     typeCheckContextAt(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-        ParsedExpr
-            ? ParsedExpr->getLoc()
-            : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+        ParsedExpr ? ParsedExpr->getLoc()
+                   : CurDeclContext->getASTContext()
+                         .SourceMgr.getIDEInspectionTargetLoc());
   }
 
   // Add keywords even if type checking fails completely.
@@ -1647,7 +1650,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     Lookup.setPreferFunctionReferencesToCalls();
 
   auto DoPostfixExprBeginning = [&] (){
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getValueCompletionsInDeclContext(Loc);
     Lookup.getSelfTypeCompletionInDeclContext(Loc, /*isForDeclResult=*/false);
   };
@@ -1735,7 +1738,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
       Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     } else {
-      SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+      SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
       Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
                                               /*LiteralCompletions=*/false);
     }
@@ -1744,7 +1747,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   case CompletionKind::TypeDeclResultBeginning:
   case CompletionKind::TypeSimpleBeginning: {
-    auto Loc = Context.SourceMgr.getCodeCompletionLoc();
+    auto Loc = Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getTypeCompletionsInDeclContext(Loc);
     Lookup.getSelfTypeCompletionInDeclContext(
         Loc, Kind == CompletionKind::TypeDeclResultBeginning);
@@ -1808,7 +1811,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
-          P.Context.SourceMgr.getCodeCompletionLoc());
+          P.Context.SourceMgr.getIDEInspectionTargetLoc());
     break;
   }
   case CompletionKind::AttributeDeclParen: {
@@ -1921,8 +1924,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
         }
 
         auto &SM = CurDeclContext->getASTContext().SourceMgr;
-        auto leadingChar =
-            SM.extractText({SM.getCodeCompletionLoc().getAdvancedLoc(-1), 1});
+        auto leadingChar = SM.extractText(
+            {SM.getIDEInspectionTargetLoc().getAdvancedLoc(-1), 1});
         Lookup.setHaveLeadingSpace(leadingChar.find_first_of(" \t\f\v") !=
                                    StringRef::npos);
 
@@ -1937,7 +1940,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::ReturnStmtExpr : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     SmallVector<Type, 2> possibleReturnTypes;
     collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
     Lookup.setExpectedTypes(possibleReturnTypes,
@@ -1947,7 +1950,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::YieldStmtExpr: {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
       if (FD->isCoroutine()) {
         // TODO: handle multi-value yields.
@@ -1974,7 +1977,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::GenericRequirement: {
-    auto Loc = Context.SourceMgr.getCodeCompletionLoc();
+    auto Loc = Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getGenericRequirementCompletions(CurDeclContext, Loc);
     break;
   }
@@ -1982,7 +1985,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
     break;
   case CompletionKind::StmtLabel: {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
     break;
   }
@@ -1991,12 +1994,12 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
     // Type names at attribute position after '@'.
     Lookup.getTypeCompletionsInDeclContext(
-      P.Context.SourceMgr.getCodeCompletionLoc());
+      P.Context.SourceMgr.getIDEInspectionTargetLoc());
     break;
 
   }
   case CompletionKind::OptionalBinding: {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getOptionalBindingCompletions(Loc);
     break;
   }
@@ -2015,7 +2018,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
 namespace {
 class CodeCompletionCallbacksFactoryImpl
-    : public CodeCompletionCallbacksFactory {
+    : public IDEInspectionCallbacksFactory {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
 
@@ -2024,13 +2027,13 @@ public:
                                      CodeCompletionConsumer &Consumer)
       : CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-  CodeCompletionCallbacks *createCodeCompletionCallbacks(Parser &P) override {
+      IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
     return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
   }
 };
 } // end anonymous namespace
 
-CodeCompletionCallbacksFactory *
+IDEInspectionCallbacksFactory *
 swift::ide::makeCodeCompletionCallbacksFactory(
     CodeCompletionContext &CompletionContext,
     CodeCompletionConsumer &Consumer) {

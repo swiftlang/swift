@@ -16,7 +16,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ConformingMethodList.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
@@ -181,7 +181,7 @@ void SwiftLangSupport::getConformingMethodList(
       [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
         ParmsResult.mapAsync<ConformingMethodListResults>(
             [&](auto &Params, auto DeliverTransformed) {
-              getCompletionInstance()->conformingMethodList(
+              getIDEInspectionInstance()->conformingMethodList(
                   Params.Invocation, Args, fileSystem, Params.completionBuffer,
                   Offset, Params.DiagC, ExpectedTypeNames,
                   Params.CancellationFlag, DeliverTransformed);

@@ -1,4 +1,4 @@
-//===--- CompletionInstance.h ---------------------------------------------===//
+//===--- IDEInspectionInstance.h ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_COMPLETIONINSTANCE_H
-#define SWIFT_IDE_COMPLETIONINSTANCE_H
+#ifndef SWIFT_IDE_IDEINSPECTIONINSTANCE_H
+#define SWIFT_IDE_IDEINSPECTIONINSTANCE_H
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CancellableResult.h"
@@ -45,25 +45,25 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
                                llvm::StringRef bufferIdentifier);
 
 /// The result returned via the callback from the perform*Operation methods.
-struct CompletionInstanceResult {
+struct IDEInspectionInstanceResult {
   /// The compiler instance that is prepared for the second pass.
   std::shared_ptr<CompilerInstance> CI;
   /// Whether an AST was reused.
   bool DidReuseAST;
-  /// Whether the CompletionInstance found a code completion token in the source
-  /// file. If this is \c false, the user will most likely want to return empty
-  /// results.
-  bool DidFindCodeCompletionToken;
+  /// Whether the IDEInspectionInstance target could be found in the source
+  /// file. If this is \c false, the user will most likely want to return
+  /// empty results.
+  bool DidFindIDEInspectionTarget;
 };
 
-/// The results returned from \c CompletionInstance::codeComplete.
+/// The results returned from \c IDEInspectionInstance::codeComplete.
 struct CodeCompleteResult {
   CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
   ImportDepth ImportDep;
 };
 
-/// The results returned from \c CompletionInstance::typeContextInfo.
+/// The results returned from \c IDEInspectionInstance::typeContextInfo.
 struct TypeContextInfoResult {
   /// The actual results. If empty, no results were found.
   ArrayRef<TypeContextInfoItem> Results;
@@ -71,24 +71,24 @@ struct TypeContextInfoResult {
   bool DidReuseAST;
 };
 
-/// The results returned from \c CompletionInstance::conformingMethodList.
+/// The results returned from \c IDEInspectionInstance::conformingMethodList.
 struct ConformingMethodListResults {
   /// The actual results. If \c nullptr, no results were found.
   const ConformingMethodListResult *Result;
-  /// Whether an AST was reused for the completion.
+  /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };
 
-/// The results returned from \c CompletionInstance::conformingMethodList.
+/// The results returned from \c IDEInspectionInstance::cursorInfo.
 struct CursorInfoResults {
   /// The actual results. If \c nullptr, no results were found.
   const ResolvedCursorInfo *Result;
-  /// Whether an AST was reused for the completion.
+  /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };
 
 /// Manages \c CompilerInstance for completion like operations.
-class CompletionInstance {
+class IDEInspectionInstance {
   struct Options {
     unsigned MaxASTReuseCount = 100;
     unsigned DependencyCheckIntervalSecond = 5;
@@ -119,10 +119,10 @@ class CompletionInstance {
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       const SearchPathOptions &SearchPathOpts,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
-      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+      llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
           Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
@@ -133,10 +133,10 @@ class CompletionInstance {
       llvm::Optional<llvm::hash_code> ArgsHash,
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
-      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+      llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
           Callback);
 
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
@@ -160,14 +160,14 @@ class CompletionInstance {
   void performOperation(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
-      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+      llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
           Callback);
 
 public:
-  CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
+  IDEInspectionInstance() : CachedCIShouldBeInvalidated(false) {}
 
   // Mark the cached compiler instance "should be invalidated". In the next
   // completion, new compiler instance will be used. (Thread safe.)
@@ -179,7 +179,7 @@ public:
   void codeComplete(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback);
@@ -187,7 +187,7 @@ public:
   void typeContextInfo(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
@@ -196,7 +196,7 @@ public:
   void conformingMethodList(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
@@ -205,7 +205,7 @@ public:
   void cursorInfo(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CursorInfoResults>)> Callback);
@@ -214,4 +214,4 @@ public:
 } // namespace ide
 } // namespace swift
 
-#endif // SWIFT_IDE_COMPLETIONINSTANCE_H
+#endif // SWIFT_IDE_IDEINSPECTIONINSTANCE_H

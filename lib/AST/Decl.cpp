@@ -8018,9 +8018,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   ASTContext &ctx = getASTContext();
 
   // Don't allow getBody() to trigger parsing of an unparsed body containing the
-  // code completion location.
+  // IDE inspection location.
   if (getBodyKind() == BodyKind::Unparsed &&
-      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
+      ctx.SourceMgr.rangeContainsIDEInspectionTarget(getBodySourceRange())) {
     return nullptr;
   }
 

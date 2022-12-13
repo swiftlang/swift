@@ -3572,7 +3572,7 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   }
 
   // Always assume non-simple 'didSet' in code completion mode.
-  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+  if (decl->getASTContext().SourceMgr.hasIDEInspectionTargetBuffer())
     return false;
 
   // didSet must have a single parameter.

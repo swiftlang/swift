@@ -21,7 +21,7 @@
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -184,8 +184,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     ty = parseTypeTupleBody();
     break;
   case tok::code_complete:
-    if (CodeCompletion)
-      CodeCompletion->completeTypeSimpleBeginning();
+    if (IDECallbacks)
+      IDECallbacks->completeTypeSimpleBeginning();
     return makeParserCodeCompletionResult<TypeRepr>(
         new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
   case tok::l_square: {
@@ -573,8 +573,8 @@ ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion)
-      CodeCompletion->completeTypeDeclResultBeginning();
+    if (IDECallbacks)
+      IDECallbacks->completeTypeDeclResultBeginning();
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -672,8 +672,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (Tok.is(tok::kw_Any)) {
       return parseAnyType();
     } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
+      if (IDECallbacks)
+        IDECallbacks->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();
@@ -759,11 +759,11 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot(ITR);
+      if (IDECallbacks)
+        IDECallbacks->completeTypeIdentifierWithDot(ITR);
     } else {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
+      if (IDECallbacks)
+        IDECallbacks->completeTypeIdentifierWithoutDot(ITR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);

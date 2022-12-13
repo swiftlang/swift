@@ -1116,7 +1116,7 @@ constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
     return None;
 
   for (unsigned i : indices(*args)) {
-    if (CS.containsCodeCompletionLoc(args->getExpr(i)))
+    if (CS.containsIDEInspectionTarget(args->getExpr(i)))
       return CompletionArgInfo{i, args->getFirstTrailingClosureIndex(),
                                args->size()};
   }
@@ -2878,7 +2878,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // code completion location, since they may have just not been written yet.
   if (cs.isForCodeCompletion()) {
     if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-      if (cs.containsCodeCompletionLoc(closure) &&
+      if (cs.containsIDEInspectionTarget(closure) &&
           (closure->hasAnonymousClosureVars() ||
            (args.empty() && closure->getInLoc().isInvalid())))
           return false;
@@ -5297,8 +5297,9 @@ bool ConstraintSystem::repairFailures(
         // other (explicit) argument's so source range containment alone isn't
         // sufficient.
         bool isSynthesizedArg = arg->isImplicit() && isa<DeclRefExpr>(arg);
-        if (!isSynthesizedArg && isForCodeCompletion() && containsCodeCompletionLoc(arg) &&
-            !lhs->isVoid() && !lhs->isUninhabited())
+        if (!isSynthesizedArg && isForCodeCompletion() &&
+            containsIDEInspectionTarget(arg) && !lhs->isVoid() &&
+            !lhs->isUninhabited())
           return true;
       }
     }

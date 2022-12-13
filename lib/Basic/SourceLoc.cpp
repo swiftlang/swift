@@ -34,12 +34,12 @@ void SourceManager::verifyAllBuffers() const {
   }
 }
 
-SourceLoc SourceManager::getCodeCompletionLoc() const {
-  if (CodeCompletionBufferID == 0U)
+SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
+  if (IDEInspectionTargetBufferID == 0U)
     return SourceLoc();
 
-  return getLocForBufferStart(CodeCompletionBufferID)
-      .getAdvancedLoc(CodeCompletionOffset);
+  return getLocForBufferStart(IDEInspectionTargetBufferID)
+      .getAdvancedLoc(IDEInspectionTargetOffset);
 }
 
 StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
