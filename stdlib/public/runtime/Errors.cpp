@@ -83,14 +83,14 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
-  bool hasUnavailableAddress = syminfo.symbolName == nullptr;
+  bool hasUnavailableAddress = syminfo.getSymbolName() == nullptr;
 
   if (hasUnavailableAddress) {
     return false;
   }
 
   // Ok, now we know that we have some sort of "real" name. Set the outAddr.
-  addrOut = uintptr_t(syminfo.symbolAddress);
+  addrOut = uintptr_t(syminfo.getSymbolAddress());
 
   // First lets try to demangle using cxxabi. If this fails, we will try to
   // demangle with swift. We are taking advantage of __cxa_demangle actually
@@ -109,7 +109,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
     dwFlags |= UNDNAME_32_BIT_DECODE;
 #endif
 
-    return UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
+    return UnDecorateSymbolName(syminfo.getSymbolName(), szUndName,
                                 sizeof(szUndName), dwFlags);
   });
 
@@ -120,7 +120,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 #else
   int status;
   char *demangled =
-      abi::__cxa_demangle(syminfo.symbolName.get(), 0, 0, &status);
+      abi::__cxa_demangle(syminfo.getSymbolName(), 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr &&
            "If __cxa_demangle succeeds, demangled should never be nullptr");
@@ -135,7 +135,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      syminfo.symbolName.get(), strlen(syminfo.symbolName.get()),
+      syminfo.getSymbolName(), strlen(syminfo.getSymbolName()),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
@@ -155,7 +155,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  llvm::StringRef libraryName{syminfo.fileName};
+  llvm::StringRef libraryName{syminfo.getFilename()};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
@@ -170,7 +170,8 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   if (foundSymbol) {
     offset = ptrdiff_t(uintptr_t(framePC) - symbolAddr);
   } else {
-    offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress));
+    auto baseAddress = syminfo.getBaseAddress();
+    offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(baseAddress));
     symbolAddr = uintptr_t(framePC);
     symbolName = "<unavailable>";
   }

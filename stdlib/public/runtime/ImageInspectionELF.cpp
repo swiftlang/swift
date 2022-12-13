@@ -20,23 +20,6 @@
 
 #if defined(__ELF__)
 
-#include "swift/shims/MetadataSections.h"
 #include "ImageInspection.h"
-#include <dlfcn.h>
-
-using namespace swift;
-
-int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-  Dl_info dlinfo;
-  if (dladdr(address, &dlinfo) == 0) {
-    return 0;
-  }
-
-  info->fileName = dlinfo.dli_fname;
-  info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName.reset(dlinfo.dli_sname);
-  info->symbolAddress = dlinfo.dli_saddr;
-  return 1;
-}
 
 #endif // defined(__ELF__)
