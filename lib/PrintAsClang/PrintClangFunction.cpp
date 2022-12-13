@@ -1249,12 +1249,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << "#else\n";
     if (resultTy->isVoid()) {
       os << "    return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));\n";
+      os << "#endif\n";
     } else {
-      os << "    return SWIFT_RETURN_THUNK(";
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
           *directResultType, resultTy, moduleContext, os, cPrologueOS,
           typeMapping, interopContext, [&]() {
+            os << "    return SWIFT_RETURN_THUNK(";
             OptionalTypeKind retKind;
             Type objTy;
             std::tie(objTy, retKind) =
@@ -1262,32 +1263,24 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
             auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                                                   OutputLanguageMode::Cxx);
+            os << ", Swift::Error(opaqueError));\n";
+            os << "#endif\n";
+
+            // Return the function result value if it doesn't throw.
+            if (!resultTy->isVoid() && hasThrows) {
+              os << "\n";
+              os << "  return SWIFT_RETURN_THUNK(";
+              printClangFunctionReturnType(
+                  objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                  OutputLanguageMode::Cxx);
+              os << ", returnValue);\n";
+            }
+
             assert(!s.isUnsupported());
           });
-      os << ", Swift::Error(opaqueError));\n";
     }
-    os << "#endif\n";
   }
 
-  // Return the function result value if it doesn't throw.
-  if (!resultTy->isVoid() && hasThrows) {
-    os << "\n";
-    os << "  return SWIFT_RETURN_THUNK(";
-    auto directResultType = signature.getDirectResultType();
-    printDirectReturnOrParamCType(
-        *directResultType, resultTy, moduleContext, os, cPrologueOS,
-        typeMapping, interopContext, [&]() {
-          OptionalTypeKind retKind;
-          Type objTy;
-          std::tie(objTy, retKind) =
-              DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
-
-          auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
-                                                OutputLanguageMode::Cxx);
-          assert(!s.isUnsupported());
-        });
-    os << ", returnValue);\n";
-  }
 }
 
 static StringRef getConstructorName(const AbstractFunctionDecl *FD) {

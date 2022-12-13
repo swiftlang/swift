@@ -181,7 +181,7 @@ private:
 
 namespace _impl {
 
-constexpr static std::size_t max(std::size_t a, std::size_t b) {
+constexpr inline std::size_t max(std::size_t a, std::size_t b) {
   return a > b ? a : b;
 }
 
