@@ -1,4 +1,3 @@
-
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
@@ -624,5 +623,30 @@ do {
       @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped = 0
       // expected-error@-1 {{extra argument 'wrappedValue' in call}}
     }
+  }
+}
+
+// Test to make sure that type-checker doesn't attempt the closure passed to
+// `.filter` before the one from `.init`, otherwise it would mean that generic
+// parameter of `.filter` wouldn't be inferred since it depends on result of
+// `.init` closure.
+func test_that_closures_are_attempted_in_order() {
+  struct Test<T> {
+    init(_: ([Int]) -> T) {}
+    init(_: String) {}
+    init(_: Int, _: String = "") {}
+
+    func filter(_: (T) -> Bool) {}
+  }
+
+  Test {
+    _ = 42
+    return $0.map { Optional(Float($0)) }
+  }
+  .filter {
+    if $0.isEmpty { // Ok
+      return true
+    }
+    return false
   }
 }
