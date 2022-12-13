@@ -1,4 +1,4 @@
-//===--- CodeCompletionCallbacks.h - Parser's interface to code completion ===//
+//===--- IDEInspectionCallbacks.h - Parser's interface to IDE inspection --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -30,7 +30,7 @@ enum class ObjCSelectorContext {
 };
 
 /// Parser's interface to code completion.
-class CodeCompletionCallbacks {
+class IDEInspectionCallbacks {
 protected:
   Parser &P;
   ASTContext &Context;
@@ -55,11 +55,11 @@ protected:
   std::vector<Expr *> leadingSequenceExprs;
 
 public:
-  CodeCompletionCallbacks(Parser &P)
+  IDEInspectionCallbacks(Parser &P)
       : P(P), Context(P.Context) {
   }
 
-  virtual ~CodeCompletionCallbacks() {}
+  virtual ~IDEInspectionCallbacks() {}
 
   bool isInsideObjCSelector() const {
     return CompleteExprSelectorContext != ObjCSelectorContext::None;
@@ -81,10 +81,10 @@ public:
   }
 
   class InEnumElementRawValueRAII {
-    CodeCompletionCallbacks *Callbacks;
+    IDEInspectionCallbacks *Callbacks;
 
   public:
-    InEnumElementRawValueRAII(CodeCompletionCallbacks *Callbacks)
+    InEnumElementRawValueRAII(IDEInspectionCallbacks *Callbacks)
         : Callbacks(Callbacks) {
       if (Callbacks)
         Callbacks->InEnumElementRawValue = true;
@@ -99,10 +99,10 @@ public:
   /// RAII type that temporarily sets the "in Objective-C #selector expression"
   /// flag on the code completion callbacks object.
   class InObjCSelectorExprRAII {
-    CodeCompletionCallbacks *Callbacks;
+    IDEInspectionCallbacks *Callbacks;
 
   public:
-    InObjCSelectorExprRAII(CodeCompletionCallbacks *Callbacks,
+    InObjCSelectorExprRAII(IDEInspectionCallbacks *Callbacks,
                            ObjCSelectorContext SelectorContext)
         : Callbacks(Callbacks) {
       if (Callbacks)
@@ -257,14 +257,14 @@ public:
   virtual void doneParsing(SourceFile *SrcFile) = 0;
 };
 
-/// A factory to create instances of \c CodeCompletionCallbacks.
-class CodeCompletionCallbacksFactory {
+/// A factory to create instances of \c IDEInspectionCallbacks.
+class IDEInspectionCallbacksFactory {
 public:
-  virtual ~CodeCompletionCallbacksFactory() {}
+  virtual ~IDEInspectionCallbacksFactory() {}
 
-  /// Create an instance of \c CodeCompletionCallbacks.  The result
+  /// Create an instance of \c IDEInspectionCallbacks.  The result
   /// should be deallocated with 'delete'.
-  virtual CodeCompletionCallbacks *createCodeCompletionCallbacks(Parser &P) = 0;
+  virtual IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) = 0;
 };
 
 } // namespace swift

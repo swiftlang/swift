@@ -27,7 +27,7 @@
 #include "swift/IDE/Indenting.h"
 #include "swift/Refactoring/Refactoring.h"
 #include "swift/IDETool/CompileInstance.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/Index/IndexSymbol.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
@@ -51,7 +51,7 @@ namespace swift {
 
 namespace ide {
   class CodeCompletionCache;
-  class CompletionInstance;
+  class IDEInspectionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
   enum class CodeCompletionDeclKind : uint8_t;
@@ -354,7 +354,7 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
-  std::shared_ptr<swift::ide::CompletionInstance> CompletionInst;
+  std::shared_ptr<swift::ide::IDEInspectionInstance> IDEInspectionInst;
   compile::SessionManager CompileManager;
 
 public:
@@ -378,8 +378,9 @@ public:
     return CCCache;
   }
 
-  std::shared_ptr<swift::ide::CompletionInstance> getCompletionInstance() {
-    return CompletionInst;
+  std::shared_ptr<swift::ide::IDEInspectionInstance>
+  getIDEInspectionInstance() {
+    return IDEInspectionInst;
   }
 
   /// Returns the FileSystemProvider registered under Name, or nullptr if not
@@ -515,7 +516,7 @@ public:
   };
 
   /// Execute \p PerformOperation synchronously with the parameters necessary to
-  /// invoke a completion-like operation on \c CompletionInstance.
+  /// invoke a completion-like operation on \c IDEInspectionInstance.
   /// If \p InsertCodeCompletionToken is \c true, a code completion token will
   /// be inserted into the source buffer, if \p InsertCodeCompletionToken is \c
   /// false, the buffer is left as-is.

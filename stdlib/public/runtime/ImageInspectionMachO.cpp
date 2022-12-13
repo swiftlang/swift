@@ -171,20 +171,5 @@ void swift::initializeAccessibleFunctionsLookup() {
                        addImageAccessibleFunctionsBlockCallbackUnsafe>);
 }
 
-#if SWIFT_STDLIB_HAS_DLADDR
-int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-  Dl_info dlinfo;
-  if (dladdr(address, &dlinfo) == 0) {
-    return 0;
-  }
-
-  info->fileName = dlinfo.dli_fname;
-  info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName.reset(dlinfo.dli_sname);
-  info->symbolAddress = dlinfo.dli_saddr;
-  return 1;
-}
-#endif
-
 #endif // defined(__APPLE__) && defined(__MACH__) &&
        // !defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

@@ -136,11 +136,11 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out,
-                    const CodeCompletionCallbacksFactory *factory);
+                    const IDEInspectionCallbacksFactory *factory);
 
-class CodeCompletionSecondPassRequest
-    : public SimpleRequest<CodeCompletionSecondPassRequest,
-                           bool(SourceFile *, CodeCompletionCallbacksFactory *),
+class IDEInspectionSecondPassRequest
+    : public SimpleRequest<IDEInspectionSecondPassRequest,
+                           bool(SourceFile *, IDEInspectionCallbacksFactory *),
                            RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -150,7 +150,7 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, SourceFile *SF,
-                CodeCompletionCallbacksFactory *Factory) const;
+                IDEInspectionCallbacksFactory *Factory) const;
 
 public:
   evaluator::DependencySource

@@ -157,10 +157,10 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
   SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
 
-  // If this buffer is for code completion, hook up the state needed by its
+  // If this buffer is for IDE functionality, hook up the state needed by its
   // second pass.
   PersistentParserState *state = nullptr;
-  if (ctx.SourceMgr.getCodeCompletionBufferID() == bufferID) {
+  if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == bufferID) {
     state = new PersistentParserState();
     SF->setDelayedParserState({state, &deletePersistentParserState});
   }
@@ -178,7 +178,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 #if SWIFT_SWIFT_PARSER
   if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
-      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID &&
+      ctx.SourceMgr.getIDEInspectionTargetBufferID() != bufferID &&
       SF->Kind != SourceFileKind::SIL) {
     auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
     unsigned int flags = 0;
@@ -265,15 +265,15 @@ ArrayRef<Decl *> ParseTopLevelDeclsRequest::evaluate(
 }
 
 //----------------------------------------------------------------------------//
-// CodeCompletionSecondPassRequest computation.
+// IDEInspectionSecondPassRequest computation.
 //----------------------------------------------------------------------------//
 
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const CodeCompletionCallbacksFactory *factory) { }
+                           const IDEInspectionCallbacksFactory *factory) { }
 
 evaluator::DependencySource
-CodeCompletionSecondPassRequest::readDependencySource(
+IDEInspectionSecondPassRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }

@@ -159,10 +159,14 @@ class CMakeProduct(product.Product):
         swift_cmake_options = cmake.CMakeOptions()
 
         if host_target.startswith("android"):
+            # Clang uses a different sysroot natively on Android in the Termux
+            # app, which the Termux build scripts pass in through a $PREFIX
+            # variable.
             prefix = os.environ.get("PREFIX")
             if prefix:
                 llvm_cmake_options.define('DEFAULT_SYSROOT:STRING',
                                           os.path.dirname(prefix))
+                llvm_cmake_options.define('CLANG_DEFAULT_LINKER:STRING', 'lld')
 
             # Android doesn't support building all of compiler-rt yet.
             if not self.is_cross_compile_target(host_target):

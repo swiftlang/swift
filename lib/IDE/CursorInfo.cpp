@@ -17,7 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
@@ -207,14 +207,14 @@ private:
 
 // MARK: - CursorInfoDoneParsingCallback
 
-class CursorInfoDoneParsingCallback : public CodeCompletionCallbacks {
+class CursorInfoDoneParsingCallback : public IDEInspectionCallbacks {
   CursorInfoConsumer &Consumer;
   SourceLoc RequestedLoc;
 
 public:
   CursorInfoDoneParsingCallback(Parser &P, CursorInfoConsumer &Consumer,
                                 SourceLoc RequestedLoc)
-      : CodeCompletionCallbacks(P), Consumer(Consumer),
+      : IDEInspectionCallbacks(P), Consumer(Consumer),
         RequestedLoc(RequestedLoc) {}
 
   std::unique_ptr<ResolvedCursorInfo>
@@ -257,10 +257,10 @@ public:
 
 } // anonymous namespace.
 
-CodeCompletionCallbacksFactory *
+IDEInspectionCallbacksFactory *
 swift::ide::makeCursorInfoCallbacksFactory(CursorInfoConsumer &Consumer,
                                            SourceLoc RequestedLoc) {
-  class CursorInfoCallbacksFactoryImpl : public CodeCompletionCallbacksFactory {
+  class CursorInfoCallbacksFactoryImpl : public IDEInspectionCallbacksFactory {
     CursorInfoConsumer &Consumer;
     SourceLoc RequestedLoc;
 
@@ -269,7 +269,7 @@ swift::ide::makeCursorInfoCallbacksFactory(CursorInfoConsumer &Consumer,
                                    SourceLoc RequestedLoc)
         : Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
-    CodeCompletionCallbacks *createCodeCompletionCallbacks(Parser &P) override {
+    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
       return new CursorInfoDoneParsingCallback(P, Consumer, RequestedLoc);
     }
   };

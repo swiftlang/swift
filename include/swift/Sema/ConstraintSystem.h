@@ -3681,10 +3681,8 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
-  /// Whether the given ASTNode's source range contains the code
-  /// completion location.
-  bool containsCodeCompletionLoc(ASTNode node) const;
-  bool containsCodeCompletionLoc(const ArgumentList *args) const;
+  bool containsIDEInspectionTarget(ASTNode node) const;
+  bool containsIDEInspectionTarget(const ArgumentList *args) const;
 
   /// Marks the argument \p Arg as being ignored because it occurs after the
   /// code completion token. This assumes that the argument is not type checked
