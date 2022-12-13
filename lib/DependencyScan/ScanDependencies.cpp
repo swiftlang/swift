@@ -728,7 +728,9 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(out, "moduleSourceInfoPath",
                              swiftBinaryDeps->module_source_info_path,
                              /*indentLevel=*/5,
-                             /*trailingComma=*/false);
+                             /*trailingComma=*/true);
+      writeJSONSingleField(out, "isFramework", swiftBinaryDeps->is_framework,
+                           5, /*trailingComma=*/false);
     } else {
       out << "\"clang\": {\n";
 
@@ -893,7 +895,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
         details->swift_binary_details = {
             create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
-            create_clone(swiftBinaryDeps->sourceInfoPath.c_str())};
+            create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
+            swiftBinaryDeps->isFramework};
       } else {
         // Clang module details
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_CLANG;
