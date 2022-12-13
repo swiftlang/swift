@@ -875,12 +875,10 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
   };
   worklist.initialize(value);
   while (auto value = worklist.pop()) {
-    if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
-      if (auto *terminator = arg->getSingleTerminator()) {
-        if (terminator->isTransformationTerminator()) {
-          worklist.insert(terminator->getOperand(0));
-          continue;
-        }
+    if (auto *result = SILArgument::isTerminatorResult(value)) {
+      if (auto *forwardedOper = result->forwardedTerminatorResultOperand()) {
+        worklist.insert(forwardedOper->get());
+        continue;
       }
     } else if (auto *inst = value->getDefiningInstruction()) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(inst)) {
@@ -948,6 +946,7 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
     root = findOwnershipReferenceRoot(root);
     if (!root)
       return root;
+
     if (isa<FirstArgOwnershipForwardingSingleValueInst>(root)
         || isa<OwnershipForwardingConversionInst>(root)
         || isa<OwnershipForwardingSelectEnumInstBase>(root)
@@ -961,15 +960,10 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
       root = inst->getOperand(0);
       continue;
     }
-    if (auto *arg = dyn_cast<SILArgument>(root)) {
-      if (auto *term = arg->getSingleTerminator()) {
-        if (term->isTransformationTerminator()) {
-          auto *ti = cast<OwnershipForwardingTermInst>(term);
-          if (ti->preservesOwnership()) {
-            root = term->getOperand(0);
-            continue;
-          }
-        }
+    if (auto *termResult = SILArgument::isTerminatorResult(root)) {
+      if (auto *oper = termResult->forwardedTerminatorResultOperand()) {
+        root = oper->get();
+        continue;
       }
     }
     break;

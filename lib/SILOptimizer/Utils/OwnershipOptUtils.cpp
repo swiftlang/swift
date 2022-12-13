@@ -669,7 +669,7 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
           if (!ownedVal) {
             ownedVal = createCopyAtEdge(reborrowedOper);
           }
-          BranchInst *branch = PhiOperand(reborrowedOper).getBranch();
+          TermInst *branch = PhiOperand(reborrowedOper).getBranch();
           branch->getOperandRef(ownedPhi.argIndex).set(ownedVal);
           return true;
         });

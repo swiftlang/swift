@@ -423,42 +423,34 @@ bool SILValueOwnershipChecker::gatherUsers(
     if (!ti) {
       continue;
     }
-    // At this point, the only type of thing we could have is a transformation
-    // terminator since all forwarding terminators are transformation
-    // terminators.
-    assert(ti->isTransformationTerminator() &&
-           "Out of sync with isTransformationTerminator()");
+    // *NOTE* terminator results that are not forwarded should be verified
+    // independently.
+    //
+    // TODO: Add a flag that associates the terminator instruction with
+    // needing to be verified. If it isn't verified appropriately,
+    // assert when the verifier is destroyed.
+    if (op != ti->forwardedOperand())
+      continue;
+
+    // All arguments must be trivial or guaranteed.
     for (auto *succBlock : ti->getSuccessorBlocks()) {
-      // If we do not have any arguments, then continue.
       if (succBlock->args_empty())
         continue;
 
-      // Otherwise, make sure that all arguments are trivial or guaranteed.
-      // If we fail, emit an error.
-      //
-      // TODO: We could ignore this error and emit a more specific error on
-      // the actual terminator.
-      for (auto *succArg : succBlock->getSILPhiArguments()) {
-        // *NOTE* We do not emit an error here since we want to allow for
-        // more specific errors to be found during use_verification.
-        //
-        // TODO: Add a flag that associates the terminator instruction with
-        // needing to be verified. If it isn't verified appropriately,
-        // assert when the verifier is destroyed.
-        auto succArgOwnershipKind = succArg->getOwnershipKind();
-        if (!succArgOwnershipKind.isCompatibleWith(OwnershipKind::Guaranteed)) {
-          // This is where the error would go.
-          continue;
-        }
+      assert(succBlock->getNumArguments() == 1 &&
+             "forwarding terminators produce a single result");
+      auto *succArg = succBlock->getArgument(0);
 
-        // If we have an any value, just continue.
-        if (succArgOwnershipKind == OwnershipKind::None)
-          continue;
+      auto succArgOwnershipKind = succArg->getOwnershipKind();
+      assert(succArgOwnershipKind.isCompatibleWith(OwnershipKind::Guaranteed));
 
-        // Otherwise add all users of this BBArg to the worklist to visit
-        // recursively.
-        llvm::copy(succArg->getUses(), std::back_inserter(users));
-      }
+      // If we have an any value, just continue.
+      if (succArgOwnershipKind == OwnershipKind::None)
+        continue;
+
+      // Otherwise add all users of this BBArg to the worklist to visit
+      // recursively.
+      llvm::copy(succArg->getUses(), std::back_inserter(users));
     }
   }
 
