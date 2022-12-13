@@ -69,11 +69,8 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // DISCUSSION: For now we do not support forwarding instructions with
     // multiple non-trivial arguments since we would need to optimize all of
     // the non-trivial arguments at the same time.
-    //
-    // NOTE: Today we do not support TermInsts for simplicity... we /could/
-    // support it though if we need to.
     auto *ti = dyn_cast<TermInst>(user);
-    if ((ti && !ti->isTransformationTerminator()) ||
+    if ((ti && !ti->forwardedOperand()) ||
         !canOpcodeForwardGuaranteedValues(op) ||
         1 !=
             count_if(user->getNonTypeDependentOperandValues(), [&](SILValue v) {

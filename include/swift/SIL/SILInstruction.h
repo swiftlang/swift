@@ -1182,6 +1182,9 @@ public:
 ///
 /// The ownership kind is set on construction and afterwards must be changed
 /// explicitly using setOwnershipKind().
+///
+/// TODO: This name is extremely misleading because it may apply to an
+/// operation that has no operand at all, like `enum .None`.
 class FirstArgOwnershipForwardingSingleValueInst
     : public SingleValueInstruction,
       public OwnershipForwardingMixin {
@@ -1668,6 +1671,8 @@ public:
 
   Operand &getOperandRef() { return Operands[0]; }
 
+  const Operand &getOperandRef() const { return Operands[0]; }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -1805,6 +1810,10 @@ public:
   }
 
   Operand &getOperandRef() {
+    return this->getAllOperands()[0];
+  }
+
+  const Operand &getOperandRef() const {
     return this->getAllOperands()[0];
   }
 
@@ -6203,6 +6212,8 @@ public:
 
   Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
 
+  const Operand &getOperandRef() const { return OptionalOperand->asArray()[0]; }
+
   ArrayRef<Operand> getAllOperands() const {
     return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
   }
@@ -8384,31 +8395,50 @@ public:
 
   TermKind getTermKind() const { return TermKind(getKind()); }
 
-  /// Returns true if this is a transformation terminator.
+  /// Returns true if this terminator may have a result, represented as a block
+  /// argument in any of its successor blocks.
   ///
-  /// The first operand is the transformed source.
-  bool isTransformationTerminator() const {
+  /// Phis (whose operands originate from BranchInst terminators) are not
+  /// terminator results.
+  ///
+  /// CondBr might produce block arguments for legacy reasons. This is gradually
+  /// being deprecated. For now, they are considered phis. In OSSA, these "phis"
+  /// must be trivial and critical edges cannot be present.
+  bool mayHaveTerminatorResult() const {
     switch (getTermKind()) {
     case TermKind::UnwindInst:
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
     case TermKind::ThrowInst:
     case TermKind::YieldInst:
-    case TermKind::TryApplyInst:
-    case TermKind::BranchInst:
     case TermKind::CondBranchInst:
-    case TermKind::SwitchValueInst:
+    case TermKind::BranchInst:
     case TermKind::SwitchEnumAddrInst:
-    case TermKind::DynamicMethodBranchInst:
     case TermKind::CheckedCastAddrBranchInst:
-    case TermKind::AwaitAsyncContinuationInst:
       return false;
-    case TermKind::SwitchEnumInst:
     case TermKind::CheckedCastBranchInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::TryApplyInst:
+    case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::DynamicMethodBranchInst:
       return true;
     }
     llvm_unreachable("Covered switch isn't covered.");
   }
+
+  /// Returns an Operand reference if this terminator forwards ownership of a
+  /// single operand to a single result for at least one successor
+  /// block. Otherwise returns nullptr.
+  ///
+  /// By convention, terminators can forward ownership of at most one operand to
+  /// at most one result. The operand value might not be directly forwarded. For
+  /// example, a switch forwards ownership of the enum type into ownership of
+  /// the payload.
+  ///
+  /// Postcondition: each successor has zero or one block arguments which
+  /// represents the forwaded result.
+  const Operand *forwardedOperand() const;
 };
 
 // Forwards the first operand to a result in each successor block.
@@ -8441,6 +8471,10 @@ public:
   }
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  Operand &getOperandRef() { return getAllOperands()[0]; }
+
+  const Operand &getOperandRef() const { return getAllOperands()[0]; }
 
   /// Create a result for this terminator on the given successor block.
   SILPhiArgument *createResult(SILBasicBlock *succ, SILType resultTy);

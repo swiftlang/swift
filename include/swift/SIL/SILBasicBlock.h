@@ -440,7 +440,7 @@ public:
   /// Whether the block has any phi arguments.
   ///
   /// Note that a block could have an argument and still return false.  The
-  /// argument must also satisfy SILPhiArgument::isPhiArgument.
+  /// argument must also satisfy SILPhiArgument::isPhi.
   bool hasPhi() const;
 
   //===--------------------------------------------------------------------===//
@@ -541,6 +541,8 @@ struct PhiOperand {
 
   PhiOperand() = default;
 
+  // This if \p operand is a CondBrInst operand, then this constructs and
+  // invalid PhiOperand. The abstraction only works for non-trivial OSSA values.
   PhiOperand(Operand *operand) {
     auto *branch = dyn_cast<BranchInst>(operand->getUser());
     if (!branch)
@@ -567,8 +569,8 @@ struct PhiOperand {
   }
 
   SILPhiArgument *getValue() const {
-    auto *branch = cast<BranchInst>(predBlock->getTerminator());
-    return cast<SILPhiArgument>(branch->getDestBB()->getArgument(argIndex));
+    return
+      cast<SILPhiArgument>(getBranch()->getDestBB()->getArgument(argIndex));
   }
 
   SILValue getSource() const {
@@ -591,12 +593,10 @@ struct PhiValue {
   PhiValue() = default;
 
   PhiValue(SILValue value) {
-    auto *blockArg = dyn_cast<SILPhiArgument>(value);
-    if (!blockArg || !blockArg->isPhi())
-      return;
-
-    phiBlock = blockArg->getParent();
-    argIndex = blockArg->getIndex();
+    if (auto *blockArg = SILArgument::asPhi(value)) {
+      phiBlock = blockArg->getParent();
+      argIndex = blockArg->getIndex();
+    }
   }
 
   explicit operator bool() const { return phiBlock != nullptr; }
@@ -612,8 +612,12 @@ struct PhiValue {
   }
 
   Operand *getOperand(SILBasicBlock *predecessor) {
-    auto *branch = cast<BranchInst>(predecessor->getTerminator());
-    return &branch->getAllOperands()[argIndex];
+    auto *term = predecessor->getTerminator();
+    if (auto *branch = dyn_cast<BranchInst>(term)) {
+      return &branch->getAllOperands()[argIndex];
+    }
+    // TODO: Support CondBr for legacy reasons
+    return cast<CondBranchInst>(term)->getOperandForDestBB(phiBlock, argIndex);
   }
 
   operator SILValue() const { return getValue(); }
