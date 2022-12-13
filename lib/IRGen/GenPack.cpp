@@ -133,9 +133,6 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   pack = IGF.Builder.CreateConstArrayGEP(
       pack, 0, IGF.IGM.getPointerSize());
 
-  IGF.Builder.CreateLifetimeStart(
-      pack, Size(IGF.IGM.getPointerSize() * elementCount));
-
   return pack;
 }
 
