@@ -73,7 +73,11 @@ extension StaticBigInt {
   @available(SwiftStdlib 5.8, *)
   @inlinable
   internal var _isNegative: Bool {
+#if compiler(>=5.8) && $BuiltinIntLiteralAccessors
     Bool(Builtin.isNegative_IntLiteral(_value))
+#else
+    fatalError("Swift compiler is incompatible with this SDK version")
+#endif
   }
 
   /// Returns the minimal number of bits in this value's binary representation,
@@ -94,7 +98,11 @@ extension StaticBigInt {
   @available(SwiftStdlib 5.8, *)
   @inlinable
   public var bitWidth: Int {
+#if compiler(>=5.8) && $BuiltinIntLiteralAccessors
     Int(Builtin.bitWidth_IntLiteral(_value))
+#else
+    fatalError("Swift compiler is incompatible with this SDK version")
+#endif
   }
 
   /// Returns a 32-bit or 64-bit word of this value's binary representation.
@@ -125,9 +133,13 @@ extension StaticBigInt {
     guard !bitIndex.overflow, bitIndex.partialValue < bitWidth else {
       return _isNegative ? ~0 : 0
     }
+#if compiler(>=5.8) && $BuiltinIntLiteralAccessors
     return UInt(
       Builtin.wordAtIndex_IntLiteral(_value, wordIndex._builtinWordValue)
     )
+#else
+    fatalError("Swift compiler is incompatible with this SDK version")
+#endif
   }
 }
 
