@@ -39,11 +39,54 @@
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple1",
-// CHECK-NEXT:        "type": "(Swift.Int, Swift.Float)",
+// CHECK-NEXT:        "type": "(Swift.String, ExtractGroups.Bar)",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "(42, 6.6)"
+// CHECK-NEXT:        "valueKind": "Tuple",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "\"foo\""
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "type": "ExtractGroups.Bar",
+// CHECK-NEXT:            "valueKind": "InitCall",
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "type": "ExtractGroups.Bar",
+// CHECK-NEXT:              "arguments": []
+// CHECK-NEXT:            }
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "tuple2",
+// CHECK-NEXT:        "type": "(lat: Swift.Float, lng: Swift.Float)",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Tuple",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "label": "lat",
+// CHECK-NEXT:            "type": "Swift.Float",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "42.7"
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "label": "lng",
+// CHECK-NEXT:            "type": "Swift.Float",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "-73.9"
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "tuple3",
+// CHECK-NEXT:        "type": "Swift.Void",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Tuple",
+// CHECK-NEXT:        "value": []
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
@@ -60,5 +103,9 @@ public struct Dictionaries : MyProto {
 }
 
 public struct Tuples : MyProto {
-    let tuple1: (Int, Float) = (42, 6.6)
+    let tuple1: (String, Bar) = ("foo", Bar())
+    let tuple2: (lat: Float, lng: Float) = (lat: 42.7, lng: -73.9)
+    let tuple3: Void = ()
 }
+
+public struct Bar {}

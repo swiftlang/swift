@@ -27,7 +27,7 @@ class Type;
 /// in a type property initializer expression
 class CompileTimeValue {
 public:
-  enum ValueKind { RawLiteral, InitCall, Builder, Dictionary, Runtime };
+  enum ValueKind { RawLiteral, InitCall, Builder, Dictionary, Runtime, Tuple };
 
   ValueKind getKind() const { return Kind; }
 
@@ -102,6 +102,28 @@ public:
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Dictionary;
   }
+};
+
+struct TupleElement {
+  Optional<std::string> Label;
+  swift::Type Type;
+  std::shared_ptr<CompileTimeValue> Value;
+};
+
+/// A representation of a tuple and each tuple-element
+class TupleValue : public CompileTimeValue {
+public:
+  TupleValue(std::vector<TupleElement> Elements)
+      : CompileTimeValue(ValueKind::Tuple), Elements(Elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Tuple;
+  }
+
+  std::vector<TupleElement> getElements() const { return Elements; }
+
+private:
+  std::vector<TupleElement> Elements;
 };
 
 /// A representation of an arbitrary value that does not fall under

@@ -125,7 +125,6 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     switch (expr->getKind()) {
     case ExprKind::Array:
     case ExprKind::Dictionary:
-    case ExprKind::Tuple:
 
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
@@ -139,6 +138,33 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         return std::make_shared<RawLiteralValue>(literalOutput);
       }
       break;
+    }
+
+    case ExprKind::Tuple: {
+      auto tupleExpr = cast<TupleExpr>(expr);
+
+      std::vector<TupleElement> elements;
+      if (tupleExpr->hasElementNames()) {
+        for (auto pair : llvm::zip(tupleExpr->getElements(),
+                                   tupleExpr->getElementNames())) {
+          auto elementExpr = std::get<0>(pair);
+          auto elementName = std::get<1>(pair);
+
+          Optional<std::string> label =
+              elementName.empty()
+                  ? Optional<std::string>()
+                  : Optional<std::string>(elementName.str().str());
+
+          elements.push_back({label, elementExpr->getType(),
+                              extractCompileTimeValue(elementExpr)});
+        }
+      } else {
+        for (auto elementExpr : tupleExpr->getElements()) {
+          elements.push_back({Optional<std::string>(), elementExpr->getType(),
+                              extractCompileTimeValue(elementExpr)});
+        }
+      }
+      return std::make_shared<TupleValue>(elements);
     }
 
     case ExprKind::Call: {
@@ -283,6 +309,24 @@ void writeValue(llvm::json::OStream &JSON,
           });
         }
       });
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Tuple: {
+    auto tupleValue = cast<TupleValue>(value);
+
+    JSON.attribute("valueKind", "Tuple");
+    JSON.attributeArray("value", [&] {
+      for (auto TV : tupleValue->getElements()) {
+        JSON.object([&] {
+          if (auto Label = TV.Label) {
+            JSON.attribute("label", Label);
+          }
+          JSON.attribute("type", toFullyQualifiedTypeNameString(TV.Type));
+          writeValue(JSON, TV.Value);
+        });
+      }
     });
     break;
   }
