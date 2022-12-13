@@ -165,12 +165,8 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
 
 EndBorrowCleanup::EndBorrowCleanup(SILValue borrowedValue)
     : borrowedValue(borrowedValue) {
-  if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-    if (auto *ti = arg->getSingleTerminator()) {
-      assert(!ti->isTransformationTerminator() &&
-             "Transforming terminators do not have end_borrow");
-    }
-  }
+  assert(!SILArgument::isTerminatorResult(borrowedValue) &&
+         "Transforming terminators do not have end_borrow");
 }
 
 void EndBorrowCleanup::emit(SILGenFunction &SGF, CleanupLocation l,

@@ -3405,7 +3405,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     assert(caseBB->getArguments().size() == 1);
     SILArgument *caseArg = caseBB->getArgument(0);
 
-    assert(&switchEnum->getOperandRef(0) == getReusedStorageOperand(caseArg));
+    assert(&switchEnum->getOperandRef() == getReusedStorageOperand(caseArg));
     assert(caseDecl->hasAssociatedValues() && "caseBB has a payload argument");
 
     SILBuilder caseBuilder = pass.getBuilder(caseBB->begin());

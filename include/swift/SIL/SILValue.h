@@ -494,6 +494,13 @@ public:
   }
   SILInstruction *getDefiningInstruction();
 
+  /// Return the instruction that defines this value, terminator instruction
+  /// that produces this result, or null if it is not defined by an instruction.
+  const SILInstruction *getDefiningInstructionOrTerminator() const {
+    return const_cast<ValueBase*>(this)->getDefiningInstructionOrTerminator();
+  }
+  SILInstruction *getDefiningInstructionOrTerminator();
+
   /// Return the SIL instruction that can be used to describe the first time
   /// this value is available.
   ///

@@ -1617,6 +1617,40 @@ TermInst::getSuccessorBlockArgumentLists() const {
   return SuccessorBlockArgumentListTy(getSuccessors(), op);
 }
 
+const Operand *TermInst::forwardedOperand() const {
+  switch (getTermKind()) {
+  case TermKind::UnwindInst:
+  case TermKind::UnreachableInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::YieldInst:
+  case TermKind::TryApplyInst:
+  case TermKind::CondBranchInst:
+  case TermKind::BranchInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
+  case TermKind::AwaitAsyncContinuationInst:
+    return nullptr;
+  case TermKind::SwitchEnumInst: {
+    auto *switchEnum = cast<SwitchEnumInst>(this);
+    if (!switchEnum->preservesOwnership())
+      return nullptr;
+
+    return &switchEnum->getOperandRef();
+  }
+  case TermKind::CheckedCastBranchInst: {
+    auto *checkedCast = cast<CheckedCastBranchInst>(this);
+    if (!checkedCast->preservesOwnership())
+      return nullptr;
+
+    return &checkedCast->getOperandRef();
+  }
+  }
+  llvm_unreachable("Covered switch isn't covered.");
+}
+
 YieldInst *YieldInst::create(SILDebugLocation loc,
                              ArrayRef<SILValue> yieldedValues,
                              SILBasicBlock *normalBB, SILBasicBlock *unwindBB,
