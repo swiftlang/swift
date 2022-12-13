@@ -419,3 +419,9 @@ PackType *PackType::get(const ASTContext &C,
 
   return get(C, wrappedArgs)->flattenPackTypes();
 }
+
+CanPackType PackArchetypeType::getSingletonPackType() {
+  SmallVector<Type, 1> types;
+  types.push_back(PackExpansionType::get(this, getReducedShape()));
+  return CanPackType(PackType::get(getASTContext(), types));
+}

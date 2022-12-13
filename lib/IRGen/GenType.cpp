@@ -2215,15 +2215,12 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::Pack:
     return convertPackType(cast<PackType>(ty));
   case TypeKind::PackArchetype: {
-    // FIXME: This is the wrong place for this kind of wrapping
-    SmallVector<Type> elts;
     auto archetypeTy = cast<PackArchetypeType>(ty);
-    elts.push_back(PackExpansionType::get(archetypeTy,
-                                          archetypeTy->getReducedShape()));
-    return convertPackType(PackType::get(IGM.Context, elts));
+    return convertPackType(archetypeTy->getSingletonPackType());
   }
   case TypeKind::PackExpansion: {
-    // FIXME: This is the wrong place for this kind of wrapping
+    // FIXME: SIL shouldn't emit values with pack expansion type; they
+    // should always be wrapped in a PackType or be a bare PackArchetypeType
     SmallVector<Type> elts;
     elts.push_back(ty);
     return convertPackType(PackType::get(IGM.Context, elts));

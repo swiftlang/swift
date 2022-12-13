@@ -6054,6 +6054,8 @@ public:
     return T->getKind() == TypeKind::PackArchetype;
   }
 
+  CanTypeWrapper<PackType> getSingletonPackType();
+
 private:
   PackArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
                     Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
