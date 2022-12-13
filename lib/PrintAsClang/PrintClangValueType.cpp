@@ -95,6 +95,7 @@ void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
 }
 
 static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
+                                         raw_ostream &os,
                                          ClangSyntaxPrinter &printer,
                                          raw_ostream &cPrologueOS) {
   if (typeDecl == typeDecl->getASTContext().getStringDecl()) {
@@ -135,6 +136,9 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
                    "$sSS10FoundationE36_"
                    "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ("
                    "void * _Nullable) SWIFT_NOEXCEPT SWIFT_CALL;\n";
+    cPrologueOS << "SWIFT_EXTERN swift_interop_stub_Swift_String "
+                   "$sSS7cStringSSSPys4Int8VG_tcfC("
+                   "const char * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;\n";
     printer.printObjCBlock([](raw_ostream &os) {
       os << "  ";
       ClangSyntaxPrinter(os).printInlineForThunk();
@@ -155,6 +159,14 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
       os << "    return result;\n";
       os << "  }\n";
     });
+    os << "#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY\n";
+    ClangSyntaxPrinter(os).printInlineForThunk();
+    os << "String(const std::string &str) noexcept {\n";
+    os << "    auto res = "
+          "_impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());\n";
+    os << "    memcpy(_getOpaquePointer(), &res, sizeof(res));\n";
+    os << "}\n";
+    os << "#endif\n";
   } else if (typeDecl == typeDecl->getASTContext().getOptionalDecl()) {
     // Add additional methods for the `Optional` declaration.
     printer.printDefine("SWIFT_CXX_INTEROP_OPTIONAL_MIXIN");
@@ -295,7 +307,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())
-    addCppExtensionsToStdlibType(typeDecl, printer, cPrologueOS);
+    addCppExtensionsToStdlibType(typeDecl, os, printer, cPrologueOS);
 
   os << "private:\n";
 
