@@ -32,6 +32,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -9681,4 +9682,16 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
     endLoc = MacroLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
+}
+
+MacroDefinition MacroDefinition::forMissing(
+    ASTContext &ctx, Identifier externalModuleName,
+    Identifier externalMacroTypeName
+) {
+  auto def = ctx.AllocateObjectCopy(
+    MissingDefinition{externalModuleName, externalMacroTypeName}
+  );
+  return MacroDefinition{
+    Kind::Expression, ImplementationKind::Missing, def
+  };
 }
