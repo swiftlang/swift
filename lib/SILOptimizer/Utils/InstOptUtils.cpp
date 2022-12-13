@@ -1482,12 +1482,33 @@ void swift::insertDeallocOfCapturedArguments(PartialApplyInst *pai,
     auto *asi = cast<AllocStackInst>(arg.get());
     computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
 
+    SmallVector<Operand *, 2> uses;
+    auto useFinding = findTransitiveUsesForAddress(asi, &uses);
+    InstructionSet users(asi->getFunction());
+    if (useFinding != AddressUseKind::Unknown) {
+      for (auto use : uses) {
+        users.insert(use->getUser());
+      }
+    }
+
     for (auto *block : boundary) {
       auto *terminator = block->getTerminator();
-      auto builder = SILBuilder(terminator);
       if (isa<UnreachableInst>(terminator))
         continue;
-      builder.createDeallocStack(CleanupLocation(terminator->getLoc()),
+      SILInstruction *insertionPoint = nullptr;
+      if (useFinding != AddressUseKind::Unknown) {
+        insertionPoint = &block->front();
+        for (auto &instruction : llvm::reverse(*block)) {
+          if (users.contains(&instruction)) {
+            insertionPoint = instruction.getNextInstruction();
+            break;
+          }
+        }
+      } else {
+        insertionPoint = terminator;
+      }
+      auto builder = SILBuilder(insertionPoint);
+      builder.createDeallocStack(CleanupLocation(insertionPoint->getLoc()),
                                  arg.get());
     }
   }
