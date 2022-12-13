@@ -1423,7 +1423,7 @@ static Optional<AccessorKind> isAccessorLabel(const Token &token) {
   return None;
 }
 
-/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
+/// Helper function that parses a base type for `parseQualifiedDeclName`.
 /// Returns true on error. Sets `baseType` to the parsed base type if present,
 /// or to `nullptr` if not. A missing base type is not considered an error.
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
@@ -1434,15 +1434,15 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   if (!P.canParseBaseTypeForQualifiedDeclName())
     return false;
 
-  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+  auto result = P.parseQualifiedDeclNameBaseType();
   // If base type should be parseable but the actual base type result is null,
   // return true (error).
   if (result.isNull())
     return true;
 
   // Consume the leading period before the final declaration name component.
-  // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
-  // leading period unparsed to avoid syntax verification errors.
+  // `parseQualifiedDeclNameBaseType` leaves the leading period unparsed to
+  // avoid syntax verification errors.
   assert(P.startsWithSymbol(P.Tok, '.') && "false");
 
   // Check if this is a reference to a property or subscript accessor.
@@ -1478,9 +1478,7 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 ///
 /// \verbatim
 ///   qualified-decl-name:
-///     type-identifier? unqualified-decl-name
-///   type-identifier:
-///     identifier generic-args? ('.' identifier generic-args?)*
+///     qualified-decl-name-base-type? unqualified-decl-name
 /// \endverbatim
 ///
 // TODO(TF-1066): Use module qualified name syntax/parsing instead of custom

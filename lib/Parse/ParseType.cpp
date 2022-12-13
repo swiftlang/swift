@@ -204,7 +204,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
           status, PackTypeRepr::create(Context, keywordLoc,
                                        SourceRange(lbLoc, rbLoc), elements));
     } else {
-      ty = parseSimpleTypeIdentifier();
+      ty = parseTypeIdentifier();
       if (auto *ITR = cast_or_null<IdentTypeRepr>(ty.getPtrOrNull())) {
         if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
           if (IDECallbacks)
@@ -716,16 +716,8 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   return makeParserSuccess();
 }
 
-/// parseTypeIdentifier
-///   
-///   type-identifier:
-///     identifier generic-args? ('.' identifier generic-args?)*
-///
-ParserResult<TypeRepr>
-Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
-  // If parsing a qualified declaration name, return error if base type cannot
-  // be parsed.
-  if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
+ParserResult<TypeRepr> Parser::parseQualifiedDeclNameBaseType() {
+  if (!canParseBaseTypeForQualifiedDeclName())
     return makeParserError();
 
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
@@ -750,38 +742,11 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     return nullptr;
   }
 
-  // In SIL files (not just when parsing SIL types), accept the
-  // Pack{} syntax for spelling variadic type packs.
-  if (SIL && Tok.isContextualKeyword("Pack") &&
-      peekToken().is(tok::l_brace)) {
-    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
-    SourceLoc keywordLoc = consumeToken(tok::identifier);
-    SourceLoc lbLoc = consumeToken(tok::l_brace);
-    SourceLoc rbLoc;
-    SmallVector<TypeRepr*, 8> elements;
-    auto status = parseList(tok::r_brace, lbLoc, rbLoc,
-                            /*AllowSepAfterLast=*/false,
-                            diag::expected_rbrace_pack_type_list,
-                            [&] () -> ParserStatus {
-      auto element = parseType(diag::expected_type);
-      if (element.hasCodeCompletion())
-        return makeParserCodeCompletionStatus();
-      if (element.isNull())
-        return makeParserError();
-      elements.push_back(element.get());
-      return makeParserSuccess();
-    });
-
-    return makeParserResult(status,
-        PackTypeRepr::create(Context, keywordLoc, SourceRange(lbLoc, rbLoc),
-                             elements));
-  }
-
   ParserStatus Status;
   SmallVector<IdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
-    auto IdentResult = parseSimpleTypeIdentifier();
+    auto IdentResult = parseTypeIdentifier();
     if (IdentResult.isParseErrorOrHasCompletion())
       return IdentResult;
 
@@ -797,9 +762,10 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       if (peekToken().isContextualKeyword("Type") ||
           peekToken().isContextualKeyword("Protocol"))
         break;
-      // If parsing a qualified declaration name, break before parsing the
-      // period before the final declaration name component.
-      if (isParsingQualifiedDeclBaseType) {
+
+      // Break before parsing the period before the final declaration
+      // name component.
+      {
         // If qualified name base type cannot be parsed from the current
         // point (i.e. the next type identifier is not followed by a '.'),
         // then the next identifier is the final declaration name component.
@@ -839,7 +805,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
   return makeParserResult(Status, DeclRefTR);
 }
 
-ParserResult<IdentTypeRepr> Parser::parseSimpleTypeIdentifier() {
+ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   // FIXME: We should parse e.g. 'X.var'. Almost any keyword is a valid member
   // component.
   DeclNameLoc Loc;
@@ -901,7 +867,7 @@ ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
       continue;
     }
 
-    auto IdentResult = parseSimpleTypeIdentifier();
+    auto IdentResult = parseTypeIdentifier();
     if (IdentResult.isParseErrorOrHasCompletion())
       return IdentResult | ParserStatus(Base);
 
