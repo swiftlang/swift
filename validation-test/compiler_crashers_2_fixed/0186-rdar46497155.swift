@@ -22,7 +22,7 @@ func foo(arr: [E], other: P) -> Bool {
   return arr.compactMap { i in
     var flag = false
     return try? i.getB(&flag)
-  }.compactMap { u -> P? in // expected-error {{unable to infer type of a closure parameter 'u' in the current context}}
+  }.compactMap { u -> P? in // Ok
     guard let a = try? u.foo() else { return nil }
     return a.value!
   }.contains {
