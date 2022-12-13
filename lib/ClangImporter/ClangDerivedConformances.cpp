@@ -17,14 +17,32 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 
 using namespace swift;
+using namespace swift::importer;
 
 /// Alternative to `NominalTypeDecl::lookupDirect`.
 /// This function does not attempt to load extensions of the nominal decl.
 static TinyPtrVector<ValueDecl *>
 lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
-  // First see if there is a Clang decl with the given name.
-  TinyPtrVector<ValueDecl *> result = evaluateOrDefault(
-      decl->getASTContext().evaluator, ClangRecordMemberLookup({decl, id}), {});
+  ASTContext &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  TinyPtrVector<ValueDecl *> result;
+
+  if (id.isOperator()) {
+    auto underlyingId =
+        ctx.getIdentifier(getPrivateOperatorName(std::string(id)));
+    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
+    for (auto it : underlyingFuncs) {
+      if (auto synthesizedFunc =
+              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
+        result.push_back(synthesizedFunc);
+    }
+  } else {
+    // See if there is a Clang decl with the given name.
+    result = evaluateOrDefault(ctx.evaluator,
+                               ClangRecordMemberLookup({decl, id}), {});
+  }
 
   // Check if there are any synthesized Swift members that match the name.
   for (auto member : decl->getCurrentMembersWithoutLoading()) {

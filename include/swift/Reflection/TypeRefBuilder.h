@@ -569,6 +569,9 @@ public:
     if (!mangling.isSuccess())
       return nullptr;
 
+    if (shapeIndex >= genericParamsPerLevel.size())
+      return nullptr;
+
     auto numGenericArgs = genericParamsPerLevel[shapeIndex];
 
     auto startOffsetFromEnd = argsIndex + numGenericArgs;

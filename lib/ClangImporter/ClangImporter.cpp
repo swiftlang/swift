@@ -89,17 +89,6 @@ using clang::CompilerInvocation;
 #pragma mark Internal data structures
 
 namespace {
-static std::string getOperatorNameForToken(std::string OperatorToken) {
-#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
-  if (OperatorToken == Spelling) {                                             \
-    return #Name;                                                              \
-  };
-#include "clang/Basic/OperatorKinds.def"
-  return "None";
-}
-} // namespace
-
-namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
     ClangImporter::Implementation &Impl;
   public:
@@ -4062,6 +4051,8 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
 
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
+  auto *importer =
+      static_cast<ClangImporter *>(SwiftContext.getClangModuleLoader());
 
   bool declFound = false;
 
@@ -4079,33 +4070,17 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
     // If CXXInterop is enabled we need to check the modified operator name as
     // well
     if (SwiftContext.LangOpts.EnableCXXInterop) {
-      auto funcBaseName = DeclBaseName(SwiftContext.getIdentifier(
-          "__operator" + getOperatorNameForToken(
-                             name.getBaseName().getIdentifier().str().str())));
+      auto funcBaseName =
+          DeclBaseName(SwiftContext.getIdentifier(getPrivateOperatorName(
+              name.getBaseName().getIdentifier().str().str())));
       for (auto entry : table.lookupMemberOperators(funcBaseName)) {
         if (isVisibleClangEntry(entry)) {
-          if (auto func = dyn_cast_or_null<ValueDecl>(
+          if (auto func = dyn_cast_or_null<FuncDecl>(
                   importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-            // `func` is not an operator, it is a regular function which has a
-            // name that starts with `__operator`. We were asked for a
-            // corresponding synthesized Swift operator, so let's retrieve it.
-
-            // The synthesized Swift operator was added as an alternative decl
-            // for `func`.
-            auto alternateDecls = getAlternateDecls(func);
-            // Did we actually synthesize an operator for `func`?
-            if (alternateDecls.empty())
-              continue;
-            // If we did, then we should have only synthesized one.
-            assert(alternateDecls.size() == 1 &&
-                   "expected only the synthesized operator as an alternative");
-
-            auto synthesizedOperator = alternateDecls.front();
-            assert(synthesizedOperator->isOperator() &&
-                   "expected the alternative to be a synthesized operator");
-
-            consumer.foundDecl(synthesizedOperator,
-                               DeclVisibilityKind::VisibleAtTopLevel);
+            if (auto synthesizedOperator =
+                    importer->getCXXSynthesizedOperatorFunc(func))
+              consumer.foundDecl(synthesizedOperator,
+                                 DeclVisibilityKind::VisibleAtTopLevel);
           }
         }
       }
@@ -6097,6 +6072,27 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 
   Impl.specializedFunctionTemplates[newFn] = newDecl;
   return ConcreteDeclRef(newDecl);
+}
+
+FuncDecl *ClangImporter::getCXXSynthesizedOperatorFunc(FuncDecl *decl) {
+  // `decl` is not an operator, it is a regular function which has a
+  // name that starts with `__operator`. We were asked for a
+  // corresponding synthesized Swift operator, so let's retrieve it.
+
+  // The synthesized Swift operator was added as an alternative decl
+  // for `func`.
+  auto alternateDecls = Impl.getAlternateDecls(decl);
+  // Did we actually synthesize an operator for `func`?
+  if (alternateDecls.empty())
+    return nullptr;
+  // If we did, then we should have only synthesized one.
+  assert(alternateDecls.size() == 1 &&
+         "expected only the synthesized operator as an alternative");
+
+  auto synthesizedOperator = alternateDecls.front();
+  assert(synthesizedOperator->isOperator() &&
+         "expected the alternative to be a synthesized operator");
+  return cast<FuncDecl>(synthesizedOperator);
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {

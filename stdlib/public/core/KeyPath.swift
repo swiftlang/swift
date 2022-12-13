@@ -3944,7 +3944,8 @@ extension AnyKeyPath: CustomDebugStringConvertible {
     return withBuffer {
       var buffer = $0
       if buffer.data.isEmpty {
-        _internalInvariantFailure("key path has no components")
+        description.append(".self")
+        return description
       }
       var valueType: Any.Type = Self.rootType
       while true {
