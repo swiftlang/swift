@@ -1645,13 +1645,20 @@ public:
         require((ValueBase *)V == AI->getFunction()->getDynamicSelfMetadata(),
                 "wrong self metadata operand");
       } else {
-        require(isa<SingleValueInstruction>(V),
+        auto DI = V->getDefiningInstruction();
+        require(DI,
                 "opened archetype operand should refer to a SIL instruction");
-        auto Archetype =
-            cast<SingleValueInstruction>(V)->getDefinedOpenedArchetype();
-        require(Archetype,
+        bool definesFoundArchetype = false;
+        bool definesAnyArchetype = false;
+        DI->forEachDefinedOpenedArchetype(
+            [&](CanOpenedArchetypeType archetype, SILValue dependency) {
+          definesAnyArchetype = true;
+          if (FoundRootOpenedArchetypes.count(archetype))
+            definesFoundArchetype = true;
+        });
+        require(definesAnyArchetype,
                 "opened archetype operand should define an opened archetype");
-        require(FoundRootOpenedArchetypes.count(Archetype),
+        require(definesFoundArchetype,
                 "opened archetype operand does not correspond to any opened "
                 "archetype from the substitutions list");
       }

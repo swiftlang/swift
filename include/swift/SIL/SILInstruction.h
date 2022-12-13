@@ -685,6 +685,14 @@ public:
     return getResultsImpl().getTypes();
   }
 
+  /// Run the given function for each opened archetype this instruction
+  /// defines, passing the value that should be used to record the
+  /// dependency.
+  void forEachDefinedOpenedArchetype(
+      llvm::function_ref<void(CanOpenedArchetypeType archetype,
+                              SILValue typeDependency)> function) const;
+  bool definesOpenedArchetypes() const;
+
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
 
@@ -1095,10 +1103,6 @@ public:
     return node->getKind() >= SILNodeKind::First_SingleValueInstruction &&
            node->getKind() <= SILNodeKind::Last_SingleValueInstruction;
   }
-
-  /// If this is an instruction which "defines" a root opened archetype, it is
-  /// returned.
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const;
 
   SILInstruction *getPreviousInstruction() {
     return SILInstruction::getPreviousInstruction();
@@ -7137,6 +7141,13 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an opaque value referring to an existential, "opens" the
@@ -7150,6 +7161,14 @@ class OpenExistentialValueInst
   OpenExistentialValueInst(SILDebugLocation debugLoc, SILValue operand,
                            SILType selfTy,
                            ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a class existential, "opens" the
@@ -7163,6 +7182,14 @@ class OpenExistentialRefInst
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
                          SILType Ty,
                          ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an existential metatype,
@@ -7177,6 +7204,14 @@ class OpenExistentialMetatypeInst
 
   OpenExistentialMetatypeInst(SILDebugLocation DebugLoc, SILValue operand,
                               SILType ty);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a boxed existential container,
@@ -7190,6 +7225,14 @@ class OpenExistentialBoxInst
 
   OpenExistentialBoxInst(SILDebugLocation DebugLoc, SILValue operand,
                          SILType ty);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a boxed existential container, "opens" the existential by returning a
@@ -7203,6 +7246,14 @@ class OpenExistentialBoxValueInst
   OpenExistentialBoxValueInst(SILDebugLocation DebugLoc, SILValue operand,
                               SILType ty,
                               ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an address to an uninitialized buffer of

@@ -260,17 +260,15 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
   // Update RootOpenedArchetypeDefs.
-  if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      // In case `willDeleteInstruction` is called twice for the same instruction,
-      // we need to check if the archetype is really still in the map for this
-      // instruction.
-      if (RootOpenedArchetypeDefs.lookup(key) == svi)
-        RootOpenedArchetypeDefs.erase(key);
-    }
-  }
+  I->forEachDefinedOpenedArchetype([&](CanOpenedArchetypeType archeTy,
+                                       SILValue dependency) {
+    OpenedArchetypeKey key = {archeTy, I->getFunction()};
+    // In case `willDeleteInstruction` is called twice for the
+    // same instruction, we need to check if the archetype is really
+    // still in the map for this instruction.
+    if (RootOpenedArchetypeDefs.lookup(key) == dependency)
+      RootOpenedArchetypeDefs.erase(key);
+  });
 }
 
 void SILModule::scheduleForDeletion(SILInstruction *I) {
@@ -766,45 +764,41 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      SILValue &val = RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}];
-      if (val) {
-        if (!isa<PlaceholderValue>(val)) {
-          // Print a useful error message (and not just abort with an assert).
-          llvm::errs() << "re-definition of root opened archetype in function "
-                       << svi->getFunction()->getName() << ":\n";
-          svi->print(llvm::errs());
-          llvm::errs() << "previously defined in function "
-                       << val->getFunction()->getName() << ":\n";
-          val->print(llvm::errs());
-          abort();
-        }
-        // The opened archetype was unresolved so far. Replace the placeholder
-        // by inst.
-        auto *placeholder = cast<PlaceholderValue>(val);
-        placeholder->replaceAllUsesWith(svi);
-        ::delete placeholder;
-        numUnresolvedOpenedArchetypes--;
+  inst->forEachDefinedOpenedArchetype([&](CanOpenedArchetypeType archeTy,
+                                          SILValue dependency) {
+    SILValue &val = RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}];
+    if (val) {
+      if (!isa<PlaceholderValue>(val)) {
+        // Print a useful error message (and not just abort with an assert).
+        llvm::errs() << "re-definition of root opened archetype in function "
+                     << inst->getFunction()->getName() << ":\n";
+        inst->print(llvm::errs());
+        llvm::errs() << "previously defined in function "
+                     << val->getFunction()->getName() << ":\n";
+        val->print(llvm::errs());
+        abort();
       }
-      val = svi;
+      // The opened archetype was unresolved so far. Replace the placeholder
+      // by inst.
+      auto *placeholder = cast<PlaceholderValue>(val);
+      placeholder->replaceAllUsesWith(dependency);
+      ::delete placeholder;
+      numUnresolvedOpenedArchetypes--;
     }
-  }
+    val = dependency;
+  });
 }
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, fromFunction};
-      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      RootOpenedArchetypeDefs.erase(key);
-      RootOpenedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
-    }
-  }
+  inst->forEachDefinedOpenedArchetype([&](CanOpenedArchetypeType archeTy,
+                                          SILValue dependency) {
+    OpenedArchetypeKey key = {archeTy, fromFunction};
+    assert(RootOpenedArchetypeDefs.lookup(key) == dependency &&
+           "archetype def was not registered");
+    RootOpenedArchetypeDefs.erase(key);
+    RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}] = dependency;
+  });
 }
 
 // TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
