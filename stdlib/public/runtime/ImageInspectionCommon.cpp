@@ -65,8 +65,8 @@ static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
     // We need to fix up the base address. We'll need a known-good address in
     // the same image: `sections` itself will work nicely.
     auto symbolInfo = SymbolInfo::lookup(sections);
-    if (symbolInfo.has_value() && symbolInfo.getBaseAddress()) {
-        sections->baseAddress.store(symbolInfo.getBaseAddress(),
+    if (symbolInfo.has_value() && symbolInfo->getBaseAddress()) {
+        sections->baseAddress.store(symbolInfo->getBaseAddress(),
                                     std::memory_order_relaxed);
     }
   }
