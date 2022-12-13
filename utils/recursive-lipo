@@ -41,9 +41,11 @@ def overlapping_lipo_architectures(file_paths, lipo_executable):
             known_archs.append(arch)
     return False
 
+
 # Determine whether we should consider a file as installable.
 def is_installable(file):
     return os.path.exists(file) or os.path.islink(file)
+
 
 # Determine the path to the first file and where it should be installed.
 def get_first_file_and_dest_path(file, src_root_dirs, dest_root_dir):
