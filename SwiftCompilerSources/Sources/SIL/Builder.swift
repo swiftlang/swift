@@ -187,4 +187,12 @@ public struct Builder {
       return bi.getAs(BranchInst.self)
     }
   }
+
+  @discardableResult
+  public func createUnreachable() -> UnreachableInst {
+    notifyInstructionsChanged()
+    notifyBranchesChanged()
+    let ui = SILBuilder_createUnreachable(bridged)
+    return ui.getAs(UnreachableInst.self)
+  }
 }

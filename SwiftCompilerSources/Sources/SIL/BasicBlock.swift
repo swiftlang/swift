@@ -13,14 +13,9 @@
 import Basic
 import SILBridging
 
-final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescription {
+final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
-
-  // Needed for ReverseList<BasicBlock>.reversed(). Never use directly.
-  public var _firstInList: BasicBlock { SILFunction_firstBlock(function.bridged).block! }
-  // Needed for List<BasicBlock>.reversed(). Never use directly.
-  public var _lastInList: BasicBlock { SILFunction_lastBlock(function.bridged).block! }
 
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
@@ -32,8 +27,8 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescr
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
-  public var instructions: List<Instruction> {
-    List(first: SILBasicBlock_firstInst(bridged).instruction)
+  public var instructions: InstructionList {
+    InstructionList(first: SILBasicBlock_firstInst(bridged).instruction)
   }
 
   public var terminator: TermInst {
@@ -74,6 +69,66 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescr
 
 public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
 public func != (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs !== rhs }
+
+/// The list of instructions in a BasicBlock.
+///
+/// It's allowed to delete the current, next or any other instructions while
+/// iterating over the instruction list.
+public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
+  private var currentInstruction: Instruction?
+
+  public init(first: Instruction?) { currentInstruction = first }
+
+  public mutating func next() -> Instruction? {
+    if var inst = currentInstruction {
+      while inst.isDeleted {
+        guard let nextInst = inst.next else {
+          return nil
+        }
+        inst = nextInst
+      }
+      currentInstruction = inst.next
+      return inst
+    }
+    return nil
+  }
+
+  public var first: Instruction? { currentInstruction }
+
+  public func reversed() -> ReverseInstructionList {
+    if let inst = currentInstruction {
+      let lastInst = SILBasicBlock_lastInst(inst.block.bridged).instruction
+      return ReverseInstructionList(first: lastInst)
+    }
+    return ReverseInstructionList(first: nil)
+  }
+}
+
+/// The list of instructions in a BasicBlock in reverse order.
+///
+/// It's allowed to delete the current, next or any other instructions while
+/// iterating over the instruction list.
+public struct ReverseInstructionList : CollectionLikeSequence, IteratorProtocol {
+  private var currentInstruction: Instruction?
+
+  public init(first: Instruction?) { currentInstruction = first }
+
+  public mutating func next() -> Instruction? {
+    if var inst = currentInstruction {
+      while inst.isDeleted {
+        guard let nextInst = inst.previous else {
+          return nil
+        }
+        inst = nextInst
+      }
+      currentInstruction = inst.previous
+      return inst
+    }
+    return nil
+  }
+
+  public var first: Instruction? { currentInstruction }
+}
 
 public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock
