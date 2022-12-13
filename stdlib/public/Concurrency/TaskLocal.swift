@@ -218,7 +218,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@usableFromInline
 @_silgen_name("swift_task_localValuePush")
 func _taskLocalValuePush<Value>(
   key: Builtin.RawPointer/*: Key*/,
@@ -226,7 +226,7 @@ func _taskLocalValuePush<Value>(
 ) // where Key: TaskLocal
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@usableFromInline
 @_silgen_name("swift_task_localValuePop")
 func _taskLocalValuePop()
 
