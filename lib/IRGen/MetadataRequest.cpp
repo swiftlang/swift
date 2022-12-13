@@ -24,6 +24,7 @@
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenMeta.h"
+#include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -1427,7 +1428,7 @@ namespace {
 
     MetadataResponse visitPackType(CanPackType type,
                                    DynamicMetadataRequest request) {
-      llvm_unreachable("Unimplemented!");
+      return emitTypeMetadataPackRef(IGF, type, request);
     }
 
     MetadataResponse visitPackExpansionType(CanPackExpansionType type,
@@ -1965,6 +1966,9 @@ namespace {
     }
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
+      if (auto packArchetypeType = dyn_cast<PackArchetypeType>(type))
+        return emitPackArchetypeMetadataRef(IGF, packArchetypeType, request);
+
       return emitArchetypeTypeMetadataRef(IGF, type, request);
     }
 
@@ -2871,6 +2875,8 @@ static bool canIssueIncompleteMetadataRequests(IRGenModule &IGM) {
 static MetadataResponse
 emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                 DynamicMetadataRequest request) {
+  assert(!isa<PackType>(type));
+
   auto &IGM = IGF.IGM;
 
   // We can only answer blocking complete metadata requests with the <=5.1
@@ -3132,7 +3138,8 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      !shouldTypeMetadataAccessUseAccessor(IGM, type)) {
+      !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
+      isa<PackType>(type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
