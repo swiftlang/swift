@@ -42,11 +42,16 @@ def overlapping_lipo_architectures(file_paths, lipo_executable):
     return False
 
 
+# Determine whether we should consider a file as installable.
+def is_installable(file):
+    return os.path.exists(file) or os.path.islink(file)
+
+
 # Determine the path to the first file and where it should be installed.
 def get_first_file_and_dest_path(file, src_root_dirs, dest_root_dir):
     for dir in src_root_dirs:
         orig_file = os.path.join(dir, file)
-        if os.path.exists(orig_file):
+        if is_installable(orig_file):
             dest_path = os.path.join(
                 dest_root_dir, os.path.relpath(orig_file, dir))
             return (orig_file, dest_path)
@@ -72,7 +77,7 @@ def merge_lipo_files(src_root_dirs, file_list, dest_root_dir, verbose=False,
     for file in file_list:
         file_paths = [
             os.path.join(dir, file) for dir in src_root_dirs
-            if os.path.exists(os.path.join(dir, file))]
+            if is_installable(os.path.join(dir, file))]
         if len(file_paths) == 0:
             print("-- Warning: Can't locate source file %s" % file)
             continue
