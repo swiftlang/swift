@@ -1301,8 +1301,8 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   // Instructions that produce an opened type never reach here because they
   // have guaranteed ownership--they project their storage. We reach this
   // point after the opened value has been copied.
-  assert((!isa<SingleValueInstruction>(value)
-          || !cast<SingleValueInstruction>(value)->getDefinedOpenedArchetype())
+  assert((!value->getDefiningInstruction() ||
+          !value->getDefiningInstruction()->definesOpenedArchetypes())
          && "owned open_existential is unsupported");
 
   SILType allocTy = value->getType();
