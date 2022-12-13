@@ -119,12 +119,8 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   }
 #endif
 
-  ctx.Diags.diagnose(
-      macro, diag::external_macro_not_found, macro->externalModuleName.str(),
-      macro->externalMacroTypeName.str(), macro->getName());
-  // FIXME: Can we give more actionable advice?
-
-  return MacroDefinition::forInvalid();
+  return MacroDefinition::forMissing(
+      ctx, macro->externalModuleName, macro->externalMacroTypeName);
 }
 
 #if SWIFT_SWIFT_PARSER
@@ -150,35 +146,43 @@ Expr *swift::expandMacroExpr(
 
   auto macroDef = evaluateOrDefault(
       ctx.evaluator, MacroDefinitionRequest{macro},
-      MacroDefinition::forInvalid());
-  if (!macroDef) {
+      MacroDefinition::forUndefined());
+  switch (macroDef.implKind) {
+  case MacroDefinition::ImplementationKind::Undefined:
+    // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::ImplementationKind::Missing: {
+    auto missingInfo = macroDef.getMissingDefinition();
+    ctx.Diags.diagnose(
+        expr->getLoc(), diag::external_macro_not_found,
+        missingInfo->externalModuleName.str(),
+        missingInfo->externalMacroTypeName.str(), macro->getName());
+    macro->diagnose(diag::decl_declared_here, macro->getName());
     return nullptr;
   }
 
-  {
+  case MacroDefinition::ImplementationKind::InProcess: {
     PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
 
-    switch (macroDef.implKind) {
-    case MacroDefinition::ImplementationKind::InProcess: {
-      // Builtin macros are handled via ASTGen.
-      auto astGenSourceFile = sourceFile->exportedSourceFile;
-      if (!astGenSourceFile)
-        return nullptr;
+    // Builtin macros are handled via ASTGen.
+    auto astGenSourceFile = sourceFile->exportedSourceFile;
+    if (!astGenSourceFile)
+      return nullptr;
 
-      const char *evaluatedSourceAddress;
-      ptrdiff_t evaluatedSourceLength;
-      swift_ASTGen_evaluateMacro(
-          &ctx.Diags,
-          macroDef.getAsInProcess(),
-          astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-          &evaluatedSourceAddress, &evaluatedSourceLength);
-      if (!evaluatedSourceAddress)
-        return nullptr;
-      evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                                (size_t)evaluatedSourceLength);
-      break;
-    }
-    }
+    const char *evaluatedSourceAddress;
+    ptrdiff_t evaluatedSourceLength;
+    swift_ASTGen_evaluateMacro(
+        &ctx.Diags,
+        macroDef.getInProcessOpaqueHandle(),
+        astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
+        &evaluatedSourceAddress, &evaluatedSourceLength);
+    if (!evaluatedSourceAddress)
+      return nullptr;
+    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
+                                              (size_t)evaluatedSourceLength);
+    break;
+  }
   }
 
   // Figure out a reasonable name for the macro expansion buffer.
