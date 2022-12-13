@@ -50,8 +50,8 @@ struct ModuleInterfaceOptions {
   /// ignored by the earlier version of the compiler.
   std::string IgnorableFlags;
 
-  /// Print SPI decls and attributes.
-  bool PrintSPIs = false;
+  /// Print for a private swiftinterface file, SPI decls and attributes.
+  bool PrintPrivateInterfaceContent = false;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.

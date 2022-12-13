@@ -649,6 +649,7 @@ struct PrintOptions {
                                               bool preferTypeRepr,
                                               bool printFullConvention,
                                               bool printSPIs,
+                                              bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
                                                 *aliasModuleNamesTargets

@@ -225,7 +225,7 @@ static void printImports(raw_ostream &out,
   // imports only if they are also SPI. First, list all implementation-only
   // imports and filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
-  if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
+  if (Opts.PrintPrivateInterfaceContent && Opts.ExperimentalSPIImports) {
 
     SmallVector<ImportedModule, 4> ioiImports, allImports;
     M->getImportedModules(ioiImports,
@@ -246,7 +246,7 @@ static void printImports(raw_ostream &out,
 
   /// Collect @_spiOnly imports that are not imported elsewhere publicly.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> spiOnlyImportSet;
-  if (Opts.PrintSPIs) {
+  if (Opts.PrintPrivateInterfaceContent) {
     SmallVector<ImportedModule, 4> spiOnlyImports, otherImports;
     M->getImportedModules(spiOnlyImports,
                           ModuleDecl::ImportFilterKind::SPIOnly);
@@ -305,7 +305,7 @@ static void printImports(raw_ostream &out,
     if (publicImportSet.count(import))
       out << "@_exported ";
 
-    if (Opts.PrintSPIs) {
+    if (Opts.PrintPrivateInterfaceContent) {
       // An import visible in the private swiftinterface only.
       //
       // In the long term, we want to print this attribute for consistency and
@@ -788,8 +788,18 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
   printImports(out, Opts, M);
 
+  static bool forceUseExportedModuleNameInPublicOnly =
+    getenv("SWIFT_DEBUG_USE_EXPORTED_MODULE_NAME_IN_PUBLIC_ONLY");
+  bool useExportedModuleNameInPublicOnly =
+    M->getASTContext().LangOpts.hasFeature(Feature::ModuleInterfaceExportAs) ||
+    forceUseExportedModuleNameInPublicOnly;
+  bool useExportedModuleNames = !(useExportedModuleNameInPublicOnly &&
+                                  Opts.PrintPrivateInterfaceContent);
+
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs,
+      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
+      Opts.PrintPrivateInterfaceContent,
+      useExportedModuleNames,
       Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
