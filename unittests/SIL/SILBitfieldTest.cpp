@@ -21,13 +21,13 @@ class BasicBlockBitfield;
 
 struct SILFunction {
   BasicBlockBitfield *newestAliveBlockBitfield = nullptr;
-  uint64_t currentBitfieldID = 1;
+  int64_t currentBitfieldID = 1;
 };
 
 struct SILBasicBlock {
   SILFunction *function;
   uint32_t customBits = 0;
-  uint64_t lastInitializedBitfieldID = 0;
+  int64_t lastInitializedBitfieldID = 0;
 
   enum { numCustomBits = 32 };
 

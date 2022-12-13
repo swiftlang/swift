@@ -49,6 +49,58 @@
 #include "llvm/Support/TrailingObjects.h"
 #include <array>
 
+namespace llvm {
+namespace ilist_detail {
+
+/// The base class of the instruction list in SILBasicBlock.
+///
+/// We need a custom base class to not clear the prev/next pointers when
+/// removing an instruction from the list.
+class SILInstructionListBase : public ilist_base<false> {
+public:
+  /// Remove an instruction from the list.
+  ///
+  /// In contrast to the default implementation, it does not clear the prev/
+  /// next pointers in the node. This is needed to being able to remove
+  /// instructions from the list while iterating over the list.
+  /// For details see `DeletableInstructionsIterator`.
+  template <class T> static void remove(T &N) {
+    node_base_type *Prev = N.getPrev();
+    node_base_type *Next = N.getNext();
+    Next->setPrev(Prev);
+    Prev->setNext(Next);
+  }
+
+  template <class T> static void insertBefore(T &Next, T &N) {
+    insertBeforeImpl(Next, N);
+  }
+
+  template <class T> static void transferBefore(T &Next, T &First, T &Last) {
+    transferBeforeImpl(Next, First, Last);
+  }
+};
+
+// This template specialization is needed to replace the default instruction
+// list base class with `SILInstructionListBase`.
+template <> struct compute_node_options<::swift::SILInstruction> {
+  struct type {
+    typedef ::swift::SILInstruction value_type;
+    typedef value_type *pointer;
+    typedef value_type &reference;
+    typedef const value_type *const_pointer;
+    typedef const value_type &const_reference;
+
+    static const bool enable_sentinel_tracking = false;
+    static const bool is_sentinel_tracking_explicit = false;
+    typedef void tag;
+    typedef ilist_node_base<enable_sentinel_tracking> node_base_type;
+    typedef SILInstructionListBase list_base_type;
+  };
+};
+
+} // end namespace ilist_detail
+} // end llvm namespace
+
 namespace swift {
 
 class AllocationInst;
@@ -376,9 +428,6 @@ protected:
     NumCreatedInstructions++;
   }
 
-  /// This method unlinks 'self' from the containing basic block.
-  void removeFromParent();
-
   ~SILInstruction() {
     NumDeletedInstructions++;
   }
@@ -394,7 +443,7 @@ public:
 
   /// Returns true if this instruction is removed from its function and
   /// scheduled to be deleted.
-  bool isDeleted() const { return !ParentBB; }
+  bool isDeleted() const { return asSILNode()->isMarkedAsDeleted(); }
 
   enum class MemoryBehavior {
     None,
@@ -10175,7 +10224,6 @@ public:
   }
 
   void addNodeToList(SILInstruction *I);
-  void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
                              instr_iterator first, instr_iterator last);
 

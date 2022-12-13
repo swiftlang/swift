@@ -72,9 +72,9 @@ private:
       for (SILBasicBlock &block : function) {
         InstructionDeleter deleter;
 
-        for (SILInstruction *inst : deleter.updatingRange(&block)) {
-          if (constFold(inst, IGM)) {
-            deleter.forceDelete(inst);
+        for (SILInstruction &inst : block.deletableInstructions()) {
+          if (constFold(&inst, IGM)) {
+            deleter.forceDelete(&inst);
             changed = true;
           }
         }

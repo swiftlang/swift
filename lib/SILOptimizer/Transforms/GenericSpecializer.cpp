@@ -291,8 +291,8 @@ bool MandatoryGenericSpecializer::optimize(SILFunction *func,
     if (!rrBlocks.reachesReturn(&block) || !neBlocks.isNonErrorHandling(&block))
       continue;
   
-    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
-      changed |= optimizeInst(inst, funcBuilder, deleter, cha, invalidatedStackNesting);
+    for (SILInstruction &inst : block.reverseDeletableInstructions()) {
+      changed |= optimizeInst(&inst, funcBuilder, deleter, cha, invalidatedStackNesting);
     }
   }
   deleter.cleanupDeadInstructions();

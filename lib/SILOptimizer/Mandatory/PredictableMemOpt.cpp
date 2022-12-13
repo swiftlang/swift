@@ -2856,9 +2856,9 @@ bool swift::optimizeMemoryAccesses(SILFunction &fn) {
 
   InstructionDeleter deleter;
   for (auto &bb : fn) {
-    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
+    for (SILInstruction &inst : bb.deletableInstructions()) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(inst);
+      AllocationInst *alloc = getOptimizableAllocation(&inst);
       if (!alloc) {
         continue;
       }
@@ -2900,9 +2900,9 @@ bool swift::eliminateDeadAllocations(SILFunction &fn) {
 
   for (auto &bb : fn) {
     InstructionDeleter deleter;
-    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
+    for (SILInstruction &inst : bb.deletableInstructions()) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(inst);
+      AllocationInst *alloc = getOptimizableAllocation(&inst);
       if (!alloc) {
         continue;
       }

@@ -340,6 +340,7 @@ BridgedArgumentConvention SILArgument_getConvention(BridgedArgument argument);
 OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
 OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
 BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst);
+bool SILInstruction_isDeleted(BridgedInstruction inst);
 BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst);
 void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
                                BridgedValue value);
@@ -456,6 +457,7 @@ BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder builder,
 BridgedInstruction SILBuilder_createBranch(
           BridgedBuilder builder, BridgedBasicBlock destBlock,
           BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder builder);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
