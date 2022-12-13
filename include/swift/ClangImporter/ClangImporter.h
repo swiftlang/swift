@@ -275,6 +275,8 @@ public:
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 
+  FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
+
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
   ClangNode getEffectiveClangNode(const Decl *decl) const;
