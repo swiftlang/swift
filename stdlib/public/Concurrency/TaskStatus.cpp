@@ -589,8 +589,8 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     }
   }
 
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   if (newStatus.isRunning()) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // The task is running, escalate the thread that is running it.
     ActiveTaskStatus *taskStatus;
     dispatch_lock_t *executionLock;
@@ -600,6 +600,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
     swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+#endif
   } else if (newStatus.isEnqueued()) {
     //  Task is not running, it's enqueued somewhere waiting to be run
     //

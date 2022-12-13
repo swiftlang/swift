@@ -273,12 +273,17 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
-
-    /// Task is enqueued somewhere - either in the cooperative pool, or in an
-    /// actor. This bit is cleared when a starts running on a thread, suspends
-    /// or is completed.
+    /// Task is intrusively enqueued somewhere - either in the default executor
+    /// pool, or in an actor. Currently, due to lack of task stealers, this bit
+    /// is cleared when a task starts running on a thread, suspends or is
+    /// completed.
+    ///
+    /// TODO (rokhinip): Once we have task stealers, this bit refers to the
+    /// enqueued-ness on the specific queue that the task is linked into and
+    /// therefore, can only be cleared when the intrusively linkage is cleaned
+    /// up. The enqueued-ness then becomes orthogonal to the other states of
+    /// running/suspended/completed.
     IsEnqueued = 0x1000,
-
     /// Task has been completed.  This is purely used to enable an assertion
     /// that the task is completed when we destroy it.
     IsComplete = 0x2000,
@@ -358,11 +363,6 @@ public:
   }
 
   /// Is the task currently running? Also known as whether it is drain locked.
-  /// IsRunning() = true implies isEnqueued()
-  ///
-  /// Eventually we'll track this with more specificity, like whether
-  /// it's running on a specific thread, enqueued on a specific actor,
-  /// etc.
   bool isRunning() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   return dispatch_lock_is_locked(ExecutionLock);
