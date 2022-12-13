@@ -223,7 +223,7 @@ static bool withStatusRecordLock(AsyncTask *task,
 SWIFT_CC(swift)
 bool swift::addStatusRecord(
     TaskStatusRecord *newRecord,
-    llvm::function_ref<bool(ActiveTaskStatus status)> shouldAddRecord) {
+    llvm::function_ref<bool(ActiveTaskStatus& status)> shouldAddRecord) {
 
   auto task = swift_task_getCurrent();
   // Load the current state. We can use a relaxed load because we're

@@ -494,7 +494,7 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+  addStatusRecord(record, [&](ActiveTaskStatus& parentStatus) {
     // If the task has already been cancelled, reflect that immediately in
     // the group's status.
     if (parentStatus.isCancelled()) {

@@ -861,13 +861,20 @@ bool removeStatusRecord(TaskStatusRecord *record);
 /// Add a status record to a task. This must be called synchronously with the
 /// task.
 ///
-/// This function also takes in a function_ref which is given the task status of
-/// the task we're adding the record to, to determine if the current status of
-/// the task permits adding the status record. This function_ref may be called
-/// multiple times and must be idempotent.
+/// This function also takes in a function_ref which is given the a reference to
+/// ActiveTaskStatus that is to be set on the task that we are adding the record
+/// to.
+///
+/// This can be used by the function to
+/// (1) to determine if the current status of the task permits adding the status
+/// record
+/// (2) Modify the task status that is to be set if needed
+///
+/// If the function_ref returns false, the status record is not added to the
+/// task. This function_ref may be called multiple times and must be idempotent.
 SWIFT_CC(swift)
 bool addStatusRecord(TaskStatusRecord *record,
-                     llvm::function_ref<bool(ActiveTaskStatus)> testAddRecord);
+                     llvm::function_ref<bool(ActiveTaskStatus&)> testAddRecord);
 
 /// A helper function for updating a new child task that is created with
 /// information from the parent or the group that it was going to be added to.
