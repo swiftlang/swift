@@ -129,12 +129,14 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
     swift::addImageAccessibleFunctionsBlockCallback(
         baseAddress, functions, accessible_funcs_section.length);
 
-  const auto &runtime_attribs_section = sections->swift5_runtime_attributes;
-  const void *functions =
-      reinterpret_cast<void *>(runtime_attribs_section.start);
-  if (runtime_attribs_section.length)
-    swift::addImageRuntimeAttributesBlockCallback(
-        baseAddress, functions, runtime_attribs_section.length);
+  if (sections->version >= 3) {
+    const auto &runtime_attribs_section = sections->swift5_runtime_attributes;
+    const void *functions =
+        reinterpret_cast<void *>(runtime_attribs_section.start);
+    if (runtime_attribs_section.length)
+      swift::addImageRuntimeAttributesBlockCallback(
+          baseAddress, functions, runtime_attribs_section.length);
+  }
 
   // Register this section for future enumeration by clients. This should occur
   // after this function has done all other relevant work to avoid a race
