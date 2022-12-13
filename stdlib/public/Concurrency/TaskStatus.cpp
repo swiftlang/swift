@@ -223,7 +223,7 @@ static bool withStatusRecordLock(AsyncTask *task,
 SWIFT_CC(swift)
 bool swift::addStatusRecord(
     TaskStatusRecord *newRecord,
-    llvm::function_ref<bool(ActiveTaskStatus& status)> shouldAddRecord) {
+    llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> shouldAddRecord) {
 
   auto task = swift_task_getCurrent();
   // Load the current state. We can use a relaxed load because we're
@@ -241,7 +241,7 @@ bool swift::addStatusRecord(
     // Set the record as the new innermost record.
     ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
 
-    if (shouldAddRecord(newStatus)) {
+    if (shouldAddRecord(oldStatus, newStatus)) {
       // We have to use a release on success to make the initialization of
       // the new record visible to an asynchronous thread trying to modify the
       // status records

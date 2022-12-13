@@ -1529,7 +1529,7 @@ swift_task_addCancellationHandlerImpl(
 
   bool fireHandlerNow = false;
 
-  addStatusRecord(record, [&](ActiveTaskStatus& parentStatus) {
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
     if (parentStatus.isCancelled()) {
       fireHandlerNow = true;
       // We don't fire the cancellation handler here since this function needs

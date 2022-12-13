@@ -150,7 +150,7 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
   // ok, now that the async let task actually is initialized: attach it to the
   // current task
   bool addedRecord =
-      addStatusRecord(record, [&](ActiveTaskStatus& parentStatus) {
+      addStatusRecord(record, [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
         updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
         return true;
       });
