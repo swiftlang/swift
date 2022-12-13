@@ -949,7 +949,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.PrintSPIs = true;
+    privOpts.PrintPrivateInterfaceContent = true;
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(

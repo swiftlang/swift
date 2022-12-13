@@ -132,6 +132,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs,
+                                                   bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
                                                      *aliasModuleNamesTargets
@@ -145,7 +146,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.FullyQualifiedTypes = true;
   result.FullyQualifiedTypesIfAmbiguous = true;
   result.FullyQualifiedExtendedTypesIfAmbiguous = true;
-  result.UseExportedModuleNames = true;
+  result.UseExportedModuleNames = useExportedModuleNames;
   result.AllowNullTypes = false;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
@@ -3071,6 +3072,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
 }
 
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureModuleInterfaceExportAs(Decl *decl) {
   return false;
 }
 
