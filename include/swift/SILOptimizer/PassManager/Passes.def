@@ -226,6 +226,8 @@ SWIFT_FUNCTION_PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
+SWIFT_FUNCTION_PASS(TestInstructionIteration, "test-instruction-iteration",
+     "Tests instruction iteration")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",

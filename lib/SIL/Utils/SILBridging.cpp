@@ -743,6 +743,10 @@ BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst) {
   return {i->getParent()};
 }
 
+bool SILInstruction_isDeleted(BridgedInstruction inst) {
+  return castToInst(inst)->isDeleted();
+}
+
 BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst) {
   auto operands = castToInst(inst)->getAllOperands();
   return {(const unsigned char *)operands.data(), operands.size()};
@@ -1183,4 +1187,10 @@ BridgedInstruction SILBuilder_createBranch(
   return {builder.createBranch(RegularLocation(b.loc.getLocation()),
                                castToBasicBlock(destBlock),
                                getSILValues(arguments, argValues))};
+}
+
+BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder b) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     b.loc.getScope());
+  return {builder.createUnreachable(RegularLocation(b.loc.getLocation()))};
 }

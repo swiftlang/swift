@@ -14,4 +14,5 @@ swift_compiler_sources(Optimizer
   SILPrinter.swift
   RangeDumper.swift
   RunUnitTests.swift
+  TestInstructionIteration.swift
 )

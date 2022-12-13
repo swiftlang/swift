@@ -164,8 +164,8 @@ void SILModule::checkForLeaks() const {
   if (!getOptions().checkSILModuleLeaks)
     return;
 
-  int instsInModule = std::distance(scheduledForDeletion.begin(),
-                                    scheduledForDeletion.end());
+  int instsInModule = scheduledForDeletion.size();
+
   for (const SILFunction &F : *this) {
     const SILFunction *sn = &F;
     do {
@@ -264,9 +264,11 @@ void SILModule::willDeleteInstruction(SILInstruction *I) {
     if (const CanOpenedArchetypeType archeTy =
             svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      RootOpenedArchetypeDefs.erase(key);
+      // In case `willDeleteInstruction` is called twice for the same instruction,
+      // we need to check if the archetype is really still in the map for this
+      // instruction.
+      if (RootOpenedArchetypeDefs.lookup(key) == svi)
+        RootOpenedArchetypeDefs.erase(key);
     }
   }
 }
@@ -274,15 +276,14 @@ void SILModule::willDeleteInstruction(SILInstruction *I) {
 void SILModule::scheduleForDeletion(SILInstruction *I) {
   I->dropAllReferences();
   scheduledForDeletion.push_back(I);
-  I->ParentBB = nullptr;
 }
 
 void SILModule::flushDeletedInsts() {
-  while (!scheduledForDeletion.empty()) {
-    SILInstruction *inst = &*scheduledForDeletion.begin();
-    scheduledForDeletion.erase(inst);
-    AlignedFree(inst);
+  for (SILInstruction *instToDelete : scheduledForDeletion) {
+    SILInstruction::destroy(instToDelete);
+    AlignedFree(instToDelete);
   }
+  scheduledForDeletion.clear();
 }
 
 SILWitnessTable *

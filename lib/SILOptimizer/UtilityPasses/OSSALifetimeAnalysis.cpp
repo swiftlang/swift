@@ -108,8 +108,8 @@ void OSSALifetimeAnalysis::run() {
     SmallVector<SILValue, 8> traceValues;
     InstructionDeleter deleter;
     for (auto &block : function) {
-      for (SILInstruction *inst : deleter.updatingRange(&block)) {
-        if (auto *debugValue = dyn_cast<DebugValueInst>(inst)) {
+      for (SILInstruction &inst : block.deletableInstructions()) {
+        if (auto *debugValue = dyn_cast<DebugValueInst>(&inst)) {
           if (!debugValue->hasTrace())
             continue;
           traceValues.push_back(debugValue->getOperand());

@@ -1,0 +1,233 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %FileCheck %s < %t/out.sil
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+
+// LOG-LABEL: Test instruction iteration in delete_current_forward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:    %1 = string_literal utf8 "delete_strings"
+// LOG-NEXT:    %1 = integer_literal $Builtin.Int64, 3
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:  End function delete_current_forward:
+
+// CHECK-LABEL: sil @delete_current_forward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    %1 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_current_forward'
+sil @delete_current_forward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "delete_strings"
+  %2 = integer_literal $Builtin.Int64, 3 
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_next_forward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:    %1 = string_literal utf8 "delete_ints"
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:  End function delete_next_forward:
+
+// CHECK-LABEL: sil @delete_next_forward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    %1 = string_literal utf8 "delete_ints"
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_next_forward'
+sil @delete_next_forward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "delete_ints"
+  %2 = integer_literal $Builtin.Int64, 3 
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_current_and_next_forward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:    %1 = string_literal utf8 "delete_strings"
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:  End function delete_current_and_next_forward:
+
+// CHECK-LABEL: sil @delete_current_and_next_forward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_current_and_next_forward'
+sil @delete_current_and_next_forward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "delete_strings"
+  %2 = string_literal utf8 ""
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_until_end_forward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:    %1 = string_literal utf8 "delete_branches"
+// LOG-NEXT:    %2 = string_literal utf8 "delete_strings"
+// LOG-NEXT:  bb1:
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:  End function delete_until_end_forward:
+
+// CHECK-LABEL: sil @delete_until_end_forward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'delete_until_end_forward'
+sil @delete_until_end_forward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "delete_branches"
+  %2 = string_literal utf8 "delete_strings"
+  %3 = string_literal utf8 ""
+  %4 = string_literal utf8 ""
+  br bb1
+bb1:
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_current_backward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:    %2 = string_literal utf8 "delete_strings"
+// LOG-NEXT:    %1 = integer_literal $Builtin.Int64, 3
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:  End function delete_current_backward:
+
+// CHECK-LABEL: sil @delete_current_backward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    %1 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_current_backward'
+sil @delete_current_backward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = integer_literal $Builtin.Int64, 3 
+  %2 = string_literal utf8 "delete_strings"
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_next_backward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:    %2 = string_literal utf8 "delete_ints"
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:  End function delete_next_backward:
+
+// CHECK-LABEL: sil @delete_next_backward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    %1 = string_literal utf8 "delete_ints"
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_next_backward'
+sil @delete_next_backward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = integer_literal $Builtin.Int64, 3 
+  %2 = string_literal utf8 "delete_ints"
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_current_and_next_backward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:    %2 = string_literal utf8 "delete_strings"
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:  End function delete_current_and_next_backward:
+
+// CHECK-LABEL: sil @delete_current_and_next_backward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_current_and_next_backward'
+sil @delete_current_and_next_backward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 ""
+  %2 = string_literal utf8 "delete_strings"
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in delete_until_end_backward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    return %3 : $()
+// LOG-NEXT:    %3 = tuple ()
+// LOG-NEXT:    %2 = string_literal utf8 "delete_strings"
+// LOG-NEXT:  End function delete_until_end_backward:
+
+// CHECK-LABEL: sil @delete_until_end_backward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'delete_until_end_backward'
+sil @delete_until_end_backward : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 ""
+  %1 = string_literal utf8 ""
+  %2 = string_literal utf8 "delete_strings"
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in split_block_forward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:    %1 = string_literal utf8 "split_block"
+// LOG-NEXT:    %2 = integer_literal $Builtin.Int64, 3
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:  End function split_block_forward:
+
+// CHECK-LABEL: sil @split_block_forward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    unreachable
+// CHECK:       bb1:
+// CHECK-NEXT:    %2 = string_literal utf8 "split_block"
+// CHECK-NEXT:    %3 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'split_block_forward'
+sil @split_block_forward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "split_block"
+  %2 = integer_literal $Builtin.Int64, 3 
+  return %0 : $()
+}
+
+// LOG-LABEL: Test instruction iteration in split_block_backward:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    return %0 : $()
+// LOG-NEXT:    %2 = integer_literal $Builtin.Int64, 3
+// LOG-NEXT:    %1 = string_literal utf8 "split_block"
+// LOG-NEXT:    %0 = tuple ()
+// LOG-NEXT:  End function split_block_backward:
+
+// CHECK-LABEL: sil @split_block_backward : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    unreachable
+// CHECK:       bb1:
+// CHECK-NEXT:    %2 = string_literal utf8 "split_block"
+// CHECK-NEXT:    %3 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:    return %0 : $()
+// CHECK-NEXT:  } // end sil function 'split_block_backward'
+sil @split_block_backward : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = string_literal utf8 "split_block"
+  %2 = integer_literal $Builtin.Int64, 3 
+  return %0 : $()
+}
+

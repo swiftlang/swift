@@ -266,7 +266,7 @@ private:
   /// A monotonically increasing ID which is incremented whenever a
   /// BasicBlockBitfield or NodeBitfield is constructed.
   /// For details see SILBitfield::bitfieldID;
-  uint64_t currentBitfieldID = 1;
+  int64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.

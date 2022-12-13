@@ -217,7 +217,7 @@ private:
   /// This avoids dangling instruction pointers within the run of a pass and in
   /// analysis caches. Note that the analysis invalidation mechanism ensures
   /// that analysis caches are invalidated before flushDeletedInsts().
-  llvm::iplist<SILInstruction> scheduledForDeletion;
+  std::vector<SILInstruction*> scheduledForDeletion;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
