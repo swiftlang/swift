@@ -76,9 +76,7 @@ extension StaticBigInt {
 #if compiler(>=5.8) && $BuiltinIntLiteralAccessors
     Bool(Builtin.isNegative_IntLiteral(_value))
 #else
-    typealias _IntLiteral = (data: Builtin.RawPointer, flags: Builtin.Word)
-    let value = unsafeBitCast(_value, to: _IntLiteral.self)
-    return Bool(Builtin.trunc_Word_Int1(value.flags))
+    fatalError("Swift compiler is incompatible with this SDK version")
 #endif
   }
 
@@ -103,9 +101,7 @@ extension StaticBigInt {
 #if compiler(>=5.8) && $BuiltinIntLiteralAccessors
     Int(Builtin.bitWidth_IntLiteral(_value))
 #else
-    typealias _IntLiteral = (data: Builtin.RawPointer, flags: Builtin.Word)
-    let value = unsafeBitCast(_value, to: _IntLiteral.self)
-    return Int(Builtin.lshr_Word(value.flags, Int(8)._builtinWordValue))
+    fatalError("Swift compiler is incompatible with this SDK version")
 #endif
   }
 
@@ -142,9 +138,7 @@ extension StaticBigInt {
       Builtin.wordAtIndex_IntLiteral(_value, wordIndex._builtinWordValue)
     )
 #else
-    typealias _IntLiteral = (data: Builtin.RawPointer, flags: Builtin.Word)
-    let value = unsafeBitCast(_value, to: _IntLiteral.self)
-    return UnsafePointer<UInt>(value.data)[wordIndex]
+    fatalError("Swift compiler is incompatible with this SDK version")
 #endif
   }
 }
