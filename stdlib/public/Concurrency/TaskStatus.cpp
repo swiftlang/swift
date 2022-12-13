@@ -623,7 +623,6 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   } else {
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
   }
-#endif
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
