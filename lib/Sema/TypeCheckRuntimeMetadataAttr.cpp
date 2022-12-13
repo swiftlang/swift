@@ -29,13 +29,6 @@
 using namespace swift;
 using namespace constraints;
 
-ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
-  auto *mutableSelf = const_cast<ValueDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           GetRuntimeDiscoverableAttributes{mutableSelf},
-                           nullptr);
-}
-
 std::pair<BraceStmt *, Type>
 ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
   auto *mutableSelf = const_cast<ValueDecl *>(this);
