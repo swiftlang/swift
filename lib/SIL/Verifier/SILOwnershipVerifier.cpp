@@ -145,6 +145,8 @@ private:
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue value,
       const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
+  bool hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
+      SILPhiArgument *phi) const;
 };
 
 } // namespace swift
@@ -280,7 +282,7 @@ bool SILValueOwnershipChecker::gatherUsers(
   // this value forwards guaranteed ownership. In such a case, we are going to
   // validate it as part of the borrow introducer from which the forwarding
   // value originates. So we can just return true and continue.
-  if (isGuaranteedForwarding(value))
+  if (canOpcodeForwardInnerGuaranteedValues(value))
     return true;
 
   // Ok, we have some sort of borrow introducer. We need to recursively validate
@@ -308,8 +310,8 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    if (op->getOperandOwnership() ==
-        OperandOwnership::GuaranteedForwardingPhi) {
+    if (PhiOperand(op) &&
+        op->getOperandOwnership() == OperandOwnership::GuaranteedForwarding) {
       LLVM_DEBUG(llvm::dbgs() << "Regular User: " << *user);
       nonLifetimeEndingUsers.push_back(op);
       continue;
@@ -554,10 +556,6 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     if (isGuaranteedForwarding(value)) {
       return true;
     }
-    auto *phi = dyn_cast<SILPhiArgument>(value);
-    if (phi && isGuaranteedForwardingPhi(phi)) {
-      return true;
-    }
   }
 
   // If we have an unowned value, then again there is nothing left to do.
@@ -619,6 +617,38 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
   });
 }
 
+bool SILValueOwnershipChecker::
+    hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
+        SILPhiArgument *phi) const {
+  bool foundGuaranteedForwardingPhiOperand = false;
+  bool foundNonGuaranteedForwardingPhiOperand = false;
+  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *operand) -> bool {
+    auto value = operand->get();
+    if (canOpcodeForwardInnerGuaranteedValues(value) ||
+        isa<SILFunctionArgument>(value)) {
+      foundGuaranteedForwardingPhiOperand = true;
+      if (foundNonGuaranteedForwardingPhiOperand) {
+        return false; /* found error, stop visiting */
+      }
+      return true;
+    }
+    foundNonGuaranteedForwardingPhiOperand = true;
+    if (foundGuaranteedForwardingPhiOperand) {
+      return false; /* found error, stop visiting */
+    }
+    return true;
+  });
+  if (foundGuaranteedForwardingPhiOperand ^
+      foundNonGuaranteedForwardingPhiOperand) {
+    return true;
+  }
+  return errorBuilder.handleMalformedSIL([&] {
+    llvm::errs() << "Malformed @guaranteed phi!\n"
+                 << "Phi: " << *phi;
+    llvm::errs() << "Guaranteed forwarding operands not found on all paths!\n";
+  });
+}
+
 bool SILValueOwnershipChecker::checkUses() {
   LLVM_DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
 
@@ -675,10 +705,16 @@ bool SILValueOwnershipChecker::checkUses() {
   // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
-  if (value->getOwnershipKind() == OwnershipKind::Guaranteed &&
-      isGuaranteedForwarding(value)) {
+  if (isGuaranteedForwarding(value)) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
+      return false;
+    }
+  }
+  auto *phi = dyn_cast<SILPhiArgument>(value);
+  if (phi && phi->isPhi() &&
+      phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (!hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(phi)) {
       return false;
     }
   }
