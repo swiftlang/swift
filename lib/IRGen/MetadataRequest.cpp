@@ -2408,14 +2408,21 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     IGM.setColocateMetadataSection(thunkFn);
 
     // Call out to the helper.
+    auto getNextParam = [&]() -> llvm::Value * {
+      auto *param = params.claimNext();
+      if (param->getType()->isPointerTy())
+        return IGF.Builder.CreateBitCast(param, IGM.Int8PtrTy);
+      return IGF.Builder.CreateIntToPtr(param, IGM.Int8PtrTy);
+    };
+
     auto arg0 = numArguments >= 1
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
     auto arg1 = numArguments >= 2
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
     auto arg2 = numArguments >= 3
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
     llvm::CallInst *call;

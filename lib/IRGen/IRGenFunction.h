@@ -349,6 +349,8 @@ public:
                                               llvm::Value *&metadataSlot,
                                               ValueWitness index);
 
+  llvm::Value *emitPackShapeExpression(CanType type);
+
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
