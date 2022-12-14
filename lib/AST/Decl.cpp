@@ -6598,14 +6598,6 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isTypeWrapperLocalStorageForInitializer() const {
-  if (auto *ctor =
-          dyn_cast_or_null<ConstructorDecl>(getDeclContext()->getAsDecl())) {
-    return this == ctor->getLocalTypeWrapperStorageVar();
-  }
-  return false;
-}
-
 bool VarDecl::isLet() const {
   // An awful hack that stabilizes the value of 'isLet' for ParamDecl instances.
   //
@@ -8888,14 +8880,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
     return false;
 
   return params->get(0)->getInterfaceType()->isVoid();
-}
-
-VarDecl *ConstructorDecl::getLocalTypeWrapperStorageVar() const {
-  auto &ctx = getASTContext();
-  auto *mutableSelf = const_cast<ConstructorDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator, SynthesizeLocalVariableForTypeWrapperStorage{mutableSelf},
-      nullptr);
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)

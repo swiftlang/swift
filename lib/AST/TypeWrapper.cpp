@@ -27,6 +27,22 @@ NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
                            GetTypeWrapper{mutableSelf}, nullptr);
 }
 
+VarDecl *ConstructorDecl::getLocalTypeWrapperStorageVar() const {
+  auto &ctx = getASTContext();
+  auto *mutableSelf = const_cast<ConstructorDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeLocalVariableForTypeWrapperStorage{mutableSelf},
+      nullptr);
+}
+
+bool VarDecl::isTypeWrapperLocalStorageForInitializer() const {
+  if (auto *ctor =
+          dyn_cast_or_null<ConstructorDecl>(getDeclContext()->getAsDecl())) {
+    return this == ctor->getLocalTypeWrapperStorageVar();
+  }
+  return false;
+}
+
 bool UsesTypeWrapperFeature::evaluate(Evaluator &evaluator,
                                       NominalTypeDecl *decl) const {
   // This is a type wrapper type.
