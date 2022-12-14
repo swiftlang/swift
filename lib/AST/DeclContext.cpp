@@ -1136,11 +1136,13 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
-    : Value(DC, isPrivate) {
-  if (isPrivate) {
+AccessScope::AccessScope(const DeclContext *DC, AccessLimitKind limitKind)
+    : Value(DC, limitKind) {
+  auto isPrivate = false;
+  if (limitKind == AccessLimitKind::Private) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
+    isPrivate = true;
   }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
