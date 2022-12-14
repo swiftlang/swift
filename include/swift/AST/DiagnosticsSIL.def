@@ -733,6 +733,8 @@ ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
       "'%0' has guaranteed ownership but was consumed", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
       "'%0' has guaranteed ownership but was consumed due to being captured by a closure", (StringRef))
+ERROR(sil_moveonlychecker_let_value_consumed_in_closure, none,
+      "'%0' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations", (StringRef))
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
       "'%0' consumed but not reinitialized before end of function", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,

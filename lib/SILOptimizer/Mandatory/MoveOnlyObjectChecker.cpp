@@ -211,9 +211,25 @@ void DiagnosticEmitter::emitGuaranteedDiagnostic(
   if (!canonicalizer.hasNonPartialApplyConsumingUse())
     return;
 
+  // Check if this value is closure captured. In such a case, emit a special
+  // error.
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(
+          lookThroughCopyValueInsts(markedValue->getOperand()))) {
+    if (fArg->isClosureCapture()) {
+      diagnose(astContext,
+               markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+               diag::sil_moveonlychecker_let_value_consumed_in_closure,
+               varName);
+      emitDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
+      valuesWithDiagnostics.insert(markedValue);
+      return;
+    }
+  }
+
   diagnose(astContext,
            markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
+
   emitDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
   valuesWithDiagnostics.insert(markedValue);
 }
