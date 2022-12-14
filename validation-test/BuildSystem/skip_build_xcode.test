@@ -11,4 +11,4 @@
 #
 # CHECK: --- Building llvm ---
 # CHECK: env {{.+}}/cmake --build {{.+}}/Xcode-ReleaseAssert/llvm-macosx-{{.+}} --config Release --target ZERO_CHECK{{$}}
-# CHECK-NEXT: env {{.+}}/cmake --build {{.+}}/Xcode-ReleaseAssert/llvm-macosx-{{.+}} --config Release --target ZERO_CHECK -- -target llvm-tblgen -target clang-resource-headers -target intrinsics_gen -target clang-tablegen-targets -target FileCheck -target not -target llvm-nm -target llvm-size{{$}}
+# CHECK-NEXT: env {{.+}}/cmake --build {{.+}}/Xcode-ReleaseAssert/llvm-macosx-{{.+}} --config Release --target ZERO_CHECK -- {{.*}}-target llvm-tblgen -target clang-resource-headers -target intrinsics_gen -target clang-tablegen-targets -target FileCheck -target not -target llvm-nm -target llvm-size{{$}}
