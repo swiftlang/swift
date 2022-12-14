@@ -275,7 +275,6 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
         break;
 
       case OperandOwnership::GuaranteedForwarding:
-      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
           if (!visitor.visitForwardingUse(use)) {

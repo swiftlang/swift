@@ -27,9 +27,6 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand,
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
   }
-  if (opOwnership == OperandOwnership::GuaranteedForwarding) {
-    return canOpcodeForwardGuaranteedValues(const_cast<Operand *>(operand));
-  }
   return true;
 }
 
@@ -430,8 +427,8 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return isGuaranteedForwardingPhi(getValue())
-               ? OperandOwnership::GuaranteedForwardingPhi
+    return isGuaranteedForwarding(getValue())
+               ? OperandOwnership::GuaranteedForwarding
                : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
