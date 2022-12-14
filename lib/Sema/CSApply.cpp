@@ -3820,13 +3820,7 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      for (unsigned i = 0; i < expr->getNumBindings(); ++i) {
-        auto *binding = expr->getBindings()[i];
-        expr->setBinding(i, visit(binding));
-      }
-
-      simplifyExprType(expr);
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
@@ -7136,10 +7130,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 
-    return cs.cacheType(PackExpansionExpr::create(ctx, pattern,
-        expansion->getOpaqueValues(), expansion->getBindings(),
-        expansion->getEndLoc(), expansion->getGenericEnvironment(),
-        expansion->isImplicit(), expansionTy));
+    expansion->setPatternExpr(pattern);
+    expansion->setType(expansionTy);
+    return expansion;
   }
 
   case TypeKind::BuiltinTuple:

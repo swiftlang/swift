@@ -3569,8 +3569,7 @@ public:
 /// call argument lists, the elements of a tuple value, and the source
 /// of a for-in loop.
 class PackExpansionExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpansionExpr,
-                                  OpaqueValueExpr *, Expr *> {
+    private llvm::TrailingObjects<PackExpansionExpr, PackElementExpr *> {
   friend TrailingObjects;
 
   Expr *PatternExpr;
@@ -3578,42 +3577,33 @@ class PackExpansionExpr final : public Expr,
   GenericEnvironment *Environment;
 
   PackExpansionExpr(Expr *patternExpr,
-                    ArrayRef<OpaqueValueExpr *> opaqueValues,
-                    ArrayRef<Expr *> bindings,
+                    ArrayRef<PackElementExpr *> packElements,
                     SourceLoc dotsLoc,
                     GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
       PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
-    assert(opaqueValues.size() == bindings.size());
-    Bits.PackExpansionExpr.NumBindings = opaqueValues.size();
+    Bits.PackExpansionExpr.NumBindings = packElements.size();
 
     assert(Bits.PackExpansionExpr.NumBindings > 0 &&
            "PackExpansionExpr must have pack references");
 
-    std::uninitialized_copy(opaqueValues.begin(), opaqueValues.end(),
-                            getTrailingObjects<OpaqueValueExpr *>());
-    std::uninitialized_copy(bindings.begin(), bindings.end(),
-                            getTrailingObjects<Expr *>());
+    std::uninitialized_copy(packElements.begin(), packElements.end(),
+                            getTrailingObjects<PackElementExpr *>());
   }
 
-  size_t numTrailingObjects(OverloadToken<OpaqueValueExpr *>) const {
+  size_t numTrailingObjects(OverloadToken<PackElementExpr *>) const {
     return getNumBindings();
   }
 
-  size_t numTrailingObjects(OverloadToken<Expr *>) const {
-    return getNumBindings();
-  }
-
-  MutableArrayRef<Expr *> getMutableBindings() {
-    return {getTrailingObjects<Expr *>(), getNumBindings()};
+  MutableArrayRef<PackElementExpr *> getMutableBindings() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
 public:
   static PackExpansionExpr *create(ASTContext &ctx,
                                    Expr *patternExpr,
-                                   ArrayRef<OpaqueValueExpr *> opaqueValues,
-                                   ArrayRef<Expr *> bindings,
+                                   ArrayRef<PackElementExpr *> packElements,
                                    SourceLoc dotsLoc,
                                    GenericEnvironment *environment,
                                    bool implicit = false,
@@ -3629,15 +3619,11 @@ public:
     return Bits.PackExpansionExpr.NumBindings;
   }
 
-  ArrayRef<OpaqueValueExpr *> getOpaqueValues() {
-    return {getTrailingObjects<OpaqueValueExpr *>(), getNumBindings()};
+  ArrayRef<PackElementExpr *> getPackElements() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
-  ArrayRef<Expr *> getBindings() {
-    return {getTrailingObjects<Expr *>(), getNumBindings()};
-  }
-
-  void setBinding(unsigned i, Expr *e) {
+  void setBinding(unsigned i, PackElementExpr *e) {
     getMutableBindings()[i] = e;
   }
 
