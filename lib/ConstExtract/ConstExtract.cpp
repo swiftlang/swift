@@ -198,11 +198,44 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   return std::make_shared<RuntimeValue>();
 }
 
-static std::shared_ptr<CompileTimeValue>
-extractPropertyInitializationValue(VarDecl *propertyDecl) {
-  if (auto binding = propertyDecl->getParentPatternBinding()) {
-    if (auto originalInit = binding->getOriginalInit(0)) {
-      return extractCompileTimeValue(originalInit);
+static std::vector<CustomAttrValue>
+extractCustomAttrValues(VarDecl *propertyDecl) {
+  std::vector<CustomAttrValue> customAttrValues;
+
+  for (auto *propertyWrapper : propertyDecl->getAttachedPropertyWrappers()) {
+    std::vector<FunctionParameter> parameters;
+
+    if (const auto *args = propertyWrapper->getArgs()) {
+      for (auto arg : *args) {
+        const auto label = arg.getLabel().str().str();
+        auto argExpr = arg.getExpr();
+
+        if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+          auto *decl = defaultArgument->getParamDecl();
+          if (decl->hasDefaultExpr()) {
+            argExpr = decl->getTypeCheckedDefaultExpr();
+          }
+        }
+        parameters.push_back(
+            {label, argExpr->getType(), extractCompileTimeValue(argExpr)});
+      }
+    }
+    customAttrValues.push_back({propertyWrapper->getType(), parameters});
+  }
+
+  return customAttrValues;
+}
+
+static ConstValueTypePropertyInfo
+extractTypePropertyInfo(VarDecl *propertyDecl) {
+  if (const auto binding = propertyDecl->getParentPatternBinding()) {
+    if (const auto originalInit = binding->getOriginalInit(0)) {
+      if (propertyDecl->hasAttachedPropertyWrapper()) {
+        return {propertyDecl, extractCompileTimeValue(originalInit),
+                extractCustomAttrValues(propertyDecl)};
+      }
+
+      return {propertyDecl, extractCompileTimeValue(originalInit)};
     }
   }
 
@@ -210,12 +243,12 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
     auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
     if (node.is<Stmt *>()) {
       if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
-        return extractCompileTimeValue(returnStmt->getResult());
+        return {propertyDecl, extractCompileTimeValue(returnStmt->getResult())};
       }
     }
   }
 
-  return std::make_shared<RuntimeValue>();
+  return {propertyDecl, std::make_shared<RuntimeValue>()};
 }
 
 ConstValueTypeInfo
@@ -228,8 +261,7 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
 
   std::vector<ConstValueTypePropertyInfo> Properties;
   for (auto Property : StoredProperties) {
-    Properties.push_back(
-        {Property, extractPropertyInitializationValue(Property)});
+    Properties.push_back(extractTypePropertyInfo(Property));
   }
 
   for (auto Member : Decl->getMembers()) {
@@ -238,13 +270,13 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
     // instead gather up remaining static and computed properties.
     if (!VD || StoredPropertiesSet.count(VD))
       continue;
-    Properties.push_back({VD, extractPropertyInitializationValue(VD)});
+    Properties.push_back(extractTypePropertyInfo(VD));
   }
 
   for (auto Extension: Decl->getExtensions()) {
     for (auto Member : Extension->getMembers()) {
       if (auto *VD = dyn_cast<VarDecl>(Member)) {
-        Properties.push_back({VD, extractPropertyInitializationValue(VD)});
+        Properties.push_back(extractTypePropertyInfo(VD));
       }
     }
   }
@@ -348,6 +380,31 @@ void writeValue(llvm::json::OStream &JSON,
   }
 }
 
+void writeAttributes(
+    llvm::json::OStream &JSON,
+    llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers) {
+  if (!PropertyWrappers.hasValue()) {
+    return;
+  }
+
+  JSON.attributeArray("attributes", [&] {
+    for (auto PW : PropertyWrappers.value()) {
+      JSON.object([&] {
+        JSON.attribute("type", toFullyQualifiedTypeNameString(PW.Type));
+        JSON.attributeArray("arguments", [&] {
+          for (auto FP : PW.Parameters) {
+            JSON.object([&] {
+              JSON.attribute("label", FP.Label);
+              JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+              writeValue(JSON, FP.Value);
+            });
+          }
+        });
+      });
+    }
+  });
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -371,6 +428,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               JSON.attribute("isComputed",
                              !decl->hasStorage() ? "true" : "false");
               writeValue(JSON, PropertyInfo.Value);
+              writeAttributes(JSON, PropertyInfo.PropertyWrappers);
             });
           }
         });
