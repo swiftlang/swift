@@ -2261,6 +2261,7 @@ static Type validateParameterType(ParamDecl *decl) {
     // @escaping in this case.
     options.setContext(TypeResolverContext::VariadicFunctionInput);
     options |= TypeResolutionFlags::Direct;
+    options |= TypeResolutionFlags::AllowPackReferences;
 
     // FIXME: This duplicates code found elsewhere
     auto *patternRepr = packExpansionRepr->getPatternType();

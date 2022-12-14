@@ -2516,6 +2516,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
+  case TypeReprKind::PackReference: {
+    auto packReferenceRepr = cast<PackReferenceTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packReferenceRepr->getPackType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
