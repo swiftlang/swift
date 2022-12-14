@@ -451,7 +451,8 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             // We don't officially support binary swift modules, so normally
             // the index data for user modules would get generated while
             // building them.
-            bool isDistributedModule = mod->isSDKModule();
+            bool isDistributedModule = mod->isSDKModule() ||
+                      mod->getASTContext().SearchPathOpts.getSDKPath().empty();
             if (mod->isSystemModule() && indexSystemModules &&
                 (isDistributedModule || mod->isStdlibModule()) &&
                 (!skipStdlib || !mod->isStdlibModule())) {
