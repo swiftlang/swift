@@ -32,6 +32,7 @@ class SILGlobalVariable;
 
 namespace irgen {
 class TypeInfo;
+class IRGenModule;
 
 /// This data structure holds everything needed to emit debug info
 /// for a type.
@@ -47,7 +48,8 @@ protected:
   Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
-  bool SizeIsFragmentSize;
+  bool SizeIsFragmentSize = false;
+  bool IsFixedBuffer = false;
 
 public:
   DebugTypeInfo() = default;
@@ -55,11 +57,7 @@ public:
                 Optional<Size::int_type> SizeInBits = {},
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFragmentTypeInfo = false);
-  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
-                Optional<Size> SizeInBytes, Alignment AlignInBytes,
-                bool HasDefaultAlignment, bool IsMetadataType,
-                bool IsFragmentTypeInfo);
+                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false);
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -80,15 +78,17 @@ public:
                                        bool IsFragmentTypeInfo);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV,
-                                 llvm::Type *StorageType, Size size,
-                                 Alignment align);
+                                 llvm::Type *StorageType, IRGenModule &IGM);
+  static DebugTypeInfo getGlobalFixedBuffer(SILGlobalVariable *GV,
+                                            llvm::Type *StorageType,
+                                            Size SizeInBytes, Alignment align);
   /// ObjC classes.
   static DebugTypeInfo getObjCClass(ClassDecl *theClass,
                                     llvm::Type *StorageType, Size size,
                                     Alignment align);
   /// Error type.
   static DebugTypeInfo getErrorResult(swift::Type Ty, llvm::Type *StorageType,
-                                      Size size, Alignment align);
+                                      IRGenModule &IGM);
 
   TypeBase *getType() const { return Type; }
 
@@ -119,6 +119,7 @@ public:
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isSizeFragmentSize() const { return SizeIsFragmentSize; }
+  bool isFixedBuffer() const { return IsFixedBuffer; }
 
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
@@ -159,8 +160,8 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Size(0), swift::irgen::Alignment(), false, false, false);
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr, 0,
+        swift::irgen::Alignment(), false, false, false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

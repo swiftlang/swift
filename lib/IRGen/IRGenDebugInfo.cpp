@@ -240,7 +240,7 @@ public:
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit, bool InFixedBuffer,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
@@ -640,9 +640,10 @@ private:
 
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType type) {
+    bool IsFragment = false;
     auto RealType = type.getASTType();
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, IGM.getTypeInfo(type),
-                                                /*isFragment*/ false);
+                                                IsFragment);
     Parameters.push_back(getOrCreateType(DbgTy));
   }
 
@@ -991,7 +992,7 @@ private:
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
               VD->getInterfaceType(),
               IGM.getTypeInfoForUnlowered(
-                  IGM.getSILTypes().getAbstractionPattern(VD), memberTy)))
+                IGM.getSILTypes().getAbstractionPattern(VD), memberTy)))
         Elements.push_back(createMemberType(*DbgTy, VD->getName().str(),
                                             OffsetInBits, Scope, File, Flags));
       else
@@ -1061,7 +1062,7 @@ private:
         // as the element type; there is no storage here.
         Type IntTy = IGM.Context.getIntType();
         ElemDbgTy = CompletedDebugTypeInfo::get(
-            DebugTypeInfo(IntTy, DbgTy.getFragmentStorageType(), Size(0),
+            DebugTypeInfo(IntTy, DbgTy.getFragmentStorageType(), 0,
                           Alignment(1), true, false, false));
       }
       if (!ElemDbgTy) {
@@ -1338,7 +1339,6 @@ private:
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
     TypeBase *BaseTy = DbgTy.getType();
-
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -1445,12 +1445,16 @@ private:
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       StringRef Name = Decl->getName().str();
-      if (DbgTy.getTypeSizeInBits())
-        return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
-      return DBuilder.createForwardDecl(
-          llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
-          llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      if (!DbgTy.getTypeSizeInBits())
+        return DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
+            llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      if (DbgTy.isFixedBuffer())
+        return DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
+            llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
+                                AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::Class: {
@@ -1782,13 +1786,13 @@ private:
 #if SWIFT_DEBUGINFO_CACHE_VERIFICATION
       if (auto SizeInBits = DbgTy.getTypeSizeInBits()) {
         if (unsigned CachedSizeInBits = getSizeInBits(DITy)) {
-          if (llvm::alignTo(CachedSizeInBits, 8) != *SizeInBits) {
+          if (CachedSizeInBits != *SizeInBits) {
             DITy->dump();
             DbgTy.dump();
             llvm::errs() << "SizeInBits = " << *SizeInBits << "\n";
             llvm::errs() << "CachedSizeInBits = " << CachedSizeInBits << "\n";
           }
-          assert(llvm::alignTo(CachedSizeInBits, 8) == *SizeInBits);
+          assert(CachedSizeInBits == *SizeInBits);
         }
       }
 #endif
@@ -2381,12 +2385,12 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   llvm::DITypeArray Error = nullptr;
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
+      SILType SILTy = IGM.silConv.getSILType(
+          *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy,
                                         IGM.getMaximalTypeExpansionContext()),
-          IGM.getTypeInfo(IGM.silConv.getSILType(
-              *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext())),
-          false);
+          IGM.getTypeInfo(SILTy), false);
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
@@ -2873,8 +2877,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
-    Optional<SILLocation> Loc) {
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -2897,7 +2900,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     // would confuse both the user and LLDB.
     return;
 
-  if (InFixedBuffer)
+  if (DbgTy.isFixedBuffer())
     DITy = createFixedValueBufferStruct(DITy);
 
   auto L = getStartLocation(Loc);
@@ -3061,10 +3064,9 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, bool InFixedBuffer,
-    Optional<SILLocation> Loc) {
+    DebugTypeInfo DebugType, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
-      Storage, Name, LinkageName, DebugType, IsLocalToUnit, InFixedBuffer, Loc);
+      Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
