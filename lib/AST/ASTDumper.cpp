@@ -3948,6 +3948,7 @@ namespace {
       printField("index", T->getIndex());
       if (auto decl = T->getDecl())
         printField("decl", decl->printRef());
+      printFlag(T->isParameterPack(), "pack");
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
