@@ -182,7 +182,6 @@ func evaluateMacro(
       emitDiagnostic(
         diagEnginePtr: diagEnginePtr,
         sourceFileBuffer: .init(mutating: sourceFile.pointee.buffer),
-        nodeStartOffset: parentSyntax.position.utf8Offset,
         diagnostic: diag
       )
     }

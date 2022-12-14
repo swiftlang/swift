@@ -5,7 +5,6 @@ import SwiftSyntax
 fileprivate func emitDiagnosticParts(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
-  nodeStartOffset: Int?,
   message: String,
   severity: DiagnosticSeverity,
   position: AbsolutePosition,
@@ -22,18 +21,8 @@ fileprivate func emitDiagnosticParts(
 
   // Form a source location for the given absolute position
   func sourceLoc(
-    at origPosition: AbsolutePosition
+    at position: AbsolutePosition
   ) -> UnsafeMutablePointer<UInt8>? {
-    // FIXME: Our tree is very confused about absolute offsets. Work around
-    // the issue in a very hacky way.
-    let position: AbsolutePosition
-    if let nodeStartOffset = nodeStartOffset,
-        origPosition.utf8Offset < nodeStartOffset {
-      position = origPosition + SourceLength(utf8Length: nodeStartOffset)
-    } else {
-      position = origPosition
-    }
-
     if let sourceFileBase = sourceFileBuffer.baseAddress,
       position.utf8Offset >= 0 &&
         position.utf8Offset < sourceFileBuffer.count {
@@ -99,7 +88,6 @@ fileprivate func emitDiagnosticParts(
 func emitDiagnostic(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
-  nodeStartOffset: Int? = nil,
   diagnostic: Diagnostic
 ) {
   // Collect all of the Fix-It changes based on their Fix-It ID.
@@ -113,7 +101,6 @@ func emitDiagnostic(
   emitDiagnosticParts(
     diagEnginePtr: diagEnginePtr,
     sourceFileBuffer: sourceFileBuffer,
-    nodeStartOffset: nodeStartOffset,
     message: diagnostic.diagMessage.message,
     severity: diagnostic.diagMessage.severity,
     position: diagnostic.position,
@@ -126,7 +113,6 @@ func emitDiagnostic(
     emitDiagnosticParts(
       diagEnginePtr: diagEnginePtr,
       sourceFileBuffer: sourceFileBuffer,
-      nodeStartOffset: nodeStartOffset,
       message: note.message,
       severity: .note, position: note.position,
       fixItChanges: fixItChangesByID[note.noteMessage.fixItID] ?? []
