@@ -8,7 +8,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop
 
-// RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -Wno-error)
+// RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-error)
 
 // XFAIL: OS=linux-android, OS=linux-androideabi
 

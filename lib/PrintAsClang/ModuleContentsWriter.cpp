@@ -776,6 +776,10 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
+    // Embed additional STL includes.
+    os << "#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY\n";
+    os << "#include <string>\n";
+    os << "#endif\n";
     // Embed an overlay for the standard library.
     ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
