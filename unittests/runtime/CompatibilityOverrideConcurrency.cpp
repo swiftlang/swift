@@ -215,6 +215,15 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAll) {
   swift_taskGroup_cancelAll(nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_waitAll) {
+  swift_taskGroup_waitAll(nullptr, nullptr, nullptr, nullptr,
+                          nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_isDiscardingResults) {
+  swift_taskGroup_isDiscardingResults(nullptr);
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_addPending) {
   swift_taskGroup_addPending(nullptr, true);
 }

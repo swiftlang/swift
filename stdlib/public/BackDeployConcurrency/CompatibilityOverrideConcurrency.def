@@ -273,6 +273,21 @@ OVERRIDE_TASK_GROUP(taskGroup_isCancelled, bool,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
 
+OVERRIDE_TASK_GROUP(taskGroup_isDiscardingResults, bool,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (TaskGroup *group), (group))
+
+OVERRIDE_TASK_GROUP(taskGroup_wait_all, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                    swift::,
+                    (OpaqueValue *resultPointer,
+                        SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                        TaskGroup *_group,
+                        ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                        AsyncContext *callContext),
+                    (resultPointer, callerContext, _group, resumeFn,
+                        callContext))
+
 OVERRIDE_TASK_GROUP(taskGroup_cancelAll, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))

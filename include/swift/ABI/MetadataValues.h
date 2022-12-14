@@ -2387,8 +2387,9 @@ enum class TaskOptionRecordKind : uint8_t {
 class TaskGroupFlags : public FlagSet<uint32_t> {
 public:
   enum {
-    // 8 bits are un-used, in case we want to introduce a Kind here
-
+    // 8 bits are reserved for future use
+    /// Request the TaskGroup to immediately release completed tasks,
+    /// and not store their results. This also effectively disables `next()`.
     TaskGroup_DiscardResults = 8,
   };
 
@@ -2396,8 +2397,8 @@ public:
   constexpr TaskGroupFlags() {}
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(TaskGroup_DiscardResults,
-                                task_isDiscardResults,
-                                task_setIsDiscardResults)
+                                isDiscardResults,
+                                setIsDiscardResults)
 };
 
 /// Kinds of task group option records that can be passed to creating a task group.
