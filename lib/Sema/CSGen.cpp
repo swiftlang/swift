@@ -844,6 +844,9 @@ namespace {
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
 
+    /// A stack of pack element generic environments.
+    llvm::SmallVector<GenericEnvironment *, 2> PackElementEnvironments;
+
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -1083,6 +1086,10 @@ namespace {
     }
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
+
+    void addPackElementEnvironment(GenericEnvironment *env) {
+      PackElementEnvironments.push_back(env);
+    }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
       CS.recordFix(
@@ -2957,10 +2964,8 @@ namespace {
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
       auto *elementEnv = expr->getGenericEnvironment();
-      for (auto *binding : expr->getBindings()) {
-        auto type = visit(binding);
-        CS.setType(binding, type);
-      }
+      assert(PackElementEnvironments.back() == elementEnv);
+      PackElementEnvironments.pop_back();
 
       auto *patternLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
@@ -3989,6 +3994,10 @@ namespace {
         for (auto ignoredArg : ignoredArgs) {
           CS.markArgumentIgnoredForCodeCompletion(ignoredArg);
         }
+      }
+
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
+        CG.addPackElementEnvironment(expansion->getGenericEnvironment());
       }
 
       return Action::Continue(expr);
