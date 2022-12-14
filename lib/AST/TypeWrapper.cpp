@@ -18,13 +18,15 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/TypeWrappers.h"
 
 using namespace swift;
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
+Optional<TypeWrapperInfo> NominalTypeDecl::getTypeWrapper() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           GetTypeWrapper{mutableSelf}, nullptr);
+                           GetTypeWrapper{mutableSelf},
+                           Optional<TypeWrapperInfo>());
 }
 
 VarDecl *ConstructorDecl::getLocalTypeWrapperStorageVar() const {

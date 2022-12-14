@@ -1257,8 +1257,9 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
       {
         bool isClass = isa<ClassDecl>(parentType);
 
-        auto typeWrapper = parentType->getTypeWrapper();
-        auto *typeWrapperInit = typeWrapper->getTypeWrapperInitializer();
+        auto typeWrapperInfo = parentType->getTypeWrapper();
+        auto *typeWrapperInit =
+            typeWrapperInfo->Wrapper->getTypeWrapperInitializer();
         SILValue typeWrapperInitRef = createInitRef(typeWrapperInit);
 
         auto *self = TheMemory.findUninitializedSelfValue();

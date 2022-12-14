@@ -20,6 +20,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeWrappers.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -77,12 +78,6 @@ VarDecl *VarDecl::getUnderlyingTypeWrapperStorage() const {
                            nullptr);
 }
 
-struct TypeWrapperAttrInfo {
-  CustomAttr *Attr;
-  NominalTypeDecl *Wrapper;
-  NominalTypeDecl *AttachedTo;
-};
-
 static void
 getDeclaredProtocolConformances(NominalTypeDecl *decl,
                                 SmallVectorImpl<ProtocolDecl *> &protocols) {
@@ -110,9 +105,8 @@ getDeclaredProtocolConformances(NominalTypeDecl *decl,
   }
 }
 
-static void
-getTypeWrappers(NominalTypeDecl *decl,
-                SmallVectorImpl<TypeWrapperAttrInfo> &typeWrappers) {
+static void getTypeWrappers(NominalTypeDecl *decl,
+                            SmallVectorImpl<TypeWrapperInfo> &typeWrappers) {
   auto &ctx = decl->getASTContext();
 
   // Attributes applied directly to the type.
@@ -126,7 +120,8 @@ getTypeWrappers(NominalTypeDecl *decl,
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
     if (typeWrapper && typeWrapper->isValid())
-      typeWrappers.push_back({mutableAttr, nominal, decl});
+      typeWrappers.push_back(
+          {mutableAttr, nominal, decl, /*isInferred=*/false});
   }
 
   // Do not allow transitive protocol inference between protocols.
@@ -139,33 +134,33 @@ getTypeWrappers(NominalTypeDecl *decl,
   getDeclaredProtocolConformances(decl, protocols);
 
   for (auto *protocol : protocols) {
-    SmallVector<TypeWrapperAttrInfo, 2> inferredAttrs;
+    SmallVector<TypeWrapperInfo, 2> inferredAttrs;
     getTypeWrappers(protocol, inferredAttrs);
 
     // De-duplicate inferred type wrappers. This also makes sure
     // that if both protocol and conforming type explicitly declare
     // the same type wrapper there is no clash between them.
     for (const auto &inferredAttr : inferredAttrs) {
-      if (llvm::find_if(typeWrappers, [&](const TypeWrapperAttrInfo &attr) {
+      if (llvm::find_if(typeWrappers, [&](const TypeWrapperInfo &attr) {
             return attr.Wrapper == inferredAttr.Wrapper;
           }) == typeWrappers.end())
-        typeWrappers.push_back(inferredAttr);
+        typeWrappers.push_back(inferredAttr.asInferred());
     }
   }
 }
 
-NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+Optional<TypeWrapperInfo>
+GetTypeWrapper::evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
   // Note that we don't actually care whether there are duplicates,
   // using the same type wrapper multiple times is still an error.
-  SmallVector<TypeWrapperAttrInfo, 2> typeWrappers;
+  SmallVector<TypeWrapperInfo, 2> typeWrappers;
 
   getTypeWrappers(decl, typeWrappers);
 
   if (typeWrappers.empty())
-    return nullptr;
+    return None;
 
   if (typeWrappers.size() != 1) {
     ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers,
@@ -183,25 +178,21 @@ NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
       }
     }
 
-    return nullptr;
+    return None;
   }
 
-  return typeWrappers.front().Wrapper;
+  return typeWrappers.front();
 }
 
 Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  SmallVector<TypeWrapperAttrInfo, 2> typeWrappers;
-
-  getTypeWrappers(decl, typeWrappers);
-
-  if (typeWrappers.size() != 1)
+  auto typeWrapperInfo = decl->getTypeWrapper();
+  if (!typeWrapperInfo)
     return Type();
 
-  auto *typeWrapperAttr = typeWrappers.front().Attr;
   auto type = evaluateOrDefault(
       evaluator,
-      CustomAttrTypeRequest{typeWrapperAttr, decl->getDeclContext(),
+      CustomAttrTypeRequest{typeWrapperInfo->Attr, decl->getDeclContext(),
                             CustomAttrTypeKind::TypeWrapper},
       Type());
 
@@ -325,7 +316,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
                                  NominalTypeDecl *parent) const {
   auto &ctx = parent->getASTContext();
 
-  auto *typeWrapper = parent->getTypeWrapper();
+  auto typeWrapper = parent->getTypeWrapper();
   if (!typeWrapper)
     return nullptr;
 
@@ -339,10 +330,9 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
 
   // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(
-      typeWrapper, /*Parent=*/typeWrapperType->getParent(),
+      typeWrapper->Wrapper, /*Parent=*/typeWrapperType->getParent(),
       /*genericArgs=*/
-      {parent->getSelfInterfaceType(),
-       storage->getDeclaredInterfaceType()});
+      {parent->getSelfInterfaceType(), storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
                         VarDecl::Introducer::Var,
@@ -426,7 +416,7 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
         ctx, DeclBaseName::createSubscript(),
         {ctx.Id_wrappedSelf, ctx.Id_propertyKeyPath, ctx.Id_storageKeyPath});
 
-    auto *typeWrapper = parent->getTypeWrapper();
+    auto *typeWrapper = parent->getTypeWrapper()->Wrapper;
     auto candidates = typeWrapper->lookupDirect(subscriptName);
 
     if (!candidates.empty()) {

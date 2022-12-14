@@ -402,7 +402,7 @@ SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
               AwaitExpr *(const SourceFile *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
-              NominalTypeDecl *(NominalTypeDecl *),
+              Optional<TypeWrapperInfo>(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
               Type(NominalTypeDecl *),
