@@ -487,25 +487,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (IGM.getOptions().ForceStructTypeLayouts &&
-          typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
-        auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
-                                                 IGF.Builder.getInt8PtrTy());
-        auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
-                                                  IGF.Builder.getInt8PtrTy());
-        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr && "Failed to make layout string");
-        llvm::Value *metadata = &*(fn->arg_begin() + 2);
-        metadata->setName("typeMetadata");
-        auto *assignFn = IGF.IGM.getGenericAssignWithCopyFn();
-        auto *assignFnTy = IGF.IGM.getGenericAssignWithCopyFnType();
-        IGF.Builder.CreateCallWithoutDbgLoc(
-            assignFnTy, assignFn,
-            {destAddr, srcAddr,
-             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy)});
-      } else {
-        typeLayoutEntry->assignWithCopy(IGF, dest, src);
-      }
+      typeLayoutEntry->assignWithCopy(IGF, dest, src);
     } else {
       type.assignWithCopy(IGF, dest, src, concreteType, true);
     }
@@ -520,26 +502,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (IGM.getOptions().ForceStructTypeLayouts &&
-          typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
-        auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
-                                                 IGF.Builder.getInt8PtrTy());
-        auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
-                                                  IGF.Builder.getInt8PtrTy());
-
-        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr && "Failed to make layout string");
-        llvm::Value *metadata = &*(fn->arg_begin() + 2);
-        metadata->setName("typeMetadata");
-        auto *assignFn = IGF.IGM.getGenericAssignWithTakeFn();
-        auto *assignFnTy = IGF.IGM.getGenericAssignWithTakeFnType();
-        IGF.Builder.CreateCallWithoutDbgLoc(
-            assignFnTy, assignFn,
-            {destAddr, srcAddr,
-             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy)});
-      } else {
-        typeLayoutEntry->assignWithTake(IGF, dest, src);
-      }
+      typeLayoutEntry->assignWithTake(IGF, dest, src);
     } else {
       type.assignWithTake(IGF, dest, src, concreteType, true);
     }
@@ -553,23 +516,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (IGM.getOptions().ForceStructTypeLayouts &&
-          typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
-        auto castAddr = IGF.Builder.CreateBitCast(object.getAddress(),
-                                                  IGF.Builder.getInt8PtrTy());
-        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr && "Failed to make layout string");
-        llvm::Value *metadata = &*(fn->arg_begin() + 1);
-        metadata->setName("typeMetadata");
-        auto *destroyFn = IGF.IGM.getGenericDestroyFn();
-        auto *destroyFnTy = IGF.IGM.getGenericDestroyFnType();
-        IGF.Builder.CreateCallWithoutDbgLoc(
-            destroyFnTy, destroyFn,
-            {castAddr,
-             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy)});
-      } else {
-        typeLayoutEntry->destroy(IGF, object);
-      }
+      typeLayoutEntry->destroy(IGF, object);
     } else {
       type.destroy(IGF, object, concreteType, true);
     }
@@ -602,25 +549,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (IGM.getOptions().ForceStructTypeLayouts &&
-          typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
-        auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
-                                                 IGF.Builder.getInt8PtrTy());
-        auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
-                                                  IGF.Builder.getInt8PtrTy());
-        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr && "Failed to make layout string");
-        llvm::Value *metadata = &*(fn->arg_begin() + 2);
-        metadata->setName("typeMetadata");
-        auto *initFn = IGF.IGM.getGenericInitWithCopyFn();
-        auto *initFnTy = IGF.IGM.getGenericInitWithCopyFnType();
-        IGF.Builder.CreateCallWithoutDbgLoc(
-            initFnTy, initFn,
-            {destAddr, srcAddr,
-             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy)});
-      } else {
-        typeLayoutEntry->initWithCopy(IGF, dest, src);
-      }
+      typeLayoutEntry->initWithCopy(IGF, dest, src);
     } else {
       type.initializeWithCopy(IGF, dest, src, concreteType, true);
     }
@@ -636,26 +565,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      if (IGM.getOptions().ForceStructTypeLayouts &&
-          typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
-        auto srcAddr = IGF.Builder.CreateBitCast(src.getAddress(),
-                                                 IGF.Builder.getInt8PtrTy());
-        auto destAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
-                                                  IGF.Builder.getInt8PtrTy());
-
-        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
-        assert(layoutStr && "Failed to make layout string");
-        llvm::Value *metadata = &*(fn->arg_begin() + 2);
-        metadata->setName("typeMetadata");
-        auto *initFn = IGF.IGM.getGenericInitWithTakeFn();
-        auto *initFnTy = IGF.IGM.getGenericInitWithTakeFnType();
-        IGF.Builder.CreateCallWithoutDbgLoc(
-            initFnTy, initFn,
-            {destAddr, srcAddr,
-             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy)});
-      } else {
-        typeLayoutEntry->initWithTake(IGF, dest, src);
-      }
+      typeLayoutEntry->initWithTake(IGF, dest, src);
     } else {
       type.initializeWithTake(IGF, dest, src, concreteType, true);
     }

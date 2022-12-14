@@ -23,6 +23,7 @@ namespace swift {
 namespace irgen {
 
 class EnumTypeLayoutEntry;
+class LayoutStringBuilder;
 
 enum class TypeLayoutEntryKind : uint8_t {
   Empty,
@@ -107,6 +108,7 @@ public:
   virtual llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const;
   virtual llvm::Optional<std::vector<uint8_t>>
   layoutString(IRGenModule &IGM) const;
+  virtual void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const;
 
   virtual void destroy(IRGenFunction &IGF, Address addr) const;
 
@@ -199,6 +201,7 @@ public:
   llvm::Type *getStorageType(IRGenFunction &IGF) const;
   llvm::Optional<std::vector<uint8_t>>
   layoutString(IRGenModule &IGM) const override;
+  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -378,6 +381,7 @@ public:
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Optional<std::vector<uint8_t>>
   layoutString(IRGenModule &IGM) const override;
+  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 

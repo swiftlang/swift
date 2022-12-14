@@ -30,6 +30,137 @@
 using namespace swift;
 using namespace irgen;
 
+namespace swift {
+namespace irgen {
+
+class LayoutStringBuilder {
+public:
+  enum class ExtraInhabitantsKind : uint8_t {
+    Mask = 0,
+    Pointer = 1,
+  };
+
+  enum class RefCountingKind : uint8_t {
+    End = 0x00,
+    Error = 0x01,
+    NativeStrong = 0x02,
+    NativeUnowned = 0x03,
+    NativeWeak = 0x04,
+    Unknown = 0x05,
+    UnknownUnowned = 0x06,
+    UnknownWeak = 0x07,
+    Bridge = 0x08,
+    Block = 0x09,
+    ObjC = 0x0a,
+    Custom = 0x0b,
+
+    Skip = 0x80,
+    // We may use the MSB as flag that a count follows,
+    // so all following values are reserved
+    // Reserved: 0x81 - 0xFF
+  };
+
+private:
+  struct RefCounting {
+    RefCountingKind kind;
+    uint32_t count;
+  };
+
+  ExtraInhabitantsKind extraInhabitantsKind;
+  uintptr_t extraInhabitant;
+  uint32_t extraInhabitantOffset;
+  size_t size;
+  uint64_t alignment;
+
+  std::vector<RefCounting> refCountings;
+
+public:
+  LayoutStringBuilder() = default;
+  ~LayoutStringBuilder() = default;
+
+  void addSize(size_t s) { size += s; }
+
+  void setAlignment(uint64_t a) { alignment = std::max(alignment, a); }
+
+  void addRefCount(RefCountingKind kind, uint32_t count) {
+    assert(count > 0 && "Count must not be 0");
+    if (kind == RefCountingKind::Skip) {
+      if (refCountings.empty() ||
+          refCountings.back().kind != RefCountingKind::Skip) {
+        refCountings.push_back({kind, 0});
+      }
+      auto &refCounting = refCountings.back();
+
+      refCounting.count += count;
+    } else {
+      refCountings.push_back({kind, 1});
+    }
+  }
+
+  void result(std::vector<uint8_t> &layoutStr) const {
+    // extra inhabitants type tag, i.e. bitmask vs type pointer
+    layoutStr.push_back(static_cast<uint8_t>(extraInhabitantsKind));
+
+    // extra inhabitant mask/pointer pointer size
+    uint64_t extraInhabitantBE;
+    llvm::support::endian::write64be(&extraInhabitantBE, extraInhabitant);
+
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&extraInhabitantBE,
+                     (uint8_t *)(&extraInhabitantBE + 1));
+
+    // extra inhabitants field offset 32-bit
+    uint32_t extraInhabitantOffsetBE;
+    llvm::support::endian::write32be(&extraInhabitantOffsetBE,
+                                     extraInhabitantOffset);
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&extraInhabitantOffsetBE,
+                     (uint8_t *)(&extraInhabitantOffsetBE + 1));
+
+    uint32_t sizeBE;
+    llvm::support::endian::write32be(&sizeBE, size);
+
+    // size 32-bit
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&sizeBE,
+                     (uint8_t *)(&sizeBE + 1));
+
+    uint64_t alignmentBE;
+    llvm::support::endian::write64be(&alignmentBE, alignment);
+
+    // alignment 64-bit
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&alignmentBE,
+                     (uint8_t *)(&alignmentBE + 1));
+
+    // padding to 28 bytes
+    layoutStr.push_back(0);
+    layoutStr.push_back(0);
+    layoutStr.push_back(0);
+
+    uint32_t skip = 0;
+    for (auto &refCounting : refCountings) {
+      if (refCounting.kind == RefCountingKind::Skip) {
+        skip += refCounting.count;
+        continue;
+      }
+      // layoutStr.push_back(static_cast<uint8_t>(refCounting.kind));
+      if ((skip & (0xff << 24)) != skip) {
+        // TODO: crash and burn!!!
+      }
+
+      skip |= (static_cast<uint32_t>(refCounting.kind) << 24);
+
+      uint32_t skipBE = 0;
+      llvm::support::endian::write32be(&skipBE, skip);
+      layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
+                       (uint8_t *)(&skipBE + 1));
+      skip = 0;
+    }
+
+    // END
+    layoutStr.push_back(0x0);
+  }
+};
+}
+}
+
 ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) {
   switch (refCounting) {
   case ReferenceCounting::Native:
@@ -173,6 +304,11 @@ llvm::Optional<std::vector<uint8_t>>
 TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   assert(isEmpty());
   return {{}};
+}
+
+void TypeLayoutEntry::refCountString(IRGenModule &IGM,
+                                     LayoutStringBuilder &B) const {
+  // assert(isEmpty());
 }
 
 llvm::Value *TypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
@@ -864,6 +1000,51 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   }
 }
 
+void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
+                                           LayoutStringBuilder &B) const {
+  switch (scalarKind) {
+  case ScalarKind::ErrorReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Error, 1);
+    break;
+  case ScalarKind::NativeStrongReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
+    break;
+  case ScalarKind::NativeWeakReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeWeak, 1);
+    break;
+  case ScalarKind::UnknownWeakReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownWeak, 1);
+    break;
+  case ScalarKind::UnknownReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Unknown, 1);
+    break;
+  case ScalarKind::UnknownUnownedReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownUnowned, 1);
+    break;
+  case ScalarKind::BridgeReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Bridge, 1);
+    break;
+  case ScalarKind::BlockReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, 1);
+    break;
+  case ScalarKind::ObjCReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, 1);
+    break;
+  case ScalarKind::ThickFunc:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
+                  IGM.getPointerSize().getValue());
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
+    break;
+  case ScalarKind::POD:
+  default:
+    if (auto size = fixedSize(IGM)) {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
+                    size->getValue());
+    }
+    break;
+  }
+}
+
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   switch (scalarKind) {
   case ScalarKind::POD:
@@ -1248,66 +1429,27 @@ llvm::Value *AlignedGroupEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 
 llvm::Optional<std::vector<uint8_t>>
 AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
-  // a numFields (alignment,fieldLength,field)+
-  // ALIGNED_GROUP:= 'a' SIZE (ALIGNMENT SIZE VALUE)+
   std::vector<uint8_t> layoutStr;
-  for (auto *entry : entries) {
-    uint64_t alignmentMask;
-    if (entry->fixedAlignment(IGM)) {
-      alignmentMask = entry->fixedAlignment(IGM)->getMaskValue();
-    } else {
-      alignmentMask = UINT64_MAX;
-    }
-    switch (alignmentMask) {
-    case (1 << 0) - 1:
-      layoutStr.push_back('0');
-      break;
-    case (1 << 1) - 1:
-      layoutStr.push_back('1');
-      break;
-    case (1 << 2) - 1:
-      layoutStr.push_back('2');
-      break;
-    case (1 << 3) - 1:
-      layoutStr.push_back('3');
-      break;
-    case (1 << 4) - 1:
-      layoutStr.push_back('4');
-      break;
-    case (1 << 5) - 1:
-      layoutStr.push_back('5');
-      break;
-    case (1 << 6) - 1:
-      layoutStr.push_back('6');
-      break;
-    case (1 << 7) - 1:
-      layoutStr.push_back('7');
-      break;
-    case UINT64_MAX:
-      // Static alignment unknown, check type metadata at runtime
-      layoutStr.push_back('?');
-      break;
-    default:
-      assert(false && "unknown alignment mask");
-    }
-    auto entryStr = entry->layoutString(IGM);
-    if (!entryStr) {
-      return None;
-    }
-    uint32_t entryStrSize;
-    llvm::support::endian::write32be(&entryStrSize, entryStr->size());
-    layoutStr.insert(layoutStr.end(), (uint8_t *)(&entryStrSize),
-                     (uint8_t *)(&entryStrSize + 1));
-    layoutStr.insert(layoutStr.end(), entryStr->begin(), entryStr->end());
-  }
-  std::vector<uint8_t> header{'a'};
-  uint32_t payloadLen;
-  llvm::support::endian::write32be(&payloadLen, entries.size());
-  header.insert(header.end(), (uint8_t *)(&payloadLen),
-                (uint8_t *)(&payloadLen + 1));
 
-  layoutStr.insert(layoutStr.begin(), header.begin(), header.end());
+  LayoutStringBuilder B{};
+
+  if (auto size = fixedSize(IGM))
+    B.addSize(size->getValue());
+  if (auto alignment = fixedAlignment(IGM))
+    B.setAlignment(alignment->getValue());
+
+  refCountString(IGM, B);
+
+  B.result(layoutStr);
+
   return {layoutStr};
+}
+
+void AlignedGroupEntry::refCountString(IRGenModule &IGM,
+                                       LayoutStringBuilder &B) const {
+  for (auto *entry : entries) {
+    entry->refCountString(IGM, B);
+  }
 }
 
 static Address alignAddress(IRGenFunction &IGF, Address addr,

@@ -117,6 +117,26 @@ enum class LayoutType : char {
   ResilientType = 'R',
 };
 
+enum class RefCountingKind : uint8_t {
+  End = 0x00,
+  Error = 0x01,
+  NativeStrong = 0x02,
+  NativeUnowned = 0x03,
+  NativeWeak = 0x04,
+  Unknown = 0x05,
+  UnknownUnowned = 0x06,
+  UnknownWeak = 0x07,
+  Bridge = 0x08,
+  Block = 0x09,
+  ObjC = 0x0a,
+  Custom = 0x0b,
+
+  Skip = 0x80,
+  // We may use the MSB as flag that a count follows,
+  // so all following values are reserved
+  // Reserved: 0x81 - 0xFF
+};
+
 // The implemenation of this should be provided by the stdlib when we link this
 // into an executable/library.
 SWIFT_RUNTIME_EXPORT

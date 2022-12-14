@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "BytecodeLayouts.h"
+#include "../../public/runtime/WeakReference.h"
 #include "../../public/SwiftShims/swift/shims/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
@@ -257,9 +258,13 @@ T readBytes(const uint8_t *typeLayout, size_t &i) {
 
 template <>
 uint8_t readBytes<uint8_t>(const uint8_t *typeLayout, size_t &i) {
-  uint8_t returnVal = *(const uint8_t *)(typeLayout + i);
+  uint8_t returnVal = *(typeLayout + i);
   i += 1;
   return returnVal;
+}
+
+RefCountingKind readRefCountingKind(const uint8_t *typeLayout, size_t &i) {
+  return static_cast<RefCountingKind>(readBytes<uint8_t>(typeLayout, i));
 }
 
 AlignedGroup readAlignedGroup(const uint8_t *typeLayout, Metadata *metadata) {
@@ -869,430 +874,139 @@ uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
   return tag;
 }
 
-__attribute__((weak)) extern "C" void swift_generic_destroy(void *address,
-                                                            void *metadata) {
+typedef void (*DestrFn)(void*);
+
+struct DestroyFuncAndMask {
+  DestrFn fn;
+  uintptr_t mask;
+  bool isIndirect;
+};
+
+const DestroyFuncAndMask destroyTable[] = {
+    {nullptr, 0x0, false},
+    {(DestrFn)&swift_errorRelease, UINTPTR_MAX, true},
+    {(DestrFn)&swift_release, ~heap_object_abi::SwiftSpareBitsMask, true},
+    {(DestrFn)&swift_unownedRelease, ~heap_object_abi::SwiftSpareBitsMask,
+     true},
+    {(DestrFn)&swift_weakDestroy, UINTPTR_MAX, false},
+    {(DestrFn)&swift_unknownObjectRelease, ~heap_object_abi::SwiftSpareBitsMask,
+     true},
+    {(DestrFn)&swift_unknownObjectUnownedDestroy, UINTPTR_MAX, false},
+    {(DestrFn)&swift_unknownObjectWeakDestroy, UINTPTR_MAX, false},
+    {(DestrFn)&swift_bridgeObjectRelease, ~heap_object_abi::SwiftSpareBitsMask,
+     true},
+#if SWIFT_OBJC_INTEROP
+    {(DestrFn)&_Block_release, UINTPTR_MAX, true},
+    {(DestrFn)&objc_release, UINTPTR_MAX, true},
+#else
+    {nullptr, UINTPTR_MAX, true},
+#endif
+    // TODO: how to handle Custom?
+    {nullptr, UINTPTR_MAX, true},
+};
+
+__attribute__((weak)) extern "C" void
+swift_generic_destroy(void *address, void *metadata) {
   uint8_t *addr = (uint8_t *)address;
   Metadata *typedMetadata = (Metadata *)metadata;
 
   const uint8_t *typeLayout = typedMetadata->getLayoutString();
 
-  switch ((LayoutType)typeLayout[0]) {
-  case LayoutType::AlignedGroup: {
-    AlignedGroup group = readAlignedGroup(typeLayout, typedMetadata);
-    auto fields = group.fields;
-    for (unsigned fieldIdx = 0; fieldIdx < fields.size(); fieldIdx++) {
-      if (fields[fieldIdx].alignment == '?') {
-        switch ((LayoutType)fields[fieldIdx].fieldPtr[0]) {
-        case LayoutType::ArcheType: {
-          // Grab the index from the
-          // archetype and consult the metadata
-          size_t offset = 1;
-          // 'A' <index: UINT32>
-          uint32_t archetypeIndex =
-              readBytes<uint32_t>(fields[fieldIdx].fieldPtr, offset);
-          const Metadata *archetypeMetadata =
-              getGenericArgs((Metadata *)metadata)[archetypeIndex];
-          uint64_t alignMask =
-              archetypeMetadata->getValueWitnesses()->getAlignmentMask();
-          addr = (uint8_t *)((((uint64_t)addr) + alignMask) & (~alignMask));
-          archetypeMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
-                                                          archetypeMetadata);
-          addr += archetypeMetadata->getValueWitnesses()->getSize();
-          break;
-        }
-        case LayoutType::ResilientType: {
-          // 'R' <nameLength: uint32_t> <mangledName...>
-          size_t offset = 1;
-          const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
-          uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, offset);
-          const Metadata *resilientMetadata =
-              swift_getTypeByMangledNameInContext(
-                  (const char *)(fieldLayout + offset), mangledNameLength,
-                  nullptr,
-                  (const void *const *)getGenericArgs((Metadata *)metadata));
-          uint64_t alignMask =
-              resilientMetadata->getValueWitnesses()->getAlignmentMask();
-          addr = (uint8_t *)((((uint64_t)addr) + alignMask) & (~alignMask));
-          resilientMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
-                                                          resilientMetadata);
-          addr += resilientMetadata->getValueWitnesses()->getSize();
-          break;
-        }
-        default:
-          assert(
-              false &&
-              "Only Archetypes and Resilient types should have '?' alignment");
-        }
-      } else {
-        uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
-        uint64_t alignMask = shiftValue - 1;
-        addr = (uint8_t *)(((uint64_t)addr + alignMask) & (~alignMask));
-        swift_generic_destroy(addr, metadata);
-        addr += computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
-      }
-    }
-    return;
-  }
-  case LayoutType::I8:
-  case LayoutType::I16:
-  case LayoutType::I32:
-  case LayoutType::I64:
-  case LayoutType::I128:
-    return;
-  case LayoutType::ErrorReference:
-    swift_errorRelease(*(SwiftError **)addr);
-    return;
-  case LayoutType::NativeStrongReference:
-    swift_release((HeapObject *)MASK_PTR(*(void **)addr));
-    return;
-  case LayoutType::NativeUnownedReference:
-    swift_release((HeapObject *)MASK_PTR(*(void **)addr));
-    return;
-  case LayoutType::NativeWeakReference:
-    swift_weakDestroy((WeakReference *)MASK_PTR(*(void **)addr));
-    return;
-  case LayoutType::UnknownUnownedReference:
-    swift_unknownObjectUnownedDestroy(
-        (UnownedReference *)MASK_PTR(*(void **)addr));
-    return;
-  case LayoutType::UnknownWeakReference:
-    swift_unknownObjectWeakDestroy((WeakReference *)MASK_PTR(*(void **)addr));
-    return;
-  case LayoutType::BridgeReference:
-    swift_bridgeObjectRelease(*(HeapObject **)addr);
-    return;
-  case LayoutType::ObjCReference:
-#if SWIFT_OBJC_INTEROP
-    objc_release((*(id *)addr));
-    return;
-#else
-    assert(false && "Got ObjCReference, but ObjCInterop is Disabled");
-    return;
-#endif
-  case LayoutType::BlockReference:
-#if SWIFT_OBJC_INTEROP
-    Block_release(*(void **)addr);
-    return;
-#else
-    assert(false && "Got ObjCBlock, but ObjCInterop is Disabled");
-    return;
-#endif
-  case LayoutType::SinglePayloadEnum: {
-    // A Single Payload Enum has a payload iff its index is 0
-    uint32_t enumTag = getEnumTag(addr, typeLayout, typedMetadata);
-    if (enumTag == 0) {
-      auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
-      swift::swift_generic_destroy((void *)addr, metadata);
-    }
-    return;
-  }
-  case LayoutType::MultiPayloadEnum: {
-    MultiPayloadEnum e = readMultiPayloadEnum(typeLayout, typedMetadata);
-    uint32_t index = extractPayloadTag(e, addr);
+  // fixed data is 28 bytes
+  size_t offset = 28;
 
-    // Enum indices count payload cases first, then non payload cases. Thus a
-    // payload index will always be in 0...numPayloadCases-1
-    if (index < e.payloadLayoutPtr.size()) {
-      swift::swift_generic_destroy((void *)addr, metadata);
-    }
-    return;
-  }
-  case LayoutType::ArcheType: {
-    // Read 'A' <index: uint32_t>
-    // Kind is a pointer sized int at offset 0 of metadata pointer
-    size_t offset = 1;
-    uint32_t index = readBytes<uint32_t>(typeLayout, offset);
-    getGenericArgs(typedMetadata)[index]->getValueWitnesses()->destroy(
-        (OpaqueValue *)addr, getGenericArgs(typedMetadata)[index]);
-    return;
-  }
-  case LayoutType::ResilientType: {
-    // Read 'R'
-    size_t offset = 0;
-    readBytes<uint8_t>(typeLayout, offset);
-    uint32_t mangledNameLength = readBytes<uint32_t>(typeLayout, offset);
-    const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
-        (const char *)(typeLayout + offset), mangledNameLength, nullptr,
-        (const void *const *)getGenericArgs(typedMetadata));
+  do {
+    uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
+    uint8_t tag = (uint8_t)(skip >> 24);
+    skip &= ~(0xff << 24);
+    addr += skip;
 
-    resilientMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
-                                                    resilientMetadata);
-    return;
-  }
-  }
+    const auto &destroyFunc = destroyTable[tag];
+    if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
+      destroyFunc.fn((void *)((*(uintptr_t *)addr) & destroyFunc.mask));
+      addr += sizeof(void *);
+    } else {
+      destroyFunc.fn(((void *)addr));
+      addr += sizeof(void *);
+    }
+  } while (typeLayout[offset] != 0);
 }
 
-void swift_generic_initialize(void *dest, void *src, void *metadata,
-                              bool isTake) {
-  uint8_t *destAddr = (uint8_t *)dest;
-  uint8_t *srcAddr = (uint8_t *)src;
-  size_t offset = 0;
-  Metadata *typedMetadata = (Metadata *)metadata;
-  const uint8_t *typeLayout = typedMetadata->getLayoutString();
+struct RetainFuncAndMask {
+  void* fn;
+  uintptr_t mask;
+  bool isSingle;
+};
 
-  switch ((LayoutType)typeLayout[offset]) {
-  case LayoutType::AlignedGroup: {
-    AlignedGroup group = readAlignedGroup(typeLayout, typedMetadata);
-    auto fields = group.fields;
-    for (unsigned fieldIdx = 0; fieldIdx < fields.size(); fieldIdx++) {
-      if (fields[fieldIdx].alignment == '?') {
-        switch ((LayoutType)fields[fieldIdx].fieldPtr[0]) {
-        case LayoutType::ArcheType: {
-          // Grab the index from the
-          // archetype and consult the metadata
-          // 'A' <index: UINT32>
-          size_t offset = 1;
-          uint32_t archetypeIndex =
-              readBytes<uint32_t>(fields[fieldIdx].fieldPtr, offset);
-          const Metadata *archetypeMetadata =
-              getGenericArgs((Metadata *)metadata)[archetypeIndex];
-          uint64_t alignMask =
-              archetypeMetadata->getValueWitnesses()->getAlignmentMask();
-          destAddr =
-              (uint8_t *)((((uint64_t)destAddr) + alignMask) & (~alignMask));
-          srcAddr =
-              (uint8_t *)((((uint64_t)srcAddr) + alignMask) & (~alignMask));
-          if (isTake) {
-            archetypeMetadata->getValueWitnesses()->initializeWithTake(
-                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
-                archetypeMetadata);
-          } else {
-            archetypeMetadata->getValueWitnesses()->initializeWithCopy(
-                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
-                archetypeMetadata);
-          }
-          uint32_t size = archetypeMetadata->getValueWitnesses()->getSize();
-          srcAddr += size;
-          destAddr += size;
-          break;
-        }
-        case LayoutType::ResilientType: {
-          // 'R' <nameLength: uint32_t> <mangledName...>
-          size_t offset = 1;
-          const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
-          uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, offset);
-          const Metadata *resilientMetadata =
-              swift_getTypeByMangledNameInContext(
-                  (const char *)(fieldLayout + offset), mangledNameLength,
-                  nullptr,
-                  (const void *const *)getGenericArgs((Metadata *)metadata));
-          uint64_t alignMask =
-              resilientMetadata->getValueWitnesses()->getAlignmentMask();
-          destAddr =
-              (uint8_t *)((((uint64_t)destAddr) + alignMask) & (~alignMask));
-          srcAddr =
-              (uint8_t *)((((uint64_t)srcAddr) + alignMask) & (~alignMask));
-          if (isTake) {
-            resilientMetadata->getValueWitnesses()->initializeWithTake(
-                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
-                resilientMetadata);
-          } else {
-            resilientMetadata->getValueWitnesses()->initializeWithCopy(
-                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
-                resilientMetadata);
-          }
-          uint32_t size = resilientMetadata->getValueWitnesses()->getSize();
-          srcAddr += size;
-          destAddr += size;
-          break;
-        }
-        default:
-          assert(
-              false &&
-              "Only Archetypes and Resilient types should have '?' alignment");
-        }
-      } else {
-        uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
-        uint64_t alignMask = shiftValue - 1;
-        srcAddr = (uint8_t *)(((uint64_t)srcAddr + alignMask) & (~alignMask));
-        destAddr = (uint8_t *)(((uint64_t)destAddr + alignMask) & (~alignMask));
-        swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
-        unsigned size = computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
-        srcAddr += size;
-        destAddr += size;
-      }
-    }
-    return;
-  }
-  case LayoutType::I8:
-    memcpy(dest, src, 1);
-    return;
-  case LayoutType::I16:
-    memcpy(dest, src, 2);
-    return;
-  case LayoutType::I32:
-    memcpy(dest, src, 4);
-    return;
-  case LayoutType::I64:
-    memcpy(dest, src, 8);
-    return;
-  case LayoutType::I128:
-    memcpy(dest, src, 16);
-    return;
-  case LayoutType::ErrorReference:
-    *(void **)dest =
-        isTake ? *(void **)src : swift_errorRetain((SwiftError *)*(void **)src);
-    return;
-  case LayoutType::NativeStrongReference:
-  case LayoutType::NativeUnownedReference:
-    memcpy(dest, src, sizeof(void *));
-    if (!isTake)
-      swift_retain((HeapObject *)MASK_PTR(*(void **)destAddr));
-    return;
-  case LayoutType::NativeWeakReference:
-    swift_weakInit((WeakReference *)MASK_PTR(*(void **)srcAddr),
-                   *(HeapObject **)dest);
-    memcpy(dest, src, sizeof(void *));
-    return;
-  case LayoutType::UnknownUnownedReference:
-    swift_unknownObjectUnownedInit(
-        (UnownedReference *)MASK_PTR(*(void **)srcAddr),
-        *(HeapObject **)destAddr);
-    memcpy(dest, src, sizeof(void *));
-    return;
-  case LayoutType::UnknownWeakReference:
-    swift_unknownObjectWeakInit((WeakReference *)MASK_PTR(*(void **)srcAddr),
-                                *(HeapObject **)destAddr);
-    memcpy(dest, src, sizeof(void *));
-    return;
-  case LayoutType::BlockReference:
-#if SWIFT_OBJC_INTEROP
-    if (!isTake) {
-      *(void **)dest = Block_copy(*(void **)src);
-    } else {
-      memcpy(dest, src, sizeof(void *));
-    }
-    return;
-#else
-    assert(false && "Got ObjCBlock, but ObjCInterop is Disabled");
-    return;
-#endif
-  case LayoutType::BridgeReference: {
-    *(void **)dest =
-        isTake ? *(void **)src
-               : swift_bridgeObjectRetain((HeapObject *)*(void **)src);
-    return;
-  }
-  case LayoutType::ObjCReference:
-#if SWIFT_OBJC_INTEROP
-    if (!isTake)
-      objc_retain((id) * (void **)src);
-    memcpy(dest, src, sizeof(void *));
-    return;
-#else
-    assert(false && "Got ObjCReference, but ObjCInterop is Disabled");
-    return;
-#endif
-  case LayoutType::SinglePayloadEnum: {
-    // We have a payload iff the enum tag is 0
-    auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
-    if (getEnumTag(src, typeLayout, typedMetadata) == 0) {
-      swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
-    }
-    memcpy(destAddr, srcAddr, e.size);
-    return;
-  }
-  case LayoutType::MultiPayloadEnum: {
-    MultiPayloadEnum e = readMultiPayloadEnum(typeLayout, typedMetadata);
-    // numExtraInhabitants
-
-    BitVector payloadBits;
-    std::vector<uint8_t> wordVec;
-    size_t wordSize = sizeof(__swift_uintptr_t);
-    for (size_t i = 0; i < e.payloadSize(); i++) {
-      wordVec.push_back(srcAddr[i]);
-      if (wordVec.size() == wordSize) {
-        // The data we read will be in little endian, so we need to reverse it
-        // byte wise.
-        for (auto j = wordVec.rbegin(); j != wordVec.rend(); j++) {
-          payloadBits.add(*j);
-        }
-        wordVec.clear();
-      }
-    }
-
-    // If we don't have a multiple of 8 bytes, we need to top off
-    if (!wordVec.empty()) {
-      while (wordVec.size() < wordSize) {
-        wordVec.push_back(0);
-      }
-      for (auto i = wordVec.rbegin(); i != wordVec.rend(); i++) {
-        payloadBits.add(*i);
-      }
-    }
-
-    BitVector tagBits;
-    for (size_t i = 0; i < (e.extraTagBitsSpareBits.count() / 8); i++) {
-      tagBits.add(srcAddr[i]);
-    }
-
-    uint32_t index = extractPayloadTag(e, srcAddr);
-
-    // Enum indices count payload cases first, then non payload cases. Thus a
-    // payload index will always be in 0...numPayloadCases-1
-    if (index < e.payloadLayoutPtr.size()) {
-      swift_generic_initialize(destAddr, srcAddr, metadata, isTake);
-    }
-    // The initialize is only going to copy the contained payload. If the enum
-    // is actually larger than that because e.g. it has another case that is
-    // larger, those bytes, which may contain the enum index, will not be
-    // copied. We _could_ use the found layout string to compute the size of
-    // the runtime payload, then copy from the end if it to the size of the
-    // enum, however, it's probably faster to just re memcpy the whole thing.
-    memcpy(destAddr, srcAddr, e.size());
-    return;
-  }
-  case LayoutType::ArcheType: {
-    // Read 'A'
-    // Kind is a pointer sized int at offset 0 of metadata pointer
-    readBytes<uint8_t>(typeLayout, offset);
-    uint32_t index = readBytes<uint32_t>(typeLayout, offset);
-    const Metadata *fieldMetadata = getGenericArgs((Metadata *)metadata)[index];
-
-    if (isTake) {
-      fieldMetadata->getValueWitnesses()->initializeWithTake(
-          (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr, fieldMetadata);
-    } else {
-      fieldMetadata->getValueWitnesses()->initializeWithCopy(
-          (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr, fieldMetadata);
-    }
-    uint32_t size = fieldMetadata->getValueWitnesses()->getSize();
-    srcAddr += size;
-    destAddr += size;
-    break;
-  }
-  case LayoutType::ResilientType: {
-    // Read 'R'
-    readBytes<uint8_t>(typeLayout, offset);
-    uint32_t mangledNameLength = readBytes<uint32_t>(typeLayout, offset);
-    const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
-        (const char *)(typeLayout + offset), mangledNameLength, nullptr,
-        (const void *const *)getGenericArgs(typedMetadata));
-
-    if (isTake) {
-      resilientMetadata->getValueWitnesses()->initializeWithTake(
-          (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr, resilientMetadata);
-    } else {
-      resilientMetadata->getValueWitnesses()->initializeWithCopy(
-          (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr, resilientMetadata);
-    }
-    offset += mangledNameLength;
-    uint32_t size = resilientMetadata->getValueWitnesses()->getSize();
-    srcAddr += size;
-    destAddr += size;
-    break;
-  }
-  }
+void Block_copyForwarder(void **dest, const void **src) {
+  *dest = _Block_copy(*src);
 }
+
+typedef void (*RetainFn)(void *);
+typedef void (*CopyInitFn)(void *, void *);
+
+const RetainFuncAndMask retainTable[] = {
+    {nullptr, 0x0, false},
+    {(void *)&swift_errorRetain, UINTPTR_MAX, true},
+    {(void *)&swift_retain, ~heap_object_abi::SwiftSpareBitsMask, true},
+    {(void *)&swift_unownedRetain, ~heap_object_abi::SwiftSpareBitsMask, true},
+    {(void *)&swift_weakCopyInit, UINTPTR_MAX, false},
+    {(void *)&swift_unknownObjectRetain, ~heap_object_abi::SwiftSpareBitsMask,
+     true},
+    {(void *)&swift_unknownObjectUnownedCopyInit, UINTPTR_MAX, false},
+    {(void *)&swift_unknownObjectWeakCopyInit, UINTPTR_MAX, false},
+    {(void *)&swift_bridgeObjectRetain, ~heap_object_abi::SwiftSpareBitsMask,
+     true},
+#if SWIFT_OBJC_INTEROP
+    {(void *)&Block_copyForwarder, UINTPTR_MAX, false},
+    {(void *)&objc_retain, UINTPTR_MAX, true},
+#else
+    {nullptr, UINTPTR_MAX, true},
+#endif
+    // TODO: how to handle Custom?
+    {nullptr, UINTPTR_MAX, true},
+};
 
 __attribute__((weak)) extern "C" void
 swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
-  swift_generic_initialize(dest, src, metadata, /*isTake*/ false);
+  uintptr_t addrOffset = 0;
+  Metadata *typedMetadata = (Metadata *)metadata;
+  const uint8_t *typeLayout = typedMetadata->getLayoutString();
+
+  size_t offset = 13;
+  size_t size = readBytes<uint32_t>(typeLayout, offset);
+
+  // fixed data is 28 bytes
+  offset = 28;
+
+  memcpy(dest, src, size);
+
+  do {
+    uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
+    auto tag = static_cast<uint8_t>(skip >> 24);
+    skip &= ~(0xff << 24);
+    addrOffset += skip;
+
+    const auto &retainFunc = retainTable[tag];
+    if (SWIFT_LIKELY(retainFunc.isSingle)) {
+      ((RetainFn)retainFunc.fn)(*(void **)((uintptr_t)dest + addrOffset));
+      addrOffset += sizeof(void *);
+    } else {
+      ((CopyInitFn)retainFunc.fn)((void *)((uintptr_t)dest + addrOffset),
+                                  (void *)((uintptr_t)src + addrOffset));
+      addrOffset += sizeof(void *);
+    }
+  } while (typeLayout[offset] != 0);
 }
 
 __attribute__((weak)) extern "C" void
 swift_generic_initWithTake(void *dest, void *src, void *metadata) {
-  swift_generic_initialize(dest, src, metadata, /*isTake*/ true);
+  Metadata *typedMetadata = (Metadata *)metadata;
+  const uint8_t *typeLayout = typedMetadata->getLayoutString();
+  size_t offset = 13;
+  size_t size = readBytes<uint32_t>(typeLayout, offset);
+
+  memcpy(dest, src, size);
 }
 
 __attribute__((weak)) extern "C" void
