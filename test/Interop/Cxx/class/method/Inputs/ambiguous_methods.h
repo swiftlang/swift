@@ -47,4 +47,13 @@ struct HasAmbiguousMethods2 {
   }
 };
 
+struct Unsafe {
+  int *ptr;
+};
+
+struct HasAmbiguousUnsafeMethods {
+  Unsafe getUnsafe() const { return Unsafe(); }
+  Unsafe getUnsafe() { return Unsafe(); }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_AMBIGUOUS_METHOD_METHODS_H
