@@ -3141,6 +3141,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+    printCommon("pack_reference");
+    printRec(T->getPackType());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTupleTypeRepr(TupleTypeRepr *T) {
     printCommon("type_tuple");
 

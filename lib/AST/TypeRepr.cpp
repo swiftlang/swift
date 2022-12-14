@@ -413,6 +413,12 @@ void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << "...";
 }
 
+void PackReferenceTypeRepr::printImpl(ASTPrinter &Printer,
+                                      const PrintOptions &Opts) const {
+  Printer.printKeyword("each", Opts, /*Suffix=*/" ");
+  printTypeRepr(PackType, Printer, Opts);
+}
+
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);

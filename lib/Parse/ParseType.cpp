@@ -780,8 +780,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
-  // Check for the opaque modifier.
-  // This is only semantically allowed in certain contexts, but we parse it
+  // Check for the contextual keyword modifiers on types.
+  // These are only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
   SourceLoc opaqueLoc;
   SourceLoc anyLoc;
@@ -793,6 +793,16 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // Treat any as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     anyLoc = consumeToken();
+  } else if (Tok.isContextualKeyword("each")) {
+    // Treat 'each' as a keyword.
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
+    SourceLoc eachLoc = consumeToken();
+    ParserResult<TypeRepr> packRef = parseTypeSimple(MessageID, reason);
+    if (packRef.isNull())
+      return packRef;
+
+    auto *typeRepr = new (Context) PackReferenceTypeRepr(eachLoc, packRef.get());
+    return makeParserResult(ParserStatus(packRef), typeRepr);
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
@@ -1392,6 +1402,8 @@ bool Parser::canParseType() {
   if (Tok.isContextualKeyword("some")) {
     consumeToken();
   } else if (Tok.isContextualKeyword("any")) {
+    consumeToken();
+  } else if (Tok.isContextualKeyword("each")) {
     consumeToken();
   }
 
