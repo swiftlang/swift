@@ -3679,11 +3679,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   while (!resultDC->isModuleScopeContext()) {
     if (isa<TopLevelCodeDecl>(resultDC)) {
       return AccessScope(resultDC->getModuleScopeContext(),
-                         access == AccessLevel::Private);
+                         access == AccessLevel::Private ? AccessLimitKind::Private : AccessLimitKind::None);
     }
 
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
-      return AccessScope(resultDC, /*private*/true);
+      return AccessScope(resultDC, AccessLimitKind::Private);
 
     if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
@@ -3714,10 +3714,10 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
     assert(resultDC->isModuleScopeContext());
-    return AccessScope(resultDC, access == AccessLevel::Private);
+    return AccessScope(resultDC, access == AccessLevel::Private ? AccessLimitKind::Private : AccessLimitKind::None);
   case AccessLevel::Internal:
   case AccessLevel::Package:
-    return AccessScope(resultDC->getParentModule());
+    return AccessScope::getPackage();
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
@@ -3752,18 +3752,20 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
   if (accessScope.getDeclContext() == useDC) return true;
   if (!AccessScope(useDC).isChildOf(accessScope)) return false;
-
   if (!useDC) return true;
   auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-  auto parentModuleMatched = VD->getDeclContext()->getParentModule() == useDC->getParentModule();
+  auto importedModule = VD->getDeclContext()->getParentModule();
+  auto curModule = useDC->getParentModule();
+  auto pkgMatched = importedModule->getPackageName() == curModule->getPackageName();
+  auto parentModuleMatched = importedModule == curModule;
+
   // Check SPI access
   if (VD->isSPI()) {
-      return !useSF || useSF->isImportedAsSPI(VD) || parentModuleMatched;
+    return !useSF || useSF->isImportedAsSPI(VD) || parentModuleMatched;
   }
-  // Check @package access
-//  if (VD->isPackage()) {
-//      return !useSF || useSF->isImportedAsPackage(VD) || parentModuleMatched;
-//  }
+  if (access == AccessLevel::Package) {
+    return !useSF || pkgMatched;
+  }
   return true;
 }
 

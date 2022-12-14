@@ -2100,8 +2100,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
     LLVM_FALLTHROUGH;
   case AccessLevel::FilePrivate: {
     const DeclContext *DC = ED->getModuleScopeContext();
-    bool isPrivate = (userSpecifiedAccess == AccessLevel::Private);
-    desiredAccessScope = AccessScope(DC, isPrivate);
+    desiredAccessScope = AccessScope(DC, userSpecifiedAccess == AccessLevel::Private ? AccessLimitKind::Private : AccessLimitKind::None);
     break;
   }
   case AccessLevel::Internal:

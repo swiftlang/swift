@@ -20,6 +20,12 @@
 
 namespace swift {
 
+enum class AccessLimitKind: uint8_t {
+  None = 0,
+  Private,
+  Package
+};
+
 /// The wrapper around the outermost DeclContext from which
 /// a particular declaration can be accessed.
 class AccessScope {
@@ -28,13 +34,14 @@ class AccessScope {
   /// If the declaration context is set, the bit means that the scope is
   /// private or not. If the declaration context is null, the bit means that
   /// this scope is SPI or not.
-  llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
+  llvm::PointerIntPair<const DeclContext *, 2, AccessLimitKind> Value;
 
 public:
-  AccessScope(const DeclContext *DC, bool isPrivate = false);
+  AccessScope(const DeclContext *DC, AccessLimitKind limitKind = AccessLimitKind::None);
 
-  static AccessScope getPublic() { return AccessScope(nullptr, false); }
- 
+  static AccessScope getPublic() { return AccessScope(nullptr, AccessLimitKind::None); }
+  static AccessScope getPackage() { return AccessScope(nullptr, AccessLimitKind::Package); }
+
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
   /// also allow access.
@@ -49,21 +56,31 @@ public:
     return getDeclContext() == RHS.getDeclContext();
   }
 
-  bool isPublic() const { return !Value.getPointer(); }
-  bool isPrivate() const { return Value.getPointer() && Value.getInt(); }
+  bool isPublic() const { return !Value.getPointer() && Value.getInt() == AccessLimitKind::None; }
+  bool isPrivate() const { return Value.getPointer() && Value.getInt() == AccessLimitKind::Private; }
   bool isFileScope() const;
   bool isInternal() const;
-  bool isPackage() const;
+  bool isPackage() const { return !Value.getPointer() && Value.getInt() == AccessLimitKind::Package; }
 
-  /// Returns true if this is a child scope of the specified other access scope.
-  ///
+  /// Returns true if this is a child scope of the specified other access scope, in the order of
+  /// `private < fileprivate < internal < package < public < open`
   /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
-    if (!isPublic() && !AS.isPublic())
-      return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
-    if (isPublic() && AS.isPublic())
-      return false;
-    return AS.isPublic();
+    if (isLessThanPackage()) {
+      if (AS.isLessThanPackage())
+        return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
+      else
+        return AS.isPackage() || AS.isPublic();
+    }
+    if (isPackage())
+      return AS.isPublic();
+
+    // If this.isPublic() then false regardless of AS level
+    return false;
+  }
+
+  bool isLessThanPackage() const {
+    return isPrivate() || isFileScope() || isInternal();
   }
 
   /// Returns the associated access level for diagnostic purposes.
