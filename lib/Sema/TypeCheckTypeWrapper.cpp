@@ -84,6 +84,33 @@ struct TypeWrapperAttrInfo {
 };
 
 static void
+getDeclaredProtocolConformances(NominalTypeDecl *decl,
+                                SmallVectorImpl<ProtocolDecl *> &protocols) {
+  for (unsigned i : indices(decl->getInherited())) {
+    auto inheritedType = evaluateOrDefault(
+        decl->getASTContext().evaluator,
+        InheritedTypeRequest{decl, i, TypeResolutionStage::Interface}, Type());
+
+    if (!(inheritedType && inheritedType->isConstraintType()))
+      continue;
+
+    if (auto *protocol =
+            dyn_cast_or_null<ProtocolDecl>(inheritedType->getAnyNominal())) {
+      protocols.push_back(protocol);
+    }
+
+    if (auto composition = inheritedType->getAs<ProtocolCompositionType>()) {
+      for (auto member : composition->getMembers()) {
+        if (auto *protocol =
+                dyn_cast_or_null<ProtocolDecl>(member->getAnyNominal())) {
+          protocols.push_back(protocol);
+        }
+      }
+    }
+  }
+}
+
+static void
 getTypeWrappers(NominalTypeDecl *decl,
                 SmallVectorImpl<TypeWrapperAttrInfo> &typeWrappers) {
   auto &ctx = decl->getASTContext();
@@ -108,18 +135,10 @@ getTypeWrappers(NominalTypeDecl *decl,
 
   // Attributes inferred from (explicit) protocol conformances
   // associated with the declaration of the type.
-  for (unsigned i : indices(decl->getInherited())) {
-    auto inheritedType = evaluateOrDefault(
-        ctx.evaluator,
-        InheritedTypeRequest{decl, i, TypeResolutionStage::Interface}, Type());
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(decl, protocols);
 
-    if (!(inheritedType && inheritedType->isConstraintType()))
-      continue;
-
-    auto *protocol = inheritedType->getAnyNominal();
-    if (!protocol)
-      continue;
-
+  for (auto *protocol : protocols) {
     SmallVector<TypeWrapperAttrInfo, 2> inferredAttrs;
     getTypeWrappers(protocol, inferredAttrs);
 
@@ -219,6 +238,54 @@ TypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
                            GetTypeWrapperStorage{mutableSelf}, nullptr);
 }
 
+static AccessLevel
+getAccessLevelForTypeWrapperStorage(NominalTypeDecl *attachedTo) {
+  auto &ctx = attachedTo->getASTContext();
+
+  if (isa<ProtocolDecl>(attachedTo))
+    return attachedTo->getFormalAccess();
+
+  llvm::SmallDenseMap<ProtocolDecl *, bool, 4> visitedProtocols;
+  std::function<bool(ProtocolDecl *)> hasPublicStorageAssociatedType =
+      [&](ProtocolDecl *protocol) {
+        if (visitedProtocols.count(protocol))
+          return visitedProtocols[protocol];
+
+        auto recordResult = [&](ProtocolDecl *P, bool hasWrapper) {
+          visitedProtocols[P] = hasWrapper;
+          return hasWrapper;
+        };
+
+        if (auto *storage =
+                protocol->getAssociatedType(ctx.Id_TypeWrapperStorage)) {
+          if (storage->getFormalAccess() == AccessLevel::Public)
+            return recordResult(protocol, true);
+        }
+
+        // Recursively check whether any of the parents have that
+        // requirement.
+        for (auto *parent : protocol->getProtocolDependencies()) {
+          bool hasPublicStorage = hasPublicStorageAssociatedType(parent);
+          (void)recordResult(parent, hasPublicStorage);
+
+          if (hasPublicStorage)
+            return recordResult(protocol, true);
+        }
+
+        return recordResult(protocol, false);
+      };
+
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(attachedTo, protocols);
+
+  for (auto *protocol : protocols) {
+    if (hasPublicStorageAssociatedType(protocol))
+      return AccessLevel::Public;
+  }
+
+  return AccessLevel::Internal;
+}
+
 TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
                                           NominalTypeDecl *parent) const {
   if (!parent->hasTypeWrapper())
@@ -246,7 +313,7 @@ TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
 
   storage->setImplicit();
   storage->setSynthesized();
-  storage->setAccess(AccessLevel::Internal);
+  storage->setAccess(getAccessLevelForTypeWrapperStorage(parent));
 
   parent->addMember(storage);
 
@@ -278,7 +345,8 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
        storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
-                        VarDecl::Introducer::Var, AccessLevel::Internal);
+                        VarDecl::Introducer::Var,
+                        getAccessLevelForTypeWrapperStorage(parent));
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
