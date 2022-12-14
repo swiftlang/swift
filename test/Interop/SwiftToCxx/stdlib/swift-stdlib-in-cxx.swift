@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
 // RUN: %FileCheck %s < %t/Swift.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -Wno-unused-private-field -Wno-unused-function -Wno-shadow)
+// RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wno-shadow)
 
 // FIXME: remove need for -Wno-shadow
 
@@ -87,6 +87,12 @@
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
+// CHECK-NEXT: #ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+// CHECK-NEXT: inline __attribute__((always_inline)) String(const std::string &str) noexcept {
+// CHECK-NEXT:      auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
+// CHECK-NEXT:      memcpy(_getOpaquePointer(), &res, sizeof(res));
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
 // CHECK-NEXT: private:
 
 // CHECK: #if __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
