@@ -429,8 +429,13 @@ void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
   auto &ctx = nominal->getASTContext();
 
   for (auto kind : synthesizedProtocolAttrs) {
-    nominal->getAttrs().add(
-        new (ctx) SynthesizedProtocolAttr(kind, this, isUnchecked));
+    // This is unfortunately not an error because some test use mock protocols.
+    // If those tests were updated, we could assert that
+    // ctx.getProtocol(kind) != nulltpr which would be nice.
+    if (auto proto = ctx.getProtocol(kind))
+      nominal->getAttrs().add(
+          new (ctx) SynthesizedProtocolAttr(ctx.getProtocol(kind), this,
+                                            isUnchecked));
   }
 }
 
@@ -2611,21 +2616,70 @@ namespace {
       }
 
       auto result = VisitRecordDecl(decl);
+      if (!result)
+        return nullptr;
 
-      if (auto classDecl = dyn_cast_or_null<ClassDecl>(result))
+      if (auto classDecl = dyn_cast<ClassDecl>(result))
         validateForeignReferenceType(decl, classDecl);
 
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
       auto clangModule = decl->getOwningModule();
       if (clangModule && requiresCPlusPlus(clangModule)) {
-        if (auto structDecl = dyn_cast_or_null<NominalTypeDecl>(result)) {
-          conformToCxxIteratorIfNeeded(Impl, structDecl, decl);
-          conformToCxxSequenceIfNeeded(Impl, structDecl, decl);
-        }
+        auto nominalDecl = cast<NominalTypeDecl>(result);
+        conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
       }
 
+      addExplicitProtocolConformances(cast<NominalTypeDecl>(result));
+
       return result;
+    }
+
+    void addExplicitProtocolConformances(NominalTypeDecl *decl) {
+      auto clangDecl = decl->getClangDecl();
+
+      if (!clangDecl->hasAttrs())
+        return;
+
+      SmallVector<ValueDecl *, 1> results;
+      auto conformsToAttr =
+          llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
+            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+              return swiftAttr->getAttribute().startswith("conforms_to:");
+            return false;
+          });
+      if (conformsToAttr == clangDecl->getAttrs().end())
+        return;
+
+      auto name = cast<clang::SwiftAttrAttr>(*conformsToAttr)
+                      ->getAttribute()
+                      .drop_front(StringRef("conforms_to:").size())
+                      .str();
+
+      for (auto &module : Impl.SwiftContext.getLoadedModules()) {
+        module.second->lookupValue(Impl.SwiftContext.getIdentifier(name),
+                                   NLKind::UnqualifiedLookup, results);
+      }
+
+      if (results.empty()) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, name);
+        return;
+      } else if (results.size() != 1) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, name);
+        return;
+      }
+
+      auto result = results.front();
+      if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
+        decl->getAttrs().add(
+            new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
+      } else {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol, name);
+      }
     }
 
     bool isSpecializationDepthGreaterThan(
@@ -5126,10 +5180,11 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   if (inheritanceListContainsProtocol(nominal, proto))
     return true;
 
-  for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
-    if (auto *otherProto = ctx.getProtocol(attr->getProtocolKind()))
-      if (otherProto == proto || otherProto->inheritsFrom(proto))
-        return true;
+  for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    auto *otherProto = attr->getProtocol();
+    if (otherProto == proto || otherProto->inheritsFrom(proto))
+      return true;
+  }
 
   // Only consider extensions from the original module...or from an overlay
   // or the Swift half of a mixed-source framework.
