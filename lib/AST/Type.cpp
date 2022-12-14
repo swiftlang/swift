@@ -4024,7 +4024,8 @@ ElementArchetypeType::ElementArchetypeType(
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
     : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
-                         RecursiveTypeProperties::HasArchetype,
+                         RecursiveTypeProperties::HasArchetype |
+                         RecursiveTypeProperties::HasElementArchetype,
                          InterfaceType,
                          ConformsTo, Superclass, Layout, GenericEnv) {
 }

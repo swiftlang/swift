@@ -168,7 +168,10 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    Last_Property = HasParameterizedExistential
+    /// This type contains an ElementArchetype.
+    HasElementArchetype = 0x4000,
+
+    Last_Property = HasElementArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -212,8 +215,18 @@ public:
   bool hasDependentMember() const { return Bits & HasDependentMember; }
 
   /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
+
+  /// Does a type with these properties structurally contain an
+  /// opened element archetype?
+  bool hasElementArchetype() const { return Bits & HasElementArchetype; }
+
+  /// Does a type with these properties structurally contain a local
+  /// archetype?
+  bool hasLocalArchetype() const {
+    return hasOpenedExistential() || hasElementArchetype();
+  }
 
   /// Does a type with these properties structurally contain a
   /// reference to DynamicSelf?
@@ -627,6 +640,16 @@ public:
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
+  }
+
+  /// Determine whether the type involves an opened element archetype.
+  bool hasElementArchetype() const {
+    return getRecursiveProperties().hasElementArchetype();
+  }
+
+  /// Determine whether the type involves a local archetype.
+  bool hasLocalArchetype() const {
+    return getRecursiveProperties().hasLocalArchetype();
   }
 
   bool hasParameterPack() const {
