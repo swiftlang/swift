@@ -1891,6 +1891,7 @@ void SwiftLangSupport::getCursorInfo(
     bool SymbolGraph, bool CancelOnSubsequentRequest,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
+    bool VerifySolverBasedCursorInfo,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
 
   std::string error;
@@ -1967,11 +1968,6 @@ void SwiftLangSupport::getCursorInfo(
   // Currently, we only verify that the solver-based cursor implementation
   // produces the same results as the AST-based implementation. Only enable it
   // in assert builds for now.
-#ifndef NDEBUG
-  bool EnableSolverBasedCursorInfo = true;
-#else
-  bool EnableSolverBasedCursorInfo = false;
-#endif
 
   // If solver based completion is enabled, a string description of the cursor
   // info result produced by the solver-based implementation. Once the AST-based
@@ -1979,7 +1975,7 @@ void SwiftLangSupport::getCursorInfo(
   // AST-based result.
   std::string SolverBasedResultDescription;
   size_t SolverBasedResultCount = 0;
-  if (EnableSolverBasedCursorInfo) {
+  if (VerifySolverBasedCursorInfo) {
     std::string InputFileError;
     llvm::SmallString<64> RealInputFilePath;
     fileSystem->getRealPath(InputFile, RealInputFilePath);
