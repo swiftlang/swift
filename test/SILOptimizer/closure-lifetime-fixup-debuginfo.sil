@@ -18,10 +18,10 @@ associatedtype Index
 // CHECK:         [[CAPTURED_ADDR:%[^,]+]] = alloc_stack $Self
 // CHECK:         try_apply {{.*}}, normal [[SUCCESS:bb[0-9]+]]
 // CHECK:       [[SUCCESS]]
-// CHECK:         destroy_addr [[CAPTURED_ADDR]]{{.*}}  // id: {{%[^,]+}}; <invalid loc>:cleanup:auto_gen
-//                                                                                       ^^^^^^^
-// CHECK:         dealloc_stack [[CAPTURED_ADDR]]{{.*}} // id: {{%[^,]+}}; <invalid loc>:cleanup:auto_gen
-//                                                                                       ^^^^^^^
+// CHECK:         destroy_addr [[CAPTURED_ADDR]]{{.*}}:cleanup:
+//                                                     ^^^^^^^
+// CHECK:         dealloc_stack [[CAPTURED_ADDR]]{{.*}}:cleanup:
+//                                                      ^^^^^^^
 // CHECK-LABEL: } // end sil function 'destroy_and_dealloc_of_capture_are_cleanups'
 sil [ossa] @destroy_and_dealloc_of_capture_are_cleanups : $@convention(method) <Self where Self : Indexable> (@in Self) -> () {
 bb0(%self : $*Self):
