@@ -373,6 +373,14 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
     deleter.forceDelete(bi);
     return true;
   }
+  if (auto *mti = dyn_cast<MetatypeInst>(inst)) {
+    // Remove dead `metatype` instructions which only have `debug_value` uses.
+    // We lose debug info for such type variables, but this is a compromise we
+    // need to accept to get allocation/lock free code.
+    if (onlyHaveDebugUses(mti)) {
+      deleter.forceDeleteWithUsers(mti);
+    }
+  }
   return false;
 }
 
