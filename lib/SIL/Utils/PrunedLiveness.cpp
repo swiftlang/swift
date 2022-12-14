@@ -318,10 +318,6 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
       updateForUse(use->getUser(), /*lifetimeEnding*/false);
       break;
     }
-    case OperandOwnership::GuaranteedForwardingPhi: {
-      updateForDef(PhiOperand(use).getValue());
-      break;
-    }
     default:
       updateForUse(use->getUser(), use->isLifetimeEnding());
       break;

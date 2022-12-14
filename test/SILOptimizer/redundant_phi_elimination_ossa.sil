@@ -183,8 +183,6 @@ bb2:
   br bb3(%0 : $FakeOptional<Klass>, %0 : $FakeOptional<Klass>)
 
 bb3(%1 : @guaranteed $FakeOptional<Klass>, %2 : @guaranteed $FakeOptional<Klass>):
-  end_borrow %1 : $FakeOptional<Klass>
-  end_borrow %2 : $FakeOptional<Klass>
   %res = tuple ()
   return %res : $()
 }
@@ -195,17 +193,18 @@ bb3(%1 : @guaranteed $FakeOptional<Klass>, %2 : @guaranteed $FakeOptional<Klass>
 sil [ossa] @test_redundantguaranteedphiarg2 : $@convention(thin) () -> () {
 bb0:
   %0 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt 
+  %b = begin_borrow %0 : $FakeOptional<Klass>
   cond_br undef, bb1, bb2
 
 bb1:
-  br bb3(%0 : $FakeOptional<Klass>, %0 : $FakeOptional<Klass>)
+  br bb3(%0 : $FakeOptional<Klass>, %b : $FakeOptional<Klass>)
 
 bb2:
-  br bb3(%0 : $FakeOptional<Klass>, %0 : $FakeOptional<Klass>)
+  br bb3(%0 : $FakeOptional<Klass>, %b : $FakeOptional<Klass>)
 
 bb3(%1 : @owned $FakeOptional<Klass>, %2 : @guaranteed $FakeOptional<Klass>):
-  destroy_value %1 : $FakeOptional<Klass>
   end_borrow %2 : $FakeOptional<Klass>
+  destroy_value %1 : $FakeOptional<Klass>
   %res = tuple ()
   return %res : $()
 }
@@ -216,13 +215,15 @@ bb3(%1 : @owned $FakeOptional<Klass>, %2 : @guaranteed $FakeOptional<Klass>):
 sil [ossa] @test_redundantguaranteedphiarg3 : $@convention(thin) () -> () {
 bb0:
   %0 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt 
+  %b1 = begin_borrow %0 : $FakeOptional<Klass>
+  %b2 = begin_borrow %0 : $FakeOptional<Klass>
   cond_br undef, bb1, bb2
 
 bb1:
-  br bb3(%0 : $FakeOptional<Klass>, %0 : $FakeOptional<Klass>)
+  br bb3(%b1 : $FakeOptional<Klass>, %b2 : $FakeOptional<Klass>)
 
 bb2:
-  br bb3(%0 : $FakeOptional<Klass>, %0 : $FakeOptional<Klass>)
+  br bb3(%b1 : $FakeOptional<Klass>, %b2 : $FakeOptional<Klass>)
 
 bb3(%1 : @guaranteed $FakeOptional<Klass>, %2 : @guaranteed $FakeOptional<Klass>):
   cond_br undef, bb4, bb5

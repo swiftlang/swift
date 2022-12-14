@@ -164,10 +164,16 @@ bool CheckerLivenessInfo::compute() {
         // A forwarding borrow is validated as part of its parent borrow. So
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
-        for (SILValue result : user->getResults()) {
+        ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+          if (auto *arg = dyn_cast<SILPhiArgument>(result)) {
+            if (arg->isTerminatorResult()) {
+              return true;
+            }
+          }
           if (result->getOwnershipKind() == OwnershipKind::Guaranteed)
             defUseWorklist.insert(result);
-        }
+          return true;
+        });
         break;
       case OperandOwnership::InteriorPointer: {
         // An interior pointer user extends liveness until the end of the
@@ -191,7 +197,6 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::EndBorrow:
         // Don't care about this use.
         break;
-      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::Reborrow:
         // Reborrows do not occur this early in the pipeline.
         llvm_unreachable(

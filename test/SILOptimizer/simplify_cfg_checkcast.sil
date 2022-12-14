@@ -383,7 +383,6 @@ bb10(%failBB7 : @guaranteed $Base):
   br bb11
 
 bb11:
-  end_borrow %joined : $Base
   %20 = tuple ()
   return %20 : $()
 
