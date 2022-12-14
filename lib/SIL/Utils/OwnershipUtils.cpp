@@ -1031,7 +1031,8 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user)) {
+        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
+        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user)) {
       leafUse(op);
       continue;
     }
