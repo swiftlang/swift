@@ -176,6 +176,11 @@ class BuildScriptInvocation(object):
                         product_name, ' '.join(cmake_opts))
                 ]
 
+        if args.build_toolchain_only:
+            impl_args += [
+                "--build-toolchain-only=1"
+            ]
+
         if args.build_stdlib_deployment_targets:
             impl_args += [
                 "--build-stdlib-deployment-targets", " ".join(
