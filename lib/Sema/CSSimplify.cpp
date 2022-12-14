@@ -8561,12 +8561,13 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
   auto elementType = simplifyType(first, flags);
-  auto *loc = getConstraintLocator(locator);
+  auto packType = simplifyType(second, flags);
 
-  if (elementType->hasTypeVariable()) {
+  if (elementType->hasTypeVariable() || packType->hasTypeVariable()) {
     if (!flags.contains(TMF_GenerateConstraints))
       return SolutionKind::Unsolved;
 
+    auto *loc = getConstraintLocator(locator);
     addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::PackElementOf,
                            first, second, loc));
@@ -8574,14 +8575,16 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
     return SolutionKind::Solved;
   }
 
-  // Replace opened element archetypes with pack archetypes
-  // for the resulting type of the pack expansion.
-  auto *environment = DC->getGenericEnvironmentOfContext();
-  auto patternType = environment->mapElementTypeIntoPackContext(
-      elementType->mapTypeOutOfContext());
-  addConstraint(ConstraintKind::Bind, second, patternType, locator);
-
-  return SolutionKind::Solved;
+  // This constraint only exists to vend bindings.
+  auto *packEnv = DC->getGenericEnvironmentOfContext();
+  if (auto *expansion = packType->getAs<PackExpansionType>())
+    packType = expansion->getPatternType();
+  if (packType->isEqual(packEnv->mapElementTypeIntoPackContext
+                        (elementType->mapTypeOutOfContext()))) {
+    return SolutionKind::Solved;
+  } else {
+    return SolutionKind::Error;
+  }
 }
 
 static bool isForKeyPathSubscript(ConstraintSystem &cs,

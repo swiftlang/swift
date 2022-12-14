@@ -2956,6 +2956,7 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
+      auto *elementEnv = expr->getGenericEnvironment();
       for (auto *binding : expr->getBindings()) {
         auto type = visit(binding);
         CS.setType(binding, type);
@@ -2967,8 +2968,10 @@ namespace {
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto *elementLoc = CS.getConstraintLocator(
+          expr, LocatorPathElt::OpenedPackElement(elementEnv));
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
-                       patternTy, CS.getConstraintLocator(expr));
+                       patternTy, elementLoc);
 
       auto *shapeLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
