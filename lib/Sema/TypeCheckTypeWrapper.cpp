@@ -77,12 +77,6 @@ VarDecl *VarDecl::getUnderlyingTypeWrapperStorage() const {
                            nullptr);
 }
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
-  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           GetTypeWrapper{mutableSelf}, nullptr);
-}
-
 struct TypeWrapperAttrInfo {
   CustomAttr *Attr;
   NominalTypeDecl *Wrapper;

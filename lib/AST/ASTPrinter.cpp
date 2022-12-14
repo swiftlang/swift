@@ -37,6 +37,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
@@ -2935,7 +2936,19 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
 }
 
 static bool usesFeatureTypeWrappers(Decl *decl) {
-  return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
+  NullablePtr<NominalTypeDecl> typeDecl;
+
+  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+    typeDecl = extension->getExtendedNominal();
+  } else {
+    typeDecl = dyn_cast<NominalTypeDecl>(decl);
+  }
+
+  if (!typeDecl)
+    return false;
+
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           UsesTypeWrapperFeature{typeDecl.get()}, false);
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
