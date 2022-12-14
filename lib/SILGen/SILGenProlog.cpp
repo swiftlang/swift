@@ -520,8 +520,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto &lowering = SGF.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    ManagedValue val = ManagedValue::forUnmanaged(
-        SGF.F.begin()->createFunctionArgument(ty, VD));
+    auto *arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    arg->setClosureCapture(true);
+
+    ManagedValue val = ManagedValue::forUnmanaged(arg);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -575,8 +577,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
                                            type),
         SGF.F.getGenericEnvironment(), /*mutable*/ true);
-    SILValue box = SGF.F.begin()->createFunctionArgument(
+    auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
+    box->setClosureCapture(true);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
@@ -595,7 +598,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
       ty = ty.getAddressType();
     }
-    SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    fArg->setClosureCapture(true);
+    SILValue arg = SILValue(fArg);
     if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
       arg = SGF.B.createMarkMustCheckInst(
           Loc, arg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
