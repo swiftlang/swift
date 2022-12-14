@@ -93,7 +93,7 @@ extern llvm::cl::opt<bool> SILPrintDebugInfo;
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   if (!isa<PrimaryArchetypeType>(A) && !isa<PackArchetypeType>(A))
     return true;
-  if (isa<OpenedArchetypeType>(A))
+  if (isa<LocalArchetypeType>(A))
     return true;
   if (isa<OpaqueTypeArchetypeType>(A))
     return true;
@@ -1472,13 +1472,13 @@ public:
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetypeOf(A)) {
+      if (auto localA = getLocalArchetypeOf(A)) {
         auto *openingInst =
-            F->getModule().getRootOpenedArchetypeDefInst(OpenedA.getRoot(), F);
+            F->getModule().getRootLocalArchetypeDefInst(localA.getRoot(), F);
         require(I == nullptr || openingInst == I ||
                     properlyDominates(openingInst, I),
-                "Use of an opened archetype should be dominated by a "
-                "definition of this root opened archetype");
+                "Use of a local archetype should be dominated by a "
+                "definition of this root local archetype");
       }
     });
   }
@@ -1499,7 +1499,7 @@ public:
     require(AI->getType().isAddress(),
             "result of alloc_stack must be an address type");
 
-    verifyOpenedArchetype(AI, AI->getElementType().getASTType());
+    verifyLocalArchetype(AI, AI->getElementType().getASTType());
 
     require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
             "AllocStack Var Info should be None if invalidated");
@@ -1513,7 +1513,7 @@ public:
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
     requireReferenceValue(ARI, "Result of alloc_ref");
-    verifyOpenedArchetype(ARI, ARI->getType().getASTType());
+    verifyLocalArchetype(ARI, ARI->getType().getASTType());
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     unsigned NumTypes = Types.size();
@@ -1521,7 +1521,7 @@ public:
     require(NumTypes == 0 || !ARI->isObjC(),
             "Can't tail allocate with ObjC class");
     for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
-      verifyOpenedArchetype(ARI, Types[Idx].getASTType());
+      verifyLocalArchetype(ARI, Types[Idx].getASTType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
@@ -1592,31 +1592,31 @@ public:
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
 
-  /// Check that for each opened archetype or dynamic self type in substitutions
-  /// or the calle type, there is a type dependent operand.
+  /// Check that for each local archetype or dynamic self type in substitutions
+  /// or the called type, there is a type dependent operand.
   void checkApplyTypeDependentArguments(ApplySite AS) {
     SILInstruction *AI = AS.getInstruction();
 
-    llvm::DenseSet<OpenedArchetypeType *> FoundRootOpenedArchetypes;
+    llvm::DenseSet<LocalArchetypeType *> FoundRootLocalArchetypes;
     unsigned hasDynamicSelf = 0;
 
-    // Function to collect opened archetypes in FoundOpenedArchetypes and set
-    // hasDynamicSelf.
+    // Function to collect local archetypes in FoundRootLocalArchetypes
+    // and set hasDynamicSelf.
     auto HandleType = [&](CanType Ty) {
-      if (const auto A = dyn_cast<OpenedArchetypeType>(Ty)) {
+      if (const auto A = dyn_cast<LocalArchetypeType>(Ty)) {
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
 
         const auto root = A.getRoot();
 
-        // Collect all root opened archetypes used in the substitutions list.
-        FoundRootOpenedArchetypes.insert(root);
+        // Collect all root local archetypes used in the substitutions list.
+        FoundRootLocalArchetypes.insert(root);
         // Also check that they are properly tracked inside the current
         // function.
-        auto *openingInst = F.getModule().getRootOpenedArchetypeDefInst(
+        auto *openingInst = F.getModule().getRootLocalArchetypeDefInst(
             root, AI->getFunction());
         require(openingInst == AI || properlyDominates(openingInst, AI),
-                "Use of an opened archetype should be dominated by a "
+                "Use of a local archetype should be dominated by a "
                 "definition of this root opened archetype");
       }
       if (Ty->hasDynamicSelfType()) {
@@ -1624,15 +1624,15 @@ public:
       }
     };
 
-    // Search for opened archetypes and dynamic self.
+    // Search for local archetypes and dynamic self.
     for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
       Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
-    require(FoundRootOpenedArchetypes.size() + hasDynamicSelf ==
+    require(FoundRootLocalArchetypes.size() + hasDynamicSelf ==
                 AI->getTypeDependentOperands().size(),
-            "Number of opened archetypes and dynamic self in the substitutions "
+            "Number of local archetypes and dynamic self in the substitutions "
             "list should match the number of type dependent operands");
 
     for (auto &Op : AI->getTypeDependentOperands()) {
@@ -1647,19 +1647,19 @@ public:
       } else {
         auto DI = V->getDefiningInstruction();
         require(DI,
-                "opened archetype operand should refer to a SIL instruction");
+                "local archetype operand should refer to a SIL instruction");
         bool definesFoundArchetype = false;
         bool definesAnyArchetype = false;
-        DI->forEachDefinedOpenedArchetype(
-            [&](CanOpenedArchetypeType archetype, SILValue dependency) {
+        DI->forEachDefinedLocalArchetype(
+            [&](CanLocalArchetypeType archetype, SILValue dependency) {
           definesAnyArchetype = true;
-          if (FoundRootOpenedArchetypes.count(archetype))
+          if (FoundRootLocalArchetypes.count(archetype))
             definesFoundArchetype = true;
         });
         require(definesAnyArchetype,
-                "opened archetype operand should define an opened archetype");
+                "local archetype operand should define a local archetype");
         require(definesFoundArchetype,
-                "opened archetype operand does not correspond to any opened "
+                "local archetype operand does not correspond to any local "
                 "archetype from the substitutions list");
       }
     }
@@ -3061,7 +3061,7 @@ public:
     auto MetaTy = MI->getType().castTo<MetatypeType>();
     require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
-    verifyOpenedArchetype(MI, MetaTy.getInstanceType());
+    verifyLocalArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
@@ -3149,7 +3149,7 @@ public:
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
-      verifyOpenedArchetype(AI, getSILBoxFieldLoweredType(
+      verifyLocalArchetype(AI, getSILBoxFieldLoweredType(
                                     F.getTypeExpansionContext(), AI->getBoxType(),
                                     F.getModule().Types, field));
     }
@@ -3447,10 +3447,10 @@ public:
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
+    if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
-      verifyOpenedArchetype(AMI, lookupType);
+      verifyLocalArchetype(AMI, lookupType);
     } else {
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
@@ -3673,7 +3673,7 @@ public:
       require(isa<ArchetypeType>(operandInstanceType) ||
               operandInstanceType->isObjCExistentialType(),
               "operand type must be an archetype or self-conforming existential");
-      verifyOpenedArchetype(OMI, OMI->getType().getASTType());
+      verifyLocalArchetype(OMI, OMI->getType().getASTType());
     }
 
     // TODO: We should enforce that ObjC methods are dispatched on ObjC
@@ -3731,7 +3731,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
@@ -3765,7 +3765,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
@@ -3788,7 +3788,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box should be registered in "
             "SILFunction");
@@ -3811,7 +3811,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box_value result not an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box_value should be "
             "registered in SILFunction");
@@ -3858,7 +3858,7 @@ public:
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
-        I->getModule().getRootOpenedArchetypeDefInst(archetype,
+        I->getModule().getRootLocalArchetypeDefInst(archetype,
                                                      I->getFunction()) == I,
         "Archetype opened by open_existential_metatype should be registered in "
         "SILFunction");
@@ -3878,7 +3878,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential should be registered in "
             "SILFunction");
@@ -3897,7 +3897,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEBI->getFormalConcreteType(),
                                          AEBI->getConformances());
-    verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
+    verifyLocalArchetype(AEBI, AEBI->getFormalConcreteType());
   }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
@@ -3930,7 +3930,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEI->getFormalConcreteType(),
                                          AEI->getConformances());
-    verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
+    verifyLocalArchetype(AEI, AEI->getFormalConcreteType());
   }
 
   void checkInitExistentialValueInst(InitExistentialValueInst *IEI) {
@@ -3958,7 +3958,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
-    verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
+    verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
@@ -3990,7 +3990,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
-    verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
+    verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
   void checkDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
@@ -4056,7 +4056,7 @@ public:
     checkExistentialProtocolConformances(resultInstanceType,
                                          operandInstanceType,
                                          I->getConformances());
-    verifyOpenedArchetype(I, MetaTy.getInstanceType());
+    verifyLocalArchetype(I, MetaTy.getInstanceType());
   }
 
   void checkExistentialProtocolConformances(CanType resultType,
@@ -4139,7 +4139,7 @@ public:
     verifyCheckedCast(/*exact*/ false,
                       CI->getOperand()->getType(),
                       CI->getType());
-    verifyOpenedArchetype(CI, CI->getType().getASTType());
+    verifyLocalArchetype(CI, CI->getType().getASTType());
   }
 
   // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
@@ -4151,17 +4151,17 @@ public:
             "Unexpected trivial-to-reference conversion: ");
   }
 
-  /// Verify if a given type is or contains an opened archetype or dynamic self.
+  /// Verify if a given type is or contains a local archetype or dynamic self.
   /// If this is the case, verify that the provided instruction has a type
   /// dependent operand for it.
-  void verifyOpenedArchetype(SILInstruction *I, CanType Ty) {
+  void verifyLocalArchetype(SILInstruction *I, CanType Ty) {
     if (!Ty)
       return;
     // Check the type and all of its contained types.
     Ty.visit([&](CanType t) {
       SILValue Def;
-      if (const auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
-        Def = I->getModule().getRootOpenedArchetypeDefInst(
+      if (const auto archetypeTy = dyn_cast<LocalArchetypeType>(t)) {
+        Def = I->getModule().getRootLocalArchetypeDefInst(
             archetypeTy.getRoot(), I->getFunction());
         require(Def, "Root opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
@@ -4188,7 +4188,7 @@ public:
     verifyCheckedCast(CBI->isExact(),
                       CBI->getSourceLoweredType(),
                       CBI->getTargetLoweredType());
-    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
+    verifyLocalArchetype(CBI, CBI->getTargetFormalType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
@@ -4387,7 +4387,7 @@ public:
   }
   
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
     require(AI->getOperand()->getType().isObject(),
             "unchecked_ref_cast operand must be a value");
     require(AI->getType().isObject(),
@@ -4411,7 +4411,7 @@ public:
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
 
     require(AI->getOperand()->getType().isAddress(),
             "unchecked_addr_cast operand must be an address");
@@ -4420,7 +4420,7 @@ public:
   }
   
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getASTType());
+    verifyLocalArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_trivial_bit_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -4430,7 +4430,7 @@ public:
   }
 
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getASTType());
+    verifyLocalArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_bitwise_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -4447,7 +4447,7 @@ public:
   }
 
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
     require(AI->getType()
               .getASTType()->isBridgeableObjectType()
             || AI->getType().getASTType()->isEqual(
@@ -4474,7 +4474,7 @@ public:
   }
   
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
-    verifyOpenedArchetype(RI, RI->getType().getASTType());
+    verifyLocalArchetype(RI, RI->getType().getASTType());
     requireSameType(RI->getConverted()->getType(),
                     SILType::getBridgeObjectType(F.getASTContext()),
                     "bridge_object_to_ref must take a BridgeObject");

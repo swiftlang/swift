@@ -1302,7 +1302,7 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   // have guaranteed ownership--they project their storage. We reach this
   // point after the opened value has been copied.
   assert((!value->getDefiningInstruction() ||
-          !value->getDefiningInstruction()->definesOpenedArchetypes())
+          !value->getDefiningInstruction()->definesLocalArchetypes())
          && "owned open_existential is unsupported");
 
   SILType allocTy = value->getType();
@@ -1319,7 +1319,7 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
 
     if (auto openedTy = getOpenedArchetypeOf(archetype)) {
       auto openingVal =
-          pass.getModule()->getRootOpenedArchetypeDef(openedTy, pass.function);
+          pass.getModule()->getRootLocalArchetypeDef(openedTy, pass.function);
 
       auto *openingInst = openingVal->getDefiningInstruction();
       assert(openingVal && "all opened archetypes should be resolved");

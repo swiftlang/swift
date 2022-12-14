@@ -685,13 +685,13 @@ public:
     return getResultsImpl().getTypes();
   }
 
-  /// Run the given function for each opened archetype this instruction
+  /// Run the given function for each local archetype this instruction
   /// defines, passing the value that should be used to record the
   /// dependency.
-  void forEachDefinedOpenedArchetype(
-      llvm::function_ref<void(CanOpenedArchetypeType archetype,
+  void forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType archetype,
                               SILValue typeDependency)> function) const;
-  bool definesOpenedArchetypes() const;
+  bool definesLocalArchetypes() const;
 
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
