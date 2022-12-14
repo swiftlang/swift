@@ -53,8 +53,8 @@ struct MetadataSections {
   /// reported when the section was registered with the Swift runtime.
   ///
   /// The value of this field is equivalent to the value of
-  /// \c SymbolInfo::baseAddress as returned from \c lookupSymbol() for a symbol
-  /// in the image that contains these sections.
+  /// \c SymbolInfo::baseAddress as returned from \c SymbolInfo::lookup() for a
+  /// symbol in the image that contains these sections.
   ///
   /// For Mach-O images, set this field to \c __dso_handle (i.e. the Mach header
   /// for the image.) For ELF images, set it to \c __dso_handle (the runtime

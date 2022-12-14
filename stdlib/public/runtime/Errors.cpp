@@ -144,18 +144,16 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
 #if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
-  SymbolInfo syminfo;
-
-  // 0 is failure for lookupSymbol
-  if (0 == lookupSymbol(framePC, &syminfo)) {
+  auto syminfo = SymbolInfo::lookup(framePC);
+  if (!syminfo.has_value()) {
     return;
   }
 
-  // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
+  // If SymbolInfo:lookup succeeded then fileName is non-null. Thus, we find the
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  llvm::StringRef libraryName{syminfo.getFilename()};
+  llvm::StringRef libraryName{syminfo->getFilename()};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
@@ -165,12 +163,12 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // we just get HexAddr + 0.
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
-      getSymbolNameAddr(libraryName, syminfo, symbolName, symbolAddr);
+      getSymbolNameAddr(libraryName, syminfo.value(), symbolName, symbolAddr);
   ptrdiff_t offset = 0;
   if (foundSymbol) {
     offset = ptrdiff_t(uintptr_t(framePC) - symbolAddr);
   } else {
-    auto baseAddress = syminfo.getBaseAddress();
+    auto baseAddress = syminfo->getBaseAddress();
     offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(baseAddress));
     symbolAddr = uintptr_t(framePC);
     symbolName = "<unavailable>";
