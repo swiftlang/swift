@@ -60,7 +60,7 @@ enum class AccessLevel : uint8_t {
   FilePrivate,
   /// Internal access is limited to the current module.
   Internal,
-  /// Package access is limited to modules within a package
+  /// Package access is limited to cross-modules within a package
   Package,
   /// Public access is not limited, but some capabilities may be
   /// restricted outside of the current module.

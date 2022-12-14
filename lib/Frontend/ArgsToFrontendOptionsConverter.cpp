@@ -552,7 +552,10 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
 
 void ArgsToFrontendOptionsConverter::computePackageNameMap() {
 //  auto list = Args.getAllArgValues(options::OPT_package_name);
-  Opts.PackageNameMap.insert({"File", "fooPkg"});
+  Opts.PackageNameMap.insert({"File", "coPkg"});
+  Opts.PackageNameMap.insert({"Countries", "coPkg"});
+  Opts.PackageNameMap.insert({"CountryPicker", "coPkg"});
+  Opts.PackageNameMap.insert({"App", "appPkg"});
 }
 
 bool ArgsToFrontendOptionsConverter::computeModuleAliases() {

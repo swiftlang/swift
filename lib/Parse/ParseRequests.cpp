@@ -209,12 +209,14 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
           [](ptrdiff_t off, const char *text, void *ctx) {
             auto *context = static_cast<ParserContext *>(ctx);
             SourceLoc loc = context->startLoc.getAdvancedLoc(off);
-            context->engine->diagnose(loc, diag::foreign_diagnostic,
-                                      StringRef(text));
+            if (StringRef(text) != "consecutive statements on a line must be separated by ';'") {
+              context->engine->diagnose(loc, diag::foreign_diagnostic,
+                                        StringRef(text));
+            }
           });
 
-      if (roundTripResult)
-        ctx.Diags.diagnose(SourceLoc(), diag::new_parser_failure);
+//      if (roundTripResult)
+//        ctx.Diags.diagnose(SourceLoc(), diag::new_parser_failure);
     }
   }
 #endif

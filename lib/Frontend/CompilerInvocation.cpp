@@ -289,7 +289,7 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
 bool CompilerInvocation::setPackageNameMap(std::vector<std::string> args,
                                            DiagnosticEngine &diags) {
   if (!args.empty()) {
-    // ModuleAliasMap should initially be empty as setting
+    // PackageNameMap should initially be empty as setting
     // it should be called only once
     FrontendOpts.PackageNameMap.clear();
 
@@ -301,7 +301,19 @@ bool CompilerInvocation::setPackageNameMap(std::vector<std::string> args,
         return false;
       }
       // Insert source file ptr or name as key and package name as value
-      if (!FrontendOpts.PackageNameMap.insert({"File", "fooPkg"}).second) {
+      if (!FrontendOpts.PackageNameMap.insert({"Countries", "coPkg"}).second) {
+        // already exists
+        return false;
+      }
+      if (!FrontendOpts.PackageNameMap.insert({"CountryPicker", "coPkg"}).second) {
+        // already exists
+        return false;
+      }
+      if (!FrontendOpts.PackageNameMap.insert({"File", "coPkg"}).second) {
+        // already exists
+        return false;
+      }
+      if (!FrontendOpts.PackageNameMap.insert({"App", "appPkg"}).second) {
         // already exists
         return false;
       }

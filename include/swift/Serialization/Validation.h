@@ -107,6 +107,7 @@ class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   std::string SDKPath;
   StringRef ModuleABIName;
+  StringRef ModulePackageName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -178,6 +179,9 @@ public:
 
   StringRef getModuleABIName() const { return ModuleABIName; }
   void setModuleABIName(StringRef name) { ModuleABIName = name; }
+
+  StringRef getModulePackageName() const { return ModulePackageName; }
+  void setModulePackageName(StringRef name) { ModulePackageName = name; }
 
   bool isConcurrencyChecked() const {
     return Bits.IsConcurrencyChecked;

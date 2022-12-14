@@ -1929,7 +1929,7 @@ ERROR(function_type_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|package|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
-      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3"
+      "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3"
       "%select{| API wrapper}6 type",
       (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_spi,none,
@@ -2673,14 +2673,14 @@ ERROR(generic_param_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|package|public|open}2}1 "
       "because its generic %select{parameter|requirement}5 uses "
-      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
+      "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3 type",
       (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(generic_param_access_warn,none,
         "%0 %select{should be declared "
         "%select{private|fileprivate|internal|package|%error|%error}3"
         "|should not be declared %select{in this context|fileprivate|internal|package|public|open}2}1 "
         "because its generic %select{parameter|requirement}5 uses "
-        "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
+        "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3 type",
         (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(generic_param_usable_from_inline,none,
       "type referenced from a "
@@ -5115,8 +5115,8 @@ ERROR(class_super_access,none,
       "%select{private|fileprivate|internal|package|%error|%error}1|private or fileprivate}3"
       "|cannot be declared %select{in this context|fileprivate|internal|package|public|open}1}0 "
       "because its superclass "
-      "%select{is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2"
-      "|uses %select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}2 "
+      "%select{is %select{private|fileprivate|internal|package|'@_spi'|'@_spi'}2"
+      "|uses %select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}2 "
       "type as a generic parameter}4",
       (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
@@ -5124,8 +5124,8 @@ WARNING(class_super_access_warn,none,
       "%select{private|fileprivate|internal|package|%error|%error}1"
       "|should not be declared %select{in this context|fileprivate|internal|package|public|open}1}0 "
       "because its superclass "
-      "%select{is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2"
-      "|uses %select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}2 "
+      "%select{is %select{private|fileprivate|internal|package|'@_spi'|'@_spi'}2"
+      "|uses %select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}2 "
       "type as a generic parameter}4",
       (bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(class_super_not_usable_from_inline,none,
