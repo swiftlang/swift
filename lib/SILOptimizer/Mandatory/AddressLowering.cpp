@@ -3768,7 +3768,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
       originalUses.insert(oper);
       UseRewriter::rewriteUse(oper, pass);
     }
-    // Rewrite every new uses that was added.
+    // Rewrite every new use that was added.
     uses.clear();
     for (auto *use : valueDef->getUses()) {
       if (originalUses.contains(use))
