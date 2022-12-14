@@ -137,9 +137,25 @@ public:
   }
 };
 
+struct CustomAttrValue {
+  swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
+};
+
 struct ConstValueTypePropertyInfo {
   swift::VarDecl *VarDecl;
   std::shared_ptr<CompileTimeValue> Value;
+  llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers;
+
+  ConstValueTypePropertyInfo(
+      swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
+      llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers)
+      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers) {}
+
+  ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
+                             std::shared_ptr<CompileTimeValue> Value)
+      : VarDecl(VarDecl), Value(Value),
+        PropertyWrappers(llvm::Optional<std::vector<CustomAttrValue>>()) {}
 };
 
 struct ConstValueTypeInfo {

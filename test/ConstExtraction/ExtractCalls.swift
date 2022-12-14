@@ -98,7 +98,6 @@ public struct Foo : MyProto {
     let func1: Int = adder(2, 3)
 }
 
-
 extension Foo {
     struct Boo {}
 
