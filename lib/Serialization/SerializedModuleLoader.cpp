@@ -779,6 +779,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (!loadedModuleFile->getModulePackageName().empty())
+      M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     for (auto name: loadedModuleFile->getAllowableClientNames()) {
       M.addAllowableClientName(Ctx.getIdentifier(name));
