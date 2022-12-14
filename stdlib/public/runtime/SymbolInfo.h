@@ -76,27 +76,6 @@ public:
   static llvm::Optional<SymbolInfo> lookup(const void *address);
 };
 
-/// Look up a symbol by address and store the result in a locally-declared
-/// \c SymbolInfo value.
-///
-/// \param address The address where the symbol is located.
-/// \param outInfo On successful return, populated with information about the
-///   symbol at \a address. On failure, unspecified.
-///
-/// \returns On success, a non-zero integer. On failure, zero.
-///
-/// \note This function will be replaced with \c SymbolInfo::lookup() in a
-///   future update.
-static inline int lookupSymbol(const void *address, SymbolInfo *outInfo) {
-  auto info = SymbolInfo::lookup(address);
-  if (info.has_value()) {
-    *outInfo = info.value();
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
 } // end namespace swift
 
 #endif

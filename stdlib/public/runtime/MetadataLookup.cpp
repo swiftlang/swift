@@ -1105,9 +1105,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
       str += "_gatherGenericParameters: context: ";
 
-      SymbolInfo contextInfo;
-      if (lookupSymbol(context, &contextInfo)) {
-        str += contextInfo.getSymbolName();
+      if (auto contextInfo = SymbolInfo::lookup(context)) {
+        str += contextInfo->getSymbolName();
         str += " ";
       }
 
