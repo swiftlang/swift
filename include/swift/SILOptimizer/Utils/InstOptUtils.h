@@ -271,18 +271,14 @@ void releasePartialApplyCapturedArg(
     SILParameterInfo paramInfo,
     InstModCallbacks callbacks = InstModCallbacks());
 
-void deallocPartialApplyCapturedArg(
-    SILBuilder &builder, SILLocation loc, SILValue arg,
-    SILParameterInfo paramInfo);
-
 /// Insert destroys of captured arguments of partial_apply [stack].
 void insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
         [](SILValue arg) -> bool { return true; });
 
-void insertDeallocOfCapturedArguments(
-    PartialApplyInst *pai, SILBuilder &builder);
+void insertDeallocOfCapturedArguments(PartialApplyInst *pai,
+                                      DominanceInfo *domInfo);
 
 /// This iterator 'looks through' one level of builtin expect users exposing all
 /// users of the looked through builtin expect instruction i.e it presents a
