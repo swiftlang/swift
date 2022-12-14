@@ -687,6 +687,21 @@ public:
   }
 };
 
+class LocatorPathElt::OpenedPackElement final
+    : public StoredPointerElement<GenericEnvironment> {
+public:
+  OpenedPackElement(GenericEnvironment *env)
+      : StoredPointerElement(PathElementKind::OpenedPackElement, env) {}
+
+  GenericEnvironment *getGenericEnvironment() const {
+    return getStoredPointer();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::OpenedPackElement;
+  }
+};
+
 class LocatorPathElt::KeyPathComponent final : public StoredIntegerElement<1> {
 public:
   KeyPathComponent(unsigned index)
