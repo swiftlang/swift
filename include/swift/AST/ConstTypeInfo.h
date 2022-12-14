@@ -27,7 +27,15 @@ class Type;
 /// in a type property initializer expression
 class CompileTimeValue {
 public:
-  enum ValueKind { RawLiteral, InitCall, Builder, Dictionary, Runtime, Tuple };
+  enum ValueKind {
+    RawLiteral,
+    InitCall,
+    Builder,
+    Dictionary,
+    Array,
+    Tuple,
+    Runtime
+  };
 
   ValueKind getKind() const { return Kind; }
 
@@ -124,6 +132,23 @@ public:
 
 private:
   std::vector<TupleElement> Elements;
+};
+
+/// An array literal value representation
+class ArrayValue : public CompileTimeValue {
+public:
+  ArrayValue(std::vector<std::shared_ptr<CompileTimeValue>> Elements)
+      : CompileTimeValue(ValueKind::Array), Elements(Elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Array;
+  }
+  std::vector<std::shared_ptr<CompileTimeValue>> getElements() const {
+    return Elements;
+  }
+
+private:
+  std::vector<std::shared_ptr<CompileTimeValue>> Elements;
 };
 
 /// A representation of an arbitrary value that does not fall under
