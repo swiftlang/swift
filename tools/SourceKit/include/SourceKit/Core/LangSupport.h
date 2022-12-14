@@ -556,8 +556,15 @@ struct CursorSymbolInfo {
     for (auto ParentContext : ParentContexts) {
       ParentContext.print(OS, Indentation + "    ");
     }
+
+    llvm::SmallVector<ReferencedDeclInfo> SortedReferencedSymbols(
+        ReferencedSymbols.begin(), ReferencedSymbols.end());
+    std::sort(SortedReferencedSymbols.begin(), SortedReferencedSymbols.end(),
+              [](const ReferencedDeclInfo &LHS, const ReferencedDeclInfo &RHS) {
+                return LHS.USR < RHS.USR;
+              });
     OS << Indentation << "ReferencedSymbols:" << '\n';
-    for (auto ReferencedSymbol : ReferencedSymbols) {
+    for (auto ReferencedSymbol : SortedReferencedSymbols) {
       ReferencedSymbol.print(OS, Indentation + "    ");
     }
     OS << Indentation << "ReceiverUSRs:" << '\n';
