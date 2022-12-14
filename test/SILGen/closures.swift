@@ -845,3 +845,22 @@ func closeOverStructDontCopyTrivial() {
   a = StructWithMutatingMethod()
   takeClosure { a.x }
 }
+
+// Make sure that we handle closure argument initialization when due to forward
+// declaration we represent a let as an lvalue
+func test() {
+    let k: SomeClass
+    let k2: SomeClass
+    var boolean: Bool { true }
+
+    if boolean {
+        k = SomeClass()
+        k2 = SomeClass()
+    } else {
+        k = SomeClass()
+        k2 = SomeClass()
+    }
+
+    assert(k.x == k2.x)
+}
+

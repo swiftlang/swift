@@ -190,7 +190,7 @@ const swift::MetadataSections *swift_getMetadataSection(size_t index) {
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getMetadataSectionName(const swift::MetadataSections *section) {
-  if (auto info = SymbolInfo::lookup(section)) {
+  if (auto info = swift::SymbolInfo::lookup(section)) {
     if (info->getFilename()) {
       return info->getFilename();
     }
@@ -202,7 +202,7 @@ SWIFT_RUNTIME_EXPORT
 void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
                                          void const **out_actual,
                                          void const **out_expected) {
-  if (auto info = SymbolInfo::lookup(section)) {
+  if (auto info = swift::SymbolInfo::lookup(section)) {
     *out_actual = info->getBaseAddress();
   } else {
     *out_actual = nullptr;

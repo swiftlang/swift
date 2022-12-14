@@ -430,6 +430,9 @@ public:
   using SILBuilder::createMarkMustCheckInst;
   ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,
                                        MarkMustCheckInst::CheckKind kind);
+
+  using SILBuilder::emitCopyValueOperation;
+  ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
 };
 
 } // namespace Lowering

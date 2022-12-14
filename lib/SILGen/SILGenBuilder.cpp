@@ -952,3 +952,12 @@ SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
       loc, value.forward(getSILGenFunction()), kind);
   return cloner.clone(mdi);
 }
+
+ManagedValue SILGenBuilder::emitCopyValueOperation(SILLocation loc,
+                                                   ManagedValue value) {
+  auto cvi = SILBuilder::emitCopyValueOperation(loc, value.getValue());
+  // Trivial type.
+  if (cvi == value.getValue())
+    return value;
+  return SGF.emitManagedRValueWithCleanup(cvi);
+}
