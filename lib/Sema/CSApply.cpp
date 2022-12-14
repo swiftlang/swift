@@ -3830,7 +3830,7 @@ namespace {
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
-      llvm_unreachable("not implemented for PackElementExpr");
+      return simplifyExprType(expr);
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {

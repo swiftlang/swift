@@ -2993,7 +2993,19 @@ namespace {
     }
 
     Type visitPackElementExpr(PackElementExpr *expr) {
-      llvm_unreachable("not implemented for PackElementExpr");
+      auto packType = CS.getType(expr->getPackRefExpr());
+      auto *elementType =
+          CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                TVO_CanBindToHole);
+      auto *elementEnv = PackElementEnvironments.back();
+      auto *elementLoc = CS.getConstraintLocator(
+          expr, LocatorPathElt::OpenedPackElement(elementEnv));
+
+      // The type of a PackElementExpr is the opened pack element archetype
+      // of the pack reference.
+      CS.addConstraint(ConstraintKind::PackElementOf, elementType, packType,
+                       elementLoc);
+      return elementType;
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
