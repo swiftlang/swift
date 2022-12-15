@@ -347,6 +347,11 @@ static bool isStoreCopy(SILValue value) {
   if (!copyInst->hasOneUse())
     return false;
 
+  auto *user = value->getSingleUse()->getUser();
+  auto *storeInst = dyn_cast<StoreInst>(user);
+  if (!storeInst)
+    return false;
+
   auto source = copyInst->getOperand();
   if (source->getOwnershipKind() == OwnershipKind::Guaranteed) {
     // [in_guaranteed_begin_apply_results] If any root of the source is a
@@ -367,8 +372,7 @@ static bool isStoreCopy(SILValue value) {
     }
   }
 
-  auto *user = value->getSingleUse()->getUser();
-  return isa<StoreInst>(user);
+  return true;
 }
 
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
