@@ -190,7 +190,7 @@ Expr *swift::expandMacroExpr(
   {
     llvm::raw_string_ostream out(bufferName);
 
-    out << "Macro expansion of #" << macro->getName();
+    out << "macro:" << macro->getName().getBaseName();
     if (auto bufferID = sourceFile->getBufferID()) {
       unsigned startLine, startColumn;
       std::tie(startLine, startColumn) =
@@ -202,7 +202,7 @@ Expr *swift::expandMacroExpr(
       std::tie(endLine, endColumn) =
           sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
 
-      out << " in " << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
+      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
           << startLine << ":" << startColumn
           << "-" << endLine << ":" << endColumn;
     }
