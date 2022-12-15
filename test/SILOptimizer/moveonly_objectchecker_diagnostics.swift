@@ -2048,7 +2048,7 @@ public func enumPatternMatchSwitch2WhereClause2OwnedArg(_ x2: __owned EnumTy) {
 
 public func closureClassUseAfterConsume1(_ x: Klass) {
     // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
-    // expected-error @-2 {{'x' has guaranteed ownership but was consumed due to being captured by a closure}}
+    // expected-error @-2 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{closure capture}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
         // expected-note @-1 {{consuming use}}
@@ -2082,7 +2082,7 @@ public func closureClassUseAfterConsumeArg(_ argX: Klass) {
 
 public func closureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2094,7 +2094,7 @@ public func closureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {
 public func closureCaptureClassUseAfterConsumeError(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-note @-3 {{consuming use}}
     let f = { // expected-note {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
@@ -2107,7 +2107,7 @@ public func closureCaptureClassUseAfterConsumeError(_ x: Klass) { // expected-er
 }
 
 public func closureCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{closure capture}}
         classUseMoveOnlyWithoutEscaping(x2)
@@ -2118,7 +2118,7 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2129,7 +2129,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
 
 public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2142,7 +2142,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
 
 public func deferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2154,7 +2154,7 @@ public func deferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'
 public func deferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2165,7 +2165,7 @@ public func deferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{
 }
 
 public func deferCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     classUseMoveOnlyWithoutEscaping(x2)
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -2176,7 +2176,7 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2187,7 +2187,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
 
 public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
@@ -2198,7 +2198,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
 
 public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
@@ -2212,8 +2212,8 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected
 
 public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         classConsume(x2) // expected-note {{consuming use}}
         defer {
@@ -2229,8 +2229,8 @@ public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) { // expecte
 public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
-    // expected-error @-3 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-3 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{consuming use}}
         classConsume(x2) // expected-note {{consuming use}}
         defer {
@@ -2245,7 +2245,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) { // expecte
 }
 
 public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{closure capture}}
         defer {
@@ -2259,7 +2259,7 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
@@ -2273,7 +2273,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Kla
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{consuming use}}
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
@@ -2288,7 +2288,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Kl
 
 public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = {
         let g = { // expected-note {{closure capture}}
@@ -2304,7 +2304,7 @@ public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expect
 public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{consuming use}}
         let g = { // expected-note {{closure capture}}
@@ -2320,7 +2320,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) { // expec
 
 
 public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{closure capture}}
@@ -2335,7 +2335,7 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = {
         let g = { // expected-note {{closure capture}}
@@ -2350,7 +2350,7 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned K
 
 public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{consuming use}}
         let g = { // expected-note {{closure capture}}

@@ -38,287 +38,15 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "MoveOnlyDiagnostics.h"
+#include "MoveOnlyObjectChecker.h"
+
 using namespace swift;
-
-//===----------------------------------------------------------------------===//
-//                            MARK: Checker State
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Wrapper around CanonicalizeOSSALifetime that we use to specialize its
-/// interface for our purposes.
-struct OSSACanonicalizer {
-  /// A per mark must check, vector of uses that copy propagation says need a
-  /// copy and thus are not final consuming uses.
-  SmallVector<Operand *, 32> consumingUsesNeedingCopy;
-
-  /// A per mark must check, vector of consuming uses that copy propagation says
-  /// are actual last uses.
-  SmallVector<Operand *, 32> finalConsumingUses;
-
-  /// The actual canonicalizer that we use.
-  ///
-  /// We mark this Optional to avoid UB behavior caused by us needing to
-  /// initialize CanonicalizeOSSALifetime with parts of OSSACanoncializer
-  /// (specifically with state in our arrays) before the actual constructor has
-  /// run. Specifically this avoids:
-  ///
-  /// 11.9.5p1 class.cdtor: For an object with a non-trivial constructor,
-  /// referring to any non-static member or base class of the object before the
-  /// constructor begins execution results in undefined behavior.
-  Optional<CanonicalizeOSSALifetime> canonicalizer;
-
-  OSSACanonicalizer(SILFunction *fn,
-                    NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                    DominanceInfo *domTree, InstructionDeleter &deleter) {
-    auto foundConsumingUseNeedingCopy = std::function<void(Operand *)>(
-        [&](Operand *use) { consumingUsesNeedingCopy.push_back(use); });
-    auto foundConsumingUseNotNeedingCopy = std::function<void(Operand *)>(
-        [&](Operand *use) { finalConsumingUses.push_back(use); });
-
-    canonicalizer.emplace(
-        false /*pruneDebugMode*/, !fn->shouldOptimize() /*maximizeLifetime*/,
-        accessBlockAnalysis, domTree, deleter, foundConsumingUseNeedingCopy,
-        foundConsumingUseNotNeedingCopy);
-  }
-
-  void clear() {
-    consumingUsesNeedingCopy.clear();
-    finalConsumingUses.clear();
-  }
-
-  bool canonicalize(MarkMustCheckInst *markedValue) {
-    return canonicalizer->canonicalizeValueLifetime(markedValue);
-  }
-
-  bool foundAnyConsumingUses() const {
-    return consumingUsesNeedingCopy.size() || finalConsumingUses.size();
-  }
-
-  bool foundConsumingUseRequiringCopy() const {
-    return consumingUsesNeedingCopy.size();
-  }
-
-  bool hasPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](Operand *use) {
-                          return isa<PartialApplyInst>(use->getUser());
-                        }) ||
-           llvm::any_of(finalConsumingUses, [](Operand *use) {
-             return isa<PartialApplyInst>(use->getUser());
-           });
-  }
-
-  bool hasNonPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](Operand *use) {
-                          return !isa<PartialApplyInst>(use->getUser());
-                        }) ||
-           llvm::any_of(finalConsumingUses, [](Operand *use) {
-             return !isa<PartialApplyInst>(use->getUser());
-           });
-  }
-};
-
-} // anonymous namespace
+using namespace swift::siloptimizer;
 
 //===----------------------------------------------------------------------===//
 //                         MARK: Diagnostic Utilities
 //===----------------------------------------------------------------------===//
-
-template <typename... T, typename... U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
-static StringRef getVariableNameForValue(MarkMustCheckInst *mmci) {
-  StringRef varName = "unknown";
-  if (auto *use = getSingleDebugUse(mmci)) {
-    DebugVarCarryingInst debugVar(use->getUser());
-    if (auto varInfo = debugVar.getVarInfo()) {
-      varName = varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        varName = decl->getBaseName().userFacingName();
-      }
-    }
-  }
-
-  return varName;
-}
-
-namespace {
-
-struct DiagnosticEmitter {
-  SILFunction *fn;
-  const OSSACanonicalizer &canonicalizer;
-  SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
-
-  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
-  void emitGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
-  void emitOwnedDiagnostic(MarkMustCheckInst *markedValue);
-
-  bool emittedAnyDiagnostics() const { return valuesWithDiagnostics.size(); }
-
-  bool emittedDiagnosticForValue(MarkMustCheckInst *markedValue) const {
-    return valuesWithDiagnostics.count(markedValue);
-  }
-
-private:
-  /// Emit diagnostics for the final consuming uses and consuming uses needing
-  /// copy. If filter is non-null, allow for the caller to pre-process operands
-  /// and emit their own diagnostic. If filter returns true, then we assume that
-  /// the caller processed it correctly. false, then we continue to process it.
-  void emitDiagnosticsForFoundUses(bool ignorePartialApply = false) const;
-  void emitDiagnosticsForPartialApplyUses() const;
-};
-
-} // anonymous namespace
-
-void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
-    MarkMustCheckInst *markedValue) {
-  // If we failed to canonicalize ownership, there was something in the SIL
-  // that copy propagation did not understand. Emit a we did not understand
-  // error.
-  if (markedValue->getType().isMoveOnlyWrapped()) {
-    diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_not_understand_no_implicit_copy);
-  } else {
-    diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_not_understand_moveonly);
-  }
-  valuesWithDiagnostics.insert(markedValue);
-}
-
-void DiagnosticEmitter::emitGuaranteedDiagnostic(
-    MarkMustCheckInst *markedValue) {
-  auto &astContext = fn->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
-
-  // See if we have any closure capture uses and emit a better diagnostic.
-  if (canonicalizer.hasPartialApplyConsumingUse()) {
-    diagnose(astContext,
-             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_guaranteed_value_captured_by_closure,
-             varName);
-    emitDiagnosticsForPartialApplyUses();
-    valuesWithDiagnostics.insert(markedValue);
-  }
-
-  // If we do not have any non-partial apply consuming uses... just exit early.
-  if (!canonicalizer.hasNonPartialApplyConsumingUse())
-    return;
-
-  diagnose(astContext,
-           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-           diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
-  emitDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
-  valuesWithDiagnostics.insert(markedValue);
-}
-
-void DiagnosticEmitter::emitOwnedDiagnostic(MarkMustCheckInst *markedValue) {
-  auto &astContext = fn->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
-
-  diagnose(astContext,
-           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-           diag::sil_moveonlychecker_owned_value_consumed_more_than_once,
-           varName);
-
-  emitDiagnosticsForFoundUses();
-  valuesWithDiagnostics.insert(markedValue);
-}
-
-void DiagnosticEmitter::emitDiagnosticsForFoundUses(
-    bool ignorePartialApplyUses) const {
-  auto &astContext = fn->getASTContext();
-
-  for (auto *consumingUse : canonicalizer.consumingUsesNeedingCopy) {
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    if (ignorePartialApplyUses &&
-        isa<PartialApplyInst>(consumingUse->getUser()))
-      continue;
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_use_here);
-  }
-
-  for (auto *consumingUse : canonicalizer.finalConsumingUses) {
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    if (ignorePartialApplyUses &&
-        isa<PartialApplyInst>(consumingUse->getUser()))
-      continue;
-
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_use_here);
-  }
-}
-
-void DiagnosticEmitter::emitDiagnosticsForPartialApplyUses() const {
-  auto &astContext = fn->getASTContext();
-
-  for (auto *consumingUse : canonicalizer.consumingUsesNeedingCopy) {
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    if (!isa<PartialApplyInst>(consumingUse->getUser()))
-      continue;
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_closure_use_here);
-  }
-
-  for (auto *consumingUse : canonicalizer.finalConsumingUses) {
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    if (!isa<PartialApplyInst>(consumingUse->getUser()))
-      continue;
-
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_closure_use_here);
-  }
-}
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Main Pass
@@ -341,7 +69,7 @@ struct MoveOnlyChecker {
   ///
   /// \returns true if we deleted a mark_must_check inst that we didn't
   /// recognize after emitting the diagnostic.
-  bool searchForCandidateMarkMustChecks();
+  bool searchForCandidateMarkMustChecks(DiagnosticEmitter &emitter);
 
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
@@ -349,7 +77,8 @@ struct MoveOnlyChecker {
 
 } // namespace
 
-bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
+bool MoveOnlyChecker::searchForCandidateMarkMustChecks(
+    DiagnosticEmitter &emitter) {
   bool changed = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
@@ -541,13 +270,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       // We then RAUW the mark_must_check once we have emitted the error since
       // later passes expect that mark_must_check has been eliminated by
       // us. Since we are failing already, this is ok to do.
-      if (mmci->getType().isMoveOnlyWrapped()) {
-        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
-      } else {
-        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-                 diag::sil_moveonlychecker_not_understand_moveonly);
-      }
+      emitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
       changed = true;
@@ -560,9 +283,20 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                             DominanceInfo *domTree) {
   bool changed = false;
 
+  auto callbacks =
+      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
+        if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
+          moveIntroducersToProcess.remove(mvi);
+        instToDelete->eraseFromParent();
+      });
+  InstructionDeleter deleter(std::move(callbacks));
+  OSSACanonicalizer canonicalizer;
+  canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
+  DiagnosticEmitter diagnosticEmitter{fn, &canonicalizer, {}, {}};
+
   // First search for candidates to process and emit diagnostics on any
   // mark_must_check [noimplicitcopy] we didn't recognize.
-  changed |= searchForCandidateMarkMustChecks();
+  changed |= searchForCandidateMarkMustChecks(diagnosticEmitter);
 
   // If we didn't find any introducers to check, just return changed.
   //
@@ -571,16 +305,6 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   // and then deleting.
   if (moveIntroducersToProcess.empty())
     return changed;
-
-  auto callbacks =
-      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-        if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
-          moveIntroducersToProcess.remove(mvi);
-        instToDelete->eraseFromParent();
-      });
-  InstructionDeleter deleter(std::move(callbacks));
-  OSSACanonicalizer canonicalizer(fn, accessBlockAnalysis, domTree, deleter);
-  DiagnosticEmitter diagnosticEmitter{fn, canonicalizer, {}};
 
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
@@ -605,7 +329,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     // /any/ consuming uses.
     if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
       if (canonicalizer.foundAnyConsumingUses()) {
-        diagnosticEmitter.emitGuaranteedDiagnostic(markedValue);
+        diagnosticEmitter.emitObjectGuaranteedDiagnostic(markedValue);
       }
       continue;
     }
@@ -618,7 +342,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       continue;
     }
 
-    diagnosticEmitter.emitOwnedDiagnostic(markedValue);
+    diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
   }
 
   bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
