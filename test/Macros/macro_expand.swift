@@ -53,7 +53,6 @@ macro addBlocker<T>(_ value: T) -> T = MacroDefinition.AddBlocker
 func testAddBlocker(a: Int, b: Int, c: Int) {
   _ = #addBlocker(a * b * c)
 #if TEST_DIAGNOSTICS
-  // FIXME: Highlight locations are wrong.
-  _ = #addBlocker(a + b * c) // expected-error{{blocked an add}}
+  _ = #addBlocker(a + b * c) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}{{21-22=-}}
 #endif
 }
