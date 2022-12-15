@@ -112,7 +112,8 @@ extension Character {
 
 extension Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
-  ExpressibleByExtendedGraphemeClusterLiteral
+  ExpressibleByExtendedGraphemeClusterLiteral,
+  _ExpressibleBySingleQuotedLiteral
 {
   /// Creates a character containing the given Unicode scalar value.
   ///

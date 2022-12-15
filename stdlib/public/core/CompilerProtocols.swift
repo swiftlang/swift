@@ -429,7 +429,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol ExpressibleByUnicodeScalarLiteral: _ExpressibleBySingleQuotedLiteral {
+public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,

@@ -46,7 +46,8 @@ extension Unicode {
 
 extension Unicode.Scalar :
     _ExpressibleByBuiltinUnicodeScalarLiteral,
-    ExpressibleByUnicodeScalarLiteral {
+    ExpressibleByUnicodeScalarLiteral,
+    _ExpressibleBySingleQuotedLiteral {
   /// A numeric representation of the Unicode scalar.
   @inlinable
   public var value: UInt32 { return _value }
