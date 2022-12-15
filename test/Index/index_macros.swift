@@ -3,9 +3,9 @@
 // REQUIRES: OS=macosx
 
 
-macro myLine: Int = _SwiftSyntaxMacros.LineMacro
-macro myFilename<T: ExpressibleByStringLiteral>: T = _SwiftSyntaxMacros.FilePathMacro
-macro myStringify<T>(_: T) -> (T, String) = _SwiftSyntaxMacros.StringifyMacro
+macro myLine: Int = MacroDefinition.LineMacro
+macro myFilename<T: ExpressibleByStringLiteral>: T = MacroDefinition.FileMacro
+macro myStringify<T>(_: T) -> (T, String) = MacroDefinition.StringifyMacro
 
 func test(x: Int) {
   _ = #myLine
