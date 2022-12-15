@@ -3,6 +3,8 @@
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 
+// REQUIRES: rdar102151684
+
 // Test dynamically allocated local variables in async functions.
 
 // CHECK-LABEL: define {{.*}} void @"$s1a1fyxxYalF"
