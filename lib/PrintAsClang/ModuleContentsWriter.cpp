@@ -612,6 +612,25 @@ public:
     });
     decls.erase(newEnd, decls.end());
 
+    if (M.isStdlibModule()) {
+      llvm::SmallVector<Decl *, 2> nestedAdds;
+      for (const auto *d : decls) {
+        auto *ext = dyn_cast<ExtensionDecl>(d);
+        if (!ext ||
+            ext->getExtendedNominal() != M.getASTContext().getStringDecl())
+          continue;
+        for (auto *m : ext->getMembers()) {
+          if (auto *sd = dyn_cast<StructDecl>(m)) {
+            if (sd->getBaseIdentifier().str() == "UTF8View" ||
+                sd->getBaseIdentifier().str() == "Index") {
+              nestedAdds.push_back(sd);
+            }
+          }
+        }
+      }
+      decls.append(nestedAdds);
+    }
+
     // REVERSE sort the decls, since we are going to copy them onto a stack.
     llvm::array_pod_sort(decls.begin(), decls.end(),
                          [](Decl * const *lhs, Decl * const *rhs) -> int {
@@ -783,6 +802,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     // Embed an overlay for the standard library.
     ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
+    // Ignore typos in Swift stdlib doc comments.
+    os << "#pragma clang diagnostic push\n";
+    os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
@@ -820,5 +842,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
+
+  if (M.isStdlibModule()) {
+    os << "#pragma clang diagnostic pop\n";
+  }
   return info;
 }

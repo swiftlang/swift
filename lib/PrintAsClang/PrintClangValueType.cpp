@@ -167,6 +167,9 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
     os << "    memcpy(_getOpaquePointer(), &res, sizeof(res));\n";
     os << "}\n";
     os << "#endif\n";
+    // Add additional methods for the `String` declaration.
+    printer.printDefine("SWIFT_CXX_INTEROP_STRING_MIXIN");
+    printer.printIncludeForShimHeader("_SwiftStdlibCxxOverlay.h");
   } else if (typeDecl == typeDecl->getASTContext().getOptionalDecl()) {
     // Add additional methods for the `Optional` declaration.
     printer.printDefine("SWIFT_CXX_INTEROP_OPTIONAL_MIXIN");
