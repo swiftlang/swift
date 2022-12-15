@@ -373,6 +373,17 @@ bb0(%0 :  @guaranteed $Optional<T>):
   return %res : $()
 }
 
+// CHECK: SIL memory lifetime failure in @test_store_borrow_addr_after_dealloc: memory is initialized, but shouldn't be
+sil [ossa] @test_store_borrow_addr_after_dealloc : $@convention(thin) (@guaranteed Optional<T>) -> () {
+bb0(%0 :  @guaranteed $Optional<T>):
+  %s = alloc_stack $Optional<T>
+  %sb = store_borrow %0 to %s : $*Optional<T>
+  dealloc_stack %s : $*Optional<T>
+  end_borrow %sb : $*Optional<T>
+  %res = tuple ()
+  return %res : $()
+}
+
 // CHECK: SIL memory lifetime failure in @test_cast_br_take_always: memory is not initialized, but should be
 sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
 bb0(%0 : $*U):
