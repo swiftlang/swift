@@ -2280,9 +2280,9 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
                                      info.isConsumed() ? IsTake : IsNotTake,
                                      IsInitialization);
       } else {
-        // [in_guaranteed_begin_apply_results] Because OSSA ensure that all uses
-        // of a guaranteed value produced by a begin_apply are used within the
-        // coroutine's range, AddressLowering will not introduce uses of
+        // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
+        // uses of a guaranteed value produced by a begin_apply are used within
+        // the coroutine's range, AddressLowering will not introduce uses of
         // invalid memory by rewriting the uses of a yielded guaranteed opaque
         // value as uses of yielded guaranteed storage.  However, it must
         // allocate storage for copies of [projections of] such values.
