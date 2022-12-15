@@ -478,6 +478,42 @@ enum TestEnum<T> {
   }
 }
 
+public enum EnumWithTwoSameAddressOnlyPayloads<T> {
+  case nope
+  case yes(T)
+  case and(T)
+
+// CHECK-LABEL: sil [ossa] @EnumWithTwoSameAddressOnlyPayloads_getPayload : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[RESULT_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         switch_enum [[COPY]] : $EnumWithTwoSameAddressOnlyPayloads<T>, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.nope!enumelt: {{bb[0-9]+}}, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
+// CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
+// CHECK:         [[YES_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[YES_VALUE]]
+// CHECK:         [[YES_COPY:%[^,]+]] = copy_value [[YES_LIFETIME]]
+// CHECK:         store [[YES_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK:       [[AND_BLOCK]]([[AND_VALUE:%[^,]+]] :
+// CHECK:         [[AND_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[AND_VALUE]]
+// CHECK:         [[AND_COPY:%[^,]+]] = copy_value [[AND_LIFETIME]]
+// CHECK:         store [[AND_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK-LABEL: } // end sil function 'EnumWithTwoSameAddressOnlyPayloads_getPayload'
+  public var getPayload: T? {
+    @_silgen_name("EnumWithTwoSameAddressOnlyPayloads_getPayload")
+    get {
+    switch self {
+      case .nope:
+        return nil
+      case .yes(let t), .and(let t):
+        return t
+    }
+    }
+  }
+}
+
+
 // Verify exit block arguments are ordered correctly.
 // 
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
