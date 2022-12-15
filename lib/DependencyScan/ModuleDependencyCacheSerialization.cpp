@@ -838,7 +838,8 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         Out, ScratchRecord, AbbrCodes[SwiftBinaryModuleDetailsLayout::Code],
         getIdentifier(swiftBinDeps->compiledModulePath),
         getIdentifier(swiftBinDeps->moduleDocPath),
-        getIdentifier(swiftBinDeps->sourceInfoPath), swiftBinDeps->isFramework);
+        getIdentifier(swiftBinDeps->sourceInfoPath),
+        swiftBinDeps->isFramework);
 
     break;
   }

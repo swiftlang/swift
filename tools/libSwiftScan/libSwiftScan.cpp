@@ -311,6 +311,11 @@ swiftscan_swift_binary_detail_get_module_source_info_path(
   return details->swift_binary_details.module_source_info_path;
 }
 
+bool swiftscan_swift_binary_detail_get_is_framework(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.is_framework;
+}
+
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
 swiftscan_string_ref_t

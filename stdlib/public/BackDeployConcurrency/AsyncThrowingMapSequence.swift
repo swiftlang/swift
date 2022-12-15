@@ -31,7 +31,7 @@ extension AsyncSequence {
   /// receiving this value from `Counter` ends the modified sequence with an
   /// error.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
   ///     do {
@@ -43,12 +43,12 @@ extension AsyncSequence {
   ///                 return roman
   ///             }
   ///         for try await numeral in stream {
-  ///             print("\(numeral) ", terminator: " ")
+  ///             print(numeral, terminator: " ")
   ///         }
   ///     } catch {
-  ///         print ("Error: \(error)")
+  ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: I  II  III  Error: MyError()
+  ///     // Prints "I II III Error: MyError() "
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the

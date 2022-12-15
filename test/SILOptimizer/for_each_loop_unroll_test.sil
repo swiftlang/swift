@@ -134,8 +134,8 @@ bb2(%39 : @owned $Error):
 // CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM2]] : $any Error)
 
 // CHECK: [[NORMAL2]](%{{.*}} : $()):
-// CHECK: dealloc_stack [[STACK]]
 // CHECK: end_borrow [[ELEM2BORROW]]
+// CHECK: dealloc_stack [[STACK]]
 // Note that the temporary alloc_stack of the array created for the forEach call
 // will be cleaned up when the forEach call is removed.
 // CHECK: destroy_value

@@ -1871,6 +1871,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   // rdar://101126543
   return false;
 
+#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -1881,6 +1882,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
 
   return getAvailabilityContext().isContainedIn(
           Context.getImmortalRefCountSymbolsAvailability());
+#endif
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

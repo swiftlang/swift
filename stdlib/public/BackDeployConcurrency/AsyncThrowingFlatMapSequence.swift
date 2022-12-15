@@ -39,18 +39,18 @@ extension AsyncSequence {
   ///                 return Counter(howHigh: value)
   ///             }
   ///         for try await number in stream {
-  ///             print ("\(number)", terminator: " ")
+  ///             print(number, terminator: " ")
   ///         }
   ///     } catch {
   ///         print(error)
   ///     }
-  ///     // Prints: 1 1 2 1 2 3 MyError()
+  ///     // Prints "1 1 2 1 2 3 MyError() "
   ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns an
   ///   `AsyncSequence`. If `transform` throws an error, the sequence ends.
   /// - Returns: A single, flattened asynchronous sequence that contains all
-  ///   elements in all the asychronous sequences produced by `transform`. The
+  ///   elements in all the asynchronous sequences produced by `transform`. The
   ///   sequence ends either when the the last sequence created from the last
   ///   element from base sequence ends, or when `transform` throws an error.
   @inlinable

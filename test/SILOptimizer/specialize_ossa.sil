@@ -32,6 +32,14 @@ bb0(%0 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s33XXX_foo_guaranteed_generic_returnBo_Tg5 :
+// CHECK:  [[S1:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:  [[S2:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:  [[SBI:%.*]] = store_borrow %0 to [[S2]] : $*Builtin.NativeObject
+// CHECK:  end_borrow [[SBI]] : $*Builtin.NativeObject
+// CHECK:  dealloc_stack [[S2]] : $*Builtin.NativeObject
+// CHECK-LABEL: } // end sil function '$s33XXX_foo_guaranteed_generic_returnBo_Tg5'
+
 // CHECK-LABEL: sil [ossa] @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
 // Call of specialized initializer: <Int32>
@@ -114,7 +122,6 @@ bb0(%0 : $*T, %1 : $*XXX<T>):
   %9 = struct $Int32 (%8 : $Builtin.Int32)        // user: %11
   return %9 : $Int32                              // id: %11
 }
-
 
 sil [ossa] [noinline] @XXX_foo_guaranteed_generic_return : $@convention(method) <T> (@in_guaranteed T, @in XXX<T>) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $*XXX<T>):

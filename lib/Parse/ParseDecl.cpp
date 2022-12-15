@@ -178,6 +178,11 @@ extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
 /// Destroy a source file parsed with swift_ASTGen_parseSourceFile.
 extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
 
+/// Check whether the given source file round-trips correctly. Returns 0 if
+/// round-trip succeeded, non-zero otherwise.
+extern "C" int swift_ASTGen_roundTripCheck(void *sourceFile);
+
+
 // Build AST nodes for the top-level entities in the syntax.
 extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
                                                    void *declContext,
@@ -197,6 +202,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
   if ((Context.LangOpts.hasFeature(Feature::Macros) ||
        Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
+       Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
       !SourceMgr.hasIDEInspectionTargetBuffer() &&
       SF.Kind != SourceFileKind::SIL) {
@@ -273,6 +279,20 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       consumeToken();
     }
   }
+
+#if SWIFT_SWIFT_PARSER
+  // Perform round-trip checking.
+  if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+      SF.exportedSourceFile &&
+      !L->lexingCutOffOffset() &&
+      swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
+    SourceLoc loc;
+    if (auto bufferID = SF.getBufferID()) {
+      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+    }
+    diagnose(loc, diag::parser_round_trip_error);
+  }
+#endif
 }
 
 bool Parser::parseTopLevelSIL() {

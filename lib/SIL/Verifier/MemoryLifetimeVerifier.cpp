@@ -377,6 +377,13 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::EndBorrowInst: {
+        auto *ebi = cast<EndBorrowInst>(&I);
+        if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+          killBits(state, sbi->getDest());
+        }
+        break;
+      }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));
@@ -696,8 +703,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
-        if (SILValue orig = cast<EndBorrowInst>(&I)->getSingleOriginalValue())
-          requireBitsSet(bits, orig, &I);
+        auto *ebi = cast<EndBorrowInst>(&I);
+        if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+          requireBitsSet(bits, sbi->getDest(), &I);
+          locations.clearBits(bits, sbi->getDest());
+        } else if (auto *lbi = dyn_cast<LoadBorrowInst>(ebi->getOperand())) {
+          requireBitsSet(bits, lbi->getOperand(), &I);
+        }
         break;
       }
       case SILInstructionKind::UncheckedRefCastAddrInst:
@@ -779,11 +791,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       }
       case SILInstructionKind::DeallocStackInst: {
         SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
-        if (isStoreBorrowLocation(opVal)) {
-          requireBitsSet(bits, opVal, &I);
-        } else {
-          requireBitsClear(bits & nonTrivialLocations, opVal, &I);
-        }
+        requireBitsClear(bits & nonTrivialLocations, opVal, &I);
         // Needed to clear any bits of trivial locations (which are not required
         // to be zero).
         locations.clearBits(bits, opVal);

@@ -4368,47 +4368,7 @@ class EndBorrowInst
   EndBorrowInst(SILDebugLocation debugLoc, SILValue borrowedValue)
       : UnaryInstructionBase(debugLoc, borrowedValue) {}
 
-public:
-  /// Return the value that this end_borrow is ending the borrow of if we are
-  /// borrowing a single value.
-  SILValue getSingleOriginalValue() const {
-    SILValue v = getOperand();
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(v))
-      return bbi->getOperand();
-    if (auto *lbi = dyn_cast<LoadBorrowInst>(v))
-      return lbi->getOperand();
-    return SILValue();
-  }
 
-  /// Return the set of guaranteed values that have scopes ended by this
-  /// end_borrow.
-  ///
-  /// Discussion: We can only have multiple values associated with an end_borrow
-  /// in the case of having Phi arguments with guaranteed inputs. This is
-  /// necessary to represent certain conditional operations such as:
-  ///
-  /// class Klass {
-  ///   let k1: Klass
-  ///   let k2: Klass
-  /// }
-  ///
-  /// func useKlass(k: Klass) { ... }
-  /// var boolValue : Bool { ... }
-  ///
-  /// func f(k: Klass) {
-  ///   useKlass(boolValue ? k.k1 : k.k2)
-  /// }
-  ///
-  /// Today, when we SILGen such code, we copy k.k1 and k.k2 before the Phi when
-  /// it could potentially be avoided. So today this just appends
-  /// getSingleOriginalValue() to originalValues.
-  ///
-  /// TODO: Once this changes, this code must be update.
-  void getOriginalValues(SmallVectorImpl<SILValue> &originalValues) const {
-    SILValue value = getSingleOriginalValue();
-    assert(value && "Guaranteed phi arguments are not supported now");
-    originalValues.emplace_back(value);
-  }
 };
 
 /// Different kinds of access.

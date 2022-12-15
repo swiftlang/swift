@@ -176,17 +176,11 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     tokensRef = ctx.AllocateCopy(*tokens);
 
 #if SWIFT_SWIFT_PARSER
-  if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
-       ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
+  if (ctx.LangOpts.hasFeature(Feature::ParserValidation) &&
       ctx.SourceMgr.getIDEInspectionTargetBufferID() != bufferID &&
       SF->Kind != SourceFileKind::SIL) {
     auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
     unsigned int flags = 0;
-
-    if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
-        !parser.L->lexingCutOffOffset()) {
-      flags |= SCC_RoundTrip;
-    }
 
     if (!ctx.Diags.hadAnyError() &&
         ctx.LangOpts.hasFeature(Feature::ParserValidation))

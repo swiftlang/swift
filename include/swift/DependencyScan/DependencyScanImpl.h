@@ -104,6 +104,9 @@ typedef struct {
 
   /// The path to the .swiftSourceInfo file.
   swiftscan_string_ref_t module_source_info_path;
+
+  /// A flag to indicate whether or not this module is a framework.
+  bool is_framework;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their

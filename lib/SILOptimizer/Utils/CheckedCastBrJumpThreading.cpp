@@ -253,7 +253,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
 // Return false if an ownership RAUW is necessary but cannot be performed.
 bool CheckedCastBrJumpThreading::Edit::
 canRAUW(OwnershipFixupContext &rauwContext) {
-  if (InvertSuccess || SuccessPreds.empty())
+  if (InvertSuccess || (SuccessPreds.empty() && !hasUnknownPreds))
     return true;
 
   auto *ccbi = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
@@ -334,7 +334,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
 
   auto *checkedCastBr = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
   auto *oldSuccessArg = checkedCastBr->getSuccessBB()->getArgument(0);
-  if (InvertSuccess) {
+  if (InvertSuccess || (SuccessPreds.empty() && !hasUnknownPreds)) {
     assert(!hasUnknownPreds && "is not handled, should have been checked");
     // This success path is unused, so undef its uses and delete the cast.
     oldSuccessArg->replaceAllUsesWithUndef();

@@ -1,4 +1,7 @@
-// RUN: %target-sil-opt -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+// RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+
+// Memory lifetime verifier also raises errors in some of these cases, add dont-abort-on-memory-lifetime-errors so that we don't check it's output.
+// Memory lifetime verifier cannot subsume this because the verification is disabled on unreachable paths.
 
 import Builtin
 
