@@ -25,6 +25,7 @@
 #include <string>
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Win32.h"
 
 #include "swift/shims/GlobalObjects.h"
 #include "swift/shims/RuntimeStubs.h"
@@ -193,48 +194,6 @@ static void swift::enumerateUnsafeArgv(const F& body) {
 #elif defined(_WIN32)
 #include <stdlib.h>
 
-namespace swift {
-  /// Convert an argument, represented by a wide string, to UTF-8.
-  ///
-  /// @param str The string to convert.
-  /// 
-  /// @returns The string, converted to UTF-8. The caller is responsible for
-  ///   freeing this string when done with it.
-  /// 
-  /// If @a str cannot be converted to UTF-8, a fatal error occurs.
-  static char *copyUTF8FromWide(wchar_t *str) {
-    char *result = nullptr;
-
-    int resultLength = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, str,
-      -1, nullptr, 0, nullptr, nullptr);
-    if (resultLength <= 0) {
-      swift::fatalError(0,
-        "Fatal error: Could not get length of commandline "
-        "argument '%ls': %lu\n",
-        str, GetLastError());
-    }
-
-    result = reinterpret_cast<char *>(malloc(resultLength));
-    if (!result) {
-      swift::fatalError(0,
-        "Fatal error: Could not allocate space for commandline "
-        "argument '%ls': %d\n",
-        str, errno);
-    }
-
-    resultLength = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, str, -1,
-      result, resultLength, nullptr, nullptr);
-    if (resultLength <= 0) {
-      swift::fatalError(0,
-        "Fatal error: Conversion to UTF-8 failed for "
-        "commandline argument '%ls': %lu\n",
-        str, GetLastError());
-    }
-
-    return result;
-  }
-}
-
 static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   return nullptr;
 }
@@ -244,7 +203,7 @@ static void swift::enumerateUnsafeArgv(const F& body) {
   int argc = 0;
   if (LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
     std::for_each(wargv, wargv + argc, [=] (wchar_t *warg) {
-      auto arg = copyUTF8FromWide(warg);
+      auto arg = swift::win32::copyUTF8FromWide(warg);
       body(argc, arg);
       free(arg);
     });
