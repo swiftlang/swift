@@ -220,13 +220,22 @@ Expr *swift::expandMacroExpr(
   auto macroBuffer =
       llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
+  GeneratedSourceInfo sourceInfo{
+    GeneratedSourceInfo::MacroExpansion,
+    *sourceFile->getBufferID(),
+    expr->getSourceRange(),
+    SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
+    ASTNode(expr).getOpaqueValue()
+  };
+  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
   free((void*)evaluatedSource.data());
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false, expr);
+      /*parsingOpts=*/{}, /*isPrimary=*/false);
 
   // Parse the expression.
   Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr, nullptr);

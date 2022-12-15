@@ -342,7 +342,17 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
                              newBufferStart.getAdvancedLoc(newInfo.EndOffset));
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    SM.setReplacedRange(AFD->getOriginalBodySourceRange(), newBodyRange);
+    SM.setGeneratedSourceInfo(
+        newBufferID,
+        GeneratedSourceInfo{
+          GeneratedSourceInfo::ReplacedFunctionBody,
+          *AFD->getParentSourceFile()->getBufferID(),
+          AFD->getOriginalBodySourceRange(),
+          newBodyRange,
+          AFD
+        }
+    );
+
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
 

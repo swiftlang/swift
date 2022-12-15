@@ -877,8 +877,18 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   cache.lookupClassMembers(accessPath, consumer);
 }
 
-SourceFile *SourceFile::getEnclosingSourceFile() const {
+ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+}
+
+SourceFile *SourceFile::getEnclosingSourceFile() const {
+  auto macroExpansion = getMacroExpansion();
+  if (!macroExpansion)
     return nullptr;
 
   auto sourceLoc = macroExpansion.getStartLoc();
@@ -3263,17 +3273,13 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ParsingOptions parsingOpts, bool isPrimary,
-                       ASTNode macroExpansion)
+                       ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary),
-      macroExpansion(macroExpansion), Kind(K) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
          "A primary cannot appear outside the main module");
-  assert(macroExpansion.isNull() == (K != SourceFileKind::MacroExpansion) &&
-         "Macro expansions always need an expansion node");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);

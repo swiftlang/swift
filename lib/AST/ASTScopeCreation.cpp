@@ -248,7 +248,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
     : SF(SF), scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
-    SourceLoc parentLoc = SF->macroExpansion.getStartLoc();
+    SourceLoc parentLoc = SF->getMacroExpansion().getStartLoc();
     if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
       parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
     }
