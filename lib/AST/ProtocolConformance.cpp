@@ -1097,6 +1097,11 @@ void NominalTypeDecl::prepareConformanceTable() const {
   if (mutableThis->getAttrs().hasAttribute<GlobalActorAttr>()) {
     addSynthesized(ctx.getProtocol(KnownProtocolKind::GlobalActor));
   }
+
+  // All nominal types that are not move-only conform to Copyable.
+  if (!mutableThis->isMoveOnly()) {
+    addSynthesized(ctx.getProtocol(KnownProtocolKind::Copyable));
+  }
 }
 
 bool NominalTypeDecl::lookupConformance(
@@ -1224,24 +1229,24 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Try to find specific conformances
   SmallVector<ProtocolConformance *, 2> result;
 
-  // Sendable may be synthesized for concrete types
-  if (!isa<ProtocolDecl>(nominal)) {
-    if (auto sendable =
-            findSynthesizedConformance(dc, KnownProtocolKind::Sendable)) {
-      result.push_back(sendable);
+  auto trySynthesize = [&](KnownProtocolKind knownProto) {
+    if (auto conformance =
+            findSynthesizedConformance(dc, knownProto)) {
+      result.push_back(conformance);
     }
+  };
+
+  // Concrete types may synthesize some conformances
+  if (!isa<ProtocolDecl>(nominal)) {
+    trySynthesize(KnownProtocolKind::Sendable);
+    trySynthesize(KnownProtocolKind::Copyable); // FIXME: we do it when the conformance table is generaetd
+                                                // so this is actually useless now.
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
   if (nominal->isDistributedActor()) {
-    if (auto conformance =
-            findSynthesizedConformance(dc, KnownProtocolKind::Encodable)) {
-      result.push_back(conformance);
-    }
-    if (auto conformance =
-            findSynthesizedConformance(dc, KnownProtocolKind::Decodable)) {
-      result.push_back(conformance);
-    }
+    trySynthesize(KnownProtocolKind::Encodable);
+    trySynthesize(KnownProtocolKind::Decodable);
   }
 
   return result;

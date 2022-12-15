@@ -422,6 +422,9 @@ enum class FixKind : uint8_t {
   /// Allow function type actor mismatch e.g. `@MainActor () -> Void`
   /// vs.`@OtherActor () -> Void`
   AllowGlobalActorMismatch,
+
+  /// Produce an error about a type that must be Copyable
+  MustBeCopyable,
 };
 
 class ConstraintFix {
@@ -2024,6 +2027,29 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::NotCompileTimeConst;
+  }
+};
+
+class MustBeCopyable final : public ConstraintFix {
+  Type noncopyableTy;
+
+  MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator);
+
+public:
+  std::string getName() const override { return "remove move-only from type"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static MustBeCopyable *create(ConstraintSystem &cs,
+                             Type noncopyableTy,
+                             ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MustBeCopyable;
   }
 };
 
