@@ -28,3 +28,40 @@ public indirect enum OneOfThese : Hashable {
 }
 
 
+public protocol ProtocolWithAYield {
+  associatedtype Assoc
+  @_borrowed
+  subscript() -> Assoc { get }
+}
+
+public struct ResilientTrivialStruct {}
+
+public struct StructYieldingAResilientTrivialValue : ProtocolWithAYield {
+  var i: ResilientTrivialStruct
+  public typealias Assoc = ResilientTrivialStruct
+  // CHECK-LABEL: sil {{.*}}@$s30opaque_values_silgen_resilient36StructYieldingAResilientTrivialValueVAA18ProtocolWithAYieldA2aDP5AssocQzycirTW {{.*}} {
+  // CHECK:         yield {{%[^,]+}} : $ResilientTrivialStruct
+  // CHECK-LABEL: } // end sil function '$s30opaque_values_silgen_resilient36StructYieldingAResilientTrivialValueVAA18ProtocolWithAYieldA2aDP5AssocQzycirTW'
+  public subscript() -> ResilientTrivialStruct {
+    _read {
+      yield i
+    }
+  }
+}
+
+public struct ResilientNontrivialStruct {
+  var s: String
+}
+
+public struct StructYieldingAResilientNonetrivialValue : ProtocolWithAYield {
+  var i: ResilientNontrivialStruct
+  public typealias Assoc = ResilientNontrivialStruct
+  // CHECK-LABEL: sil {{.*}}@$s30opaque_values_silgen_resilient40StructYieldingAResilientNonetrivialValueVAA18ProtocolWithAYieldA2aDP5AssocQzycirTW {{.*}} {
+  // CHECK:         yield {{%[^,]+}} : $ResilientNontrivialStruct
+  // CHECK-LABEL: } // end sil function '$s30opaque_values_silgen_resilient40StructYieldingAResilientNonetrivialValueVAA18ProtocolWithAYieldA2aDP5AssocQzycirTW'
+  public subscript() -> ResilientNontrivialStruct {
+    _read {
+      yield i
+    }
+  }
+}

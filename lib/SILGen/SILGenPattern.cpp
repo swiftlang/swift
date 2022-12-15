@@ -2449,7 +2449,13 @@ void PatternMatchEmission::
 emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
   auto found = Temporaries.find(dest);
   assert(found != Temporaries.end());
-  SGF.B.createCopyAddr(dest, value, found->second, IsNotTake, IsInitialization);
+  if (SGF.useLoweredAddresses()) {
+    SGF.B.createCopyAddr(dest, value, found->second, IsNotTake,
+                         IsInitialization);
+    return;
+  }
+  auto copy = SGF.B.createCopyValue(dest, value);
+  SGF.B.createStore(dest, copy, found->second, StoreOwnershipQualifier::Init);
 }
 
 /// Emit all the shared case statements.
