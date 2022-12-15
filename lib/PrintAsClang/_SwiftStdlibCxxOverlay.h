@@ -35,6 +35,12 @@ SWIFT_INLINE_THUNK T_0_0 get() const
 
 #ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
 
+/// Constructs a Swift string from a C++ string.
+SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
+  auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
+  memcpy(_getOpaquePointer(), &res, sizeof(res));
+}
+
 /// Casts the Swift String value to a C++ std::string.
 SWIFT_INLINE_THUNK operator std::string() const;
 

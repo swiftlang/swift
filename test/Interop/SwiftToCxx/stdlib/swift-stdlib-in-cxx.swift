@@ -90,12 +90,6 @@
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
-// CHECK-NEXT: #ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
-// CHECK-NEXT: inline __attribute__((always_inline)) String(const std::string &str) noexcept {
-// CHECK-NEXT:      auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
-// CHECK-NEXT:      memcpy(_getOpaquePointer(), &res, sizeof(res));
-// CHECK-NEXT: }
-// CHECK-NEXT: #endif
 // CHECK-NEXT: #define SWIFT_CXX_INTEROP_STRING_MIXIN
 // CHECK-NEXT: // Look for the C++ interop support header relative to clang's resource dir:
 // CHECK-NEXT: //  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
