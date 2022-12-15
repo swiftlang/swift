@@ -88,7 +88,8 @@ fileprivate func emitDiagnosticParts(
 func emitDiagnostic(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
-  diagnostic: Diagnostic
+  diagnostic: Diagnostic,
+  messageSuffix: String? = nil
 ) {
   // Collect all of the Fix-It changes based on their Fix-It ID.
   var fixItChangesByID: [MessageID : [FixIt.Change]] = [:]
@@ -101,7 +102,7 @@ func emitDiagnostic(
   emitDiagnosticParts(
     diagEnginePtr: diagEnginePtr,
     sourceFileBuffer: sourceFileBuffer,
-    message: diagnostic.diagMessage.message,
+    message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
     severity: diagnostic.diagMessage.severity,
     position: diagnostic.position,
     highlights: diagnostic.highlights,
