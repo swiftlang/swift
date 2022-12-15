@@ -411,6 +411,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ///             conflicts.
 
 #undef ADD_UNIT_TEST_SUBCLASS
+    llvm::errs() << "No test named: " << name << "\n";
+    assert(false && "Invalid test name");
   }
 
 
