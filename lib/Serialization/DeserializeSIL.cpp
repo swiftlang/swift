@@ -908,11 +908,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (fn->empty() && errorIfEmptyBody)
     return nullptr;
 
-  // Check that there are no unresolved forward definitions of opened
+  // Check that there are no unresolved forward definitions of local
   // archetypes.
-  if (SILMod.hasUnresolvedOpenedArchetypeDefinitions())
+  if (SILMod.hasUnresolvedLocalArchetypeDefinitions())
     llvm_unreachable(
-        "All forward definitions of opened archetypes should be resolved");
+        "All forward definitions of local archetypes should be resolved");
 
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);

@@ -45,7 +45,7 @@ static void *allocateTrailingInst(SILFunction &F, CountTypes... counts) {
 
 namespace {
 class TypeDependentOperandCollector {
-  SmallVector<CanOpenedArchetypeType, 4> rootOpenedArchetypes;
+  SmallVector<CanLocalArchetypeType, 4> rootLocalArchetypes;
   bool hasDynamicSelf = false;
 public:
   void collect(CanType type);
@@ -72,27 +72,27 @@ public:
 
 }
 
-/// Collect root open archetypes from a given type into \p RootOpenedArchetypes.
-/// \p RootOpenedArchetypes is being used as a set. We don't use a real set type
+/// Collect root open archetypes from a given type into \p RootLocalArchetypes.
+/// \p RootLocalArchetypes is being used as a set. We don't use a real set type
 /// here for performance reasons.
 void TypeDependentOperandCollector::collect(CanType type) {
   if (!type)
     return;
   if (type->hasDynamicSelfType())
     hasDynamicSelf = true;
-  if (!type->hasOpenedExistential())
+  if (!type->hasLocalArchetype())
     return;
   type.visit([&](CanType t) {
-    if (const auto opened = dyn_cast<OpenedArchetypeType>(t)) {
-      const auto root = opened.getRoot();
+    if (const auto local = dyn_cast<LocalArchetypeType>(t)) {
+      const auto root = local.getRoot();
 
-      // Add this root opened archetype if it was not seen yet.
+      // Add this root local archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
-      if (std::find(rootOpenedArchetypes.begin(), rootOpenedArchetypes.end(),
-                    root) == rootOpenedArchetypes.end())
-        rootOpenedArchetypes.push_back(root);
+      if (std::find(rootLocalArchetypes.begin(), rootLocalArchetypes.end(),
+                    root) == rootLocalArchetypes.end())
+        rootLocalArchetypes.push_back(root);
     }
   });
 }
@@ -112,12 +112,12 @@ void TypeDependentOperandCollector::collect(SubstitutionMap subs) {
 void TypeDependentOperandCollector::addTo(SmallVectorImpl<SILValue> &operands,
                                           SILFunction &F) {
   size_t firstArchetypeOperand = operands.size();
-  for (CanOpenedArchetypeType archetype : rootOpenedArchetypes) {
-    SILValue def = F.getModule().getRootOpenedArchetypeDef(archetype, &F);
+  for (CanLocalArchetypeType archetype : rootLocalArchetypes) {
+    SILValue def = F.getModule().getRootLocalArchetypeDef(archetype, &F);
     assert(def->getFunction() == &F &&
-           "def of root opened archetype is in wrong function");
+           "def of root local archetype is in wrong function");
 
-    // The archetypes in rootOpenedArchetypes have already been uniqued,
+    // The archetypes in rootLocalArchetypes have already been uniqued,
     // but a single instruction can open multiple archetypes (e.g.
     // open_pack_element), so we also unique the actual operand values.
     // As above, we assume there are very few values in practice and so
@@ -130,9 +130,9 @@ void TypeDependentOperandCollector::addTo(SmallVectorImpl<SILValue> &operands,
     operands.push_back(F.getDynamicSelfMetadata());
 }
 
-/// Collects all root opened archetypes from a type and a substitution list, and
+/// Collects all root local archetypes from a type and a substitution list, and
 /// forms a corresponding list of operands.
-/// We need to know the number of root opened archetypes to estimate the number
+/// We need to know the number of root local archetypes to estimate the number
 /// of corresponding operands for the instruction being formed, because we need
 /// to reserve enough memory for these operands.
 template <class... Sources>

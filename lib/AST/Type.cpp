@@ -3964,11 +3964,12 @@ OpenedArchetypeType::OpenedArchetypeType(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout)
-  : ArchetypeType(TypeKind::OpenedArchetype, interfaceType->getASTContext(),
-                  RecursiveTypeProperties::HasArchetype
-                    | RecursiveTypeProperties::HasOpenedExistential,
-                  interfaceType, conformsTo, superclass, layout,
-                  environment)
+  : LocalArchetypeType(TypeKind::OpenedArchetype,
+                       interfaceType->getASTContext(),
+                       RecursiveTypeProperties::HasArchetype
+                         | RecursiveTypeProperties::HasOpenedExistential,
+                       interfaceType, conformsTo, superclass, layout,
+                       environment)
 {
   assert(!interfaceType->isParameterPack());
 }
@@ -4022,9 +4023,11 @@ ElementArchetypeType::ElementArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
-    : ArchetypeType(TypeKind::ElementArchetype, Ctx,
-                    RecursiveTypeProperties::HasArchetype, InterfaceType,
-                    ConformsTo, Superclass, Layout, GenericEnv) {
+    : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
+                         RecursiveTypeProperties::HasArchetype |
+                         RecursiveTypeProperties::HasElementArchetype,
+                         InterfaceType,
+                         ConformsTo, Superclass, Layout, GenericEnv) {
 }
 
 CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(

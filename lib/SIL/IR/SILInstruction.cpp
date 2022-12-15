@@ -1531,17 +1531,17 @@ const ValueBase *SILInstructionResultArray::back() const {
 //                          Defined opened archetypes
 //===----------------------------------------------------------------------===//
 
-bool SILInstruction::definesOpenedArchetypes() const {
+bool SILInstruction::definesLocalArchetypes() const {
   bool definesAny = false;
-  forEachDefinedOpenedArchetype([&](CanOpenedArchetypeType type,
-                                    SILValue dependency) {
+  forEachDefinedLocalArchetype([&](CanLocalArchetypeType type,
+                                   SILValue dependency) {
     definesAny = true;
   });
   return definesAny;
 }
 
-void SILInstruction::forEachDefinedOpenedArchetype(
-      llvm::function_ref<void(CanOpenedArchetypeType, SILValue)> fn) const {
+void SILInstruction::forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const {
   switch (getKind()) {
 #define SINGLE_VALUE_SINGLE_OPEN(TYPE)                                    \
   case SILInstructionKind::TYPE: {                                        \
