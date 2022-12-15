@@ -112,9 +112,9 @@
 // CHECK-NEXT:   inline Swift::Optional<String_Index> index(const String_Index& i, swift::Int n, const String_Index& limit) const;
 // CHECK-NEXT:   inline swift::Int distance(const String_Index& i, const String_Index& j) const;
 // CHECK-NEXT: inline uint8_t operator [](const String_Index& i) const;
-// CHECK-NEXT:   inline String getDebugDescription() const;
-// CHECK-NEXT:   inline String getDescription() const;
-// CHECK-NEXT:   inline swift::Int getCount() const;
+// CHECK:   inline String getDescription() const;
+// CHECK:   inline swift::Int getCount() const;
+// CHECK-NEXT: private:
 
 // CHECK: #if __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
