@@ -8,17 +8,19 @@ import StdlibUnittest
 
 var DeinitEscapeTestSuite = TestSuite("DeinitEscape")
 
-var globalObjects: [AnyObject] = []
+var globalObjects1: [AnyObject] = []
+var globalObjects2: [AnyObject] = []
 
 DeinitEscapeTestSuite.test("deinit escapes self") {
   expectCrashLater()
 
   class C {
     deinit {
-      globalObjects.append(self)
+      globalObjects2.append(self)
     }
   }
-  _ = C()
+  globalObjects1.append(C())
+  globalObjects1 = []
 
   expectUnreachable()
 }
