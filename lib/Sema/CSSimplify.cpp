@@ -8129,6 +8129,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
       }
     }
+
+    // If this is a failure to conform to Copyable, tailor the error message.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      auto *fix =
+          MustBeCopyable::create(*this, type, getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
   }
 
   // There's nothing more we can do; fail.
@@ -13945,7 +13953,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MacroMissingPound:
   case FixKind::MacroMissingArguments:
-  case FixKind::AllowGlobalActorMismatch: {
+  case FixKind::AllowGlobalActorMismatch:
+  case FixKind::MustBeCopyable: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

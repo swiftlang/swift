@@ -1527,6 +1527,11 @@ LookupConformanceInModuleRequest::evaluate(
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
+    // All archetypes conform to Copyable since they represent a generic.
+    // FIXME: can't tell whether this is a hack.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
+      return ProtocolConformanceRef(protocol);
+
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be

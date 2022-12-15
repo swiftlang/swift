@@ -1326,6 +1326,21 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   return failure.diagnose(asNote);
 }
 
+MustBeCopyable::MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::MustBeCopyable, locator, FixBehavior::Error),
+      noncopyableTy(noncopyableTy) {}
+
+bool MustBeCopyable::diagnose(const Solution &solution, bool asNote) const {
+  NotCopyableFailure failure(solution, noncopyableTy, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MustBeCopyable* MustBeCopyable::create(ConstraintSystem &cs,
+                                              Type noncopyableTy,
+                                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy, locator);
+}
+
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
   CollectionElementContextualFailure failure(

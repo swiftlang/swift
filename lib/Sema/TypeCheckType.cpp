@@ -964,6 +964,23 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   return result;
 }
 
+/// if any of the generic args are a concrete move-only type, emit an error.
+/// returns true iff an error diagnostic was emitted
+static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
+                                         SourceLoc loc,
+                                         ArrayRef<Type> genericArgs) {
+  bool didEmitDiag = false;
+  for (auto t: genericArgs) {
+    if (!t->isPureMoveOnly())
+      continue;
+
+    ctx.Diags.diagnose(loc, diag::moveonly_generics, t);
+    didEmitDiag = true;
+  }
+
+  return didEmitDiag;
+}
+
 /// Apply generic arguments to the given type.
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
@@ -983,6 +1000,10 @@ Type TypeResolution::applyUnboundGenericArguments(
   // or unbound generics, let's skip the check here, and let the solver
   // do it when missing types are deduced.
   bool skipRequirementsCheck = false;
+
+  // check for generic args that are move-only
+  if (didDiagnoseMoveOnlyGenericArgs(getASTContext(), loc, genericArgs))
+    return ErrorType::get(getASTContext());
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -1969,6 +1990,7 @@ namespace {
     }
 
     Type diagnoseDisallowedExistential(TypeRepr *repr, Type type);
+    bool diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy);
 
     NeverNullType resolveOpenedExistentialArchetype(
         TypeAttributes &attrs, TypeRepr *repr,
@@ -2149,6 +2171,23 @@ Type TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr, Type type) {
   }
 
   return type;
+}
+
+/// Checks the given type, assuming that it appears as an argument for a
+/// generic parameter in the \c repr, to see if it is move-only.
+///
+/// Because generic type parameters currently all assume copyability of
+/// the substituted type, it's an error for a move-only type to appear
+/// as an argument for type parameters.
+///
+/// returns true if an error diagnostic was emitted
+bool TypeResolver::diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy) {
+  if (genericArgTy->isPureMoveOnly()) {
+    diagnoseInvalid(repr, repr->getLoc(), diag::moveonly_generics,
+                    genericArgTy);
+    return true;
+  }
+  return false;
 }
 
 NeverNullType TypeResolver::resolveType(TypeRepr *repr,
@@ -4054,6 +4093,10 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
     return ErrorType::get(ctx);
   }
 
+  // do not allow move-only types in an array
+  if (diagnoseMoveOnly(repr, baseTy))
+    return ErrorType::get(ctx);
+
   return ArraySliceType::get(baseTy);
 }
 
@@ -4103,6 +4146,10 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   if (optionalTy->hasError()) {
     return ErrorType::get(getASTContext());
   }
+
+  // do not allow move-only types in an optional
+  if (diagnoseMoveOnly(repr, baseTy))
+    return ErrorType::get(getASTContext());
 
   return optionalTy;
 }
@@ -4201,6 +4248,10 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     return ErrorType::get(getASTContext());
   }
 
+  // do not allow move-only types in an implicitly-unwrapped optional
+  if (diagnoseMoveOnly(repr, baseTy))
+    return ErrorType::get(getASTContext());
+
   return uncheckedOptionalTy;
 }
 
@@ -4214,6 +4265,10 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
     diagnose(repr->getLoc(), diag::vararg_not_allowed)
       .highlight(repr->getSourceRange());
   }
+
+  // do not allow move-only types as the element of a vararg
+  if (diagnoseMoveOnly(repr, element))
+    return ErrorType::get(getASTContext());
 
   return element;
 }

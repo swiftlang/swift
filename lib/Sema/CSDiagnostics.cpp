@@ -5811,6 +5811,11 @@ bool NotCompileTimeConstFailure::diagnoseAsError() {
   return true;
 }
 
+bool NotCopyableFailure::diagnoseAsError() {
+  emitDiagnostic(diag::moveonly_generics, noncopyableTy);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();
