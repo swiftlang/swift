@@ -76,7 +76,6 @@ if (SWIFT_SWIFT_PARSER)
     SwiftOperators
     SwiftSyntaxBuilder
     _SwiftSyntaxMacros
-    SwiftCompilerSupport
   )
 
   # Compute the list of SwiftSyntax targets

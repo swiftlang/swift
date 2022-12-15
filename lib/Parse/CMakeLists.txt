@@ -33,7 +33,7 @@ if (SWIFT_SWIFT_PARSER)
   #
   #   target_link_libraries(swiftParse
   #     PRIVATE
-  #     SwiftSyntax::SwiftCompilerSupport
+  #     SwiftSyntax::SwiftParser
   #     ...
   #   )
   target_link_libraries(swiftParse
@@ -46,7 +46,6 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftOperators
     SwiftSyntax::SwiftSyntaxBuilder
     SwiftSyntax::_SwiftSyntaxMacros
-    SwiftSyntax::SwiftCompilerSupport
     $<TARGET_OBJECTS:swiftASTGen>
   )
 
@@ -59,13 +58,7 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftOperators
     SwiftSyntax::SwiftSyntaxBuilder
     SwiftSyntax::_SwiftSyntaxMacros
-    SwiftSyntax::SwiftCompilerSupport
     swiftASTGen
-  )
-
-  target_include_directories(swiftParse
-    PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftCompilerSupport
   )
 
   target_compile_definitions(swiftParse

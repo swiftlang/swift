@@ -182,6 +182,11 @@ extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
 /// round-trip succeeded, non-zero otherwise.
 extern "C" int swift_ASTGen_roundTripCheck(void *sourceFile);
 
+/// Emit parser diagnostics for given source file.. Returns non-zero if any
+/// diagnostics were emitted.
+extern "C" int swift_ASTGen_emitParserDiagnostics(
+    void *diagEngine, void *sourceFile
+);
 
 // Build AST nodes for the top-level entities in the syntax.
 extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
@@ -203,6 +208,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   if ((Context.LangOpts.hasFeature(Feature::Macros) ||
        Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
        Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       Context.LangOpts.hasFeature(Feature::ParserValidation) ||
        Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
       !SourceMgr.hasIDEInspectionTargetBuffer() &&
       SF.Kind != SourceFileKind::SIL) {
@@ -281,16 +287,28 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   }
 
 #if SWIFT_SWIFT_PARSER
-  // Perform round-trip checking.
-  if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+  // Perform round-trip and/or validation checking.
+  if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
       SF.exportedSourceFile &&
-      !L->lexingCutOffOffset() &&
-      swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
-    SourceLoc loc;
-    if (auto bufferID = SF.getBufferID()) {
-      loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+      !L->lexingCutOffOffset()) {
+    if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+        swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
+      SourceLoc loc;
+      if (auto bufferID = SF.getBufferID()) {
+        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+      }
+      diagnose(loc, diag::parser_round_trip_error);
+    } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
+               !Context.Diags.hadAnyError() &&
+               swift_ASTGen_emitParserDiagnostics(
+                   &Context.Diags, SF.exportedSourceFile)) {
+      SourceLoc loc;
+      if (auto bufferID = SF.getBufferID()) {
+        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+      }
+      diagnose(loc, diag::parser_new_parser_errors);
     }
-    diagnose(loc, diag::parser_round_trip_error);
   }
 #endif
 }
