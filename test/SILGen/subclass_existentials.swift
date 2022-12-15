@@ -195,7 +195,7 @@ func methodCalls(
 // CHECK: } // end sil function '$[[THUNK1_NAME]]'
 //
 // CHECK: sil private [ossa] @$[[THUNK2_NAME]] : $@convention(thin) (@guaranteed any Base<Int> & P) -> @owned any Base<Int> & P {
-// CHECK: bb0(%0 : @guaranteed $any Base<Int> & P):
+// CHECK: bb0(%0 : @closureCapture @guaranteed $any Base<Int> & P):
 // CHECK:  [[OPENED:%[0-9]+]] = open_existential_ref %0 : $any Base<Int> & P to $[[OPENED_TY:@opened\("[-A-F0-9]+", any Base<Int> & P\) Self]]
 // CHECK:  [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
 // CHECK:  [[CLASS:%[0-9]+]] = upcast [[OPENED_COPY]] : $[[OPENED_TY]] to $Base<Int>

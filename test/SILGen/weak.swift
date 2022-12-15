@@ -56,7 +56,7 @@ func test0(c c: C) {
 // <rdar://problem/16871284> silgen crashes on weak capture
 // CHECK: closure #1 () -> Swift.Int in weak.testClosureOverWeak() -> ()
 // CHECK-LABEL: sil private [ossa] @$s4weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> Int {
-// CHECK: bb0(%0 : @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] %1

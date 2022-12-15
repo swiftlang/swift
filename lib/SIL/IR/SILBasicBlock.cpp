@@ -136,8 +136,7 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
     for (auto *FuncArg : Other->getSILFunctionArguments()) {
       auto *NewArg =
           createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
-      NewArg->setNoImplicitCopy(FuncArg->isNoImplicitCopy());
-      NewArg->setLifetimeAnnotation(FuncArg->getLifetimeAnnotation());
+      NewArg->copyFlags(FuncArg);
     }
     return;
   }
