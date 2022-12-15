@@ -298,7 +298,7 @@ func logical_local_get(_ x: Int) -> Int {
   return prop
 }
 // CHECK-: sil private [[PROP_GET_CLOSURE]]
-// CHECK: bb0(%{{[0-9]+}} : $Int):
+// CHECK: bb0(%{{[0-9]+}} : @closureCapture $Int):
 
 func logical_generic_local_get<T>(_ x: Int, _: T) {
   var prop1: Int {
@@ -335,7 +335,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   // CHECK: apply [[FUNC_REF]](%0)
 }
 // CHECK: sil private [ossa] @$s10properties26logical_local_captured_get{{.*}}vg
-// CHECK: bb0(%{{[0-9]+}} : $Int):
+// CHECK: bb0(%{{[0-9]+}} : @closureCapture $Int):
 
 func inout_arg(_ x: inout Int) {}
 

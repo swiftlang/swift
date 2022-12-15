@@ -41,7 +41,7 @@ func test2() {
 // The closure just returns its value, which it captured directly.
 
 // CHECK: sil private [ossa] @$s9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : @closureCapture $Int):
 // CHECK:  return %0 : $Int
 
 // Verify that we can close over let decls of tuple type.

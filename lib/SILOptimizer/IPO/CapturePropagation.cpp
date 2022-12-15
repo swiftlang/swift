@@ -199,10 +199,7 @@ void CapturePropagationCloner::cloneClosure(
 
     auto *MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
-    MappedValue->setNoImplicitCopy(
-        cast<SILFunctionArgument>(Arg)->isNoImplicitCopy());
-    MappedValue->setLifetimeAnnotation(
-        cast<SILFunctionArgument>(Arg)->getLifetimeAnnotation());
+    MappedValue->copyFlags(cast<SILFunctionArgument>(Arg));
     entryArgs.push_back(MappedValue);
   }
   assert(OrigEntryBB->args_size() - ArgIdx == PartialApplyArgs.size()

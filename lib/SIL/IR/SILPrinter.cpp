@@ -160,6 +160,7 @@ struct SILValuePrinterInfo {
   Optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
+  bool IsCapture = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -169,13 +170,15 @@ struct SILValuePrinterInfo {
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -659,6 +662,8 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@_lexical ";
       break;
     }
+    if (i.IsCapture)
+      *this << "@closureCapture ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
@@ -693,14 +698,18 @@ public:
   }
   SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy(),
-            arg->getLifetimeAnnotation()};
+            arg->getLifetimeAnnotation(), arg->isClosureCapture()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
-    return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
-            arg->isNoImplicitCopy(), arg->getLifetimeAnnotation()};
+    return {Ctx.getID(arg),
+            arg->getType(),
+            arg->getOwnershipKind(),
+            arg->isNoImplicitCopy(),
+            arg->getLifetimeAnnotation(),
+            arg->isClosureCapture()};
   }
 
   //===--------------------------------------------------------------------===//
