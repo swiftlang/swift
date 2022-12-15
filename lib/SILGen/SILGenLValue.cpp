@@ -2122,12 +2122,16 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
     && !base.getType().isTrivial(SGF.F);
   if (!base.getType().isAddress() || isBorrowed) {
-    auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
-    if (isBorrowed)
-      base.copyInto(SGF, loc, tmp);
-    else
-      base.forwardInto(SGF, loc, tmp);
-    return SGF.emitManagedBufferWithCleanup(tmp);
+    if (SGF.useLoweredAddresses()) {
+      auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
+      if (isBorrowed)
+        base.copyInto(SGF, loc, tmp);
+      else
+        base.forwardInto(SGF, loc, tmp);
+      return SGF.emitManagedBufferWithCleanup(tmp);
+    } else {
+      return base.copy(SGF, loc);
+    }
   }
 
   return base;
