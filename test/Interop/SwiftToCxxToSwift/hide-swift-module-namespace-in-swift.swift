@@ -1,19 +1,20 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: touch %t/swiftMod.h
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop
+// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %FileCheck %s < %t/swiftMod.h
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop -Xcc -DTEST_FORCE_MODULE_REBUILD
+// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop
 
 // RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-error)
 
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
 //--- header.h
+#ifndef FIRSTPASS
 #include "swiftMod.h"
+#endif
 
 //--- module.modulemap
 module SwiftToCxxTest {
