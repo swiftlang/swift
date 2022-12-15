@@ -48,3 +48,14 @@ public func destroySourceFile(
     sourceFile.deallocate()
   }
 }
+
+/// Check for whether the given source file round-trips
+@_cdecl("swift_ASTGen_roundTripCheck")
+public func roundTripCheck(
+  sourceFilePtr: UnsafeMutablePointer<UInt8>
+) -> CInt {
+  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
+    let sf = sourceFile.pointee
+    return sf.syntax.syntaxTextBytes.elementsEqual(sf.buffer) ? 0 : 1
+  }
+}
