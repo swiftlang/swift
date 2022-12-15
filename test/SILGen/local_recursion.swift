@@ -82,25 +82,25 @@ func local_recursion(_ x: Int, y: Int) {
 }
 
 // CHECK: sil private [ossa] [[SELF_RECURSIVE]] :
-// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
+// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : @closureCapture $Int):
 // CHECK:   [[SELF_REF:%.*]] = function_ref [[SELF_RECURSIVE]] :
 // CHECK:   apply [[SELF_REF]]({{.*}}, [[X]])
 
 // CHECK: sil private [ossa] [[MUTUALLY_RECURSIVE_1]]
-// CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : $Int, [[X:%2]] : $Int):
+// CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : @closureCapture $Int, [[X:%2]] : @closureCapture $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@\$s15local_recursionAA_1yySi_SitF20mutually_recursive_2L_yySiF]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
 // CHECK: sil private [ossa] [[MUTUALLY_RECURSIVE_2]]
-// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
+// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : @closureCapture $Int, [[Y:%2]] : @closureCapture $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
 // CHECK: sil private [ossa] [[TRANS_CAPTURE_1:@\$s15local_recursionAA_1yySi_SitF20transitive_capture_1L_yS2iF]]
-// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
+// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : @closureCapture $Int):
 
 // CHECK: sil private [ossa] [[TRANS_CAPTURE]]
-// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
+// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : @closureCapture $Int, [[Y:%2]] : @closureCapture $Int):
 // CHECK:   [[TRANS_CAPTURE_1_REF:%.*]] = function_ref [[TRANS_CAPTURE_1]]
 // CHECK:   apply [[TRANS_CAPTURE_1_REF]]({{.*}}, [[X]])
 
