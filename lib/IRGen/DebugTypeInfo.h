@@ -61,11 +61,11 @@ public:
                                         const TypeInfo &Info,
                                         bool IsFragmentTypeInfo);
   /// Create type for global type metadata.
-  static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
-                                   Size size, Alignment align);
+  static DebugTypeInfo getGlobalMetadata(swift::Type Ty, llvm::Type *StorageTy,
+                                         Size size, Alignment align);
   /// Create type for an artificial metadata variable.
-  static DebugTypeInfo getArchetype(swift::Type Ty, llvm::Type *StorageTy,
-                                    Size size, Alignment align);
+  static DebugTypeInfo getTypeMetadata(swift::Type Ty, llvm::Type *StorageTy,
+                                       Size size, Alignment align);
 
   /// Create a forward declaration for a type whose size is unknown.
   static DebugTypeInfo getForwardDecl(swift::Type Ty);

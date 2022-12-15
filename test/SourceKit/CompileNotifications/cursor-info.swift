@@ -1,3 +1,6 @@
+// rdar://103369449
+// REQUIRES: asserts
+
 // RUN: %sourcekitd-test -req=track-compiles == -req=cursor %s -offset=0 -- %s | %FileCheck %s -check-prefix=COMPILE_1 --enable-yaml-compatibility
 // COMPILE_1: <empty cursor info; internal diagnostic: "Unable to resolve cursor info.">
 // COMPILE_1: {

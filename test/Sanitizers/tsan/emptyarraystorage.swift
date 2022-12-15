@@ -6,6 +6,9 @@
 // REQUIRES: foundation
 // UNSUPPORTED: OS=tvos
 
+// rdar://101876380
+// UNSUPPORTED: OS=ios
+
 import Foundation
 
 let sem = DispatchSemaphore(value: 0)

@@ -76,8 +76,9 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
   return getFromTypeInfo(Type, Info, IsFragmentTypeInfo);
 }
 
-DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,
-                                         Size size, Alignment align) {
+DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
+                                               llvm::Type *StorageTy, Size size,
+                                               Alignment align) {
   DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size,
                       align, true, false, false);
   assert(StorageTy && "StorageType is a nullptr");
@@ -86,8 +87,9 @@ DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,
   return DbgTy;
 }
 
-DebugTypeInfo DebugTypeInfo::getArchetype(swift::Type Ty, llvm::Type *StorageTy,
-                                          Size size, Alignment align) {
+DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty,
+                                             llvm::Type *StorageTy, Size size,
+                                             Alignment align) {
   DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size,
                       align, true, true, false);
   assert(StorageTy && "StorageType is a nullptr");

@@ -2,6 +2,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://103369740 #62183
+// UNSUPPORTED: OS=watchos
+
 func markUsed<T>(_ t: T) {}
 
 protocol BarProtocol {

@@ -17,6 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// rdar://103369837
+// UNSUPPORTED: OS=watchos
+
 import StdlibUnittest
 
 @available(SwiftStdlib 5.8, *)

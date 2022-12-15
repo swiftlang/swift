@@ -2918,7 +2918,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   static const char *Tau = u8"\u03C4";
   llvm::raw_svector_ostream OS(Buf);
   OS << '$' << Tau << '_' << Depth << '_' << Index;
-  auto DbgTy = DebugTypeInfo::getArchetype(
+  auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
