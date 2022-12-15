@@ -1,7 +1,9 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
 // REQUIRES: OS=macosx
 
-macro stringify<T>(_ value: T) -> (T, String) = _SwiftSyntaxMacros.StringifyMacro
+macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
 macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 macro missingMacro2(_: Any) = MissingModule.MissingType
 

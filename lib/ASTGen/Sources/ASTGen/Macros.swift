@@ -176,14 +176,13 @@ func evaluateMacro(
     }
 
     // Emit diagnostics accumulated in the context.
+    let macroName = parentExpansion.macro.withoutTrivia().description
     for diag in context.diagnostics {
-      // FIXME: Consider tacking on a note that says that this diagnostic
-      // came from a macro expansion.
       emitDiagnostic(
         diagEnginePtr: diagEnginePtr,
         sourceFileBuffer: .init(mutating: sourceFile.pointee.buffer),
-        nodeStartOffset: parentSyntax.position.utf8Offset,
-        diagnostic: diag
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
       )
     }
 
