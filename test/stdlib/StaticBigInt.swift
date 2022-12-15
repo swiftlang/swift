@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 // rdar://103369837
-// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=watchos || OS=macos
 
 import StdlibUnittest
 
