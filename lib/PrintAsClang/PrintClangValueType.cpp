@@ -159,14 +159,9 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
       os << "    return result;\n";
       os << "  }\n";
     });
-    os << "#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY\n";
-    ClangSyntaxPrinter(os).printInlineForThunk();
-    os << "String(const std::string &str) noexcept {\n";
-    os << "    auto res = "
-          "_impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());\n";
-    os << "    memcpy(_getOpaquePointer(), &res, sizeof(res));\n";
-    os << "}\n";
-    os << "#endif\n";
+    // Add additional methods for the `String` declaration.
+    printer.printDefine("SWIFT_CXX_INTEROP_STRING_MIXIN");
+    printer.printIncludeForShimHeader("_SwiftStdlibCxxOverlay.h");
   } else if (typeDecl == typeDecl->getASTContext().getOptionalDecl()) {
     // Add additional methods for the `Optional` declaration.
     printer.printDefine("SWIFT_CXX_INTEROP_OPTIONAL_MIXIN");

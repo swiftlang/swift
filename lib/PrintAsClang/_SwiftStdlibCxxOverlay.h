@@ -31,11 +31,45 @@ SWIFT_INLINE_THUNK T_0_0 get() const
 
 #undef SWIFT_CXX_INTEROP_OPTIONAL_MIXIN
 
+#elif defined(SWIFT_CXX_INTEROP_STRING_MIXIN)
+
+#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+
+/// Constructs a Swift string from a C++ string.
+SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
+  auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
+  memcpy(_getOpaquePointer(), &res, sizeof(res));
+}
+
+/// Casts the Swift String value to a C++ std::string.
+SWIFT_INLINE_THUNK operator std::string() const;
+
+#endif // SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+
+#undef SWIFT_CXX_INTEROP_STRING_MIXIN
+
 #else
 // out-of-class overlay for Swift standard library.
 
 static_assert(sizeof(_impl::_impl_String) >= 0,
               "included outside of stdlib bindings");
+
+#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+
+SWIFT_INLINE_THUNK String::operator std::string() const {
+  auto u = getUtf8();
+  std::string result;
+  result.reserve(u.getCount() + 1);
+  using IndexType = decltype(u.getStartIndex());
+  for (auto s = u.getStartIndex().getEncodedOffset(),
+            e = u.getEndIndex().getEncodedOffset();
+       s != e; s = u.index(IndexType::init(s), 1).getEncodedOffset()) {
+    result.push_back(u[IndexType::init(s)]);
+  }
+  return result;
+}
+
+#endif // SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
 
 namespace cxxOverlay {
 
