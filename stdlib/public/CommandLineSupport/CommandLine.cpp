@@ -204,6 +204,15 @@ static void swift::enumerateUnsafeArgv(const F& body) {
   if (LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
     std::for_each(wargv, wargv + argc, [=] (wchar_t *warg) {
       auto arg = swift::win32::copyUTF8FromWide(warg);
+      if (!arg) {
+        // Note that GetLastError() and errno may not be so useful here,
+        // as in the error case we may have called free(), which might reset
+        // either or both of them.
+        swift::fatalError(0,
+                          "Fatal error: Unable to convert argument '%ls' to "
+                          "UTF-8: %lx, %d.\n",
+                          warg, ::GetLastError(), errno);
+      }
       body(argc, arg);
       free(arg);
     });

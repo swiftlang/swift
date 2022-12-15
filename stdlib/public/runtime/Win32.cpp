@@ -28,30 +28,23 @@ swift::win32::copyUTF8FromWide(const wchar_t *str) {
                                   str, -1,
                                   nullptr, 0,
                                   nullptr, nullptr);
-  if (len <= 0) {
-    swift::fatalError(0, "failed to convert string '%ls' "
-                      "from wide to UTF-8: %lx\n",
-                      str, ::GetLastError());
-  }
+  if (len <= 0)
+    return nullptr;
 
   result = reinterpret_cast<char *>(std::malloc(len));
-  if (!result) {
-    swift::fatalError(0, "unable to allocate space to convert '%ls': %d\n",
-                      str, errno);
-  }
+  if (!result)
+    return nullptr;
 
   len = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
                               str, -1,
                               result, len,
                               nullptr, nullptr);
 
-  if (len <= 0) {
-    swift::fatalError(0, "failed to convert string '%ls' "
-                      "from wide to UTF-8: %lx\n",
-                      str, ::GetLastError());
-  }
+  if (len)
+    return result;
 
-  return result;
+  free(result);
+  return nullptr;
 }
 
 wchar_t *
@@ -60,28 +53,22 @@ swift::win32::copyWideFromUTF8(const char *str) {
   int len = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                                   str, -1,
                                   nullptr, 0);
-  if (len <= 0) {
-    swift::fatalError(0, "failed to convert string '%s' "
-                      "from UTF-8 to wide: %lx\n",
-                      str, ::GetLastError());
-  }
+  if (len <= 0)
+    return nullptr;
 
   result = reinterpret_cast<wchar_t *>(std::malloc(len * sizeof(wchar_t)));
-  if (!result) {
-    swift::fatalError(0, "unable to allocate space to convert '%s': %d\n",
-                      str, errno);
-  }
+  if (!result)
+    return nullptr;
 
   len = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                               str, -1,
                               result, len);
-  if (len <= 0) {
-    swift::fatalError(0, "failed to convert string '%s' "
-                      "from UTF-8 to wide: %lx\n",
-                      str, ::GetLastError());
-  }
 
-  return result;
+  if (len)
+    return result;
+
+  free(result);
+  return nullptr;
 }
 
 #endif // defined(_WIN32)

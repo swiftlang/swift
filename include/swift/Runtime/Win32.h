@@ -33,7 +33,7 @@ namespace win32 {
 /// @returns The string, converted to UTF-8.  The caller is responsible
 ///          for freeing this string with @c free() when done with it.
 ///
-/// If @a str cannot be converted to UTF-8, a fatal error occurs.
+/// If @a str cannot be converted to UTF-8, @c nullptr is returned.
 SWIFT_RUNTIME_STDLIB_INTERNAL
 char *copyUTF8FromWide(const wchar_t *str);
 
@@ -44,7 +44,7 @@ char *copyUTF8FromWide(const wchar_t *str);
 /// @returns The string, converted to UTF-16.  The caller is responsible
 ///          for freeing this string with @c free() when done with it.
 ///
-/// If @a str cannot be converted to UTF-16, a fatal error occurs.
+/// If @a str cannot be converted to UTF-16, @c nullptr is returned.
 SWIFT_RUNTIME_STDLIB_INTERNAL
 wchar_t *copyWideFromUTF8(const char *str);
 
