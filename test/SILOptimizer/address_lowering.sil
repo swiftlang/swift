@@ -1858,6 +1858,29 @@ entry:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @testCopyValue1StoreExtractAfterDestroyAggregate : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = alloc_stack $Pair<T>
+// CHECK:         [[COPY_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[INSTANCE_ADDR]])
+// CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[INSTANCE_ADDR]]{{.*}}, #Pair.x
+// CHECK:         copy_addr [[X_ADDR]] to [init] [[COPY_ADDR]]
+// CHECK:         destroy_addr [[INSTANCE_ADDR]]
+// CHECK:         copy_addr [take] [[COPY_ADDR]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testCopyValue1StoreExtractAfterDestroyAggregate'
+sil [ossa] @testCopyValue1StoreExtractAfterDestroyAggregate : $@convention(thin) <T> (@inout T) -> () {
+entry(%addr : $*T):
+    %instance = apply undef<T>() : $@convention(thin) <Tee> () -> @out Pair<Tee>
+    %lifetime = begin_borrow %instance : $Pair<T>
+    %x = struct_extract %lifetime : $Pair<T>, #Pair.x
+    %copy = copy_value %x : $T
+    end_borrow %lifetime : $Pair<T>
+    destroy_value %instance : $Pair<T>
+    store %copy to [assign] %addr : $*T
+    %retval = tuple ()
+    return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric

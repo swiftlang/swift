@@ -361,13 +361,28 @@ static bool isStoreCopy(SILValue value) {
     SmallVector<SILValue, 4> roots;
     findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
                                  roots);
-    if (llvm::any_of(roots, [](SILValue root) {
-      // Handle forwarding phis conservatively rather than recursing.
-      if (SILArgument::asPhi(root) && !BorrowedValue(root))
-        return true;
+    SSAPrunedLiveness liveness;
+    if (llvm::any_of(roots, [&liveness, storeInst](SILValue root) {
+          // Handle forwarding phis conservatively rather than recursing.
+          if (SILArgument::asPhi(root) && !BorrowedValue(root))
+            return true;
 
-      return isa<BeginApplyInst>(root->getDefiningInstruction());
-    })) {
+          if (isa<BeginApplyInst>(root->getDefiningInstruction())) {
+            return true;
+          }
+          liveness.initializeDef(root);
+          auto summary = liveness.computeSimple();
+          if (summary.addressUseKind != AddressUseKind::NonEscaping) {
+            return true;
+          }
+          if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
+            return true;
+          }
+          if (!liveness.isWithinBoundary(storeInst)) {
+            return true;
+          }
+          return false;
+        })) {
       return false;
     }
   }
