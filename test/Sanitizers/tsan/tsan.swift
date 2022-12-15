@@ -7,6 +7,9 @@
 // UNSUPPORTED: CPU=powerpc64le
 // UNSUPPORTED: threading_none
 
+// rdar://101876380
+// UNSUPPORTED: OS=ios
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run
