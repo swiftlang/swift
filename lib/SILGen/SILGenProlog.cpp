@@ -581,6 +581,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
+    if (addr->getType().isMoveOnly())
+      addr = SGF.B.createMarkMustCheckInst(
+          VD, addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
