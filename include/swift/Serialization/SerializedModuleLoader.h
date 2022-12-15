@@ -137,7 +137,7 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath);
+  llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath, bool isFramework);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>

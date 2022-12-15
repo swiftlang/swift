@@ -392,7 +392,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 }
 
 llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
-    Twine modulePath) {
+    Twine modulePath, bool isFramework) {
   // Open the module file
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   auto moduleBuf = fs.getBufferForFile(modulePath);
@@ -401,7 +401,6 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
 
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
       isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,

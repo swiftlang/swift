@@ -43,7 +43,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
   if (LoadMode == ModuleLoadingMode::OnlySerialized || !fs.exists(InPath)) {
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
-      auto dependencies = scanModuleFile(ModPath);
+      auto dependencies = scanModuleFile(ModPath, IsFramework);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();

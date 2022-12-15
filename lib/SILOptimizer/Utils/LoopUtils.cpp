@@ -33,7 +33,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   llvm::SmallVector<SILValue, 8> Args;
   for (auto *HeaderArg : Header->getArguments()) {
     Args.push_back(Preheader->createPhiArgument(HeaderArg->getType(),
-                                                OwnershipKind::Owned));
+                                                HeaderArg->getOwnershipKind()));
   }
 
   // Create the branch to the header.
