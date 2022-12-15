@@ -6575,6 +6575,42 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // FIXME: TuplePackMatcher doesn't correctly handle matching two
+       // abstract contextual tuple types in a generic context.
+       if (simplifyType(desugar1)->isEqual(simplifyType(desugar2)))
+         return getTypeMatchSuccess();
+
+      // If the tuple has consecutive pack expansions, packs must be
+      // resolved before matching.
+      auto delayMatching = [](TupleType *tuple) {
+        bool afterUnresolvedPack = false;
+        for (auto element : tuple->getElements()) {
+          if (afterUnresolvedPack && !element.hasName()) {
+            return true;
+          }
+
+          if (element.getType()->is<PackExpansionType>()) {
+            SmallPtrSet<TypeVariableType *, 2> typeVars;
+            element.getType()->getTypeVariables(typeVars);
+
+            afterUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
+              return tv->getImpl().canBindToPack();
+            });
+          } else {
+            afterUnresolvedPack = false;
+          }
+        }
+
+        return false;
+      };
+
+
+      auto *tuple1 = cast<TupleType>(desugar1);
+      auto *tuple2 = cast<TupleType>(desugar2);
+      if (delayMatching(tuple1) || delayMatching(tuple2)) {
+        return formUnsolvedResult();
+      }
+
       // Add each tuple type to the locator before matching the element types.
       // This is useful for diagnostics, because the error message can use the
       // full tuple type for several element mismatches. Use the original types
