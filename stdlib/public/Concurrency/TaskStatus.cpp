@@ -249,6 +249,7 @@ bool swift::addStatusRecord(
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
+        newStatus.traceStatusChanged(task);
         return true;
       } else {
         // Retry
@@ -260,7 +261,9 @@ bool swift::addStatusRecord(
 }
 
 SWIFT_CC(swift)
-bool swift::removeStatusRecord(TaskStatusRecord *record) {
+bool swift::removeStatusRecord(TaskStatusRecord *record,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn)) {
+
   auto task = swift_task_getCurrent();
   SWIFT_TASK_DEBUG_LOG("remove status record = %p, from current task = %p",
                        record, task);
@@ -278,6 +281,9 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
     if (oldStatus.getInnermostRecord() == record) {
       ActiveTaskStatus newStatus =
         oldStatus.withInnermostRecord(record->getParent());
+
+      fn(oldStatus, newStatus);
+
       if (status.compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_relaxed,
              /*failure*/ std::memory_order_relaxed)) {
@@ -311,6 +317,8 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
         break;
       }
     }
+
+    fn(oldStatus, oldStatus);
   });
 
   return !oldStatus.isCancelled();
@@ -552,10 +560,11 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   }
 
-  // TODO (rokhinip): These should support having escalation. For now,
-  // shortcircuit
-  case TaskStatusRecordKind::TaskDependency:
+  case TaskStatusRecordKind::TaskDependency: {
+    auto dependency = cast<TaskDependencyStatusRecord>(record);
+    dependency->performEscalationAction(newPriority);
     return;
+  }
 
   // Record locks shouldn't be found this way, but they don't have
   // anything to do anyway.
@@ -567,12 +576,14 @@ static void performEscalationAction(TaskStatusRecord *record,
   // FIXME: allow dynamic extension/correction?
 }
 
+// Caller has a valid +1 to the input task it is escalating for the duration of
+// this call
 SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 
   SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
-  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_acquire);
   auto newStatus = oldStatus;
 
   while (true) {
@@ -583,17 +594,22 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       return oldStatus.getStoredPriority();
     }
 
-    // Regardless of whether status record is locked or not, update the priority
-    // and RO bit on the task status
     if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
+      // Regardless of whether status record is locked or not, update the
+      // priority and RO bit on the task status
       newStatus = oldStatus.withEscalatedPriority(newPriority);
+    } else if (oldStatus.isComplete()) {
+      // We raced with concurrent completion, nothing to escalate
+      SWIFT_TASK_DEBUG_LOG("Escalated a task %p which had completed, do nothing", task);
+      return oldStatus.getStoredPriority();
     } else {
+      // Task is suspended.
       newStatus = oldStatus.withNewPriority(newPriority);
     }
 
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /* success */ std::memory_order_relaxed,
-            /* failure */ std::memory_order_relaxed)) {
+            /* failure */ std::memory_order_acquire)) {
       break;
     }
   }
@@ -620,8 +636,11 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // TODO (rokhinip): Add a signpost to flag that this is a potential
     // priority inversion
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
+
   } else {
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+    // We must have at least one record - the task dependency one.
+    assert(newStatus.getInnermostRecord() != NULL);
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
@@ -634,11 +653,6 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       performEscalationAction(cur, newPriority);
     }
   });
-  // TODO (rokhinip): If the task is awaiting on another task that is not a
-  // child task, we need to escalate whoever we are already awaiting on
-  //
-  // rdar://88093007 (Task escalation does not propagate to a future that it is
-  // waiting on)
 
   return newStatus.getStoredPriority();
 }

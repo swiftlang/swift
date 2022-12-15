@@ -1649,7 +1649,7 @@ SWIFT_CC(swiftasync)
 static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
                                ExecutorTrackingInfo *oldTracking) {
   // Note that this doesn't change the active task and so doesn't
-  // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+  // need to either update ActiveTask or flagAsRunning/flagAsSuspended*.
 
   // If there's already tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
@@ -1685,6 +1685,16 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
 
 // TODO (rokhinip): Workaround rdar://88700717. To be removed with
 // rdar://88711954
+//
+//   Executor we are jumping from            Executor we are jumping to                                  What do we do
+//       Default Executor                       Serial Queue
+//       Default Executor                       Workloop (generic, custom properties)
+//        Serial Queue                          Default
+//        Serial Queue                          Serial Queue
+//        Serial Queue                          Workloop (generic, custom properties)
+//        Workloop                              Workloop (generic, custom properties)
+//        Workloop                              Default
+//        Workloop                              Serial Queue
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,

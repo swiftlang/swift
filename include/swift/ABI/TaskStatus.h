@@ -318,7 +318,10 @@ public:
 
 
 // TODO (rokhinip): This should probably be part of every task instead of being
-// allocated on demand.
+// allocated on demand in the task when it first suspends
+//
+// This record is allocated for a task to record what it is dependent on before
+// the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
   // Enum specifying the type of dependency this task has
   enum {
@@ -379,6 +382,8 @@ public:
   TaskDependencyStatusRecord(AsyncTask *task) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(WaitingOnTask) {
+      // Released when this record is removed from the active task status
+      swift_retain(task);
       WaitingOn.Task = task;
   }
 
@@ -392,6 +397,37 @@ public:
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(WaitingOnActor) {
       WaitingOn.Actor = actor;
+  }
+
+  void performEscalationAction(JobPriority newPriority) {
+    switch (DependencyKind) {
+    case WaitingOnContinuation:
+      // We can't do anything here
+      //
+      // TODO (rokhinip): Drop a signpost indicating a potential priority
+      // inversion here
+      break;
+    case WaitingOnTaskGroup:
+      // Shortcircuit here. We know that this task will also have a
+      // TaskGroupTaskStatusRecord which will handle the escalation logic for
+      // the task group
+      break;
+    case WaitingOnTask:
+      // This might be redundant if we are waiting on an async let child task
+      // since we'd normally hit it by virtue of esclating all structured
+      // concurrency children but the 2nd escalation should just end up
+      // shortcircuiting.
+      //
+      // This is particularly relevant if we are waiting on a task that is not a
+      // structured concurrency child task
+      swift_task_escalate(WaitingOn.Task, newPriority);
+      break;
+    case WaitingOnActor:
+      // TODO (rokhinip): Escalate the actor which might be running at a lower
+      // priority
+      swift_actor_escalate(WaitingOn.Actor, task, newPriority);
+      break;
+    }
   }
 };
 

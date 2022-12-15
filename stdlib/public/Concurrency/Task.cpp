@@ -103,6 +103,7 @@ void FutureFragment::destroy() {
   }
 }
 
+// this --> task we are waiting on
 FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                                              AsyncContext *waitingTaskContext,
                                              TaskContinuationFunction *resumeFn,
@@ -146,7 +147,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       context->successResultPointer = result;
       context->ResumeParent = resumeFn;
       context->Parent = callerContext;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTask(this);
     }
 
     // Escalate the blocking task to the priority of the waiting task.
@@ -157,7 +158,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     // Recording this dependency is tricky because we need escalators
     // to be able to escalate without worrying about the blocking task
     // concurrently finishing, resuming the escalated task, and being
-    // invalidated.  So we're not doing that yet.  In the meantime, we
+    // invalidated.  So we're not doing that yet. In the meantime, we
     // do the best-effort alternative of escalating the blocking task
     // as a one-time deal to the current priority of the waiting task.
     // If the waiting task is escalated after this point, the priority
@@ -183,6 +184,10 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     // the escalation will be innocuous.  The wasted effort is acceptable;
     // programmers should be encouraged to give tasks that will block
     // other tasks the correct priority to begin with.
+    //
+    // TODO (rokhinip): Reevaluate on how this is to work - I think we might
+    // still have to keep this here instead of after adding to the waitQueue unless we take an explicit
+    // swift_task_retain(this)
     auto waitingStatus =
       waitingTask->_private()._status().load(std::memory_order_relaxed);
     if (waitingStatus.getStoredPriority() > escalatedPriority) {
@@ -1320,7 +1325,7 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
   if (flags.isPreawaited()) {
     task = _swift_task_clearCurrent();
     assert(task && "initializing a continuation with no current task");
-    task->flagAsSuspended();
+    task->flagAsSuspendedOnContinuation(context);
   } else {
     task = swift_task_getCurrent();
     assert(task && "initializing a continuation with no current task");
@@ -1378,7 +1383,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   context->Cond = &Cond;
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   // Flag the task as suspended.
-  task->flagAsSuspended();
+  task->flagAsSuspendedOnContinuation(context);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL

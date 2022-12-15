@@ -305,7 +305,7 @@ public:
   ///       enqueued -> running
   ///       running -> suspended
   ///       running -> completed
-  ///       running -> enqueued
+  ///       running -> enqueued (usually on an actor)
   ///
   /// The 4 methods below are how a task switches from one state to another.
 
@@ -317,8 +317,15 @@ public:
   /// ActiveTask.
   void flagAsRunning();
 
-  /// Flag that this task is now suspended.
+  /// Flag that this task is now suspended. To be replaced by specific versions
+  /// of this function eventually
   void flagAsSuspended();
+  void flagAsSuspendedOnTask(AsyncTask *task);
+  void flagAsSuspendedOnContinuation(ContinuationAsyncContext *continuation);
+  void flagAsSuspendedOnTaskGroup(TaskGroup *group);
+  // TODO (rokhinip): Technically we'd want a variant that also tracks
+  // dependency on actor but it probably needs to be in enqueued since we always
+  // end up going from running --> enqueued if we are waiting on an actor
 
 private:
   // Helper function
