@@ -357,19 +357,19 @@ while retaining the option of building with Ninja on the command line.
 
 Assuming that you have already [built the toolchain via Ninja](#the-actual-build),
 several more steps are necessary to set up this environment:
-* Generate Xcode projects with `utils/build-script --release --swift-darwin-supported-archs "$(uname -m)" --xcode`.
+* Generate Xcode projects with `utils/build-script --release --swift-darwin-supported-archs "$(uname -m)" --xcode --clean`.
   This will first build a few LLVM files that are needed to configure the
   projects.
 * Create a new Xcode workspace.
 * Add the generated Xcode projects or Swift packages that are relevant to your
   tasks to your workspace. All the Xcode projects can be found among the
-  build artifacts under `build/Xcode-DebugAssert`. For example:
-  * If you are aiming for the compiler, add `build/Xcode-DebugAssert/swift-macosx-*/Swift.xcodeproj`.
+  build artifacts under `build/Xcode-ReleaseAssert`. For example:
+  * If you are aiming for the compiler, add `build/Xcode-ReleaseAssert/swift-macosx-*/Swift.xcodeproj`.
     This project also includes the standard library and runtime sources. If you
     need the parts of the compiler that are implemented in Swift itself, add the
     `swift/SwiftCompilerSources/Package.swift` package as well.
   * If you are aiming for just the standard library or runtime, add
-    `build/Xcode-DebugAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
+    `build/Xcode-ReleaseAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
   <br />
 
