@@ -1313,6 +1313,7 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
       expansionNote.setLoc(origRange.Start);
       expansionNote.addRange(
           Lexer::getCharSourceRangeFromSourceRange(SourceMgr, origRange));
+      expansionNote.setIsChildNote(true);
       childNotes.push_back(std::move(expansionNote));
       break;
     }
