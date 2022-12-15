@@ -1018,7 +1018,8 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user)) {
+        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
+        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -1052,14 +1053,12 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
 
     // If we have a load_borrow, add it's end scope to the liveness requirement.
     if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
-      if (foundUses) {
-        // FIXME: if we can assume complete lifetimes, then this should be
-        // as simple as:
-        //   for (Operand *use : lbi->getUses()) {
-        //     if (use->endsLocalBorrowScope()) {
-        if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
-          result = meet(result, AddressUseKind::PointerEscape);
-        }
+      // FIXME: if we can assume complete lifetimes, then this should be
+      // as simple as:
+      //   for (Operand *use : lbi->getUses()) {
+      //     if (use->endsLocalBorrowScope()) {
+      if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
+        result = meet(result, AddressUseKind::PointerEscape);
       }
       continue;
     }
