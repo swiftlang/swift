@@ -591,3 +591,48 @@ func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, I
     (42, (value, (value, (value, 43), value)), 44)
   }
 }
+
+// Keypaths
+
+indirect enum IndirectEnumWithAReadableIntProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// TODO: Eliminate this copy.
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivg : $@convention(method) (@guaranteed IndirectEnumWithAReadableIntProperty) -> Int
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK'
+  var i: Int { 0 }
+}
+
+func takeReadableIntKeyPath<T>(_ kp: KeyPath<T, Int>) {
+}
+
+func giveReadableIntKeyPathInt() {
+  takeReadableIntKeyPath(\IndirectEnumWithAReadableIntProperty.i)
+}
+
+indirect enum StructWithAReadableStringProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvg : $@convention(method) (@guaranteed StructWithAReadableStringProperty) -> @owned String 
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK'
+  var s: String { "howdy" }
+}
+
+func takeKeyPathString<T>(_ kp: KeyPath<T, String>) {
+}
+
+func giveKeyPathString() {
+  takeKeyPathString(\StructWithAReadableStringProperty.s)
+}
