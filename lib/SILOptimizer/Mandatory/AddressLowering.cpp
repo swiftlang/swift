@@ -352,6 +352,22 @@ static bool isStoreCopy(SILValue value) {
   if (!storeInst)
     return false;
 
+  SSAPrunedLiveness liveness;
+  auto isStoreOutOfRange = [&liveness, storeInst](SILValue root) {
+    liveness.initializeDef(root);
+    auto summary = liveness.computeSimple();
+    if (summary.addressUseKind != AddressUseKind::NonEscaping) {
+      return true;
+    }
+    if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
+      return true;
+    }
+    if (!liveness.isWithinBoundary(storeInst)) {
+      return true;
+    }
+    return false;
+  };
+
   auto source = copyInst->getOperand();
   if (source->getOwnershipKind() == OwnershipKind::Guaranteed) {
     // [in_guaranteed_begin_apply_results] If any root of the source is a
@@ -361,8 +377,7 @@ static bool isStoreCopy(SILValue value) {
     SmallVector<SILValue, 4> roots;
     findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
                                  roots);
-    SSAPrunedLiveness liveness;
-    if (llvm::any_of(roots, [&liveness, storeInst](SILValue root) {
+    if (llvm::any_of(roots, [&](SILValue root) {
           // Handle forwarding phis conservatively rather than recursing.
           if (SILArgument::asPhi(root) && !BorrowedValue(root))
             return true;
@@ -370,19 +385,12 @@ static bool isStoreCopy(SILValue value) {
           if (isa<BeginApplyInst>(root->getDefiningInstruction())) {
             return true;
           }
-          liveness.initializeDef(root);
-          auto summary = liveness.computeSimple();
-          if (summary.addressUseKind != AddressUseKind::NonEscaping) {
-            return true;
-          }
-          if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
-            return true;
-          }
-          if (!liveness.isWithinBoundary(storeInst)) {
-            return true;
-          }
-          return false;
+          return isStoreOutOfRange(root);
         })) {
+      return false;
+    }
+  } else if (source->getOwnershipKind() == OwnershipKind::Owned) {
+    if (isStoreOutOfRange(source)) {
       return false;
     }
   }

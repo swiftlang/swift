@@ -1881,6 +1881,49 @@ entry(%addr : $*T):
     return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @testCopyValue2StoreCopyAfterDestroy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         [[COPY_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[INSTANCE_ADDR]])
+// CHECK:         copy_addr [[INSTANCE_ADDR]] to [init] [[COPY_ADDR]]
+// CHECK:         destroy_addr [[INSTANCE_ADDR]]
+// CHECK:         copy_addr [take] [[COPY_ADDR]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testCopyValue2StoreCopyAfterDestroy'
+sil [ossa] @testCopyValue2StoreCopyAfterDestroy : $@convention(thin) <T> (@inout T) -> () {
+entry(%addr : $*T):
+    %instance = apply undef<T>() : $@convention(thin) <Tee> () -> @out Tee
+    %copy = copy_value %instance : $T
+    destroy_value %instance : $T
+    store %copy to [assign] %addr : $*T
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testCopyValue3StoreTupleDestructureFieldAfterDestroy : $@convention(thin) <T> (@inout T) -> () {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = alloc_stack $(T, T)
+// CHECK:         [[COPY_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[INSTANCE_ADDR]]) : $@convention(thin) <τ_0_0> () -> @out (τ_0_0, τ_0_0)
+// CHECK:         [[ONE_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE_ADDR]]{{.*}}, 0
+// CHECK:         [[TWO_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE_ADDR]]{{.*}}, 1
+// CHECK:         copy_addr [[ONE_ADDR]] to [init] [[COPY_ADDR]]
+// CHECK:         destroy_addr [[ONE_ADDR]]
+// CHECK:         destroy_addr [[TWO_ADDR]]
+// CHECK:         copy_addr [take] [[COPY_ADDR]] to [[ADDR]]
+// CHECK-LABEL: } // end sil function 'testCopyValue3StoreTupleDestructureFieldAfterDestroy'
+sil [ossa] @testCopyValue3StoreTupleDestructureFieldAfterDestroy : $@convention(thin) <T> (@inout T) -> () {
+entry(%addr : $*T):
+    %instance = apply undef<T>() : $@convention(thin) <Tee> () -> @out (Tee, Tee)
+    (%one, %two) = destructure_tuple %instance : $(T, T)
+    %copy = copy_value %one : $T
+    destroy_value %one : $T
+    destroy_value %two : $T
+    store %copy to [assign] %addr : $*T
+    %retval = tuple ()
+    return %retval : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
