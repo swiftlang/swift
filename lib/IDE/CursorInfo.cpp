@@ -150,7 +150,10 @@ private:
     }
 
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->hasName()) {
+      // FIXME: ParamDecls might be closure parameters that can have ambiguous
+      // types. The current infrastructure of just asking for the VD's type
+      // doesn't work here. We need to inspect the constraints system solution.
+      if (VD->hasName() && !isa<ParamDecl>(D)) {
         assert(Result == nullptr);
         Result = std::make_unique<NodeFinderDeclResult>(VD);
         return Action::Stop();
