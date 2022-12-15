@@ -1409,7 +1409,7 @@ public:
       recursivelyMaterializeStorage(storage, /*intoPhiOperand*/ false);
     } else {
       assert(storage.isDefProjection);
-      storage.storageAddress = materializeDefProjection(origValue);
+      updateStorageAddress(storage, materializeDefProjection(origValue));
     }
     return storage.storageAddress;
   }
@@ -1435,6 +1435,8 @@ protected:
     return recursivelyMaterializeStorage(pass.valueStorageMap.getStorage(user),
                                          intoPhiOperand);
   }
+
+  SILValue updateStorageAddress(ValueStorage &storage, SILValue address);
 };
 } // anonymous namespace
 
@@ -1489,15 +1491,10 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
 //
 SILValue AddressMaterialization::recursivelyMaterializeStorage(
     ValueStorage &storage, bool intoPhiOperand = false) {
-  // If this storage is already materialized, then simply return its
-  // address. This not only avoids redundant projections, but is necessary for
-  // correctness when emitting init_enum_data_addr.
-  if (!intoPhiOperand && storage.storageAddress)
-    return storage.storageAddress;
-
   auto recordAddress = [&](SILValue address) {
-    if (!intoPhiOperand)
-      storage.storageAddress = address;
+    if (!intoPhiOperand) {
+      return updateStorageAddress(storage, address);
+    }
     return address;
   };
   if (storage.isComposingUseProjection()) {
@@ -1650,6 +1647,35 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
                                     operand->get()->getType().getAddressType());
   }
   }
+}
+
+// Updates \p storage's address to the dominating instruction of \p address and
+// its old value (if any).
+//
+// If the old address is replaced, its uses are replaced with the new address.
+//
+// The dominated instruction is deleted.
+SILValue AddressMaterialization::updateStorageAddress(ValueStorage &storage,
+                                                      SILValue address) {
+  if (!storage.storageAddress) {
+    storage.storageAddress = address;
+    return address;
+  }
+  if (storage.storageAddress == address)
+    return address;
+
+  auto *oldInst = storage.storageAddress->getDefiningInstruction();
+  auto *newInst = address->getDefiningInstruction();
+
+  if (pass.domInfo->dominates(oldInst, newInst)) {
+    pass.deleter.forceDelete(newInst);
+    return storage.storageAddress;
+  }
+
+  storage.storageAddress->replaceAllUsesWith(address);
+  storage.storageAddress = address;
+  pass.deleter.forceDelete(oldInst);
+  return storage.storageAddress;
 }
 
 //===----------------------------------------------------------------------===//

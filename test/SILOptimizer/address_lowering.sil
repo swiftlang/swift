@@ -2096,6 +2096,10 @@ exit:
   return %retval : $()
 }
 
+enum PairEnum<T> {
+  case it(T, T)
+}
+
 // CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
 // CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
 // CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
@@ -2125,6 +2129,55 @@ exit:
   return %505 : $()
 }
 
+
+// Verify that the init_enum_data_addr instruction is created before its first
+// use.  Although the opaque values are visited in forward order, their
+// uses are visited at the same time.  At that point, addresses are
+// materialized, and, in this case, an init_enum_data_addr is created.
+//
+// In this test, because %second_in is the first opaque value (i.e. in forward
+// order), its copy_value use is visited before %first_out is defined.  If the
+// init_enum_data_addr were created at that point and reused from then on, it
+// would be reused when rewriting the def of %first_out:
+//
+//     %second_in_addr = alloc_stack $T
+//     %out_addr = alloc_stack $PairEnum<T>
+//     apply undef<T>(%second_in_addr)
+//     %first_out_addr = tuple_element_addr %enum_data_addr, 0
+//                                          ^^^^^^^^^^^^^^^ USE BEFORE DEF
+//     apply undef<T>(%first_out_addr)
+//     %enum_data_addr = init_enum_data_addr %out_addr
+//     %second_out_addr = tuple_element_addr %enum_data_addr, 1
+//     copy_addr %second_in_addr to [init] %second_out_addr
+//
+// We would end up with a use of %enum_data_addr (in the definition of
+// %first_out_addr) that is not dominated by %enum_data_addr's def.
+//
+// CHECK-LABEL: sil [ossa] @test_enum_1_tuple_projection_dominance : {{.*}} {
+// CHECK:         [[SECOND_IN_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         [[OUT_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
+// CHECK:         apply undef<T>([[SECOND_IN_ADDR]])
+// CHECK:         [[ENUM_DATA_ADDR:%[^,]+]] = init_enum_data_addr [[OUT_ADDR]]
+// CHECK:         [[FIRST_OUT_ADDR:%[^,]+]] = tuple_element_addr [[ENUM_DATA_ADDR]]{{.*}}, 0
+// CHECK:         apply undef<T>([[FIRST_OUT_ADDR]])
+// CHECK:         [[SECOND_OUT_ADDR:%[^,]+]] = tuple_element_addr [[ENUM_DATA_ADDR]]{{.*}}, 1
+// CHECK:         copy_addr [[SECOND_IN_ADDR]] to [init] [[SECOND_OUT_ADDR]]
+// CHECK:         inject_enum_addr [[OUT_ADDR]]
+// CHECK:         destroy_addr [[OUT_ADDR]]
+// CHECK:         destroy_addr [[SECOND_IN_ADDR]]
+// CHECK-LABEL: } // end sil function 'test_enum_1_tuple_projection_dominance'
+sil [ossa] @test_enum_1_tuple_projection_dominance : $@convention(thin) <T> () -> () {
+bb0:
+  %second_in = apply undef<T>() : $@convention(thin) <Tee> () -> @out Tee
+  %first_out = apply undef<T>() : $@convention(thin) <Tee> () -> @out Tee
+  %second_out = copy_value %second_in : $T
+  %pair_out = tuple (%first_out : $T, %second_out : $T)
+  %out = enum $PairEnum<T>, #PairEnum.it!enumelt, %pair_out : $(T, T)
+  destroy_value %out : $PairEnum<T>
+  destroy_value %second_in : $T
+  %retval = tuple ()
+  return %retval : $()
+}
 
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
