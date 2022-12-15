@@ -1084,7 +1084,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       llvm::cl::ResetAllOptionOccurrences();
 
       // Create a new instance by the arguments and save it in the map.
-      auto newGlobalCache = std::make_unique<GlobalModuleDependenciesCache>();
+      auto newService = std::make_unique<SwiftDependencyScanningService>();
       auto newInstance = std::make_unique<CompilerInstance>();
 
       SmallVector<const char *, 4> args;
@@ -1105,12 +1105,12 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       auto mainModuleName = newInstance->getMainModule()->getNameStr();
       auto scanContextHash = newInstance->getInvocation().getModuleScanningHash();
       auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
-          *newGlobalCache, mainModuleName.str(), scanContextHash);
+          *newService, mainModuleName.str(), scanContextHash);
       pInstance = newInstance.get();
       pCache = newLocalCache.get();
       subInstanceMap->insert(
           {entry.arguments,
-           std::make_tuple(std::move(newInstance), std::move(newGlobalCache),
+           std::make_tuple(std::move(newInstance), std::move(newService),
                            std::move(newLocalCache))});
     }
     assert(pInstance);
@@ -1202,24 +1202,24 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
 } // namespace
 
 static void serializeDependencyCache(CompilerInstance &instance,
-                                     const GlobalModuleDependenciesCache &cache) {
+                                     const SwiftDependencyScanningService &service) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto savePath = opts.SerializedDependencyScannerCachePath;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Context.Diags, savePath, cache);
+      Context.Diags, savePath, service);
   if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
   }
 }
 
 static void deserializeDependencyCache(CompilerInstance &instance,
-                                       GlobalModuleDependenciesCache &cache) {
+                                       SwiftDependencyScanningService &service) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto loadPath = opts.SerializedDependencyScannerCachePath;
   if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          loadPath, cache)) {
+          loadPath, service)) {
     Context.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                            loadPath);
   } else if (opts.EmitDependencyScannerCacheRemarks) {
@@ -1242,12 +1242,12 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
 
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  GlobalModuleDependenciesCache globalCache;
+  SwiftDependencyScanningService service;
   if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, globalCache);
+    deserializeDependencyCache(instance, service);
   // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
-  globalCache.overlaySharedFilesystemCacheForCompilation(instance);
-  ModuleDependenciesCache cache(globalCache,
+  service.overlaySharedFilesystemCacheForCompilation(instance);
+  ModuleDependenciesCache cache(service,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
   auto ModuleCachePath = getModuleCachePathFromClang(
@@ -1259,7 +1259,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, globalCache);
+    serializeDependencyCache(instance, service);
   
   if (dependenciesOrErr.getError())
     return true;
@@ -1283,8 +1283,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  GlobalModuleDependenciesCache singleUseGlobalCache;
-  ModuleDependenciesCache cache(singleUseGlobalCache,
+  SwiftDependencyScanningService singleUseService;
+  ModuleDependenciesCache cache(singleUseService,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
   if (out.has_error() || EC) {
@@ -1314,11 +1314,10 @@ bool swift::dependencies::batchScanDependencies(
     CompilerInstance &instance, llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
-  GlobalModuleDependenciesCache singleUseGlobalCache;
-  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
-  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
-  singleUseGlobalCache.overlaySharedFilesystemCacheForCompilation(instance);
-  ModuleDependenciesCache cache(singleUseGlobalCache,
+
+  SwiftDependencyScanningService singleUseService;
+  singleUseService.overlaySharedFilesystemCacheForCompilation(instance);
+  ModuleDependenciesCache cache(singleUseService,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
   (void)instance.getMainModule();
@@ -1352,8 +1351,8 @@ bool swift::dependencies::batchPrescanDependencies(
     CompilerInstance &instance, llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
-  GlobalModuleDependenciesCache singleUseGlobalCache;
-  ModuleDependenciesCache cache(singleUseGlobalCache,
+  SwiftDependencyScanningService singleUseService;
+  ModuleDependenciesCache cache(singleUseService,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
   (void)instance.getMainModule();
