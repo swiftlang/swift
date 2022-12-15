@@ -3055,6 +3055,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureOptInReflection(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImplicitSome(Decl *decl) {
   return false;
 }

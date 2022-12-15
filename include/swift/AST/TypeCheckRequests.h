@@ -3752,6 +3752,41 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine if the given declaration conforms to 'Reflectable'.
+class IsReflectableRequest :
+    public SimpleRequest<IsReflectableRequest,
+                         bool(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the implicit conformance for the given nominal type to
+/// the Reflectable protocol.
+class GetImplicitReflectableRequest :
+    public SimpleRequest<GetImplicitReflectableRequest,
+                         ProtocolConformance *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ProtocolConformance *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Find the definition of a given macro.
 class MacroDefinitionRequest
     : public SimpleRequest<MacroDefinitionRequest,

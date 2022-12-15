@@ -91,6 +91,8 @@ enum class ReflectionMetadataMode : unsigned {
   None,         ///< Don't emit reflection metadata at all.
   DebuggerOnly, ///< Emit reflection metadata for the debugger, don't link them
                 ///  into runtime metadata and don't force them to stay alive.
+  OptIn,        ///< Compiler emits reflection metadata for types
+                ///  that conform to Reflectable.
   Runtime,      ///< Make reflection metadata fully available.
 };
 
@@ -536,6 +538,22 @@ public:
 
   bool optimizeForSize() const {
     return OptMode == OptimizationMode::ForSize;
+  }
+
+  bool shouldEmitFieldDescriptorForDebugger() const {
+    bool debuggingEnabled = (DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes || DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes);
+    bool emitForDebuggerOnly = ReflectionMetadata == ReflectionMetadataMode::DebuggerOnly;
+    return debuggingEnabled || emitForDebuggerOnly;
+  }
+
+  bool shouldEmitFieldDescriptor(bool isTypeReflectable) const {
+    bool optInEnabledAndReflectable = isTypeReflectable && ReflectionMetadata == ReflectionMetadataMode::OptIn;
+    return ReflectionMetadata == ReflectionMetadataMode::Runtime || shouldEmitFieldDescriptorForDebugger() || optInEnabledAndReflectable;
+  }
+
+  bool shouldReferenceFieldDescriptorInNTD(bool isTypeReflectable) const {
+    bool optInEnabledAndReflectable = isTypeReflectable && ReflectionMetadata == ReflectionMetadataMode::OptIn;
+    return ReflectionMetadata == ReflectionMetadataMode::Runtime || optInEnabledAndReflectable;
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator) const {

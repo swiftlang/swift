@@ -117,6 +117,7 @@ set(SWIFTLIB_ESSENTIAL
   Range.swift
   RangeReplaceableCollection.swift
   ReflectionMirror.swift
+  Reflection.swift
   Repeat.swift
   REPL.swift
   Result.swift
@@ -374,4 +375,4 @@ add_swift_target_library(swiftCore
                     ${swiftCore_common_dependencies}
                   INSTALL_IN_COMPONENT
                     stdlib)
-
+                    

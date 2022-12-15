@@ -900,6 +900,9 @@ public:
   /// needed to place array buffers into constant data sections.
   AvailabilityContext getImmortalRefCountSymbolsAvailability();
 
+  /// Get the runtime availability of reflectable cast runtime functions.
+  AvailabilityContext getReflectableCastRuntimeAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -923,6 +926,10 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
   AvailabilityContext getSwift57Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.8
+  /// compiler for the target platform.
+  AvailabilityContext getSwift58Availability();
 
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).

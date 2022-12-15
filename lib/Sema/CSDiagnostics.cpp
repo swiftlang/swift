@@ -8460,3 +8460,9 @@ bool ConflictingPatternVariables::diagnoseAsError() {
   }
   return true;
 }
+
+bool ImplicitReflectableConversion::diagnoseAsError() {
+  emitDiagnostic(diag::implicit_reflectable_conversion)
+      .highlight(getSourceRange());
+  return true;
+}

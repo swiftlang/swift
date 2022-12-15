@@ -41,6 +41,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1259,6 +1260,16 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     }
   }
 
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable) && 
+    getASTContext().LangOpts.ReflectionMetadata == ReflectionMetadataLevel::Full) {
+    if (auto nominal = type->getAnyNominal()) {
+      GetImplicitReflectableRequest icvRequest{nominal};
+      if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
+          getASTContext().evaluator.hasActiveRequest(request))
+        return ProtocolConformanceRef::forInvalid();
+    }
+  }
+
   auto result = evaluateOrDefault(
       getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 
@@ -1561,6 +1572,17 @@ LookupConformanceInModuleRequest::evaluate(
     if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       // Try to infer Sendable conformance.
       GetImplicitSendableRequest cvRequest{nominal};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable) && 
+      ctx.LangOpts.ReflectionMetadata == ReflectionMetadataLevel::Full) {
+      // Try to infer Reflectable conformance.
+      GetImplicitReflectableRequest cvRequest{nominal};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
         conformances.clear();

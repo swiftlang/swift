@@ -31,6 +31,10 @@
 #include "SwiftValue.h"
 #endif
 
+#ifdef SWIFT_ENABLE_REFLECTION
+#include "swift/Runtime/Reflection.h"
+#endif
+
 using namespace swift;
 using namespace hashable_support;
 
@@ -2561,6 +2565,31 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
   case DynamicCastResult::SuccessViaTake:
     return true;
   }
+}
+
+/// ABI: Perform a cast to Reflectable type, which has special semantic and 
+/// succeed only if reflection metadata is available at runtime.
+SWIFT_RUNTIME_EXPORT
+bool
+swift_reflectableCast(OpaqueValue *destLocation,
+                      OpaqueValue *srcValue,
+                      const Metadata *srcType,
+                      const Metadata *destType,
+                      DynamicCastFlags flags) { 
+#ifdef SWIFT_ENABLE_REFLECTION
+  if (swift_isReflectable(srcValue, srcType)) {
+    // `Reflectable` protocol doesn't exist at runtime, so if a type has reflection metadata available
+    //  we just invoke regular cast machinery to do casting to Any.
+    return swift_dynamicCast(destLocation, srcValue, srcType, destType, flags);
+  }
+#endif
+    if (flags & DynamicCastFlags::Unconditional) {
+      swift_reflectableCastFailure(srcType);
+    }
+    if (flags & DynamicCastFlags::DestroyOnFailure) {
+      srcType->vw_destroy(srcValue);
+    }
+    return false;
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE

@@ -182,6 +182,10 @@ struct ReflectionMirrorImpl {
 #if SWIFT_OBJC_INTEROP
   virtual id quickLookObject() { return nil; }
 #endif
+
+  virtual bool isReflectable() {
+    return false;
+  }
   
   // For class types, traverse through superclasses when providing field
   // information. The base implementations call through to their local-only
@@ -414,7 +418,7 @@ getFieldAt(const Metadata *base, unsigned index) {
 
 // Implementation for structs.
 struct StructImpl : ReflectionMirrorImpl {
-  bool isReflectable() {
+  bool isReflectable() override {
     const auto *Struct = static_cast<const StructMetadata *>(type);
     const auto &Description = Struct->getDescription();
     return Description->isReflectable();
@@ -469,7 +473,7 @@ struct StructImpl : ReflectionMirrorImpl {
 };
 
 struct ForeignReferenceTypeImpl : ReflectionMirrorImpl {
-  bool isReflectable() {
+  bool isReflectable() override {
     return false;
   }
 
@@ -499,7 +503,7 @@ struct ForeignReferenceTypeImpl : ReflectionMirrorImpl {
 
 // Implementation for enums.
 struct EnumImpl : ReflectionMirrorImpl {
-  bool isReflectable() {
+  bool isReflectable() override {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->getDescription();
     return Description->isReflectable();
@@ -612,7 +616,7 @@ struct EnumImpl : ReflectionMirrorImpl {
 
 // Implementation for classes.
 struct ClassImpl : ReflectionMirrorImpl {
-  bool isReflectable() {
+  bool isReflectable() override {
     const auto *Class = static_cast<const ClassMetadata *>(type);
     const auto &Description = Class->getDescription();
     return Description->isReflectable();
@@ -966,6 +970,12 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
 } // end anonymous namespace
 
+
+SWIFT_RUNTIME_EXPORT
+bool swift_isReflectable(OpaqueValue *value,
+                    const Metadata *type) {
+  return call(value, type, nullptr, [](ReflectionMirrorImpl *impl) { return impl->isReflectable(); });
+}
 
 // func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API

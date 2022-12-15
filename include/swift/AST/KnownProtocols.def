@@ -85,6 +85,7 @@ PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
+PROTOCOL(Reflectable)
 
 PROTOCOL(Sendable)
 PROTOCOL(UnsafeSendable)

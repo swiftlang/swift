@@ -105,6 +105,13 @@ extern void
 SWIFT_FORMAT(2, 3)
 warning(uint32_t flags, const char *format, ...);
 
+// swift_reflectableCastFailure halts using fatalError()
+// with a description of a failed cast's types.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+void
+swift_reflectableCastFailure(const Metadata *sourceType,
+                             const char *message = nullptr);
+
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN

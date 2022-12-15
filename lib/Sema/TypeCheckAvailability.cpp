@@ -3281,6 +3281,23 @@ public:
         diagnoseParameterizedProtocolAvailability(loc, Where.getDeclContext());
       }
     }
+    if (auto *CC = dyn_cast<CheckedCastExpr>(E)) {
+      auto toType = CC->getCastType();
+      auto &ctx = DC->getASTContext();
+      if (toType->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable)) {
+        auto availability = ctx.getReflectableCastRuntimeAvailability();
+        const bool hasReflectableCastSupport =
+        AvailabilityContext::forDeploymentTarget(ctx).isContainedIn(availability);
+
+        if (!hasReflectableCastSupport) {
+          auto UR = UnavailabilityReason::requiresVersionRange(availability.getOSVersion());
+          ctx.Diags.diagnose(CC->getLoc(),
+                          diag::reflectable_cast_only_version_newer,
+                          prettyPlatformString(targetPlatform(Context.LangOpts)),
+                          UR.getRequiredOSVersionRange().getLowerEndpoint());
+        }
+      }
+    }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
     }

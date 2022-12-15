@@ -1557,8 +1557,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (IGM.IRGen.Opts.ReflectionMetadata !=
-          ReflectionMetadataMode::Runtime) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1636,8 +1635,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (IGM.IRGen.Opts.ReflectionMetadata !=
-          ReflectionMetadataMode::Runtime) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1791,11 +1789,7 @@ namespace {
     }
 
     void addReflectionFieldDescriptor() {
-      // Classes are always reflectable, unless reflection is disabled or this
-      // is a foreign class.
-      if ((IGM.IRGen.Opts.ReflectionMetadata !=
-           ReflectionMetadataMode::Runtime) ||
-          getType()->isForeign()) {
+      if (!IGM.IRGen.Opts.shouldReferenceFieldDescriptorInNTD(getType()->isReflectable()) || getType()->isForeign()) {
         B.addInt32(0);
         return;
       }
@@ -5862,6 +5856,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CodingKey:
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
+  case KnownProtocolKind::Reflectable:
   case KnownProtocolKind::StringInterpolationProtocol:
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:

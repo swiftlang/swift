@@ -54,4 +54,6 @@ swift_reflectAny(OpaqueValue *value, const Metadata *T);
 
 #pragma clang diagnostic pop
 
+SWIFT_RUNTIME_EXPORT
+bool swift_isReflectable(OpaqueValue *value, const Metadata *type);
 }

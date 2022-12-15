@@ -6305,6 +6305,27 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto *typeVar1 = dyn_cast<TypeVariableType>(desugar1);
   auto *typeVar2 = dyn_cast<TypeVariableType>(desugar2);
 
+  // Emit diagnostics for conversion to Reflectable.
+  if (kind == ConstraintKind::Conversion ||
+      kind == ConstraintKind::ArgumentConversion ||
+      kind == ConstraintKind::OperatorArgumentConversion) {
+    // type1 can be an optional type_variable, so let's unwrap it.
+    auto unwrappedType1 = type1->lookThroughAllOptionalTypes();
+    auto unwrappedTypeVar1 = dyn_cast<TypeVariableType>(unwrappedType1->getDesugaredType());
+    Type unwrappedType2 = type2->lookThroughAllOptionalTypes();
+
+    if (unwrappedTypeVar1 && unwrappedType2) {
+      if (unwrappedType2->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable)) {
+        auto anchor = locator.getAnchor();
+        if (anchor && isExpr<Expr>(anchor)) {
+          auto E = getAsExpr(anchor);
+          if (recordFix(ImplicitConversionToReflectable::create(*this, getConstraintLocator(E))))
+            return getTypeMatchFailure(locator);
+        }
+      }
+    }
+  }
+
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
     // Handle the easy case of both being type variables, and being
@@ -8152,6 +8173,11 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
 
   auto *castExpr = getAsExpr<ExplicitCastExpr>(anchor);
   if (!castExpr)
+    return nullptr;
+
+  // Do not emit diagnostics if casting to Reflectable,
+  // since it will be resolved through runtime in all cases.
+  if (toType->hasKnownProtocolInLayout(KnownProtocolKind::Reflectable))
     return nullptr;
 
   // "from" could be less optional than "to" e.g. `0 as Any?`, so
@@ -13993,6 +14019,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
+  case FixKind::ImplicitConversionToReflectable:
     llvm_unreachable("handled elsewhere");
   }
 

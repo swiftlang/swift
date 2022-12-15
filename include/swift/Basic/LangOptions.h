@@ -61,6 +61,13 @@ namespace swift {
     Complete,
   };
 
+  enum class ReflectionMetadataLevel {
+    OptIn,
+    None,          ///< Don't emit reflection metadata at all.
+    DebuggerOnly,  ///< Make reflection metadata availabe for the debugger.
+    Full,          ///< Make reflection metadata fully available.
+  };
+
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
     /// Enforce Sendable constraints where it has been explicitly adopted and
@@ -448,6 +455,11 @@ namespace swift {
     /// recovery issues won't bring down the debugger.
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
+
+    /// Allows to add implicit conformance to Reflectable 
+    /// and diagnose `Reflectable` declarations
+    /// when reflection metadata is disabled.
+    ReflectionMetadataLevel ReflectionMetadata = ReflectionMetadataLevel::Full;
 
     // Allow errors during module generation. See corresponding option in
     // FrontendOptions.

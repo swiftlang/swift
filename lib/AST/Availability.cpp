@@ -444,6 +444,11 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
 }
 
 AvailabilityContext
+ASTContext::getReflectableCastRuntimeAvailability() {
+  return getSwift58Availability();
+}
+
+AvailabilityContext
 ASTContext::getImmortalRefCountSymbolsAvailability() {
   // TODO: replace this with a concrete swift version once we have it.
   // rdar://94185998
@@ -579,6 +584,10 @@ AvailabilityContext ASTContext::getSwift57Availability() {
   }
 }
 
+AvailabilityContext ASTContext::getSwift58Availability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 
@@ -608,6 +617,7 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 5: return getSwift55Availability();
     case 6: return getSwift56Availability();
     case 7: return getSwift57Availability();
+    case 8: return getSwift58Availability();
     default: break;
     }
   }

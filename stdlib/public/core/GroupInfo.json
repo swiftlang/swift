@@ -222,6 +222,7 @@
     "Print.swift",
     "REPL.swift",
     "Random.swift",
+    "Reflection.swift",
     "Runtime.swift",
     "RuntimeFunctionCounters.swift",
     "Shims.swift",

@@ -403,6 +403,20 @@ SWIFT_NORETURN void swift::swift_dynamicCastFailure(const Metadata *sourceType,
                            targetType, targetName.c_str(), message);
 }
 
+/// Report a casting failure explicitly dedicated for casts to Reflectable, 
+/// which has special semantics.
+SWIFT_NORETURN SWIFT_NOINLINE void
+swift::swift_reflectableCastFailure(const Metadata *sourceType,
+                                    const char *message) {
+  std::string sourceName = nameForMetadata(sourceType);
+  swift::fatalError(/* flags = */ 0,
+                    "Could not cast value of type '%s' (%p) to 'Reflectable', " 
+                    "reflection metadata isn't available at runtime for this type%s%s\n",
+                    sourceName.c_str(), sourceType, 
+                    message ? ": " : ".", 
+                    message ? message : "");
+}
+
 // Objective-C bridging helpers.
 namespace {
   struct _ObjectiveCBridgeableWitnessTable;

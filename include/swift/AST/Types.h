@@ -1117,6 +1117,8 @@ public:
   /// in that language.
   bool isRepresentableIn(ForeignLanguage language, const DeclContext *dc);
 
+  bool hasKnownProtocolInLayout(KnownProtocolKind kind);
+
   /// Determines whether the type is trivially representable within
   /// the foreign language, meaning that it is both representable in
   /// that language and that the runtime representations are
