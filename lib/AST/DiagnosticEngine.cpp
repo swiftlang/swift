@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -1267,10 +1268,82 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       diagnostic.isChildNote());
 }
 
+std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
+    SourceLoc loc, Optional<unsigned> &lastBufferID
+) {
+  // The set of child notes we're building up.
+  std::vector<Diagnostic> childNotes;
+
+  // If the location is invalid, there's nothing to do.
+  if (loc.isInvalid())
+    return childNotes;
+
+  // If we already emitted these notes for a prior part of the diagnostic,
+  // don't do so again.
+  auto currentBufferID = SourceMgr.findBufferContainingLoc(loc);
+  if (currentBufferID == lastBufferID)
+    return childNotes;
+
+  // Keep track of the last buffer ID we considered.
+  lastBufferID = currentBufferID;
+
+  SourceLoc currentLoc = loc;
+  do {
+    auto generatedInfo = SourceMgr.getGeneratedSourceInfo(currentBufferID);
+    if (!generatedInfo)
+      return childNotes;
+
+    ASTNode expansionNode =
+        ASTNode::getFromOpaqueValue(generatedInfo->astNode);
+
+    switch (generatedInfo->kind) {
+    case GeneratedSourceInfo::MacroExpansion: {
+      SourceRange origRange = expansionNode.getSourceRange();
+      DeclName macroName;
+      if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+              expansionNode.dyn_cast<Expr *>())) {
+        macroName = expansionExpr->getMacroName().getFullName();
+      } else {
+        auto expansionDecl =
+            cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+        macroName = expansionDecl->getMacro().getFullName();
+      }
+
+      Diagnostic expansionNote(diag::in_macro_expansion, macroName);
+      expansionNote.setLoc(origRange.Start);
+      expansionNote.addRange(
+          Lexer::getCharSourceRangeFromSourceRange(SourceMgr, origRange));
+      childNotes.push_back(std::move(expansionNote));
+      break;
+    }
+
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+      return childNotes;
+    }
+
+    // Walk up the stack.
+    currentLoc = expansionNode.getStartLoc();
+    currentBufferID = SourceMgr.findBufferContainingLoc(currentLoc);
+  } while (true);
+}
+
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+  Optional<unsigned> lastBufferID;
+
+  ArrayRef<Diagnostic> childNotes = diagnostic.getChildNotes();
+  std::vector<Diagnostic> extendedChildNotes;
+
   if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+    // If the diagnostic location is within a buffer containing generated
+    // source code, add child notes showing where the generation occurred.
+    extendedChildNotes = getGeneratedSourceBufferNotes(info->Loc, lastBufferID);
+    if (!extendedChildNotes.empty()) {
+      extendedChildNotes.insert(extendedChildNotes.end(),
+                                childNotes.begin(), childNotes.end());
+      childNotes = extendedChildNotes;
+    }
+
     SmallVector<DiagnosticInfo, 1> childInfo;
-    auto childNotes = diagnostic.getChildNotes();
     for (unsigned i : indices(childNotes)) {
       auto child = diagnosticInfoForDiagnostic(childNotes[i]);
       assert(child);
@@ -1302,7 +1375,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   // For compatibility with DiagnosticConsumers which don't know about child
   // notes. These can be ignored by consumers which do take advantage of the
   // grouping.
-  for (auto &childNote : diagnostic.getChildNotes())
+  for (auto &childNote : childNotes)
     emitDiagnostic(childNote);
 }
 
