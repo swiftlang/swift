@@ -351,8 +351,15 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
          && nextII->isDebugInstruction()) {
     ++nextII;
   }
-  deleteAllDebugUses(*loadInst, pass.getCallbacks());
-  return killInstAndIncidentalUses(*loadInst, nextII, pass);
+  //fix message: Hide the old load into unsafe access, keep the debug_value of old load outside
+  SILBuilderWithScope newBuilder(*loadInst);
+  BeginAccessInst *newBegin = newBuilder.createBeginAccess(loadInst.getLoadInst()->getLoc(), loadInst.getOperand(), SILAccessKind::Read, SILAccessEnforcement::Unsafe, false, true);
+  //Insert the end_access after the old loadInst, thanks to
+  SILBuilderWithScope::insertAfter(loadInst.getLoadInst(),[&](SILBuilder builder){
+      EndAccessInst *newEnd = builder.createEndAccess(loadInst.getLoadInst()->getLoc(), newBegin, false);
+    });
+    //fix message: Do not delete any old load, just hide them between begin_access and end_access
+    return nextII;
 }
 
 // Given a store within a single property struct, recursively form the parent
