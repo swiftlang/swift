@@ -50,6 +50,11 @@ void typeCheckDeclAndParentClosures(ValueDecl *VD) {
   typeCheckASTNodeAtLoc(
       TypeCheckASTNodeAtLocContext::declContext(VD->getDeclContext()),
       VD->getLoc());
+  // Type check any attached property wrappers so the annotated declaration can
+  // refer to their USRs
+  if (auto VarD = dyn_cast<VarDecl>(VD)) {
+    (void)VarD->getPropertyWrapperBackingPropertyType();
+  }
 }
 
 // MARK: - NodeFinderResults
