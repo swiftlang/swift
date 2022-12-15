@@ -423,7 +423,7 @@ public:
       ModuleDependenciesCache &cache,
       const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
 
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
@@ -439,7 +439,7 @@ public:
   /// \returns \c true if an error occurred, \c false otherwise
   bool addBridgingHeaderDependencies(
       StringRef moduleName,
-      ModuleDependenciesKind moduleKind,
+      ModuleDependencyKind moduleKind,
       ModuleDependenciesCache &cache);
 
   clang::TargetInfo &getTargetInfo() const override;

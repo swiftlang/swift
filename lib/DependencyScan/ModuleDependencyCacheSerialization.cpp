@@ -269,7 +269,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         extraPCMRefs.push_back(arg);
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftInterfaceModule(
+      auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(),
           optionalSwiftInterfaceFile.value(), *compiledModuleCandidates,
           buildCommandRefs, extraPCMRefs, *contextHash, isFramework);
@@ -338,7 +338,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         extraPCMRefs.push_back(arg);
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftSourceModule(extraPCMRefs);
+      auto moduleDep = ModuleDependencyInfo::forSwiftSourceModule(extraPCMRefs);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
@@ -402,7 +402,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad module source info path");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftBinaryModule(
+      auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           isFramework);
       // Add dependencies of this module
@@ -435,7 +435,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad module source info path");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forPlaceholderSwiftModuleStub(
+      auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
@@ -476,7 +476,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad captured PCM Args");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forClangModule(*pcmOutputPath,
+      auto moduleDep = ModuleDependencyInfo::forClangModule(*pcmOutputPath,
           *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies,
           *capturedPCMArgs);
 
@@ -617,7 +617,7 @@ struct llvm::DenseMapInfo<ModuleIdentifierArrayKind> {
 namespace std {
 template <>
 struct hash<ModuleDependencyID> {
-  using UnderlyingKindType = std::underlying_type<ModuleDependenciesKind>::type;
+  using UnderlyingKindType = std::underlying_type<ModuleDependencyKind>::type;
   std::size_t operator()(const ModuleDependencyID &id) const {
     auto underlyingKindValue = static_cast<UnderlyingKindType>(id.second);
 
@@ -682,7 +682,7 @@ class ModuleDependenciesCacheSerializer {
 
   void writeModuleInfo(ModuleDependencyID moduleID,
                        Optional<std::string> contextHash,
-                       const ModuleDependencies &dependencyInfo);
+                       const ModuleDependencyInfo &dependencyInfo);
 
 public:
   ModuleDependenciesCacheSerializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
@@ -772,7 +772,7 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
 
 void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID moduleID,
                                  Optional<std::string> contextHash,
-                                 const ModuleDependencies &dependencyInfo) {
+                                 const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;
 
@@ -782,7 +782,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
       getArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies));
 
   switch (dependencyInfo.getKind()) {
-  case swift::ModuleDependenciesKind::SwiftInterface: {
+  case swift::ModuleDependencyKind::SwiftInterface: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
@@ -810,7 +810,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
                  ModuleIdentifierArrayKind::BridgingModuleDependencies));
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftSource: {
+  case swift::ModuleDependencyKind::SwiftSource: {
     assert(!contextHash.has_value() &&
            "Did not expect context hash for serializing MODULE_NODE");
     auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
@@ -830,7 +830,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
                  ModuleIdentifierArrayKind::BridgingModuleDependencies));
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftBinary: {
+  case swift::ModuleDependencyKind::SwiftBinary: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
     assert(swiftBinDeps);
@@ -843,7 +843,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
 
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+  case swift::ModuleDependencyKind::SwiftPlaceholder: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
     assert(swiftPHDeps);
@@ -855,7 +855,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         getIdentifier(swiftPHDeps->sourceInfoPath));
     break;
   }
-  case swift::ModuleDependenciesKind::Clang: {
+  case swift::ModuleDependencyKind::Clang: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto clangDeps = dependencyInfo.getAsClangModule();
     assert(clangDeps);
@@ -945,7 +945,7 @@ unsigned ModuleDependenciesCacheSerializer::getArray(ModuleDependencyID moduleID
 void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const GlobalModuleDependenciesCache &cache) {
   for (auto &moduleID : cache.getAllSourceModules()) {
-    assert(moduleID.second == ModuleDependenciesKind::SwiftSource &&
+    assert(moduleID.second == ModuleDependencyKind::SwiftSource &&
            "Expected source-based dependency");
     auto optionalDependencyInfo =
         cache.findSourceModuleDependency(moduleID.first);
@@ -986,7 +986,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
 
       // Add the dependency-kind-specific data
       switch (dependencyInfo->getKind()) {
-        case swift::ModuleDependenciesKind::SwiftInterface: {
+        case swift::ModuleDependencyKind::SwiftInterface: {
           auto swiftTextDeps = dependencyInfo->getAsSwiftInterfaceModule();
           assert(swiftTextDeps);
           addIdentifier(swiftTextDeps->moduleOutputPath);
@@ -1011,7 +1011,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                    swiftTextDeps->textualModuleDetails.bridgingModuleDependencies);
           break;
         }
-        case swift::ModuleDependenciesKind::SwiftBinary: {
+        case swift::ModuleDependencyKind::SwiftBinary: {
           auto swiftBinDeps = dependencyInfo->getAsSwiftBinaryModule();
           assert(swiftBinDeps);
           addIdentifier(swiftBinDeps->compiledModulePath);
@@ -1019,7 +1019,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
           addIdentifier(swiftBinDeps->sourceInfoPath);
           break;
         }
-        case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+        case swift::ModuleDependencyKind::SwiftPlaceholder: {
           auto swiftPHDeps = dependencyInfo->getAsPlaceholderDependencyModule();
           assert(swiftPHDeps);
           addIdentifier(swiftPHDeps->compiledModulePath);
@@ -1027,7 +1027,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
           addIdentifier(swiftPHDeps->sourceInfoPath);
           break;
         }
-        case swift::ModuleDependenciesKind::Clang: {
+        case swift::ModuleDependencyKind::Clang: {
           auto clangDeps = dependencyInfo->getAsClangModule();
           assert(clangDeps);
           addIdentifier(clangDeps->pcmOutputPath);
