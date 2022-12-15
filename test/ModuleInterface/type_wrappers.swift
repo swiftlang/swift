@@ -46,7 +46,7 @@ public protocol Wrapped {
 
 public protocol OuterWrapped : Wrapped {}
 
-// CHECK: public struct WithProtocol : TypeWrappers.Wrapped {
+// CHECK:  @TypeWrappers.Wrapper public struct WithProtocol : TypeWrappers.Wrapped {
 // CHECK:   public var a: Swift.Int {
 // CHECK:     get
 // CHECK:     set
