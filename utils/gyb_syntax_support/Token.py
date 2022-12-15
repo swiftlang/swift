@@ -1,49 +1,15 @@
-def lowercase_first_word(name):
-    """
-    Lowercases the first word in the provided camelCase or PascalCase string.
-    EOF -> eof
-    IfKeyword -> ifKeyword
-    EOFToken -> eofToken
-    """
-    word_index = 0
-    threshold_index = 1
-    for c in name:
-        if c.islower():
-            if word_index > threshold_index:
-                word_index -= 1
-            break
-        word_index += 1
-    if word_index == 0:
-        return name
-    return name[:word_index].lower() + name[word_index:]
-
-
 class Token(object):
     """
     Represents the specification for a Token in the TokenSyntax file.
     """
 
-    def __init__(self, name, kind, name_for_diagnostics,
-                 unprefixed_kind=None, text=None, classification='None',
-                 is_keyword=False, requires_leading_space=False,
-                 requires_trailing_space=False):
+    def __init__(self, name, kind, unprefixed_kind=None, text=None):
         self.name = name
-        self.kind = kind
         if unprefixed_kind is None:
             self.unprefixed_kind = kind
         else:
             self.unprefixed_kind = unprefixed_kind
-        self.name_for_diagnostics = name_for_diagnostics
         self.text = text
-        self.is_keyword = is_keyword
-        self.requires_leading_space = requires_leading_space
-        self.requires_trailing_space = requires_trailing_space
-
-    def swift_kind(self):
-        name = lowercase_first_word(self.name)
-        if self.is_keyword:
-            return name + 'Keyword'
-        return name
 
 
 class Keyword(Token):
@@ -51,16 +17,9 @@ class Keyword(Token):
     Represents a keyword token.
     """
 
-    def __init__(self, name, text, classification='Keyword',
-                 requires_leading_space=False, requires_trailing_space=True):
-        Token.__init__(self,
-                       name=name,
-                       kind='kw_' + text,
-                       name_for_diagnostics=text,
-                       unprefixed_kind=text, text=text,
-                       classification=classification, is_keyword=True,
-                       requires_leading_space=requires_leading_space,
-                       requires_trailing_space=requires_trailing_space)
+    def __init__(self, name, text):
+        Token.__init__(self, name=name, kind='kw_' + text, unprefixed_kind=text,
+                       text=text)
 
     def macro_name(self):
         return "KEYWORD"
@@ -97,17 +56,11 @@ class SilKeyword(Keyword):
 
 
 class PoundKeyword(Token):
-    def __init__(self, name, kind, text, name_for_diagnostics=None,
-                 classification='Keyword'):
+    def __init__(self, name, kind, text, name_for_diagnostics=None):
         if name_for_diagnostics is None:
             name_for_diagnostics = text
-        Token.__init__(self,
-                       name=name,
-                       kind='pound_' + kind,
-                       name_for_diagnostics=name_for_diagnostics,
-                       unprefixed_kind=kind, text=text,
-                       classification=classification, is_keyword=True,
-                       requires_trailing_space=True)
+        Token.__init__(self, name=name, kind='pound_' + kind, unprefixed_kind=kind,
+                       text=text)
 
     def macro_name(self):
         return "POUND_KEYWORD"
@@ -115,14 +68,13 @@ class PoundKeyword(Token):
 
 class PoundObjectLiteral(PoundKeyword):
     def __init__(self, name, kind, text, name_for_diagnostics,
-                 protocol, classification='ObjectLiteral'):
+                 protocol):
         PoundKeyword.__init__(
             self,
             name=name,
             kind=kind,
             text=text,
-            name_for_diagnostics=name_for_diagnostics,
-            classification=classification
+            name_for_diagnostics=name_for_diagnostics
         )
         self.description = name_for_diagnostics
         self.protocol = protocol
@@ -137,14 +89,12 @@ class PoundConfig(PoundKeyword):
 
 
 class PoundDirectiveKeyword(PoundKeyword):
-    def __init__(self, name, kind, text,
-                 classification='PoundDirectiveKeyword'):
+    def __init__(self, name, kind, text):
         PoundKeyword.__init__(
             self,
             name=name,
             kind=kind,
-            text=text,
-            classification=classification
+            text=text
         )
 
     def macro_name(self):
@@ -152,14 +102,12 @@ class PoundDirectiveKeyword(PoundKeyword):
 
 
 class PoundConditionalDirectiveKeyword(PoundDirectiveKeyword):
-    def __init__(self, name, kind, text,
-                 classification='PoundDirectiveKeyword'):
+    def __init__(self, name, kind, text):
         PoundKeyword.__init__(
             self,
             name=name,
             kind=kind,
-            text=text,
-            classification=classification
+            text=text
         )
 
     def macro_name(self):
@@ -167,19 +115,13 @@ class PoundConditionalDirectiveKeyword(PoundDirectiveKeyword):
 
 
 class Punctuator(Token):
-    def __init__(self, name, kind, text, classification='None',
-                 requires_leading_space=False, requires_trailing_space=False):
+    def __init__(self, name, kind, text):
         Token.__init__(
             self,
             name=name,
             kind=kind,
-            name_for_diagnostics=text,
             unprefixed_kind=None,
-            text=text,
-            classification=classification,
-            is_keyword=False,
-            requires_leading_space=requires_leading_space,
-            requires_trailing_space=requires_trailing_space
+            text=text
         )
 
     def macro_name(self):
@@ -226,7 +168,7 @@ SYNTAX_TOKENS = [
     StmtKeyword('Defer', 'defer'),
     StmtKeyword('If', 'if'),
     StmtKeyword('Guard', 'guard'),
-    StmtKeyword('Do', 'do', requires_trailing_space=False),
+    StmtKeyword('Do', 'do'),
     StmtKeyword('Repeat', 'repeat'),
     StmtKeyword('Else', 'else'),
     StmtKeyword('For', 'for'),
@@ -238,23 +180,22 @@ SYNTAX_TOKENS = [
     StmtKeyword('Fallthrough', 'fallthrough'),
     StmtKeyword('Switch', 'switch'),
     StmtKeyword('Case', 'case'),
-    StmtKeyword('Default', 'default', requires_trailing_space=False),
-    StmtKeyword('Where', 'where', requires_leading_space=True),
-    StmtKeyword('Catch', 'catch', requires_leading_space=True,
-                requires_trailing_space=False),
+    StmtKeyword('Default', 'default'),
+    StmtKeyword('Where', 'where'),
+    StmtKeyword('Catch', 'catch'),
     StmtKeyword('Throw', 'throw'),
 
     # Expression keywords
     ExprKeyword('As', 'as'),
     ExprKeyword('Any', 'Any'),
-    ExprKeyword('False', 'false', requires_trailing_space=False),
+    ExprKeyword('False', 'false'),
     ExprKeyword('Is', 'is'),
-    ExprKeyword('Nil', 'nil', requires_trailing_space=False),
+    ExprKeyword('Nil', 'nil'),
     ExprKeyword('Rethrows', 'rethrows'),
-    ExprKeyword('Super', 'super', requires_trailing_space=False),
-    ExprKeyword('Self', 'self', requires_trailing_space=False),
-    ExprKeyword('CapitalSelf', 'Self', requires_trailing_space=False),
-    ExprKeyword('True', 'true', requires_trailing_space=False),
+    ExprKeyword('Super', 'super'),
+    ExprKeyword('Self', 'self'),
+    ExprKeyword('CapitalSelf', 'Self'),
+    ExprKeyword('True', 'true'),
     ExprKeyword('Try', 'try'),
     ExprKeyword('Throws', 'throws'),
 
@@ -264,29 +205,25 @@ SYNTAX_TOKENS = [
     # Punctuators
     Punctuator('LeftParen', 'l_paren', text='('),
     Punctuator('RightParen', 'r_paren', text=')'),
-    Punctuator('LeftBrace', 'l_brace', text='{', requires_leading_space=True),
+    Punctuator('LeftBrace', 'l_brace', text='{'),
     Punctuator('RightBrace', 'r_brace', text='}'),
     Punctuator('LeftSquareBracket', 'l_square', text='['),
     Punctuator('RightSquareBracket', 'r_square', text=']'),
-    Punctuator('LeftAngle', 'l_angle', text='<', requires_leading_space=True,
-               requires_trailing_space=True),
-    Punctuator('RightAngle', 'r_angle', text='>', requires_leading_space=True,
-               requires_trailing_space=True),
+    Punctuator('LeftAngle', 'l_angle', text='<'),
+    Punctuator('RightAngle', 'r_angle', text='>'),
 
     Punctuator('Period', 'period', text='.'),
     Punctuator('PrefixPeriod', 'period_prefix', text='.'),
-    Punctuator('Comma', 'comma', text=',', requires_trailing_space=True),
+    Punctuator('Comma', 'comma', text=','),
     Punctuator('Ellipsis', 'ellipsis', text='...'),
-    Punctuator('Colon', 'colon', text=':', requires_trailing_space=True),
+    Punctuator('Colon', 'colon', text=':'),
     Punctuator('Semicolon', 'semi', text=';'),
-    Punctuator('Equal', 'equal', text='=', requires_leading_space=True,
-               requires_trailing_space=True),
-    Punctuator('AtSign', 'at_sign', text='@', classification='Attribute'),
+    Punctuator('Equal', 'equal', text='='),
+    Punctuator('AtSign', 'at_sign', text='@'),
     Punctuator('Pound', 'pound', text='#'),
 
     Punctuator('PrefixAmpersand', 'amp_prefix', text='&'),
-    Punctuator('Arrow', 'arrow', text='->', requires_leading_space=True,
-               requires_trailing_space=True),
+    Punctuator('Arrow', 'arrow', text='->'),
 
     Punctuator('Backtick', 'backtick', text='`'),
 
@@ -297,12 +234,10 @@ SYNTAX_TOKENS = [
     Punctuator('PostfixQuestionMark', 'question_postfix', text='?'),
     Punctuator('InfixQuestionMark', 'question_infix', text='?'),
 
-    Punctuator('StringQuote', 'string_quote', text='\\\"',
-               classification='StringLiteral'),
-    Punctuator('SingleQuote', 'single_quote', text='\\\'',
-               classification='StringLiteral'),
+    Punctuator('StringQuote', 'string_quote', text='\\\"'),
+    Punctuator('SingleQuote', 'single_quote', text='\\\''),
     Punctuator('MultilineStringQuote', 'multiline_string_quote',
-               text='\\\"\\\"\\\"', classification='StringLiteral'),
+               text='\\\"\\\"\\\"'),
 
     # Keywords prefixed with a '#'.
 
@@ -347,44 +282,25 @@ SYNTAX_TOKENS = [
 
     PoundConfig('PoundHasSymbol', '_hasSymbol', text='#_hasSymbol'),
 
-    Literal('IntegerLiteral', 'integer_literal', name_for_diagnostics='integer literal',
-            classification='IntegerLiteral'),
-    Literal('FloatingLiteral', 'floating_literal',
-            name_for_diagnostics='floating literal', classification='FloatingLiteral'),
-    Literal('StringLiteral', 'string_literal', name_for_diagnostics='string literal',
-            classification='StringLiteral'),
-    Literal('RegexLiteral', 'regex_literal', name_for_diagnostics='regex literal'),
+    Literal('IntegerLiteral', 'integer_literal'),
+    Literal('FloatingLiteral', 'floating_literal'),
+    Literal('StringLiteral', 'string_literal'),
+    Literal('RegexLiteral', 'regex_literal'),
 
-    Misc('Unknown', 'unknown', name_for_diagnostics='token'),
-    Misc('Identifier', 'identifier', name_for_diagnostics='identifier',
-         classification='Identifier'),
-    Misc('UnspacedBinaryOperator', 'oper_binary_unspaced',
-         name_for_diagnostics='binary operator',
-         classification='OperatorIdentifier'),
-    Misc('SpacedBinaryOperator', 'oper_binary_spaced',
-         name_for_diagnostics='binary operator',
-         classification='OperatorIdentifier',
-         requires_leading_space=True, requires_trailing_space=True),
-    Misc('PostfixOperator', 'oper_postfix', name_for_diagnostics='postfix operator',
-         classification='OperatorIdentifier'),
-    Misc('PrefixOperator', 'oper_prefix', name_for_diagnostics='prefix operator',
-         classification='OperatorIdentifier'),
-    Misc('DollarIdentifier', 'dollarident', name_for_diagnostics='dollar identifier',
-         classification='DollarIdentifier'),
+    Misc('Unknown', 'unknown'),
+    Misc('Identifier', 'identifier'),
+    Misc('UnspacedBinaryOperator', 'oper_binary_unspaced'),
+    Misc('SpacedBinaryOperator', 'oper_binary_spaced'),
+    Misc('PostfixOperator', 'oper_postfix'),
+    Misc('PrefixOperator', 'oper_prefix'),
+    Misc('DollarIdentifier', 'dollarident'),
 
-    Misc('ContextualKeyword', 'contextual_keyword', name_for_diagnostics='keyword',
-         classification='Keyword'),
-    Misc('RawStringDelimiter', 'raw_string_delimiter',
-         name_for_diagnostics='raw string delimiter'),
-    Misc('StringSegment', 'string_segment', name_for_diagnostics='string segment',
-         classification='StringLiteral'),
-    Misc('StringInterpolationAnchor', 'string_interpolation_anchor',
-         name_for_diagnostics='string interpolation anchor',
-         text=')', classification='StringInterpolationAnchor'),
-    Misc('Yield', 'kw_yield', name_for_diagnostics='yield',
-         text='yield'),
+    Misc('ContextualKeyword', 'contextual_keyword'),
+    Misc('RawStringDelimiter', 'raw_string_delimiter'),
+    Misc('StringSegment', 'string_segment'),
+    Misc('StringInterpolationAnchor', 'string_interpolation_anchor', text=')'),
+    Misc('Yield', 'kw_yield', text='yield'),
 
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}
-
