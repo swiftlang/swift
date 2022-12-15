@@ -4,6 +4,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// REQUIRES: rdar103369708
+
 import StdlibUnittest
 
 var DeinitEscapeTestSuite = TestSuite("DeinitEscape")
