@@ -239,6 +239,14 @@ public:
     return std::count_if(Cases.begin(), Cases.end(),
                          [](const FieldInfo &Case){return Case.TR != 0;});
   }
+  unsigned getNumNonEmptyPayloadCases() const {
+    auto Cases = getCases();
+    return std::count_if(Cases.begin(), Cases.end(),
+                         [](const FieldInfo &Case){
+                           return Case.TR != 0
+                             && Case.TI.getSize() != 0;
+                         });
+  }
   // Size of the payload area.
   unsigned getPayloadSize() const {
     return EnumTypeInfo::getPayloadSizeForCases(Cases);
