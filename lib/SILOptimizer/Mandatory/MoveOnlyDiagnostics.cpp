@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -282,6 +283,19 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
   }
 
   if (isInOutEndOfFunction) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
+      if (fArg->isClosureCapture()) {
+        diagnose(
+            astContext,
+            markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+            diag::
+                sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
+            varName);
+        diagnose(astContext, violatingUse->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_consuming_use_here);
+        return;
+      }
+    }
     diagnose(
         astContext,
         markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
@@ -321,6 +335,8 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
   if (!useWithDiagnostic.insert(violatingUse).second)
     return;
 
+  valuesWithDiagnostics.insert(markedValue);
+
   assert(cast<SILFunctionArgument>(markedValue->getOperand())
              ->getArgumentConvention()
              .isInoutConvention() &&
@@ -335,6 +351,19 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
 
   // Otherwise, we need to do no implicit copy semantics. If our last use was
   // consuming message:
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
+    if (fArg->isClosureCapture()) {
+      diagnose(
+          astContext,
+          markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+          diag::
+              sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
+          varName);
+      diagnose(astContext, violatingUse->getLoc().getSourceLoc(),
+               diag::sil_moveonlychecker_consuming_use_here);
+      return;
+    }
+  }
   diagnose(
       astContext,
       markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
@@ -342,7 +371,6 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
       varName);
   diagnose(astContext, violatingUse->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_consuming_use_here);
-  valuesWithDiagnostics.insert(markedValue);
 }
 
 void DiagnosticEmitter::emitAddressDiagnosticNoCopy(

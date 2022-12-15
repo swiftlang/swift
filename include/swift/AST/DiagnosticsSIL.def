@@ -737,6 +737,8 @@ ERROR(sil_moveonlychecker_let_value_consumed_in_closure, none,
       "'%0' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations", (StringRef))
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
       "'%0' consumed but not reinitialized before end of function", (StringRef))
+ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure, none,
+      "'%0' consumed in closure but not reinitialized before end of closure", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
 ERROR(sil_moveonlychecker_exclusivity_violation, none,
