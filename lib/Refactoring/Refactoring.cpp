@@ -49,7 +49,7 @@ class ContextFinder : public SourceEntityWalker {
   ASTContext &Ctx;
   SourceManager &SM;
   SourceRange Target;
-  function_ref<bool(ASTNode)> IsContext;
+  std::function<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
     auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
@@ -59,12 +59,12 @@ class ContextFinder : public SourceEntityWalker {
   }
 public:
   ContextFinder(SourceFile &SF, ASTNode TargetNode,
-                function_ref<bool(ASTNode)> IsContext =
+                std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
   ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
-                function_ref<bool(ASTNode)> IsContext =
+                std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetLoc), IsContext(IsContext) {
