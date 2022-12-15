@@ -7132,7 +7132,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     expansion->setPatternExpr(pattern);
     expansion->setType(expansionTy);
-    return expansion;
+    return cs.cacheType(expansion);
   }
 
   case TypeKind::BuiltinTuple:
