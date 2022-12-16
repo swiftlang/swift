@@ -897,13 +897,13 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     ? MetatypeRepresentation::Thick
     : MetatypeRepresentation::Thin;
 
-  ManagedValue actorMetaType =
+  CanType actorMetaType = CanMetatypeType::get(actorType, metaRepr);
+  ManagedValue actorMetaTypeValue =
     ManagedValue::forUnmanaged(B.createMetatype(loc,
-      SILType::getPrimitiveObjectType(
-        CanMetatypeType::get(actorType, metaRepr))));
+      SILType::getPrimitiveObjectType(actorMetaType)));
 
-  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
-    actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
+  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaTypeValue,
+    actorMetaType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
     subs, AccessSemantics::Ordinary, instanceType, SGFContext());
   ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
   return emitLoadActorExecutor(loc, actorInstance);
