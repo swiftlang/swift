@@ -307,8 +307,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   // Perform round-trip and/or validation checking.
   if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
-      SF.exportedSourceFile &&
-      !L->lexingCutOffOffset()) {
+      SF.exportedSourceFile) {
     if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
         swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
       SourceLoc loc;
