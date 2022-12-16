@@ -402,8 +402,7 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
 static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
   struct PackReferenceFinder : public ASTWalker {
     DeclContext *dc;
-    llvm::SmallVector<OpaqueValueExpr *, 2> opaqueValues;
-    llvm::SmallVector<Expr *, 2> bindings;
+    llvm::SmallVector<PackElementExpr *, 2> packElements;
     GenericEnvironment *environment;
 
     PackReferenceFinder(DeclContext *dc)
@@ -411,46 +410,30 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       auto &ctx = dc->getASTContext();
+      auto *packElement = dyn_cast<PackElementExpr>(E);
+      if (!packElement)
+        return Action::Continue(E);
 
-      if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
-        auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
-        if (!decl)
-          return Action::Continue(E);
-
-        if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
-          auto sourceRange = declRef->getSourceRange();
-
-          // Map the pattern interface type into the context of the opened
-          // element signature.
-          if (!environment) {
-            auto sig = ctx.getOpenedElementSignature(
-                dc->getGenericSignatureOfContext().getCanonicalSignature());
-            auto *contextEnv = dc->getGenericEnvironmentOfContext();
-            auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-            environment =
-                GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
-                                                     contextSubs);
-          }
-          auto elementType = environment->mapPackTypeIntoElementContext(
-              expansionType->getPatternType()->mapTypeOutOfContext());
-
-          auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange, elementType);
-          opaqueValues.push_back(opaqueValue);
-          bindings.push_back(declRef);
-          return Action::Continue(opaqueValue);
-        }
+      if (!environment) {
+        auto sig = ctx.getOpenedElementSignature(
+            dc->getGenericSignatureOfContext().getCanonicalSignature());
+        auto *contextEnv = dc->getGenericEnvironmentOfContext();
+        auto contextSubs = contextEnv->getForwardingSubstitutionMap();
+        environment =
+            GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
+                                                 contextSubs);
       }
 
-      return Action::Continue(E);
+      packElements.push_back(packElement);
+      return Action::Continue(packElement);
     }
   } packReferenceFinder(dc);
 
   auto *pattern = expr->walk(packReferenceFinder);
 
-  if (!packReferenceFinder.bindings.empty()) {
+  if (!packReferenceFinder.packElements.empty()) {
     return PackExpansionExpr::create(dc->getASTContext(), pattern,
-                                     packReferenceFinder.opaqueValues,
-                                     packReferenceFinder.bindings,
+                                     packReferenceFinder.packElements,
                                      opLoc, packReferenceFinder.environment);
   }
 

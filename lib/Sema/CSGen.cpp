@@ -844,6 +844,9 @@ namespace {
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
 
+    /// A stack of pack element generic environments.
+    llvm::SmallVector<GenericEnvironment *, 2> PackElementEnvironments;
+
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -1083,6 +1086,10 @@ namespace {
     }
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
+
+    void addPackElementEnvironment(GenericEnvironment *env) {
+      PackElementEnvironments.push_back(env);
+    }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
       CS.recordFix(
@@ -2956,10 +2963,9 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
-      for (auto *binding : expr->getBindings()) {
-        auto type = visit(binding);
-        CS.setType(binding, type);
-      }
+      auto *elementEnv = expr->getGenericEnvironment();
+      assert(PackElementEnvironments.back() == elementEnv);
+      PackElementEnvironments.pop_back();
 
       auto *patternLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
@@ -2967,21 +2973,39 @@ namespace {
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto *elementLoc = CS.getConstraintLocator(
+          expr, LocatorPathElt::OpenedPackElement(elementEnv));
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
-                       patternTy, CS.getConstraintLocator(expr));
+                       patternTy, elementLoc);
 
       auto *shapeLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      auto packReference = expr->getBindings().front();
+      auto packReference = expr->getPackElements().front()->getPackRefExpr();
       auto packType = CS.simplifyType(CS.getType(packReference))
           ->castTo<PackExpansionType>()->getPatternType();
       CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
                        CS.getConstraintLocator(expr));
 
       return PackExpansionType::get(patternTy, shapeTypeVar);
+    }
+
+    Type visitPackElementExpr(PackElementExpr *expr) {
+      auto packType = CS.getType(expr->getPackRefExpr());
+      auto *elementType =
+          CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                TVO_CanBindToHole);
+      auto *elementEnv = PackElementEnvironments.back();
+      auto *elementLoc = CS.getConstraintLocator(
+          expr, LocatorPathElt::OpenedPackElement(elementEnv));
+
+      // The type of a PackElementExpr is the opened pack element archetype
+      // of the pack reference.
+      CS.addConstraint(ConstraintKind::PackElementOf, elementType, packType,
+                       elementLoc);
+      return elementType;
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3982,6 +4006,10 @@ namespace {
         for (auto ignoredArg : ignoredArgs) {
           CS.markArgumentIgnoredForCodeCompletion(ignoredArg);
         }
+      }
+
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
+        CG.addPackElementEnvironment(expansion->getGenericEnvironment());
       }
 
       return Action::Continue(expr);

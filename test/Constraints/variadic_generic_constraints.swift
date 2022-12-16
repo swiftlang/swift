@@ -69,10 +69,10 @@ let _ = zip(t: 1, 2, 3, u: "hi", "hello", "greetings")  // ok
 let _ = zip(t: 1, u: "hi", "hello", "greetings")  // expected-error {{type of expression is ambiguous without more context}}
 
 func goodCallToZip<T..., U...>(t: T..., u: U...) where ((T, U)...): Any {
-  _ = zip(t: t..., u: u...)
+  _ = zip(t: (each t)..., u: (each u)...)
 }
 
 func badCallToZip<T..., U...>(t: T..., u: U...) {
-  _ = zip(t: t..., u: u...)
+  _ = zip(t: (each t)..., u: (each u)...)
   // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'T' and 'U' have the same shape}}
 }
