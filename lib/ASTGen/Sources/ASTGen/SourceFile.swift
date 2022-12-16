@@ -1,5 +1,6 @@
 import SwiftParser
 import SwiftSyntax
+import SwiftParserDiagnostics
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -57,5 +58,51 @@ public func roundTripCheck(
   sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
     let sf = sourceFile.pointee
     return sf.syntax.syntaxTextBytes.elementsEqual(sf.buffer) ? 0 : 1
+  }
+}
+
+extension Syntax {
+  /// Whether this syntax node is or is enclosed within a #if.
+  fileprivate var isInIfConfig: Bool {
+    if self.is(IfConfigDeclSyntax.self) {
+      return true
+    }
+
+    return parent?.isInIfConfig ?? false
+  }
+}
+
+/// Emit diagnostics within the given source file.
+@_cdecl("swift_ASTGen_emitParserDiagnostics")
+public func emitParserDiagnostics(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  sourceFilePtr: UnsafeMutablePointer<UInt8>
+) -> CInt {
+  return sourceFilePtr.withMemoryRebound(
+    to: ExportedSourceFile.self, capacity: 1
+  ) { sourceFile in
+    var anyDiags = false
+
+    let diags = ParseDiagnosticsGenerator.diagnostics(
+      for: sourceFile.pointee.syntax
+    )
+    for diag in diags {
+      // Skip over diagnostics within #if, because we don't know whether
+      // we are in an active region or not.
+      // FIXME: This heuristic could be improved.
+      if diag.node.isInIfConfig {
+        continue
+      }
+
+      emitDiagnostic(
+        diagEnginePtr: diagEnginePtr,
+        sourceFileBuffer: UnsafeMutableBufferPointer(
+          mutating: sourceFile.pointee.buffer),
+        diagnostic: diag
+      )
+      anyDiags = true
+    }
+
+    return anyDiags ? 1 : 0
   }
 }

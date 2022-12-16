@@ -1965,12 +1965,6 @@ ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
 
 //------------------------------------------------------------------------------
-// MARK: Consistency diagnostics
-//------------------------------------------------------------------------------
-ERROR(new_parser_failure, none,
-      "new parser has failed consistency checking; please see errors above", ())
-
-//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
@@ -2021,6 +2015,9 @@ ERROR(macro_expansion_decl_expected_macro_identifier,none,
 
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the Swift Swift parser", ())
+ERROR(parser_new_parser_errors,none,
+      "Swift Swift parser generated errors for code that C++ parser accepted",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
