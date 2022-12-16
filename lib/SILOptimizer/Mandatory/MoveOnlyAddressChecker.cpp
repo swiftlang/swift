@@ -292,6 +292,7 @@ struct UseState {
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> livenessUses;
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> borrows;
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> takeInsts;
+  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> copyInsts;
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> initInsts;
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
 
@@ -301,6 +302,7 @@ struct UseState {
     destroys.clear();
     livenessUses.clear();
     borrows.clear();
+    copyInsts.clear();
     takeInsts.clear();
     initInsts.clear();
     reinitInsts.clear();
@@ -552,6 +554,9 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // At this point, we have handled all of the non-loadTakeOrCopy/consuming
   // uses.
   if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
+    assert(op->getOperandNumber() == CopyAddrInst::Src &&
+           "Should have dest above in memInstMust{Rei,I}nitialize");
+
     if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found mark must check [nocopy] error: " << *user);
@@ -564,8 +569,13 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     if (!leafRange)
       return false;
 
-    LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
-    useState.takeInsts.insert({user, *leafRange});
+    if (copyAddr->isTakeOfSrc()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
+      useState.takeInsts.insert({user, *leafRange});
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
+      useState.copyInsts.insert({user, *leafRange});
+    }
     return true;
   }
 
@@ -637,7 +647,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       }
 
       // Then if we had any final consuming uses, mark that this liveness use is
-      // a take and if not, mark this as a borrow.
+      // a take/copy and if not, mark this as a borrow.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
       if (!leafRange)
         return false;
@@ -652,14 +662,23 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
         useState.borrows.insert({user, *leafRange});
       } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
-        useState.takeInsts.insert({user, *leafRange});
+        // If we had a load [copy], store this into the copy list. These are the
+        // things that we must merge into destroy_addr or reinits after we are
+        // done checking. The load [take] are already complete and good to go.
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+          LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
+          useState.takeInsts.insert({user, *leafRange});
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
+          useState.copyInsts.insert({user, *leafRange});
+        }
       }
       return true;
     }
   }
 
-  // Now that we have handled or loadTakeOrCopy, we need to now track our Takes.
+  // Now that we have handled or loadTakeOrCopy, we need to now track our
+  // additional pure takes.
   if (::memInstMustConsume(op)) {
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
@@ -900,6 +919,65 @@ void BlockSummaries::summarize(SILBasicBlock &block) {
     {
       auto iter = addressUseState.takeInsts.find(&inst);
       if (iter != addressUseState.takeInsts.end()) {
+        // If we are not yet tracking a "take up" or a "liveness up", then we
+        // can update our state. In those other two cases we emit an error
+        // diagnostic below.
+        if (!state.isTrackingAnyState()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Tracking new take up: " << *iter->first);
+          state.trackTake(iter->first, iter->second);
+          continue;
+        }
+
+        bool emittedSomeDiagnostic = false;
+        if (auto *takeUp = state.getTakeUp()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Found two takes, emitting error!\n");
+          LLVM_DEBUG(llvm::dbgs() << "    First take: " << *takeUp);
+          LLVM_DEBUG(llvm::dbgs() << "    Second take: " << inst);
+          diagnosticEmitter.emitAddressDiagnostic(markedAddress, takeUp, &inst,
+                                                  true /*is consuming*/);
+          emittedSomeDiagnostic = true;
+        }
+
+        // If we found a liveness inst, we are going to emit an error since we
+        // have a use after free.
+        if (auto *livenessUpInst = state.getLivenessUp()) {
+          // If we are tracking state for an inout and our liveness inst is a
+          // function exiting instruction, we want to emit a special
+          // diagnostic error saying that the user has not reinitialized inout
+          // along a path to the end of the function.
+          if (livenessUpInst == term && isInOut) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "    Found liveness inout error: " << inst);
+            // Even though we emit a diagnostic for inout here, we actually
+            // want to no longer track the inout liveness use and instead want
+            // to track the consuming use so that earlier errors are on the
+            // take and not on the inout. This is to ensure that we only emit
+            // a single inout not reinitialized before end of function error
+            // if we have multiple consumes along that path.
+            diagnosticEmitter.emitInOutEndOfFunctionDiagnostic(markedAddress,
+                                                               &inst);
+            state.trackTakeForLivenessError(iter->first, iter->second);
+          } else {
+            // Otherwise, we just emit a normal liveness error.
+            LLVM_DEBUG(llvm::dbgs() << "    Found liveness error: " << inst);
+            diagnosticEmitter.emitAddressDiagnostic(markedAddress,
+                                                    livenessUpInst, &inst,
+                                                    false /*is not consuming*/);
+            state.trackTakeForLivenessError(iter->first, iter->second);
+          }
+          emittedSomeDiagnostic = true;
+        }
+
+        (void)emittedSomeDiagnostic;
+        assert(emittedSomeDiagnostic);
+        continue;
+      }
+    }
+
+    {
+      auto iter = addressUseState.copyInsts.find(&inst);
+      if (iter != addressUseState.copyInsts.end()) {
         // If we are not yet tracking a "take up" or a "liveness up", then we
         // can update our state. In those other two cases we emit an error
         // diagnostic below.
@@ -1424,27 +1502,24 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
             addressUseState.reinitInsts.count(&*ii))
           break;
 
-        if (addressUseState.takeInsts.count(&*ii)) {
+        assert(!addressUseState.takeInsts.count(&*ii) &&
+               "Double destroy?! Should have errored on this?!");
+
+        if (addressUseState.copyInsts.count(&*ii)) {
           if (auto *li = dyn_cast<LoadInst>(&*ii)) {
-            if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-              // If we have a copy in the single block case, erase the destroy
-              // and visit the next one.
-              destroy->eraseFromParent();
-              changed = true;
-              foundSingleBlockCase = true;
-              break;
-            }
-            llvm_unreachable("Error?! This is a double destroy?!");
+            // If we have a copy in the single block case, erase the destroy
+            // and visit the next one.
+            destroy->eraseFromParent();
+            changed = true;
+            foundSingleBlockCase = true;
+            break;
           }
 
           if (auto *copyAddr = dyn_cast<CopyAddrInst>(&*ii)) {
-            if (!copyAddr->isTakeOfSrc()) {
-              destroy->eraseFromParent();
-              changed = true;
-              foundSingleBlockCase = true;
-              break;
-            }
-            llvm_unreachable("Error?! This is a double destroy?!");
+            destroy->eraseFromParent();
+            changed = true;
+            foundSingleBlockCase = true;
+            break;
           }
         }
 
@@ -1463,28 +1538,17 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   // Now that we have rewritten all borrows, convert any takes that are today
   // copies into their take form. If we couldn't do this, we would have had an
   // error.
-  for (auto take : addressUseState.takeInsts) {
+  for (auto take : addressUseState.copyInsts) {
     if (auto *li = dyn_cast<LoadInst>(take.first)) {
-      switch (li->getOwnershipQualifier()) {
-      case LoadOwnershipQualifier::Unqualified:
-      case LoadOwnershipQualifier::Trivial:
-        llvm_unreachable("Should never hit this");
-      case LoadOwnershipQualifier::Take:
-        // This is already correct.
-        continue;
-      case LoadOwnershipQualifier::Copy:
-        // Convert this to its take form.
-        if (auto *access = dyn_cast<BeginAccessInst>(li->getOperand()))
-          access->setAccessKind(SILAccessKind::Modify);
-        li->setOwnershipQualifier(LoadOwnershipQualifier::Take);
-        changed = true;
-        continue;
-      }
+      // Convert this to its take form.
+      if (auto *access = dyn_cast<BeginAccessInst>(li->getOperand()))
+        access->setAccessKind(SILAccessKind::Modify);
+      li->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+      changed = true;
+      continue;
     }
 
     if (auto *copy = dyn_cast<CopyAddrInst>(take.first)) {
-      if (copy->isTakeOfSrc())
-        continue;
       // Convert this to its take form.
       if (auto *access = dyn_cast<BeginAccessInst>(copy->getSrc()))
         access->setAccessKind(SILAccessKind::Modify);
@@ -1492,7 +1556,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
       continue;
     }
 
-    llvm::dbgs() << "Take User: " << *take.first;
+    llvm::dbgs() << "Unhandled copy user: " << *take.first;
     llvm_unreachable("Unhandled case?!");
   }
 
