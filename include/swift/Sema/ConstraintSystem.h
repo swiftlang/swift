@@ -74,7 +74,8 @@ class SolutionApplicationTarget;
 namespace TypeChecker {
 
 Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+                                                      Type builderType,
+                                                      bool AllowHoles);
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
@@ -1783,6 +1784,8 @@ enum class ConstraintSystemFlags {
 
   /// When set, ignore async/sync mismatches
   IgnoreAsyncSyncMismatch = 0x80,
+
+  AllowResultBuilderTransformWithHoles = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3587,7 +3590,8 @@ private:
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend Optional<BraceStmt *>
   swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+                                                      Type builderType,
+                                                      bool AllowHoles);
 
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(

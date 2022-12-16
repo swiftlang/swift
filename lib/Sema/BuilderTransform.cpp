@@ -2230,8 +2230,9 @@ BraceStmt *swift::applyResultBuilderTransform(
   return cast<BraceStmt>(result.get());
 }
 
-Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
-    FuncDecl *func, Type builderType) {
+Optional<BraceStmt *>
+TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType,
+                                             bool AllowHoles) {
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   //
@@ -2287,6 +2288,9 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (AllowHoles) {
+    options |= ConstraintSystemFlags::AllowResultBuilderTransformWithHoles;
+  }
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 

@@ -2049,8 +2049,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
-      auto optBody =
-          TypeChecker::applyResultBuilderBodyTransform(func, builderType);
+      auto optBody = TypeChecker::applyResultBuilderBodyTransform(
+          func, builderType, /*AllowHoles=*/true);
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -2139,9 +2139,8 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getResultBuilderType(func)) {
-      if (auto optBody =
-              TypeChecker::applyResultBuilderBodyTransform(
-                func, builderType)) {
+      if (auto optBody = TypeChecker::applyResultBuilderBodyTransform(
+              func, builderType, /*AllowHoles=*/false)) {
         if (!*optBody)
           return errorBody();
 

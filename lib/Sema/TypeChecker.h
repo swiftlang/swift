@@ -455,7 +455,8 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
 Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+                                                      Type builderType,
+                                                      bool AllowHoles);
 
 /// Find the return statements within the body of the given function.
 std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
