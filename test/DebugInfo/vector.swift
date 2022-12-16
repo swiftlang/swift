@@ -8,13 +8,7 @@
 
 
 import Swift
-public struct float2 {
-  public var _vector: Builtin.Vec2xFPIEEE32
-  public subscript(index: Int) -> Float {
-    get {
-      let elt = Builtin.extractelement_Vec2xFPIEEE32_Int32(_vector,
-        Int32(index)._value)
-      return Float(elt)
-    }
-  }
+public func float2(_ _vector: Builtin.Vec2xFPIEEE32, _ index: UInt) {
+  let elt = Builtin.extractelement_Vec2xFPIEEE32_Int32(_vector,
+    Int32(index)._value)
 }
