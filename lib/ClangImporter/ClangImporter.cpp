@@ -2713,6 +2713,9 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
                                                         ClangASTContext);
   if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
+  
+  if (VD->hasName() && VD->getName().isSimpleName("__CxxTemplateInstSs"))
+    return true;
 
   // Friends from class templates don't have an owning module. Just return true.
   if (isa<clang::FunctionDecl>(D) &&
