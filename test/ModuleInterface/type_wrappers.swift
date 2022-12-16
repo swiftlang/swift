@@ -3,6 +3,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/TypeWrappers.swiftinterface) -module-name TypeWrappers
 // RUN: %FileCheck %s < %t/TypeWrappers.swiftinterface
 
+// REQUIRES: asserts
+
 // CHECK: @typeWrapper public struct Wrapper<W, S> {
 // CHECK-NEXT: public init(for: W.Type, storage: S)
 // CHECK-NEXT:   public subscript<V>(propertyKeyPath _: Swift.KeyPath<W, V>, storageKeyPath path: Swift.KeyPath<S, V>) -> V {
