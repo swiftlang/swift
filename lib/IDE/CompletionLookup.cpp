@@ -1703,6 +1703,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
 void CompletionLookup::addGenericTypeParamRef(
     const GenericTypeParamDecl *GP, DeclVisibilityKind Reason,
     DynamicLookupInfo dynamicLookupInfo) {
+  assert(!GP->getName().empty());
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(GP, Reason, dynamicLookupInfo));
