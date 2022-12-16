@@ -6,6 +6,11 @@ module Fields {
   header "fields.h"
 }
 
+module Polymorphism {
+  header "polymorphism.h"
+  requires cplusplus
+}
+
 module SubTypes {
   header "sub-types.h"
 }
