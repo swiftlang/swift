@@ -84,16 +84,12 @@ public struct AddBlocker: ExpressionMacro {
     // Link the folded argument back into the tree.
     var node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
 
-   class AddVisitor: SyntaxVisitor {
+   class AddVisitor: SyntaxRewriter {
       var diagnostics: [Diagnostic] = []
-
-      init() {
-        super.init(viewMode: .sourceAccurate)
-      }
 
       override func visit(
         _ node: InfixOperatorExprSyntax
-      ) -> SyntaxVisitorContinueKind {
+      ) -> ExprSyntax {
         if let binOp = node.operatorOperand.as(BinaryOperatorExprSyntax.self) {
           if binOp.operatorToken.text == "+" {
             let messageID = MessageID(domain: "silly", id: "addblock")
@@ -131,20 +127,30 @@ public struct AddBlocker: ExpressionMacro {
                 ]
               )
             )
+
+            return ExprSyntax(
+              node.withOperatorOperand(
+                ExprSyntax(
+                  binOp.withOperatorToken(
+                    binOp.operatorToken.withKind(.spacedBinaryOperator("-"))
+                  )
+                )
+              )
+            )
           }
         }
 
-        return .visitChildren
+        return ExprSyntax(node)
       }
     }
 
     let visitor = AddVisitor()
-    visitor.walk(Syntax(node))
+    let result = visitor.visit(Syntax(node))
 
     for diag in visitor.diagnostics {
       context.diagnose(diag)
     }
 
-    return argument
+    return result.as(MacroExpansionExprSyntax.self)!.argumentList.first!.expression
   }
 }
