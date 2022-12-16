@@ -23,9 +23,6 @@
 
 #include <wchar.h>
 
-namespace swift {
-namespace win32 {
-
 /// Convert a wide string to UTF-8.
 ///
 /// @param str The string to convert.
@@ -35,7 +32,7 @@ namespace win32 {
 ///
 /// If @a str cannot be converted to UTF-8, @c nullptr is returned.
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char *copyUTF8FromWide(const wchar_t *str);
+char *_swift_win32_copyUTF8FromWide(const wchar_t *str);
 
 /// Convert a UTF-8 string to a wide string.
 ///
@@ -46,10 +43,8 @@ char *copyUTF8FromWide(const wchar_t *str);
 ///
 /// If @a str cannot be converted to UTF-16, @c nullptr is returned.
 SWIFT_RUNTIME_STDLIB_INTERNAL
-wchar_t *copyWideFromUTF8(const char *str);
+wchar_t *_swift_win32_copyWideFromUTF8(const char *str);
 
-}
-}
 #endif // defined(_WIN32)
 
 #endif // SWIFT_RUNTIME_WIN32_H

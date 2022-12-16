@@ -203,8 +203,10 @@ static void swift::enumerateUnsafeArgv(const F& body) {
   int argc = 0;
   if (LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
     std::for_each(wargv, wargv + argc, [=] (wchar_t *warg) {
-      auto arg = swift::win32::copyUTF8FromWide(warg);
-      if (!arg) {
+      if (char *arg = _swift_win32_copyUTF8FromWide(warg)) {
+        body(argc, arg);
+        free(arg);
+      } else {
         // Note that GetLastError() and errno may not be so useful here,
         // as in the error case we may have called free(), which might reset
         // either or both of them.
@@ -213,8 +215,6 @@ static void swift::enumerateUnsafeArgv(const F& body) {
                           "UTF-8: %lx, %d.\n",
                           warg, ::GetLastError(), errno);
       }
-      body(argc, arg);
-      free(arg);
     });
 
     LocalFree(wargv);

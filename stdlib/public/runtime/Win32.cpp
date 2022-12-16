@@ -22,7 +22,7 @@
 #include <windows.h>
 
 char *
-swift::win32::copyUTF8FromWide(const wchar_t *str) {
+_swift_win32_copyUTF8FromWide(const wchar_t *str) {
   char *result = nullptr;
   int len = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
                                   str, -1,
@@ -48,7 +48,7 @@ swift::win32::copyUTF8FromWide(const wchar_t *str) {
 }
 
 wchar_t *
-swift::win32::copyWideFromUTF8(const char *str) {
+_swift_win32_copyWideFromUTF8(const char *str) {
   wchar_t *result = nullptr;
   int len = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                                   str, -1,
