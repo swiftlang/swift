@@ -1583,6 +1583,12 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     return;
   }
 
+  if (auto *Cond = node.dyn_cast<StmtConditionElement *>()) {
+    bool IsFalsable; // ignored
+    TypeChecker::typeCheckStmtConditionElement(*Cond, IsFalsable, DC);
+    return;
+  }
+
   llvm_unreachable("Type checking null ASTNode");
 }
 
@@ -1910,6 +1916,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   class ASTNodeFinder : public ASTWalker {
     SourceManager &SM;
     SourceLoc Loc;
+
+    /// When the \c ASTNode that we want to check was found inside a brace
+    /// statement, we need to store a *reference* to the element in the
+    /// \c BraceStmt. When the brace statement gets type checked for result
+    /// builders its elements will be updated in-place, which makes
+    /// \c FoundNodeRef now point to the type-checked replacement node. We need
+    /// this behavior.
+    ///
+    /// But for all other cases, we just want to store a plain \c ASTNode. To
+    /// make sure we free the \c ASTNode again, we store it in
+    /// \c FoundNodeStorage and set \c FoundNodeRef to point to
+    /// \c FoundNodeStorage.
+    ASTNode FoundNodeStorage;
     ASTNode *FoundNode = nullptr;
 
     /// The innermost DeclContext that contains \c FoundNode.
@@ -1977,6 +1996,20 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         }
         // Already walked into.
         return Action::Stop();
+      } else if (auto Conditional = dyn_cast<LabeledConditionalStmt>(S)) {
+        for (StmtConditionElement &Cond : Conditional->getCond()) {
+          if (SM.isBeforeInBuffer(Loc, Cond.getStartLoc())) {
+            break;
+          }
+          SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, Cond.getEndLoc());
+          if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc) {
+            continue;
+          }
+
+          FoundNodeStorage = ASTNode(&Cond);
+          FoundNode = &FoundNodeStorage;
+          return Action::Stop();
+        }
       }
 
       return Action::Continue(S);
@@ -2017,7 +2050,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, D->getEndLoc());
         if (!(SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)) {
           if (!isa<TopLevelCodeDecl>(D)) {
-            FoundNode = new ASTNode(D);
+            FoundNodeStorage = ASTNode(D);
+            FoundNode = &FoundNodeStorage;
           }
         }
       }
