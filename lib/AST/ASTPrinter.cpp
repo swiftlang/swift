@@ -37,6 +37,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
@@ -1178,6 +1179,16 @@ void PrintAST::printAttributes(const Decl *D) {
   }
 
   D->getAttrs().print(Printer, Options, D);
+
+  // We need to check whether this is a type with an inferred
+  // type wrapper attribute and if so print it explicitly.
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    auto typeWrapperInfo = NTD->getTypeWrapper();
+    // The attribute has been inferred and we have to print it.
+    if (typeWrapperInfo && typeWrapperInfo->IsInferred) {
+      typeWrapperInfo->Attr->print(Printer, Options, D);
+    }
+  }
 
   // Print the implicit 'final' attribute.
   if (auto VD = dyn_cast<ValueDecl>(D)) {
@@ -2936,7 +2947,19 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
 }
 
 static bool usesFeatureTypeWrappers(Decl *decl) {
-  return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
+  NullablePtr<NominalTypeDecl> typeDecl;
+
+  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+    typeDecl = extension->getExtendedNominal();
+  } else {
+    typeDecl = dyn_cast<NominalTypeDecl>(decl);
+  }
+
+  if (!typeDecl)
+    return false;
+
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           UsesTypeWrapperFeature{typeDecl.get()}, false);
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
