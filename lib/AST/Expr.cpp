@@ -394,6 +394,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(PackExpansion);
+  NO_REFERENCE(PackElement);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -750,6 +751,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
     return false;
 
   case ExprKind::Call:
@@ -927,6 +929,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -1245,17 +1248,21 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 
 PackExpansionExpr *
 PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          ArrayRef<OpaqueValueExpr *> opaqueValues,
-                          ArrayRef<Expr *> bindings, SourceLoc dotsLoc,
-                          GenericEnvironment *environment,
+                          ArrayRef<PackElementExpr *> packElements,
+                          SourceLoc dotsLoc, GenericEnvironment *environment,
                           bool implicit, Type type) {
   size_t size =
-      totalSizeToAlloc<OpaqueValueExpr *, Expr *>(opaqueValues.size(),
-                                                  bindings.size());
+      totalSizeToAlloc<PackElementExpr *>(packElements.size());
   void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
-  return ::new (mem) PackExpansionExpr(patternExpr, opaqueValues,
-                                       bindings, dotsLoc, environment,
+  return ::new (mem) PackExpansionExpr(patternExpr, packElements,
+                                       dotsLoc, environment,
                                        implicit, type);
+}
+
+PackElementExpr *
+PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
+                        bool implicit, Type type) {
+  return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

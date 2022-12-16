@@ -97,6 +97,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::OpenedPackElement:
   case ConstraintLocator::PackShape:
   case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
@@ -445,6 +446,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   case ConstraintLocator::PackElement: {
     auto packElt = elt.castTo<LocatorPathElt::PackElement>();
     out << "pack element #" << llvm::utostr(packElt.getIndex());
+    break;
+  }
+
+  case ConstraintLocator::OpenedPackElement: {
+    out << "opened pack element";
     break;
   }
 

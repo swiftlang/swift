@@ -5338,6 +5338,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
 
     case ConstraintLocator::PackElement:
+    case ConstraintLocator::OpenedPackElement:
     case ConstraintLocator::PackShape:
       break;
 

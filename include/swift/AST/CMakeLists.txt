@@ -11,10 +11,7 @@ set(generated_include_sources
 add_gyb_target(swift-ast-generated-headers
     "${generated_include_sources}"
     DEPENDS
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/kinds.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AttributeKinds.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Classification.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Token.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Utils.py")
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeKinds.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py")
 set_property(TARGET swift-ast-generated-headers
     PROPERTY FOLDER "Miscellaneous")
