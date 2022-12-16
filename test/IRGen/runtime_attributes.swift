@@ -209,3 +209,8 @@ struct FlagWithAvail {
 @FlagWithAvail
 @available(macOS, obsoleted: 100.0)
 func attrIsHigherThanFunc() {}
+
+func test_local_type_with_protocol_conformance() {
+  // CHECK-NOT: define hidden swiftcc void @"$s18runtime_attributes41test_local_type_with_protocol_conformanceyyF9LocalTest{{.*}}"
+  struct LocalTest : Ignored {} // Ok but attribute is not inferred.
+}

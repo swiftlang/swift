@@ -7391,7 +7391,7 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
 
   auto *NTD = dyn_cast<NominalTypeDecl>(decl);
   // Attribute inference is only possible from protocol conformances.
-  if (!NTD || isa<ProtocolDecl>(NTD))
+  if (!NTD || isa<ProtocolDecl>(NTD) || NTD->getDeclContext()->isLocalContext())
     return copyAttrs(attrs);
 
   // Gather any attributes inferred from (explicit) protocol conformances

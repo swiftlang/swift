@@ -153,3 +153,7 @@ class MembersWithAvailability {
   @available(macOS, introduced: 100.0)
   var prop: Int { get { 0 } } // Ok
 }
+
+func test_local_types_with_conformances() {
+  struct X : Flagged {}
+}
