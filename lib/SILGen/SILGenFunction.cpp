@@ -1160,9 +1160,9 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   emitEpilog(loc);
 }
 
-void SILGenFunction::emitGeneratorFunction(SILDeclRef function,
-                                           Type resultInterfaceType,
-                                           BraceStmt *body) {
+void SILGenFunction::emitGeneratorFunction(
+    SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
+    Optional<AbstractionPattern> pattern) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation loc(function.getDecl());
@@ -1172,7 +1172,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function,
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   emitProlog(captureInfo, ParameterList::createEmpty(getASTContext()),
              /*selfParam=*/nullptr, dc, resultInterfaceType, /*throws=*/false,
-             SourceLoc());
+             SourceLoc(), pattern);
 
   prepareEpilog(resultInterfaceType, /*hasThrows=*/false, CleanupLocation(loc));
 

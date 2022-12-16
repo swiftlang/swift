@@ -1146,7 +1146,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitRuntimeAttributeGenerator ", f);
     SILGenFunction SGF(*this, *f, DC);
-    SGF.emitGeneratorFunction(constant, generator.second, generator.first);
+    SGF.emitGeneratorFunction(constant, generator.second, generator.first,
+                              AbstractionPattern::getOpaqueFunction());
     postEmitFunction(constant, f);
     break;
   }
