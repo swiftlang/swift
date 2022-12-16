@@ -132,6 +132,8 @@ inline const void *_Nullable getErrorMetadata() {
   return ptr2;
 }
 
+#ifndef SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
+
 class Error {
 public:
   Error() {}
@@ -368,5 +370,7 @@ using ThrowingResult = Swift::Expected<T>;
 #define SWIFT_RETURN_THUNK(T, v) Swift::Expected<T>(v)
 
 #endif
+
+#endif // SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
 
 #endif
