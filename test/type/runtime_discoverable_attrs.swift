@@ -72,6 +72,9 @@ struct A { // Ok
 
   class Inner {
     @OnlyPropsTest @Flag("test property") var test: [Int]? = nil // Ok
+
+    @Flag func testInner() {}
+    @Flag static func testStaticInner() {}
   }
 }
 
