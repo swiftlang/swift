@@ -1566,10 +1566,7 @@ public:
   /// \verbatim
   ///   simple-type-identifier: identifier generic-argument-list?
   /// \endverbatim
-  bool canParseSimpleTypeIdentifier();
-
   bool canParseTypeIdentifier();
-  bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();

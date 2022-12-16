@@ -1520,15 +1520,13 @@ bool Parser::canParseType() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
+  case tok::identifier:
   case tok::code_complete:
     if (!canParseTypeIdentifier())
       return false;
     break;
-  case tok::kw_protocol: // Deprecated composition syntax
-  case tok::identifier:
-    if (!canParseTypeIdentifierOrTypeComposition())
-      return false;
-    break;
+  case tok::kw_protocol:
+    return canParseOldStyleProtocolComposition();
   case tok::l_paren: {
     consumeToken();
     if (!canParseTypeTupleBody())
@@ -1561,14 +1559,22 @@ bool Parser::canParseType() {
     return false;
   }
 
-  // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
+  // A member type, '.Type', '.Protocol', '?', and '!' still leave us with
+  // type-simple.
   while (true) {
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        (peekToken().isContextualKeyword("Type")
-         || peekToken().isContextualKeyword("Protocol"))) {
+    if (Tok.isAny(tok::period_prefix, tok::period)) {
       consumeToken();
-      consumeToken(tok::identifier);
-      continue;
+
+      if (Tok.isContextualKeyword("Type") ||
+          Tok.isContextualKeyword("Protocol")) {
+        consumeToken();
+        continue;
+      }
+
+      if (canParseTypeIdentifier())
+        continue;
+
+      return false;
     }
     if (isOptionalToken(Tok)) {
       consumeOptionalToken();
@@ -1579,6 +1585,13 @@ bool Parser::canParseType() {
       continue;
     }
     break;
+  }
+
+  while (Tok.isContextualPunctuator("&")) {
+    consumeToken();
+    // FIXME: Should be 'canParseTypeSimple', but we don't have one.
+    if (!canParseType())
+      return false;
   }
 
   if (isAtFunctionTypeArrow()) {
@@ -1605,25 +1618,10 @@ bool Parser::canParseType() {
   return true;
 }
 
-bool Parser::canParseTypeIdentifierOrTypeComposition() {
-  if (Tok.is(tok::kw_protocol))
-    return canParseOldStyleProtocolComposition();
-  
-  while (true) {
-    if (!canParseTypeIdentifier())
-      return false;
-    
-    if (Tok.isContextualPunctuator("&")) {
-      consumeToken();
-      continue;
-    } else {
-      return true;
-    }
-  }
-}
-
-bool Parser::canParseSimpleTypeIdentifier() {
+bool Parser::canParseTypeIdentifier() {
   // Parse an identifier.
+  //
+  // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.
   if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any, tok::code_complete))
     return false;
   consumeToken();
@@ -1635,28 +1633,11 @@ bool Parser::canParseSimpleTypeIdentifier() {
   return true;
 }
 
-bool Parser::canParseTypeIdentifier() {
-  while (true) {
-    if (!canParseSimpleTypeIdentifier())
-      return false;
-
-    // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type' or 'Protocol'.
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        !peekToken().isContextualKeyword("Type") &&
-        !peekToken().isContextualKeyword("Protocol")) {
-      consumeToken();
-    } else {
-      return true;
-    }
-  }
-}
-
 bool Parser::canParseBaseTypeForQualifiedDeclName() {
   BacktrackingScope backtrack(*this);
 
   // Parse a simple type identifier.
-  if (!canParseSimpleTypeIdentifier())
+  if (!canParseTypeIdentifier())
     return false;
 
   // Qualified name base types must be followed by a period.
