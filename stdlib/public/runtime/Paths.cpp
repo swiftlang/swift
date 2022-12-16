@@ -99,11 +99,13 @@ _swift_getDefaultRootPath()
   const char *ptr = runtimePath + runtimePathLen;
   while (ptr > runtimePath && !_swift_isPathSep(*--ptr));
 
-  // Remove the "lib" directory if it's present
-  if (ptr - runtimePath >= 4
-      && _swift_isPathSep(ptr[-4])
-      && std::strncmp(ptr - 3, "lib", 3) == 0) {
-    ptr -= 4;
+  // Remove lib/swift/ if present
+  if (ptr - runtimePath >= 10
+      && _swift_isPathSep(ptr[-10])
+      && std::strncmp(ptr - 9, "lib", 3) == 0
+      && _swift_isPathSep(ptr[-6])
+      && std::strncmp(ptr - 5, "swift", 5) == 0) {
+    ptr -= 10;
   }
 
   // If the result is empty, return "./" or ".\\"
@@ -152,9 +154,9 @@ swift_getAuxiliaryExecutablePath(const char *name)
 {
   const char *rootPath = swift_getRootPath();
 
-  // Form <rootPath>/libexec/
+  // Form <rootPath>/libexec/swift/
   size_t rootPathLen = std::strlen(rootPath);
-  const char *libexecStr = PATHSEP_STR "libexec" PATHSEP_STR;
+  const char *libexecStr = PATHSEP_STR "libexec" PATHSEP_STR "swift" PATHSEP_STR;
   size_t libexecLen = std::strlen(libexecStr);
   char *libexecPath = (char *)malloc(rootPathLen + libexecLen + 1);
   std::memcpy(libexecPath, rootPath, rootPathLen);
