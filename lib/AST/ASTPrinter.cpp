@@ -2974,7 +2974,7 @@ static bool usesFeatureParserValidation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureParserSequenceFolding(Decl *decl) {
+static bool usesFeatureParserDiagnostics(Decl *decl) {
   return false;
 }
 
