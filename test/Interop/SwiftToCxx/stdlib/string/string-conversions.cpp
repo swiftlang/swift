@@ -17,6 +17,11 @@ public func printString(_ s: String) {
     print("'''\(s)'''")
 }
 
+@_expose(Cxx)
+public func makeString(_ s: String, _ y: String) -> String {
+    return "\(s)++\(y)"
+}
+
 //--- string-conversions.cpp
 
 #include <cassert>
@@ -37,5 +42,13 @@ int main() {
     printString(str);
   }
 // CHECK-NEXT: '''test std::string'''
+  {
+    auto s = makeString(String("start"), String("end"));
+    std::string str = s;
+    assert(str == "start++end");
+    str += "++cxx";
+    printString(String(str));
+  }
+// CHECK-NEXT: '''start++end++cxx'''
   return 0;
 }

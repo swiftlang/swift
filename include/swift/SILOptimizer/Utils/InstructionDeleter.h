@@ -126,6 +126,10 @@ public:
 
   InstModCallbacks &getCallbacks() { return callbacks; }
 
+  void setCallbacks(const InstModCallbacks &newCallbacks) {
+    callbacks = newCallbacks;
+  }
+
   bool hadCallbackInvocation() const {
     return const_cast<InstructionDeleter *>(this)
         ->getCallbacks()
