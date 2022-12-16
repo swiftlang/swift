@@ -2815,8 +2815,8 @@ void YieldRewriter::rewriteYield(YieldInst *yieldInst) {
 void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   auto info = opaqueFnConv.getYieldInfoForOperandIndex(index);
   auto convention = info.getConvention();
-  auto ty =
-      opaqueFnConv.getSILType(info, pass.function->getTypeExpansionContext());
+  auto ty = pass.function->mapTypeIntoContext(
+      opaqueFnConv.getSILType(info, pass.function->getTypeExpansionContext()));
   if (ty.isAddressOnly(*pass.function)) {
     assert(yieldInst->getOperand(index)->getType().isAddress() &&
            "rewriting yield of of address-only value after use rewriting!?");

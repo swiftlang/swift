@@ -37,6 +37,10 @@ struct LoadableNontrivial {
     var x: Klass
 }
 
+struct LoadableNontrivialGeneric<T> {
+  var x: Klass
+}
+
 struct SI<T> {
   var element: T
   var index: I
@@ -2642,3 +2646,29 @@ unwindbb:
   abort_apply %token
   unwind
 }
+
+// Verify that the type of the alloc_stack is appropriately mapped into the
+// function's context.
+// CHECK-LABEL: sil [ossa] @test_yield_D_loadable_generic_as_inguaranteed : {{.*}} <T> {{.*}} {
+// CHECK:         ([[INSTANCE_ADDR:%[^,]+]], {{%[^,]+}}) = begin_apply undef<T>()
+// CHECK:         [[INSTANCE:%[^,]+]] = load_borrow [[INSTANCE_ADDR:%[^,]+]]
+// CHECK:         [[STACK_ADDR:%[^,]+]] = alloc_stack $LoadableNontrivialGeneric<T>  
+//                                                                              ^^^ Verify that T and not τ_0_0 appears
+// CHECK:         [[YIELDABLE_INSTANCE:%[^,]+]] = store_borrow [[INSTANCE:%[^,]+]] to [[STACK_ADDR:%[^,]+]]
+// CHECK:         yield [[YIELDABLE_INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_yield_D_loadable_generic_as_inguaranteed'
+sil [ossa] @test_yield_D_loadable_generic_as_inguaranteed : $@yield_once @convention(thin) <T> () -> @yields @in_guaranteed LoadableNontrivialGeneric<T> {
+bb0:
+  (%3, %4) = begin_apply undef<T>() : $@yield_once @convention(method) <Tee> () -> @yields @in_guaranteed LoadableNontrivialGeneric<Tee>
+  yield %3 : $LoadableNontrivialGeneric<T>, resume bb1, unwind bb2
+
+bb1:
+  end_apply %4
+  %7 = tuple ()
+  return %7 : $()
+
+bb2:
+  abort_apply %4
+  unwind
+}
+
