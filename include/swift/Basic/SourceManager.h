@@ -23,6 +23,40 @@
 
 namespace swift {
 
+/// Augments a buffer that was created specifically to hold generated source
+/// code with the reasons for it being generated.
+class GeneratedSourceInfo {
+public:
+  /// The kind of generated source code.
+  enum Kind {
+    /// The expansion of a macro.
+    MacroExpansion,
+
+    /// A new function body that is replacing an existing function body.
+    ReplacedFunctionBody,
+  } kind;
+
+  /// The buffer ID for the enclosing buffer, in which originalSourceRange
+  /// resides.
+  unsigned originalBufferID;
+
+  /// The source range in the enclosing buffer where this source was generated.
+  ///
+  /// This could point at a macro expansion or at the implicit location at
+  /// which source code was generated. Conceptually, one can think of the
+  /// buffer described by a \c GeneratedSource instance as replacing the
+  /// code in the \c originalSourceRange.
+  SourceRange originalSourceRange;
+
+  /// The source range in the generated-source buffer where the generated
+  /// code exists. This might be a subrange of the buffer containing the
+  /// generated source, but it will never be from a different buffer.
+  SourceRange generatedSourceRange;
+
+  /// The opaque pointer for an ASTNode.
+  void *astNode;
+};
+
 /// This class manages and owns source buffers.
 class SourceManager {
 public:
@@ -51,7 +85,10 @@ private:
   /// to speed up stats.
   mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
-  /// Holds replaced ranges. Keys are orignal ranges, and values are new ranges
+  /// Holds generated source information, indexed by the buffer ID.
+  llvm::DenseMap<unsigned, GeneratedSourceInfo> GeneratedSourceInfos;
+
+  /// Holds replaced ranges. Keys are original ranges, and values are new ranges
   /// in different buffers. This is used for code completion and ASTContext
   /// reusing compilation.
   llvm::DenseMap<SourceRange, SourceRange> ReplacedRanges;
@@ -108,9 +145,12 @@ public:
   const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
     return ReplacedRanges;
   }
-  void setReplacedRange(SourceRange Orig, SourceRange New) {
-    ReplacedRanges[Orig] = New;
-  }
+
+  /// Set the generated source information associated with a given buffer.
+  void setGeneratedSourceInfo(unsigned bufferID, GeneratedSourceInfo);
+
+  /// Retrieve the generated source information for the given buffer.
+  Optional<GeneratedSourceInfo> getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Record the starting source location of a regex literal.
   void recordRegexLiteralStartLoc(SourceLoc loc) {
