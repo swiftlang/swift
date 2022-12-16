@@ -205,9 +205,11 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 /// \endverbatim
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
+  Optional<DiagnosticTransaction> existingParsingTransaction;
   if ((Context.LangOpts.hasFeature(Feature::Macros) ||
        Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
        Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
        Context.LangOpts.hasFeature(Feature::ParserValidation) ||
        Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
       !SourceMgr.hasIDEInspectionTargetBuffer() &&
@@ -224,6 +226,18 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
     Context.addCleanup([exportedSourceFile] {
       swift_ASTGen_destroySourceFile(exportedSourceFile);
     });
+
+    // If we're supposed to emit diagnostics from the parser, do so now.
+    if ((Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
+         Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
+        swift_ASTGen_emitParserDiagnostics(
+            &Context.Diags, SF.exportedSourceFile) &&
+        Context.Diags.hadAnyError() &&
+        !Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
+      // Errors were emitted, and we're still using the C++ parser, so
+      // disable diagnostics from the C++ parser.
+      existingParsingTransaction.emplace(Context.Diags);
+    }
 
     // If we want to do ASTGen, do so now.
     if (Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
@@ -287,6 +301,9 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   }
 
 #if SWIFT_SWIFT_PARSER
+  if (existingParsingTransaction)
+    existingParsingTransaction->abort();
+
   // Perform round-trip and/or validation checking.
   if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        Context.LangOpts.hasFeature(Feature::ParserValidation)) &&

@@ -138,9 +138,10 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
-/// Whether to fold sequence expressions in the syntax tree produced by the
-/// Swift Swift parser.
-EXPERIMENTAL_FEATURE(ParserSequenceFolding, false)
+/// Whether to emit diagnostics from the new parser first, and only emit
+/// diagnostics from the existing parser when there are none from the new
+/// parser.
+EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
 
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
