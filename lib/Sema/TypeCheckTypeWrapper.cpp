@@ -20,6 +20,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeWrappers.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -77,21 +78,35 @@ VarDecl *VarDecl::getUnderlyingTypeWrapperStorage() const {
                            nullptr);
 }
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
-  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           GetTypeWrapper{mutableSelf}, nullptr);
+static void
+getDeclaredProtocolConformances(NominalTypeDecl *decl,
+                                SmallVectorImpl<ProtocolDecl *> &protocols) {
+  for (unsigned i : indices(decl->getInherited())) {
+    auto inheritedType = evaluateOrDefault(
+        decl->getASTContext().evaluator,
+        InheritedTypeRequest{decl, i, TypeResolutionStage::Interface}, Type());
+
+    if (!(inheritedType && inheritedType->isConstraintType()))
+      continue;
+
+    if (auto *protocol =
+            dyn_cast_or_null<ProtocolDecl>(inheritedType->getAnyNominal())) {
+      protocols.push_back(protocol);
+    }
+
+    if (auto composition = inheritedType->getAs<ProtocolCompositionType>()) {
+      for (auto member : composition->getMembers()) {
+        if (auto *protocol =
+                dyn_cast_or_null<ProtocolDecl>(member->getAnyNominal())) {
+          protocols.push_back(protocol);
+        }
+      }
+    }
+  }
 }
 
-struct TypeWrapperAttrInfo {
-  CustomAttr *Attr;
-  NominalTypeDecl *Wrapper;
-  NominalTypeDecl *AttachedTo;
-};
-
-static void
-getTypeWrappers(NominalTypeDecl *decl,
-                SmallVectorImpl<TypeWrapperAttrInfo> &typeWrappers) {
+static void getTypeWrappers(NominalTypeDecl *decl,
+                            SmallVectorImpl<TypeWrapperInfo> &typeWrappers) {
   auto &ctx = decl->getASTContext();
 
   // Attributes applied directly to the type.
@@ -105,7 +120,8 @@ getTypeWrappers(NominalTypeDecl *decl,
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
     if (typeWrapper && typeWrapper->isValid())
-      typeWrappers.push_back({mutableAttr, nominal, decl});
+      typeWrappers.push_back(
+          {mutableAttr, nominal, decl, /*isInferred=*/false});
   }
 
   // Do not allow transitive protocol inference between protocols.
@@ -114,45 +130,37 @@ getTypeWrappers(NominalTypeDecl *decl,
 
   // Attributes inferred from (explicit) protocol conformances
   // associated with the declaration of the type.
-  for (unsigned i : indices(decl->getInherited())) {
-    auto inheritedType = evaluateOrDefault(
-        ctx.evaluator,
-        InheritedTypeRequest{decl, i, TypeResolutionStage::Interface}, Type());
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(decl, protocols);
 
-    if (!(inheritedType && inheritedType->isConstraintType()))
-      continue;
-
-    auto *protocol = inheritedType->getAnyNominal();
-    if (!protocol)
-      continue;
-
-    SmallVector<TypeWrapperAttrInfo, 2> inferredAttrs;
+  for (auto *protocol : protocols) {
+    SmallVector<TypeWrapperInfo, 2> inferredAttrs;
     getTypeWrappers(protocol, inferredAttrs);
 
     // De-duplicate inferred type wrappers. This also makes sure
     // that if both protocol and conforming type explicitly declare
     // the same type wrapper there is no clash between them.
     for (const auto &inferredAttr : inferredAttrs) {
-      if (llvm::find_if(typeWrappers, [&](const TypeWrapperAttrInfo &attr) {
+      if (llvm::find_if(typeWrappers, [&](const TypeWrapperInfo &attr) {
             return attr.Wrapper == inferredAttr.Wrapper;
           }) == typeWrappers.end())
-        typeWrappers.push_back(inferredAttr);
+        typeWrappers.push_back(inferredAttr.asInferred());
     }
   }
 }
 
-NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+Optional<TypeWrapperInfo>
+GetTypeWrapper::evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
   // Note that we don't actually care whether there are duplicates,
   // using the same type wrapper multiple times is still an error.
-  SmallVector<TypeWrapperAttrInfo, 2> typeWrappers;
+  SmallVector<TypeWrapperInfo, 2> typeWrappers;
 
   getTypeWrappers(decl, typeWrappers);
 
   if (typeWrappers.empty())
-    return nullptr;
+    return None;
 
   if (typeWrappers.size() != 1) {
     ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers,
@@ -170,25 +178,21 @@ NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
       }
     }
 
-    return nullptr;
+    return None;
   }
 
-  return typeWrappers.front().Wrapper;
+  return typeWrappers.front();
 }
 
 Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  SmallVector<TypeWrapperAttrInfo, 2> typeWrappers;
-
-  getTypeWrappers(decl, typeWrappers);
-
-  if (typeWrappers.size() != 1)
+  auto typeWrapperInfo = decl->getTypeWrapper();
+  if (!typeWrapperInfo)
     return Type();
 
-  auto *typeWrapperAttr = typeWrappers.front().Attr;
   auto type = evaluateOrDefault(
       evaluator,
-      CustomAttrTypeRequest{typeWrapperAttr, decl->getDeclContext(),
+      CustomAttrTypeRequest{typeWrapperInfo->Attr, decl->getDeclContext(),
                             CustomAttrTypeKind::TypeWrapper},
       Type());
 
@@ -225,6 +229,54 @@ TypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
                            GetTypeWrapperStorage{mutableSelf}, nullptr);
 }
 
+static AccessLevel
+getAccessLevelForTypeWrapperStorage(NominalTypeDecl *attachedTo) {
+  auto &ctx = attachedTo->getASTContext();
+
+  if (isa<ProtocolDecl>(attachedTo))
+    return attachedTo->getFormalAccess();
+
+  llvm::SmallDenseMap<ProtocolDecl *, bool, 4> visitedProtocols;
+  std::function<bool(ProtocolDecl *)> hasPublicStorageAssociatedType =
+      [&](ProtocolDecl *protocol) {
+        if (visitedProtocols.count(protocol))
+          return visitedProtocols[protocol];
+
+        auto recordResult = [&](ProtocolDecl *P, bool hasWrapper) {
+          visitedProtocols[P] = hasWrapper;
+          return hasWrapper;
+        };
+
+        if (auto *storage =
+                protocol->getAssociatedType(ctx.Id_TypeWrapperStorage)) {
+          if (storage->getFormalAccess() == AccessLevel::Public)
+            return recordResult(protocol, true);
+        }
+
+        // Recursively check whether any of the parents have that
+        // requirement.
+        for (auto *parent : protocol->getProtocolDependencies()) {
+          bool hasPublicStorage = hasPublicStorageAssociatedType(parent);
+          (void)recordResult(parent, hasPublicStorage);
+
+          if (hasPublicStorage)
+            return recordResult(protocol, true);
+        }
+
+        return recordResult(protocol, false);
+      };
+
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(attachedTo, protocols);
+
+  for (auto *protocol : protocols) {
+    if (hasPublicStorageAssociatedType(protocol))
+      return AccessLevel::Public;
+  }
+
+  return AccessLevel::Internal;
+}
+
 TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
                                           NominalTypeDecl *parent) const {
   if (!parent->hasTypeWrapper())
@@ -252,7 +304,7 @@ TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
 
   storage->setImplicit();
   storage->setSynthesized();
-  storage->setAccess(AccessLevel::Internal);
+  storage->setAccess(getAccessLevelForTypeWrapperStorage(parent));
 
   parent->addMember(storage);
 
@@ -264,7 +316,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
                                  NominalTypeDecl *parent) const {
   auto &ctx = parent->getASTContext();
 
-  auto *typeWrapper = parent->getTypeWrapper();
+  auto typeWrapper = parent->getTypeWrapper();
   if (!typeWrapper)
     return nullptr;
 
@@ -278,13 +330,13 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
 
   // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(
-      typeWrapper, /*Parent=*/typeWrapperType->getParent(),
+      typeWrapper->Wrapper, /*Parent=*/typeWrapperType->getParent(),
       /*genericArgs=*/
-      {parent->getSelfInterfaceType(),
-       storage->getDeclaredInterfaceType()});
+      {parent->getSelfInterfaceType(), storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
-                        VarDecl::Introducer::Var, AccessLevel::Internal);
+                        VarDecl::Introducer::Var,
+                        getAccessLevelForTypeWrapperStorage(parent));
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
@@ -364,7 +416,7 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
         ctx, DeclBaseName::createSubscript(),
         {ctx.Id_wrappedSelf, ctx.Id_propertyKeyPath, ctx.Id_storageKeyPath});
 
-    auto *typeWrapper = parent->getTypeWrapper();
+    auto *typeWrapper = parent->getTypeWrapper()->Wrapper;
     auto candidates = typeWrapper->lookupDirect(subscriptName);
 
     if (!candidates.empty()) {

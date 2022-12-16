@@ -64,6 +64,7 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
+struct TypeWrapperInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -3522,7 +3523,8 @@ public:
 
 /// Return a type wrapper (if any) associated with the given declaration.
 class GetTypeWrapper
-    : public SimpleRequest<GetTypeWrapper, NominalTypeDecl *(NominalTypeDecl *),
+    : public SimpleRequest<GetTypeWrapper,
+                           Optional<TypeWrapperInfo>(NominalTypeDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3530,7 +3532,8 @@ public:
 private:
   friend SimpleRequest;
 
-  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+  Optional<TypeWrapperInfo> evaluate(Evaluator &evaluator,
+                                     NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
@@ -3747,6 +3750,23 @@ private:
   friend SimpleRequest;
 
   ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Check whether this is a protocol that has a type wrapper attribute
+/// or one of its dependencies does.
+class UsesTypeWrapperFeature
+    : public SimpleRequest<UsesTypeWrapperFeature, bool(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
