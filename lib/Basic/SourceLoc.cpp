@@ -252,6 +252,32 @@ StringRef SourceManager::extractText(CharSourceRange Range,
                        Range.getByteLength());
 }
 
+void SourceManager::setGeneratedSourceInfo(
+    unsigned bufferID, GeneratedSourceInfo info
+) {
+  assert(GeneratedSourceInfos.count(bufferID) == 0);
+  GeneratedSourceInfos[bufferID] = info;
+
+  switch (info.kind) {
+  case GeneratedSourceInfo::MacroExpansion:
+    break;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    // Keep track of the replaced range.
+    ReplacedRanges[info.originalSourceRange] = info.generatedSourceRange;
+    break;
+  }
+}
+
+Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
+    unsigned bufferID
+) const {
+  auto known = GeneratedSourceInfos.find(bufferID);
+  if (known == GeneratedSourceInfos.end())
+    return None;
+  return known->second;
+}
+
 Optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());

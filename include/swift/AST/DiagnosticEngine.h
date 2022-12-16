@@ -502,6 +502,7 @@ namespace swift {
     }
 
     void addChildNote(Diagnostic &&D);
+    void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
   };
   
   /// Describes an in-flight diagnostic, which is currently active
@@ -1163,6 +1164,11 @@ namespace swift {
 
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
+
+    /// Retrieve the set of child notes that describe how the generated
+    /// source buffer was derived, e.g., a macro expansion backtrace.
+    std::vector<Diagnostic> getGeneratedSourceBufferNotes(
+        SourceLoc loc, Optional<unsigned> &lastBufferID);
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.
