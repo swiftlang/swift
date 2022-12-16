@@ -836,12 +836,6 @@ public:
         return false;
 
       Generics.push_back(expr->getGenericEnvironment());
-
-      for (auto *placeholder : expr->getOpaqueValues()) {
-        assert(!OpaqueValues.count(placeholder));
-        OpaqueValues[placeholder] = 0;
-      }
-
       return true;
     }
 
@@ -852,13 +846,6 @@ public:
              E->getGenericEnvironment());
       Generics.pop_back();
       verifyCheckedAlwaysBase(E);
-    }
-
-    void cleanup(PackExpansionExpr *expr) {
-      for (auto *placeholder : expr->getOpaqueValues()) {
-        assert(OpaqueValues.count(placeholder));
-        OpaqueValues.erase(placeholder);
-      }
     }
 
     bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {

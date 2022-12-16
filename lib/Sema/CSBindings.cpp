@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
@@ -1404,11 +1405,50 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::Conjunction:
   case ConstraintKind::BindTupleOfFunctionParams:
-  case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
     // Constraints from which we can't do anything.
     break;
+
+  case ConstraintKind::PackElementOf: {
+    auto elementType = CS.simplifyType(constraint->getFirstType());
+    auto packType = CS.simplifyType(constraint->getSecondType());
+
+    auto *loc = constraint->getLocator();
+    auto openedElement  =
+        loc->getLastElementAs<LocatorPathElt::OpenedPackElement>();
+
+    if (elementType->isTypeVariableOrMember() && packType->isTypeVariableOrMember())
+      break;
+
+    auto *elementVar = elementType->getAs<TypeVariableType>();
+    auto *packVar = packType->getAs<TypeVariableType>();
+
+    if (elementVar == TypeVar && !packVar) {
+      // Produce a potential binding to the opened element archetype corresponding
+      // to the pack type.
+      packType = packType->mapTypeOutOfContext();
+      if (auto *expansion = packType->getAs<PackExpansionType>())
+        packType = expansion->getPatternType();
+
+      auto *elementEnv = openedElement->getGenericEnvironment();
+      auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
+      addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
+
+      break;
+    } else if (packVar == TypeVar && !elementVar) {
+      // Produce a potential binding to the pack archetype corresponding to
+      // the opened element type.
+      auto *packEnv = CS.DC->getGenericEnvironmentOfContext();
+      elementType = elementType->mapTypeOutOfContext();
+      auto patternType = packEnv->mapElementTypeIntoPackContext(elementType);
+      addPotentialBinding({patternType, AllowedBindingKind::Exact, constraint});
+
+      break;
+    }
+
+    break;
+  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
