@@ -87,8 +87,7 @@ public:
                                     llvm::Type *StorageType, Size size,
                                     Alignment align);
   /// Error type.
-  static DebugTypeInfo getErrorResult(swift::Type Ty, llvm::Type *StorageType,
-                                      IRGenModule &IGM);
+  static DebugTypeInfo getErrorResult(swift::Type Ty, IRGenModule &IGM);
 
   TypeBase *getType() const { return Type; }
 
