@@ -7041,7 +7041,8 @@ void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
 
   // Check whether type marked as runtime attribute capable has an initializer
   // with first parameter labeled as `attachedTo:`.
-  for (auto *member : nominal->getMembers()) {
+  for (auto *member :
+       nominal->lookupDirect(DeclBaseName::createConstructor())) {
     auto *init = dyn_cast<ConstructorDecl>(member);
     if (!init)
       continue;

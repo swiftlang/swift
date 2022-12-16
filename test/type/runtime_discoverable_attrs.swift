@@ -157,3 +157,15 @@ class MembersWithAvailability {
 func test_local_types_with_conformances() {
   struct X : Flagged {}
 }
+
+@runtimeMetadata
+struct AttrWithInitsInExts {
+}
+
+extension AttrWithInitsInExts {
+  init(attachedTo: Any.Type) {}
+}
+
+@AttrWithInitsInExts
+struct TestAttrWithExts { // Ok
+}
