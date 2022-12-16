@@ -53,8 +53,6 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
   if (TI.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
     Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
-    //if (!StorageType->isPointerTy())
-    //  Size -= FixTy.getSpareBits().asAPInt().countTrailingOnes();
     SizeInBits = Size;
   }
   assert(TI.getStorageType() && "StorageType is a nullptr");
