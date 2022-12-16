@@ -364,7 +364,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   } else if (ICK == ImplicitConstructorKind::TypeWrapperStorage) {
     accessLevel = AccessLevel::Public;
 
-    auto *typeWrapper = decl->getTypeWrapper();
+    auto typeWrapperInfo = decl->getTypeWrapper();
+    assert(typeWrapperInfo);
+
+    auto *typeWrapper = typeWrapperInfo->Wrapper;
 
     auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_storageWrapper,
                                     Loc, ctx.Id_storageWrapper, decl);

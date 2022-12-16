@@ -35,6 +35,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/TypeWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -3903,7 +3904,7 @@ public:
   bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
 
   /// Return a type wrapper (if any) associated with this type.
-  NominalTypeDecl *getTypeWrapper() const;
+  Optional<TypeWrapperInfo> getTypeWrapper() const;
 
   /// If this declaration has a type wrapper return a property that
   /// is used for all type wrapper related operations (mainly for
