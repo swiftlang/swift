@@ -91,10 +91,18 @@ func emitDiagnostic(
   diagnostic: Diagnostic,
   messageSuffix: String? = nil
 ) {
+  // Determine the set of note IDs.
+  let knownNoteIDs: Set<MessageID> = .init(
+    diagnostic.notes.map { $0.noteMessage.fixItID }
+  )
+
   // Collect all of the Fix-It changes based on their Fix-It ID.
   var fixItChangesByID: [MessageID : [FixIt.Change]] = [:]
   for fixIt in diagnostic.fixIts {
-    fixItChangesByID[fixIt.message.fixItID, default: []]
+    let id = knownNoteIDs.contains(fixIt.message.fixItID)
+        ? fixIt.message.fixItID
+        : diagnostic.diagnosticID
+    fixItChangesByID[id, default: []]
       .append(contentsOf: fixIt.changes.changes)
   }
 
@@ -109,6 +117,8 @@ func emitDiagnostic(
     fixItChanges: fixItChangesByID[diagnostic.diagnosticID] ?? []
   )
 
+  fixItChangesByID.removeValue(forKey: diagnostic.diagnosticID)
+
   // Emit any notes as follow-ons.
   for note in diagnostic.notes {
     emitDiagnosticParts(
@@ -118,5 +128,10 @@ func emitDiagnostic(
       severity: .note, position: note.position,
       fixItChanges: fixItChangesByID[note.noteMessage.fixItID] ?? []
     )
+
+    fixItChangesByID.removeValue(forKey: note.noteMessage.fixItID)
   }
+
+  // All Fix-Its must have been removed by the code above.
+  assert(fixItChangesByID.isEmpty)
 }
