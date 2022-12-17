@@ -521,7 +521,7 @@ ManagedValue Transform::transform(ManagedValue v,
       } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
-        llvm_unreachable("unsupported collection upcast kind");
+        llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
       return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
