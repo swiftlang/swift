@@ -2014,9 +2014,9 @@ ERROR(macro_expansion_decl_expected_macro_identifier,none,
       "expected a macro identifier for a pound literal declaration", ())
 
 ERROR(parser_round_trip_error,none,
-      "source file did not round-trip through the Swift Swift parser", ())
+      "source file did not round-trip through the new Swift parser", ())
 ERROR(parser_new_parser_errors,none,
-      "Swift Swift parser generated errors for code that C++ parser accepted",
+      "new Swift parser generated errors for code that C++ parser accepted",
        ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
