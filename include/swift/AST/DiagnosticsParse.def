@@ -883,7 +883,7 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
 
 ERROR(deprecated_protocol_composition,none,
-      "'protocol<...>' composition syntax has been removed; join the protocols using '&'", ())
+      "'protocol<...>' composition syntax has been removed; join the types using '&'", ())
 ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,

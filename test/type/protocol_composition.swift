@@ -110,7 +110,7 @@ func testConversion() {
   accept_manyPrintable(sp)
 
   // Conversions among existential types.
-  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
+  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
   x2 = x // expected-error{{value of type 'any FooProtocol & REPLPrintable' does not conform to 'SuperREPLPrintable' in assignment}}
   x = x2
 
@@ -118,20 +118,20 @@ func testConversion() {
   var _ : () -> FooProtocol & SuperREPLPrintable = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-53=FooProtocol & REPLPrintable}}
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{17-53=FooProtocol & REPLPrintable}}
 }
 
 // Test the parser's splitting of >= into > and =.
 var x : protocol<P5>= 17 // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{9-22=P5=}} expected-error {{'=' must have consistent whitespace on both sides}}
-var y : protocol<P5, P7>= 17 // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{9-26=P5 & P7=}} expected-error {{'=' must have consistent whitespace on both sides}}
-var z : protocol<P5, P7>?=17 // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{9-27=(P5 & P7)?=}}
+var y : protocol<P5, P7>= 17 // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{9-26=P5 & P7=}} expected-error {{'=' must have consistent whitespace on both sides}}
+var z : protocol<P5, P7>?=17 // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{9-27=(P5 & P7)?=}}
 
 typealias A1 = protocol<> // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-26=Any}}
 typealias A2 = protocol<>? // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-27=Any?}}
-typealias B1 = protocol<P1,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-31=P1 & P2}}
-typealias B2 = protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
-typealias B3 = protocol<P1 ,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
-typealias B4 = protocol<P1 , P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-33=P1 & P2}}
+typealias B1 = protocol<P1,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{16-31=P1 & P2}}
+typealias B2 = protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{16-32=P1 & P2}}
+typealias B3 = protocol<P1 ,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{16-32=P1 & P2}}
+typealias B4 = protocol<P1 , P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{16-33=P1 & P2}}
 typealias C1 = protocol<Any, P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
 typealias C2 = protocol<P1, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
 typealias D = protocol<P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
@@ -140,8 +140,8 @@ typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition
 typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
 typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
 // expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
-typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-31=(P1 & P2)}}
-typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-32=(P1 & P2)?}}
+typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{15-31=(P1 & P2)}}
+typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{15-32=(P1 & P2)?}}
 
 typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type '(any P1).Type' cannot be used within a protocol-constrained type}}
 typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
@@ -162,8 +162,8 @@ struct S05<T> where T : P5? & P6 {} // expected-error {{non-protocol, non-class 
 
 // https://github.com/apple/swift/issues/45712
 // Protocol Composition Often Migrated Incorrectly
-struct S_45712<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{19-36=P1 & P3>}}
-func f1_45712<U where U: protocol<P1, P3>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{26-43=P1 & P3>}} // expected-error {{'where' clause}}
+struct S_45712<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{19-36=P1 & P3>}}
+func f1_45712<U where U: protocol<P1, P3>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the types using '&'}} {{26-43=P1 & P3>}} // expected-error {{'where' clause}}
 func f2_45712<U : protocol<P1>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{19-32=P1>}}
 
 // Make sure we correctly form compositions in expression context
