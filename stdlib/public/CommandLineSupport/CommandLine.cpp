@@ -123,12 +123,18 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
       // STL collections may call operator new() which can be overridden by 
       // client code and that client code could call back into Swift.
       size_t argvSize = sizeof(char *) * (maxArgc + 1);
-      argv = reinterpret_cast<char **>(realloc(argv, argvSize));
-      if (!argv) {
+      char **argvReallocated = reinterpret_cast<char **>(realloc(argv, argvSize));
+      if (!argvReallocated) {
         swift::fatalError(0,
           "Fatal error: Could not allocate space for %d commandline "
           " arguments: %d\n",
           argc, errno);
+      }
+      if (!argv) { // initial allocation
+        argv = argvReallocated;
+      } else if (argvReallocated != argv) { // argv didn't grow in original location, but was reallocated
+        free(argv);
+        argv = argvReallocated;
       }
     }
 
