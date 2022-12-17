@@ -5175,8 +5175,6 @@ namespace {
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
                                                const ProtocolDecl *proto) {
-  auto &ctx = nominal->getASTContext();
-
   if (inheritanceListContainsProtocol(nominal, proto))
     return true;
 
