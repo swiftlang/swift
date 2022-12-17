@@ -1,12 +1,17 @@
-// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/custom_rr_abi_utilities.h)
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -o %t/custom_rr_abi -import-objc-header %S/Inputs/custom_rr_abi_utilities.h
+// RUN: %target-codesign %t/custom_rr_abi
+// RUN: env %env-DYLD_USE_CLOSURES=1 %target-run %t/custom_rr_abi
+
+// We set DYLD_USE_CLOSURES to avoid dyld2 mode on older OS versions. dyld2's stub binder
+// assumes a standard calling convention and doesn't preserve volatile registers, which
+// can cause the RR functions operating on those registers to crash.
 
 // REQUIRES: CPU=arm64 || CPU=arm64e
 
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// REQUIRES: rdar102912772
 
 import StdlibUnittest
 
