@@ -2359,16 +2359,7 @@ codeCompleteOpen(StringRef Name, llvm::MemoryBuffer *InputBuf, int64_t Offset,
       case FilterRule::Everything:
         break;
       case FilterRule::Module:
-      case FilterRule::Identifier: {
-        SmallVector<const char *, 8> names;
-        if (dict.getStringArray(KeyNames, names, false)) {
-          failed = true;
-          CCC.failed("filter rule missing required key 'key.names'");
-          return true;
-        }
-        rule.names.assign(names.begin(), names.end());
-        break;
-      }
+      case FilterRule::Identifier:
       case FilterRule::Description: {
         SmallVector<const char *, 8> names;
         if (dict.getStringArray(KeyNames, names, false)) {
