@@ -16,13 +16,13 @@ set(swift_regex_builder_link_libraries
   swift_StringProcessing)
 
 file(GLOB_RECURSE _REGEX_BUILDER_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/RegexBuilder/*.swift")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/RegexBuilder/*.swift")
 set(REGEX_BUILDER_SOURCES)
 foreach(source ${_REGEX_BUILDER_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND REGEX_BUILDER_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for RegexBuilder (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for RegexBuilder (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 add_swift_target_library(swiftRegexBuilder ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${REGEX_BUILDER_SOURCES}"
