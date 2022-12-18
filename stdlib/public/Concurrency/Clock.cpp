@@ -42,7 +42,7 @@ void swift_get_time(
       clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
-#elif (defined(__OpenBSD__) || defined(__wasi__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)) && HAS_TIME
       struct timespec continuous;
       clock_gettime(CLOCK_MONOTONIC, &continuous);
       *seconds = continuous.tv_sec;
@@ -81,7 +81,7 @@ void swift_get_time(
       clock_gettime(CLOCK_MONOTONIC, &suspending);
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
-#elif defined(__OpenBSD__) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__)) && HAS_TIME
       struct timespec suspending;
       clock_gettime(CLOCK_UPTIME, &suspending);
       *seconds = suspending.tv_sec;
@@ -126,7 +126,7 @@ switch (clock_id) {
       clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
-#elif (defined(__OpenBSD__) || defined(__wasi__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)) && HAS_TIME
       struct timespec continuous;
       clock_getres(CLOCK_MONOTONIC, &continuous);
       *seconds = continuous.tv_sec;
@@ -153,7 +153,7 @@ switch (clock_id) {
       clock_getres(CLOCK_MONOTONIC, &suspending);
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
-#elif defined(__OpenBSD__) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__)) && HAS_TIME
       clock_getres(CLOCK_UPTIME, &suspending);
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
