@@ -361,6 +361,10 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
 
     auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
 
+    // Check for "unusual" decl contexts, e.g. ObjC extensions.
+    if (!Ty)
+      return true;
+
     // Initializer for a let property of a class cannot exist externally.
     // It cannot be defined by an extension or a derived class.
     if (isa<ClassDecl>(Ty))
