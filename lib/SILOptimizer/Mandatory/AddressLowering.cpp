@@ -3024,11 +3024,7 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::ResumeNonThrowingContinuationReturning: {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(use->getOperandNumber(), opAddr);
-      break;
-    }
+    case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
