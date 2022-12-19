@@ -941,8 +941,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    if (!arg ||
-        !isOneOfConventions(arg->getArgumentConvention(), ArgumentConventions))
+    if (!isOneOfConventions(arg->getArgumentConvention(), ArgumentConventions))
       break;
 
     // Ok, we have a release on a SILArgument that has a consuming convention.
