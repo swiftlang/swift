@@ -84,17 +84,19 @@ Solution ConstraintSystem::finalize() {
     if (getFixedType(tv))
       continue;
 
-    switch (solverState->AllowFreeTypeVariables) {
-    case FreeTypeVariableBinding::Disallow:
-      llvm_unreachable("Solver left free type variables");
+      if (solverState) {
+        switch (solverState->AllowFreeTypeVariables) {
+        case FreeTypeVariableBinding::Disallow:
+          llvm_unreachable("Solver left free type variables");
 
-    case FreeTypeVariableBinding::Allow:
-      break;
+        case FreeTypeVariableBinding::Allow:
+          break;
 
-    case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, ctx.TheUnresolvedType);
-      break;
-    }
+        case FreeTypeVariableBinding::UnresolvedType:
+          assignFixedType(tv, ctx.TheUnresolvedType);
+          break;
+        }
+      }
   }
 
   // For each of the type variables, get its fixed type.
