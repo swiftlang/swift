@@ -419,3 +419,35 @@ public struct PropWrapperWithDefaultInit<T> {
     self.value = wrappedValue
   }
 }
+
+@typeWrapper
+public struct WrapperWithConformance<W : WrappedTypesOnly, S> {
+  var underlying: S
+
+  public init(for wrappedType: W.Type, storage: S) {
+    print("WrapperWithConformance.init(for: \(wrappedType), storage: \(storage))")
+    self.underlying = storage
+  }
+
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+    storageKeyPath storagePath: KeyPath<S, V>) -> V {
+    get {
+      print("in read-only getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+  }
+
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+    storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
+    get {
+      print("in getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+    set {
+      print("in setter => \(newValue)")
+      underlying[keyPath: storagePath] = newValue
+    }
+  }
+}
+
+public protocol WrappedTypesOnly {}

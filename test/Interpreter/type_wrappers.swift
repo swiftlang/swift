@@ -710,3 +710,17 @@ do {
   // CHECK-NEXT: in (reference type) getter storage: \$Storage._x
   // CHECK-NEXT: 42
 }
+
+do {
+  @WrapperWithConformance
+  struct Test : WrappedTypesOnly {
+    var a: Int = 42
+    var b: String = ""
+    @PropWrapperWithDefaultInit var c: [Int]
+
+    init() {}
+  }
+
+  let test = Test()
+  // CHECK: WrapperWithConformance.init(for: Test, storage: $Storage(a: 42, b: "", _c: type_wrapper_defs.PropWrapperWithDefaultInit<Swift.Array<Swift.Int>>(value: nil)))
+}
