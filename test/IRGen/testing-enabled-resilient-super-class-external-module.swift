@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(FrameworkA)) %S/Inputs/FrameworkA.swift -module-name FrameworkA -emit-module -emit-module-path %t/FrameworkA.swiftmodule -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/FrameworkA.swiftinterface
-// RUN: %target-build-swift-dylib(%t/%target-library-name(FrameworkB)) %S/Inputs/FrameworkB.swift -module-name FrameworkB -emit-module -emit-module-path %t/FrameworkB.swiftmodule -enable-library-evolution -enable-testing -I %t -L %t -lFrameworkA
+// RUN: %target-build-swift-dylib(%t/%target-library-name(FrameworkB)) %S/Inputs/FrameworkB.swift -module-name FrameworkB -emit-module -emit-module-path %t/FrameworkB.swiftmodule -enable-library-evolution -enable-testing -I %t -L %t -lFrameworkA %target-rpath(%t)
 // Remove the swiftmodule file of FrameworkA such that the test case only has a resilient view of this framework.
 // RUN: rm %t/FrameworkA.swiftmodule
 // RUN: %target-build-swift -I %t -L %t -lFrameworkB %s -o %t/main %target-rpath(%t)
