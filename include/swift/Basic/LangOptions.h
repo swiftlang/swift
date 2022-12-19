@@ -632,14 +632,14 @@ namespace swift {
     /// contribute to a Swift Dependency Scanning hash.
     llvm::hash_code getModuleScanningHashComponents() const {
       auto hashValue = getPCHHashComponents();
-      if (TargetVariant.hasValue())
-        hashValue = llvm::hash_combine(hashValue, TargetVariant.getValue().str());
-      if (ClangTarget.hasValue())
-        hashValue = llvm::hash_combine(hashValue, ClangTarget.getValue().str());
-      if (SDKVersion.hasValue())
-        hashValue = llvm::hash_combine(hashValue, SDKVersion.getValue().getAsString());
-      if (VariantSDKVersion.hasValue())
-        hashValue = llvm::hash_combine(hashValue, VariantSDKVersion.getValue().getAsString());
+      if (TargetVariant.has_value())
+        hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
+      if (ClangTarget.has_value())
+        hashValue = llvm::hash_combine(hashValue, ClangTarget.value().str());
+      if (SDKVersion.has_value())
+        hashValue = llvm::hash_combine(hashValue, SDKVersion.value().getAsString());
+      if (VariantSDKVersion.has_value())
+        hashValue = llvm::hash_combine(hashValue, VariantSDKVersion.value().getAsString());
       return hashValue;
     }
 
