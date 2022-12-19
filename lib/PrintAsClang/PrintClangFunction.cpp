@@ -1248,14 +1248,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << "    throw (Swift::Error(opaqueError));\n";
     os << "#else\n";
     if (resultTy->isVoid()) {
-      os << "    return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));\n";
+      os << "    return Swift::Expected<void>(Swift::Error(opaqueError));\n";
       os << "#endif\n";
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
           *directResultType, resultTy, moduleContext, os, cPrologueOS,
           typeMapping, interopContext, [&]() {
-            os << "    return SWIFT_RETURN_THUNK(";
+            os << "    return Swift::Expected<";
             OptionalTypeKind retKind;
             Type objTy;
             std::tie(objTy, retKind) =
@@ -1263,7 +1263,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
             auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                                                   OutputLanguageMode::Cxx);
-            os << ", Swift::Error(opaqueError));\n";
+            os << ">(Swift::Error(opaqueError));\n";
             os << "#endif\n";
 
             // Return the function result value if it doesn't throw.
