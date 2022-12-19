@@ -391,7 +391,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
+llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     Twine modulePath, bool isFramework) {
   // Open the module file
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -410,7 +410,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
   // Map the set of dependencies over to the "module dependencies".
-  auto dependencies = ModuleDependencies::forSwiftBinaryModule(modulePath.str(),
+  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(modulePath.str(),
                                                                moduleDocPath,
                                                                sourceInfoPath,
                                                                isFramework);
