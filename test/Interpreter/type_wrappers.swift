@@ -689,3 +689,24 @@ do {
   // CHECK-NEXT: in getter storage: \$Storage.v
   // CHECK-NEXT: 1
 }
+
+do {
+  @Wrapper
+  class Test {
+    @PropWrapperWithDefaultInit var x: Int
+
+    required init() {}
+
+    required init(x: Int) {
+      self.x = x
+    }
+  }
+
+  var test = Test(x: 42)
+  print(test.x)
+  // CHECK: Wrapper.init(for: Test, storage: $Storage(_x: type_wrapper_defs.PropWrapperWithDefaultInit<Swift.Int>(value: nil)))
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._x
+  // CHECK-NEXT: in (reference type) setter => PropWrapperWithDefaultInit<Int>(value: Optional(42))
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._x
+  // CHECK-NEXT: 42
+}

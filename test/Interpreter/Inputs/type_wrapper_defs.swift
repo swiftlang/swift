@@ -401,3 +401,21 @@ public protocol WrappedProtocol {
 
   var v: T { get set }
 }
+
+@propertyWrapper
+public struct PropWrapperWithDefaultInit<T> {
+  typealias Wrapped = T
+
+  public var wrappedValue: T {
+    get { value! }
+    set { value = newValue }
+  }
+
+  var value: T?
+
+  public init() {}
+
+  public init(wrappedValue: T) {
+    self.value = wrappedValue
+  }
+}

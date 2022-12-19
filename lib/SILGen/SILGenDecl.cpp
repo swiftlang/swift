@@ -1347,6 +1347,16 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
+  auto getWrappedValueExpr = [&](VarDecl *var) -> Expr * {
+    if (auto *orig = var->getOriginalWrappedProperty()) {
+      auto initInfo = orig->getPropertyWrapperInitializerInfo();
+      if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
+        return placeholder->getOriginalWrappedValue();
+      }
+    }
+    return nullptr;
+  };
+
   auto emitInitializer = [&](Expr *initExpr, VarDecl *var, bool forLocalContext,
                              InitializationPtr &initialization) {
     // If an initial value expression was specified by the decl, emit it into
@@ -1355,14 +1365,11 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
     if (forLocalContext) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
-        auto initInfo = orig->getPropertyWrapperInitializerInfo();
-        if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
-          initExpr = placeholder->getOriginalWrappedValue();
-
+        if (auto *initExpr = getWrappedValueExpr(var)) {
           auto value = emitRValue(initExpr);
           emitApplyOfPropertyWrapperBackingInitializer(
-              PBD, orig, getForwardingSubstitutionMap(), std::move(value))
-              .forwardInto(*this, SILLocation(PBD), initialization.get());
+            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
           return;
         }
       }
@@ -1430,7 +1437,11 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
       auto &fieldInit = fieldInits[i];
       if (initExpr) {
-        emitInitializer(initExpr, field, /*forLocalContext=*/true, fieldInit);
+        // If there is wrapped value expression, we have to emit a
+        // backing property initializer call, otherwise let's use
+        // default expression (which is just `.init()` call).
+        emitInitializer(initExpr, field, bool(getWrappedValueExpr(field)),
+                        fieldInit);
       } else {
         fieldInit->finishUninitialized(*this);
       }
