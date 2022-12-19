@@ -82,7 +82,7 @@ bool PlaceholderSwiftModuleScanner::findModule(
     return false;
   }
   auto &moduleInfo = it->getValue();
-  auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
+  auto dependencies = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
       moduleInfo.modulePath, moduleInfo.moduleDocPath,
       moduleInfo.moduleSourceInfoPath);
   this->dependencies = std::move(dependencies);
@@ -96,7 +96,7 @@ static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
       moduleName.str(), interfacePath);
 }
 
-ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
+ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     Twine moduleInterfacePath, bool isFramework) {
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
@@ -105,7 +105,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   auto realModuleName = Ctx.getRealModuleName(moduleName);
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  Optional<ModuleDependencies> Result;
+  Optional<ModuleDependencyInfo> Result;
   std::error_code code =
     astDelegate.runInSubContext(realModuleName.str(),
                                               moduleInterfacePath.str(),
@@ -124,7 +124,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
         outputPathBase,
         moduleName.str() + "-" + Hash + "." +
             file_types::getExtension(file_types::TY_SwiftModuleFile));
-    Result = ModuleDependencies::forSwiftInterfaceModule(
+    Result = ModuleDependencyInfo::forSwiftInterfaceModule(
         outputPathBase.str().str(), InPath, compiledCandidates, Args, PCMArgs,
         Hash, isFramework);
     // Open the interface file.
@@ -160,23 +160,23 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   return *Result;
 }
 
-Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
+Optional<ModuleDependencyInfo> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
   auto currentSearchPathSet = Ctx.getAllModuleSearchPathsSet();
 
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
-           moduleName, ModuleDependenciesKind::SwiftInterface))
+           moduleName, ModuleDependencyKind::SwiftInterface))
     return found;
   if (auto found = cache.findDependencies(
-           moduleName, ModuleDependenciesKind::SwiftSource))
+           moduleName, ModuleDependencyKind::SwiftSource))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName, ModuleDependenciesKind::SwiftBinary))
+            moduleName, ModuleDependencyKind::SwiftBinary))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName, ModuleDependenciesKind::SwiftPlaceholder))
+            moduleName, ModuleDependencyKind::SwiftPlaceholder))
     return found;
 
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
