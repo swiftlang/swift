@@ -780,7 +780,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
       TypeResolution::forInterface(
           DC, None,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto) -> Type { llvm_unreachable("should not be used"); })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -1596,7 +1597,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type =
         TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
                                      /*unboundTyOpener*/ nullptr,
-                                     /*placeholderHandler*/ nullptr)
+                                     /*placeholderHandler*/ nullptr,
+                                     /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
     type = useDC->mapTypeIntoContext(type);
@@ -2957,7 +2959,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
           castType = TypeResolution::resolveContextualType(
               castTypeRepr, DC, TypeResolverContext::InExpression,
               /*unboundTyOpener*/ nullptr,
-              /*placeholderHandler*/ nullptr);
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr);
         } else {
           castType = isp->getCastType();
         }

@@ -1419,8 +1419,11 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+      // FIXME: Open pack elements with a PackElementOf constraint.
+      OpenPackElementFn packElementOpener = nullptr;
       const auto result = TypeResolution::resolveContextualType(
-          repr, CS.DC, resCtx, genericOpener, placeholderHandler);
+          repr, CS.DC, resCtx, genericOpener, placeholderHandler,
+          packElementOpener);
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
@@ -1666,7 +1669,9 @@ namespace {
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, locator),
-            HandlePlaceholderType(CS, locator));
+            HandlePlaceholderType(CS, locator),
+            // FIXME: Open pack elements with a PackElementOf constraint.
+            /*packElementOpener*/ nullptr);
         if (result->hasError())
           return true;
 
@@ -1730,7 +1735,9 @@ namespace {
                 specializations[i], CS.DC, options,
                 // Introduce type variables for unbound generics.
                 OpenUnboundGenericType(CS, locator),
-                HandlePlaceholderType(CS, locator));
+                HandlePlaceholderType(CS, locator),
+                // FIXME: Open pack elements with a PackElementOf constraint.
+                /*packElementOpener*/ nullptr);
             if (result->hasError())
               return Type();
 
