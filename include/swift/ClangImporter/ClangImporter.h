@@ -423,7 +423,7 @@ public:
       ModuleDependenciesCache &cache,
       const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
 
-  Optional<ModuleDependencyInfo> getModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 

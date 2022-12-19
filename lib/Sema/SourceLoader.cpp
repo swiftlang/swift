@@ -152,7 +152,7 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
   // nothing to do here.
 }
 
-Optional<ModuleDependencyInfo>
+Optional<const ModuleDependencyInfo*>
 SourceLoader::getModuleDependencies(StringRef moduleName,
                                     ModuleDependenciesCache &cache,
                                     InterfaceSubContextDelegate &delegate) {
