@@ -25,6 +25,12 @@ extension std.string: ExpressibleByStringLiteral {
   }
 }
 
+extension std.string: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "std.string(\(String(cxxString: self)))"
+  }
+}
+
 extension String {
   public init(cxxString: std.string) {
     let buffer = UnsafeBufferPointer<CChar>(
