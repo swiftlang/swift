@@ -15,9 +15,8 @@
 
 @testable import resilient
 
-// Don't access via the class offset global. Use a fragile access pattern instead.
-
-// CHECK-NOT: s9resilient8SubClassCMo
+// Use a resilient access pattern.
+// CHECK: s9resilient8SubClassC1yAA13TypeContainerV8SomeEnumOvgTj
 
 public func isEqual<T:Equatable>(_ l: T, _ r: T) -> Bool {
     return l == r

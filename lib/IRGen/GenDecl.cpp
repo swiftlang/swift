@@ -5562,17 +5562,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 ///    not publically accessible (e.g private or internal).
 /// This would normally not happen except if we compile theClass's module with
 /// enable-testing.
-static bool shouldTreatClassAsFragileBecauseOfEnableTesting(ClassDecl *D,
-                                                            IRGenModule &IGM) {
-    if (!D)
-      return false;
-
-    return D->getModuleContext() != IGM.getSwiftModule() &&
-           !D->getFormalAccessScope(/*useDC=*/nullptr,
-                                  /*treatUsableFromInlineAsPublic=*/true)
-           .isPublic();
-}
-
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -5593,10 +5582,6 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
     return false;
   }
 
-  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
-                                                      *this))
-    return false;
-
   return D->isResilient(getSwiftModule(), expansion);
 }
 
@@ -5612,10 +5597,6 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
-
-  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
-                                                      *this))
-    return false;
 
   return D->hasResilientMetadata(getSwiftModule(), expansion);
 }
