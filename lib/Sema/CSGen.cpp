@@ -1422,12 +1422,14 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
-      OpenPackElementFn packElementOpener = nullptr;
+
+      // Add a PackElementOf constraint for 'each T' type reprs.
+      GenericEnvironment *elementEnv = nullptr;
       if (!PackElementEnvironments.empty()) {
         options |= TypeResolutionFlags::AllowPackReferences;
-        packElementOpener = OpenPackElementType(CS,
-            CS.getConstraintLocator(locator), PackElementEnvironments.back());
+        elementEnv = PackElementEnvironments.back();
       }
+      const auto packElementOpener = OpenPackElementType(CS, locator, elementEnv);
 
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
@@ -1673,17 +1675,17 @@ namespace {
       auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
       for (auto specializationArg : specializationArgs) {
-        OpenPackElementFn packElementOpener = nullptr;
+        GenericEnvironment *elementEnv = nullptr;
         if (!PackElementEnvironments.empty()) {
           options |= TypeResolutionFlags::AllowPackReferences;
-          packElementOpener = OpenPackElementType(CS, locator, PackElementEnvironments.back());
+          elementEnv = PackElementEnvironments.back();
         }
         const auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, locator),
             HandlePlaceholderType(CS, locator),
-            packElementOpener);
+            OpenPackElementType(CS, locator, elementEnv));
         if (result->hasError())
           return true;
 
@@ -1743,10 +1745,10 @@ namespace {
           auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
           for (size_t i = 0, e = specializations.size(); i < e; ++i) {
-            OpenPackElementFn packElementOpener = nullptr;
+            GenericEnvironment *elementEnv = nullptr;
             if (!PackElementEnvironments.empty()) {
               options |= TypeResolutionFlags::AllowPackReferences;
-              packElementOpener = OpenPackElementType(CS, locator, PackElementEnvironments.back());
+              elementEnv = PackElementEnvironments.back();
             }
 
             const auto result = TypeResolution::resolveContextualType(
@@ -1754,7 +1756,7 @@ namespace {
                 // Introduce type variables for unbound generics.
                 OpenUnboundGenericType(CS, locator),
                 HandlePlaceholderType(CS, locator),
-                packElementOpener);
+                OpenPackElementType(CS, locator, elementEnv));
             if (result->hasError())
               return Type();
 
