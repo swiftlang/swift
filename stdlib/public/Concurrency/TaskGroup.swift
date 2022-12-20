@@ -639,12 +639,17 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @usableFromInline
   @available(*, deprecated, message: "Use `awaitAllRemainingTasksThrowing`, since 5.8 with discardResults draining may throw")
   internal mutating func awaitAllRemainingTasks() async {
-    // We discard the error because in old code, which may have inlined this `awaitAllRemainingTasks`
-    // method, draining was never going to throw
-    _ = try? await awaitAllRemainingTasksThrowing(childFailureCancelsGroup: false)
+    while true {
+      do {
+        guard let _ = try await next() else {
+          return
+        }
+      } catch {}
+    }
   }
 
   /// Await all the remaining tasks on this group.
+  @available(SwiftStdlib 5.8, *)
   @usableFromInline
   internal mutating func awaitAllRemainingTasksThrowing(childFailureCancelsGroup: Bool) async throws {
     /// Since 5.8, we implement "wait for all pending tasks to complete"
@@ -679,7 +684,11 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: only during
   @_alwaysEmitIntoClient
   public mutating func waitForAll() async throws {
-    try await self.awaitAllRemainingTasksThrowing(childFailureCancelsGroup: false)
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      try await self.awaitAllRemainingTasksThrowing(childFailureCancelsGroup: false)
+    } else {
+      await self.awaitAllRemainingTasks()
+    }
   }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
