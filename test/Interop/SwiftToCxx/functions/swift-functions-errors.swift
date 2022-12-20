@@ -38,7 +38,7 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (Swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));
+// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -64,7 +64,7 @@ public func testDestroyedError() throws { throw DestroyedError() }
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (Swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));
+// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -82,7 +82,7 @@ public func throwFunction() throws {
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (Swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return SWIFT_RETURN_THUNK(void, Swift::Error(opaqueError));
+// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -103,7 +103,7 @@ public func throwFunctionWithPossibleReturn(_ a: Int) throws -> Int {
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (Swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return SWIFT_RETURN_THUNK(swift::Int, Swift::Error(opaqueError));
+// CHECK: return Swift::Expected<swift::Int>(Swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
@@ -122,7 +122,7 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (Swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return SWIFT_RETURN_THUNK(swift::Int, Swift::Error(opaqueError));
+// CHECK: return Swift::Expected<swift::Int>(Swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
