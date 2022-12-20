@@ -54,7 +54,7 @@ using namespace swift;
 /*************************** TASK GROUP ***************************************/
 /******************************************************************************/
 
-#if 1
+#if 0
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...) \
 fprintf(stderr, "[%#lx] [%s:%d](%s) group(%p%s) " fmt "\n",             \
       (unsigned long)Thread::current().platformThreadId(),              \
@@ -956,6 +956,7 @@ __attribute__((noinline))
 SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_waitAllImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
+    bool childFailureCancelsGroup,
     ThrowingTaskFutureWaitContinuationFunction resumeFunction,
     AsyncContext *callContext) {
   // Make sure we don't eliminate calls to this function.
@@ -1187,6 +1188,7 @@ SWIFT_CC(swiftasync)
 static void swift_taskGroup_waitAllImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
+    bool childFailureCancelsGroup,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
   auto waitingTask = swift_task_getCurrent();
@@ -1213,7 +1215,7 @@ static void swift_taskGroup_waitAllImpl(
       // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
       return workaround_function_swift_taskGroup_waitAllImpl(
-         resultPointer, callerContext, _group, resumeFunction, rawContext);
+         resultPointer, callerContext, _group, childFailureCancelsGroup, resumeFunction, rawContext);
 #else /* __ARM_ARCH_7K__ */
       return;
 #endif /* __ARM_ARCH_7K__ */

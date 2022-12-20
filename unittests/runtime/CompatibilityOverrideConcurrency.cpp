@@ -216,7 +216,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAll) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_waitAll) {
-  swift_taskGroup_waitAll(nullptr, nullptr, nullptr, nullptr,
+  swift_taskGroup_waitAll(nullptr, nullptr, nullptr, false, nullptr,
                           nullptr);
 }
 

@@ -326,10 +326,11 @@ OVERRIDE_TASK_GROUP(taskGroup_waitAll, void,
                     (OpaqueValue *resultPointer,
                         SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                         TaskGroup *_group,
+                        bool childFailureCancelsGroup,
                         ThrowingTaskFutureWaitContinuationFunction *resumeFn,
                         AsyncContext *callContext),
-                    (resultPointer, callerContext, _group, resumeFn,
-                        callContext))
+                    (resultPointer, callerContext, _group, childFailureCancelsGroup,
+                        resumeFn, callContext))
 
 OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,

@@ -93,14 +93,17 @@ func test_taskGroup_discardResults_automaticallyRethrowsOnlyFirst() async {
     let got = try await withThrowingTaskGroup(of: Int.self, returning: Int.self,
                                               discardResults: true) { group in
       group.addTask { await echo(1) }
-      group.addTask { throw Boom(id: "first") }
+      group.addTask { throw Boom(id: "first-a") }
+      group.addTask { throw Boom(id: "first-b") }
       // add a throwing task, but don't consume it explicitly
       // since we're in discard results mode, all will be awaited and the first error it thrown
 
       do {
         try await group.waitForAll()
       } catch {
-        // CHECK: caught: Boom(id: "first")
+        // There's no guarantee about which of the `first-...` tasks will complete first,
+        // however, they all will be consumed when we have returned from the `waitForAll`.
+        // CHECK: caught: Boom(id: "first
         print("caught: \(error)")
       }
 

@@ -137,7 +137,10 @@ namespace {
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 ///
 ///   @_silgen_name("swift_taskGroup_waitAll")
-///   func _taskGroupWaitAll<T>(group: Builtin.RawPointer) async throws -> T?
+///   func _taskGroupWaitAll<T>(
+///     group: Builtin.RawPointer,
+///     childFailureCancelsGroup: Bool
+///   ) async throws -> T?
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
