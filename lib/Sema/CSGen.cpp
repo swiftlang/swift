@@ -23,6 +23,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -3006,9 +3007,17 @@ namespace {
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      auto packReference = expr->getPackElements().front()->getPackRefExpr();
-      auto packType = CS.simplifyType(CS.getType(packReference))
-          ->castTo<PackExpansionType>()->getPatternType();
+      Type packType;
+      if (!expr->getPackElements().empty()) {
+        auto packReference = expr->getPackElements().front()->getPackRefExpr();
+        packType = CS.simplifyType(CS.getType(packReference))
+            ->castTo<PackExpansionType>()->getPatternType();
+      } else {
+        // FIXME: The generic environment needs to be per-shape-class.
+        llvm::SmallVector<GenericEnvironment::PackElementBinding, 2> bindings;
+        elementEnv->getPackElementBindings(bindings);
+        packType = bindings.front().second;
+      }
       CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
                        CS.getConstraintLocator(expr));
 

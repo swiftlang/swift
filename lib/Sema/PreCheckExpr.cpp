@@ -408,13 +408,9 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
     PackReferenceFinder(DeclContext *dc)
       : dc(dc), environment(nullptr) {}
 
-    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto &ctx = dc->getASTContext();
-      auto *packElement = dyn_cast<PackElementExpr>(E);
-      if (!packElement)
-        return Action::Continue(E);
-
+    void createElementEnvironment() {
       if (!environment) {
+        auto &ctx = dc->getASTContext();
         auto sig = ctx.getOpenedElementSignature(
             dc->getGenericSignatureOfContext().getCanonicalSignature());
         auto *contextEnv = dc->getGenericEnvironmentOfContext();
@@ -423,15 +419,30 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
             GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
                                                  contextSubs);
       }
+    }
 
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *packElement = dyn_cast<PackElementExpr>(E);
+      if (!packElement)
+        return Action::Continue(E);
+
+      createElementEnvironment();
       packElements.push_back(packElement);
       return Action::Continue(packElement);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      if (isa<PackReferenceTypeRepr>(T)) {
+        createElementEnvironment();
+      }
+
+      return Action::Continue();
     }
   } packReferenceFinder(dc);
 
   auto *pattern = expr->walk(packReferenceFinder);
 
-  if (!packReferenceFinder.packElements.empty()) {
+  if (packReferenceFinder.environment != nullptr) {
     return PackExpansionExpr::create(dc->getASTContext(), pattern,
                                      packReferenceFinder.packElements,
                                      opLoc, packReferenceFinder.environment);
