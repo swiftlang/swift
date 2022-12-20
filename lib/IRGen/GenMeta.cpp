@@ -2963,7 +2963,28 @@ namespace {
       cache->setInitializer(init);
     }
 
+    SILType getLoweredType() {
+      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
+    }
+
     Impl &asImpl() { return *static_cast<Impl*>(this); }
+
+    llvm::Constant *emitLayoutString() {
+      auto lowered = getLoweredType();
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto layoutStr = typeLayoutEntry.layoutString(IGM);
+      // assert(layoutStr && "Failed to make layout string");
+      if (!layoutStr) {
+        return nullptr;
+      }
+      llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
+          llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
+      return layoutArray;
+    }
+
+    llvm::Constant *getLayoutString() {
+      return emitLayoutString();
+    }
 
     /// Emit the create function for the template.
     void emitInstantiationFunction() {
@@ -3003,6 +3024,13 @@ namespace {
       // Allocate the metadata.
       llvm::Value *metadata =
         asImpl().emitAllocateMetadata(IGF, descriptor, args, templatePointer);
+
+      if (IGM.getOptions().ForceStructTypeLayouts) {
+        if (auto *layoutString = getLayoutString()) {
+          IGF.Builder.CreateCall(IGM.getAssignLayoutStringFunctionPointer(),
+                                 {metadata, layoutString});
+        }
+      }
 
       IGF.Builder.CreateRet(metadata);
     }

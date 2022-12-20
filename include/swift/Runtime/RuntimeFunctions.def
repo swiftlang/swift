@@ -2170,7 +2170,7 @@ FUNCTION(GenericDestroy,
          EFFECT(Deallocating))
 
 
-// void *swift_generic_assign_with_copy(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_generic_assignWithCopy(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericAssignWithCopy,
          swift_generic_assignWithCopy,
          C_CC, AlwaysAvailable,
@@ -2179,7 +2179,7 @@ FUNCTION(GenericAssignWithCopy,
          ATTRS(NoUnwind),
          EFFECT(Refcounting, Deallocating))
 
-// void *swift_generic_assign_with_take(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericAssignWithTake,
          swift_generic_assignWithTake,
          C_CC, AlwaysAvailable,
@@ -2188,7 +2188,7 @@ FUNCTION(GenericAssignWithTake,
          ATTRS(NoUnwind),
          EFFECT(Refcounting, Deallocating))
 
-// void *swift_generic_init_with_copy(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithCopy,
          swift_generic_initWithCopy,
          C_CC, AlwaysAvailable,
@@ -2197,7 +2197,7 @@ FUNCTION(GenericInitWithCopy,
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
 
-// void *swift_generic_init_with_take(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithTake,
          swift_generic_initWithTake,
          C_CC, AlwaysAvailable,
@@ -2205,6 +2205,15 @@ FUNCTION(GenericInitWithTake,
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
+
+// void *swift_assignLayoutString(Metadata* type, const uint8_t *layoutString);
+FUNCTION(AssignLayoutString,
+         swift_assignLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
 
 #undef RETURNS
 #undef ARGS

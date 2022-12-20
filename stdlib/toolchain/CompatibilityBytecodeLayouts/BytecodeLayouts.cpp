@@ -874,7 +874,7 @@ uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
   return tag;
 }
 
-typedef void (*DestrFn)(void*);
+typedef void *(*DestrFn)(void *);
 
 struct DestroyFuncAndMask {
   DestrFn fn;
@@ -882,8 +882,10 @@ struct DestroyFuncAndMask {
   bool isIndirect;
 };
 
+void *skipDestroy(void *ignore) { return nullptr; }
+
 const DestroyFuncAndMask destroyTable[] = {
-    {nullptr, 0x0, false},
+    {(DestrFn)&skipDestroy, UINTPTR_MAX, false},
     {(DestrFn)&swift_errorRelease, UINTPTR_MAX, true},
     {(DestrFn)&swift_release, ~heap_object_abi::SwiftSpareBitsMask, true},
     {(DestrFn)&swift_unownedRelease, ~heap_object_abi::SwiftSpareBitsMask,
@@ -899,7 +901,7 @@ const DestroyFuncAndMask destroyTable[] = {
     {(DestrFn)&_Block_release, UINTPTR_MAX, true},
     {(DestrFn)&objc_release, UINTPTR_MAX, true},
 #else
-    {nullptr, UINTPTR_MAX, true},
+  {nullptr, UINTPTR_MAX, true},
 #endif
     // TODO: how to handle Custom?
     {nullptr, UINTPTR_MAX, true},
@@ -917,16 +919,22 @@ swift_generic_destroy(void *address, void *metadata) {
 
   do {
     uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
-    uint8_t tag = (uint8_t)(skip >> 24);
+    uint8_t tag = ((uint8_t)(skip >> 24));
     skip &= ~(0xff << 24);
     addr += skip;
 
-    const auto &destroyFunc = destroyTable[tag];
-    if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
-      destroyFunc.fn((void *)((*(uintptr_t *)addr) & destroyFunc.mask));
-      addr += sizeof(void *);
+    if (SWIFT_UNLIKELY(tag == (uint8_t)RefCountingKind::Generic)) {
+      auto genericIndex = readBytes<uint32_t>(typeLayout, offset);
+      auto *generic = getGenericArgs(typedMetadata)[genericIndex];
+      generic->vw_destroy((OpaqueValue *)addr);
+      addr += generic->vw_size();
     } else {
-      destroyFunc.fn(((void *)addr));
+      const auto &destroyFunc = destroyTable[tag];
+      if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
+        destroyFunc.fn((void *)((*(uintptr_t *)addr) & destroyFunc.mask));
+      } else {
+        destroyFunc.fn(((void *)addr));
+      }
       addr += sizeof(void *);
     }
   } while (typeLayout[offset] != 0);
@@ -938,12 +946,13 @@ struct RetainFuncAndMask {
   bool isSingle;
 };
 
-void Block_copyForwarder(void **dest, const void **src) {
+void* Block_copyForwarder(void** dest, const void** src) {
   *dest = _Block_copy(*src);
+  return *dest;
 }
 
-typedef void (*RetainFn)(void *);
-typedef void (*CopyInitFn)(void *, void *);
+typedef void* (*RetainFn)(void*);
+typedef void* (*CopyInitFn)(void*, void*);
 
 const RetainFuncAndMask retainTable[] = {
     {nullptr, 0x0, false},
@@ -985,15 +994,28 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
     uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
     auto tag = static_cast<uint8_t>(skip >> 24);
     skip &= ~(0xff << 24);
-    addrOffset += skip;
 
-    const auto &retainFunc = retainTable[tag];
-    if (SWIFT_LIKELY(retainFunc.isSingle)) {
-      ((RetainFn)retainFunc.fn)(*(void **)((uintptr_t)dest + addrOffset));
-      addrOffset += sizeof(void *);
+    if (SWIFT_UNLIKELY(tag == (uint8_t)RefCountingKind::Generic)) {
+      auto *generic = getGenericArgs(typedMetadata)[skip];
+      generic->vw_initializeWithCopy(
+          (OpaqueValue *)((uintptr_t)dest + addrOffset),
+          (OpaqueValue *)((uintptr_t)src + addrOffset));
+      addrOffset += generic->vw_size();
     } else {
-      ((CopyInitFn)retainFunc.fn)((void *)((uintptr_t)dest + addrOffset),
-                                  (void *)((uintptr_t)src + addrOffset));
+      addrOffset += skip;
+
+      if (SWIFT_UNLIKELY(tag == (uint8_t)RefCountingKind::Skip)) {
+        continue;
+      }
+
+      const auto &retainFunc = retainTable[tag];
+      if (SWIFT_LIKELY(retainFunc.isSingle)) {
+        ((RetainFn)retainFunc.fn)(
+            *(void **)(((uintptr_t)dest + addrOffset) & retainFunc.mask));
+      } else {
+        addrOffset += skip;
+        ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset), (void*)((uintptr_t)src + addrOffset));
+      }
       addrOffset += sizeof(void *);
     }
   } while (typeLayout[offset] != 0);
@@ -1019,6 +1041,11 @@ __attribute__((weak)) extern "C" void
 swift_generic_assignWithTake(void *dest, void *src, void *metadata) {
   swift_generic_destroy(dest, metadata);
   swift_generic_initWithTake(dest, src, metadata);
+}
+
+__attribute__((weak)) extern "C" void
+swift_assignLayoutString(Metadata *type, const uint8_t *layoutString) {
+  type->setLayoutString(layoutString);
 }
 
 // Allow this library to get force-loaded by autolinking

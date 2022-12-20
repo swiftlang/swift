@@ -131,6 +131,9 @@ enum class RefCountingKind : uint8_t {
   ObjC = 0x0a,
   Custom = 0x0b,
 
+  Witness = 0x0c,
+  Generic = 0x0d,
+
   Skip = 0x80,
   // We may use the MSB as flag that a count follows,
   // so all following values are reserved
@@ -156,6 +159,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_generic_initWithCopy(void *dest, void *src, void *metadata);
 SWIFT_RUNTIME_EXPORT
 void swift_generic_initWithTake(void *dest, void *src, void *metadata);
+SWIFT_RUNTIME_EXPORT
+void swift_assignLayoutString(Metadata *type, const uint8_t *layoutString);
 } // namespace swift
 
 /// A simple version of swift/Basic/ClusteredBitVector that doesn't use

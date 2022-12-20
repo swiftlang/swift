@@ -261,6 +261,7 @@ public:
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Optional<std::vector<uint8_t>>
   layoutString(IRGenModule &IGM) const override;
+  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 

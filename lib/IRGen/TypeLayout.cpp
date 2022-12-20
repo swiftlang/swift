@@ -54,6 +54,10 @@ public:
     ObjC = 0x0a,
     Custom = 0x0b,
 
+    Witness = 0x0c,
+
+    Generic = 0x0d,
+
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
     // so all following values are reserved
@@ -63,7 +67,10 @@ public:
 private:
   struct RefCounting {
     RefCountingKind kind;
-    uint32_t count;
+    union {
+      uint32_t offset;
+      uintptr_t witness;
+    };
   };
 
   ExtraInhabitantsKind extraInhabitantsKind;
@@ -82,20 +89,33 @@ public:
 
   void setAlignment(uint64_t a) { alignment = std::max(alignment, a); }
 
-  void addRefCount(RefCountingKind kind, uint32_t count) {
-    assert(count > 0 && "Count must not be 0");
+  void addRefCount(RefCountingKind kind, uint32_t offset) {
     if (kind == RefCountingKind::Skip) {
       if (refCountings.empty() ||
           refCountings.back().kind != RefCountingKind::Skip) {
-        refCountings.push_back({kind, 0});
+        refCountings.push_back({kind, {0}});
       }
       auto &refCounting = refCountings.back();
 
-      refCounting.count += count;
+      refCounting.offset += offset;
     } else {
-      refCountings.push_back({kind, 1});
+      refCountings.push_back({kind, {offset}});
     }
   }
+
+  // void addWitnessRefCount(WitnessTa count) {
+  //   if (kind == RefCountingKind::Skip) {
+  //     if (refCountings.empty() ||
+  //         refCountings.back().kind != RefCountingKind::Skip) {
+  //       refCountings.push_back({kind, 0});
+  //     }
+  //     auto &refCounting = refCountings.back();
+
+  //     refCounting.count += count;
+  //   } else {
+  //     refCountings.push_back({kind, count});
+  //   }
+  // }
 
   void result(std::vector<uint8_t> &layoutStr) const {
     // extra inhabitants type tag, i.e. bitmask vs type pointer
@@ -129,7 +149,7 @@ public:
     layoutStr.insert(layoutStr.end(), (uint8_t *)&alignmentBE,
                      (uint8_t *)(&alignmentBE + 1));
 
-    // padding to 28 bytes
+    // number of ref counting ops
     layoutStr.push_back(0);
     layoutStr.push_back(0);
     layoutStr.push_back(0);
@@ -137,11 +157,11 @@ public:
     uint32_t skip = 0;
     for (auto &refCounting : refCountings) {
       if (refCounting.kind == RefCountingKind::Skip) {
-        skip += refCounting.count;
+        skip += refCounting.offset;
         continue;
       }
-      // layoutStr.push_back(static_cast<uint8_t>(refCounting.kind));
-      if ((skip & (0xff << 24)) != skip) {
+
+      if ((skip & ~(0xff << 24)) != skip) {
         // TODO: crash and burn!!!
       }
 
@@ -151,11 +171,29 @@ public:
       llvm::support::endian::write32be(&skipBE, skip);
       layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
                        (uint8_t *)(&skipBE + 1));
+
+      if (refCounting.kind == RefCountingKind::Generic) {
+        uint32_t paramIdxBE = 0;
+        llvm::support::endian::write32be(&paramIdxBE, refCounting.offset);
+        layoutStr.insert(layoutStr.end(), (uint8_t *)&paramIdxBE,
+                         (uint8_t *)(&paramIdxBE + 1));
+      } else if (refCounting.kind == RefCountingKind::Witness) {
+      }
+
       skip = 0;
     }
 
-    // END
-    layoutStr.push_back(0x0);
+    // Encoding `End` with the last skip bytes count
+    // this is necessary to correctly build layout
+    // strings for generic types at runtime.
+    if ((skip & ~(0xff << 24)) != skip) {
+      // TODO: crash and burn!!!
+    }
+
+    uint32_t skipBE = 0;
+    llvm::support::endian::write32be(&skipBE, skip);
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
+                     (uint8_t *)(&skipBE + 1));
   }
 };
 }
@@ -1804,6 +1842,16 @@ ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
     }
   }
   return None;
+}
+
+void ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
+                                          LayoutStringBuilder &B) const {
+  auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
+  auto params = archetypeType->getGenericEnvironment()->getGenericParams();
+  for (auto param : params) {
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Generic,
+                  param->getIndex());
+  }
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
