@@ -2789,12 +2789,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
     return makeParserError();
   }
   
-  unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
-
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
       attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
-      arrowLoc, inLoc, explicitResultType, discriminator, CurDeclContext);
+      arrowLoc, inLoc, explicitResultType, CurDeclContext);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
