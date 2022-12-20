@@ -8297,6 +8297,17 @@ public:
   }
 };
 
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroContext: uint8_t {
+  /// An expression macro, referenced explicitly via "#stringify" or similar
+  /// in the source code.
+  Expression,
+};
+
+/// The contexts in which a particular macro declaration can be used.
+using MacroContexts = OptionSet<MacroContext>;
+
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.
@@ -8347,6 +8358,9 @@ public:
 
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
+
+  /// Determine the contexts in which this macro can be applied.
+  MacroContexts getMacroContexts() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())

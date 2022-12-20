@@ -25,12 +25,6 @@ namespace swift {
 /// Provides the definition of a macro.
 class MacroDefinition {
 public:
-  /// The kind of macro, which determines how it can be used in source code.
-  enum Kind: uint8_t {
-    /// An expression macro.
-    Expression,
-  };
-
   /// Describes a missing macro definition.
   struct MissingDefinition {
     Identifier externalModuleName;
@@ -50,19 +44,18 @@ public:
     InProcess,
   };
 
-  Kind kind;
   ImplementationKind implKind;
 
 private:
   void *opaqueHandle;
 
-  MacroDefinition(Kind kind, ImplementationKind implKind, void *opaqueHandle)
-    : kind(kind), implKind(implKind), opaqueHandle(opaqueHandle) { }
+  MacroDefinition(ImplementationKind implKind, void *opaqueHandle)
+    : implKind(implKind), opaqueHandle(opaqueHandle) { }
 
 public:
   static MacroDefinition forUndefined() {
     return MacroDefinition{
-      Kind::Expression, ImplementationKind::Undefined, nullptr
+      ImplementationKind::Undefined, nullptr
     };
   }
 
@@ -72,8 +65,8 @@ public:
       Identifier externalMacroTypeName
   );
 
-  static MacroDefinition forInProcess(Kind kind, void *opaqueHandle) {
-    return MacroDefinition{kind, ImplementationKind::InProcess, opaqueHandle};
+  static MacroDefinition forInProcess(void *opaqueHandle) {
+    return MacroDefinition{ImplementationKind::InProcess, opaqueHandle};
   }
 
   /// Return the opaque handle for an in-process macro definition.

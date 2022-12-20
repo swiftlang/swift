@@ -9689,9 +9689,7 @@ MacroDefinition MacroDefinition::forMissing(
   auto def = ctx.AllocateObjectCopy(
     MissingDefinition{externalModuleName, externalMacroTypeName}
   );
-  return MacroDefinition{
-    Kind::Expression, ImplementationKind::Missing, def
-  };
+  return MacroDefinition{ImplementationKind::Missing, def};
 }
 
 NominalTypeDecl *
