@@ -63,7 +63,9 @@ One of the most common uses of this "API patterns" concept concerns the import o
 
 Types in C++ do not always fit cleanly into this model, and they cannot always be automatically mapped to it even when they do. As discussed above, many C++ class types are idiomatically used as reference types; they are always passed around as a reference, either using a raw pointer (`*`) or reference (`&`) type or using a smart pointer type such as `std::shared_ptr` or `std::unique_ptr`. C++ class types can also customize or even remove their value operations. Some types that do this still have "value semantics": they function as self-contained values with referential transparency. Others maintain a more hybrid semantics, or have external dependencies, or make themselves uncopyable or even unmovable, or are even just using types as a language mechanism for getting a scoped destructor.
 
-### Reference types
+### Reference types 
+
+**Review Note: this section ('Reference types') has pending changes.**
 
 Like Swift types, Objective-C types fall into two categories, which makes importing them easy: structs are imported as value types and Objective-C classes are imported as Swift class types. The same is not true for C++. As discussed above, there is no clear idiom for defining reference types in C++. All types in C++ are declared in the same way, but some types have reference semantics and others don’t. To be able to express reference types in Swift natively, users must annotate their reference types as such, which will tell the compiler to import them as Swift classes (which have the same semantics).
 
