@@ -7130,7 +7130,6 @@ swift::getInheritedForPrinting(
   }
 
   // Collect synthesized conformances.
-  auto &ctx = decl->getASTContext();
   llvm::SetVector<ProtocolDecl *> protocols;
   llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
