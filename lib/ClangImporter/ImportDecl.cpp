@@ -8241,11 +8241,17 @@ ClangImporter::Implementation::importDeclContextOf(
     if (dc->getDeclKind() == clang::Decl::LinkageSpec)
       dc = dc->getParent();
 
-    // Treat friend decls like top-level decls.
     if (auto functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
+      // Treat friend decls like top-level decls.
       if (functionDecl->getFriendObjectKind()) {
         // Find the top-level decl context.
         while (isa<clang::NamedDecl>(dc))
+          dc = dc->getParent();
+      }
+
+      // If this is a non-member operator, import it as a top-level function.
+      if (functionDecl->isOverloadedOperator()) {
+        while (dc->isNamespace())
           dc = dc->getParent();
       }
     }
