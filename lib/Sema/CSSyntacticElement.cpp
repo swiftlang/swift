@@ -2111,11 +2111,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
     NullablePtr<BraceStmt> newBody;
 
-    if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
-      BraceStmt *transformedBody =
-          const_cast<BraceStmt *>(transform->transformedBody.get());
-
-      fn.setParsedBody(transformedBody, /*singleExpression=*/false);
+    if (auto transformedBody = transform->transformedBody) {
+      fn.setParsedBody(const_cast<BraceStmt *>(transformedBody.get()),
+                       /*singleExpression=*/false);
 
       ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
 

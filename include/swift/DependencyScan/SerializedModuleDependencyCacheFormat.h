@@ -23,7 +23,7 @@ class MemoryBuffer;
 namespace swift {
 
 class DiagnosticEngine;
-class GlobalModuleDependenciesCache;
+class SwiftDependencyScanningService;
 
 namespace dependencies {
 namespace module_dependency_cache_serialization {
@@ -174,23 +174,23 @@ using ClangModuleDetailsLayout =
 /// Tries to read the dependency graph from the given buffer.
 /// Returns \c true if there was an error.
 bool readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                      GlobalModuleDependenciesCache &cache);
+                                      SwiftDependencyScanningService &cache);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
 bool readInterModuleDependenciesCache(llvm::StringRef path,
-                                      GlobalModuleDependenciesCache &cache);
+                                      SwiftDependencyScanningService &cache);
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
 bool writeInterModuleDependenciesCache(DiagnosticEngine &diags,
                                        llvm::StringRef path,
-                                       const GlobalModuleDependenciesCache &cache);
+                                       const SwiftDependencyScanningService &cache);
 
 /// Tries to write out the given dependency cache with the given
 /// bitstream writer.
 void writeInterModuleDependenciesCache(llvm::BitstreamWriter &Out,
-                                       const GlobalModuleDependenciesCache &cache);
+                                       const SwiftDependencyScanningService &cache);
 
 } // end namespace module_dependency_cache_serialization
 } // end namespace dependencies

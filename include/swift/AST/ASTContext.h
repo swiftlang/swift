@@ -87,7 +87,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class ModuleDependencies;
+  class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -993,16 +993,16 @@ public:
   ///
   /// \param isUnderlyingClangModule When true, only look for a Clang module
   /// with the given name, ignoring any Swift modules.
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
       bool cacheOnly = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<ModuleDependencies> getSwiftModuleDependencies(
+  Optional<ModuleDependencyInfo> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
