@@ -269,6 +269,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_package_name))
+    Opts.PackageName = A->getValue();
+
   // This must be called after computing module name, module abi name,
   // and module link name. If computing module aliases is unsuccessful,
   // return early.
