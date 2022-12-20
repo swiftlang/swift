@@ -204,9 +204,9 @@
                 "swift-installer-scripts": "release/5.8",
                 "swift-docc": "release/5.8",
                 "swift-lmdb": "release/5.8",
-                "swift-docc-render-artifact": "main",
-                "swift-docc-symbolkit": "main",
-                "swift-markdown": "main",
+                "swift-docc-render-artifact": "release/5.8",
+                "swift-docc-symbolkit": "release/5.8",
+                "swift-markdown": "release/5.8",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/release/5.8"
