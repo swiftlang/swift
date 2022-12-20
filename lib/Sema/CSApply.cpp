@@ -1187,8 +1187,7 @@ namespace {
       }
 
       auto *const thunk =
-          new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy,
-                                    AutoClosureExpr::InvalidDiscriminator, dc);
+          new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy, dc);
       thunk->setParameterList(thunkParamList);
       thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
       cs.cacheType(thunk);
@@ -1427,8 +1426,7 @@ namespace {
 
       // Finally, construct the outer thunk.
       auto *outerThunk =
-          new (ctx) AutoClosureExpr(outerThunkBody, outerThunkTy,
-                                    AutoClosureExpr::InvalidDiscriminator, dc);
+          new (ctx) AutoClosureExpr(outerThunkBody, outerThunkTy, dc);
       outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
       outerThunk->setParameterList(
           ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
@@ -5153,14 +5151,12 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       auto &ctx = cs.getASTContext();
-      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
           FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
       auto closure = new (ctx)
-          AutoClosureExpr(/*set body later*/nullptr, leafTy,
-                          discriminator, dc);
+          AutoClosureExpr(/*set body later*/nullptr, leafTy, dc);
 
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
