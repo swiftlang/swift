@@ -648,9 +648,9 @@ struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
   /// Return the basic bounds of all Swift class metadata.
   /// The immediate members offset will not be meaningful.
   static constexpr TargetClassMetadataBounds<Runtime> forSwiftRootClass() {
-    using Metadata = FullMetadata<TargetClassMetadataType<Runtime>>;
-    return forAddressPointAndSize(sizeof(typename Metadata::HeaderType),
-                                  sizeof(Metadata));
+    using MetadataTy = FullMetadata<TargetClassMetadataType<Runtime>>;
+    return forAddressPointAndSize(sizeof(typename MetadataTy::HeaderType),
+                                  sizeof(MetadataTy));
   }
 
   /// Return the bounds of a Swift class metadata with the given address
