@@ -234,7 +234,7 @@ SWIFT_CC(swiftasync)
 static void swift_asyncLet_wait_throwingImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     AsyncLet *alet,
-    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    TaskContinuationFunction *resumeFunction,
     AsyncContext * callContext) {
   auto task = alet->getTask();
   swift_task_future_wait_throwing(result, callerContext, task, resumeFunction,
@@ -297,16 +297,17 @@ static void swift_asyncLet_get_throwingImpl(
                     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                     AsyncLet *alet,
                     void *resultBuffer,
-                    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+                    TaskContinuationFunction *resumeFn,
                     AsyncContext *callContext) {
+  auto resumeFunction = reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction *>(resumeFn);
+
   // Don't need to do anything if the result buffer is already populated.
   if (asImpl(alet)->hasResultInBuffer()) {
     return resumeFunction(callerContext, nullptr);
   }
   
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent = resumeFn;
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
@@ -318,7 +319,7 @@ static void swift_asyncLet_get_throwingImpl(
   return swift_task_future_wait_throwing(
                          reinterpret_cast<OpaqueValue*>(resultBuffer),
                          aletContext, alet->getTask(),
-                         _asyncLet_get_throwing_continuation,
+                         reinterpret_cast<TaskContinuationFunction *>(_asyncLet_get_throwing_continuation),
                          futureContext);
 }
 
@@ -443,7 +444,7 @@ static void swift_asyncLet_finishImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerCo
   return swift_task_future_wait_throwing(
                          reinterpret_cast<OpaqueValue*>(resultBuffer),
                          callContext, alet->getTask(),
-                         _asyncLet_finish_continuation,
+                         reinterpret_cast<TaskContinuationFunction *>(_asyncLet_finish_continuation),
                          futureContext);
 }
 
@@ -493,7 +494,7 @@ static void swift_asyncLet_consumeImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerC
   return swift_task_future_wait(
                          reinterpret_cast<OpaqueValue*>(resultBuffer),
                          callContext, alet->getTask(),
-                         _asyncLet_consume_continuation,
+                         reinterpret_cast<TaskContinuationFunction *>(_asyncLet_consume_continuation),
                          futureContext);
 }
 
@@ -517,21 +518,20 @@ static void swift_asyncLet_consume_throwingImpl(
                     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                     AsyncLet *alet,
                     void *resultBuffer,
-                    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+                    TaskContinuationFunction *resumeFunction,
                     AsyncContext *callContext) {
   // If the result buffer is already populated, we just need to clean up the
   // task.
   if (asImpl(alet)->hasResultInBuffer()) {
     return asyncLet_finish_after_task_completion(callerContext,
                    alet,
-                   reinterpret_cast<TaskContinuationFunction*>(resumeFunction),
+                   resumeFunction,
                    callContext,
                    nullptr);
   }
   
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent = resumeFunction;
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
@@ -543,7 +543,7 @@ static void swift_asyncLet_consume_throwingImpl(
   return swift_task_future_wait_throwing(
                          reinterpret_cast<OpaqueValue*>(resultBuffer),
                          aletContext, alet->getTask(),
-                         _asyncLet_consume_throwing_continuation,
+                         reinterpret_cast<TaskContinuationFunction *>(_asyncLet_consume_throwing_continuation),
                          futureContext);
 }
 

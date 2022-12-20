@@ -1183,14 +1183,14 @@ SWIFT_CC(swiftasync)
 void swift_task_future_wait_throwingImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     AsyncTask *task,
-    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    TaskContinuationFunction *resumeFn,
     AsyncContext *callContext) {
   auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
-  auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+  auto resumeFunction = reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction *>(resumeFn);
 
   // Wait on the future.
   assert(task->isFuture());

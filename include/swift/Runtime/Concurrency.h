@@ -174,7 +174,7 @@ void swift_task_future_wait_throwing(
   OpaqueValue *,
   SWIFT_ASYNC_CONTEXT AsyncContext *,
   AsyncTask *,
-  ThrowingTaskFutureWaitContinuationFunction *,
+  TaskContinuationFunction *,
   AsyncContext *);
 
 /// Wait for a readyQueue of a Channel to become non empty.
@@ -191,7 +191,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swiftasync)
 void swift_taskGroup_wait_next_throwing(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    TaskGroup *group, ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    TaskGroup *group, TaskContinuationFunction *resumeFn,
     AsyncContext *callContext);
 
 /// Initialize a `TaskGroup` in the passed `group` memory location.
@@ -358,7 +358,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait_throwing(OpaqueValue *,
                                   SWIFT_ASYNC_CONTEXT AsyncContext *,
                                   AsyncLet *,
-                                  ThrowingTaskFutureWaitContinuationFunction *,
+                                  TaskContinuationFunction *,
                                   AsyncContext *);
 
 /// DEPRECATED. swift_asyncLet_finish is used instead.
@@ -415,7 +415,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_get_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
                                  AsyncLet *,
                                  void *,
-                                 ThrowingTaskFutureWaitContinuationFunction *,
+                                 TaskContinuationFunction *,
                                  AsyncContext *);
 
 /// Exit the scope of an async-let binding. If the task is still running, it
@@ -482,7 +482,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
                                      AsyncLet *,
                                      void *,
-                                     ThrowingTaskFutureWaitContinuationFunction *,
+                                     TaskContinuationFunction *,
                                      AsyncContext *);
 
 /// Returns true if the currently executing AsyncTask has a

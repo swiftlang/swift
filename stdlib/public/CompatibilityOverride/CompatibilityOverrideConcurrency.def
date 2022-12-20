@@ -146,7 +146,7 @@ OVERRIDE_TASK(task_future_wait_throwing, void,
               swift::,
               (OpaqueValue *result,
                SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, AsyncTask *task,
-               ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+               TaskContinuationFunction *resumeFunction,
                AsyncContext *callContext),
               (result, callerContext, task, resumeFunction, callContext))
 
@@ -218,7 +218,7 @@ OVERRIDE_ASYNC_LET(asyncLet_wait_throwing, void,
                    (OpaqueValue *result,
                        SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                        AsyncLet *alet,
-                       ThrowingTaskFutureWaitContinuationFunction *resume,
+                       TaskContinuationFunction *resume,
                        AsyncContext *callContext),
                    (result, callerContext, alet, resume, callContext))
 
@@ -240,7 +240,7 @@ OVERRIDE_ASYNC_LET(asyncLet_get_throwing, void,
                    swift::,
                    (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                     AsyncLet *alet, void *resultBuffer,
-                    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                    TaskContinuationFunction *resumeFn,
                     AsyncContext *callContext),
                    (callerContext, alet, resultBuffer, resumeFn, callContext))
 
@@ -258,7 +258,7 @@ OVERRIDE_ASYNC_LET(asyncLet_consume_throwing, void,
                    swift::,
                    (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                     AsyncLet *alet, void *resultBuffer,
-                    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                    TaskContinuationFunction *resumeFn,
                     AsyncContext *callContext),
                    (callerContext, alet, resultBuffer, resumeFn, callContext))
 
@@ -290,7 +290,7 @@ OVERRIDE_TASK_GROUP(taskGroup_wait_next_throwing, void,
                     (OpaqueValue *resultPointer,
                      SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
                      TaskGroup *_group,
-                     ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                     TaskContinuationFunction *resumeFn,
                      AsyncContext *callContext),
                     (resultPointer, callerContext, _group, resumeFn,
                     callContext))

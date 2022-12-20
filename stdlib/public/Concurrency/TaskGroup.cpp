@@ -756,7 +756,7 @@ __attribute__((noinline))
 SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
-    ThrowingTaskFutureWaitContinuationFunction resumeFunction,
+    TaskContinuationFunction* resumeFunction,
     AsyncContext *callContext) {
   // Make sure we don't eliminate calls to this function.
   asm volatile("" // Do nothing.
@@ -775,15 +775,14 @@ SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
-    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    TaskContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
   auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = task_group_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-  context->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+  context->ResumeParent = resumeFunction;
   context->Parent = callerContext;
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
