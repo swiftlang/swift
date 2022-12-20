@@ -3792,6 +3792,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Compute the local discriminators for the given declaration context.
+///
+/// This is a state-changing operation for closures within the context, which
+/// produces the number of assigned discriminators.
+class LocalDiscriminatorsRequest
+    : public SimpleRequest<LocalDiscriminatorsRequest,
+                           unsigned(DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  unsigned evaluate(Evaluator &evaluator, DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
