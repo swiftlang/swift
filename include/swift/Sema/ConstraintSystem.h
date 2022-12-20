@@ -6108,6 +6108,30 @@ public:
   }
 };
 
+/// A function object that opens a given pack type by generating a
+/// \c PackElementOf constraint.
+class OpenPackElementType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+  GenericEnvironment *elementEnv;
+
+public:
+  explicit OpenPackElementType(ConstraintSystem &cs,
+                               ConstraintLocator *locator,
+                               GenericEnvironment *elementEnv)
+      : cs(cs), locator(locator), elementEnv(elementEnv) {}
+
+  Type operator()(Type packType) const {
+    auto *elementType = cs.createTypeVariable(locator, TVO_CanBindToHole);
+    auto elementLoc = cs.getConstraintLocator(locator,
+        LocatorPathElt::OpenedPackElement(elementEnv));
+
+    cs.addConstraint(ConstraintKind::PackElementOf, elementType,
+                     packType, elementLoc);
+    return elementType;
+  }
+};
+
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
