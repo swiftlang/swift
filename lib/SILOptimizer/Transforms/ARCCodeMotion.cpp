@@ -161,7 +161,7 @@ protected:
   RCIdentityFunctionInfo *RCFI;
 
   /// All the unique refcount roots retained or released in the function.
-  llvm::SetVector<SILValue> RCRootVault;
+  llvm::SmallVector<SILValue, 16> RCRootVault;
 
   /// Contains a map between RC roots to their index in the RCRootVault.
   /// used to facilitate fast RC roots to index lookup.
@@ -413,7 +413,7 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
-      RCRootVault.insert(Root);
+      RCRootVault.push_back(Root);
       LLVM_DEBUG(llvm::dbgs()
                  << "Retain Root #" << RCRootVault.size() << " " << Root);
     }
@@ -801,7 +801,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
-      RCRootVault.insert(Root);
+      RCRootVault.push_back(Root);
       LLVM_DEBUG(llvm::dbgs()
                  << "Release Root #" << RCRootVault.size() << " " << Root);
     }
