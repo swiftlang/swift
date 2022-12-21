@@ -21,3 +21,19 @@ func testVar() {
     t = String()
     useString(_borrow t)
 }
+
+struct S {
+    var k = Klass()
+
+    func test() {}
+
+    func test2() {
+        (_borrow self).test()
+    }
+}
+
+func useApply() {
+    var s = S()
+    s = S()
+    (_borrow s).test()
+}
