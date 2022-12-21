@@ -659,8 +659,10 @@ public:
   }
 };
 
-/// Skip same-shape generic requirement constraint,
-/// and assume that types are equal.
+/// Skip a same-shape requirement between two type packs.
+///
+/// A same shape requirement can be inferred from a generic requirement,
+/// or from a pack expansion expression.
 class SkipSameShapeRequirement final : public ConstraintFix {
   Type LHS, RHS;
 
@@ -671,7 +673,7 @@ class SkipSameShapeRequirement final : public ConstraintFix {
 
 public:
   std::string getName() const override {
-    return "skip same-shape generic requirement";
+    return "skip same-shape requirement";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;

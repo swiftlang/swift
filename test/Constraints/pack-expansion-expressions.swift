@@ -71,3 +71,9 @@ func typeReprPacks<T...>(_ t: T...) where T: ExpressibleByIntegerLiteral {
   _ = Array<each T>() // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
   _ = 1 as each T // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
 }
+
+func sameShapeDiagnostics<T..., U...>(t: T..., u: U...) {
+  _ = (each t, each u)... // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = Array<(each T, each U)>()... // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (Array<each T>(), each u)... // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+}

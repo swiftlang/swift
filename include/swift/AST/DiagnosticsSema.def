@@ -5164,6 +5164,9 @@ ERROR(multiple_ellipsis_in_tuple,none,
 ERROR(expansion_not_same_shape,none,
       "variadic expansion %0 requires that %1 and %2 have the same shape",
       (Type, Type, Type))
+ERROR(expansion_expr_not_same_shape,none,
+      "pack expansion requires that %0 and %1 have the same shape",
+      (Type, Type))
 
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
