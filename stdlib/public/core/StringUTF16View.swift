@@ -201,6 +201,17 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n)
     }
 
+    if n.magnitude <= _StringBreadcrumbs.breadcrumbStride {
+      // Do not use breadcrumbs if directly computing the result is expected to
+      // be cheaper.
+      if _guts.isASCII {
+        return Index(
+          _encodedOffset: i._encodedOffset + n
+        )._scalarAligned._encodingIndependent
+      }
+      return _index(i, offsetBy: n)._knownUTF8
+    }
+
     let lowerOffset = _nativeGetOffset(for: i)
     let result = _nativeGetIndex(for: lowerOffset + n)
     return result
@@ -217,6 +228,17 @@ extension String.UTF16View: BidirectionalCollection {
 
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
+    }
+
+    if n.magnitude <= _StringBreadcrumbs.breadcrumbStride {
+      // Do not use breadcrumbs if directly computing the result is expected to
+      // be cheaper.
+      if _guts.isASCII {
+        return (0 ..< _guts.count).index(
+          i._encodedOffset, offsetBy: n, limitedBy: limit._encodedOffset
+        ).map { Index(_encodedOffset: $0)._scalarAligned._encodingIndependent }
+      }
+      return _index(i, offsetBy: n, limitedBy: limit)?._knownUTF8
     }
 
     let iOffset = _nativeGetOffset(for: i)
@@ -255,6 +277,18 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignDistance(from: start, to: end)
     }
 
+    let utf8Distance = end._encodedOffset - start._encodedOffset
+    if utf8Distance.magnitude <= _StringBreadcrumbs.breadcrumbStride {
+      // Do not use breadcrumbs if directly computing the result is expected to
+      // be cheaper. The conservative threshold above assumes that each UTF-16
+      // code unit will map to a single UTF-8 code unit, i.e., the worst
+      // possible (a.k.a. most compact) case with all ASCII scalars.
+      // FIXME: Figure out if a more optimistic threshold would work better.
+      if _guts.isASCII {
+        return end._encodedOffset - start._encodedOffset
+      }
+      return _utf16Distance(from: start, to: end)
+    }
     let lower = _nativeGetOffset(for: start)
     let upper = _nativeGetOffset(for: end)
     return upper &- lower
@@ -691,6 +725,14 @@ extension String.UTF16View {
     }
   }
 
+  /// Return the UTF-16 offset corresponding to `idx`, measured from the
+  /// start of this string, which must be a native UTF-8 string.
+  ///
+  /// - Complexity: This measures the UTF-16 distance of `idx` from its nearest
+  ///    breadcrumb index (rounding down), so on average it needs to look at
+  ///    `breadcrumbStride / 2` UTF-8 code units. (In addition to the O(log(n))
+  ///    cost of looking up the nearest breadcrumb, and the amortizable O(n)
+  ///    cost of generating the breadcrumbs in the first place.)
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
@@ -714,11 +756,22 @@ extension String.UTF16View {
     if idx == endIndex { return breadcrumbsPtr.pointee.utf16Length }
 
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
+    // FIXME: Starting from the upper-bound crumb when that is closer would cut
+    // the average cost of the subsequent iteration by 50%.
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
     return crumbOffset + _utf16Distance(from: crumb, to: idx)
   }
 
+  /// Return the index at the given UTF-16 offset, measured from the
+  /// start of this string, which must be a native UTF-8 string.
+  ///
+  /// - Complexity: This iterates UTF-16 code units starting from the
+  ///    nearest breadcrumb to `offset` (rounding down), so on
+  ///    average it needs to look at `breadcrumbStride / 2` UTF-8 code
+  ///    units. (In addition to the O(1) cost of looking up the nearest
+  ///    breadcrumb, and the amortizable O(n) cost of generating the
+  ///    breadcrumbs in the first place.)
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetIndex(for offset: Int) -> Index {
@@ -742,6 +795,8 @@ extension String.UTF16View {
     if offset == breadcrumbsPtr.pointee.utf16Length { return endIndex }
 
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
+    // FIXME: Starting from the upper-bound crumb when that is closer would cut
+    // the average cost of the subsequent iteration by 50%.
     let (crumb, remaining) = breadcrumbsPtr.pointee.getBreadcrumb(
       forOffset: offset)
     if remaining == 0 { return crumb }
