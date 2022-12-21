@@ -2529,7 +2529,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->getCurrentIndent() : 0;
       log.indent(indent) << "------- Transfomed Body -------\n";
-      transformedBody->second->dump(log);
+      transformedBody->second->dump(log, &getASTContext(), indent);
       log << '\n';
     }
 
