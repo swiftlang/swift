@@ -27,7 +27,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
   ConstraintSystem cs(DC, options);
 
-  auto *intLiteral = IntegerLiteralExpr::createFromUnsigned(Context, 42);
+  auto *intLiteral = IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc());
 
   auto *literalTy = cs.createTypeVariable(cs.getConstraintLocator(intLiteral),
                                           /*options=*/0);

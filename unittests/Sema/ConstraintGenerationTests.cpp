@@ -33,7 +33,7 @@ static Type getTypeOfCoercedExpr(ExplicitCastExpr *castExpr) {
 TEST_F(SemaTest, TestImplicitForceCastConstraintGeneration) {
   ConstraintSystem cs(DC, ConstraintSystemOptions());
 
-  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
+  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc());
 
   auto *castExpr = ForcedCheckedCastExpr::createImplicit(Context, literal,
                                                          Context.TheAnyType);
@@ -61,7 +61,7 @@ TEST_F(SemaTest, TestImplicitForceCastConstraintGeneration) {
 TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
   ConstraintSystem cs(DC, ConstraintSystemOptions());
 
-  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
+  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc());
 
   auto *castExpr = CoerceExpr::createImplicit(Context, literal,
                                               getStdlibType("Double"));
@@ -90,7 +90,7 @@ TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
 TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
   ConstraintSystem cs(DC, ConstraintSystemOptions());
 
-  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
+  auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc());
 
   auto *castExpr = ConditionalCheckedCastExpr::createImplicit(
       Context, literal, getStdlibType("Double"));
