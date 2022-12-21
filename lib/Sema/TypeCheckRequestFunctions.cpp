@@ -58,14 +58,16 @@ Type InheritedTypeRequest::evaluate(
     resolution =
         TypeResolution::forStructural(dc, context,
                                       /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr);
+                                      /*placeholderHandler*/ nullptr,
+                                      /*packElementOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
         TypeResolution::forInterface(dc, context,
                                      /*unboundTyOpener*/ nullptr,
-                                     /*placeholderHandler*/ nullptr);
+                                     /*placeholderHandler*/ nullptr,
+                                     /*packElementOpener*/ nullptr);
     break;
   }
 

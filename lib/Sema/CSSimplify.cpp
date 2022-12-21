@@ -8612,8 +8612,6 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
 
   // This constraint only exists to vend bindings.
   auto *packEnv = DC->getGenericEnvironmentOfContext();
-  if (auto *expansion = packType->getAs<PackExpansionType>())
-    packType = expansion->getPatternType();
   if (packType->isEqual(packEnv->mapElementTypeIntoPackContext
                         (elementType->mapTypeOutOfContext()))) {
     return SolutionKind::Solved;
