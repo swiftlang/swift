@@ -1466,7 +1466,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get,
-        // FIXME: Open pack elements with a PackElementOf constraint.
+        // TypeExpr pack elements are opened in CSGen.
         /*packElementOpener*/ nullptr);
 
     if (BaseTy->mayHaveMembers()) {
@@ -2221,7 +2221,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get,
-        // FIXME: Open pack elements with a PackElementOf constraint.
+        // Pack elements for CoerceExprs are opened in CSGen.
         /*packElementOpener*/ nullptr);
 
     if (result->hasError())

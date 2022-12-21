@@ -1191,7 +1191,6 @@ void ConstraintSystem::shrink(Expr *expr) {
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
                 /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
-                // FIXME: Open pack elements with a PackElementOf constraint.
                 /*packElementOpener*/ nullptr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
