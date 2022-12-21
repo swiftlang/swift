@@ -7,6 +7,8 @@ func testStringify(a: Int, b: Int) {
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar103606300
+
 // REQUIRES=shell
 
 // RUN: %empty-directory(%t)
