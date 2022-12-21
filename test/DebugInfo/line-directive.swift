@@ -1,5 +1,3 @@
-// REQUIRES: rdar102151684
-
 func markUsed<T>(_ t: T) {}
 func f() {
   if 1==1 {
