@@ -3012,8 +3012,7 @@ namespace {
       Type packType;
       if (!expr->getPackElements().empty()) {
         auto packReference = expr->getPackElements().front()->getPackRefExpr();
-        packType = CS.simplifyType(CS.getType(packReference))
-            ->castTo<PackExpansionType>()->getPatternType();
+        packType = CS.simplifyType(CS.getType(packReference));
       } else {
         // FIXME: The generic environment needs to be per-shape-class.
         llvm::SmallVector<GenericEnvironment::PackElementBinding, 2> bindings;
