@@ -28,7 +28,8 @@ public:
                                                  SILLocation loc) {
     auto *result = builder.createFunction(
         SILLinkage::Private, name, ty, nullptr, loc, IsNotBare,
-        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed);
+        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
     result->setDebugScope(new (builder.mod) SILDebugScope(loc, result));
     return result;
   }

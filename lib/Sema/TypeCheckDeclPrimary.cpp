@@ -1875,6 +1875,18 @@ public:
       // Compute access level.
       (void) VD->getFormalAccess();
 
+      // Force runtime discoverable attribute checking.
+      {
+        auto runtimeDiscoverableAttrs = VD->getRuntimeDiscoverableAttrs();
+        if (!runtimeDiscoverableAttrs.empty()) {
+          // Register the declaration only if all of its attributes are valid.
+          if (llvm::all_of(runtimeDiscoverableAttrs, [&](CustomAttr *attr) {
+                return VD->getRuntimeDiscoverableAttributeGenerator(attr).first;
+              }))
+            SF->addDeclWithRuntimeDiscoverableAttrs(VD);
+        }
+      }
+
       // Compute overrides.
       if (!VD->getOverriddenDecls().empty())
         checkOverrideActorIsolation(VD);

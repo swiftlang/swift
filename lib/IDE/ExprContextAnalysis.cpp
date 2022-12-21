@@ -1216,6 +1216,11 @@ class ExprContextAnalyzer {
       recordPossibleType(AFD->mapTypeIntoContext(var->getInterfaceType()));
       break;
     }
+
+    case InitializerKind::RuntimeAttribute: {
+      // This never appears in AST.
+      break;
+    }
     }
   }
 

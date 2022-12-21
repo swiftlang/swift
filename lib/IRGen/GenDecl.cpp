@@ -4389,6 +4389,101 @@ void IRGenModule::emitAccessibleFunctions() {
   }
 }
 
+void IRGenModule::emitRuntimeDiscoverableAttributes(
+    TinyPtrVector<FileUnit *> &filesToEmit) {
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit attribute section for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_rattrs, regular";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_runtime_attributes";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5ratt$B";
+    break;
+  }
+
+  // Map attribute type to each declaration it's attached to
+  // and a corresponding generator function.
+  llvm::MapVector<NominalTypeDecl *, SmallVector<SILDeclRef, 2>> attributes;
+  {
+    for (auto *fileUnit : filesToEmit) {
+      auto *SF = dyn_cast<SourceFile>(fileUnit);
+      if (!SF)
+        continue;
+
+      for (auto *decl : SF->getDeclsWithRuntimeDiscoverableAttrs()) {
+        for (auto *attr : decl->getRuntimeDiscoverableAttrs()) {
+          auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
+          attributes[attrType].push_back(
+              SILDeclRef::getRuntimeAttributeGenerator(attr, decl)
+                  .asRuntimeAccessible());
+        }
+      }
+    }
+  }
+
+  auto &SM = getSILModule();
+
+  for (auto &attr : attributes) {
+    auto *attrType = attr.first;
+    const auto &attachedTo = attr.second;
+
+    auto mangledRecordName =
+        LinkEntity::forRuntimeDiscoverableAttributeRecord(attrType)
+            .mangleAsString();
+
+    ConstantInitBuilder builder(*this);
+    ConstantStructBuilder B = builder.beginStruct();
+
+    // Flags
+    B.addInt32(0);
+
+    // Attribute metadata descriptor
+    B.addRelativeAddress(
+        getAddrOfTypeContextDescriptor(attrType, RequireMetadata));
+
+    // Number of types it's attached to.
+    B.addInt32(attachedTo.size());
+
+    // Emit all of the trailing objects
+    for (auto &ref : attachedTo) {
+      auto type = ref.getDecl()->getInterfaceType()->getCanonicalType();
+      auto *generator = SM.lookUpFunction(ref);
+
+      B.addRelativeAddress(
+          getTypeRef(type, /*genericSig=*/nullptr, MangledTypeRefRole::Metadata)
+              .first);
+      B.addRelativeAddressOrNull(getAddrOfAccessibleFunctionRecord(generator));
+    }
+
+    B.suggestType(RuntimeDiscoverableAttributeTy);
+
+    auto entity = LinkEntity::forRuntimeDiscoverableAttributeRecord(attrType);
+
+    auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(
+        entity, B.finishAndCreateFuture(), DebugTypeInfo()));
+
+    var->setConstant(true);
+    setTrueConstGlobal(var);
+
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+  }
+}
+
 /// Fetch a global reference to a reference to the given Objective-C class.
 /// The result is of type ObjCClassPtrTy->getPointerTo().
 Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
