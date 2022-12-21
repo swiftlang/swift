@@ -4614,7 +4614,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
 
 void Parser::recordLocalType(TypeDecl *TD) {
   // If we're not in a local context, this is unnecessary.
-  if (!CurLocalContext || !TD->getDeclContext()->isLocalContext())
+  if (!TD->getDeclContext()->isLocalContext())
     return;
 
   if (!InInactiveClauseEnvironment)
@@ -7117,8 +7117,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       Optional<ParseFunctionBody> initParser;
       Optional<ContextChange> topLevelParser;
       if (topLevelDecl)
-        topLevelParser.emplace(*this, topLevelDecl,
-                               &State->getTopLevelContext());
+        topLevelParser.emplace(*this, topLevelDecl);
       if (initContext)
         initParser.emplace(*this, initContext);
 
@@ -7789,16 +7788,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       {
         IDEInspectionCallbacks::InEnumElementRawValueRAII
             InEnumElementRawValue(IDECallbacks);
-        if (!CurLocalContext) {
-          // A local context is needed for parsing closures. We want to parse
-          // them anyways for proper diagnosis.
-          LocalContext tempContext{};
-          CurLocalContext = &tempContext;
-          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
-          CurLocalContext = nullptr;
-        } else {
-          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
-        }
+        RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
       }
       if (RawValueExpr.hasCodeCompletion()) {
         Status.setHasCodeCompletionAndIsError();

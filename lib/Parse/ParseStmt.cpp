@@ -396,7 +396,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-      ContextChange CC(*this, TLCD, &State->getTopLevelContext());
+      ContextChange CC(*this, TLCD);
       SourceLoc StartLoc = Tok.getLoc();
 
       // Expressions can't begin with a closure literal at statement position.

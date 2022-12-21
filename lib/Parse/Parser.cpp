@@ -159,7 +159,7 @@ void Parser::performIDEInspectionSecondPassImpl(
     // Re-enter the top-level code decl context.
     // FIXME: this can issue discriminators out-of-order?
     auto *TLCD = cast<TopLevelCodeDecl>(DC);
-    ContextChange CC(*this, TLCD, &State->getTopLevelContext());
+    ContextChange CC(*this, TLCD);
 
     SourceLoc StartLoc = Tok.getLoc();
     ASTNode Result;
