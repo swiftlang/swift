@@ -5,6 +5,8 @@
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar103588798
+
 // First, make sure that we emit:
 // - accessible function records for each generator
 // - runtime attribute records with correct number of trailing objects
