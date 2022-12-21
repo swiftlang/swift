@@ -3025,7 +3025,7 @@ namespace {
         }
 
         CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
-                         CS.getConstraintLocator(expr));
+            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       }
 
       return PackExpansionType::get(patternTy, shapeTypeVar);

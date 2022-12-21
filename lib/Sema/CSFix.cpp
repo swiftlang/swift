@@ -467,6 +467,11 @@ SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
 
 bool SkipSameShapeRequirement::diagnose(const Solution &solution,
                                        bool asNote) const {
+  if (getLocator()->isLastElement<LocatorPathElt::PackShape>()) {
+    SameShapeExpansionFailure failure(solution, LHS, RHS, getLocator());
+    return failure.diagnose(asNote);
+  }
+
   SameShapeRequirementFailure failure(solution, LHS, RHS, getLocator());
   return failure.diagnose(asNote);
 }
