@@ -770,6 +770,7 @@ static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
     return InlineCost::Expensive;
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
+  case SILAccessEnforcement::Signed:
     return InlineCost::Free;
   }
   llvm_unreachable("bad enforcement");

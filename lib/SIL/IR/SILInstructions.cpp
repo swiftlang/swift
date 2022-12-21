@@ -1206,6 +1206,8 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
   case SILAccessEnforcement::Static: return "static";
   case SILAccessEnforcement::Dynamic: return "dynamic";
   case SILAccessEnforcement::Unsafe: return "unsafe";
+  case SILAccessEnforcement::Signed:
+    return "signed";
   }
   llvm_unreachable("bad access enforcement");
 }
