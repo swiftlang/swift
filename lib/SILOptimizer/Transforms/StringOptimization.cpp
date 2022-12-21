@@ -681,7 +681,7 @@ SILValue StringOptimization::copyValue(SILValue value, SILInstruction *before) {
 /// Creates a call to a string initializer.
 ApplyInst *StringOptimization::createStringInit(StringRef str,
                                                 SILInstruction *beforeInst) {
-  SILBuilder builder(beforeInst);
+  SILBuilderWithScope builder(beforeInst);
   SILLocation loc = beforeInst->getLoc();
   SILModule &module = beforeInst->getFunction()->getModule();
   ASTContext &ctxt = module.getASTContext();
