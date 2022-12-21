@@ -385,7 +385,7 @@ void *ClosureExpr_create(void *ctx, void *body, void *dc) {
 
   auto *out = new (Context)
       ClosureExpr(attributes, bracketRange, nullptr, nullptr, asyncLoc,
-                  throwsLoc, arrowLoc, inLoc, nullptr, 0, (DeclContext *)dc);
+                  throwsLoc, arrowLoc, inLoc, nullptr, (DeclContext *)dc);
   out->setBody((BraceStmt *)body, true);
   out->setParameterList(params);
   return (Expr *)out;

@@ -267,8 +267,9 @@ private:
         ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
                     SourceLoc(), SourceLoc(),
                     SourceLoc(), SourceLoc(), nullptr,
-                    DF.getNextDiscriminator(), getCurrentDeclContext());
+                    getCurrentDeclContext());
     Closure->setImplicit(true);
+    Closure->setDiscriminator(DF.getNextDiscriminator());
 
     // TODO: Save and return the value of $OriginalExpr.
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};

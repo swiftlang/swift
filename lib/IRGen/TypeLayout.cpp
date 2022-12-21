@@ -838,7 +838,7 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
              0x0, 0x0, 0x0, 0x1, 'N'}};
   }
   default:
-    return llvm::NoneType::None;
+    return None;
   }
 }
 
@@ -1156,7 +1156,7 @@ llvm::Optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
   Size currentSize(0);
   for (auto *entry : entries) {
     if (!entry->fixedSize(IGM) || !entry->fixedAlignment(IGM)) {
-      return *(_fixedSize = llvm::Optional<Size>(llvm::NoneType::None));
+      return *(_fixedSize = llvm::Optional<Size>(None));
     }
     Size entrySize = *entry->fixedSize(IGM);
     currentSize =
@@ -1174,7 +1174,7 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
   for (auto *entry : entries) {
     if (!entry->fixedAlignment(IGM)) {
       return *(_fixedAlignment =
-                   llvm::Optional<Alignment>(llvm::NoneType::None));
+                   llvm::Optional<Alignment>(None));
     }
     currentAlignment = std::max(currentAlignment, *entry->fixedAlignment(IGM));
   }
@@ -1190,7 +1190,7 @@ AlignedGroupEntry::fixedXICount(IRGenModule &IGM) const {
   for (auto *entry : entries) {
     auto entryXICount = entry->fixedXICount(IGM);
     if (!entryXICount) {
-      return *(_fixedXICount = llvm::Optional<uint32_t>(llvm::NoneType::None));
+      return *(_fixedXICount = llvm::Optional<uint32_t>(None));
     }
     currentMaxXICount = std::max(*entryXICount, currentMaxXICount);
   }
@@ -1269,7 +1269,7 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
     }
     auto entryStr = entry->layoutString(IGM);
     if (!entryStr) {
-      return llvm::NoneType::None;
+      return None;
     }
     uint32_t entryStrSize;
     llvm::support::endian::write32be(&entryStrSize, entryStr->size());
@@ -1597,17 +1597,17 @@ bool ArchetypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
 bool ArchetypeLayoutEntry::isSingleRetainablePointer() const { return false; }
 
 llvm::Optional<Size> ArchetypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 llvm::Optional<Alignment>
 ArchetypeLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 llvm::Optional<uint32_t>
 ArchetypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 llvm::Value *
@@ -1638,7 +1638,7 @@ ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
       return layoutStr;
     }
   }
-  return llvm::NoneType::None;
+  return None;
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -1770,7 +1770,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
     // E numEmptyPayloads numPayloads legnthOfEachPayload payloads
     //
     // Not yet supported/implemented
-    return llvm::NoneType::None;
+    return None;
   } else {
     // SINGLEENUM := 'e' SIZE SIZE VALUE
     // e NumEmptyPayloads LengthOfPayload Payload
@@ -1783,7 +1783,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
     llvm::Optional<std::vector<uint8_t>> payloadLayout =
         cases[0]->layoutString(IGM);
     if (!payloadLayout) {
-      return llvm::NoneType::None;
+      return None;
     }
     assert(payloadLayout->size() <= UINT32_MAX &&
            "Enum layout exceeds length limit");
@@ -1938,7 +1938,7 @@ llvm::Optional<Size> EnumTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
     auto payloadNumExtraInhabitants = cases[0]->fixedXICount(IGM);
     auto payloadSize = cases[0]->fixedSize(IGM);
     if (!payloadNumExtraInhabitants || !payloadSize) {
-      return *(_fixedSize = llvm::Optional<Size>(llvm::NoneType::None));
+      return *(_fixedSize = llvm::Optional<Size>(None));
     }
     if (*payloadNumExtraInhabitants >= numEmptyCases) {
       size = *payloadSize;
@@ -1957,7 +1957,7 @@ llvm::Optional<Size> EnumTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
   for (auto enum_case : cases) {
     auto caseSize = enum_case->fixedSize(IGM);
     if (!caseSize) {
-      return *(_fixedSize = llvm::Optional<Size>(llvm::NoneType::None));
+      return *(_fixedSize = llvm::Optional<Size>(None));
     }
     maxPayloadSize = std::max(*caseSize, maxPayloadSize);
   }
@@ -1977,7 +1977,7 @@ EnumTypeLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
     auto caseAlign = payload->fixedAlignment(IGM);
     if (!caseAlign) {
       return *(_fixedAlignment =
-                   llvm::Optional<Alignment>(llvm::NoneType::None));
+                   llvm::Optional<Alignment>(None));
     }
     maxAlign = std::max(*caseAlign, maxAlign);
   }
@@ -1999,7 +1999,7 @@ EnumTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
     //     payloadNumExtraInhabitants - emptyCases : 0;
     auto payloadXIs = cases[0]->fixedXICount(IGM);
     if (!payloadXIs) {
-      return *(_fixedXICount = llvm::Optional<uint32_t>(llvm::NoneType::None));
+      return *(_fixedXICount = llvm::Optional<uint32_t>(None));
     }
     return *(_fixedXICount =
                  payloadXIs >= numEmptyCases ? *payloadXIs - numEmptyCases : 0);
@@ -2015,7 +2015,7 @@ EnumTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
   for (auto enum_case : cases) {
     auto caseSize = enum_case->fixedSize(IGM);
     if (!caseSize) {
-      return *(_fixedXICount = llvm::Optional<uint32_t>(llvm::NoneType::None));
+      return *(_fixedXICount = llvm::Optional<uint32_t>(None));
     }
     maxPayloadSize = std::max(*caseSize, maxPayloadSize);
   }
@@ -2900,7 +2900,7 @@ llvm::Value *ResilientTypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 llvm::Optional<Size>
 ResilientTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 bool ResilientTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
@@ -2920,12 +2920,12 @@ bool ResilientTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
 
 llvm::Optional<Alignment>
 ResilientTypeLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 llvm::Optional<uint32_t>
 ResilientTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 llvm::Value *
@@ -3190,7 +3190,7 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
 
 llvm::Optional<std::vector<uint8_t>>
 TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  return None;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

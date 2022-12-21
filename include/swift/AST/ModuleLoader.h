@@ -46,13 +46,13 @@ class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
 class ModuleDecl;
-class ModuleDependencies;
+class ModuleDependencyInfo;
 class ModuleDependenciesCache;
 class NominalTypeDecl;
 class SourceFile;
 class TypeDecl;
 class CompilerInstance;
-enum class ModuleDependenciesKind : int8_t;
+enum class ModuleDependencyKind : int8_t;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -321,7 +321,7 @@ public:
 
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
-  virtual Optional<ModuleDependencies> getModuleDependencies(
+  virtual Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) = 0;

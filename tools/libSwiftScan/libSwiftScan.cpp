@@ -513,7 +513,7 @@ swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation) {
   for (int i = 0; i < argc; ++i)
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
-  auto TargetInfo = getTargetInfo(Compilation);
+  auto TargetInfo = swift::dependencies::getTargetInfo(Compilation);
   if (TargetInfo.getError())
     return swift::c_string_utils::create_null();
   return TargetInfo.get();

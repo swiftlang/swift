@@ -36,7 +36,7 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   for (auto &str : CommandStrArr)
     Compilation.push_back(str.c_str());
 
-  auto targetInfo = getTargetInfo(Compilation);
+  auto targetInfo = swift::dependencies::getTargetInfo(Compilation);
   if (targetInfo.getError()) {
     llvm::errs() << "For compilation: ";
     for (auto &str : Compilation)

@@ -2732,6 +2732,10 @@ static InitializeDynamicReplacementLookup initDynamicReplacements;
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 void DynamicReplacementDescriptor::enableReplacement() const {
+  // Weakly linked symbols can be zero.
+  if (replacedFunctionKey.get() == nullptr)
+    return;
+
   auto *chainRoot = const_cast<DynamicReplacementChainEntry *>(
       replacedFunctionKey->root.get());
 

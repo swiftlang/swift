@@ -161,13 +161,9 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
 }
 
 DebugTypeInfo DebugTypeInfo::getErrorResult(swift::Type Ty,
-                                            llvm::Type *StorageType,
                                             IRGenModule &IGM) {
   auto &TI = IGM.getTypeInfoForUnlowered(Ty);
-  // FIXME: Enable this. Currently breaks on i386.
-  // assert(TI.getStorageType() == StorageType);
   DebugTypeInfo DbgTy = getFromTypeInfo(Ty, TI, false);
-  assert(StorageType && "FragmentStorageType is a nullptr");
   return DbgTy;
 }
 

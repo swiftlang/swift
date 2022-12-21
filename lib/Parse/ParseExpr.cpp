@@ -1612,6 +1612,19 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return makeParserResult(typeExpr);
     }
 
+    // 'each' followed by another identifier is a pack element expr.
+    if (Tok.isContextualKeyword("each") &&
+        peekToken().is(tok::identifier) &&
+        !peekToken().isAtStartOfLine()) {
+      SourceLoc loc = consumeToken();
+      ParserResult<Expr> ref = parseExpr(ID);
+      if (ref.isNull())
+        return ref;
+
+      auto *packRef = PackElementExpr::create(Context, loc, ref.get());
+      return makeParserResult(packRef);
+    }
+
     LLVM_FALLTHROUGH;
   case tok::kw_Self:     // Self
     return parseExprIdentifier();
@@ -2776,12 +2789,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
     return makeParserError();
   }
   
-  unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
-
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
       attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
-      arrowLoc, inLoc, explicitResultType, discriminator, CurDeclContext);
+      arrowLoc, inLoc, explicitResultType, CurDeclContext);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.

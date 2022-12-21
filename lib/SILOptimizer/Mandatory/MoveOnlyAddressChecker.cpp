@@ -391,7 +391,17 @@ struct MoveOnlyChecker {
   /// [noimplicitcopy]. If we find one that does not fit a pattern that we
   /// understand, emit an error diagnostic telling the programmer that the move
   /// checker did not know how to recognize this code pattern.
-  void searchForCandidateMarkMustChecks();
+  ///
+  /// Returns true if we emitted a diagnostic. Returns false otherwise.
+  bool searchForCandidateMarkMustChecks();
+
+  /// After we have emitted a diagnostic, we need to clean up the instruction
+  /// stream by converting /all/ copies of move only typed things to use
+  /// explicit_copy_value so that we maintain the SIL invariant that in
+  /// canonical SIL move only types are not copied by normal copies.
+  ///
+  /// Returns true if we actually changed any instructions.
+  void cleanupAfterEmittingDiagnostic();
 
   /// Emits an error diagnostic for \p markedValue.
   void performObjectCheck(MarkMustCheckInst *markedValue);
@@ -1334,7 +1344,44 @@ bool GlobalDataflow::compute() {
 //                       MARK: Main Pass Implementation
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::searchForCandidateMarkMustChecks() {
+void MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *inst = &*ii;
+      ++ii;
+
+      // Convert load [copy] -> load_borrow + explicit_copy_value.
+      if (auto *li = dyn_cast<LoadInst>(inst)) {
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+          SILBuilderWithScope builder(li);
+          auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
+          auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
+          builder.createEndBorrow(li->getLoc(), lbi);
+          li->replaceAllUsesWith(cvi);
+          li->eraseFromParent();
+          changed = true;
+        }
+      }
+
+      // Convert copy_addr !take of src to its explicit value form so we don't
+      // error.
+      if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+        if (!copyAddr->isTakeOfSrc()) {
+          SILBuilderWithScope builder(copyAddr);
+          builder.createExplicitCopyAddr(
+              copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
+              IsTake_t(copyAddr->isTakeOfSrc()),
+              IsInitialization_t(copyAddr->isInitializationOfDest()));
+          copyAddr->eraseFromParent();
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
+bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
+  bool emittedDiagnostic = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
@@ -1351,6 +1398,7 @@ void MoveOnlyChecker::searchForCandidateMarkMustChecks() {
               llvm::dbgs()
               << "Early emitting diagnostic for unsupported alloc box!\n");
           diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
+          emittedDiagnostic = true;
           continue;
         }
 
@@ -1360,6 +1408,7 @@ void MoveOnlyChecker::searchForCandidateMarkMustChecks() {
                 llvm::dbgs()
                 << "Early emitting diagnostic for unsupported alloc box!\n");
             diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
+            emittedDiagnostic = true;
             continue;
           }
         }
@@ -1368,6 +1417,7 @@ void MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       moveIntroducersToProcess.insert(mmci);
     }
   }
+  return emittedDiagnostic;
 }
 
 bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
@@ -1566,15 +1616,18 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
 bool MoveOnlyChecker::check() {
   // First search for candidates to process and emit diagnostics on any
   // mark_must_check [noimplicitcopy] we didn't recognize.
-  searchForCandidateMarkMustChecks();
+  bool emittedDiagnostic = searchForCandidateMarkMustChecks();
 
   // If we didn't find any introducers to check, just return changed.
   //
   // NOTE: changed /can/ be true here if we had any mark_must_check
   // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
   // and then deleting.
-  if (moveIntroducersToProcess.empty())
+  if (moveIntroducersToProcess.empty()) {
+    if (emittedDiagnostic)
+      cleanupAfterEmittingDiagnostic();
     return changed;
+  }
 
   for (auto *markedValue : moveIntroducersToProcess) {
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
@@ -1587,7 +1640,7 @@ bool MoveOnlyChecker::check() {
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }
   }
-  bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
+  emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
 
   // Ok, now that we have performed our checks, we need to eliminate all mark
   // must check inst since it is invalid for these to be in canonical SIL and
@@ -1608,40 +1661,7 @@ bool MoveOnlyChecker::check() {
   // It is also ok that we use a little more compile time and go over the
   // function again, since we are going to fail the compilation and not codegen.
   if (emittedDiagnostic) {
-    for (auto &block : *fn) {
-      for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-        auto *inst = &*ii;
-        ++ii;
-
-        // Convert load [copy] -> load_borrow + explicit_copy_value.
-        if (auto *li = dyn_cast<LoadInst>(inst)) {
-          if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-            SILBuilderWithScope builder(li);
-            auto *lbi =
-                builder.createLoadBorrow(li->getLoc(), li->getOperand());
-            auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
-            builder.createEndBorrow(li->getLoc(), lbi);
-            li->replaceAllUsesWith(cvi);
-            li->eraseFromParent();
-            changed = true;
-          }
-        }
-
-        // Convert copy_addr !take of src to its explicit value form so we don't
-        // error.
-        if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-          if (!copyAddr->isTakeOfSrc()) {
-            SILBuilderWithScope builder(copyAddr);
-            builder.createExplicitCopyAddr(
-                copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
-                IsTake_t(copyAddr->isTakeOfSrc()),
-                IsInitialization_t(copyAddr->isInitializationOfDest()));
-            copyAddr->eraseFromParent();
-            changed = true;
-          }
-        }
-      }
-    }
+    cleanupAfterEmittingDiagnostic();
   }
 
   return changed;

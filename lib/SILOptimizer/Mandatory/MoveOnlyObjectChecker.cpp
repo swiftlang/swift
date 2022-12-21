@@ -73,9 +73,38 @@ struct MoveOnlyChecker {
 
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
+
+  /// After we have emitted a diagnostic, we need to clean up the instruction
+  /// stream by converting /all/ copies of move only typed things to use
+  /// explicit_copy_value so that we maintain the SIL invariant that in
+  /// canonical SIL move only types are not copied by normal copies.
+  ///
+  /// Returns true if we actually changed any instructions.
+  bool cleanupAfterEmittingDiagnostic();
 };
 
 } // namespace
+
+bool MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
+  bool changed = false;
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *cvi = dyn_cast<CopyValueInst>(&*ii);
+      ++ii;
+
+      if (!cvi || !cvi->getOperand()->getType().isMoveOnlyWrapped())
+        continue;
+
+      SILBuilderWithScope b(cvi);
+      auto *expCopy =
+          b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+      cvi->replaceAllUsesWith(expCopy);
+      cvi->eraseFromParent();
+      changed = true;
+    }
+  }
+  return changed;
+}
 
 bool MoveOnlyChecker::searchForCandidateMarkMustChecks(
     DiagnosticEmitter &emitter) {
@@ -296,15 +325,22 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
 
   // First search for candidates to process and emit diagnostics on any
   // mark_must_check [noimplicitcopy] we didn't recognize.
-  changed |= searchForCandidateMarkMustChecks(diagnosticEmitter);
+  bool emittedDiagnostic = searchForCandidateMarkMustChecks(diagnosticEmitter);
 
-  // If we didn't find any introducers to check, just return changed.
+  // If we didn't find any introducers to check, just return if we emitted an
+  // error (which is the only way we emitted a change to the instruction
+  // stream).
   //
   // NOTE: changed /can/ be true here if we had any mark_must_check
   // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
   // and then deleting.
-  if (moveIntroducersToProcess.empty())
-    return changed;
+  if (moveIntroducersToProcess.empty()) {
+    if (emittedDiagnostic) {
+      cleanupAfterEmittingDiagnostic();
+      return true;
+    }
+    return false;
+  }
 
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
@@ -345,7 +381,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
   }
 
-  bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
+  emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
 
   // Ok, we have success. All of our marker instructions were proven as safe or
   // we emitted a diagnostic. Now we need to clean up the IR by eliminating our
@@ -390,30 +426,15 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   }
 
   // Once we have finished processing, if we emitted any diagnostics, then we
-  // may have copy_value of @moveOnly typed values. This is not valid in
-  // Canonical SIL, so we need to ensure that those copy_value become
-  // explicit_copy_value. This is ok to do since we are already going to fail
-  // the compilation and just are trying to maintain SIL invariants.
+  // may have copy_value of move only and @moveOnly wrapped type values. This is
+  // not valid in Canonical SIL, so we need to ensure that those copy_value
+  // become explicit_copy_value. This is ok to do since we are already going to
+  // fail the compilation and just are trying to maintain SIL invariants.
   //
   // It is also ok that we use a little more compile time and go over the
   // function again, since we are going to fail the compilation and not codegen.
   if (emittedDiagnostic) {
-    for (auto &block : *fn) {
-      for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-        auto *cvi = dyn_cast<CopyValueInst>(&*ii);
-        ++ii;
-
-        if (!cvi || !cvi->getOperand()->getType().isMoveOnlyWrapped())
-          continue;
-
-        SILBuilderWithScope b(cvi);
-        auto *expCopy =
-            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-        cvi->replaceAllUsesWith(expCopy);
-        cvi->eraseFromParent();
-        changed = true;
-      }
-    }
+    changed |= cleanupAfterEmittingDiagnostic();
   }
 
   return changed;

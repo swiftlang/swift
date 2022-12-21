@@ -2974,7 +2974,7 @@ static bool usesFeatureParserValidation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureParserSequenceFolding(Decl *decl) {
+static bool usesFeatureParserDiagnostics(Decl *decl) {
   return false;
 }
 
@@ -4879,6 +4879,10 @@ void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
 
 void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
   visit(expr->getPatternExpr());
+}
+
+void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
+  visit(expr->getPackRefExpr());
 }
 
 void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {

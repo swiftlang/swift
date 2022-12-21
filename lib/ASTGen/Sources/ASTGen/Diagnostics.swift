@@ -91,13 +91,6 @@ func emitDiagnostic(
   diagnostic: Diagnostic,
   messageSuffix: String? = nil
 ) {
-  // Collect all of the Fix-It changes based on their Fix-It ID.
-  var fixItChangesByID: [MessageID : [FixIt.Change]] = [:]
-  for fixIt in diagnostic.fixIts {
-    fixItChangesByID[fixIt.message.fixItID, default: []]
-      .append(contentsOf: fixIt.changes.changes)
-  }
-
   // Emit the main diagnostic
   emitDiagnosticParts(
     diagEnginePtr: diagEnginePtr,
@@ -105,9 +98,19 @@ func emitDiagnostic(
     message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
     severity: diagnostic.diagMessage.severity,
     position: diagnostic.position,
-    highlights: diagnostic.highlights,
-    fixItChanges: fixItChangesByID[diagnostic.diagnosticID] ?? []
+    highlights: diagnostic.highlights
   )
+
+  // Emit Fix-Its.
+  for fixIt in diagnostic.fixIts {
+    emitDiagnosticParts(
+        diagEnginePtr: diagEnginePtr,
+        sourceFileBuffer: sourceFileBuffer,
+        message: fixIt.message.message,
+        severity: .note, position: diagnostic.position,
+        fixItChanges: fixIt.changes.changes
+    )
+  }
 
   // Emit any notes as follow-ons.
   for note in diagnostic.notes {
@@ -115,8 +118,7 @@ func emitDiagnostic(
       diagEnginePtr: diagEnginePtr,
       sourceFileBuffer: sourceFileBuffer,
       message: note.message,
-      severity: .note, position: note.position,
-      fixItChanges: fixItChangesByID[note.noteMessage.fixItID] ?? []
+      severity: .note, position: note.position
     )
   }
 }

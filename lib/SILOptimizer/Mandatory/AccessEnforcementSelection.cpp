@@ -99,6 +99,15 @@ raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
 
 // For each non-escaping closure, record the indices of arguments that
 // require dynamic enforcement.
+//
+// A note on closure cycles: local functions can be recursive, creating closure
+// cycles. DynamicCaptures ignores such cycles, simply processing the call graph
+// top-down. This relies on a simple rule: if a captured variable is passed as a
+// box a local function (presumably because the function escapes), then it must
+// also be passed as a box to any other local function called by the
+// first. Therefore, if any capture escapes in a closure cycle, then it must be
+// passed as a box in all closures within the cycle. DynamicCaptures does not
+// care about boxes, because they are always dynamically enforced.
 class DynamicCaptures {
   const ClosureFunctionOrder &closureOrder;
 
@@ -127,10 +136,10 @@ public:
   }
 
   bool isDynamic(SILFunctionArgument *arg) const {
-    // If the current function is a local function that directly or indirectly
-    // refers to itself, then conservatively assume dynamic enforcement.
-    if (closureOrder.isHeadOfClosureCycle(arg->getFunction()))
-      return true;
+    // This closure may be the head of a closure cycle. That's ok, because we
+    // only care about whether this argument escapes in the calling function
+    // this is *not* part of the cycle. If the capture escapes anywhere in the
+    // cycle, then it is passed as a box to all closures in that cycle.
 
     auto pos = dynamicCaptureMap.find(arg->getFunction());
     if (pos == dynamicCaptureMap.end())
