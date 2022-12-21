@@ -1509,6 +1509,9 @@ public:
            getKind() == Kind::OpaqueTypeDescriptorAccessorKey ||
            getKind() == Kind::OpaqueTypeDescriptorAccessorVar;
   }
+  bool isOpaqueTypeDescriptorAccessorImpl() const {
+    return getKind() == Kind::OpaqueTypeDescriptorAccessorImpl;
+  }
   bool isAllocator() const {
     assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
            getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
@@ -1539,6 +1542,9 @@ public:
   }
   bool isDynamicallyReplaceableFunctionKey() const {
     return getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+  bool isDynamicallyReplaceableFunctionImpl() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionImpl;
   }
   bool isTypeMetadataAccessFunction() const {
     return getKind() == Kind::TypeMetadataAccessFunction;

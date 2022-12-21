@@ -19,6 +19,13 @@ public func funcWithOpaqueResult() -> some P { return S(member: 0) }
 public func asyncFunc() async {}
 #endif
 
+public dynamic func dynamicFunc() {}
+@_dynamicReplacement(for: dynamicFunc) public func replacementFunc() {}
+
+public dynamic func dynamicFuncOpaqueResult() -> some P { return S(member: 0) }
+@_dynamicReplacement(for: dynamicFuncOpaqueResult)
+public func replacementFuncOpaqueResult() -> some P { return S(member: 1) }
+
 public protocol P {
   func requirement()
   func requirementWithDefaultImpl()
