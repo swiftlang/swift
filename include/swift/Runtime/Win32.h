@@ -39,7 +39,7 @@
 ///          for freeing this string with @c free() when done with it.
 ///
 /// If @a str cannot be converted to UTF-8, @c nullptr is returned.
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 char *_swift_win32_copyUTF8FromWide(const wchar_t *str);
 
 /// Convert a UTF-8 string to a wide string.
@@ -50,7 +50,7 @@ char *_swift_win32_copyUTF8FromWide(const wchar_t *str);
 ///          for freeing this string with @c free() when done with it.
 ///
 /// If @a str cannot be converted to UTF-16, @c nullptr is returned.
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 wchar_t *_swift_win32_copyWideFromUTF8(const char *str);
 
 /// Configure the environment to allow calling into the Debug Help library.
