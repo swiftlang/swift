@@ -2469,7 +2469,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return None;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
+  auto disableASTTransform = [&](NominalTypeDecl *builder) { return false; };
+
+  if (!disableASTTransform(builder)) {
     auto transformedBody = getBuilderTransformedBody(fn, builder);
     // If this builder transform has not yet been applied to this function,
     // let's do it and cache the result.
