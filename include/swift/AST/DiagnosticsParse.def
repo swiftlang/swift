@@ -1348,6 +1348,10 @@ ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_move, none,
+      "expected expression after '_move'", ())
+ERROR(expected_expr_after_borrow, none,
+      "expected expression after '_borrow'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
