@@ -22,6 +22,7 @@
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -148,6 +149,10 @@ void Parser::performIDEInspectionSecondPassImpl(
   restoreParserPosition(getParserPosition(startLoc, prevLoc));
 
   DeclContext *DC = info.ParentContext;
+
+  // Forget about the fact that we may have already computed local
+  // discriminators.
+  Context.evaluator.clearCachedOutput(LocalDiscriminatorsRequest{DC});
 
   switch (info.Kind) {
   case IDEInspectionDelayedDeclKind::TopLevelCodeDecl: {

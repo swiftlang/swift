@@ -3004,8 +3004,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       }
     }
 
-    if (value->getDeclContext()->isLocalContext()) {
+    if (value->hasLocalDiscriminator()) {
       auto discriminator = value->getLocalDiscriminator();
+      assert(discriminator != ValueDecl::InvalidDiscriminator);
       auto abbrCode = S.DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                            discriminator);

@@ -34,7 +34,7 @@ switch p {
 // CHECK2REF: source.lang.swift.ref.var.local (16:42-16:43)
 
 // CHECKX: x
-// CHECKX: s:33cursor_vardecl_across_fallthrough1xL_Sivp
+// CHECKX: s:33cursor_vardecl_across_fallthrough1xL0_Sivp
 // CHECKX: Int
 
 
@@ -53,5 +53,5 @@ switch p {
 // CHECK4REF: source.lang.swift.ref.var.local (16:49-16:50)
 
 // CHECKY: y
-// CHECKY: s:33cursor_vardecl_across_fallthrough1yL_SSvp
+// CHECKY: s:33cursor_vardecl_across_fallthrough1yL0_SSvp
 // CHECKY: String

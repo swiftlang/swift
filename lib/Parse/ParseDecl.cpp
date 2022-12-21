@@ -4620,10 +4620,6 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (auto TD = dyn_cast<TypeDecl>(D))
     if (!InInactiveClauseEnvironment)
       SF.LocalTypeDecls.insert(TD);
-
-  const Identifier name = D->getBaseIdentifier();
-  unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
-  D->setLocalDiscriminator(discriminator);
 }
 
 void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {

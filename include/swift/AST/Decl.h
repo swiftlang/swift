@@ -2292,10 +2292,14 @@ private:
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
+public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+private:
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
-  unsigned LocalDiscriminator = 0;
+  unsigned LocalDiscriminator = InvalidDiscriminator;
 
   struct {
     /// Whether the "IsObjC" bit has been computed yet.
@@ -2581,6 +2585,12 @@ public:
   /// setters have discriminators.
   unsigned getLocalDiscriminator() const;
   void setLocalDiscriminator(unsigned index);
+
+  /// Whether this declaration has a local discriminator.
+  bool hasLocalDiscriminator() const;
+
+  /// Return the "raw" local discriminator, without computing it.
+  unsigned getRawLocalDiscriminator() const { return LocalDiscriminator; }
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
