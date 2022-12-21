@@ -6017,6 +6017,13 @@ bool ConstraintSystem::repairFailures(
                           getConstraintLocator(anchor, path));
   }
 
+  case ConstraintLocator::PackShape: {
+    auto *shapeLocator = getConstraintLocator(locator);
+    auto *fix = SkipSameShapeRequirement::create(*this, lhs, rhs, shapeLocator);
+    conversionsOrFixes.push_back(fix);
+    break;
+  }
+
   case ConstraintLocator::SequenceElementType: {
     if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
       recordAnyTypeVarAsPotentialHole(lhs);

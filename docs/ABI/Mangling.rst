@@ -655,6 +655,7 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
   
   type ::= pattern-type count-type 'Qp'      // pack expansion type
   type ::= pack-element-list 'QP'            // pack type
