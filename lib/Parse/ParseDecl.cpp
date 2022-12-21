@@ -4612,22 +4612,13 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   }
 }
 
-void Parser::setLocalDiscriminator(ValueDecl *D) {
+void Parser::recordLocalType(TypeDecl *TD) {
   // If we're not in a local context, this is unnecessary.
-  if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
+  if (!CurLocalContext || !TD->getDeclContext()->isLocalContext())
     return;
 
-  if (auto TD = dyn_cast<TypeDecl>(D))
-    if (!InInactiveClauseEnvironment)
-      SF.LocalTypeDecls.insert(TD);
-}
-
-void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
-  for (auto P : *PL) {
-    if (!P->hasName() || P->isImplicit())
-      continue;
-    setLocalDiscriminator(P);
-  }
+  if (!InInactiveClauseEnvironment)
+    SF.LocalTypeDecls.insert(TD);
 }
 
 /// Set the original declaration in `@differentiable` attributes.
@@ -5984,7 +5975,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
                                           genericParams, CurDeclContext);
-  setLocalDiscriminator(TAD);
+  recordLocalType(TAD);
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
@@ -7086,7 +7077,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
-      setLocalDiscriminator(VD);
       VD->setTopLevelGlobal(topLevelDecl);
 
       // Set original declaration in `@differentiable` attributes.
@@ -7426,7 +7416,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   }
 
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
-  setLocalDiscriminator(FD);
 
   if (Flags.contains(PD_InProtocol)) {
     if (Tok.is(tok::l_brace)) {
@@ -7448,7 +7437,6 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
 
   // Establish the new context.
   ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   if (auto *Stats = Context.Stats)
     ++Stats->getFrontendCounters().NumFunctionsParsed;
@@ -7656,7 +7644,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
-  setLocalDiscriminator(ED);
+  recordLocalType(ED);
   ED->getAttrs() = Attributes;
 
   ContextChange CC(*this, ED);
@@ -7928,7 +7916,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             { },
                                             GenericParams,
                                             CurDeclContext);
-  setLocalDiscriminator(SD);
+  recordLocalType(SD);
   SD->getAttrs() = Attributes;
 
   ContextChange CC(*this, SD);
@@ -8018,7 +8006,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext,
                                           isExplicitActorDecl);
-  setLocalDiscriminator(CD);
+  recordLocalType(CD);
   CD->getAttrs() = Attributes;
 
   // Parsed classes never have missing vtable entries.

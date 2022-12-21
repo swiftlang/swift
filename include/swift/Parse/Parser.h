@@ -990,8 +990,7 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void setLocalDiscriminator(ValueDecl *D);
-  void setLocalDiscriminatorToParamList(ParameterList *PL);
+  void recordLocalType(TypeDecl *TD);
 
   /// Skip an `#if` configuration block containing only attributes.
   ///

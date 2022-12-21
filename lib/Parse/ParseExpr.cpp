@@ -2036,7 +2036,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
 
@@ -2796,9 +2795,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
-  if (params) {
-    setLocalDiscriminatorToParamList(params);
-  } else {
+  if (!params) {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
