@@ -781,7 +781,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           DC, None,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
           [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);

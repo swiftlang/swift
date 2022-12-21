@@ -482,7 +482,8 @@ using HandlePlaceholderTypeReprFn =
 
 /// A function reference used to replace pack references with opened
 /// element archetypes when resolving a \c PackReferenceTypeRepr.
-using OpenPackElementFn = llvm::function_ref<Type(Type)>;
+using OpenPackElementFn =
+    llvm::function_ref<Type(Type, PackReferenceTypeRepr *)>;
 
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular

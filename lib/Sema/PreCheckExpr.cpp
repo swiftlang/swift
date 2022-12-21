@@ -400,6 +400,10 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
 }
 
 static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
+  // FIXME: The parser should create PackExpansionExprs directly, pack
+  // elements should be discovered via PackExpansionExpr::getExpandedPacks,
+  // and the generic environment should be created lazily when solving
+  // PackElementOf constraints.
   struct PackReferenceFinder : public ASTWalker {
     DeclContext *dc;
     llvm::SmallVector<PackElementExpr *, 2> packElements;

@@ -4288,7 +4288,7 @@ NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
   // Open the pack reference to an element archetype if requested.
   if (auto openPackElement = resolution.getPackElementOpener()) {
     auto *env = resolution.getGenericSignature().getGenericEnvironment();
-    return openPackElement(env->mapTypeIntoContext(packReference));
+    return openPackElement(env->mapTypeIntoContext(packReference), repr);
   }
 
   return packReference;

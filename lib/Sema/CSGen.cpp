@@ -3009,18 +3009,24 @@ namespace {
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      Type packType;
-      if (!expr->getPackElements().empty()) {
-        auto packReference = expr->getPackElements().front()->getPackRefExpr();
-        packType = CS.simplifyType(CS.getType(packReference));
-      } else {
-        // FIXME: The generic environment needs to be per-shape-class.
-        llvm::SmallVector<GenericEnvironment::PackElementBinding, 2> bindings;
-        elementEnv->getPackElementBindings(bindings);
-        packType = bindings.front().second;
+
+      // Generate ShapeOf constraints between all packs expanded by this
+      // pack expansion expression through the shape type variable.
+      SmallVector<ASTNode, 2> expandedPacks;
+      expr->getExpandedPacks(expandedPacks);
+      for (auto pack : expandedPacks) {
+        Type packType;
+        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
+          packType = CS.getType(elementExpr->getPackRefExpr());
+        } else if (auto *elementType = getAsTypeRepr<PackReferenceTypeRepr>(pack)) {
+          packType = CS.getType(elementType->getPackType());
+        } else {
+          llvm_unreachable("unsupported pack reference ASTNode");
+        }
+
+        CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
+                         CS.getConstraintLocator(expr));
       }
-      CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
-                       CS.getConstraintLocator(expr));
 
       return PackExpansionType::get(patternTy, shapeTypeVar);
     }
@@ -3032,7 +3038,7 @@ namespace {
       // of the pack reference.
       OpenPackElementType openPackElement(CS, CS.getConstraintLocator(expr),
                                           PackElementEnvironments.back());
-      return openPackElement(packType);
+      return openPackElement(packType, /*packRepr*/ nullptr);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {

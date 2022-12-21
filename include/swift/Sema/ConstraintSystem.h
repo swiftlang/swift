@@ -6130,7 +6130,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(Type packType) const {
+  Type operator()(Type packType, PackReferenceTypeRepr *packRepr) const {
     // Only assert we have an element environment when invoking the function
     // object. In cases where pack elements are referenced outside of a
     // pack expansion, type resolution will error before opening the pack
@@ -6140,6 +6140,14 @@ public:
     auto *elementType = cs.createTypeVariable(locator, TVO_CanBindToHole);
     auto elementLoc = cs.getConstraintLocator(locator,
         LocatorPathElt::OpenedPackElement(elementEnv));
+
+    // If we're opening a pack element from an explicit type repr,
+    // set the type repr types in the constraint system for generating
+    // ShapeOf constraints when visiting the PackExpansionExpr.
+    if (packRepr) {
+      cs.setType(packRepr->getPackType(), packType);
+      cs.setType(packRepr, elementType);
+    }
 
     cs.addConstraint(ConstraintKind::PackElementOf, elementType,
                      packType, elementLoc);
