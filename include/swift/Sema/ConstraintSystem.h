@@ -680,6 +680,13 @@ template <typename T = Decl> T *getAsDecl(ASTNode node) {
   return nullptr;
 }
 
+template <typename T = TypeRepr>
+T *getAsTypeRepr(ASTNode node) {
+  if (auto *type = node.dyn_cast<TypeRepr *>())
+    return dyn_cast_or_null<T>(type);
+  return nullptr;
+}
+
 template <typename T = Stmt>
 T *getAsStmt(ASTNode node) {
   if (auto *S = node.dyn_cast<Stmt *>())
