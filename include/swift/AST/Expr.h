@@ -3619,9 +3619,7 @@ public:
     return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
-  void setBinding(unsigned i, PackElementExpr *e) {
-    getMutableBindings()[i] = e;
-  }
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
 
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
