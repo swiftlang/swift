@@ -458,7 +458,8 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
              },
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
-             PlaceholderType::get)
+             PlaceholderType::get,
+             /*packElementOpener*/ nullptr)
       .resolveType(TyR, GenericParams);
 }
 

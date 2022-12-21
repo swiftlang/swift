@@ -3584,10 +3584,6 @@ class PackExpansionExpr final : public Expr,
     : Expr(ExprKind::PackExpansion, implicit, type),
       PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
     Bits.PackExpansionExpr.NumBindings = packElements.size();
-
-    assert(Bits.PackExpansionExpr.NumBindings > 0 &&
-           "PackExpansionExpr must have pack references");
-
     std::uninitialized_copy(packElements.begin(), packElements.end(),
                             getTrailingObjects<PackElementExpr *>());
   }
@@ -3623,9 +3619,7 @@ public:
     return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
-  void setBinding(unsigned i, PackElementExpr *e) {
-    getMutableBindings()[i] = e;
-  }
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
 
   GenericEnvironment *getGenericEnvironment() {
     return Environment;

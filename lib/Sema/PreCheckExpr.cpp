@@ -400,6 +400,10 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
 }
 
 static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
+  // FIXME: The parser should create PackExpansionExprs directly, pack
+  // elements should be discovered via PackExpansionExpr::getExpandedPacks,
+  // and the generic environment should be created lazily when solving
+  // PackElementOf constraints.
   struct PackReferenceFinder : public ASTWalker {
     DeclContext *dc;
     llvm::SmallVector<PackElementExpr *, 2> packElements;
@@ -408,13 +412,9 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
     PackReferenceFinder(DeclContext *dc)
       : dc(dc), environment(nullptr) {}
 
-    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto &ctx = dc->getASTContext();
-      auto *packElement = dyn_cast<PackElementExpr>(E);
-      if (!packElement)
-        return Action::Continue(E);
-
+    void createElementEnvironment() {
       if (!environment) {
+        auto &ctx = dc->getASTContext();
         auto sig = ctx.getOpenedElementSignature(
             dc->getGenericSignatureOfContext().getCanonicalSignature());
         auto *contextEnv = dc->getGenericEnvironmentOfContext();
@@ -423,15 +423,30 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
             GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
                                                  contextSubs);
       }
+    }
 
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *packElement = dyn_cast<PackElementExpr>(E);
+      if (!packElement)
+        return Action::Continue(E);
+
+      createElementEnvironment();
       packElements.push_back(packElement);
       return Action::Continue(packElement);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      if (isa<PackReferenceTypeRepr>(T)) {
+        createElementEnvironment();
+      }
+
+      return Action::Continue();
     }
   } packReferenceFinder(dc);
 
   auto *pattern = expr->walk(packReferenceFinder);
 
-  if (!packReferenceFinder.packElements.empty()) {
+  if (packReferenceFinder.environment != nullptr) {
     return PackExpansionExpr::create(dc->getASTContext(), pattern,
                                      packReferenceFinder.packElements,
                                      opLoc, packReferenceFinder.environment);
@@ -1450,7 +1465,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        PlaceholderType::get);
+        PlaceholderType::get,
+        // TypeExpr pack elements are opened in CSGen.
+        /*packElementOpener*/ nullptr);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -2203,7 +2220,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        PlaceholderType::get);
+        PlaceholderType::get,
+        // Pack elements for CoerceExprs are opened in CSGen.
+        /*packElementOpener*/ nullptr);
 
     if (result->hasError())
       return new (getASTContext())

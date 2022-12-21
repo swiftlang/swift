@@ -1031,7 +1031,8 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
                                         // Diagnose unbound generics and
                                         // placeholders.
                                         /*unboundTyOpener*/ nullptr,
-                                        /*placeholderHandler*/ nullptr)
+                                        /*placeholderHandler*/ nullptr,
+                                        /*packElementOpener*/ nullptr)
         .resolveType(defaultDefinition);
   }
 
@@ -1870,7 +1871,8 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   const auto result =
       TypeResolution::forInterface(typeAlias, options,
                                    /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
+                                   /*placeholderHandler*/ nullptr,
+                                   /*packElementOpener*/ nullptr)
           .resolveType(underlyingRepr);
 
   if (result->hasError()) {
@@ -2133,7 +2135,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get)
+                                      PlaceholderType::get,
+                                      /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
 
@@ -2270,7 +2273,8 @@ static Type validateParameterType(ParamDecl *decl) {
 
     const auto resolution =
         TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get);
+                                     PlaceholderType::get,
+                                     /*packElementOpener*/ nullptr);
     Ty = resolution.resolveType(patternRepr);
 
     // Find the first type parameter pack and use that as the count type.
@@ -2299,7 +2303,8 @@ static Type validateParameterType(ParamDecl *decl) {
 
     const auto resolution =
         TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get);
+                                     PlaceholderType::get,
+                                     /*packElementOpener*/ nullptr);
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
 
@@ -2912,7 +2917,8 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      PlaceholderType::get);
+      PlaceholderType::get,
+      /*packElementOpener*/ nullptr);
 
   const auto extendedType = resolution.resolveType(extendedRepr);
 
