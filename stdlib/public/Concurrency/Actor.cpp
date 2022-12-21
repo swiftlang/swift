@@ -853,7 +853,9 @@ public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
     this->isDistributedRemoteActor = isDistributedRemote;
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    new (&this->drainLock) Mutex();
+#else
    _status().store(ActiveActorStatus(), std::memory_order_relaxed);
 #endif
     SWIFT_TASK_DEBUG_LOG("Creating default actor %p", this);
