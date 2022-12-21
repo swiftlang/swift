@@ -36,6 +36,9 @@ enum class InitializerKind : uint8_t {
 
   /// A property wrapper initialization expression.
   PropertyWrapper,
+
+  /// A runtime discoverable attribute initialization expression.
+  RuntimeAttribute,
 };
 
 /// An Initializer is a kind of DeclContext used for expressions that
@@ -232,7 +235,36 @@ public:
     return I->getInitializerKind() == InitializerKind::PropertyWrapper;
   }
 };
-  
+
+/// A runtime discoverable attribute initialization expression context.
+///
+/// The parent context is context of the file/module this generator is
+/// synthesized in.
+class RuntimeAttributeInitializer : public Initializer {
+  CustomAttr *Attr;
+  ValueDecl *AttachedTo;
+
+public:
+  explicit RuntimeAttributeInitializer(CustomAttr *attr, ValueDecl *attachedTo)
+      : Initializer(InitializerKind::RuntimeAttribute,
+                    attachedTo->getDeclContext()->getModuleScopeContext()),
+        Attr(attr), AttachedTo(attachedTo) {}
+
+  CustomAttr *getAttr() const { return Attr; }
+
+  ValueDecl *getAttachedToDecl() const { return AttachedTo; }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto init = dyn_cast<Initializer>(DC))
+      return classof(init);
+    return false;
+  }
+
+  static bool classof(const Initializer *I) {
+    return I->getInitializerKind() == InitializerKind::RuntimeAttribute;
+  }
+};
+
 } // end namespace swift
 
 #endif

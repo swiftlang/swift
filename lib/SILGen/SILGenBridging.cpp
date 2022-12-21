@@ -1524,7 +1524,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
                                               ProfileCounter(),
                                               IsThunk,
                                               IsNotDynamic,
-                                              IsNotDistributed);
+                                              IsNotDistributed,
+                                              IsNotRuntimeAccessible);
   
   auto closureRef = B.createFunctionRef(loc, closure);
   

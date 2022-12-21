@@ -781,7 +781,8 @@ static SILFunction *createEmptyVJP(ADContext &context,
       context.getASTContext().getIdentifier(vjpName).str(), vjpType,
       vjpGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
-      original->isDistributed());
+      original->isDistributed(),
+      original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
@@ -823,7 +824,8 @@ static SILFunction *createEmptyJVP(ADContext &context,
       context.getASTContext().getIdentifier(jvpName).str(), jvpType,
       jvpGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
-      original->isDistributed());
+      original->isDistributed(),
+      original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
@@ -857,7 +859,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto *fatalErrorFn = fnBuilder.getOrCreateFunction(
       loc, fatalErrorFuncName, SILLinkage::PublicExternal, fatalErrorFnType,
       IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      IsNotDistributed, ProfileCounter(), IsNotThunk);
+      IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsNotThunk);
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
@@ -1017,6 +1019,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
       loc, newThunkName, getSpecializedLinkage(thunk, thunk->getLinkage()),
       thunkType, thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
       thunk->isDynamicallyReplaceable(), thunk->isDistributed(),
+      thunk->isRuntimeAccessible(),
       ProfileCounter(), thunk->isThunk());
   // If new thunk is newly created: clone the old thunk body, wrap the
   // returned function value with an `differentiable_function`

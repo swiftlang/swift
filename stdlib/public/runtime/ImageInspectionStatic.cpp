@@ -86,5 +86,14 @@ void swift::initializeAccessibleFunctionsLookup() {
     return;
   addImageAccessibleFunctionsBlockCallbackUnsafe(__dso_handle, start, size);
 }
+void swift::initializeRuntimeAttributesLookup() {
+  void *start;
+  uintptr_t size;
+  GET_SECTION_START_AND_SIZE(start, size, MachOTextSegment,
+                             MachORuntimeAttributesSection);
+  if (start == nullptr || size == 0)
+    return;
+  addImageRuntimeAttributesBlockCallbackUnsafe(__dso_handle, start, size);
+}
 
 #endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
