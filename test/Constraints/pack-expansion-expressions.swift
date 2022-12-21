@@ -63,3 +63,11 @@ func forEachEach<C..., U>(c: C..., function: (U) -> Void)
     where C: Collection, C.Element == U {
   _ = (each c).forEach(function)...
 }
+
+func typeReprPacks<T...>(_ t: T...) where T: ExpressibleByIntegerLiteral {
+  _ = Array<each T>()...
+  _ = (1 as each T)...
+
+  _ = Array<each T>() // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+  _ = 1 as each T // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+}

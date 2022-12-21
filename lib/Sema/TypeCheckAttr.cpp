@@ -3260,7 +3260,8 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
         // are not allowed within this
         // attribute.
         /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr);
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -3468,7 +3469,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
                                               TypeResolutionOptions(context),
                                               /*unboundTyOpener*/ nullptr,
-                                              /*placeholderHandler*/ nullptr);
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr);
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -3564,7 +3566,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
                                              // are not allowed within this
                                              // attribute.
                                              /*unboundTyOpener*/ nullptr,
-                                             /*placeholderHandler*/ nullptr)
+                                             /*placeholderHandler*/ nullptr,
+                                             /*packElementOpener*/ nullptr)
         .resolveType(typeRepr);
 
     if (type->is<ErrorType>()) {
@@ -5954,7 +5957,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     baseType = TypeResolution::resolveContextualType(
         baseTypeRepr, derivative->getDeclContext(), options,
         /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr);
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -6550,7 +6554,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     baseType = TypeResolution::resolveContextualType(
         attr->getBaseTypeRepr(), transpose->getDeclContext(), None,
         /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr);
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
   }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions

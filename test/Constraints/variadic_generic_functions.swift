@@ -27,15 +27,19 @@ func invalidPacks() {
 }
 
 func call() {
-  func multipleParameters<T...>(xs: T..., ys: T...) -> (T...) { return (_: xs) }
+  func multipleParameters<T...>(xs: T..., ys: T...) -> (T...) {
+    return ((each xs)...)
+  }
   multipleParameters()
 
   let x: (_: String) = multipleParameters(xs: "", ys: "")
   let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 
-  func multipleSequences<T..., U...>(xs: T..., ys: U...) -> (T...) { return (_: ys) }
-  // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
+  func multipleSequences<T..., U...>(xs: T..., ys: U...) -> (T...) {
+    return ((each ys)...)
+    // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
+  }
 
   multipleSequences()
   _ = multipleSequences(xs: "", ys: "")
