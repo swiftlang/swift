@@ -2485,7 +2485,7 @@ private:
   getIndentContextFrom(CaptureListExpr *CL,
                        SourceLoc ContextLoc = SourceLoc()) {
     AbstractClosureExpr *CE = CL->getClosureBody();
-    BraceStmt *BS = CE->getBody();
+    BraceStmt *BS = CE ? CE->getBody() : NULL;
     if (!CE || !BS)
       return None;
 
