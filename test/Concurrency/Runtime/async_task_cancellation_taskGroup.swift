@@ -7,6 +7,8 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 
+// REQUIRES: rdar103606995
+
 import Dispatch
 
 @available(SwiftStdlib 5.1, *)
