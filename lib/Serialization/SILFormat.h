@@ -294,6 +294,7 @@ namespace sil_block {
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class
                      BCFixed<1>,  // is distributed
+                     BCFixed<1>,  // is runtime accessible
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)

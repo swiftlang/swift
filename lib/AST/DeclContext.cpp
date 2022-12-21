@@ -728,6 +728,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       }
       break;
     }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto init = cast<RuntimeAttributeInitializer>(this);
+      auto *decl = init->getAttachedToDecl();
+
+      OS << "RuntimeAttribute attachedTo="
+         << init->getAttachedToDecl()->getName() << ", attribute=";
+      init->getAttr()->print(OS, decl);
+    }
     }
     break;
 

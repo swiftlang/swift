@@ -2271,6 +2271,9 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.noteSwiftAsyncFunctionDef();
   }
 
+  if (CurSILFn->isRuntimeAccessible())
+    IGM.addAccessibleFunction(CurSILFn);
+
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
