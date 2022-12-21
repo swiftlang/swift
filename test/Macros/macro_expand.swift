@@ -9,9 +9,9 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-macro customFileID: String = MacroDefinition.FileIDMacro
-macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
-macro fileID<T: _ExpressibleByStringLitera>: T = MacroDefinition.FileIDMacro
+@expression macro customFileID: String = MacroDefinition.FileIDMacro
+@expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+@expression macro fileID<T: _ExpressibleByStringLitera>: T = MacroDefinition.FileIDMacro
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
@@ -48,7 +48,7 @@ func testStringify(a: Int, b: Int) {
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
 
-macro addBlocker<T>(_ value: T) -> T = MacroDefinition.AddBlocker
+@expression macro addBlocker<T>(_ value: T) -> T = MacroDefinition.AddBlocker
 
 struct OnlyAdds {
   static func +(lhs: OnlyAdds, rhs: OnlyAdds) -> OnlyAdds { lhs }

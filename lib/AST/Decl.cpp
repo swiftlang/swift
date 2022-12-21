@@ -9670,6 +9670,13 @@ SourceRange MacroDecl::getSourceRange() const {
   return SourceRange(macroLoc, endLoc);
 }
 
+MacroContexts MacroDecl::getMacroContexts() const {
+  MacroContexts contexts = None;
+  if (getAttrs().hasAttribute<ExpressionAttr>())
+    contexts |= MacroContext::Expression;
+  return contexts;
+}
+
 SourceRange MacroExpansionDecl::getSourceRange() const {
   SourceLoc endLoc;
   if (ArgList)

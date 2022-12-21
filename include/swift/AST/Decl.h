@@ -8302,7 +8302,7 @@ public:
 enum class MacroContext: uint8_t {
   /// An expression macro, referenced explicitly via "#stringify" or similar
   /// in the source code.
-  Expression,
+  Expression = 0x01,
 };
 
 /// The contexts in which a particular macro declaration can be used.
