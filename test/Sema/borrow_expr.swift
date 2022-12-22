@@ -66,18 +66,18 @@ struct StructWithField {
 
 func testLetStructAccessField() {
     let t = StructWithField()
-    let _ = _borrow t.k  // expected-error {{'borrow' can only be applied to lvalues}}
+    let _ = _borrow t.k
 }
 
 func testVarStructAccessField() {
     var t = StructWithField()
     t = StructWithField()
-    let _ = _borrow t.k // expected-error {{'borrow' can only be applied to lvalues}}
+    let _ = _borrow t.k
 }
 
 func testLetClassAccessField() {
     let t = Klass()
-    let _ = _borrow t.k  // expected-error {{'borrow' can only be applied to lvalues}}
+    let _ = _borrow t.k
 }
 
 func testVarClassAccessField() {
