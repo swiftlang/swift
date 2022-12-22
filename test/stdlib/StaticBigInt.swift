@@ -32,6 +32,8 @@ final class StaticBigIntTests {
     let testSuite = TestSuite("StaticBigIntTests")
     testSuite.test("BinaryRepresentation",  testCase.testBinaryRepresentation)
     testSuite.test("TextualRepresentation", testCase.testTextualRepresentation)
+    testSuite.test("PrefixPlusTypeInference",  testCase.testPrefixPlusTypeInference)
+    testSuite.test("PrefixMinusTypeInference", testCase.testPrefixMinusTypeInference)
     testSuite.test("WrapperAssociatedType", testCase.testWrapperAssociatedType)
     runAllTests()
   }
