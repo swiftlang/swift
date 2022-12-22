@@ -109,7 +109,7 @@ extension StaticBigInt {
   ///     negative[1]        //-> 0xFFEEDDCCBBAA9988
   ///     negative[2]        //-> 0xFFFFFFFFFFFFFFFF
   ///
-  ///     let positive: StaticBigInt = +0x0011223344556677_8899AABBCCDDEEFF
+  ///     let positive: StaticBigInt =  0x0011223344556677_8899AABBCCDDEEFF
   ///     positive.signum()  //-> +1
   ///     positive.bitWidth  //-> 118
   ///     positive[0]        //-> 0x8899AABBCCDDEEFF
