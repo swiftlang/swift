@@ -127,6 +127,18 @@ SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated);
 
+typedef BridgedMemoryBehavior (* _Nonnull AliasAnalysisGetMemEffectFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2InstFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2ValFn)(
+      BridgedPassContext context, BridgedValue, BridgedValue);
+
+void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
+                            AliasAnalysisEscaping2InstFn isObjReleasedFn,
+                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValFn mayPointToSameAddrFn);
+
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
 BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
