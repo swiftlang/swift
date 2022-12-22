@@ -5035,7 +5035,7 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
                                         CalleeInfo &&calleeInfo) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
   auto authInfo =
-    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
+      PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
   auto fn = FunctionPointer::createSigned(FunctionPointer::Kind::Function,
                                           fnPtr, authInfo, sig);
