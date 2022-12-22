@@ -74,7 +74,8 @@ endif()
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
     ${swiftDarwin_common_options}
     TARGET_SDKS "${swiftDarwin_target_sdks}"
-    INSTALL_IN_COMPONENT sdk-overlay)
+    INSTALL_IN_COMPONENT sdk-overlay
+    MACCATALYST_BUILD_FLAVOR "zippered")
 
 set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")

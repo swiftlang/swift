@@ -49,4 +49,5 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   INSTALL_IN_COMPONENT stdlib
+  MACCATALYST_BUILD_FLAVOR "zippered"
 )
