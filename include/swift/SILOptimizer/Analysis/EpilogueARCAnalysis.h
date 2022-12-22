@@ -57,11 +57,10 @@ public:
   enum EpilogueARCKind { Retain = 0, Release = 1 };
 
 private:
+  SILPassManager *PM;
+
   /// Current post-order we are using.
   LazyFunctionInfo<PostOrderAnalysis, PostOrderFunctionInfo> PO;
-
-  /// Current alias analysis we are using.
-  AliasAnalysis *AA;
 
   /// Current rc-identity we are using.
   LazyFunctionInfo<RCIdentityAnalysis, RCIdentityFunctionInfo> RCFI;
@@ -130,9 +129,9 @@ private:
 
 public:
   /// Constructor.
-  EpilogueARCContext(SILFunction *F, PostOrderAnalysis *PO, AliasAnalysis *AA,
+  EpilogueARCContext(SILFunction *F, PostOrderAnalysis *PO, SILPassManager *PM,
                      RCIdentityAnalysis *RCIA)
-      : PO(F, PO), AA(AA), RCFI(F, RCIA) {}
+      : PM(PM), PO(F, PO), RCFI(F, RCIA) {}
 
   /// Run the data flow to find the epilogue retains or releases.
   bool run(EpilogueARCKind NewKind, SILValue NewArg) {
@@ -174,12 +173,13 @@ public:
   bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) { 
     // reference decrementing instruction prevents any retain to be identified as
     // epilogue retains.
-    if (mayDecrementRefCount(II, Ptr, AA))
+    auto *function = II->getFunction();
+    if (mayDecrementRefCount(II, Ptr, PM->getAnalysis<AliasAnalysis>(function)))
       return true;
     // Handle self-recursion. A self-recursion can be considered a +1 on the
     // current argument.
     if (auto *AI = dyn_cast<ApplyInst>(II))
-     if (AI->getCalleeFunction() == II->getParent()->getParent())
+     if (AI->getCalleeFunction() == function)
        return true;
     return false;
   } 
@@ -237,8 +237,8 @@ class EpilogueARCFunctionInfo {
 public:
   /// Constructor.
   EpilogueARCFunctionInfo(SILFunction *F, PostOrderAnalysis *PO,
-                          AliasAnalysis *AA, RCIdentityAnalysis *RC)
-      : Context(F, PO, AA, RC) {}
+                          SILPassManager *PM, RCIdentityAnalysis *RC)
+      : Context(F, PO, PM, RC) {}
 
   /// Find the epilogue ARC instruction based on the given \p Kind and given
   /// \p Arg.
