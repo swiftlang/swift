@@ -96,7 +96,7 @@ public:
     // Parsing populates the Objective-C method tables.
   }
 
-  Optional<ModuleDependencies>
+  Optional<ModuleDependencyInfo>
   getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
                         InterfaceSubContextDelegate &delegate) override;
 };

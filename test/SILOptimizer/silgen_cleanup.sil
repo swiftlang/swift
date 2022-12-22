@@ -362,3 +362,33 @@ bb9(%0 : @owned $Klass):
   destroy_value %0 : $Klass
   return %v : $Builtin.Int64
 }
+
+// debug_value must be preserved after splitting loads
+
+struct IntWrapper {
+  var _value : Int
+}
+
+sil_scope 5 { loc "./test.swift":3:6 parent @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 }
+sil_scope 6 { loc "./test.swift":3:10 parent 5 }
+
+// CHECK-LABEL: sil hidden [ossa] @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 {
+// CHECK: bb0(%0 : $*IntWrapper):
+// CHECKDEB:   [[A1:%.*]] = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
+// CHECKDEB:   [[A2:%.*]] = struct_element_addr [[A1]] : $*Int, #Int._value
+// CHECKDEB:   [[SPLIT:%.*]] = load [trivial] %2 : $*Builtin.Int32
+// CHECKDEB:   [[A3:%.*]] = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
+// CHECKDEB:   [[A4:%.*]] = begin_access [read] [unsafe] [no_nested_conflict] [[A3]] : $*Int
+// CHECKDEB:   [[OLD:%.*]] = load [trivial] [[A4]] : $*Int
+// CHECKDEB:   end_access [[A4]] : $*Int
+// CHECKDEB:   debug_value [[OLD]] : $Int, let, name "flag"
+// CHECKDEB:   return [[SPLIT]] : $Builtin.Int32
+// CHECK-LABEL: } // end sil function 'testSplitLoadDebug'
+sil hidden [ossa] @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 {
+bb0(%0: $*IntWrapper):
+  %1 = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
+  %2 = load [trivial] %1 : $*Int
+  debug_value %2 : $Int, let, name "flag", loc "./test.swift":4:7, scope 6
+  %4 = struct_extract %2 : $Int, #Int._value
+  return %4 : $Builtin.Int32
+}

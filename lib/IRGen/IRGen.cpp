@@ -1205,9 +1205,10 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 IRGenOptions &Opts) {
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
   auto targetMachine = irgen->createTargetMachine();
-  if (!targetMachine)
+  if (!targetMachine) {
+    delete irgen;
     return std::make_pair(nullptr, nullptr);
-
+  }
   // Create the IR emitter.
   IRGenModule *IGM = new IRGenModule(
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
@@ -1361,6 +1362,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitAccessibleFunctions();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
+      IGM.emitRuntimeDiscoverableAttributes(filesToEmit);
       irgen.emitEagerClassInitialization();
       irgen.emitObjCActorsNeedingSuperclassSwizzle();
       irgen.emitDynamicReplacements();

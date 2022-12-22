@@ -16,6 +16,14 @@ struct G<T...> {
   func caller() {
     callee()
   }
+
+  func makeTuple1() -> (T...).Type {
+    return (T...).self
+  }
+
+  func makeTuple2() -> ((Array<T>)...).Type {
+    return ((Array<T>)...).self
+  }
 }
 
 func blackHole<T>(_: T) {}
@@ -23,6 +31,6 @@ func blackHole<T>(_: T) {}
 blackHole(G< >.self)
 blackHole(G<Int, String>.self)
 
-func genericMetadata<T...>(_: T...) {
-  blackHole(G<T... >.self)
-}
+let g = G<Int, String, Float>()
+blackHole(g.makeTuple1())
+blackHole(g.makeTuple2())

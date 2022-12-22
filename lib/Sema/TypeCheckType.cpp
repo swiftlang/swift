@@ -64,32 +64,38 @@ using namespace swift;
 TypeResolution
 TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               OpenUnboundGenericTypeFn unboundTyOpener,
-                              HandlePlaceholderTypeReprFn placeholderHandler) {
+                              HandlePlaceholderTypeReprFn placeholderHandler,
+                              OpenPackElementFn packElementOpener) {
   return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler);
+                        unboundTyOpener, placeholderHandler,
+                        packElementOpener);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler) {
+                             HandlePlaceholderTypeReprFn placeholderHandler,
+                             OpenPackElementFn packElementOpener) {
   return forInterface(dc, dc->getGenericSignatureOfContext(), options,
-                      unboundTyOpener, placeholderHandler);
+                      unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
                              TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler) {
+                             HandlePlaceholderTypeReprFn placeholderHandler,
+                             OpenPackElementFn packElementOpener) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler);
+                        unboundTyOpener, placeholderHandler,
+                        packElementOpener);
   result.genericSig = genericSig;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
+  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler,
+                        packElementOpener);
   result.genericSig = genericSig;
   return result;
 }
@@ -2121,18 +2127,22 @@ Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, TypeResolutionOptions opts,
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener,
     GenericParamList *silParams) {
   return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
-                               opts, unboundTyOpener, placeholderHandler);
+                               opts, unboundTyOpener, placeholderHandler,
+                               packElementOpener);
 }
 
 Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener,
     GenericParamList *silParams) {
   const auto resolution = TypeResolution::forInterface(
-      dc, genericSig, opts, unboundTyOpener, placeholderHandler);
+      dc, genericSig, opts, unboundTyOpener, placeholderHandler,
+      packElementOpener);
   const auto ty = resolution.resolveType(TyR, silParams);
 
   return GenericEnvironment::mapTypeIntoContext(
@@ -2455,7 +2465,8 @@ TypeResolver::resolveOpenedExistentialArchetype(
   auto structuralResolution = TypeResolution::forStructural(
       dc, options,
       /*unboundTyOpener*/ nullptr,
-      /*placeholderHandler*/ nullptr);
+      /*placeholderHandler*/ nullptr,
+      /*packElementOpener*/ nullptr);
   TypeResolver interfaceTypeResolver(structuralResolution,
                                      ctx.getSelfGenericParamList(dc));
   auto interfaceType = interfaceTypeResolver.resolveType(repr, options);
@@ -3419,7 +3430,8 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       fieldResolution =
           TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler());
+                                       resolution.getPlaceholderHandler(),
+                                       resolution.getPackElementOpener());
     }
 
     TypeResolver fieldResolver{fieldResolution,
@@ -3505,7 +3517,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       functionResolution = TypeResolution::forInterface(
           getDeclContext(), componentTypeSig, options,
           resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler());
+          resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener());
     }
 
     TypeResolver silResolver{functionResolution, componentGenericParams};
@@ -3559,7 +3572,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       auto resolveSILParameters =
           TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler());
+                                       resolution.getPlaceholderHandler(),
+                                       resolution.getPackElementOpener());
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -4271,6 +4285,12 @@ NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
     return ErrorType::get(ctx);
   }
 
+  // Open the pack reference to an element archetype if requested.
+  if (auto openPackElement = resolution.getPackElementOpener()) {
+    auto *env = resolution.getGenericSignature().getGenericEnvironment();
+    return openPackElement(env->mapTypeIntoContext(packReference), repr);
+  }
+
   return packReference;
 }
 
@@ -4952,7 +4972,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper ||
-      typeKind == CustomAttrTypeKind::TypeWrapper) {
+      typeKind == CustomAttrTypeKind::TypeWrapper ||
+      typeKind == CustomAttrTypeKind::RuntimeMetadata) {
     unboundTyOpener = [](auto unboundTy) {
       // FIXME: Don't let unbound generic types
       // escape type resolution. For now, just
@@ -4963,7 +4984,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   const auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener,
-      /*placeholderHandler*/ nullptr);
+      /*placeholderHandler*/ nullptr, /*packElementOpener*/ nullptr);
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via

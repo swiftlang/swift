@@ -1428,9 +1428,6 @@ void PotentialBindings::infer(Constraint *constraint) {
       // Produce a potential binding to the opened element archetype corresponding
       // to the pack type.
       packType = packType->mapTypeOutOfContext();
-      if (auto *expansion = packType->getAs<PackExpansionType>())
-        packType = expansion->getPatternType();
-
       auto *elementEnv = openedElement->getGenericEnvironment();
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});

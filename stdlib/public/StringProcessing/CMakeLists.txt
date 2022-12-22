@@ -22,15 +22,15 @@ if(SWIFT_BUILD_STATIC_STDLIB)
 endif()
 
 file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift"
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.h"
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.c")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_StringProcessing/*.swift"
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_CUnicode/*.h"
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_CUnicode/*.c")
 set(STRING_PROCESSING_SOURCES)
 foreach(source ${_STRING_PROCESSING_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND STRING_PROCESSING_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for _StringProcessing (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for _StringProcessing (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${STRING_PROCESSING_SOURCES}"

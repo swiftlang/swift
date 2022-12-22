@@ -1259,6 +1259,41 @@ PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
                                        implicit, type);
 }
 
+void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
+  struct PackCollector : public ASTWalker {
+    llvm::SmallVector<ASTNode, 2> packs;
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionExpr>(E)) {
+        return Action::SkipChildren(E);
+      }
+
+      if (isa<PackElementExpr>(E)) {
+        packs.push_back(E);
+      }
+
+      return Action::Continue(E);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionTypeRepr>(T)) {
+        return Action::SkipChildren();
+      }
+
+      if (isa<PackReferenceTypeRepr>(T)) {
+        packs.push_back(T);
+      }
+
+      return Action::Continue();
+    }
+  } packCollector;
+
+  getPatternExpr()->walk(packCollector);
+  packs.append(packCollector.packs.begin(), packCollector.packs.end());
+}
+
 PackElementExpr *
 PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
                         bool implicit, Type type) {
@@ -1855,6 +1890,27 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
         preconcurrency());
   }
   }
+}
+
+unsigned AbstractClosureExpr::getDiscriminator() const {
+  auto raw = getRawDiscriminator();
+  if (raw != InvalidDiscriminator)
+    return raw;
+
+  evaluateOrDefault(
+      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+
+  // Ill-formed code might not be able to assign discriminators, so assign
+  // a new one now.
+  if (getRawDiscriminator() == InvalidDiscriminator &&
+      getASTContext().Diags.hadAnyError()) {
+    const_cast<AbstractClosureExpr *>(this)->
+        Bits.AbstractClosureExpr.Discriminator =
+          getASTContext().NextAutoClosureDiscriminator++;
+  }
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
 }
 
 void AbstractClosureExpr::setParameterList(ParameterList *P) {

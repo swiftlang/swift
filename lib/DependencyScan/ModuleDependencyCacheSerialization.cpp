@@ -36,14 +36,14 @@ class ModuleDependenciesCacheDeserializer {
   bool readSignature();
   bool enterGraphBlock();
   bool readMetadata();
-  bool readGraph(GlobalModuleDependenciesCache &cache);
+  bool readGraph(SwiftDependencyScanningService &cache);
 
   llvm::Optional<std::string> getIdentifier(unsigned n);
   llvm::Optional<std::vector<std::string>> getArray(unsigned n);
 
 public:
   ModuleDependenciesCacheDeserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
-  bool readInterModuleDependenciesCache(GlobalModuleDependenciesCache &cache);
+  bool readInterModuleDependenciesCache(SwiftDependencyScanningService &cache);
 };
 
 } // end namespace
@@ -146,7 +146,7 @@ bool ModuleDependenciesCacheDeserializer::readMetadata() {
 /// all of the file's identifiers and arrays of identifiers, followed by
 /// consuming individual module info records and registering them into the
 /// cache.
-bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCache &cache) {
+bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningService &cache) {
   using namespace graph_block;
 
   bool hasCurrentModule = false;
@@ -269,7 +269,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         extraPCMRefs.push_back(arg);
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftInterfaceModule(
+      auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(),
           optionalSwiftInterfaceFile.value(), *compiledModuleCandidates,
           buildCommandRefs, extraPCMRefs, *contextHash, isFramework);
@@ -338,7 +338,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         extraPCMRefs.push_back(arg);
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftSourceModule(extraPCMRefs);
+      auto moduleDep = ModuleDependencyInfo::forSwiftSourceModule(extraPCMRefs);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
@@ -402,7 +402,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad module source info path");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftBinaryModule(
+      auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           isFramework);
       // Add dependencies of this module
@@ -435,7 +435,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad module source info path");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forPlaceholderSwiftModuleStub(
+      auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
@@ -476,7 +476,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
         llvm::report_fatal_error("Bad captured PCM Args");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forClangModule(*pcmOutputPath,
+      auto moduleDep = ModuleDependencyInfo::forClangModule(*pcmOutputPath,
           *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies,
           *capturedPCMArgs);
 
@@ -499,7 +499,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(GlobalModuleDependenciesCach
 }
 
 bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
-    GlobalModuleDependenciesCache &cache) {
+    SwiftDependencyScanningService &cache) {
   using namespace graph_block;
 
   if (readSignature())
@@ -553,14 +553,14 @@ llvm::Optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::ge
 
 bool swift::dependencies::module_dependency_cache_serialization::
     readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                     GlobalModuleDependenciesCache &cache) {
+                                     SwiftDependencyScanningService &cache) {
   ModuleDependenciesCacheDeserializer deserializer(buffer.getMemBufferRef());
   return deserializer.readInterModuleDependenciesCache(cache);
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
     readInterModuleDependenciesCache(StringRef path,
-                                     GlobalModuleDependenciesCache &cache) {
+                                     SwiftDependencyScanningService &cache) {
   PrettyStackTraceStringAction stackTrace(
       "loading inter-module dependency graph", path);
   auto buffer = llvm::MemoryBuffer::getFile(path);
@@ -617,7 +617,7 @@ struct llvm::DenseMapInfo<ModuleIdentifierArrayKind> {
 namespace std {
 template <>
 struct hash<ModuleDependencyID> {
-  using UnderlyingKindType = std::underlying_type<ModuleDependenciesKind>::type;
+  using UnderlyingKindType = std::underlying_type<ModuleDependencyKind>::type;
   std::size_t operator()(const ModuleDependencyID &id) const {
     auto underlyingKindValue = static_cast<UnderlyingKindType>(id.second);
 
@@ -665,7 +665,7 @@ class ModuleDependenciesCacheSerializer {
     AbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
   }
 
-  void collectStringsAndArrays(const GlobalModuleDependenciesCache &cache);
+  void collectStringsAndArrays(const SwiftDependencyScanningService &cache);
 
   void emitBlockID(unsigned ID, StringRef name,
                    SmallVectorImpl<unsigned char> &nameBuffer);
@@ -682,14 +682,14 @@ class ModuleDependenciesCacheSerializer {
 
   void writeModuleInfo(ModuleDependencyID moduleID,
                        Optional<std::string> contextHash,
-                       const ModuleDependencies &dependencyInfo);
+                       const ModuleDependencyInfo &dependencyInfo);
 
 public:
   ModuleDependenciesCacheSerializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
 
 public:
   void
-  writeInterModuleDependenciesCache(const GlobalModuleDependenciesCache &cache);
+  writeInterModuleDependenciesCache(const SwiftDependencyScanningService &cache);
 };
 
 } // end namespace
@@ -772,7 +772,7 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
 
 void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID moduleID,
                                  Optional<std::string> contextHash,
-                                 const ModuleDependencies &dependencyInfo) {
+                                 const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;
 
@@ -782,7 +782,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
       getArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies));
 
   switch (dependencyInfo.getKind()) {
-  case swift::ModuleDependenciesKind::SwiftInterface: {
+  case swift::ModuleDependencyKind::SwiftInterface: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
@@ -810,7 +810,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
                  ModuleIdentifierArrayKind::BridgingModuleDependencies));
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftSource: {
+  case swift::ModuleDependencyKind::SwiftSource: {
     assert(!contextHash.has_value() &&
            "Did not expect context hash for serializing MODULE_NODE");
     auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
@@ -830,7 +830,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
                  ModuleIdentifierArrayKind::BridgingModuleDependencies));
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftBinary: {
+  case swift::ModuleDependencyKind::SwiftBinary: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
     assert(swiftBinDeps);
@@ -843,7 +843,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
 
     break;
   }
-  case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+  case swift::ModuleDependencyKind::SwiftPlaceholder: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
     assert(swiftPHDeps);
@@ -855,7 +855,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         getIdentifier(swiftPHDeps->sourceInfoPath));
     break;
   }
-  case swift::ModuleDependenciesKind::Clang: {
+  case swift::ModuleDependencyKind::Clang: {
     assert(contextHash.has_value() && "Expected context hash for serializing MODULE_NODE");
     auto clangDeps = dependencyInfo.getAsClangModule();
     assert(clangDeps);
@@ -943,9 +943,9 @@ unsigned ModuleDependenciesCacheSerializer::getArray(ModuleDependencyID moduleID
 }
 
 void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
-    const GlobalModuleDependenciesCache &cache) {
+    const SwiftDependencyScanningService &cache) {
   for (auto &moduleID : cache.getAllSourceModules()) {
-    assert(moduleID.second == ModuleDependenciesKind::SwiftSource &&
+    assert(moduleID.second == ModuleDependencyKind::SwiftSource &&
            "Expected source-based dependency");
     auto optionalDependencyInfo =
         cache.findSourceModuleDependency(moduleID.first);
@@ -986,7 +986,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
 
       // Add the dependency-kind-specific data
       switch (dependencyInfo->getKind()) {
-        case swift::ModuleDependenciesKind::SwiftInterface: {
+        case swift::ModuleDependencyKind::SwiftInterface: {
           auto swiftTextDeps = dependencyInfo->getAsSwiftInterfaceModule();
           assert(swiftTextDeps);
           addIdentifier(swiftTextDeps->moduleOutputPath);
@@ -1011,7 +1011,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                    swiftTextDeps->textualModuleDetails.bridgingModuleDependencies);
           break;
         }
-        case swift::ModuleDependenciesKind::SwiftBinary: {
+        case swift::ModuleDependencyKind::SwiftBinary: {
           auto swiftBinDeps = dependencyInfo->getAsSwiftBinaryModule();
           assert(swiftBinDeps);
           addIdentifier(swiftBinDeps->compiledModulePath);
@@ -1019,7 +1019,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
           addIdentifier(swiftBinDeps->sourceInfoPath);
           break;
         }
-        case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+        case swift::ModuleDependencyKind::SwiftPlaceholder: {
           auto swiftPHDeps = dependencyInfo->getAsPlaceholderDependencyModule();
           assert(swiftPHDeps);
           addIdentifier(swiftPHDeps->compiledModulePath);
@@ -1027,7 +1027,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
           addIdentifier(swiftPHDeps->sourceInfoPath);
           break;
         }
-        case swift::ModuleDependenciesKind::Clang: {
+        case swift::ModuleDependencyKind::Clang: {
           auto clangDeps = dependencyInfo->getAsClangModule();
           assert(clangDeps);
           addIdentifier(clangDeps->pcmOutputPath);
@@ -1049,7 +1049,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
 }
 
 void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
-    const GlobalModuleDependenciesCache &cache) {
+    const SwiftDependencyScanningService &cache) {
   // Write the header
   writeSignature();
   writeBlockInfoBlock();
@@ -1108,7 +1108,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
 void swift::dependencies::module_dependency_cache_serialization::
     writeInterModuleDependenciesCache(
         llvm::BitstreamWriter &Out,
-        const GlobalModuleDependenciesCache &cache) {
+        const SwiftDependencyScanningService &cache) {
   ModuleDependenciesCacheSerializer serializer{Out};
   serializer.writeInterModuleDependenciesCache(cache);
 }
@@ -1116,7 +1116,7 @@ void swift::dependencies::module_dependency_cache_serialization::
 bool swift::dependencies::module_dependency_cache_serialization::
     writeInterModuleDependenciesCache(
         DiagnosticEngine &diags, StringRef path,
-        const GlobalModuleDependenciesCache &cache) {
+        const SwiftDependencyScanningService &cache) {
   PrettyStackTraceStringAction stackTrace(
       "saving inter-module dependency graph", path);
   return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {

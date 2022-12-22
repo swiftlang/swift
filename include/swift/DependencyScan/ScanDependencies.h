@@ -27,13 +27,13 @@ namespace swift {
 class CompilerInvocation;
 class CompilerInstance;
 class ModuleDependenciesCache;
-class GlobalModuleDependenciesCache;
+class SwiftDependencyScanningService;
 
 namespace dependencies {
 
 using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::tuple<std::unique_ptr<CompilerInstance>,
-                               std::unique_ptr<GlobalModuleDependenciesCache>,
+                               std::unique_ptr<SwiftDependencyScanningService>,
                                std::unique_ptr<ModuleDependenciesCache>>>;
 
 struct BatchScanInput {

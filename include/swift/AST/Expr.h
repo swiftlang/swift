@@ -3584,10 +3584,6 @@ class PackExpansionExpr final : public Expr,
     : Expr(ExprKind::PackExpansion, implicit, type),
       PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
     Bits.PackExpansionExpr.NumBindings = packElements.size();
-
-    assert(Bits.PackExpansionExpr.NumBindings > 0 &&
-           "PackExpansionExpr must have pack references");
-
     std::uninitialized_copy(packElements.begin(), packElements.end(),
                             getTrailingObjects<PackElementExpr *>());
   }
@@ -3623,9 +3619,7 @@ public:
     return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
-  void setBinding(unsigned i, PackElementExpr *e) {
-    getMutableBindings()[i] = e;
-  }
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
 
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
@@ -3791,11 +3785,11 @@ class AbstractClosureExpr : public DeclContext, public Expr {
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
-                      unsigned Discriminator, DeclContext *Parent)
+                      DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
-    Bits.AbstractClosureExpr.Discriminator = Discriminator;
+    Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
   CaptureInfo getCaptureInfo() const { return Captures; }
@@ -3824,11 +3818,18 @@ public:
   /// optimization and therefore make it into e.g. stack traces.
   /// Having their symbol names be stable across minor code changes is
   /// therefore pretty useful for debugging.)
-  unsigned getDiscriminator() const {
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
     return Bits.AbstractClosureExpr.Discriminator;
   }
+
   void setDiscriminator(unsigned discriminator) {
-    assert(getDiscriminator() == InvalidDiscriminator);
+    assert(getRawDiscriminator() == InvalidDiscriminator);
     assert(discriminator != InvalidDiscriminator);
     Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
@@ -3987,9 +3988,9 @@ public:
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+              DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          discriminator, parent),
+                          parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
@@ -4185,10 +4186,9 @@ public:
     AsyncLet = 3,
   };
 
-  AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
-                  DeclContext *Parent)
+  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
-                            Discriminator, Parent) {
+                            Parent) {
     if (Body != nullptr)
       setBody(Body);
 

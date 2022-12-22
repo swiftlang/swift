@@ -681,6 +681,11 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   return true;
 }
 
+bool SameShapeExpansionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::expansion_expr_not_same_shape, lhs, rhs);
+  return true;
+}
+
 Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     ContextualTypePurpose context) {
   switch (context) {

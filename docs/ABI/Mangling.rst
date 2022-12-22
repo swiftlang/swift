@@ -149,6 +149,7 @@ Globals
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
   global ::= global 'HF'                 // accessible function runtime record
+  global ::= global 'Ha'                 // runtime discoverable attribute record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -346,6 +347,7 @@ Entities
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
+  entity-spec ::= 'fa'                       // runtime discoverable attribute generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fW'                       // property wrapper init from projected value
@@ -653,6 +655,7 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
   
   type ::= pattern-type count-type 'Qp'      // pack expansion type
   type ::= pack-element-list 'QP'            // pack type

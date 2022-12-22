@@ -351,6 +351,8 @@ NODE(SymbolicExtendedExistentialType)
 // Added in Swift 5.8
 NODE(MetatypeParamsRemoved)
 NODE(HasSymbolQuery)
+NODE(RuntimeDiscoverableAttributeRecord)
+CONTEXT_NODE(RuntimeAttributeGenerator)
 
 #undef CONTEXT_NODE
 #undef NODE

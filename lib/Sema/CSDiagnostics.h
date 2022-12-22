@@ -470,6 +470,17 @@ protected:
   }
 };
 
+class SameShapeExpansionFailure final : public FailureDiagnostic {
+  Type lhs, rhs;
+
+public:
+  SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to superclass generic requirements, e.g.
 /// ```swift
 /// class A {

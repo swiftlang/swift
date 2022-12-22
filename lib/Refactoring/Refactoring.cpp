@@ -661,8 +661,7 @@ private:
           assert(existingLoc->OldName == loc->OldName &&
                  existingLoc->NewName == loc->NewName &&
                  existingLoc->IsFunctionLike == loc->IsFunctionLike &&
-                 existingLoc->IsNonProtocolType ==
-                     existingLoc->IsNonProtocolType &&
+                 existingLoc->IsNonProtocolType == loc->IsNonProtocolType &&
                  "Asked to do a different rename for the same location?");
         }
       }

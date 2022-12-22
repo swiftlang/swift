@@ -4999,8 +4999,8 @@ bool ClassDecl::hasResilientMetadata() const {
     return false;
 
   // If the class is not public, we can't use it outside the module at all.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+  // Take enable testing into account.
+  if (getEffectiveAccess() < AccessLevel::Public)
     return false;
 
   // Otherwise we access metadata members, such as vtable entries, resiliently.
@@ -9692,4 +9692,20 @@ MacroDefinition MacroDefinition::forMissing(
   return MacroDefinition{
     Kind::Expression, ImplementationKind::Missing, def
   };
+}
+
+NominalTypeDecl *
+ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
+  auto &ctx = getASTContext();
+  auto *nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{attr, getDeclContext()}, nullptr);
+  assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
+  return nominal;
+}
+
+ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetRuntimeDiscoverableAttributes{mutableSelf},
+                           nullptr);
 }

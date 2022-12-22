@@ -575,6 +575,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::RuntimeAttributeGenerator:
       if (!fullSubstitutionMap)
         break;
 
@@ -1693,6 +1694,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
       case Node::Kind::HasSymbolQuery:
+      case Node::Kind::RuntimeDiscoverableAttributeRecord:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3574,6 +3576,22 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError
+Remangler::mangleRuntimeDiscoverableAttributeRecord(Node *node,
+                                                    unsigned depth) {
+  Buffer << "Ha";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleRuntimeAttributeGenerator(Node *node,
+                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  Buffer << "fa";
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  return mangleChildNode(node, 2, depth + 1);
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
@@ -3649,6 +3667,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::RuntimeAttributeGenerator:
     case Node::Kind::Getter:
     case Node::Kind::Setter:
     case Node::Kind::WillSet:
@@ -3694,6 +3713,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::RuntimeAttributeGenerator:
     case Node::Kind::Static:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;

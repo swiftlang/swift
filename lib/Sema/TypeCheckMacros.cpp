@@ -246,19 +246,6 @@ Expr *swift::expandMacroExpr(
   LocalContext tempContext{};
   parser.CurDeclContext = dc;
   parser.CurLocalContext = &tempContext;
-  {
-    DiscriminatorFinder finder;
-    expr->walk(finder);
-
-    unsigned closureDiscriminator;
-    if (finder.getFirstDiscriminator() ==
-          AbstractClosureExpr::InvalidDiscriminator)
-      closureDiscriminator = 0;
-    else
-      closureDiscriminator = finder.getFirstDiscriminator() + 1;
-
-    tempContext.overrideNextClosureDiscriminator(closureDiscriminator);
-  }
 
   auto parsedResult = parser.parseExpr(diag::expected_macro_expansion_expr);
   if (parsedResult.isParseError() || parsedResult.isNull()) {

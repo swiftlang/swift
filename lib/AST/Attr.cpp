@@ -941,6 +941,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Optimize:
   case DAK_Exclusivity:
   case DAK_NonSendable:
+  case DAK_ObjCImplementation:
     if (getKind() == DAK_Effects &&
         cast<EffectsAttr>(this)->getKind() == EffectsKind::Custom) {
       Printer.printAttrName("@_effects");

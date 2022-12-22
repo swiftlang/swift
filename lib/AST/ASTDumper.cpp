@@ -1388,7 +1388,13 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
       PrintWithColorRAII(os, DiscriminatorColor)
         << "autoclosure discriminator=";
     }
-    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getDiscriminator();
+
+    // If we aren't printing to standard error or the debugger output stream,
+    // this client expects to see the computed discriminator. Compute it now.
+    if (&os != &llvm::errs() && &os != &llvm::dbgs())
+      (void)ACE->getDiscriminator();
+
+    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
 
@@ -1414,6 +1420,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     case InitializerKind::PropertyWrapper:
       os << "property wrapper initializer";
       break;
+    case InitializerKind::RuntimeAttribute:
+      os << "runtime attribute initializer";
     }
     break;
 
@@ -2554,8 +2562,14 @@ public:
 
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
+
+    // If we aren't printing to standard error or the debugger output stream,
+    // this client expects to see the computed discriminator. Compute it now.
+    if (&OS != &llvm::errs() && &OS != &llvm::dbgs())
+      (void)E->getDiscriminator();
+
     PrintWithColorRAII(OS, DiscriminatorColor)
-      << " discriminator=" << E->getDiscriminator();
+      << " discriminator=" << E->getRawDiscriminator();
 
     switch (auto isolation = E->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
