@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -105,11 +105,19 @@ private:
 /// A dictionary literal value representation
 class DictionaryValue : public CompileTimeValue {
 public:
-  DictionaryValue() : CompileTimeValue(ValueKind::Dictionary) {}
+  DictionaryValue(std::vector<std::shared_ptr<CompileTimeValue>> elements)
+      : CompileTimeValue(ValueKind::Dictionary), elements(elements) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Dictionary;
   }
+
+  std::vector<std::shared_ptr<CompileTimeValue>> getElements() const {
+    return elements;
+  }
+
+private:
+  std::vector<std::shared_ptr<CompileTimeValue>> elements;
 };
 
 struct TupleElement {

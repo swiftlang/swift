@@ -123,8 +123,6 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
-    case ExprKind::Dictionary:
-
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
@@ -146,6 +144,16 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         elementValues.push_back(extractCompileTimeValue(elementExpr));
       }
       return std::make_shared<ArrayValue>(elementValues);
+    }
+
+    case ExprKind::Dictionary: {
+      auto dictionaryExpr = cast<DictionaryExpr>(expr);
+      std::vector<std::shared_ptr<CompileTimeValue>> elementValues;
+      for (unsigned n = dictionaryExpr->getNumElements(), i = 0; i != n; i++) {
+        auto elementExpr = dictionaryExpr->getElement(i);
+        elementValues.push_back(extractCompileTimeValue(elementExpr));
+      }
+      return std::make_shared<DictionaryValue>(elementValues);
     }
 
     case ExprKind::Tuple: {
@@ -383,6 +391,17 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Dictionary: {
     JSON.attribute("valueKind", "Dictionary");
+    JSON.attributeArray("value", [&] {
+      for (auto element : cast<DictionaryValue>(value)->getElements()) {
+        auto tupleElements = cast<TupleValue>(element.get())->getElements();
+        JSON.object([&] {
+          JSON.attributeObject(
+              "key", [&] { writeValue(JSON, tupleElements[0].Value); });
+          JSON.attributeObject(
+              "value", [&] { writeValue(JSON, tupleElements[1].Value); });
+        });
+      }
+    });
     break;
   }
 
