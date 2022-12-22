@@ -2706,6 +2706,10 @@ bool ValueDecl::hasLocalDiscriminator() const {
   if (isa<OpaqueTypeDecl>(this))
     return false;
 
+  // Accessors never have local discriminators.
+  if (isa<AccessorDecl>(this))
+    return false;
+
   // Implicit and unnamed declarations never have local discriminators.
   if (getBaseName().isSpecial())
     return false;
