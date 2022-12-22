@@ -6,6 +6,7 @@
 // REQUIRES: executable_test
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+// expected-note@-1{{'stringify' declared here}}
 @expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 @expression macro missingMacro2(_: Any) = MissingModule.MissingType
 
@@ -40,6 +41,11 @@ struct ZZZ {
 func test(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
+
+  _ = #stringify()
+  // expected-error@-1{{missing argument for parameter #1 in call}}
+  _ = #stringify(label: a + b)
+  // expected-error@-1{{extraneous argument label 'label:' in call}}
 }
 
 func shadow(a: Int, b: Int, stringify: Int) {

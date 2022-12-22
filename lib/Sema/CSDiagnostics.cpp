@@ -4753,7 +4753,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto anchor = getRawAnchor();
   if (!(isExpr<CallExpr>(anchor) || isExpr<SubscriptExpr>(anchor) ||
         isExpr<UnresolvedMemberExpr>(anchor) ||
-        isExpr<ObjectLiteralExpr>(anchor)))
+        isExpr<ObjectLiteralExpr>(anchor) ||
+        isExpr<MacroExpansionExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
@@ -5112,6 +5113,8 @@ MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
     return std::make_pair((Expr *)SE, SE->getArgs());
   } else if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
     return std::make_pair((Expr *)OLE, OLE->getArgs());
+  } else if (auto *ME = getAsExpr<MacroExpansionExpr>(anchor)) {
+    return std::make_pair((Expr *)ME, ME->getArgs());
   }
   return None;
 }
