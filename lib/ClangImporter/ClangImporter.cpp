@@ -4074,9 +4074,11 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
           if (auto func = dyn_cast_or_null<FuncDecl>(
                   importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
             if (auto synthesizedOperator =
-                    importer->getCXXSynthesizedOperatorFunc(func))
+                    importer->getCXXSynthesizedOperatorFunc(func)) {
               consumer.foundDecl(synthesizedOperator,
                                  DeclVisibilityKind::VisibleAtTopLevel);
+              declFound = true;
+            }
           }
         }
       }
