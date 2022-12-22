@@ -2731,8 +2731,6 @@ unsigned ValueDecl::getLocalDiscriminator() const {
   evaluateOrDefault(
       getASTContext().evaluator,
       LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
-  if (LocalDiscriminator == InvalidDiscriminator)
-    dump();
 
   assert(LocalDiscriminator != InvalidDiscriminator);
 
