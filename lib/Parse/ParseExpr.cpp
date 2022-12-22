@@ -512,7 +512,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
   // 'repeat' as an expression prefix is a pack expansion expression.
-  if (Tok.is(tok::kw_repeat)) {
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+      Tok.is(tok::kw_repeat)) {
     SourceLoc repeatLoc = consumeToken();
     auto patternExpr = parseExpr(Message);
     if (patternExpr.isNull())

@@ -66,7 +66,8 @@ bool Parser::isStartOfStmt() {
     // is a pack expansion expression.
     // FIXME: 'repeat' followed by '{' could be a pack expansion
     // with a closure pattern.
-    return peekToken().is(tok::l_brace);
+    return !Context.LangOpts.hasFeature(Feature::VariadicGenerics) ||
+           peekToken().is(tok::l_brace);
 
   case tok::pound_line:
     // #line at the start of a line is a directive, when within, it is an expr.
