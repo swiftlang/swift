@@ -2972,7 +2972,8 @@ ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
 
   // A tuple with a single, unlabeled element is just parentheses.
   if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-    if (elts.size() == 1 && elts[0].LabelLoc.isInvalid()) {
+    if (elts.size() == 1 && !isa<PackExpansionExpr>(elts[0].E) &&
+        elts[0].LabelLoc.isInvalid()) {
       return makeParserResult(
           status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
     }

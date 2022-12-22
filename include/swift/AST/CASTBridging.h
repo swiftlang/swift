@@ -239,7 +239,7 @@ void *ImplicitlyUnwrappedOptionalTypeRepr_create(void *ctx, void *base,
                                                  void *exclamationLoc);
 void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc);
 void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
-void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc);
+void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc);
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc);
 void *DeclRefTypeRepr_create(void *ctx, BridgedArrayRef bridgedComponents);

@@ -535,16 +535,28 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 ///
 ParserResult<TypeRepr> Parser::parseType(
     Diag<> MessageID, ParseTypeReason reason) {
+  // Parse pack expansion 'repeat T'
+  if (Tok.is(tok::kw_repeat)) {
+    SourceLoc repeatLoc = consumeToken(tok::kw_repeat);
+
+    auto ty = parseTypeScalar(MessageID, reason);
+    if (ty.isNull())
+      return ty;
+
+    return makeParserResult(ty,
+        new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
+  }
+
   auto ty = parseTypeScalar(MessageID, reason);
   if (ty.isNull())
     return ty;
 
-  // Parse pack expansion 'T...'.
+  // Parse vararg type 'T...'.
   if (Tok.isEllipsis()) {
     Tok.setKind(tok::ellipsis);
     SourceLoc ellipsisLoc = consumeToken();
     ty = makeParserResult(ty,
-        new (Context) PackExpansionTypeRepr(ty.get(), ellipsisLoc));
+        new (Context) VarargTypeRepr(ty.get(), ellipsisLoc));
   }
 
   return ty;
@@ -1400,6 +1412,9 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
+  // 'repeat' starts a pack expansion type.
+  consumeIf(tok::kw_repeat);
+
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 

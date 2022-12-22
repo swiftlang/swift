@@ -3053,6 +3053,9 @@ namespace {
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
 
+      if (PackElementEnvironments.empty())
+        return Type();
+
       // The type of a PackElementExpr is the opened pack element archetype
       // of the pack reference.
       OpenPackElementType openPackElement(CS, CS.getConstraintLocator(expr),

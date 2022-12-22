@@ -1774,6 +1774,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     SmallVector<TupleTypeReprElement, 4> Elts;
     unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
+      // Try to simplify the element, e.g. to fold PackExpansionExprs
+      // into TypeExprs.
+      if (auto simplified = simplifyTypeExpr(Elt))
+        Elt = simplified;
+
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
       if (!eltTE) return nullptr;
       TupleTypeReprElement elt;
@@ -1974,11 +1979,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(CompRepr);
   }
 
-  // Fold 'T...' into a pack expansion type when 'T' is a TypeExpr.
-  if (auto *operand = isPostfixEllipsisOperator(E)) {
-    if (auto *pattern = dyn_cast<TypeExpr>(operand)) {
-      auto *repr = new (Ctx) PackExpansionTypeRepr(pattern->getTypeRepr(),
-                                                   E->getLoc());
+  // Fold a pack expansion expr into a TypeExpr when the pattern is a TypeExpr.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    if (auto *pattern = dyn_cast<TypeExpr>(expansion->getPatternExpr())) {
+      auto *repr = new (Ctx) PackExpansionTypeRepr(expansion->getStartLoc(),
+                                                   pattern->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
     }
   }

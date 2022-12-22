@@ -693,6 +693,32 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
+/// A vararg type 'T...' with element type 'T'.
+class VarargTypeRepr final : public TypeRepr {
+  TypeRepr *Element;
+  SourceLoc EllipsisLoc;
+
+public:
+  VarargTypeRepr(TypeRepr *Element, SourceLoc EllipsisLoc)
+  : TypeRepr(TypeReprKind::Vararg), Element(Element),
+    EllipsisLoc(EllipsisLoc) {}
+
+  TypeRepr *getElementType() const { return Element; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Vararg;
+  }
+  static bool classof(const VarargTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Element->getEndLoc(); }
+  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
+  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A pack expansion 'T...' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
@@ -708,16 +734,16 @@ struct TupleTypeReprElement {
 /// In the third case, tuples cannot contain an old-style variadic element,
 /// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
+  SourceLoc RepeatLoc;
   TypeRepr *Pattern;
-  SourceLoc EllipsisLoc;
 
 public:
-  PackExpansionTypeRepr(TypeRepr *Pattern, SourceLoc EllipsisLoc)
-    : TypeRepr(TypeReprKind::PackExpansion), Pattern(Pattern),
-      EllipsisLoc(EllipsisLoc) {}
+  PackExpansionTypeRepr(SourceLoc RepeatLoc, TypeRepr *Pattern)
+    : TypeRepr(TypeReprKind::PackExpansion), RepeatLoc(RepeatLoc),
+      Pattern(Pattern) {}
 
+  SourceLoc getRepeatLoc() const { return RepeatLoc; }
   TypeRepr *getPatternType() const { return Pattern; }
-  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::PackExpansion;
@@ -725,9 +751,9 @@ public:
   static bool classof(const PackExpansionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
-  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  SourceLoc getStartLocImpl() const { return RepeatLoc; }
+  SourceLoc getEndLocImpl() const { return Pattern->getEndLoc(); }
+  SourceLoc getLocImpl() const { return RepeatLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1370,6 +1396,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::Vararg:
   case TypeReprKind::PackExpansion:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:

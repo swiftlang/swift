@@ -2032,6 +2032,8 @@ namespace {
     std::pair<Type, Type>
     maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
                                   TypeResolutionOptions options);
+    NeverNullType resolveVarargType(VarargTypeRepr *repr,
+                                    TypeResolutionOptions options);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
     NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
@@ -2162,7 +2164,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   if (options.is(TypeResolverContext::FunctionInput) &&
       !isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
-      !isa<DeclRefTypeRepr>(repr) &&
+      !isa<DeclRefTypeRepr>(repr) && !isa<PackExpansionTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options.setContext(None);
   }
@@ -2225,6 +2227,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     auto iuoRepr = cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr);
     return resolveImplicitlyUnwrappedOptionalType(iuoRepr, options, isDirect);
   }
+
+  case TypeReprKind::Vararg:
+    return resolveVarargType(cast<VarargTypeRepr>(repr), options);
 
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
@@ -3147,39 +3152,41 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     // Do we have an old-style variadic parameter?
     bool variadic = false;
 
-    // If the element is a variadic parameter, resolve the parameter type as if
-    // it were in non-parameter position, since we want functions to be
-    // @escaping in this case.
     if (auto *packExpansionTypeRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
-      if (ellipsisLoc) {
-        diagnose(packExpansionTypeRepr->getLoc(),
-                 diag::multiple_ellipsis_in_tuple)
-          .highlight(ellipsisLoc)
-          .fixItRemove(packExpansionTypeRepr->getEllipsisLoc());
-      }
-
-      ellipsisLoc = packExpansionTypeRepr->getEllipsisLoc();
-
-      // FIXME: Bona fide variadic pack expansions don't need this; we want
-      // the pattern type of (() -> ())... to be a non-escaping function
-      // type.
-      auto thisElementOptions = elementOptions.withoutContext();
-      thisElementOptions.setContext(TypeResolverContext::VariadicFunctionInput);
+      auto patternOptions = elementOptions;
+      patternOptions.setContext(TypeResolverContext::VariadicFunctionInput);
 
       auto pair = maybeResolvePackExpansionType(packExpansionTypeRepr,
-                                                thisElementOptions);
+                                                patternOptions);
       if (pair.first->hasError()) {
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
       }
 
-      if (pair.second) {
-        // We have a variadic pack expansion.
-        ty = PackExpansionType::get(pair.first, pair.second);
-      } else {
-        // We have an old-style variadic parameter.
-        ty = pair.first;
-        variadic = true;
+      // We have a pack expansion type.
+      ty = PackExpansionType::get(pair.first, pair.second);
+    } else if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+      if (ellipsisLoc) {
+        diagnose(varargTypeRepr->getLoc(),
+                 diag::multiple_ellipsis_in_tuple)
+          .highlight(ellipsisLoc)
+          .fixItRemove(varargTypeRepr->getEllipsisLoc());
+      }
+
+      ellipsisLoc = varargTypeRepr->getEllipsisLoc();
+
+      // If the element is a variadic parameter, resolve the parameter type as if
+      // it were in non-parameter position, since we want functions to be
+      // @escaping in this case.
+      auto thisElementOptions = elementOptions.withoutContext();
+      thisElementOptions.setContext(TypeResolverContext::VariadicFunctionInput);
+
+      // We have an old-style variadic parameter.
+      variadic = true;
+      ty = resolveType(varargTypeRepr, thisElementOptions);
+      if (ty->hasError()) {
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
       }
     } else {
       ty = resolveType(eltTypeRepr, elementOptions);
@@ -4199,6 +4206,20 @@ TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
   return std::make_pair(patternTy, rootParameterPacks[0]);
 }
 
+NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
+                                              TypeResolutionOptions options) {
+  auto element = resolveType(repr->getElementType(), options);
+
+  // Non-pack variadic parameters can only appear in variadic function
+  // parameter types.
+  if (options.getContext() != TypeResolverContext::VariadicFunctionInput) {
+    diagnose(repr->getLoc(), diag::vararg_not_allowed)
+      .highlight(repr->getSourceRange());
+  }
+
+  return element;
+}
+
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                                      TypeResolutionOptions options) {
   auto &ctx = getASTContext();
@@ -4215,12 +4236,7 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   }
 
   if (!pair.second) {
-    // Non-pack variadic parameters parse as PackExpansionTypeReprs. These
-    // can only appear in variadic function parameter types.
-    if (options.getContext() == TypeResolverContext::VariadicFunctionInput)
-      return pair.first;
-
-    // Otherwise, the pattern type must contain at least one pack reference.
+    // The pattern type must contain at least one pack reference.
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
     return ErrorType::get(ctx);
@@ -4772,6 +4788,7 @@ public:
     case TypeReprKind::Isolated:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
+    case TypeReprKind::Vararg:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackReference:
       return false;

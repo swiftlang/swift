@@ -2258,42 +2258,28 @@ static Type validateParameterType(ParamDecl *decl) {
     break;
   }
 
-  if (auto *packExpansionRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
     // If the element is a variadic parameter, resolve the parameter type as if
     // it were in non-parameter position, since we want functions to be
     // @escaping in this case.
     options.setContext(TypeResolverContext::VariadicFunctionInput);
     options |= TypeResolutionFlags::Direct;
-    options |= TypeResolutionFlags::AllowPackReferences;
-
-    // FIXME: This duplicates code found elsewhere
-    auto *patternRepr = packExpansionRepr->getPatternType();
 
     const auto resolution =
         TypeResolution::forInterface(dc, options, unboundTyOpener,
                                      PlaceholderType::get,
                                      /*packElementOpener*/ nullptr);
-    Ty = resolution.resolveType(patternRepr);
+    Ty = resolution.resolveType(nestedRepr);
 
-    // Find the first type parameter pack and use that as the count type.
-    SmallVector<Type, 2> rootParameterPacks;
-    Ty->getTypeParameterPacks(rootParameterPacks);
+    // Monovariadic types (T...) for <T> resolve to [T].
+    Ty = VariadicSequenceType::get(Ty);
 
-    // Handle the monovariadic/polyvariadic interface type split.
-    if (!rootParameterPacks.empty()) {
-      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty, rootParameterPacks[0]);
-    } else {
-      // Monovariadic types (T...) for <T> resolve to [T].
-      Ty = VariadicSequenceType::get(Ty);
-
-      // Set the old-style variadic bit.
-      decl->setVariadic();
-      if (!ctx.getArrayDecl()) {
-        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                           diag::sugar_type_not_found, 0);
-        return ErrorType::get(ctx);
-      }
+    // Set the old-style variadic bit.
+    decl->setVariadic();
+    if (!ctx.getArrayDecl()) {
+      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                         diag::sugar_type_not_found, 0);
+      return ErrorType::get(ctx);
     }
   } else {
     options.setContext(TypeResolverContext::FunctionInput);

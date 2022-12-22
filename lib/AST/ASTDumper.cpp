@@ -3168,6 +3168,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitVarargTypeRepr(VarargTypeRepr *T) {
+    printCommon("vararg") << '\n';
+    printRec(T->getElementType());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
     printCommon("pack_expansion") << '\n';
     printRec(T->getPatternType());
