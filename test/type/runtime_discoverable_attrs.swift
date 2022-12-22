@@ -172,3 +172,16 @@ extension AttrWithInitsInExts {
 @AttrWithInitsInExts
 struct TestAttrWithExts { // Ok
 }
+
+@runtimeMetadata
+struct FlagForMutating {
+  init<T, Result>(attachedTo: (inout T) -> Result) {}
+  init<T, Result>(attachedTo: (inout T, String, inout Int, (String, [Int])) -> Result) {}
+}
+
+struct TestMutatingMethods {
+  @FlagForMutating mutating func noArgs() -> Int { 42 } // Ok
+  @FlagForMutating mutating func yesArgs(_: String, x: inout Int, _ data: (String, [Int])) -> (q: String, a: Int) {
+    (q: "", a: 42)
+  }
+}
