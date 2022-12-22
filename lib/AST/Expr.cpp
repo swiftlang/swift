@@ -1250,10 +1250,10 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 }
 
 PackExpansionExpr *
-PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          SourceLoc dotsLoc, GenericEnvironment *environment,
+PackExpansionExpr::create(ASTContext &ctx, SourceLoc repeatLoc,
+                          Expr *patternExpr, GenericEnvironment *environment,
                           bool implicit, Type type) {
-  return new (ctx) PackExpansionExpr(patternExpr, dotsLoc, environment,
+  return new (ctx) PackExpansionExpr(repeatLoc, patternExpr, environment,
                                      implicit, type);
 }
 

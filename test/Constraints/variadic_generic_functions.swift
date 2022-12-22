@@ -28,7 +28,7 @@ func invalidPacks() {
 
 func call() {
   func multipleParameters<T...>(xs: T..., ys: T...) -> (T...) {
-    return ((each xs)...)
+    return (repeat each xs)
   }
   multipleParameters()
 
@@ -37,7 +37,7 @@ func call() {
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 
   func multipleSequences<T..., U...>(xs: T..., ys: U...) -> (T...) {
-    return ((each ys)...)
+    return (repeat each ys)
     // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
   }
 

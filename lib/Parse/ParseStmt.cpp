@@ -46,7 +46,6 @@ bool Parser::isStartOfStmt() {
   case tok::kw_guard:
   case tok::kw_while:
   case tok::kw_do:
-  case tok::kw_repeat:
   case tok::kw_for:
   case tok::kw_break:
   case tok::kw_continue:
@@ -61,6 +60,13 @@ bool Parser::isStartOfStmt() {
   case tok::pound_error:
   case tok::pound_sourceLocation:
     return true;
+
+  case tok::kw_repeat:
+    // 'repeat' followed by anything other than a brace stmt
+    // is a pack expansion expression.
+    // FIXME: 'repeat' followed by '{' could be a pack expansion
+    // with a closure pattern.
+    return peekToken().is(tok::l_brace);
 
   case tok::pound_line:
     // #line at the start of a line is a directive, when within, it is an expr.

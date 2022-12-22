@@ -3595,21 +3595,22 @@ public:
 /// call argument lists, the elements of a tuple value, and the source
 /// of a for-in loop.
 class PackExpansionExpr final : public Expr {
+  SourceLoc RepeatLoc;
   Expr *PatternExpr;
-  SourceLoc DotsLoc;
   GenericEnvironment *Environment;
 
-  PackExpansionExpr(Expr *patternExpr,
-                    SourceLoc dotsLoc,
+  PackExpansionExpr(SourceLoc repeatLoc,
+                    Expr *patternExpr,
                     GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
-      PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {}
+      RepeatLoc(repeatLoc), PatternExpr(patternExpr),
+      Environment(environment) {}
 
 public:
   static PackExpansionExpr *create(ASTContext &ctx,
+                                   SourceLoc repeatLoc,
                                    Expr *patternExpr,
-                                   SourceLoc dotsLoc,
                                    GenericEnvironment *environment,
                                    bool implicit = false,
                                    Type type = Type());
@@ -3626,12 +3627,16 @@ public:
     return Environment;
   }
 
+  void setGenericEnvironment(GenericEnvironment *env) {
+    Environment = env;
+  }
+
   SourceLoc getStartLoc() const {
-    return PatternExpr->getStartLoc();
+    return RepeatLoc;
   }
 
   SourceLoc getEndLoc() const {
-    return DotsLoc;
+    return PatternExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {

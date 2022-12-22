@@ -399,57 +399,19 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
   return nullptr;
 }
 
-static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
-  // FIXME: The parser should create PackExpansionExprs directly, pack
-  // elements should be discovered via PackExpansionExpr::getExpandedPacks,
-  // and the generic environment should be created lazily when solving
+static void
+setPackElementEnvironment(DeclContext *dc, PackExpansionExpr *expansion) {
+  // FIXME: The generic environment should be created lazily when solving
   // PackElementOf constraints.
-  struct PackReferenceFinder : public ASTWalker {
-    DeclContext *dc;
-    GenericEnvironment *environment;
-
-    PackReferenceFinder(DeclContext *dc)
-      : dc(dc), environment(nullptr) {}
-
-    void createElementEnvironment() {
-      if (!environment) {
-        auto &ctx = dc->getASTContext();
-        auto sig = ctx.getOpenedElementSignature(
-            dc->getGenericSignatureOfContext().getCanonicalSignature());
-        auto *contextEnv = dc->getGenericEnvironmentOfContext();
-        auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-        environment =
-            GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
-                                                 contextSubs);
-      }
-    }
-
-    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto *packElement = dyn_cast<PackElementExpr>(E);
-      if (!packElement)
-        return Action::Continue(E);
-
-      createElementEnvironment();
-      return Action::Continue(packElement);
-    }
-
-    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      if (isa<PackReferenceTypeRepr>(T)) {
-        createElementEnvironment();
-      }
-
-      return Action::Continue();
-    }
-  } packReferenceFinder(dc);
-
-  auto *pattern = expr->walk(packReferenceFinder);
-
-  if (packReferenceFinder.environment != nullptr) {
-    return PackExpansionExpr::create(dc->getASTContext(), pattern,
-                                     opLoc, packReferenceFinder.environment);
-  }
-
-  return nullptr;
+  auto &ctx = dc->getASTContext();
+  auto sig = ctx.getOpenedElementSignature(
+      dc->getGenericSignatureOfContext().getCanonicalSignature());
+  auto *contextEnv = dc->getGenericEnvironmentOfContext();
+  auto contextSubs = contextEnv->getForwardingSubstitutionMap();
+  auto *environment =
+      GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
+                                           contextSubs);
+  expansion->setGenericEnvironment(environment);
 }
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
@@ -1202,12 +1164,10 @@ namespace {
         return Action::Continue(result);
       }
 
-      // Rewrite postfix unary '...' expressions containing pack
-      // references to PackExpansionExpr.
-      if (auto *operand = isPostfixEllipsisOperator(expr)) {
-        if (auto *expansion = getPackExpansion(DC, operand, expr->getLoc())) {
-          return Action::Continue(expansion);
-        }
+      // Set the generic environment of a PackExpansionExpr.
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
+        setPackElementEnvironment(DC, expansion);
+        return Action::Continue(expansion);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.

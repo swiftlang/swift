@@ -511,6 +511,19 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // First check to see if we have the start of a regex literal `/.../`.
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
+  // 'repeat' as an expression prefix is a pack expansion expression.
+  if (Tok.is(tok::kw_repeat)) {
+    SourceLoc repeatLoc = consumeToken();
+    auto patternExpr = parseExpr(Message);
+    if (patternExpr.isNull())
+      return patternExpr;
+
+    auto *expansion =
+        PackExpansionExpr::create(Context, repeatLoc, patternExpr.get(),
+                                  /*genericEnv*/ nullptr);
+    return makeParserResult(expansion);
+  }
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.

@@ -3,44 +3,44 @@
 // REQUIRES: asserts
 
 func tuplify<T...>(_ t: T...) -> (T...) {
-  return ((each t)...)
+  return (repeat each t)
 }
 
 func prepend<First, Rest...>(value: First, to rest: Rest...) -> (First, Rest...) {
-  return (value, (each rest)...)
+  return (value, repeat each rest)
 }
 
 func concatenate<T..., U...>(_ first: T..., with second: U...) -> (T..., U...) {
-  return ((each first)..., (each second)...)
+  return (repeat each first, repeat each second)
 }
 
 func zip<T..., U...>(_ first: T..., with second: U...) -> ((T, U)...) {
-  return ((each first, each second)...)
+  return (repeat (each first, each second))
 }
 
 func forward<U...>(_ u: U...) -> (U...) {
-  return tuplify((each u)...)
+  return tuplify(repeat each u)
 }
 
 func forwardAndMap<U..., V...>(us u: U..., vs v: V...) -> ([(U, V)]...) {
-  return tuplify([(each u, each v)]...)
+  return tuplify(repeat [(each u, each v)])
 }
 
 func variadicMap<T..., Result...>(_ t: T..., transform: ((T) -> Result)...) -> (Result...) {
-  return ((each transform)(each t)...)
+  return (repeat (each transform)(each t))
 }
 
 func coerceExpansion<T...>(_ value: T...) {
   func promoteToOptional<Wrapped...>(_: Wrapped?...) {}
 
-  promoteToOptional((each value)...)
+  promoteToOptional(repeat each value)
 }
 
 func localValuePack<T...>(_ t: T...) -> (T..., T...) {
-  let local = (each t)...
-  let localAnnotated: T... = (each t)...
+  let local = repeat each t
+  let localAnnotated: T... = repeat each t
 
-  return ((each local)..., (each localAnnotated)...)
+  return (repeat each local, repeat each localAnnotated)
 }
 
 protocol P {
@@ -52,21 +52,21 @@ protocol P {
 }
 
 func outerArchetype<T..., U>(t: T..., u: U) where T: P {
-  let _: (T.A, U)... = ((each t).value, u)...
+  let _: (T.A, U)... = repeat ((each t).value, u)
 }
 
 func sameElement<T..., U>(t: T..., u: U) where T: P, T == U {
-  let _: T... = (each t).f(u)...
+  let _: T... = repeat (each t).f(u)
 }
 
 func forEachEach<C..., U>(c: C..., function: (U) -> Void)
     where C: Collection, C.Element == U {
-  _ = (each c).forEach(function)...
+  _ = repeat (each c).forEach(function)
 }
 
 func typeReprPacks<T...>(_ t: T...) where T: ExpressibleByIntegerLiteral {
-  _ = Array<each T>()...
-  _ = (1 as each T)...
+  _ = repeat Array<each T>()
+  _ = repeat 1 as each T
 
   _ = Array<each T>() // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
   _ = 1 as each T // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
