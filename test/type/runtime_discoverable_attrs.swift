@@ -185,3 +185,30 @@ struct TestMutatingMethods {
     (q: "", a: 42)
   }
 }
+
+@runtimeMetadata
+struct FlagForAsyncFuncs {
+  init<Act>(attachedTo: (Act) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int, inout [Int]) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int) async -> Void) {}
+  init(attachedTo: () async -> [String]) {}
+}
+
+actor TestActor {
+  @FlagForAsyncFuncs func asyncExternally() throws {
+  }
+
+  @FlagForAsyncFuncs func doSomething() async throws {
+  }
+
+  @FlagForAsyncFuncs nonisolated func doSomething(_: Int) async {
+  }
+
+  @FlagForAsyncFuncs func doSomething(_: Int, x: inout [Int]) async {
+  }
+}
+
+@FlagForAsyncFuncs
+func globalAsyncFn() async -> [String] {
+  return []
+}

@@ -14,9 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
@@ -170,8 +172,38 @@ static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
       }
     }
 
-    auto *call = CallExpr::createImplicit(
+    Expr *call = CallExpr::createImplicit(
         ctx, memberRef, ArgumentList::createImplicit(ctx, arguments));
+
+    bool isAsync = false;
+    bool isThrows = method->hasThrows();
+
+    switch (getActorIsolation(method)) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent: {
+      isAsync = method->hasAsync();
+      break;
+    }
+
+    case ActorIsolation::ActorInstance: {
+      isAsync = true;
+      isThrows |= nominal->isDistributedActor();
+      break;
+    }
+
+    case ActorIsolation::GlobalActor:
+      isAsync = true;
+      LLVM_FALLTHROUGH;
+    case ActorIsolation::GlobalActorUnsafe: {
+      break;
+    }
+    }
+
+    if (isAsync)
+      call = AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), call);
+
+    if (isThrows)
+      call = TryExpr::createImplicit(ctx, /*tryLoc=*/SourceLoc(), call);
 
     body.push_back(new (ctx) ReturnStmt(/*ReturnLoc=*/SourceLoc(), call,
                                         /*implicit=*/true));
@@ -282,6 +314,7 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     return nullptr;
 
   TypeChecker::contextualizeInitializer(initContext, result);
+  checkInitializerActorIsolation(initContext, result);
   TypeChecker::checkInitializerEffects(initContext, result);
 
   return result;
