@@ -27,7 +27,7 @@ extension AsyncSequence {
   ///     for await number in Counter(howHigh: 10).dropFirst(3) {
   ///         print(number, terminator: " ")
   ///     }
-  ///     // Prints "4 5 6 7 8 9 10"
+  ///     // Prints "4 5 6 7 8 9 10 "
   ///
   /// If the number of elements to drop exceeds the number of elements in the
   /// sequence, the result is an empty sequence.
