@@ -406,7 +406,6 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
   // PackElementOf constraints.
   struct PackReferenceFinder : public ASTWalker {
     DeclContext *dc;
-    llvm::SmallVector<PackElementExpr *, 2> packElements;
     GenericEnvironment *environment;
 
     PackReferenceFinder(DeclContext *dc)
@@ -431,7 +430,6 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
         return Action::Continue(E);
 
       createElementEnvironment();
-      packElements.push_back(packElement);
       return Action::Continue(packElement);
     }
 
@@ -448,7 +446,6 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
 
   if (packReferenceFinder.environment != nullptr) {
     return PackExpansionExpr::create(dc->getASTContext(), pattern,
-                                     packReferenceFinder.packElements,
                                      opLoc, packReferenceFinder.environment);
   }
 
