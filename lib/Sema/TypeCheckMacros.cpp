@@ -29,7 +29,6 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -129,12 +128,8 @@ Expr *swift::expandMacroExpr(
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
-  // FIXME: Introduce a more robust way to ensure that we can get the "exported"
-  // source file for a given context. If it's within a macro expansion, it
-  // may not have a C++ SourceFile, but will have a Syntax tree.
-  //
-  // FIXME^2: And find a better name for "exportedSourceFile".
-  auto sourceFile = dc->getParentSourceFile();
+  auto moduleDecl = dc->getParentModule();
+  auto sourceFile = moduleDecl->getSourceFileContainingLocation(expr->getLoc());
   if (!sourceFile)
     return nullptr;
 
@@ -225,7 +220,8 @@ Expr *swift::expandMacroExpr(
     *sourceFile->getBufferID(),
     expr->getSourceRange(),
     SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-    ASTNode(expr).getOpaqueValue()
+    ASTNode(expr).getOpaqueValue(),
+    dc
   };
   sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
   free((void*)evaluatedSource.data());
@@ -236,24 +232,22 @@ Expr *swift::expandMacroExpr(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
 
-  // Parse the expression.
-  Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr, nullptr);
-  parser.consumeTokenWithoutFeedingReceiver();
+  // Retrieve the parsed expression from the list of top-level items.
+  auto topLevelItems = macroSourceFile->getTopLevelItems();
+  Expr *expandedExpr = nullptr;
+  if (topLevelItems.size() == 1) {
+    expandedExpr = topLevelItems.front().dyn_cast<Expr *>();
+  }
 
-  // Set up a "local context" for parsing, so that we have a source of
-  // closure and local-variable discriminators.
-  parser.CurDeclContext = dc;
-
-  auto parsedResult = parser.parseExpr(diag::expected_macro_expansion_expr);
-  if (parsedResult.isParseError() || parsedResult.isNull()) {
-    // Tack on a note to say where we expanded the macro from?
+  if (!expandedExpr) {
+    ctx.Diags.diagnose(
+        macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
     return nullptr;
   }
 
   // Type-check the expanded expression.
   // FIXME: Would like to pass through type checking options like "discarded"
   // that are captured by TypeCheckExprOptions.
-  Expr *expandedExpr = parsedResult.get();
   constraints::ContextualTypeInfo contextualType {
     TypeLoc::withoutLoc(expandedType),
     // FIXME: Add a contextual type purpose for macro expansion.

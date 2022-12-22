@@ -49,6 +49,10 @@ struct Outer {
   var value: Int = 0
   func test() {
     _ = #stringify(1 + value)
+
+    _ = #stringify({ x in
+      x + 1
+    })
   }
 }
 
