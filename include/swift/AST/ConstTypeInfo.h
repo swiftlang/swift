@@ -102,24 +102,6 @@ private:
   std::vector<CompileTimeValue> Members;
 };
 
-/// A dictionary literal value representation
-class DictionaryValue : public CompileTimeValue {
-public:
-  DictionaryValue(std::vector<std::shared_ptr<CompileTimeValue>> elements)
-      : CompileTimeValue(ValueKind::Dictionary), elements(elements) {}
-
-  static bool classof(const CompileTimeValue *T) {
-    return T->getKind() == ValueKind::Dictionary;
-  }
-
-  std::vector<std::shared_ptr<CompileTimeValue>> getElements() const {
-    return elements;
-  }
-
-private:
-  std::vector<std::shared_ptr<CompileTimeValue>> elements;
-};
-
 struct TupleElement {
   Optional<std::string> Label;
   swift::Type Type;
@@ -157,6 +139,24 @@ public:
 
 private:
   std::vector<std::shared_ptr<CompileTimeValue>> Elements;
+};
+
+/// A dictionary literal value representation
+class DictionaryValue : public CompileTimeValue {
+public:
+  DictionaryValue(std::vector<std::shared_ptr<TupleValue>> elements)
+      : CompileTimeValue(ValueKind::Dictionary), Elements(elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Dictionary;
+  }
+
+  std::vector<std::shared_ptr<TupleValue>> getElements() const {
+    return Elements;
+  }
+
+private:
+  std::vector<std::shared_ptr<TupleValue>> Elements;
 };
 
 /// A representation of an arbitrary value that does not fall under
