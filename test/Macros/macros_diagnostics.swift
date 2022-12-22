@@ -3,6 +3,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar103606300
+
 macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
 macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 macro missingMacro2(_: Any) = MissingModule.MissingType
