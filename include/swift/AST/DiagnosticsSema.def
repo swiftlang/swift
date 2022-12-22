@@ -1271,15 +1271,18 @@ ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
       ())
 ERROR(extra_argument_labels,none,
-      "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
-      (bool, StringRef, bool))
+      "extraneous argument label%select{|s}0 '%1' in "
+      "%select{call|subscript|macro expansion}2",
+      (bool, StringRef, unsigned))
 ERROR(missing_argument_labels,none,
-      "missing argument label%select{|s}0 '%1' in %select{call|subscript}2",
-      (bool, StringRef, bool))
+      "missing argument label%select{|s}0 '%1' in "
+      "%select{call|subscript|macro expansion}2",
+      (bool, StringRef, unsigned))
 ERROR(wrong_argument_labels,none,
-      "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
+      "incorrect argument label%select{|s}0 in "
+      "%select{call|subscript|macro expansion}3 "
       "(have '%1', expected '%2')",
-      (bool, StringRef, StringRef, bool))
+      (bool, StringRef, StringRef, unsigned))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
@@ -1313,22 +1316,29 @@ ERROR(instance_member_in_default_parameter,none,
       "cannot use instance member %0 as a default parameter", (DeclNameRef))
 
 ERROR(missing_argument_named,none,
-      "missing argument for parameter %0 in call", (Identifier))
+      "missing argument for parameter %0 in "
+      "%select{call|subscript|macro expansion}1", (Identifier, unsigned))
 ERROR(missing_argument_positional,none,
-      "missing argument for parameter #%0 in call", (unsigned))
+      "missing argument for parameter #%0 in "
+      "%select{call|subscript|macro expansion}1", (unsigned, unsigned))
 ERROR(missing_arguments_in_call,none,
-      "missing arguments for parameters %0 in call", (StringRef))
+      "missing arguments for parameters %0 in "
+      "%select{call|subscript|macro expansion}1", (StringRef, unsigned))
 ERROR(extra_argument_named,none,
-      "extra argument %0 in call", (Identifier))
+      "extra argument %0 in %select{call|subscript|macro expansion}1",
+       (Identifier, unsigned))
 ERROR(extra_argument_positional,none,
-      "extra argument in call", ())
+      "extra argument in %select{call|subscript|macro expansion}0",
+      (unsigned))
 ERROR(extra_arguments_in_call,none,
       "extra %select{arguments|trailing closures}0 at positions %1 in call",
        (bool, StringRef))
 ERROR(extra_argument_to_nullary_call,none,
-      "argument passed to call that takes no arguments", ())
+      "argument passed to %select{call|subscript|macro expansion}0 "
+      "that takes no arguments", (unsigned))
 ERROR(extra_trailing_closure_in_call,none,
-      "extra trailing closure passed in call", ())
+      "extra trailing closure passed in "
+      "%select{call|subscript|macro expansion}0", (unsigned))
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))

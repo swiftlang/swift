@@ -38,14 +38,23 @@ struct ZZZ {
   // expected-error@-2{{macro 'm5' must declare its applicable contexts (e.g., '@expression')}}
 }
 
-func test(a: Int, b: Int) {
+@expression macro multiArgMacro(_: Any, second: Any) = MissingModule.MissingType
+// expected-note@-1{{'multiArgMacro(_:second:)' declared here}}
+func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
 
   _ = #stringify()
-  // expected-error@-1{{missing argument for parameter #1 in call}}
+  // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
   _ = #stringify(label: a + b)
-  // expected-error@-1{{extraneous argument label 'label:' in call}}
+  // expected-error@-1{{extraneous argument label 'label:' in macro expansion}}
+
+  _ = #multiArgMacro() // expected-error{{missing arguments for parameters #1, 'second' in macro expansion}}
+  _ = #multiArgMacro(1, 2) // expected-error{{missing argument label 'second:' in macro expansion}}{{25-25=second: }}
+
+  _ = #multiArgMacro(1, second: 2) { } // expected-error{{extra trailing closure passed in macro expansion}}
+  _ = #multiArgMacro(1, second: 2, 3) // expected-error{{extra argument in macro expansion}}
+  _ = #multiArgMacro(1, second: 2, third: 3) // expected-error{{extra argument 'third' in macro expansion}}
 }
 
 func shadow(a: Int, b: Int, stringify: Int) {
