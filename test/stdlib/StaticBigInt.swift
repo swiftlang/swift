@@ -147,6 +147,26 @@ extension StaticBigIntTests {
       self.actual = actual
     }
   }
+  
+  func testPrefixPlusTypeInference() {
+    let a: Int = 7
+    // An earlier version of StaticBigInt contained a prefix + operation,
+    // which caused b to be inferred to have type StaticBigInt rather than
+    // Int:
+    let b = +1
+    // and then this would fail to typecheck, because there's no
+    // Int + StaticBigInt operation.
+    let c = a + b
+  }
+  
+  func testPrefixMinusTypeInference() {
+    // This example shouldn't suffer from the same problem as above, because
+    // -1 is a literal, not a prefix operator followed by a literal.
+    // Nonetheless, let's test it.
+    let a: Int = 7
+    let b = -1
+    let c = a + b
+  }
 
   @available(SwiftStdlib 5.8, *)
   func testWrapperAssociatedType() {
