@@ -257,6 +257,10 @@ public:
       return GroupStatus{status - change};
     }
 
+    GroupStatus asCancelled(bool cancel) {
+      return GroupStatus{status | cancel ? cancelled : 0};
+    }
+
     /// Pretty prints the status, as follows:
     /// If accumulating results:
     ///     GroupStatus{ C:{cancelled} W:{waiting task} R:{ready tasks} P:{pending tasks} {binary repr} }
@@ -374,7 +378,6 @@ public:
       successType(T),
       discardResults(discardResults) {
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "init discardResults=%d", discardResults);
-    fprintf(stderr, "[%s:%d](%s) HELLO\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   }
 
   TaskGroupTaskStatusRecord *getTaskRecord() {
@@ -487,25 +490,24 @@ public:
       /*failure*/ std::memory_order_relaxed);
   }
 
-  bool statusCompletePendingReady(GroupStatus &old) {
-    return status.compare_exchange_strong(
-      old.status, old.completingPendingReady(this).status,
-      /*success*/ std::memory_order_relaxed,
-      /*failure*/ std::memory_order_relaxed);
-  }
+//  bool statusCompletePendingReady(GroupStatus &old) {
+//    return status.compare_exchange_strong(
+//      old.status, old.completingPendingReady(this).status,
+//      /*success*/ std::memory_order_relaxed,
+//      /*failure*/ std::memory_order_relaxed);
+//  }
 
   /// Decrement the pending status count.
   /// Returns the *assumed* new status, including the just performed -1.
-  GroupStatus statusCompletePendingAssumeRelease(const TaskGroupImpl *group) {
-    assert(group->isDiscardingResults()
+  GroupStatus statusCompletePendingAssumeRelease() {
+    assert(this->isDiscardingResults()
            && "only a discardResults TaskGroup may use completePending, "
               "since it avoids updating the ready count, which other groups need.");
     auto old = status.fetch_sub(GroupStatus::onePendingTask,
                                 std::memory_order_release);
-    assert(GroupStatus{old}.pendingTasks(group) > 0 && "attempted to decrement pending count when it was 0 already");
+    assert(GroupStatus{old}.pendingTasks(this) > 0 && "attempted to decrement pending count when it was 0 already");
     return GroupStatus{old - GroupStatus::onePendingTask};
   }
-
 
   /// Offer result of a task into this task group.
   ///
@@ -764,7 +766,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "ENTER offer, completedTask:%p , status:%s", completedTask, statusLoadRelaxed().to_string(this).c_str());
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p , status:%s", completedTask, statusLoadRelaxed().to_string(this).c_str());
 
   // The current ownership convention is that we are *not* given ownership
   // of a retain on completedTask; we're called from the task completion
@@ -809,7 +811,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
                                hadErrorResult, assumed.pendingTasks(this));
     if (!lastPendingTaskAndWaitingTask) {
       // we're not able to immediately complete a waitingTask with this task, so we may have to store it...
-      if (hadErrorResult) {
+      if (hadErrorResult && readyQueue.isEmpty()) {
         // a discardResults throwing task group must retain the FIRST error it encounters.
         SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, completedTask:%p", completedTask);
         enqueueCompletedTask(completedTask, /*hadErrorResult=*/hadErrorResult);
@@ -820,15 +822,22 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     // we must resume the task; but not otherwise. There cannot be any waiters on next()
     // while we're discarding results.
     if (lastPendingTaskAndWaitingTask) {
-      /// No need to maintain status????
       SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, offered last pending task, resume waiting task:%p",
                                  waitQueue.load(std::memory_order_relaxed));
       resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult);
     } else {
-      auto afterComplete = statusCompletePendingAssumeRelease(this);
+      auto afterComplete = statusCompletePendingAssumeRelease();
       SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, either more pending tasks, or no waiting task, status:%s",
                                  afterComplete.to_string(this).c_str());
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
+    }
+
+
+    // Discarding results mode, immediately treats a child failure as group cancellation.
+    // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
+    // such that the discarding group can exit as soon as possible.
+    if (hadErrorResult) {
+      cancelAll();
     }
 
     unlock();
@@ -955,8 +964,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_t
 __attribute__((noinline))
 SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_waitAllImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    TaskGroup *_group,
-    bool childFailureCancelsGroup,
+    TaskGroup *_group
     ThrowingTaskFutureWaitContinuationFunction resumeFunction,
     AsyncContext *callContext) {
   // Make sure we don't eliminate calls to this function.
@@ -1188,7 +1196,6 @@ SWIFT_CC(swiftasync)
 static void swift_taskGroup_waitAllImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
-    bool childFailureCancelsGroup,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
   auto waitingTask = swift_task_getCurrent();
@@ -1215,7 +1222,7 @@ static void swift_taskGroup_waitAllImpl(
       // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
       return workaround_function_swift_taskGroup_waitAllImpl(
-         resultPointer, callerContext, _group, childFailureCancelsGroup, resumeFunction, rawContext);
+         resultPointer, callerContext, _group, resumeFunction, rawContext);
 #else /* __ARM_ARCH_7K__ */
       return;
 #endif /* __ARM_ARCH_7K__ */

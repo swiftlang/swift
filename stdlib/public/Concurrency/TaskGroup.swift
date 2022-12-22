@@ -90,30 +90,6 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-@available(SwiftStdlib 5.8, *)
-@inlinable
-@_unsafeInheritExecutor
-public func withTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
-  returning returnType: GroupResult.Type = GroupResult.self,
-  discardResults: Bool,
-  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
-) async -> GroupResult {
-  let flags = taskGroupCreateFlags(
-    discardResults: discardResults
-  )
-
-  let _group = Builtin.createTaskGroupWithFlags(flags, ChildTaskResult.self)
-  var group = TaskGroup<ChildTaskResult>(group: _group)
-  defer { Builtin.destroyTaskGroup(_group) }
-
-  // Run the withTaskGroup body.
-  let result = await body(&group)
-
-  let _: ChildTaskResult? = try? await _taskGroupWaitAll(group: _group, childFailureCancelsGroup: discardResults) // try!-safe, cannot throw since this is a non throwing group
-  return result
-}
-
 /// Starts a new scope that can contain a dynamic number of throwing child tasks.
 ///
 /// A group waits for all of its child tasks
@@ -216,41 +192,6 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-@available(SwiftStdlib 5.8, *)
-@_unsafeInheritExecutor
-@inlinable
-public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
-  returning returnType: GroupResult.Type = GroupResult.self,
-  discardResults: Bool,
-  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
-) async throws -> GroupResult {
-  let flags = taskGroupCreateFlags(
-          discardResults: discardResults
-  )
-
-  let _group = Builtin.createTaskGroupWithFlags(flags, ChildTaskResult.self)
-  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
-  defer { Builtin.destroyTaskGroup(_group) }
-
-  let result: GroupResult
-  do {
-    // Run the withTaskGroup body.
-    result = try await body(&group)
-  } catch {
-    group.cancelAll()
-
-    await group.awaitAllRemainingTasks()
-
-    throw error
-  }
-
-  // FIXME: if one of them throws, cancel the group
-  try await group.awaitAllRemainingTasksThrowing(childFailureCancelsGroup: true)
-
-  return result
-}
-
 /// A group that contains dynamically created child tasks.
 ///
 /// To create a task group,
@@ -322,7 +263,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Adds a child task to the group, unless the group has been canceled.
   ///
   /// - Parameters:
-  ///   - overridingPriority: The priority of the operation task.
+  ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
@@ -484,17 +425,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// For example, because the `add(priority:operation:)` method is mutating,
   /// that method can't be called from a concurrent execution context like a child task.
   ///
-  /// ## Discarding results mode
-  /// A `TaskGroup` created in the `discardResults` mode, does not retain
-  /// completions of tasks it kicks off, and thus, is not able to return
-  /// any such results from this next method.
-  ///
-  /// Instead, a discarding results task group will always immediately return `nil`.
-  /// It is not possible to rely on awaiting a number of `next()` suspensions to complete,
-  /// in order to wait "for all remaining tasks to complete", and one must instead use
-  /// the dedicated `waitForAll` method, which returns once all pending tasks (added
-  /// to this group) have completed (regardless if those completions were successful, or not).
-  ///
   /// - Returns: The value returned by the next child task that completes.
   public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
@@ -505,18 +435,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Await all of the pending tasks added this group.
   @usableFromInline
   internal mutating func awaitAllRemainingTasks() async {
-    /// Since 5.8, we implement "wait for all pending tasks to complete"
-    /// in the runtime, in order to be able to handle the discard-results
-    /// implementation.
-    if #available(SwiftStdlib 5.8, *) {
-      if isDiscardingResults {
-        let _: ChildTaskResult? = try! await _taskGroupWaitAll(group: _group, childFailureCancelsGroup: isDiscardingResults) // try!-safe, cannot throw, not throwing group
-        return
-      }
-    }
-
-    // Old implementation just consumes the group as normal end-user code would.
-    // As it does not have to account for the `discardResults` mode.
     while let _ = await next() {}
   }
 
@@ -536,17 +454,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
-  }
-
-  /// A Boolean value that indicates whether the group has been created in `discardResults` mode.
-  ///
-  /// If true, the group will not be accumulating results and the `next()` method will always
-  /// return `nil` immediately.
-  ///
-  /// - SeeAlso: ``waitForAll`` which waits for all pending tasks to complete.
-  @available(SwiftStdlib 5.8, *)
-  public var isDiscardingResults: Bool {
-    _taskGroupIsDiscardingResults(group: _group) // TODO: test this
   }
 
   /// Cancel all of the remaining tasks in the group.
@@ -637,34 +544,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Await all the remaining tasks on this group.
   @usableFromInline
-  @available(*, deprecated, message: "Use `awaitAllRemainingTasksThrowing`, since 5.8 with discardResults draining may throw")
   internal mutating func awaitAllRemainingTasks() async {
-    while true {
-      do {
-        guard let _ = try await next() else {
-          return
-        }
-      } catch {}
-    }
-  }
-
-  /// Await all the remaining tasks on this group.
-  @available(SwiftStdlib 5.8, *)
-  @usableFromInline
-  internal mutating func awaitAllRemainingTasksThrowing(childFailureCancelsGroup: Bool) async throws {
-    /// Since 5.8, we implement "wait for all pending tasks to complete"
-    /// in the runtime, in order to be able to handle the discard-results
-    /// implementation.
-    if #available(SwiftStdlib 5.8, *) {
-      if isDiscardingResults {
-        let _: ChildTaskResult? = try await _taskGroupWaitAll(group: _group, childFailureCancelsGroup: childFailureCancelsGroup) // if any of the tasks throws, this will "rethrow" here
-        return
-      }
-    }
-
-    // Old implementation just consumes the group as normal end-user code would.
-    // As it does not have to account for the `discardResults` mode.
-    // The first error encountered while draining tasks is rethrown.
     while true {
       do {
         guard let _ = try await next() else {
@@ -676,7 +556,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @usableFromInline
   internal mutating func _waitForAll() async throws {
-    try await self.awaitAllRemainingTasks()
+    await self.awaitAllRemainingTasks()
   }
 
   /// Wait for all of the group's remaining tasks to complete.
@@ -684,11 +564,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: only during
   @_alwaysEmitIntoClient
   public mutating func waitForAll() async throws {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-      try await self.awaitAllRemainingTasksThrowing(childFailureCancelsGroup: false)
-    } else {
-      await self.awaitAllRemainingTasks()
-    }
+    await self.awaitAllRemainingTasks()
   }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -968,18 +844,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _taskGroupIsEmpty(_group)
   }
 
-  /// A Boolean value that indicates whether the group has been created in `discardResults` mode.
-  ///
-  /// If true, the group will not be accumulating results and the `next()` method will always
-  /// return `nil` immediately.
-  ///
-  /// - SeeAlso: ``waitForAll`` which waits for all pending tasks to complete.
-  @available(SwiftStdlib 5.8, *)
-  public var isDiscardingResults: Bool {
-    _taskGroupIsDiscardingResults(group: _group) // TODO: test this
-  }
-
-
   /// Cancel all of the remaining tasks in the group.
   ///
   /// After cancellation,
@@ -1184,7 +1048,8 @@ extension ThrowingTaskGroup: AsyncSequence {
   }
 }
 
-/// ==== -----------------------------------------------------------------------
+// ==== -----------------------------------------------------------------------
+// MARK: Runtime functions
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_destroy")
@@ -1215,17 +1080,6 @@ func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
 func _taskHasTaskGroupStatusRecord() -> Bool
-
-/// Always returns `nil`.
-@available(SwiftStdlib 5.8, *)
-@usableFromInline
-@discardableResult
-@_silgen_name("swift_taskGroup_waitAll")
-func _taskGroupWaitAll<T>(group: Builtin.RawPointer, childFailureCancelsGroup: Bool) async throws -> T?
-
-@available(SwiftStdlib 5.8, *)
-@_silgen_name("swift_taskGroup_isDiscardingResults")
-func _taskGroupIsDiscardingResults(group: Builtin.RawPointer) -> Bool
 
 @available(SwiftStdlib 5.1, *)
 enum PollStatus: Int {

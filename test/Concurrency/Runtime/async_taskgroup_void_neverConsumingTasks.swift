@@ -46,7 +46,7 @@ func test_taskGroup_void_neverConsume() async {
   let waiter = Waiter(until: until)
 
   print("Start tasks: \(until)")
-  let allTasks = await withTaskGroup(of: Void.self, discardResults: true) { group in
+  let allTasks = await withDiscardingTaskGroup() { group in
     for n in 1...until {
     fputs("> enqueue: \(n)\n", stderr);
       group.addTask {
@@ -55,9 +55,6 @@ func test_taskGroup_void_neverConsume() async {
         await waiter.increment()
       }
     }
-
-    let none: Void? = await group.next()
-    precondition(none == nil, "discardResults group must always return `nil` from next()")
 
     return until
   }
@@ -72,7 +69,7 @@ func test_taskGroup_void_neverConsume(sleepBeforeGroupWaitAll: Duration) async {
   let waiter = Waiter(until: until)
 
   print("Start tasks: \(until)")
-  let allTasks = await withTaskGroup(of: Void.self, discardResults: true) { group in
+  let allTasks = await withDiscardingTaskGroup() { group in
     for n in 1...until {
     fputs("> enqueue: \(n)\n", stderr);
       group.addTask {
@@ -81,9 +78,6 @@ func test_taskGroup_void_neverConsume(sleepBeforeGroupWaitAll: Duration) async {
         await waiter.increment()
       }
     }
-
-    let none: Void? = await group.next()
-    precondition(none == nil, "discardResults group must always return `nil` from next()")
 
     // wait a little bit, so some tasks complete before we hit the implicit "wait at end of task group scope"
     try? await Task.sleep(until: .now + sleepBeforeGroupWaitAll, clock: .continuous)
