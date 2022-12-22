@@ -2,6 +2,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
 // RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
+// REQUIRES: swift_in_compiler
+
 import Builtin
 import Swift
 
@@ -935,6 +937,13 @@ bb0(%0 : @owned $Node, %1 : $*Queue):
   return %6 : $()
 }
 
+sil [ossa] @destroyNode : $@convention(thin) (@owned Node, @inout Queue) -> () {
+bb0(%0 : @owned $Node, %1 : $*Queue):
+  destroy_value %0 : $Node
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // When analyzing this function for retain code motion,
 // AliasAnalysis::canApplyDecrementRefCount will query
 // EscapeAnalysis::mayReleaseContent, passing it an inout pointer for
@@ -1007,9 +1016,9 @@ sil @testMayReleaseUniqNoSink : $@convention(thin) () -> () {
 bb0:
   %queue = alloc_stack $Queue
   %extraNode = alloc_ref $Node
-  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %destroy = function_ref @destroyNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
   strong_retain %extraNode : $Node
-  %call = apply %set(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %call = apply %destroy(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
   dealloc_stack %queue : $*Queue
   %12 = tuple ()
   return %12 : $()
@@ -1019,8 +1028,8 @@ bb0:
 // there's no connection.
 //
 // CHECK-LABEL: sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
-// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
-// CHECK: strong_retain
+// CHECK-NOT-SUPPORTED-YET: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-NOT-SUPPORTED-YET: strong_retain
 // CHECK-LABEL: } // end sil function 'testMayReleaseUniqSink'
 sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
 bb0:

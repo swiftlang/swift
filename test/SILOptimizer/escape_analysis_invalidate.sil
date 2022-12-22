@@ -1,5 +1,7 @@
-// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all -escapes-internal-verify -wmo | %FileCheck %s
-//
+// RUN: %target-sil-opt %s -compute-escape-effects -compute-side-effects -temp-rvalue-opt -enable-sil-verify-all -wmo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
 // TempRValue iteratively uses EscapeAnalysis and deletes
 // instructions. Make sure that the connection graph remains valid
 // <rdar://57290845>.

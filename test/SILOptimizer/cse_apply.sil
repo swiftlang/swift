@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -compute-side-effects -cse | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -72,7 +74,7 @@ class XX {
 
 sil_global @ggs : $Storage
 
-sil @retain_only : $@convention(thin) () -> XX {
+sil @retain_only : $@convention(thin) () -> @owned XX {
 bb0:
   %g = global_addr @ggs : $*Storage
   %a = address_to_pointer %g : $*Storage to $Builtin.RawPointer
@@ -130,9 +132,9 @@ bb0(%0 : $Int64):
 //CHECK: return
 sil @dont_cse_retain_only_apply : $@convention(thin) () -> () {
 bb0:
-  %f = function_ref @retain_only : $@convention(thin) () -> XX
-  %a1 = apply %f() : $@convention(thin) () -> XX
-  %a2 = apply %f() : $@convention(thin) () -> XX
+  %f = function_ref @retain_only : $@convention(thin) () -> @owned XX
+  %a1 = apply %f() : $@convention(thin) () -> @owned XX
+  %a2 = apply %f() : $@convention(thin) () -> @owned XX
   strong_release %a1 : $XX
   strong_release %a2 : $XX
   %r = tuple()

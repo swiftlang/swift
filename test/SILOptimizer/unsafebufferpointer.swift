@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -Osize -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for UnsafeBufferPointer.
@@ -14,9 +15,9 @@ public func testIteration(_ p: UnsafeBufferPointer<Int>) -> Int {
 // Check for an optimal loop kernel
 // CHECK:       phi
 // CHECK-NEXT:  phi
+// CHECK-NEXT:  getelementptr
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  load
-// CHECK-NEXT:  getelementptr
 // CHECK-NEXT:  add
 // CHECK-NEXT:  icmp
 // CHECK-NEXT:  br

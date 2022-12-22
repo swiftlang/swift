@@ -179,8 +179,7 @@ void EpilogueARCAnalysis::initialize(SILPassManager *PM) {
 
 std::unique_ptr<EpilogueARCFunctionInfo>
 EpilogueARCAnalysis::newFunctionAnalysis(SILFunction *F) {
-  return std::make_unique<EpilogueARCFunctionInfo>(F, PO,
-    passManager->getAnalysis<AliasAnalysis>(F), RC);
+  return std::make_unique<EpilogueARCFunctionInfo>(F, PO, passManager, RC);
 }
 
 SILAnalysis *swift::createEpilogueARCAnalysis(SILModule *M) {
