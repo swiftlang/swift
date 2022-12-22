@@ -2702,6 +2702,10 @@ bool ValueDecl::hasLocalDiscriminator() const {
       (isa<ParamDecl>(this) && !hasName()))
     return false;
 
+  // Opaque types never have local discriminators.
+  if (isa<OpaqueTypeDecl>(this))
+    return false;
+
   // Implicit and unnamed declarations never have local discriminators.
   if (getBaseName().isSpecial())
     return false;
