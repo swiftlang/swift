@@ -151,7 +151,9 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       std::vector<std::shared_ptr<TupleValue>> tuples;
       for (auto elementExpr : dictionaryExpr->getElements()) {
         auto elementValue = extractCompileTimeValue(elementExpr);
-        tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
+        if (isa<TupleValue>(elementValue.get())) {
+          tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
+        }
       }
       return std::make_shared<DictionaryValue>(tuples);
     }
