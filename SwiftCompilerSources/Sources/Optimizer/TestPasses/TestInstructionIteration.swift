@@ -55,11 +55,11 @@ private func handle(instruction: Instruction, _ context: PassContext) {
   if let sl = instruction as? StringLiteralInst {
     switch sl.string {
       case "delete_strings":
-        deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.parentBlock, context)
       case "delete_ints":
-        deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.parentBlock, context)
       case "delete_branches":
-        deleteAllInstructions(ofType: BranchInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
       case "split_block":
         _ = context.splitBlock(at: instruction)
       default:

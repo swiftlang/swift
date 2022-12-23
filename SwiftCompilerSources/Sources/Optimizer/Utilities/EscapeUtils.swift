@@ -734,7 +734,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is AllocBoxInst:
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
     case let arg as BlockArgument:
-      let block = arg.block
+      let block = arg.parentBlock
       switch block.singlePredecessor!.terminator {
       case let ta as TryApplyInst:
         if block != ta.normalBlock { return isEscaping }

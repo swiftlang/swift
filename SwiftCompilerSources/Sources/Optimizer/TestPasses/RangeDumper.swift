@@ -88,7 +88,7 @@ private func verify(_ blockRange: BasicBlockRange, _ context: PassContext) {
     inInclusiveRange.insert(b)
   }
 
-  for b in blockRange.begin.function.blocks {
+  for b in blockRange.begin.parentFunction.blocks {
     assert(blockRange.contains(b) == inRange.contains(b))
     assert(blockRange.inclusiveRangeContains(b) == inInclusiveRange.contains(b))
   }

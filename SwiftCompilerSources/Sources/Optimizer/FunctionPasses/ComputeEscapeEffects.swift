@@ -144,7 +144,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   }
   
   // If the function never returns, the argument can not escape to another arg/return.
-  guard let returnInst = arg.function.returnInstruction else {
+  guard let returnInst = arg.parentFunction.returnInstruction else {
     return false
   }
 
@@ -189,7 +189,7 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   let inst = op.instruction
   if let applySite = inst as? FullApplySite,
      let callee = applySite.referencedFunction,
-     callee == inst.function,
+     callee == inst.parentFunction,
      let argIdx = applySite.argumentIndex(of: op),
      op.value == callee.arguments[argIdx] {
     return true
@@ -256,7 +256,7 @@ func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjecti
   }
   let visitor = IsExclusiveArgumentEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath,
                                                  toArgumentIndex: toArgumentIndex, toPath: toPath)
-  let toArg = fromArgument.function.arguments[toArgumentIndex]
+  let toArg = fromArgument.parentFunction.arguments[toArgumentIndex]
   return !toArg.at(toPath).isEscapingWhenWalkingDown(using: visitor, context)
 }
 

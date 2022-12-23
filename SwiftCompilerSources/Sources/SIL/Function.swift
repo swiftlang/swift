@@ -376,7 +376,7 @@ public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
 
   public func reversed() -> ReverseBasicBlockList {
     if let block = currentBlock {
-      let lastBlock = SILFunction_lastBlock(block.function.bridged).block
+      let lastBlock = SILFunction_lastBlock(block.parentFunction.bridged).block
       return ReverseBasicBlockList(first: lastBlock)
     }
     return ReverseBasicBlockList(first: nil)

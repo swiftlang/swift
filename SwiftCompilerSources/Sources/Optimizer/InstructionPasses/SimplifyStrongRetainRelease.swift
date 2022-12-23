@@ -83,11 +83,11 @@ private func isNotReferenceCounted(value: Value, context: PassContext) -> Bool {
       // Note that the `simplifyGlobalValuePass` pass is deleting balanced
       // retains/releases, which doesn't require a Swift 5.1 minimum deployment
       // target.
-      return gvi.function.isSwift51RuntimeAvailable
+      return gvi.parentFunction.isSwift51RuntimeAvailable
     case let rptr as RawPointerToRefInst:
       // Like `global_value` but for the empty collection singletons from the
       // stdlib, e.g. the empty Array singleton.
-      if rptr.function.isSwift51RuntimeAvailable {
+      if rptr.parentFunction.isSwift51RuntimeAvailable {
         // The pattern generated for empty collection singletons is:
         //     %0 = global_addr @_swiftEmptyArrayStorage
         //     %1 = address_to_pointer %0

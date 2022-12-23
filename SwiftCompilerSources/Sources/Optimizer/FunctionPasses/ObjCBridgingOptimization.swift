@@ -144,7 +144,8 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 
     let originalObjCValue = originalObjCValueSwitch.enumOp
     let optionalReplacement = originalObjCValue.copy(at: originalObjCValueSwitch,
-                                                     andMakeAvailableIn: bridgeToObjcCall.block, context)
+                                                     andMakeAvailableIn: bridgeToObjcCall.parentBlock,
+                                                     context)
     let builder = Builder(at: bridgeToObjcCall, context)
     
     // We know that it's the some-case.
@@ -183,7 +184,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   // Creates a `switch_enum` on `originalObjCValue` and in the nil-case return a bridged
   // empty value.
   // Create the needed blocks of the `switch_enum` CFG diamond.
-  let origBlock = bridgeToSwiftCall.block
+  let origBlock = bridgeToSwiftCall.parentBlock
   let someBlock = context.splitBlock(at: bridgeToSwiftCall)
   let noneBlock = context.splitBlock(at: bridgeToSwiftCall)
   let continueBlock = context.splitBlock(at: bridgeToSwiftCall)
@@ -217,7 +218,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   let s = continueBlock.addBlockArgument(type: objCType, ownership: .owned, context)
   
   // Now replace the bridged value with the original value in the destination block.
-  let replacement = s.makeAvailable(in: bridgeToObjcCall.block, context)
+  let replacement = s.makeAvailable(in: bridgeToObjcCall.parentBlock, context)
   bridgeToObjcCall.uses.replaceAll(with: replacement, context)
   context.erase(instruction: bridgeToObjcCall)
   return true
@@ -315,9 +316,9 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
     } else {
       // The none-case
       if noneSwitch != nil { return nil }
-      guard let singlePred = enumInst.block.singlePredecessor,
+      guard let singlePred = enumInst.parentBlock.singlePredecessor,
             let se = singlePred.terminator as? SwitchEnumInst,
-            se.getUniqueSuccessor(forCaseIndex: enumInst.caseIndex) === enumInst.block else {
+            se.getUniqueSuccessor(forCaseIndex: enumInst.caseIndex) === enumInst.parentBlock else {
         return nil
       }
       noneSwitch = se
@@ -335,9 +336,9 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
 /// the payload block argument of the `switch_enum`.
 private func isPayloadOfSwitchEnum(_ value: Value) -> (SwitchEnumInst, case: Int)? {
   if let payloadArg = value as? BlockArgument,
-     let pred = payloadArg.block.singlePredecessor,
+     let pred = payloadArg.parentBlock.singlePredecessor,
      let se = pred.terminator as? SwitchEnumInst,
-     let caseIdx = se.getUniqueCase(forSuccessor: payloadArg.block) {
+     let caseIdx = se.getUniqueCase(forSuccessor: payloadArg.parentBlock) {
     return (se, caseIdx)
   }
   return nil

@@ -164,7 +164,7 @@ extension Builder {
     if let nextInst = insPnt.next {
       self.init(insertAt: .before(nextInst), location: location, passContext: context._bridged)
     } else {
-      self.init(insertAt: .atEndOf(insPnt.block), location: location, passContext: context._bridged)
+      self.init(insertAt: .atEndOf(insPnt.parentBlock), location: location, passContext: context._bridged)
     }
   }
 

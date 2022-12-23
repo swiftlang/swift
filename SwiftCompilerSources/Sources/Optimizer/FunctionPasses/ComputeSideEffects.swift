@@ -417,7 +417,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     let inst = address.instruction
-    let function = inst.function
+    let function = inst.parentFunction
     switch inst {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&

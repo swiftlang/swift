@@ -22,7 +22,7 @@ extension Builder {
   static func insert(after inst: Instruction, location: Location,
                      _ context: PassContext, insertFunc: (Builder) -> ()) {
     if inst is TermInst {
-      for succ in inst.block.successors {
+      for succ in inst.parentBlock.successors {
         assert(succ.hasSinglePredecessor,
                "the terminator instruction must not have critical successors")
         let builder = Builder(at: succ.instructions.first!, location: location,
@@ -47,7 +47,7 @@ extension Value {
     assert(uses.isEmpty)
     assert(ownership == .owned)
 
-    let beginBlock = definingBlock
+    let beginBlock = parentBlock
     var useToDefRange = BasicBlockRange(begin: beginBlock, context)
     defer { useToDefRange.deinitialize() }
 

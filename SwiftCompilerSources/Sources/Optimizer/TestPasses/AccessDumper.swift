@@ -91,6 +91,6 @@ private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Boo
   }
   
   print("in function")
-  print(apply.function)
+  print(apply.parentFunction)
   fatalError()
 }

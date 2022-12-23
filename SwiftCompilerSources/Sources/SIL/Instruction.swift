@@ -26,11 +26,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     SILInstruction_previous(bridged).instruction
   }
 
-  final public var block: BasicBlock {
+  final public var parentBlock: BasicBlock {
     SILInstruction_getParent(bridged).block
   }
 
-  final public var function: Function { block.function }
+  final public var parentFunction: Function { parentBlock.parentFunction }
 
   final public var description: String {
     let stdString = SILNode_debugDescription(bridgedNode)
@@ -157,7 +157,6 @@ extension OptionalBridgedInstruction {
 
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
-  final public var definingBlock: BasicBlock { block }
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
@@ -173,12 +172,13 @@ public final class MultipleValueInstructionResult : Value {
     return String(_cxxString: stdString)
   }
 
-  public var instruction: Instruction {
-    MultiValueInstResult_getParent(bridged).instruction
+  public var parentInstruction: MultipleValueInstruction {
+    MultiValueInstResult_getParent(bridged).getAs(MultipleValueInstruction.self)
   }
 
-  public var definingInstruction: Instruction? { instruction }
-  public var definingBlock: BasicBlock { instruction.block }
+  public var definingInstruction: Instruction? { parentInstruction }
+
+  public var parentBlock: BasicBlock { parentInstruction.parentBlock }
 
   public var index: Int { MultiValueInstResult_getIndex(bridged) }
 

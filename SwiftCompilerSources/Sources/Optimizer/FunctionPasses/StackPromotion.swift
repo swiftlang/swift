@@ -46,7 +46,7 @@ let stackPromotion = FunctionPass(name: "stack-promotion", {
   var changed = false
   for inst in function.instructions {
     if let ar = inst as? AllocRefInstBase {
-      if deadEndBlocks.isDeadEnd(ar.block) {
+      if deadEndBlocks.isDeadEnd(ar.parentBlock) {
         // Don't stack promote any allocation inside a code region which ends up
         // in a no-return block. Such allocations may missing their final release.
         // We would insert the deallocation too early, which may result in a
@@ -170,7 +170,7 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   // Do the transformation!
   // Insert `dealloc_stack_ref` instructions at the exit- and end-points of the inner liferange.
   for exitInst in innerRange.exits {
-    if !deadEndBlocks.isDeadEnd(exitInst.block) {
+    if !deadEndBlocks.isDeadEnd(exitInst.parentBlock) {
       let builder = Builder(at: exitInst, context)
       builder.createDeallocStackRef(allocRef)
     }
@@ -197,7 +197,7 @@ private func getDominatingBlockOfAllUsePoints(context: PassContext,
     var result: BasicBlock
     let domTree: DominatorTree
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      let defBlock = operand.value.definingBlock
+      let defBlock = operand.value.parentBlock
       if defBlock.dominates(result, domTree) {
         result = defBlock
       }
@@ -205,7 +205,7 @@ private func getDominatingBlockOfAllUsePoints(context: PassContext,
     }
   }
   
-  return value.visit(using: FindDominatingBlock(result: value.block, domTree: domTree), context)!
+  return value.visit(using: FindDominatingBlock(result: value.parentBlock, domTree: domTree), context)!
 }
 
 
@@ -229,13 +229,13 @@ func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domB
     
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let user = operand.instruction
-      if innerRange.blockRange.begin.dominates(user.block, domTree) {
+      if innerRange.blockRange.begin.dominates(user.parentBlock, domTree) {
         innerRange.insert(user)
       }
-      outerBlockRange.insert(user.block)
+      outerBlockRange.insert(user.parentBlock)
       
       let val = operand.value
-      let defBlock = val.definingBlock
+      let defBlock = val.parentBlock
       
       // Also insert the operand's definition. Otherwise we would miss allocation
       // instructions (for which the `visitUse` closure is not called).

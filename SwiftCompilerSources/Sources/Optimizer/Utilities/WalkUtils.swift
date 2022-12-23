@@ -374,7 +374,7 @@ extension ValueDefUseWalker {
          let payload = succBlock.arguments.first {
         return walkDownUses(ofValue: payload, path: path)
       } else if path.popIfMatches(.anyValueFields, index: nil) != nil {
-        for succBlock in se.block.successors {
+        for succBlock in se.parentBlock.successors {
           if let payload = succBlock.arguments.first,
              walkDownUses(ofValue: payload, path: path) == .abortWalk {
             return .abortWalk
@@ -597,7 +597,7 @@ extension ValueUseDefWalker {
     case let ued as UncheckedEnumDataInst:
       return walkUp(value: ued.operand, path: path.push(.enumCase, index: ued.caseIndex))
     case let mvr as MultipleValueInstructionResult:
-      let instruction = mvr.instruction
+      let instruction = mvr.parentInstruction
       if let ds = instruction as? DestructureStructInst {
         return walkUp(value: ds.operand, path: path.push(.structField, index: mvr.index))
       } else if let dt = instruction as? DestructureTupleInst {
@@ -625,7 +625,7 @@ extension ValueUseDefWalker {
         return .continueWalk
       }
       
-      let block = arg.block
+      let block = arg.parentBlock
       if let pred = block.singlePredecessor,
          let se = pred.terminator as? SwitchEnumInst,
          let caseIdx = se.getUniqueCase(forSuccessor: block) {
