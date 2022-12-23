@@ -9,15 +9,15 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@expression macro varPrint<Value...>(_ value: Value...) = MacroDefinition.PrintMacro
+@expression macro print<Value...>(_ value: Value...) = MacroDefinition.PrintMacro
 
 func testIt() {
   // CHECK: hello
   // CHECK: [1, 2, 3, 4, 5]
-  #varPrint("hello", [1, 2, 3, 4, 5])
+  #print("hello", [1, 2, 3, 4, 5])
 
   // CHECK: world
-  #varPrint("world")
+  #print("world")
 }
 
 testIt()
