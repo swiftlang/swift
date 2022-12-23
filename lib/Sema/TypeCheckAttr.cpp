@@ -3826,7 +3826,16 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 }
 
 void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::TypeWrappers)) {
+  auto isEnabled = [&]() {
+    if (Ctx.LangOpts.hasFeature(Feature::TypeWrappers))
+      return true;
+
+    // Accept attributes that come from swiftinterface files.
+    auto *parentSF = D->getDeclContext()->getParentSourceFile();
+    return parentSF && parentSF->Kind == SourceFileKind::Interface;
+  };
+
+  if (!isEnabled()) {
     diagnose(attr->getLocation(), diag::type_wrappers_are_experimental);
     attr->setInvalid();
     return;
