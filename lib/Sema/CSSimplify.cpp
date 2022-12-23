@@ -13809,7 +13809,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAutoClosurePointerConversion:
   case FixKind::IgnoreKeyPathContextualMismatch:
   case FixKind::NotCompileTimeConst:
-  case FixKind::RenameConflictingPatternVariables: {
+  case FixKind::RenameConflictingPatternVariables:
+  case FixKind::MacroMissingPound: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

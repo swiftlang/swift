@@ -8496,3 +8496,9 @@ bool ConflictingPatternVariables::diagnoseAsError() {
   }
   return true;
 }
+
+bool AddMissingMacroPound::diagnoseAsError() {
+  emitDiagnostic(diag::macro_expansion_missing_pound, macro->getName())
+    .fixItInsert(getLoc(), "#");
+  return true;
+}

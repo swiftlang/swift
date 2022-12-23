@@ -3568,6 +3568,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
       }
     }
+
+    // If we have a macro, it can only be used in an expansion.
+    if (auto macro = dyn_cast<MacroDecl>(decl)) {
+      if (!locator->isForMacroExpansion()) {
+        // Record a fix here
+        (void)recordFix(MacroMissingPound::create(*this, macro, locator));
+      }
+    }
   }
 
   // Note that we have resolved this overload.

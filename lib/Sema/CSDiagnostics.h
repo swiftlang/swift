@@ -2854,6 +2854,29 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that was not indicated as a missing # in the source.:
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   print(a, b, c) // missing # to use the macro
+/// }
+/// \endcode
+class AddMissingMacroPound final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroPound(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

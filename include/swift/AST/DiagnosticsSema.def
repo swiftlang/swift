@@ -6794,6 +6794,8 @@ ERROR(macro_in_nested,none,
 ERROR(macro_without_context,none,
       "macro %0 must declare its applicable contexts (e.g., '@expression')",
        (DeclName))
+ERROR(macro_expansion_missing_pound,none,
+      "expansion of macro %0 requires leading '#'", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
