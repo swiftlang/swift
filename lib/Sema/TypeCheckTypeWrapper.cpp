@@ -26,6 +26,17 @@
 
 using namespace swift;
 
+/// Check whether given declaration comes from the .swiftinterface file.
+static bool inSwiftInterfaceContext(NominalTypeDecl *typeDecl) {
+  auto *SF = typeDecl->getDeclContext()->getParentSourceFile();
+  return SF && SF->Kind == SourceFileKind::Interface;
+}
+
+static ValueDecl *findMember(NominalTypeDecl *typeDecl, Identifier memberName) {
+  auto members = typeDecl->lookupDirect(memberName);
+  return members.size() == 1 ? members.front() : nullptr;
+}
+
 static PatternBindingDecl *injectVariable(DeclContext *DC, Identifier name,
                                           Type type,
                                           VarDecl::Introducer introducer,
@@ -284,6 +295,15 @@ TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
 
   auto &ctx = parent->getASTContext();
 
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<TypeDecl>(
+            findMember(parent, ctx.Id_TypeWrapperStorage)))
+      return storage;
+  }
+
   TypeDecl *storage = nullptr;
   if (isa<ProtocolDecl>(parent)) {
     // If type wrapper is associated with a protocol, we need to
@@ -319,6 +339,15 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   auto typeWrapper = parent->getTypeWrapper();
   if (!typeWrapper)
     return nullptr;
+
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<VarDecl>(
+            findMember(parent, ctx.Id_TypeWrapperProperty)))
+      return storage;
+  }
 
   auto *storage = parent->getTypeWrapperStorageDecl();
   assert(storage);
