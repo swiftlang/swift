@@ -161,6 +161,9 @@ EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 /// declare an attribute which is discoverable and constructable at runtime.
 EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
 
+/// Whether to allow types from Foundation to be implicitly shadowed
+EXPERIMENTAL_FEATURE(ShadowFoundation, false)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE

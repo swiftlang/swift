@@ -3156,6 +3156,10 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureShadowFoundation(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
