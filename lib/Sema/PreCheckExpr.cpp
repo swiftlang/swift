@@ -991,10 +991,6 @@ namespace {
     /// in simple pattern-like expressions, so we reject anything complex here.
     void markAcceptableDiscardExprs(Expr *E);
 
-    /// Check if this is a postfix '...' operator, which might denote a pack
-    /// expansion expression.
-    Expr *isPostfixEllipsisOperator(Expr *E);
-
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
                        bool replaceInvalidRefsWithErrors,
@@ -1468,7 +1464,7 @@ bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
       isa<ForceValueExpr>(expr) ||
       isa<ParenExpr>(expr) ||
       isa<ArrowExpr>(expr) ||
-      isPostfixEllipsisOperator(expr) ||
+      isa<PackExpansionExpr>(expr) ||
       isa<TupleExpr>(expr) ||
       (isa<ArrayExpr>(expr) &&
        cast<ArrayExpr>(expr)->getElements().size() == 1) ||
@@ -1665,28 +1661,6 @@ VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   }
 
   return methodSelf;
-}
-
-/// Check if this is a postfix '...' operator, which might denote a pack
-/// expansion expression.
-Expr *PreCheckExpression::isPostfixEllipsisOperator(Expr *E) {
-  if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics))
-    return nullptr;
-
-  auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(E);
-  if (!postfixExpr)
-    return nullptr;
-
-  if (auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn())) {
-    if (op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
-      return postfixExpr->getOperand();
-    }
-  } else if (auto *op = dyn_cast<UnresolvedDeclRefExpr>(postfixExpr->getFn())) {
-    if (op->getName().getBaseName().getIdentifier().isExpansionOperator())
-      return postfixExpr->getOperand();
-  }
-
-  return nullptr;
 }
 
 /// Simplify expressions which are type sugar productions that got parsed
