@@ -362,7 +362,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       params.push_back(arg);
     }
   } else if (ICK == ImplicitConstructorKind::TypeWrapperStorage) {
-    accessLevel = AccessLevel::Public;
+    accessLevel = decl->getTypeWrapperStorageDecl()->getFormalAccess();
 
     auto typeWrapperInfo = decl->getTypeWrapper();
     assert(typeWrapperInfo);
