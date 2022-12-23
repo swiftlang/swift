@@ -41,6 +41,12 @@ struct ZZZ {
 @expression macro multiArgMacro(_: Any, second: Any) = MissingModule.MissingType
 // expected-note@-1{{'multiArgMacro(_:second:)' declared here}}
 
+@expression macro overloaded1(_ p: P) = MissingModule.MissingType
+func overloaded1(_ p: Any) { }
+
+@expression macro notOverloaded1(_ p: P) = MissingModule.MissingType // expected-note{{'notOverloaded1' previously declared here}}
+@expression macro notOverloaded1(_ p: P) = MissingModule.MissingOtherType // expected-error{{invalid redeclaration of 'notOverloaded1'}}
+
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
@@ -59,6 +65,9 @@ func testDiags(a: Int, b: Int) {
 
   _ = stringify(a + b)
   // expected-error@-1{{expansion of macro 'stringify' requires leading '#'}}{{7-7=#}}
+
+  overloaded1(a) // okay, calls the function
+  #overloaded1(a) // expected-error{{argument type 'Int' does not conform to expected type 'P'}}
 }
 
 func shadow(a: Int, b: Int, stringify: Int) {

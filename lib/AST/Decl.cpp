@@ -2785,6 +2785,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
   if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
     return false;
 
+  // If one is a macro and the other is not, they can't conflict.
+  if (sig1.IsMacro != sig2.IsMacro)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -3016,6 +3020,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
+  signature.IsMacro = isa<MacroDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 

@@ -255,6 +255,9 @@ struct OverloadSignature {
   /// Whether this is a type alias.
   unsigned IsTypeAlias : 1;
 
+  /// Whether this is a macro.
+  unsigned IsMacro : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
