@@ -3782,9 +3782,16 @@ namespace {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        auto locator = CS.getConstraintLocator(expr);
+
+        // For calls, set up the argument list.
+        bool isCall = expr->getArgs() != nullptr;
+        if (isCall) {
+          CS.associateArgumentList(locator, expr->getArgs());
+        }
+
         // Look up the macros with this name.
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
-        bool isCall = expr->getArgs() != nullptr;
         FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
                                                  : FunctionRefKind::Unapplied;
         auto macros = lookupMacros(
@@ -3798,7 +3805,6 @@ namespace {
         }
 
         // Introduce an overload set for the macro reference.
-        auto locator = CS.getConstraintLocator(expr);
         auto macroRefType = Type(CS.createTypeVariable(locator, 0));
         CS.addOverloadSet(macroRefType, macros, CurDC, locator);
 
@@ -3814,10 +3820,8 @@ namespace {
         if (!isCall)
           return macroRefType;
 
-        // For calls, set up the argument list and form the applicable-function
-        // constraint. The result type is the result of that call.
-        CS.associateArgumentList(locator, expr->getArgs());
-
+        // For calls, form the applicable-function constraint. The result type
+        // is the result of that call.
         SmallVector<AnyFunctionType::Param, 8> params;
         getMatchingParams(expr->getArgs(), params);
 

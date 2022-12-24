@@ -6796,6 +6796,8 @@ ERROR(macro_without_context,none,
        (DeclName))
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
+ERROR(macro_expansion_missing_arguments,none,
+      "expansion of macro %0 requires arguments", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

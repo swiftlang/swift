@@ -2877,6 +2877,29 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that has parameters, but was not provided any arguments.
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   #print
+/// }
+/// \endcode
+class AddMissingMacroArguments final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroArguments(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

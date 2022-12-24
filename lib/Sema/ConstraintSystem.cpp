@@ -3569,11 +3569,33 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    // If we have a macro, it can only be used in an expansion.
+    // If we have a macro, check for correct usage.
     if (auto macro = dyn_cast<MacroDecl>(decl)) {
+      // Macro can only be used in an expansion. If we end up here, it's
+      // because we found a macro but are missing the leading '#'.
       if (!locator->isForMacroExpansion()) {
         // Record a fix here
         (void)recordFix(MacroMissingPound::create(*this, macro, locator));
+      }
+
+      // If the macro has parameters but wasn't provided with any arguments,
+      // introduce a fix to add the arguments.
+      bool isCall;
+      switch (choice.getFunctionRefKind()) {
+      case FunctionRefKind::SingleApply:
+      case FunctionRefKind::DoubleApply:
+        isCall = true;
+        break;
+
+      case FunctionRefKind::Unapplied:
+      case FunctionRefKind::Compound:
+        // Note: macros don't have compound name references.
+        isCall = false;
+        break;
+      }
+      if (macro->parameterList && !isCall) {
+        // Record a fix here
+        (void)recordFix(MacroMissingArguments::create(*this, macro, locator));
       }
     }
   }

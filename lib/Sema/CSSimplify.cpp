@@ -13810,7 +13810,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreKeyPathContextualMismatch:
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
-  case FixKind::MacroMissingPound: {
+  case FixKind::MacroMissingPound:
+  case FixKind::MacroMissingArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

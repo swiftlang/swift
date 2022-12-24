@@ -418,6 +418,9 @@ enum class FixKind : uint8_t {
 
   /// Macro without leading #.
   MacroMissingPound,
+
+  /// Macro that has parameters but was not provided with any arguments.
+  MacroMissingArguments,
 };
 
 class ConstraintFix {
@@ -3254,6 +3257,32 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MacroMissingPound;
+  }
+};
+
+class MacroMissingArguments final : public ConstraintFix {
+  MacroDecl *macro;
+
+  MacroMissingArguments(ConstraintSystem &cs, MacroDecl *macro,
+                        ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MacroMissingArguments, locator),
+        macro(macro) { }
+
+public:
+  std::string getName() const override { return "macro missing arguments"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static MacroMissingArguments *
+  create(ConstraintSystem &cs, MacroDecl *macro,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MacroMissingArguments;
   }
 };
 

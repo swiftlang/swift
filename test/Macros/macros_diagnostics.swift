@@ -47,6 +47,9 @@ func overloaded1(_ p: Any) { }
 @expression macro notOverloaded1(_ p: P) = MissingModule.MissingType // expected-note{{'notOverloaded1' previously declared here}}
 @expression macro notOverloaded1(_ p: P) = MissingModule.MissingOtherType // expected-error{{invalid redeclaration of 'notOverloaded1'}}
 
+@expression macro intIdentity(value: Int, _: Float) -> Int = MissingModule.MissingType
+// expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
+
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
@@ -65,6 +68,8 @@ func testDiags(a: Int, b: Int) {
 
   _ = stringify(a + b)
   // expected-error@-1{{expansion of macro 'stringify' requires leading '#'}}{{7-7=#}}
+
+  _ = #intIdentity // expected-error{{expansion of macro 'intIdentity(value:_:)' requires arguments}}{{19-19=(value: <#Int#>, <#Float#>)}}
 
   overloaded1(a) // okay, calls the function
   #overloaded1(a) // expected-error{{argument type 'Int' does not conform to expected type 'P'}}
