@@ -45,13 +45,13 @@ extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
 /// Produce the mangled name for the nominal type descriptor of a type
 /// referenced by its module and type name.
 static std::string mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName) {
+    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
   using namespace Demangle;
 
   //  kind=Global
   //    kind=NominalTypeDescriptor
   //      kind=Type
-  //        kind=Structure
+  //        kind=Structure|Enum|Class
   //          kind=Module, text=moduleName
   //          kind=Identifier, text=typeName
   Demangle::Demangler D;
@@ -64,7 +64,7 @@ static std::string mangledNameForTypeMetadataAccessor(
       {
         auto *module = D.createNode(Node::Kind::Module, moduleName);
         auto *identifier = D.createNode(Node::Kind::Identifier, typeName);
-        auto *structNode = D.createNode(Node::Kind::Structure);
+        auto *structNode = D.createNode(typeKind);
         structNode->addChild(module, D);
         structNode->addChild(identifier, D);
         type->addChild(structNode, D);
@@ -82,9 +82,22 @@ static std::string mangledNameForTypeMetadataAccessor(
 /// Look for macro's type metadata given its external module and type name.
 static void const *lookupMacroTypeMetadataByExternalName(
     ASTContext &ctx, StringRef moduleName, StringRef typeName) {
-  // Look up the type metadata accessor.
-  auto symbolName = mangledNameForTypeMetadataAccessor(moduleName, typeName);
-  auto accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str());
+  // Look up the type metadata accessor as a struct, enum, or class.
+  const Demangle::Node::Kind typeKinds[] = {
+    Demangle::Node::Kind::Structure,
+    Demangle::Node::Kind::Enum,
+    Demangle::Node::Kind::Class
+  };
+
+  void *accessorAddr = nullptr;
+  for (auto typeKind : typeKinds) {
+    auto symbolName = mangledNameForTypeMetadataAccessor(
+                                                         moduleName, typeName, typeKind);
+    accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str());
+    if (accessorAddr)
+      break;
+  }
+
   if (!accessorAddr)
     return nullptr;
 

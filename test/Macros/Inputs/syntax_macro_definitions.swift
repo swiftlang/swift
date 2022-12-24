@@ -67,7 +67,7 @@ extension SimpleDiagnosticMessage: FixItMessage {
   var fixItID: MessageID { diagnosticID }
 }
 
-public struct AddBlocker: ExpressionMacro {
+public enum AddBlocker: ExpressionMacro {
   public static func expansion(
     of node: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
@@ -155,7 +155,7 @@ public struct AddBlocker: ExpressionMacro {
   }
 }
 
-public struct RecursiveMacro: ExpressionMacro {
+public class RecursiveMacro: ExpressionMacro {
   public static func expansion(
     of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
