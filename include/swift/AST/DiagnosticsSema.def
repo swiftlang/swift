@@ -6799,6 +6799,8 @@ ERROR(macro_expansion_missing_arguments,none,
       "expansion of macro %0 requires arguments", (DeclName))
 ERROR(macro_unsupported,none,
       "macros are not supported in this compiler", ())
+ERROR(macro_recursive,none,
+      "recursive expansion of macro %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

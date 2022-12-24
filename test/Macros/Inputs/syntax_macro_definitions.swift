@@ -154,3 +154,16 @@ public struct AddBlocker: ExpressionMacro {
     return result.as(MacroExpansionExprSyntax.self)!.argumentList.first!.expression
   }
 }
+
+public struct RecursiveMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression,
+          argument.description == "false" else {
+      return ExprSyntax(macro)
+    }
+
+    return "()"
+  }
+}

@@ -11,7 +11,8 @@
 
 @expression macro customFileID: String = MacroDefinition.FileIDMacro
 @expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
-@expression macro fileID<T: _ExpressibleByStringLitera>: T = MacroDefinition.FileIDMacro
+@expression macro fileID<T: _ExpressibleByStringLiteral>: T = MacroDefinition.FileIDMacro
+@expression macro recurse(_: Bool) = MacroDefinition.RecursiveMacro
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
@@ -73,5 +74,9 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   _ = #addBlocker(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
+
+  // Check recursion.
+  #recurse(false) // okay
+  #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}
 #endif
 }

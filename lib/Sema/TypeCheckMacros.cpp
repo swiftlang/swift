@@ -121,6 +121,34 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       ctx, macro->externalModuleName, macro->externalMacroTypeName);
 }
 
+/// Determine whether the given source file is from an expansion of the given
+/// macro.
+static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
+  while (sourceFile) {
+    auto expansion = sourceFile->getMacroExpansion();
+    if (!expansion)
+      return false;
+
+    if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+            expansion.dyn_cast<Expr *>())) {
+      if (expansionExpr->getMacroRef().getDecl() == macro)
+        return true;
+    } else if (auto expansionDecl = dyn_cast_or_null<MacroExpansionDecl>(
+            expansion.dyn_cast<Decl *>())) {
+      // FIXME: Update once MacroExpansionDecl has a proper macro reference
+      // in it.
+      if (expansionDecl->getMacro().getFullName() == macro->getName())
+        return true;
+    } else {
+      llvm_unreachable("Unknown macro expansion node kind");
+    }
+
+    sourceFile = sourceFile->getEnclosingSourceFile();
+  }
+
+  return false;
+}
+
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
 ) {
@@ -136,6 +164,11 @@ Expr *swift::expandMacroExpr(
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
+
+  if (isFromExpansionOfMacro(sourceFile, macro)) {
+    ctx.Diags.diagnose(expr->getLoc(), diag::macro_recursive, macro->getName());
+    return nullptr;
+  }
 
   auto macroDef = evaluateOrDefault(
       ctx.evaluator, MacroDefinitionRequest{macro},
