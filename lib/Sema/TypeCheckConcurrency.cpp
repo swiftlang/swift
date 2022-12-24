@@ -2029,8 +2029,6 @@ namespace {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return true; }
-
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::Expansion;
     }

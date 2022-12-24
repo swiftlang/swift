@@ -3232,8 +3232,6 @@ public:
     return false;
   }
 
-  bool shouldWalkIntoTapExpression() override { return false; }
-
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
   }
