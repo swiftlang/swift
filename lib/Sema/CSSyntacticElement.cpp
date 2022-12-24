@@ -360,6 +360,11 @@ static void createConjunction(ConstraintSystem &cs,
     if (auto *closure = dyn_cast<ClosureExpr>(tapDC)) {
       referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
     }
+
+    // Body of the interpolation is always isolated from its context, only
+    // its individual elements are allowed access to type information
+    // from the outside e.g. external declaration references.
+    isIsolated = true;
   }
 
   UnresolvedVarCollector paramCollector(cs);
