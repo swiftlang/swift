@@ -38,7 +38,7 @@ do {
   /#
   // expected-error@-2:7 {{unterminated regex literal}}
   // expected-error@-3:10 {{expected escape sequence}}
-  // expected-error@-3:4 {{expected expression}}
+  // expected-error@-3:4 {{expected a macro identifier}}
 }
 
 func foo<T>(_ x: T, _ y: T) {}
