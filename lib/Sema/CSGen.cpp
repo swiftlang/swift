@@ -3779,67 +3779,62 @@ namespace {
     }
 
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
-#if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
-      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
-        auto locator = CS.getConstraintLocator(expr);
+      auto locator = CS.getConstraintLocator(expr);
 
-        // For calls, set up the argument list.
-        bool isCall = expr->getArgs() != nullptr;
-        if (isCall) {
-          CS.associateArgumentList(locator, expr->getArgs());
-        }
-
-        // Look up the macros with this name.
-        auto macroIdent = expr->getMacroName().getBaseIdentifier();
-        FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
-                                                 : FunctionRefKind::Unapplied;
-        auto macros = lookupMacros(
-            macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
-            functionRefKind);
-        if (macros.empty()) {
-          ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
-                             macroIdent)
-              .highlight(expr->getMacroNameLoc().getSourceRange());
-          return Type();
-        }
-
-        // Introduce an overload set for the macro reference.
-        auto macroRefType = Type(CS.createTypeVariable(locator, 0));
-        CS.addOverloadSet(macroRefType, macros, CurDC, locator);
-
-        // Add explicit generic arguments, if there were any.
-        if (expr->getGenericArgsRange().isValid()) {
-          if (addSpecializationConstraint(
-                CS.getConstraintLocator(expr), macroRefType,
-                expr->getGenericArgs()))
-            return Type();
-        }
-
-        // For non-calls, the type variable is the result.
-        if (!isCall)
-          return macroRefType;
-
-        // For calls, form the applicable-function constraint. The result type
-        // is the result of that call.
-        SmallVector<AnyFunctionType::Param, 8> params;
-        getMatchingParams(expr->getArgs(), params);
-
-        Type resultType = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-            TVO_CanBindToNoEscape);
-
-        CS.addConstraint(
-            ConstraintKind::ApplicableFunction,
-            FunctionType::get(params, resultType),
-            macroRefType,
-            CS.getConstraintLocator(
-              expr, ConstraintLocator::ApplyFunction));
-
-        return resultType;
+      // For calls, set up the argument list.
+      bool isCall = expr->getArgs() != nullptr;
+      if (isCall) {
+        CS.associateArgumentList(locator, expr->getArgs());
       }
-#endif
-      return Type();
+
+      // Look up the macros with this name.
+      auto macroIdent = expr->getMacroName().getBaseIdentifier();
+      FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
+                                               : FunctionRefKind::Unapplied;
+      auto macros = lookupMacros(
+          macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
+          functionRefKind);
+      if (macros.empty()) {
+        ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
+                           macroIdent)
+            .highlight(expr->getMacroNameLoc().getSourceRange());
+        return Type();
+      }
+
+      // Introduce an overload set for the macro reference.
+      auto macroRefType = Type(CS.createTypeVariable(locator, 0));
+      CS.addOverloadSet(macroRefType, macros, CurDC, locator);
+
+      // Add explicit generic arguments, if there were any.
+      if (expr->getGenericArgsRange().isValid()) {
+        if (addSpecializationConstraint(
+              CS.getConstraintLocator(expr), macroRefType,
+              expr->getGenericArgs()))
+          return Type();
+      }
+
+      // For non-calls, the type variable is the result.
+      if (!isCall)
+        return macroRefType;
+
+      // For calls, form the applicable-function constraint. The result type
+      // is the result of that call.
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(expr->getArgs(), params);
+
+      Type resultType = CS.createTypeVariable(
+          CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+          TVO_CanBindToNoEscape);
+
+      CS.addConstraint(
+          ConstraintKind::ApplicableFunction,
+          FunctionType::get(params, resultType),
+          macroRefType,
+          CS.getConstraintLocator(
+            expr, ConstraintLocator::ApplyFunction));
+
+      return resultType;
     }
 
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,

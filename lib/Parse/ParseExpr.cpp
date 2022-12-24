@@ -1774,14 +1774,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundCodeCompletion(/*ParentKind*/None);
     }
-    if (Context.LangOpts.hasFeature(Feature::Macros)) {
-      return parseExprMacroExpansion(isExprBasic);
-    }
-    if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
-        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-      return parseExprPoundUnknown(SourceLoc());
-    }
-    goto UnknownCharacter;
+
+    return parseExprMacroExpansion(isExprBasic);
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
@@ -3245,82 +3239,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                                     /*implicit*/ false));
 }
 
-/// Parse and diagnose unknown pound expression
-///
-/// If it look like a legacy (Swift 2) object literal expression, suggest fix-it
-/// to use new object literal syntax.
-///
-/// expr-unknown-pound:
-///   '#' identifier expr-paren?
-///   '[' '#' identifier expr-paren? '#' ']' ; Legacy object literal
-ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
-  SourceLoc PoundLoc = consumeToken(tok::pound);
-
-  assert(Tok.is(tok::identifier) && !Tok.isEscapedIdentifier() &&
-         PoundLoc.getAdvancedLoc(1) == Tok.getLoc());
-
-  Identifier Name;
-  SourceLoc NameLoc = consumeIdentifier(Name, /*diagnoseDollarPrefix=*/false);
-
-  // Parse arguments if exist.
-  ArgumentList *ArgList = nullptr;
-  if (Tok.isFollowingLParen()) {
-    // Parse arguments.
-    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
-                                    /*isExprBasic*/ true);
-    if (result.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
-    if (result.isParseErrorOrHasCompletion())
-      return makeParserError();
-    ArgList = result.get();
-  }
-
-  std::pair<StringRef, StringRef> NewNameArgPair =
-      llvm::StringSwitch<std::pair<StringRef, StringRef>>(Name.str())
-          .Case("Color", {"colorLiteral", "red"})
-          .Case("Image", {"imageLiteral", "resourceName"})
-          .Case("FileReference", {"fileLiteral", "resourceName"})
-          .Default({});
-
-  // If it's not legacy object literal, we don't know how to handle this.
-  if (NewNameArgPair.first.empty()) {
-    diagnose(PoundLoc, diag::unknown_pound_expr, Name.str());
-    return makeParserError();
-  }
-
-  // Diagnose legacy object literal.
-
-  // Didn't have arguments.
-  if (!ArgList || ArgList->getLParenLoc().isInvalid()) {
-    diagnose(Tok.getLoc(), diag::expected_arg_list_in_object_literal);
-    return makeParserError();
-  }
-
-  // If it's started with '[', try to parse closing '#]'.
-  SourceLoc RPoundLoc, RSquareLoc;
-  if (LSquareLoc.isValid() && consumeIf(tok::pound, RPoundLoc))
-    consumeIf(tok::r_square, RSquareLoc);
-
-  auto diag = diagnose(LSquareLoc.isValid() ? LSquareLoc : PoundLoc,
-                       diag::legacy_object_literal, LSquareLoc.isValid(),
-                       Name.str(), NewNameArgPair.first);
-
-  // Remove '[' if exist.
-  if (LSquareLoc.isValid())
-    diag.fixItRemove(LSquareLoc);
-  // Replace the literal name.
-  diag.fixItReplace(NameLoc, NewNameArgPair.first);
-  // Replace the first argument.
-  if (!ArgList->empty() && ArgList->front().getLabelLoc().isValid())
-    diag.fixItReplace(ArgList->front().getLabelLoc(), NewNameArgPair.second);
-  // Remove '#]' if exist.
-  if (RPoundLoc.isValid())
-    diag.fixItRemove(
-        {RPoundLoc, RSquareLoc.isValid() ? RSquareLoc : RPoundLoc});
-
-  return makeParserError();
-}
-
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
@@ -3458,14 +3376,6 @@ ParserResult<Expr> Parser::parseExprCollection() {
     RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
                DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
-  }
-
-  // [#identifier is likely to be a legacy object literal.
-  if (Tok.is(tok::pound) && peekToken().is(tok::identifier) &&
-      !peekToken().isEscapedIdentifier() &&
-      LSquareLoc.getAdvancedLoc(1) == Tok.getLoc() &&
-      Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-    return parseExprPoundUnknown(LSquareLoc);
   }
 
   ParserStatus Status;

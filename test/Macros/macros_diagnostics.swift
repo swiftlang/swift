@@ -1,12 +1,7 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
-// REQUIRES: OS=macosx
-
-// REQUIRES: executable_test
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
-// expected-note@-1{{'stringify' declared here}}
+// expected-note@-1 2{{'stringify' declared here}}
 @expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 @expression macro missingMacro2(_: Any) = MissingModule.MissingType
 
@@ -77,6 +72,7 @@ func testDiags(a: Int, b: Int) {
 
 func shadow(a: Int, b: Int, stringify: Int) {
   _ = #stringify(a + b)
+  // expected-error@-1{{external macro implementation type 'MacroDefinition.StringifyMacro' could not be found for macro 'stringify'}}
 }
 
 func testMissing() {

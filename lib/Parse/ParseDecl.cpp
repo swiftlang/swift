@@ -4844,11 +4844,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
       consumeToken(tok::code_complete);
       DeclResult = makeParserCodeCompletionResult<Decl>();
       break;
-    } else if (Context.LangOpts.hasFeature(Feature::Macros)) {
-      DeclResult = parseDeclMacroExpansion(Flags, Attributes);
-      break;
     }
-    LLVM_FALLTHROUGH;
+
+    // Parse as a macro expansion.
+    DeclResult = parseDeclMacroExpansion(Flags, Attributes);
+    break;
 
   case tok::pound_if:
   case tok::pound_sourceLocation:

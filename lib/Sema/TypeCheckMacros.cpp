@@ -121,7 +121,6 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       ctx, macro->externalModuleName, macro->externalMacroTypeName);
 }
 
-#if SWIFT_SWIFT_PARSER
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
 ) {
@@ -157,6 +156,13 @@ Expr *swift::expandMacroExpr(
   }
 
   case MacroDefinition::ImplementationKind::InProcess: {
+    // Make sure macros are enabled before we expand.
+    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
+      ctx.Diags.diagnose(expr->getLoc(), diag::macro_experimental);
+      return nullptr;
+    }
+
+#if SWIFT_SWIFT_PARSER
     PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
 
     // Builtin macros are handled via ASTGen.
@@ -176,6 +182,10 @@ Expr *swift::expandMacroExpr(
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
                                               (size_t)evaluatedSourceLength);
     break;
+#else
+    ctx.Diags.diagnose(expr->getLoc(), diag::macro_unsupported);
+    return nullptr;
+#endif
   }
   }
 
@@ -266,5 +276,3 @@ Expr *swift::expandMacroExpr(
          "Type checking changed the result type?");
   return expandedExpr;
 }
-
-#endif // SWIFT_SWIFT_PARSER

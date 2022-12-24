@@ -1329,9 +1329,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(legacy_object_literal,none,
-      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
-      (bool, StringRef, StringRef))
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,

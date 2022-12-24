@@ -1998,6 +1998,8 @@ public:
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
 
+    if (!Ctx.LangOpts.hasFeature(Feature::Macros))
+      MD->diagnose(diag::macro_experimental);
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroContexts())

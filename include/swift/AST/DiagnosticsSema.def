@@ -6762,8 +6762,7 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
 ERROR(macro_undefined,PointsToFirstBadToken,
-      "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
-      "libraries that contain this macro", (Identifier))
+      "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
       "macro %2; the type must be public and provided via "
@@ -6798,6 +6797,8 @@ ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
 ERROR(macro_expansion_missing_arguments,none,
       "expansion of macro %0 requires arguments", (DeclName))
+ERROR(macro_unsupported,none,
+      "macros are not supported in this compiler", ())
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

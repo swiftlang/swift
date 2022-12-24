@@ -1748,7 +1748,6 @@ public:
   ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
-  ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
