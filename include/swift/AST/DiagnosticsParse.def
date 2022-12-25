@@ -2005,9 +2005,9 @@ ERROR(macro_decl_expected_period,PointsToFirstBadToken,
 ERROR(macro_decl_expected_macro_type,PointsToFirstBadToken,
       "expected external macro type name", ())
 
-ERROR(macro_expansion_expr_expected_macro_identifier,none,
+ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal expression", ())
-ERROR(macro_expansion_decl_expected_macro_identifier,none,
+ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal declaration", ())
 
 ERROR(parser_round_trip_error,none,
