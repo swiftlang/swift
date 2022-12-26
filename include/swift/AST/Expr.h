@@ -3308,7 +3308,7 @@ public:
   /// this array will be empty
   ArrayRef<ConversionPair> getArgumentConversions() const {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   /// Retrieve the conversion expressions mapping requirements from any
@@ -3318,7 +3318,7 @@ public:
   /// this array will be empty
   MutableArrayRef<ConversionPair> getArgumentConversions() {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   void setArgumentConversion(unsigned i, const ConversionPair &p) {
