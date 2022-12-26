@@ -2070,11 +2070,15 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
       if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
           path[lastIdx].is<LocatorPathElt::FunctionArgument>())
         return true;
-      // `case .foo((let a, _), let b) = question`
-      if (path[lastIdx - 2].is<LocatorPathElt::PatternMatch>() &&
-          path[lastIdx - 1].is<LocatorPathElt::FunctionArgument>() &&
-          path[lastIdx].is<LocatorPathElt::TupleElement>())
-        return true;
+      
+        if (path.size() > 5) {
+            // `case .bar(_, (_, (_, (_, (let a, _), _), _))) = question`
+            if (path[3].is<LocatorPathElt::PatternMatch>() &&
+                path[4].is<LocatorPathElt::FunctionArgument>() &&
+                path[lastIdx].is<LocatorPathElt::TupleElement>())
+                return true;
+        }
+      
     }
   }
 
