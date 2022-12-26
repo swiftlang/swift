@@ -859,6 +859,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
+  Expr *visitPackElementExpr(PackElementExpr *E) {
+    if (Expr *pattern = doIt(E->getPackRefExpr())) {
+      E->setPackRefExpr(pattern);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
@@ -1993,6 +2001,10 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
 }
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
+}
+
+bool Traversal::visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+  return doIt(T->getPackType());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {

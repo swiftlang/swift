@@ -621,6 +621,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
 
+  RuntimeDiscoverableAttributeTy =
+    createStructType(*this, "swift.runtime_attr",
+                     {Int32Ty, RelativeAddressTy, Int32Ty});
+
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
@@ -1190,6 +1194,12 @@ Address IRGenModule::getAddrOfObjCISAMask() {
         .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
   return Address(ObjCISAMaskPtr, IntPtrTy, getPointerAlignment());
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn) {
+  auto entity = LinkEntity::forAccessibleFunctionRecord(accessibleFn);
+  return getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 }
 
 ModuleDecl *IRGenModule::getSwiftModule() const {
@@ -1871,6 +1881,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   // rdar://101126543
   return false;
 
+#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -1881,6 +1892,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
 
   return getAvailabilityContext().isContainedIn(
           Context.getImmortalRefCountSymbolsAvailability());
+#endif
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
@@ -1890,6 +1902,17 @@ void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
     PrimaryIGM = IGM;
   }
   Queue.push_back(IGM);
+}
+
+IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
+  // If we're emitting for a single module, or a single file, we always use the
+  // primary IGM.
+  if (GenModules.size() == 1)
+    return getPrimaryIGM();
+
+ IRGenModule *IGM = GenModules[SF];
+ assert(IGM);
+ return IGM;
 }
 
 IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {

@@ -317,7 +317,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
     } else if (nonConsumingUse->getOperandOwnership() ==
                    OperandOwnership::Reborrow ||
                nonConsumingUse->getOperandOwnership() ==
-                   OperandOwnership::GuaranteedForwardingPhi) {
+                   OperandOwnership::GuaranteedForwarding) {
       continue;
     }
 

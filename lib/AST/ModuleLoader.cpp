@@ -174,7 +174,7 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 }
 
 llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
+ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
                                                    StringRef moduleName) {
   using namespace llvm::sys;
   using namespace file_types;
@@ -183,7 +183,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
 
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
+    case swift::ModuleDependencyKind::SwiftInterface: {
       auto *swiftDep = getAsSwiftInterfaceModule();
       // Prefer interface path to binary module path if we have it.
       modulePath = swiftDep->swiftInterfaceFile;
@@ -194,7 +194,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
       }
       break;
     }
-    case swift::ModuleDependenciesKind::SwiftBinary: {
+    case swift::ModuleDependencyKind::SwiftBinary: {
       auto *swiftBinaryDep = getAsSwiftBinaryModule();
       modulePath = swiftBinaryDep->compiledModulePath;
       assert(modulePath.has_value());
@@ -204,21 +204,21 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
       }
       break;
     }
-    case swift::ModuleDependenciesKind::Clang: {
+    case swift::ModuleDependencyKind::Clang: {
       auto *clangDep = getAsClangModule();
       modulePath = clangDep->moduleMapFile;
       assert(modulePath.has_value());
       break;
     }
-    case swift::ModuleDependenciesKind::SwiftSource: {
+    case swift::ModuleDependencyKind::SwiftSource: {
       auto *swiftSourceDep = getAsSwiftSourceModule();
       assert(!swiftSourceDep->sourceFiles.empty());
       return result;
     }
-    case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+    case swift::ModuleDependencyKind::SwiftPlaceholder: {
       return result;
     }
-    case swift::ModuleDependenciesKind::LastKind:
+    case swift::ModuleDependencyKind::LastKind:
       llvm_unreachable("Unhandled dependency kind.");
   }
   // Mimic getModuleDefiningPath() for Swift and Clang module.

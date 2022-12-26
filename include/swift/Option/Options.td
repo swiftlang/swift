@@ -252,7 +252,7 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
   
-def e : JoinedOrSeparate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
+def e : Separate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
   HelpText<"Executes a line of code provided on the command line">;
 
 def F : JoinedOrSeparate<["-"], "F">,
@@ -481,6 +481,9 @@ def autolink_force_load : Flag<["-"], "autolink-force-load">,
 def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
+def package_name : Separate<["-"], "package-name">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Name of the package the module belongs to">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
@@ -566,6 +569,9 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
+def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmodular-includes">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,

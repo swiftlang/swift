@@ -131,12 +131,12 @@ func testGlobalWithComplexInit() -> Int {
   return Str.s3 // expected-note {{called from here}}
 }
 
-func metatypeArg<T>(_ t: T.Type, _ b: Bool) { // expected-error {{Using type 'Int' can cause metadata allocation or locks}}
+func metatypeArg<T>(_ t: T.Type, _ b: Bool) {
 }
 
 @_noAllocation
 func callFuncWithMetatypeArg() {
-  metatypeArg(Int.self, false)                // expected-note {{called from here}}
+  metatypeArg(Int.self, false)
 }
 
 @_noAllocation
@@ -221,5 +221,23 @@ func closueWhichModifiesLocalVar() -> Int {
   }
   localNonEscapingClosure()
   return x
+}
+
+@_noAllocation
+func createEmptyArray() {
+  _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
+}
+
+struct Buffer {
+  var p: UnsafeMutableRawBufferPointer
+
+  func bind<T>(of type: T.Type) -> UnsafeMutableBufferPointer<T> {
+    self.p.bindMemory(to: T.self)
+  }
+
+  @_noAllocation
+  func callBind() -> UnsafeMutableBufferPointer<Int> {
+    return bind(of: Int.self)
+  }
 }
 

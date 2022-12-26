@@ -22,27 +22,34 @@
 
 namespace swift {
 
-class CompilerPlugin;
-
 /// Provides the definition of a macro.
-struct MacroDefinition {
-    /// The kind of macro, which determines how it can be used in source code.
+class MacroDefinition {
+public:
+  /// The kind of macro, which determines how it can be used in source code.
   enum Kind: uint8_t {
-      /// An expression macro.
+    /// An expression macro.
     Expression,
+  };
+
+  /// Describes a missing macro definition.
+  struct MissingDefinition {
+    Identifier externalModuleName;
+    Identifier externalMacroTypeName;
   };
 
     /// Describes how the macro is implemented.
   enum class ImplementationKind: uint8_t {
-      /// The macro is built-in to the compiler, linked against the same
-      /// underlying syntax tree libraries.
-    Builtin,
+    /// The macro has no definition.
+    Undefined,
 
-      /// The macro was defined in a compiler plugin.
-    Plugin,
+    /// The macro has a definition, but it could not be found.
+    Missing,
+
+    /// The macro is in the same process as the compiler, whether built-in or
+    /// loaded via a compiler plugin.
+    InProcess,
   };
 
-public:
   Kind kind;
   ImplementationKind implKind;
 
@@ -53,42 +60,32 @@ private:
     : kind(kind), implKind(implKind), opaqueHandle(opaqueHandle) { }
 
 public:
-  static MacroDefinition forInvalid() {
+  static MacroDefinition forUndefined() {
     return MacroDefinition{
-      Kind::Expression, ImplementationKind::Builtin, nullptr
+      Kind::Expression, ImplementationKind::Undefined, nullptr
     };
   }
 
-  static MacroDefinition forBuiltin(Kind kind, void *opaqueHandle) {
-    return MacroDefinition{kind, ImplementationKind::Builtin, opaqueHandle};
+  static MacroDefinition forMissing(
+      ASTContext &ctx,
+      Identifier externalModuleName,
+      Identifier externalMacroTypeName
+  );
+
+  static MacroDefinition forInProcess(Kind kind, void *opaqueHandle) {
+    return MacroDefinition{kind, ImplementationKind::InProcess, opaqueHandle};
   }
 
-  static MacroDefinition forCompilerPlugin(Kind kind, CompilerPlugin *plugin) {
-    return MacroDefinition{kind, ImplementationKind::Plugin, plugin};
+  /// Return the opaque handle for an in-process macro definition.
+  void *getInProcessOpaqueHandle() const {
+    assert(implKind == ImplementationKind::InProcess);
+    return opaqueHandle;
   }
 
-  bool isInvalid() const { return opaqueHandle == nullptr; }
-
-  explicit operator bool() const { return !isInvalid(); }
-
-  void *getAsBuiltin() const {
-    switch (implKind) {
-    case ImplementationKind::Builtin:
-      return opaqueHandle;
-
-    case ImplementationKind::Plugin:
-      return nullptr;
-    }
-  }
-
-  CompilerPlugin *getAsCompilerPlugin() const {
-    switch (implKind) {
-    case ImplementationKind::Builtin:
-      return nullptr;
-
-    case ImplementationKind::Plugin:
-      return (CompilerPlugin *)opaqueHandle;
-    }
+  /// Return more information about a missing macro definition.
+  MissingDefinition *getMissingDefinition() const {
+    assert(implKind == ImplementationKind::Missing);
+    return static_cast<MissingDefinition *>(opaqueHandle);
   }
 };
 

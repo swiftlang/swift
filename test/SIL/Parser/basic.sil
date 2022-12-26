@@ -1743,6 +1743,13 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil hidden [runtime_accessible] @test_runtime_accessible_method
+sil hidden [runtime_accessible] @test_runtime_accessible_method : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {

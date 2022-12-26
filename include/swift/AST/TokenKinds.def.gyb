@@ -1,6 +1,6 @@
 %{
   # -*- mode: Swift -*-
-  from gyb_syntax_support import *
+  from gyb_syntax_support.Token import *
   # Ignore the following admonition it applies to the resulting .def file only
 }%
 //// Automatically Generated From TokenKinds.def.gyb.
@@ -145,9 +145,9 @@
 
 // Keywords that start decls.
 % for token in SYNTAX_TOKENS:
-%   if isinstance(token, Token.Punctuator):
+%   if isinstance(token, Punctuator):
 ${token.macro_name()}(${token.unprefixed_kind}, "${token.text}")
-%   elif isinstance(token, Token.PoundObjectLiteral):
+%   elif isinstance(token, PoundObjectLiteral):
 ${token.macro_name()}(${token.unprefixed_kind}, "${token.description}", ${token.protocol})
 %   else:
 ${token.macro_name()}(${token.unprefixed_kind})

@@ -693,7 +693,8 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
       CallSiteDesc.isSerialized(), IsNotDynamic, IsNotDistributed,
-      ClosureUser->getEntryCount(), ClosureUser->isThunk(),
+      IsNotRuntimeAccessible, ClosureUser->getEntryCount(),
+      ClosureUser->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
@@ -808,10 +809,7 @@ void ClosureSpecCloner::populateCloned() {
     auto typeInContext = Cloned->getLoweredType(Arg->getType());
     auto *MappedValue =
         ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
-    MappedValue->setNoImplicitCopy(
-        cast<SILFunctionArgument>(Arg)->isNoImplicitCopy());
-    MappedValue->setLifetimeAnnotation(
-        cast<SILFunctionArgument>(Arg)->getLifetimeAnnotation());
+    MappedValue->copyFlags(cast<SILFunctionArgument>(Arg));
     entryArgs.push_back(MappedValue);
   }
 

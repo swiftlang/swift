@@ -32,6 +32,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -4998,8 +4999,8 @@ bool ClassDecl::hasResilientMetadata() const {
     return false;
 
   // If the class is not public, we can't use it outside the module at all.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+  // Take enable testing into account.
+  if (getEffectiveAccess() < AccessLevel::Public)
     return false;
 
   // Otherwise we access metadata members, such as vtable entries, resiliently.
@@ -6598,14 +6599,6 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isTypeWrapperLocalStorageForInitializer() const {
-  if (auto *ctor =
-          dyn_cast_or_null<ConstructorDecl>(getDeclContext()->getAsDecl())) {
-    return this == ctor->getLocalTypeWrapperStorageVar();
-  }
-  return false;
-}
-
 bool VarDecl::isLet() const {
   // An awful hack that stabilizes the value of 'isLet' for ParamDecl instances.
   //
@@ -8017,9 +8010,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   ASTContext &ctx = getASTContext();
 
   // Don't allow getBody() to trigger parsing of an unparsed body containing the
-  // code completion location.
+  // IDE inspection location.
   if (getBodyKind() == BodyKind::Unparsed &&
-      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
+      ctx.SourceMgr.rangeContainsIDEInspectionTarget(getBodySourceRange())) {
     return nullptr;
   }
 
@@ -8890,14 +8883,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
-VarDecl *ConstructorDecl::getLocalTypeWrapperStorageVar() const {
-  auto &ctx = getASTContext();
-  auto *mutableSelf = const_cast<ConstructorDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator, SynthesizeLocalVariableForTypeWrapperStorage{mutableSelf},
-      nullptr);
-}
-
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
@@ -9104,6 +9089,20 @@ Type ConstructorDecl::getInitializerInterfaceType() {
 }
 
 CtorInitializerKind ConstructorDecl::getInitKind() const {
+  const auto *ED =
+      dyn_cast_or_null<ExtensionDecl>(getDeclContext()->getAsDecl());
+  if (ED && !ED->hasBeenBound()) {
+    // When the declaration context is an extension and this is called when the
+    // extended nominal hasn't be bound yet, e.g. dumping pre-typechecked AST,
+    // there is not enough information about extended nominal to use for
+    // computing init kind on InitKindRequest as bindExtensions is done at
+    // typechecking, so in that case just look to parsed attribute in init
+    // declaration.
+    return getAttrs().hasAttribute<ConvenienceAttr>()
+               ? CtorInitializerKind::Convenience
+               : CtorInitializerKind::Designated;
+  }
+
   return evaluateOrDefault(getASTContext().evaluator,
     InitKindRequest{const_cast<ConstructorDecl *>(this)},
     CtorInitializerKind::Designated);
@@ -9681,4 +9680,32 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
     endLoc = MacroLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
+}
+
+MacroDefinition MacroDefinition::forMissing(
+    ASTContext &ctx, Identifier externalModuleName,
+    Identifier externalMacroTypeName
+) {
+  auto def = ctx.AllocateObjectCopy(
+    MissingDefinition{externalModuleName, externalMacroTypeName}
+  );
+  return MacroDefinition{
+    Kind::Expression, ImplementationKind::Missing, def
+  };
+}
+
+NominalTypeDecl *
+ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
+  auto &ctx = getASTContext();
+  auto *nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{attr, getDeclContext()}, nullptr);
+  assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
+  return nominal;
+}
+
+ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetRuntimeDiscoverableAttributes{mutableSelf},
+                           nullptr);
 }

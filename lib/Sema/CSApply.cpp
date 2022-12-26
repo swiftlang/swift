@@ -1187,8 +1187,7 @@ namespace {
       }
 
       auto *const thunk =
-          new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy,
-                                    AutoClosureExpr::InvalidDiscriminator, dc);
+          new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy, dc);
       thunk->setParameterList(thunkParamList);
       thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
       cs.cacheType(thunk);
@@ -1427,8 +1426,7 @@ namespace {
 
       // Finally, construct the outer thunk.
       auto *outerThunk =
-          new (ctx) AutoClosureExpr(outerThunkBody, outerThunkTy,
-                                    AutoClosureExpr::InvalidDiscriminator, dc);
+          new (ctx) AutoClosureExpr(outerThunkBody, outerThunkTy, dc);
       outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
       outerThunk->setParameterList(
           ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
@@ -3820,13 +3818,11 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      for (unsigned i = 0; i < expr->getNumBindings(); ++i) {
-        auto *binding = expr->getBindings()[i];
-        expr->setBinding(i, visit(binding));
-      }
+      return simplifyExprType(expr);
+    }
 
-      simplifyExprType(expr);
-      return expr;
+    Expr *visitPackElementExpr(PackElementExpr *expr) {
+      return simplifyExprType(expr);
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -5155,14 +5151,12 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       auto &ctx = cs.getASTContext();
-      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
           FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
       auto closure = new (ctx)
-          AutoClosureExpr(/*set body later*/nullptr, leafTy,
-                          discriminator, dc);
+          AutoClosureExpr(/*set body later*/nullptr, leafTy, dc);
 
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
@@ -7132,10 +7126,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 
-    return cs.cacheType(PackExpansionExpr::create(ctx, pattern,
-        expansion->getOpaqueValues(), expansion->getBindings(),
-        expansion->getEndLoc(), expansion->getGenericEnvironment(),
-        expansion->isImplicit(), expansionTy));
+    expansion->setPatternExpr(pattern);
+    expansion->setType(expansionTy);
+    return cs.cacheType(expansion);
   }
 
   case TypeKind::BuiltinTuple:

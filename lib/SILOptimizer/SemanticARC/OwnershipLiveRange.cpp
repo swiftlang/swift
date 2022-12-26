@@ -73,8 +73,8 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // NOTE: Today we do not support TermInsts for simplicity... we /could/
     // support it though if we need to.
     auto *ti = dyn_cast<TermInst>(user);
-    if ((ti && !ti->isTransformationTerminator()) ||
-        !canOpcodeForwardGuaranteedValues(op) ||
+    if ((ti && !ti->mayHaveTerminatorResult()) ||
+        !canOpcodeForwardInnerGuaranteedValues(op) ||
         1 !=
             count_if(user->getNonTypeDependentOperandValues(), [&](SILValue v) {
               return v->getOwnershipKind() == OwnershipKind::Owned;

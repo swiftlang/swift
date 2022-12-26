@@ -163,6 +163,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_CONCURRENCY_CHECKED:
       extendedInfo.setIsConcurrencyChecked(true);
       break;
+    case options_block::MODULE_PACKAGE_NAME:
+      extendedInfo.setModulePackageName(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -360,11 +363,9 @@ static ValidationInfo validateControlBlock(
       static const char* forcedDebugRevision =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
-      bool isCompilerTagged = forcedDebugRevision ||
-        version::isCurrentCompilerTagged();
-
       StringRef moduleRevision = blobData;
-      if (isCompilerTagged) {
+      if (forcedDebugRevision ||
+          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getCurrentCompilerTag();
         if (moduleRevision != compilerRevision) {
@@ -1348,6 +1349,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
+      ModulePackageName = extInfo.getModulePackageName();
 
       hasValidControlBlock = true;
       break;

@@ -78,6 +78,7 @@ public:
     clear();
     Root = other.Root;
     other.Root = nullptr;
+    return *this;
   }
 
   SuccessorMap(const SuccessorMap &other) : Root(copyTree(other.Root)) {}
@@ -85,6 +86,7 @@ public:
     // TODO: this is clearly optimizable to re-use nodes.
     deleteTree(Root);
     Root = copyTree(other.Root);
+    return *this;
   }
 
   ~SuccessorMap() {

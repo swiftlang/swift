@@ -407,7 +407,7 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
                               param.getDifferentiability());
     else
       return SILParameterInfo(storageType.getASTType(),
-                              ParameterConvention::Indirect_In_Constant,
+                              ParameterConvention::Indirect_In,
                               param.getDifferentiability());
   } else {
     auto newType = getNewSILType(env, storageType, IGM);

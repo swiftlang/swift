@@ -1584,7 +1584,15 @@ public:
     // If so, let's put a fresh generic parameter in the substituted signature
     // here.
     unsigned paramIndex = substGenericParams.size();
-    auto gp = GenericTypeParamType::get(false, 0, paramIndex, TC.Context);
+
+    bool isParameterPack = false;
+    if (substTy->isParameterPack() || substTy->is<PackArchetypeType>())
+      isParameterPack = true;
+    else if (pattern.isTypeParameterPack())
+      isParameterPack = true;
+
+    auto gp = GenericTypeParamType::get(isParameterPack, 0, paramIndex,
+                                        TC.Context);
     substGenericParams.push_back(gp);
     substReplacementTypes.push_back(substTy);
     
@@ -1737,119 +1745,31 @@ public:
     }
     
     auto decl = orig->getAnyNominal();
-    
-    // Any type parameters we use as arguments to the nominal type must still
-    // satisfy the requirements on the nominal type. So we pull all of the
-    // generic requirements from the nominal type declaration into the
-    // substituted signature, then same-type-constrain those variables to the
-    // types we get by recursively visiting the bound generic arguments.
+
     auto moduleDecl = decl->getParentModule();
-    auto origSubMap = orig->getContextSubstitutionMap(moduleDecl,
-                                                decl,
-                                                decl->getGenericEnvironment());
-    auto substSubMap = subst->getContextSubstitutionMap(moduleDecl, decl,
-                                                decl->getGenericEnvironment());
+    auto origSubMap = orig->getContextSubstitutionMap(moduleDecl, decl);
+    auto substSubMap = subst->getContextSubstitutionMap(moduleDecl, decl);
     
-    auto nomGenericSig = decl->getGenericSignature().getCanonicalSignature();
+    auto nomGenericSig = decl->getGenericSignature();
     
-    llvm::DenseMap<GenericTypeParamType*, GenericTypeParamType*>
-      substGPMapping;
-    
-    // Create parallel generic params for the nominal type's generic params.
-    for (unsigned i = 0; i < nomGenericSig.getGenericParams().size(); ++i) {
-      auto nomTyParam = nomGenericSig.getGenericParams()[i];
-      // If the nominal type same-type constrains away this generic parameter,
-      // we don't need to visit it.
-      if (nomGenericSig->isConcreteType(nomTyParam))
-        continue;
-      
-      unsigned substGPIndex = substGenericParams.size();
-      auto substGP = GenericTypeParamType::get(false, 0,
-                                               substGPIndex, TC.Context);
-      substGenericParams.push_back(substGP);
-      substReplacementTypes.push_back(Type());
-      substGPMapping.insert({nomGenericSig.getGenericParams()[i], substGP});
-    }
-    
-    // Create parallel requirements too, mapping from the generic signature's
-    // params to our parallel params.
-    auto substGPMap = SubstitutionMap::get(nomGenericSig,
-      [&](SubstitutableType *dt) -> Type {
-        auto mapping = substGPMapping.find(cast<GenericTypeParamType>(dt));
-        assert(mapping != substGPMapping.end());
-        return mapping->second;
-      }, [&](CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-        // We should always be substituting type parameter for type parameter
-        return ProtocolConformanceRef(conformedProtocol);
-      });
-    
-    for (auto reqt : nomGenericSig.getRequirements()) {
-      auto firstTy = reqt.getFirstType().subst(substGPMap);
-      switch (auto kind = reqt.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
-
-      case RequirementKind::SameType:
-        // Skip same-type constraints that define away primary generic params,
-        // since we didn't duplicate those params.
-        if (reqt.getFirstType()->getAs<GenericTypeParamType>()
-            && nomGenericSig->isConcreteType(reqt.getFirstType()))
-          continue;
-          
-        LLVM_FALLTHROUGH;
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass: {
-        auto secondTy = reqt.getSecondType().subst(substGPMap);
-        substRequirements.push_back(Requirement(kind, firstTy, secondTy));
-        break;
-      }
-      case RequirementKind::Layout:
-        substRequirements.push_back(Requirement(kind, firstTy,
-                                                reqt.getLayoutConstraint()));
-        break;
-      }
-    }
-    
-    // Now recur into the type arguments, and same-type-constrain the
-    // substituted type arguments to the parallel generic parameter, giving us
-    // the intersection of constraints on the type binding and the nominal type's
-    // requirements.
-    llvm::DenseMap<GenericTypeParamType*, Type>
-      newGPMapping;
-
+    TypeSubstitutionMap replacementTypes;
     for (auto gp : nomGenericSig.getGenericParams()) {
-      if (nomGenericSig->isConcreteType(gp))
-        continue;
-      
       auto origParamTy = Type(gp).subst(origSubMap)
         ->getCanonicalType();
       auto substParamTy = Type(gp).subst(substSubMap)
         ->getCanonicalType();
-      
-      auto newParamTy = visit(substParamTy,
-                              AbstractionPattern(origSig, origParamTy));
-      newGPMapping.insert({gp, newParamTy});
-      auto substGPTy = Type(gp).subst(substGPMap)->castTo<GenericTypeParamType>();
-      substRequirements.push_back(Requirement(RequirementKind::SameType,
-                                              newParamTy,
-                                              substGPTy));
-      assert(!substReplacementTypes[substGPTy->getIndex()]);
-      substReplacementTypes[substGPTy->getIndex()] = substParamTy;
+
+      replacementTypes[gp->getCanonicalType()->castTo<SubstitutableType>()]
+          = visit(substParamTy, AbstractionPattern(origSig, origParamTy));
     }
-    
+
     auto newSubMap = SubstitutionMap::get(nomGenericSig,
-      [&](SubstitutableType *dt) -> Type {
-        auto mapping = newGPMapping.find(cast<GenericTypeParamType>(dt));
-        assert(mapping != newGPMapping.end());
-        return mapping->second;
-      }, [&](CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-        // We should always be substituting type parameter for type parameter
-        return ProtocolConformanceRef(conformedProtocol);
-      });
+      QueryTypeSubstitutionMap{replacementTypes},
+      LookUpConformanceInModule(moduleDecl));
+    
+    for (auto reqt : nomGenericSig.getRequirements()) {
+      substRequirements.push_back(reqt.subst(newSubMap));
+    }
     
     return decl->getDeclaredInterfaceType().subst(newSubMap)->getCanonicalType();
   }
@@ -1881,11 +1801,30 @@ public:
   }
 
   CanType visitPackType(PackType *pack, AbstractionPattern pattern) {
-    llvm_unreachable("Unimplemented!");
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, pack))
+      return gp;
+
+    // Break down the pack.
+    SmallVector<Type, 4> packElts;
+    for (unsigned i = 0; i < pack->getNumElements(); ++i) {
+      packElts.push_back(visit(pack->getElementType(i),
+                               pattern.getPackElementType(i)));
+    }
+
+    return CanType(PackType::get(TC.Context, packElts));
   }
 
-  CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
-    llvm_unreachable("Unimplemented!");
+  CanType visitPackExpansionType(PackExpansionType *pack,
+                                 AbstractionPattern pattern) {
+    // Avoid walking into the pattern and count type if we can help it.
+    if (!pack->hasTypeParameter() && !pack->hasArchetype() &&
+        !pack->hasOpaqueArchetype()) {
+      return CanType(pack);
+    }
+
+    return CanType(PackExpansionType::get(
+        visit(pack->getPatternType(), pattern.getPackExpansionPatternType()),
+        visit(pack->getCountType(), pattern.getPackExpansionCountType())));
   }
 
   CanType visitExistentialType(ExistentialType *exist,

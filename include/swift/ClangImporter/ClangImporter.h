@@ -275,6 +275,8 @@ public:
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 
+  FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
+
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
   ClangNode getEffectiveClangNode(const Decl *decl) const;
@@ -421,7 +423,7 @@ public:
       ModuleDependenciesCache &cache,
       const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
 
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
@@ -437,7 +439,7 @@ public:
   /// \returns \c true if an error occurred, \c false otherwise
   bool addBridgingHeaderDependencies(
       StringRef moduleName,
-      ModuleDependenciesKind moduleKind,
+      ModuleDependencyKind moduleKind,
       ModuleDependenciesCache &cache);
 
   clang::TargetInfo &getTargetInfo() const override;

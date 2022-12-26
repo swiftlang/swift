@@ -53,8 +53,6 @@ bool swift::hasPointerEscape(BorrowedValue value) {
     case OperandOwnership::InteriorPointer:
     case OperandOwnership::BitwiseEscape:
       break;
-
-    case OperandOwnership::GuaranteedForwardingPhi:
     case OperandOwnership::Reborrow: {
       SILArgument *phi = cast<BranchInst>(op->getUser())
                              ->getDestBB()
@@ -84,12 +82,12 @@ bool swift::hasPointerEscape(BorrowedValue value) {
   return false;
 }
 
-bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
+bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
-      if (ti->isTransformationTerminator())
+      if (ti->mayHaveTerminatorResult())
         return OwnershipForwardingMixin::get(ti)->preservesOwnership();
 
   if (auto *inst = value->getDefiningInstruction())
@@ -100,7 +98,7 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   return false;
 }
 
-bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
+bool swift::canOpcodeForwardInnerGuaranteedValues(Operand *use) {
   if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
     return mixin->preservesOwnership() &&
            !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
@@ -108,18 +106,12 @@ bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
-  // If we have a SILArgument and we are the successor block of a transforming
-  // terminator, we are fine.
-  if (auto *arg = dyn_cast<SILPhiArgument>(value))
-    if (auto *predTerm = arg->getSingleTerminator())
-      if (predTerm->isTransformationTerminator())
-        return OwnershipForwardingMixin::get(predTerm)->preservesOwnership();
-
-  if (auto *inst = value->getDefiningInstruction())
-    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+  if (auto *inst = value->getDefiningInstructionOrTerminator()) {
+    if (auto *mixin = OwnershipForwardingMixin::get(inst)) {
       return mixin->preservesOwnership() &&
              !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
-
+    }
+  }
   return false;
 }
 
@@ -225,6 +217,11 @@ bool swift::findInnerTransitiveGuaranteedUses(
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
+        if (auto *phi = SILArgument::asPhi(result)) {
+          leafUse(use);
+          foundPointerEscape = true;
+          return true;
+        }
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
             nonLeaf = true;
@@ -238,11 +235,6 @@ bool swift::findInnerTransitiveGuaranteedUses(
       if (!nonLeaf) {
         leafUse(use);
       }
-      break;
-    }
-    case OperandOwnership::GuaranteedForwardingPhi: {
-      leafUse(use);
-      foundPointerEscape = true;
       break;
     }
     case OperandOwnership::Borrow:
@@ -342,17 +334,6 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       }
       recordUse(use);
       break;
-    // \p borrowedValue will dominate this GuaranteedForwardingPhi, because we
-    // return false in the case of Reborrow.
-    case OperandOwnership::GuaranteedForwardingPhi: {
-      SILArgument *phi = PhiOperand(use).getValue();
-      for (auto *use : phi->getUses()) {
-        if (use->getOperandOwnership() != OperandOwnership::NonUse)
-          worklist.insert(use);
-      }
-      recordUse(use);
-      break;
-    }
     case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
@@ -425,15 +406,12 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // GuaranteedForwardingPhi uses.
   for (auto *use : value->getUses()) {
     if (use->getOperandOwnership() == OperandOwnership::GuaranteedForwarding) {
-      guaranteedForwardingOps.insert(use);
-      continue;
-    }
-    if (use->getOperandOwnership() ==
-        OperandOwnership::GuaranteedForwardingPhi) {
-      if (!visitor(use)) {
-        return false;
+      if (PhiOperand(use)) {
+        if (!visitor(use)) {
+          return false;
+        }
       }
-      continue;
+      guaranteedForwardingOps.insert(use);
     }
   }
 
@@ -443,15 +421,12 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
       for (auto *valUse : val->getUses()) {
         if (valUse->getOperandOwnership() ==
             OperandOwnership::GuaranteedForwarding) {
-          guaranteedForwardingOps.insert(valUse);
-          continue;
-        }
-        if (valUse->getOperandOwnership() ==
-            OperandOwnership::GuaranteedForwardingPhi) {
-          if (!visitor(valUse)) {
-            return false;
+          if (PhiOperand(valUse)) {
+            if (!visitor(valUse)) {
+              return false;
+            }
           }
-          continue;
+          guaranteedForwardingOps.insert(valUse);
         }
       }
     }
@@ -1043,7 +1018,8 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user)) {
+        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
+        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -1077,14 +1053,12 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
 
     // If we have a load_borrow, add it's end scope to the liveness requirement.
     if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
-      if (foundUses) {
-        // FIXME: if we can assume complete lifetimes, then this should be
-        // as simple as:
-        //   for (Operand *use : lbi->getUses()) {
-        //     if (use->endsLocalBorrowScope()) {
-        if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
-          result = meet(result, AddressUseKind::PointerEscape);
-        }
+      // FIXME: if we can assume complete lifetimes, then this should be
+      // as simple as:
+      //   for (Operand *use : lbi->getUses()) {
+      //     if (use->endsLocalBorrowScope()) {
+      if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
+        result = meet(result, AddressUseKind::PointerEscape);
       }
       continue;
     }
@@ -1220,11 +1194,12 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
-  SmallVector<SILValue, 32> worklist;
-  worklist.emplace_back(inputValue);
+  SmallSetVector<SILValue, 32> worklist;
+  worklist.insert(inputValue);
 
-  while (!worklist.empty()) {
-    SILValue value = worklist.pop_back_val();
+  // worklist grows in this loop.
+  for (unsigned idx = 0; idx < worklist.size(); idx++) {
+    SILValue value = worklist[idx];
 
     // First check if v is an introducer. If so, stash it and continue.
     if (auto scopeIntroducer = BorrowedValue(value)) {
@@ -1243,21 +1218,25 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // instruction
     if (isGuaranteedForwarding(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getNonTypeDependentOperandValues(),
-                   std::back_inserter(worklist));
+        for (SILValue opValue : i->getNonTypeDependentOperandValues()) {
+          worklist.insert(opValue);
+        }
         continue;
       }
 
       // Otherwise, we should have a block argument that is defined by a single
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(value);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transforming terminators should always have a single operand");
-      worklist.push_back(termInst->getAllOperands()[0].get());
-      continue;
+      if (arg->isTerminatorResult()) {
+        if (auto *forwardedOper = arg->forwardedTerminatorResultOperand()) {
+          worklist.insert(forwardedOper->get());
+          continue;
+        }
+      }
+      arg->visitIncomingPhiOperands([&](auto *operand) {
+        worklist.insert(operand->get());
+        return true;
+      });
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1287,7 +1266,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwarding(currentValue)) {
-      if (auto *i = currentValue->getDefiningInstruction()) {
+      if (auto *i = currentValue->getDefiningInstructionOrTerminator()) {
         auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
@@ -1299,17 +1278,6 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
         currentValue = *begin;
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(currentValue);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transformation terminators should only have single operands");
-      currentValue = termInst->getAllOperands()[0].get();
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1347,22 +1315,11 @@ bool swift::getAllOwnedValueIntroducers(
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isForwardingConsume(value)) {
-      if (auto *i = value->getDefiningInstruction()) {
+      if (auto *i = value->getDefiningInstructionOrTerminator()) {
         llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(value);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands() == 1 &&
-             "Transforming terminators should always have a single operand");
-      worklist.push_back(termInst->getAllOperands()[0].get());
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1388,7 +1345,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isForwardingConsume(currentValue)) {
-      if (auto *i = currentValue->getDefiningInstruction()) {
+      if (auto *i = currentValue->getDefiningInstructionOrTerminator()) {
         auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
@@ -1400,18 +1357,6 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
         currentValue = *begin;
         continue;
       }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator and is directly forwarding.
-      auto *arg = cast<SILPhiArgument>(currentValue);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
-      assert(termInst->getNumOperands()
-             - termInst->getNumTypeDependentOperands() == 1 &&
-             "Transformation terminators should only have single operands");
-      currentValue = termInst->getAllOperands()[0].get();
-      continue;
     }
 
     // Otherwise, this is an introducer we do not understand. Bail and return
@@ -1430,31 +1375,16 @@ ForwardingOperand::ForwardingOperand(Operand *use) {
   if (use->isTypeDependent())
     return;
 
-  if (!OwnershipForwardingMixin::isa(use->getUser())) {
-    return;
-  }
-#ifndef NDEBUG
   switch (use->getOperandOwnership()) {
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::GuaranteedForwarding:
+    this->use = use;
     break;
-  case OperandOwnership::NonUse:
-  case OperandOwnership::TrivialUse:
-  case OperandOwnership::InstantaneousUse:
-  case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::PointerEscape:
-  case OperandOwnership::BitwiseEscape:
-  case OperandOwnership::Borrow:
-  case OperandOwnership::DestroyingConsume:
-  case OperandOwnership::InteriorPointer:
-  case OperandOwnership::GuaranteedForwardingPhi:
-  case OperandOwnership::EndBorrow:
-  case OperandOwnership::Reborrow:
-    llvm_unreachable("this isn't the operand being forwarding!");
+  default:
+    this->use = nullptr;
+    return;
   }
-#endif
-  this->use = use;
 }
 
 ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
@@ -1660,15 +1590,22 @@ bool ForwardingOperand::visitForwardedValues(
   // "transforming terminators"... We know that this means that we should at
   // most have a single phi argument.
   auto *ti = cast<TermInst>(user);
-  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
-    // If we do not have any arguments, then continue.
-    if (succBlock->args_empty())
-      return true;
+  if (ti->mayHaveTerminatorResult()) {
+    return llvm::all_of(
+        ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+          // If we do not have any arguments, then continue.
+          if (succBlock->args_empty())
+            return true;
 
-    auto args = succBlock->getSILPhiArguments();
-    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
-    return visitor(args[0]);
-  });
+          auto args = succBlock->getSILPhiArguments();
+          assert(args.size() == 1 &&
+                 "Transforming terminator with multiple args?!");
+          return visitor(args[0]);
+        });
+  }
+
+  auto *succArg = PhiOperand(use).getValue();
+  return visitor(succArg);
 }
 
 void swift::visitExtendedReborrowPhiBaseValuePairs(

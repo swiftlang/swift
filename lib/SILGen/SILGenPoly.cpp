@@ -521,7 +521,7 @@ ManagedValue Transform::transform(ManagedValue v,
       } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
-        llvm_unreachable("unsupported collection upcast kind");
+        llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
       return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
@@ -1514,8 +1514,6 @@ namespace {
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("abstraction difference in aliasable argument not "
                          "allowed");
-      case ParameterConvention::Indirect_In_Constant:
-        llvm_unreachable("in_constant convention not allowed in SILGen");
       }
 
       llvm_unreachable("Covered switch isn't covered?!");
@@ -1731,7 +1729,6 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -1739,10 +1736,13 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed: {
-    bool isOpaque = SGF.getTypeLowering(value->getType()).isAddressOnly() &&
-                    !SGF.silConv.useLoweredAddresses();
-    return isOpaque ? ManagedValue::forBorrowedObjectRValue(value)
-                    : ManagedValue::forBorrowedAddressRValue(value);
+    if (SGF.silConv.useLoweredAddresses()) {
+      return ManagedValue::forBorrowedAddressRValue(value);
+    }
+    if (value->getType().isTrivial(SGF.F)) {
+      return ManagedValue::forTrivialObjectRValue(value);
+    }
+    return ManagedValue::forBorrowedObjectRValue(value);
   }
   }
   llvm_unreachable("bad kind");
@@ -3463,7 +3463,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
 
   // Partially-apply the thunk to `linearMap` and return the thunked value.
   auto getThunkedResult = [&]() {
@@ -3733,6 +3734,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       customDerivativeFn->isSerialized(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
+      customDerivativeFn->isRuntimeAccessible(),
       customDerivativeFn->getEntryCount(), IsThunk,
       customDerivativeFn->getClassSubclassScope());
   // This thunk may be publicly exposed and cannot be transparent.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,9 +26,6 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand,
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
-  }
-  if (opOwnership == OperandOwnership::GuaranteedForwarding) {
-    return canOpcodeForwardGuaranteedValues(const_cast<Operand *>(operand));
   }
   return true;
 }
@@ -430,8 +427,8 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return isGuaranteedForwardingPhi(getValue())
-               ? OperandOwnership::GuaranteedForwardingPhi
+    return isGuaranteedForwarding(getValue())
+               ? OperandOwnership::GuaranteedForwarding
                : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
@@ -454,7 +451,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
 
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Direct_Owned:
     return OperandOwnership::ForwardingConsume;
 
@@ -742,6 +738,9 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_ULE)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_ULT)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InsertElement)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntToFPWithOverflow)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, BitWidth)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsNegative)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, WordAtIndex)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntToPtr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsOptionalType)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsPOD)

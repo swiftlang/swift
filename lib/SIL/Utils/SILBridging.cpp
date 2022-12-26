@@ -214,8 +214,6 @@ BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention
       return ArgumentConvention_Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
       return ArgumentConvention_Indirect_In;
-    case SILArgumentConvention::Indirect_In_Constant:
-      return ArgumentConvention_Indirect_In_Constant;
     case SILArgumentConvention::Indirect_Out:
       return ArgumentConvention_Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:
@@ -392,8 +390,6 @@ static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention 
       return ArgumentConvention_Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
       return ArgumentConvention_Indirect_In;
-    case SILArgumentConvention::Indirect_In_Constant:
-      return ArgumentConvention_Indirect_In_Constant;
     case SILArgumentConvention::Indirect_Out:
       return ArgumentConvention_Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:
@@ -745,6 +741,10 @@ BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst) {
   assert(!i->isStaticInitializerInst() &&
          "cannot get the parent of a static initializer instruction");
   return {i->getParent()};
+}
+
+bool SILInstruction_isDeleted(BridgedInstruction inst) {
+  return castToInst(inst)->isDeleted();
 }
 
 BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst) {
@@ -1187,4 +1187,10 @@ BridgedInstruction SILBuilder_createBranch(
   return {builder.createBranch(RegularLocation(b.loc.getLocation()),
                                castToBasicBlock(destBlock),
                                getSILValues(arguments, argValues))};
+}
+
+BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder b) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     b.loc.getScope());
+  return {builder.createUnreachable(RegularLocation(b.loc.getLocation()))};
 }

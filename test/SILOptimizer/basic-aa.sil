@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -enforce-exclusivity=none -module-name Swift %s -aa-kind=basic-aa -aa-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -141,11 +142,6 @@ struct StructLvl1 {
 // CHECK-NEXT:   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
 // CHECK-NEXT: PartialAlias
 
-// CHECK: PAIR #12.
-// CHECK-NEXT:   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT:   %14 = tuple ()
-// CHECK-NEXT: MayAlias
-
 // CHECK: PAIR #21.
 // CHECK-NEXT:   %1 = alloc_stack $StructLvl1
 // CHECK-NEXT:   %9 = struct_element_addr %7 : $*StructLvl2, #StructLvl2.tup
@@ -190,6 +186,14 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
   %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
   %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
 
+  fix_lifetime %2 : $*StructLvl2
+  fix_lifetime %3 : $*Builtin.Int64
+  fix_lifetime %5 : $*Builtin.Int64
+  fix_lifetime %6 : $*Builtin.Int32
+  fix_lifetime %8 : $*Builtin.Int64
+  fix_lifetime %10 : $*Builtin.Int64
+  fix_lifetime %11 : $*Builtin.Int32
+
   dealloc_stack %1 : $*StructLvl1
   dealloc_stack %0 : $*StructLvl1
 
@@ -213,10 +217,6 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
 // CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #4.
-// CHECK-NEXT:   %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT:   %5 = tuple ()
-// CHECK-NEXT: MayAlias
 // CHECK: PAIR #6.
 // CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT:   %2 = argument of bb0 : $*Builtin.NativeObject
@@ -290,14 +290,10 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
 // CHECK-NEXT: MayAlias
-// CHECK: PAIR #18.
-// CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
-// CHECK-NEXT: MayAlias
 // CHECK: PAIR #19.
 // CHECK-NEXT:   %1 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: MayAlias
+// CHECK-NEXT: NoAlias
 
 // Test %2
 // CHECK: PAIR #22.
@@ -316,10 +312,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #28.
-// CHECK-NEXT:   %2 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: MayAlias
 
 // Test %3 (the escaping alloca).
 
@@ -330,10 +322,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK: PAIR #33.
 // CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT:   %6 = load %0 : $*Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #35.
-// CHECK-NEXT:   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
 
 // Test %5 (the read write apply inst).
@@ -350,15 +338,11 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-NEXT: function_ref use_native_object
 // CHECK-NEXT:   %7 = function_ref @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #48.
-// CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
-// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
-// CHECK-NEXT: MayAlias
+// CHECK-NEXT: NoAlias
 // CHECK: PAIR #49.
 // CHECK-NEXT:   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
 // CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: MayAlias
+// CHECK-NEXT: NoAlias
 
 // Test %8 (the escaping load)
 
@@ -366,10 +350,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
 // CHECK-NEXT: MustAlias
-// CHECK: PAIR #61.
-// CHECK-NEXT:   %8 = load %3 : $*Builtin.NativeObject
-// CHECK-NEXT:   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: MayAlias
 sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = alloc_stack $Builtin.NativeObject
@@ -399,6 +379,8 @@ sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : 
   %4 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
   %5 = struct_element_addr %4 : $*StructLvl2, #StructLvl2.tup
   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
+  fix_lifetime %3: $*Builtin.Int32
+  fix_lifetime %6: $*Builtin.Int32
   dealloc_stack %0 : $*StructLvl1
   %7 = tuple()
   return %7 : $()
@@ -513,6 +495,7 @@ sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $C
   %1 = ref_element_addr %0 : $C, #C.a
+  fix_lifetime %1 : $*Int
   %2 = tuple()
   return %2 : $()
 }
@@ -527,22 +510,6 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
   %6 = ref_element_addr %0 : $C, #C.a
   %8 = ref_element_addr %1 : $C, #C.b
   return %2 : $Int
-}
-
-// CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
-// CHECK: PAIR #7.
-// CHECK-NEXT:   %1 = alloc_ref $X{{.*}}                               // user: %3
-// CHECK-NEXT:   %3 = apply %2(%1) : $@convention(thin) (X) -> X
-// CHECK-NEXT: NoAlias
-sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
-bb0(%0 : $X):
-  %1 = alloc_ref $X
-
-  %f = function_ref @not_escaping : $@convention(thin) (X) -> X
-  %2 = apply %f(%1) : $@convention(thin) (X) -> X
-
-  %12 = tuple()
-  return %12 : $()
 }
 
 sil @not_escaping: $@convention(thin) (X) -> X {
@@ -618,6 +585,8 @@ bb0(%0 : $*StructWithOptional):
   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
   %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
   %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+  fix_lifetime %4 : $*Int
+  fix_lifetime %5 : $*Int
   dealloc_stack %1 : $*StructWithOptional
   %6 = tuple ()
   return %6 : $()
@@ -652,6 +621,7 @@ bb0(%0 : $P):
   %2 = alloc_stack $P
   %3 = init_existential_addr %2 : $*P, $S
   %4 = struct_element_addr %3 : $*S, #S.i
+  fix_lifetime %4 : $*Int
   dealloc_stack %2 : $*P
   dealloc_stack %1 : $*S
   %6 = tuple ()

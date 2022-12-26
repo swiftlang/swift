@@ -352,19 +352,19 @@ ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
   return scratch;
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(ASTNode node) const {
+bool ConstraintSystem::containsIDEInspectionTarget(ASTNode node) const {
   SourceRange range = node.getSourceRange();
   if (range.isInvalid())
     return false;
-  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(
+bool ConstraintSystem::containsIDEInspectionTarget(
     const ArgumentList *args) const {
   SourceRange range = args->getSourceRange();
   if (range.isInvalid())
     return false;
-  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
@@ -780,7 +780,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
       TypeResolution::forInterface(
           DC, None,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -1281,6 +1282,10 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
+  // Strip pack expansion types off of pack references.
+  if (auto *expansion = requestedType->getAs<PackExpansionType>())
+    requestedType = expansion->getPatternType();
+
   // Adjust the type for concurrency if requested.
   if (adjustForPreconcurrency)
     requestedType = adjustVarTypeForConcurrency(
@@ -1401,6 +1406,15 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   if (!(functionRefKind == FunctionRefKind::Compound ||
         functionRefKind == FunctionRefKind::Unapplied)) {
     return functionType;
+  }
+
+  // This transform is not applicable to pattern matching context.
+  //
+  // Note: If the transform is ever enabled for patterns - new branch
+  // would have to be added to `nameLoc` selection.
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::PatternMatch>())
+      return functionType;
   }
 
   auto *paramList = funcDecl->getParameters();
@@ -1587,7 +1601,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type =
         TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
                                      /*unboundTyOpener*/ nullptr,
-                                     /*placeholderHandler*/ nullptr)
+                                     /*placeholderHandler*/ nullptr,
+                                     /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
     type = useDC->mapTypeIntoContext(type);
@@ -2948,7 +2963,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
           castType = TypeResolution::resolveContextualType(
               castTypeRepr, DC, TypeResolverContext::InExpression,
               /*unboundTyOpener*/ nullptr,
-              /*placeholderHandler*/ nullptr);
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr);
         } else {
           castType = isp->getCastType();
         }
@@ -3467,7 +3483,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // contains the completion location
     auto SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
     if (!isForCodeCompletion() ||
-        (SE && !containsCodeCompletionLoc(SE->getArgs()))) {
+        (SE && !containsIDEInspectionTarget(SE->getArgs()))) {
       increaseScore(SK_KeyPathSubscript);
     }
     break;
@@ -5329,6 +5345,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
 
     case ConstraintLocator::PackElement:
+    case ConstraintLocator::OpenedPackElement:
     case ConstraintLocator::PackShape:
       break;
 
@@ -6107,8 +6124,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                          ->castTo<FunctionType>();
 
   auto *closure = new (Context)
-      AutoClosureExpr(expr, newClosureType,
-                      AutoClosureExpr::InvalidDiscriminator, ClosureContext);
+      AutoClosureExpr(expr, newClosureType, ClosureContext);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
@@ -6930,6 +6946,9 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
 }
 
 bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
+  if (getAppliedResultBuilderTransform(closure))
+    return true;
+
   if (closure->hasSingleExpressionBody())
     return true;
 

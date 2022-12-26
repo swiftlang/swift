@@ -921,7 +921,7 @@ bool swift::ide::isDeclOverridable(ValueDecl *D) {
   return true;
 }
 
-bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D) {
+bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> getType) {
   if (!isDeclOverridable(D))
     return false;
 
@@ -940,7 +940,7 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D) {
 
   // `type(of: foo).staticOrClassMethod()`. A static method may be "dynamic"
   // here, but not if the instance type is a struct/enum.
-  if (auto IT = Base->getType()->getAs<MetatypeType>()) {
+  if (auto IT = getType(Base)->getAs<MetatypeType>()) {
     auto InstanceType = IT->getInstanceType();
     if (InstanceType->getStructOrBoundGenericStruct() ||
         InstanceType->getEnumOrBoundGenericEnum())

@@ -23,7 +23,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -162,7 +162,8 @@ bool Parser::startsParameterName(bool isClosure) {
     // If the first name wasn't "isolated", we're done.
     if (!Tok.isContextualKeyword("isolated") &&
         !Tok.isContextualKeyword("some") &&
-        !Tok.isContextualKeyword("any"))
+        !Tok.isContextualKeyword("any") &&
+        !Tok.isContextualKeyword("each"))
       return true;
 
     // "isolated" can be an argument label, but it's also a contextual keyword,
@@ -239,8 +240,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (paramContext != ParameterContextKind::EnumElement) {
       auto AttrStatus = parseDeclAttributeList(param.Attrs);
       if (AttrStatus.hasCodeCompletion()) {
-        if (CodeCompletion)
-          CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
+        if (IDECallbacks)
+          IDECallbacks->setAttrTargetDeclKind(DeclKind::Param);
         status.setHasCodeCompletionAndIsError();
       }
     }
@@ -989,8 +990,8 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
     // Code completion.
     if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine() &&
         !existingArrowLoc.isValid()) {
-      if (CodeCompletion)
-        CodeCompletion->completeEffectsSpecifier(asyncLoc.isValid(),
+      if (IDECallbacks)
+        IDECallbacks->completeEffectsSpecifier(asyncLoc.isValid(),
                                                  throwsLoc.isValid());
       consumeToken(tok::code_complete);
       status.setHasCodeCompletionAndIsError();
@@ -1027,9 +1028,10 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     if (!Ty.isNull()) {
       // Attempt to diagnose initializer calls incorrectly written
       // as typed patterns, such as "var x: [Int]()".
-      // Disable this tentative parse when in code-completion mode, otherwise
+      // Disable this tentative parse when in IDE inspection mode, otherwise
       // code-completion may enter the delayed-decl state twice.
-      if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
+      if (Tok.isFollowingLParen() &&
+          !SourceMgr.hasIDEInspectionTargetBuffer()) {
         CancellableBacktrackingScope backtrack(*this);
 
         // Create a local context if needed so we can parse trailing closures.

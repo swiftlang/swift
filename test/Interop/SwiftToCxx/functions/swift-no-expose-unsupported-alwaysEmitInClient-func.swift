@@ -9,8 +9,6 @@
 // CHECK:       namespace Functions __attribute__((swift_private)) {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-EMPTY:
-// CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
 // CHECK-NOT: inline bool alwaysEmitIntoClientFunc(bool x) noexcept SWIFT_WARN_UNUSED_RESULT {

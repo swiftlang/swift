@@ -13,9 +13,10 @@
 #ifndef SWIFT_AST_CONST_TYPE_INFO_H
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
+#include "swift/AST/Type.h"
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace swift {
 class NominalTypeDecl;
@@ -26,7 +27,15 @@ class Type;
 /// in a type property initializer expression
 class CompileTimeValue {
 public:
-  enum ValueKind { RawLiteral, InitCall, Builder, Dictionary, Runtime };
+  enum ValueKind {
+    RawLiteral,
+    InitCall,
+    Builder,
+    Dictionary,
+    Array,
+    Tuple,
+    Runtime
+  };
 
   ValueKind getKind() const { return Kind; }
 
@@ -55,13 +64,9 @@ private:
 };
 
 struct FunctionParameter {
-public:
-  std::string getLabel() { return Label; }
-  swift::Type *getType() { return Type; }
-
-private:
   std::string Label;
-  swift::Type *Type;
+  swift::Type Type;
+  std::shared_ptr<CompileTimeValue> Value;
 };
 
 /// A representation of a call to a type's initializer
@@ -77,6 +82,7 @@ public:
   }
 
   std::string getName() const { return Name; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
 
 private:
   std::string Name;
@@ -106,6 +112,45 @@ public:
   }
 };
 
+struct TupleElement {
+  Optional<std::string> Label;
+  swift::Type Type;
+  std::shared_ptr<CompileTimeValue> Value;
+};
+
+/// A representation of a tuple and each tuple-element
+class TupleValue : public CompileTimeValue {
+public:
+  TupleValue(std::vector<TupleElement> Elements)
+      : CompileTimeValue(ValueKind::Tuple), Elements(Elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Tuple;
+  }
+
+  std::vector<TupleElement> getElements() const { return Elements; }
+
+private:
+  std::vector<TupleElement> Elements;
+};
+
+/// An array literal value representation
+class ArrayValue : public CompileTimeValue {
+public:
+  ArrayValue(std::vector<std::shared_ptr<CompileTimeValue>> Elements)
+      : CompileTimeValue(ValueKind::Array), Elements(Elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Array;
+  }
+  std::vector<std::shared_ptr<CompileTimeValue>> getElements() const {
+    return Elements;
+  }
+
+private:
+  std::vector<std::shared_ptr<CompileTimeValue>> Elements;
+};
+
 /// A representation of an arbitrary value that does not fall under
 /// any of the above categories.
 class RuntimeValue : public CompileTimeValue {
@@ -117,9 +162,25 @@ public:
   }
 };
 
+struct CustomAttrValue {
+  swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
+};
+
 struct ConstValueTypePropertyInfo {
   swift::VarDecl *VarDecl;
   std::shared_ptr<CompileTimeValue> Value;
+  llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers;
+
+  ConstValueTypePropertyInfo(
+      swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
+      llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers)
+      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers) {}
+
+  ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
+                             std::shared_ptr<CompileTimeValue> Value)
+      : VarDecl(VarDecl), Value(Value),
+        PropertyWrappers(llvm::Optional<std::vector<CustomAttrValue>>()) {}
 };
 
 struct ConstValueTypeInfo {

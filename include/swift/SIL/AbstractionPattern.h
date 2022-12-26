@@ -933,6 +933,20 @@ public:
       return false;
     }
   }
+
+  bool isTypeParameterPack() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return false;
+    case Kind::Type:
+    case Kind::ClangType:
+    case Kind::Discard: {
+      return getType()->isParameterPack();
+    }
+    default:
+      return false;
+    }
+  }
   
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?

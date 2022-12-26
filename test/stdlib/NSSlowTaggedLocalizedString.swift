@@ -4,6 +4,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
+// REQUIRES: rdar100559801
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

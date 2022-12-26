@@ -86,12 +86,48 @@ typedef struct {
   // FIXME: Handle Layout Requirements
 } BridgedRequirementRepr;
 
+/// Diagnostic severity when reporting diagnostics.
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : long {
+  BridgedFatalError,
+  BridgedError,
+  BridgedWarning,
+  BridgedRemark,
+  BridgedNote,
+} BridgedDiagnosticSeverity;
+
+typedef void* BridgedDiagnostic;
+
 #ifdef __cplusplus
 extern "C" {
 
 #define _Bool bool
 
 #endif
+
+// Diagnostics
+
+/// Create a new diagnostic with the given severity, location, and diagnostic
+/// text.
+///
+/// \returns a diagnostic instance that can be extended with additional
+/// information and then must be finished via \c SwiftDiagnostic_finish.
+BridgedDiagnostic SwiftDiagnostic_create(
+    void *diagnosticEngine, BridgedDiagnosticSeverity severity,
+    void *_Nullable sourceLoc,
+    const uint8_t *_Nullable text, long textLen);
+
+/// Highlight a source range as part of the diagnostic.
+void SwiftDiagnostic_highlight(
+    BridgedDiagnostic diag, void *_Nullable startLoc, void *_Nullable endLoc);
+
+/// Add a Fix-It to replace a source range as part of the diagnostic.
+void SwiftDiagnostic_fixItReplace(
+    BridgedDiagnostic diag,
+    void *_Nullable replaceStartLoc, void *_Nullable replaceEndLoc,
+    const uint8_t *_Nullable newText, long newTextLen);
+
+/// Finish the given diagnostic and emit it.
+void SwiftDiagnostic_finish(BridgedDiagnostic diag);
 
 BridgedIdentifier SwiftASTContext_getIdentifier(void *ctx,
                                                 const uint8_t *_Nullable str,

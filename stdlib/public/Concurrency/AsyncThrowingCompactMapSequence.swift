@@ -47,7 +47,7 @@ extension AsyncSequence {
   ///     } catch {
   ///         print("Error: \(error)")
   ///     }
-  ///     // Prints "I II III Error: MyError()"
+  ///     // Prints "I II III Error: MyError() "
   ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns a

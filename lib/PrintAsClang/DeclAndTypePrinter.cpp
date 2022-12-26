@@ -1637,12 +1637,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // Don't expose async functions or @_alwaysEmitIntoClient functions
-      // because they're currently unsupported
-      if (FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
-        return;
-      }
-
       // FIXME: Support static methods.
       if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
         return;
@@ -2614,6 +2608,15 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
+static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
+  auto ctx = VD->getDeclContext();
+  return VD->hasName() && VD->getName().isSimpleName() &&
+         VD->getBaseIdentifier().str() == Typename &&
+         isa<ExtensionDecl>(ctx->getAsDecl()) &&
+         cast<ExtensionDecl>(ctx->getAsDecl())->getExtendedNominal() ==
+             VD->getASTContext().getStringDecl();
+}
+
 static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl() && !isExtension)
@@ -2621,6 +2624,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
     if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
+      return true;
+    if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))
       return true;
     return false;
   }
@@ -2637,6 +2642,33 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
     // should be renamed automatically or using the expose attribute.
     if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
       if (isa<AbstractFunctionDecl>(VD) &&
+          !cast<AbstractFunctionDecl>(VD)
+               ->getName()
+               .getBaseName()
+               .isSpecial() &&
+          cast<AbstractFunctionDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("index"))
+        return false;
+    }
+    if (ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) {
+      if (isa<ValueDecl>(VD) &&
+          !cast<ValueDecl>(VD)->getName().getBaseName().isSpecial() &&
+          cast<ValueDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("utf8"))
+        return true;
+    }
+    if (isStringNestedType(ED->getExtendedNominal(), "UTF8View")) {
+      // Do not expose ambiguous 'index(after:' / 'index(before:' overloads.
+      if (isa<AbstractFunctionDecl>(VD) &&
+          cast<AbstractFunctionDecl>(VD)->getParameters()->size() == 1 &&
           !cast<AbstractFunctionDecl>(VD)
                ->getName()
                .getBaseName()

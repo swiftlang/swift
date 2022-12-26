@@ -3,6 +3,9 @@
 // Like opaque_values_Onone.swift but for code that needs to be compiled with 
 // -parse-stdlib.
 
+protocol Error {}
+enum Never : Error{}
+
 precedencegroup AssignmentPrecedence { assignment: true }
 precedencegroup CastingPrecedence {}
 
@@ -96,4 +99,41 @@ func getAnotherType<T, U>(_ object: inout T, to ty: U.Type) -> U {
 @_silgen_name("isOfTypeOfAnyObjectType")
 func isOfTypeOfAnyObjectType(fromAny any: Any) -> Bool {
   type(of: any) is Builtin.AnyObject.Type
+}
+
+@available(SwiftStdlib 5.1, *)
+struct UnsafeContinuation<T, E: Error> {
+  @usableFromInline internal var context: Builtin.RawUnsafeContinuation
+
+// CHECK-LABEL: sil {{.*}}@unsafeContinuationResumeNoThrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[VALUE:%[^,]+]] : $*T, [[CONTINUATION:%[^,]+]] : $UnsafeContinuation<T, Never>):
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[CONTEXT:%[^,]+]] = struct_extract [[CONTINUATION]]
+// CHECK:         copy_addr [[VALUE]] to [init] [[STACK]]
+// CHECK:         builtin "resumeNonThrowingContinuationReturning"<T>([[CONTEXT]] : $Builtin.RawUnsafeContinuation, [[STACK]] : $*T)
+// CHECK:         destroy_addr [[VALUE]]
+// CHECK-LABEL: } // end sil function 'unsafeContinuationResumeNoThrow'
+  @_silgen_name("unsafeContinuationResumeNoThrow")
+  @_alwaysEmitIntoClient
+  public func resume(returning value: __owned T) where E == Never {
+    #if compiler(>=5.5) && $BuiltinContinuation
+    Builtin.resumeNonThrowingContinuationReturning(context, value)
+    #endif
+  }
+
+// CHECK-LABEL: sil {{.*}}@unsafeContinuationResumeThrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[VALUE:%[^,]+]] : $*T, [[CONTINUATION:%[^,]+]] : $UnsafeContinuation<T, E>):
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[CONTEXT:%[^,]+]] = struct_extract [[CONTINUATION]]
+// CHECK:         copy_addr [[VALUE]] to [init] [[STACK]]
+// CHECK:         builtin "resumeThrowingContinuationReturning"<T>([[CONTEXT]] : $Builtin.RawUnsafeContinuation, [[STACK]] : $*T)
+// CHECK:         destroy_addr [[VALUE]]
+// CHECK-LABEL: } // end sil function 'unsafeContinuationResumeThrow'
+  @_silgen_name("unsafeContinuationResumeThrow")
+  @_alwaysEmitIntoClient
+  public func resume(returning value: __owned T) {
+    #if compiler(>=5.5) && $BuiltinContinuation
+    Builtin.resumeThrowingContinuationReturning(context, value)
+    #endif
+  }
 }

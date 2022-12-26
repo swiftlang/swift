@@ -1,4 +1,7 @@
-// RUN: %target-sil-opt -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+// RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+
+// Memory lifetime verifier also raises errors in some of these cases, add dont-abort-on-memory-lifetime-errors so that we don't check it's output.
+// Memory lifetime verifier cannot subsume this because the verification is disabled on unreachable paths.
 
 import Builtin
 
@@ -196,7 +199,7 @@ bb1:
 }
 
 // CHECK: Begin Error in function test_store_borrow_dest
-// CHECK: SIL verification failed: store_borrow destination should be alloc_stack: isa<AllocStackInst>(SI->getDest())
+// CHECK: SIL verification failed: store_borrow destination can only be an alloc_stack: isa<AllocStackInst>(SI->getDest())
 // CHECK: Verifying instruction:
 // CHECK:    %0 = argument of bb0 : $Klass                  // user: %3
 // CHECK:      %2 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val // user: %3

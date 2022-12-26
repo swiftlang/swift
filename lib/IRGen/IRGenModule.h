@@ -96,7 +96,7 @@ namespace swift {
   class BraceStmt;
   class CanType;
   class GeneratedModule;
-  struct GenericRequirement;
+  class GenericRequirement;
   class LinkLibrary;
   class SILFunction;
   class IRGenOptions;
@@ -104,6 +104,7 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolCompositionType;
   class RootProtocolConformance;
+  class SILCoverageMap;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
   class SILDifferentiabilityWitness;
@@ -350,11 +351,7 @@ public:
   void addGenModule(SourceFile *SF, IRGenModule *IGM);
   
   /// Get an IRGenModule for a source file.
-  IRGenModule *getGenModule(SourceFile *SF) {
-    IRGenModule *IGM = GenModules[SF];
-    assert(IGM);
-    return IGM;
-  }
+  IRGenModule *getGenModule(SourceFile *SF);
 
   SourceFile *getSourceFile(IRGenModule *module) {
     for (auto pair : GenModules) {
@@ -773,6 +770,8 @@ public:
   llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+
+  llvm::StructType *RuntimeDiscoverableAttributeTy; // { i32, i32*, i32 }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -1481,7 +1480,7 @@ public:
   void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *D);
 
   void emitSILGlobalVariable(SILGlobalVariable *gv);
-  void emitCoverageMapping();
+  void emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings);
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
@@ -1491,6 +1490,11 @@ public:
   void emitProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
+  /// Emit runtime discoverable attribute metadata section for the given set
+  /// of source files.
+  void
+  emitRuntimeDiscoverableAttributes(TinyPtrVector<FileUnit *> &filesToEmit);
+
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
@@ -1571,6 +1575,8 @@ public:
                                       llvm::Constant *dependsOn);
   void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                                       const ProtocolConformance *conformance);
+
+  void setColocateMetadataSection(llvm::Function *f);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
@@ -1725,6 +1731,8 @@ public:
                                      ForDefinition_t forDefinition);
 
   void emitDistributedTargetAccessor(SILFunction *method);
+
+  llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
 
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.

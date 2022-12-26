@@ -112,7 +112,7 @@ public:
   }
 
   void printTypeName(raw_ostream &os) const {
-    ClangSyntaxPrinter(os).printNominalClangTypeReference(typeDecl);
+    ClangSyntaxPrinter(os).printClangTypeReference(typeDecl);
   }
 
   static void
@@ -268,7 +268,7 @@ public:
                                      bool isInOutParam) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
-      ClangSyntaxPrinter(os).printNominalClangTypeReference(cd->getClangDecl());
+      ClangSyntaxPrinter(os).printClangTypeReference(cd->getClangDecl());
       os << " *"
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
@@ -688,6 +688,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       ClangRepresentation::representable;
 
   // Print out the return type.
+  if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
+    os << "Swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -740,7 +742,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
             .isUnsupported())
       return resultingRepresentation;
   }
-
+  if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
+    os << ">";
   os << ' ';
   if (const auto *typeDecl = modifiers.qualifierContext)
     ClangSyntaxPrinter(os).printNominalTypeQualifier(
@@ -843,8 +846,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 &genericRequirementParam) {
           emitNewParam();
           os << "void * _Nonnull ";
-          if (auto *proto = genericRequirementParam.getRequirement().Protocol)
-            ClangSyntaxPrinter(os).printBaseName(proto);
+          auto reqt = genericRequirementParam.getRequirement();
+          if (reqt.isWitnessTable())
+            ClangSyntaxPrinter(os).printBaseName(reqt.getProtocol());
+          else
+            assert(reqt.isMetadata());
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
@@ -1122,8 +1128,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           emitNewParam();
           auto genericRequirement = genericRequirementParam.getRequirement();
           // FIXME: Add protocol requirement support.
-          assert(!genericRequirement.Protocol);
-          if (auto *gtpt = genericRequirement.TypeParameter
+          assert(genericRequirement.isMetadata());
+          if (auto *gtpt = genericRequirement.getTypeParameter()
                                ->getAs<GenericTypeParamType>()) {
             os << "swift::TypeMetadataTrait<";
             ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
@@ -1238,14 +1244,43 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // Create the condition and the statement to throw an exception.
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
+    os << "#ifdef __cpp_exceptions\n";
     os << "    throw (Swift::Error(opaqueError));\n";
+    os << "#else\n";
+    if (resultTy->isVoid()) {
+      os << "    return Swift::Expected<void>(Swift::Error(opaqueError));\n";
+      os << "#endif\n";
+    } else {
+      auto directResultType = signature.getDirectResultType();
+      printDirectReturnOrParamCType(
+          *directResultType, resultTy, moduleContext, os, cPrologueOS,
+          typeMapping, interopContext, [&]() {
+            os << "    return Swift::Expected<";
+            OptionalTypeKind retKind;
+            Type objTy;
+            std::tie(objTy, retKind) =
+                DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+
+            auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                                                  OutputLanguageMode::Cxx);
+            os << ">(Swift::Error(opaqueError));\n";
+            os << "#endif\n";
+
+            // Return the function result value if it doesn't throw.
+            if (!resultTy->isVoid() && hasThrows) {
+              os << "\n";
+              os << "  return SWIFT_RETURN_THUNK(";
+              printClangFunctionReturnType(
+                  objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                  OutputLanguageMode::Cxx);
+              os << ", returnValue);\n";
+            }
+
+            assert(!s.isUnsupported());
+          });
+    }
   }
 
-  // Return the function result value if it doesn't throw.
-  if (!resultTy->isVoid() && hasThrows) {
-    os << "\n";
-    os << "return returnValue;\n";
-  }
 }
 
 static StringRef getConstructorName(const AbstractFunctionDecl *FD) {

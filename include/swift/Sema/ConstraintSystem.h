@@ -680,6 +680,13 @@ template <typename T = Decl> T *getAsDecl(ASTNode node) {
   return nullptr;
 }
 
+template <typename T = TypeRepr>
+T *getAsTypeRepr(ASTNode node) {
+  if (auto *type = node.dyn_cast<TypeRepr *>())
+    return dyn_cast_or_null<T>(type);
+  return nullptr;
+}
+
 template <typename T = Stmt>
 T *getAsStmt(ASTNode node) {
   if (auto *S = node.dyn_cast<Stmt *>())
@@ -3681,10 +3688,8 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
-  /// Whether the given ASTNode's source range contains the code
-  /// completion location.
-  bool containsCodeCompletionLoc(ASTNode node) const;
-  bool containsCodeCompletionLoc(const ArgumentList *args) const;
+  bool containsIDEInspectionTarget(ASTNode node) const;
+  bool containsIDEInspectionTarget(const ArgumentList *args) const;
 
   /// Marks the argument \p Arg as being ignored because it occurs after the
   /// code completion token. This assumes that the argument is not type checked
@@ -6107,6 +6112,46 @@ public:
             locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
         TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
             TVO_CanBindToHole);
+  }
+};
+
+/// A function object that opens a given pack type by generating a
+/// \c PackElementOf constraint.
+class OpenPackElementType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+  GenericEnvironment *elementEnv;
+
+public:
+  explicit OpenPackElementType(ConstraintSystem &cs,
+                               const ConstraintLocatorBuilder &locator,
+                               GenericEnvironment *elementEnv)
+      : cs(cs), elementEnv(elementEnv) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(Type packType, PackReferenceTypeRepr *packRepr) const {
+    // Only assert we have an element environment when invoking the function
+    // object. In cases where pack elements are referenced outside of a
+    // pack expansion, type resolution will error before opening the pack
+    // element.
+    assert(elementEnv);
+
+    auto *elementType = cs.createTypeVariable(locator, TVO_CanBindToHole);
+    auto elementLoc = cs.getConstraintLocator(locator,
+        LocatorPathElt::OpenedPackElement(elementEnv));
+
+    // If we're opening a pack element from an explicit type repr,
+    // set the type repr types in the constraint system for generating
+    // ShapeOf constraints when visiting the PackExpansionExpr.
+    if (packRepr) {
+      cs.setType(packRepr->getPackType(), packType);
+      cs.setType(packRepr, elementType);
+    }
+
+    cs.addConstraint(ConstraintKind::PackElementOf, elementType,
+                     packType, elementLoc);
+    return elementType;
   }
 };
 

@@ -42,7 +42,7 @@ SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, CodeCompletionFileRequest,
+SWIFT_REQUEST(TypeChecker, IDEInspectionFileRequest,
               SourceFile *(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
@@ -402,7 +402,7 @@ SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
               AwaitExpr *(const SourceFile *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
-              NominalTypeDecl *(NominalTypeDecl *),
+              Optional<TypeWrapperInfo>(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
               Type(NominalTypeDecl *),
@@ -443,6 +443,21 @@ SWIFT_REQUEST(TypeChecker, ContinueTargetRequest,
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, UsesTypeWrapperFeature,
+              bool(NominalTypeDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MacroDefinitionRequest,
               MacroDefinition(MacroDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
+              Expr *(CustomAttr *, ValueDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGeneratorBody,
+              BraceStmt *(CustomAttr *, ValueDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetRuntimeDiscoverableAttributes,
+              ArrayRef<CustomAttr *>(ValueDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
+              unsigned(DeclContext *),
               Cached, NoLocationInfo)

@@ -87,7 +87,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class ModuleDependencies;
+  class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -132,7 +132,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class CompilerPlugin;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -288,6 +287,11 @@ public:
   std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
   ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
+
+  /// A callback that will be called when the constraint system found a
+  /// solution. Called multiple times if the constraint system has ambiguous
+  /// solutions.
+  ide::TypeCheckCompletionCallback *SolutionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
@@ -989,16 +993,16 @@ public:
   ///
   /// \param isUnderlyingClangModule When true, only look for a Clang module
   /// with the given name, ignoring any Swift modules.
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
       bool cacheOnly = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<ModuleDependencies> getSwiftModuleDependencies(
+  Optional<ModuleDependencyInfo> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);

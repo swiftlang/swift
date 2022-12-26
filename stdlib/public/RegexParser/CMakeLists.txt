@@ -14,13 +14,13 @@ set(swift_matching_engine_link_libraries
   swiftCore)
 
 file(GLOB_RECURSE _MATCHING_ENGINE_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser/*.swift")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_RegexParser/*.swift")
 set(MATCHING_ENGINE_SOURCES)
 foreach(source ${_MATCHING_ENGINE_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND MATCHING_ENGINE_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for _RegexParser (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for _RegexParser (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 set(SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS_NO_RESILIENCE)
 string(REGEX REPLACE "-enable-library-evolution" ""

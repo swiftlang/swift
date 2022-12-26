@@ -206,7 +206,7 @@ SILValue findOwnershipReferenceRoot(SILValue ref);
 
 /// Look through all ownership forwarding instructions to find the values which
 /// were originally borrowed.
-void findGuaranteedReferenceRoots(SILValue value,
+void findGuaranteedReferenceRoots(SILValue value, bool lookThroughNestedBorrows,
                                   SmallVectorImpl<SILValue> &roots);
 
 /// Find the aggregate containing the first owned root of the
@@ -1907,6 +1907,8 @@ public:
 /// Clone all projections and casts on the access use-def chain until the
 /// checkBase predicate returns a valid base.
 ///
+/// Returns the cloned value equivalent to \p addr.
+///
 /// This will not clone ref_element_addr or ref_tail_addr because those aren't
 /// part of the access chain.
 ///
@@ -1914,7 +1916,7 @@ public:
 /// returns a valid SILValue to use as the base of the cloned access path, or an
 /// invalid SILValue to continue cloning.
 ///
-/// CheckBase must return a valid SILValue either before attempting to clone the
+/// CheckBase must return a valid SILValue before attempting to clone the
 /// access base. The most basic valid predicate is:
 ///
 ///    auto checkBase = [&](SILValue srcAddr) {
@@ -1929,6 +1931,8 @@ SILValue cloneUseDefChain(SILValue addr, SILInstruction *insertionPoint,
 
 /// Analog to cloneUseDefChain to check validity. begin_borrow and
 /// mark_dependence currently cannot be cloned.
+///
+/// Returns the cloned value equivalent to \p addr.
 template <typename CheckBase>
 bool canCloneUseDefChain(SILValue addr, CheckBase checkBase) {
   return AccessUseDefChainCloner<CheckBase>(checkBase, nullptr)

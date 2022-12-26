@@ -160,6 +160,7 @@ struct SILValuePrinterInfo {
   Optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
+  bool IsCapture = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -169,13 +170,15 @@ struct SILValuePrinterInfo {
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -372,6 +375,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
+    break;
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    OS << "!attrgenerator";
     break;
   }
 
@@ -659,6 +665,8 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@_lexical ";
       break;
     }
+    if (i.IsCapture)
+      *this << "@closureCapture ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
@@ -693,14 +701,18 @@ public:
   }
   SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy(),
-            arg->getLifetimeAnnotation()};
+            arg->getLifetimeAnnotation(), arg->isClosureCapture()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
-    return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
-            arg->isNoImplicitCopy(), arg->getLifetimeAnnotation()};
+    return {Ctx.getID(arg),
+            arg->getType(),
+            arg->getOwnershipKind(),
+            arg->isNoImplicitCopy(),
+            arg->getLifetimeAnnotation(),
+            arg->isClosureCapture()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -1487,7 +1499,6 @@ public:
     // Should not apply to callees.
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -3029,6 +3040,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isDistributed()) {
     OS << "[distributed] ";
   }
+  if (isRuntimeAccessible()) {
+    OS << "[runtime_accessible] ";
+  }
+
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }
@@ -3877,7 +3892,7 @@ void SILDifferentiabilityWitness::dump() const {
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_coverage_map " << QuotedString(getFile()) << " "
+  OS << "sil_coverage_map " << QuotedString(getFilename()) << " "
      << QuotedString(getName()) << " " << QuotedString(getPGOFuncName()) << " "
      << getHash() << " {\t// " << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())

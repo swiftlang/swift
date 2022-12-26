@@ -49,7 +49,7 @@ class ContextFinder : public SourceEntityWalker {
   ASTContext &Ctx;
   SourceManager &SM;
   SourceRange Target;
-  function_ref<bool(ASTNode)> IsContext;
+  std::function<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
     auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
@@ -59,12 +59,12 @@ class ContextFinder : public SourceEntityWalker {
   }
 public:
   ContextFinder(SourceFile &SF, ASTNode TargetNode,
-                function_ref<bool(ASTNode)> IsContext =
+                std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
   ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
-                function_ref<bool(ASTNode)> IsContext =
+                std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetLoc), IsContext(IsContext) {
@@ -661,8 +661,7 @@ private:
           assert(existingLoc->OldName == loc->OldName &&
                  existingLoc->NewName == loc->NewName &&
                  existingLoc->IsFunctionLike == loc->IsFunctionLike &&
-                 existingLoc->IsNonProtocolType ==
-                     existingLoc->IsNonProtocolType &&
+                 existingLoc->IsNonProtocolType == loc->IsNonProtocolType &&
                  "Asked to do a different rename for the same location?");
         }
       }
@@ -8418,6 +8417,62 @@ bool RefactoringActionAddAsyncWrapper::performChange() {
   // Add the async wrapper.
   Converter.insertAfter(FD, EditConsumer);
 
+  return false;
+}
+
+static MacroExpansionExpr *
+findMacroExpansionTargetExpr(const ResolvedCursorInfo &Info) {
+
+  // Handle '#' position in '#macroName(...)'.
+  if (auto exprInfo = dyn_cast<ResolvedExprStartCursorInfo>(&Info)) {
+    if (auto target =
+            dyn_cast_or_null<MacroExpansionExpr>(exprInfo->getTrailingExpr()))
+      if (target->getRewritten())
+        return target;
+    return nullptr;
+  }
+
+  // Handle 'macroName' position in '#macroName(...)'.
+  if (auto refInfo = dyn_cast<ResolvedValueRefCursorInfo>(&Info)) {
+    if (refInfo->isRef() && isa_and_nonnull<MacroDecl>(refInfo->getValueD())) {
+      ContextFinder Finder(
+          *Info.getSourceFile(), Info.getLoc(), [&](ASTNode N) {
+            auto *expr =
+                dyn_cast_or_null<MacroExpansionExpr>(N.dyn_cast<Expr *>());
+            return expr &&
+                   (expr->getMacroNameLoc().getBaseNameLoc() == Info.getLoc());
+          });
+      Finder.resolve();
+      if (!Finder.getContexts().empty()) {
+        auto *target =
+            dyn_cast<MacroExpansionExpr>(Finder.getContexts()[0].get<Expr *>());
+        if (target->getRewritten())
+          return target;
+      }
+    }
+    return nullptr;
+  }
+
+  // TODO: handle MacroExpansionDecl.
+  return nullptr;
+}
+
+bool RefactoringActionExpandMacro::isApplicable(const ResolvedCursorInfo &Info,
+                                                DiagnosticEngine &Diag) {
+  return findMacroExpansionTargetExpr(Info) != nullptr;
+}
+
+bool RefactoringActionExpandMacro::performChange() {
+  auto target = findMacroExpansionTargetExpr(CursorInfo);
+  if (!target)
+    return true;
+
+  auto exprRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, target->getSourceRange());
+  auto rewrittenRange = Lexer::getCharSourceRangeFromSourceRange(
+      SM, target->getRewritten()->getSourceRange());
+  auto rewrittenBuffer = SM.extractText(rewrittenRange);
+  EditConsumer.accept(SM, exprRange, rewrittenBuffer);
   return false;
 }
 

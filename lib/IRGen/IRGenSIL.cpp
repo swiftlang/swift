@@ -403,7 +403,7 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
-  llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
+  llvm::SmallDenseMap<Decl *, Identifier, 8> AnonymousVariables;
   /// To avoid inserting elements into ValueDomPoints twice.
   llvm::SmallDenseSet<llvm::Value *, 8> ValueVariables;
   /// Holds the DominancePoint of values that are storage for a source variable.
@@ -653,15 +653,17 @@ public:
   }
 
   StringRef getOrCreateAnonymousVarName(VarDecl *Decl) {
-    llvm::SmallString<4> &Name = AnonymousVariables[Decl];
+    Identifier &Name = AnonymousVariables[Decl];
     if (Name.empty()) {
       {
-        llvm::raw_svector_ostream S(Name);
+        llvm::SmallString<64> NameBuffer;
+        llvm::raw_svector_ostream S(NameBuffer);
         S << "$_" << NumAnonVars++;
+        Name = IGM.Context.getIdentifier(NameBuffer);
       }
       AnonymousVariables.insert({Decl, Name});
     }
-    return Name;
+    return Name.str();
   }
 
   template <class DebugVarCarryingInst>
@@ -2269,6 +2271,9 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.noteSwiftAsyncFunctionDef();
   }
 
+  if (CurSILFn->isRuntimeAccessible())
+    IGM.addAccessibleFunction(CurSILFn);
+
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
@@ -3544,7 +3549,6 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
     // direct or indirect.
     switch (appliedParam.getConvention()) {
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       // Indirect arguments are trivially word sized.
@@ -4876,9 +4880,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
     return;
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
-                                   IGM.getMaximalTypeExpansionContext()),
-      ErrorResultSlot->getType(), IGM.getPointerSize(),
-      IGM.getPointerAlignment());
+                                   IGM.getMaximalTypeExpansionContext()),IGM);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
                                          getDebugScope(), {}, *Var,
                                          IndirectValue, ArtificialValue);
@@ -5388,8 +5390,11 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
          isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
 
-  auto Indirection =
-      InCoroContext(*CurSILFn, *i) ? CoroDirectValue : DirectValue;
+  auto Indirection = DirectValue;
+  if (InCoroContext(*CurSILFn, *i))
+    Indirection =
+        isCallToSwiftTaskAlloc(addr) ? CoroIndirectValue : CoroDirectValue;
+
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
       !IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
@@ -5432,25 +5437,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                            IsFragmentType);
   } else
     return;
-
-  // Async functions use the value of the artificial address.
-  auto shadow = addr;
-  if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow) &&
-      !isa<llvm::UndefValue>(shadow)) {
-    if (ValueVariables.insert(shadow).second)
-      ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
-    auto shadowInst = cast<llvm::Instruction>(shadow);
-    llvm::IRBuilder<> builder(shadowInst->getNextNode());
-    llvm::Type *shadowTy = IGM.IntPtrTy;
-    if (auto *alloca = dyn_cast<llvm::AllocaInst>(shadow)) {
-      shadowTy = alloca->getAllocatedType();
-    } else if (isCallToSwiftTaskAlloc(shadow)) {
-      shadowTy = IGM.Int8Ty;
-    }
-    assert(!IGM.getLLVMContext().supportsTypedPointers() ||
-           shadowTy == shadow->getType()->getNonOpaquePointerElementType());
-    addr = builder.CreateLoad(shadowTy, shadow);
-  }
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo) {
@@ -6542,8 +6528,8 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     if (!I->getSubstitutions().empty()) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
         [&](GenericRequirement reqt) -> llvm::Value * {
-          return emitGenericRequirementFromSubstitutions(*this, sig,
-                                                         reqt, subs);
+          return emitGenericRequirementFromSubstitutions(*this, reqt, subs,
+                                                         MetadataState::Complete);
         });
     }
     

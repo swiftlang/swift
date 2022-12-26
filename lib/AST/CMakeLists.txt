@@ -33,7 +33,6 @@ add_swift_host_library(swiftAST STATIC
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
-  CompilerPlugin.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
@@ -117,6 +116,7 @@ add_swift_host_library(swiftAST STATIC
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
+  TypeWrapper.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 

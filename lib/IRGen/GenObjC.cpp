@@ -628,6 +628,7 @@ namespace {
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
       case SILDeclRef::Kind::AsyncEntryPoint:
+      case SILDeclRef::Kind::RuntimeAttributeGenerator:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
@@ -913,7 +914,6 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     break;
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("self passed indirectly?!");

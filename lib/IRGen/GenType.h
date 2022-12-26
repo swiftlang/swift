@@ -168,6 +168,7 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
+  const TypeInfo *convertPackType(PackType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();

@@ -760,10 +760,9 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
       swift::getSpecializedLinkage(Orig, Orig->getLinkage()), ClonedName,
       ClonedTy, Orig->getGenericEnvironment(), Orig->getLocation(),
       Orig->isBare(), Orig->isTransparent(), Serialized, IsNotDynamic,
-      IsNotDistributed, Orig->getEntryCount(), Orig->isThunk(),
-      Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      IsNotDistributed, IsNotRuntimeAccessible, Orig->getEntryCount(),
+      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
@@ -801,10 +800,7 @@ PromotedParamCloner::populateCloned() {
                                            Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
-      promotedArg->setNoImplicitCopy(
-          cast<SILFunctionArgument>(*I)->isNoImplicitCopy());
-      promotedArg->setLifetimeAnnotation(
-          cast<SILFunctionArgument>(*I)->getLifetimeAnnotation());
+      promotedArg->copyFlags(cast<SILFunctionArgument>(*I));
       OrigPromotedParameters.insert(*I);
 
       NewPromotedArgs[ArgNo] = promotedArg;
@@ -819,10 +815,7 @@ PromotedParamCloner::populateCloned() {
       // Create a new argument which copies the original argument.
       auto *newArg = ClonedEntryBB->createFunctionArgument((*I)->getType(),
                                                            (*I)->getDecl());
-      newArg->setNoImplicitCopy(
-          cast<SILFunctionArgument>(*I)->isNoImplicitCopy());
-      newArg->setLifetimeAnnotation(
-          cast<SILFunctionArgument>(*I)->getLifetimeAnnotation());
+      newArg->copyFlags(cast<SILFunctionArgument>(*I));
       entryArgs.push_back(newArg);
     }
     ++ArgNo;

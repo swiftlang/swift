@@ -537,7 +537,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed;
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
@@ -545,7 +545,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -679,6 +679,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     fn->setIsDistributed(IsDistributed_t(isDistributed));
+    fn->setIsRuntimeAccessible(IsRuntimeAccessible_t(isRuntimeAccessible));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -908,11 +909,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (fn->empty() && errorIfEmptyBody)
     return nullptr;
 
-  // Check that there are no unresolved forward definitions of opened
+  // Check that there are no unresolved forward definitions of local
   // archetypes.
-  if (SILMod.hasUnresolvedOpenedArchetypeDefinitions())
+  if (SILMod.hasUnresolvedLocalArchetypeDefinitions())
     llvm_unreachable(
-        "All forward definitions of opened archetypes should be resolved");
+        "All forward definitions of local archetypes should be resolved");
 
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
@@ -966,6 +967,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setNoImplicitCopy(isNoImplicitCopy);
       auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
       fArg->setLifetimeAnnotation(lifetime);
+      bool isClosureCapture = (Args[I + 1] >> 19) & 0x1;
+      fArg->setClosureCapture(isClosureCapture);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
@@ -3096,7 +3099,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed;
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
@@ -3104,7 +3107,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

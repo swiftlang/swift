@@ -2,8 +2,6 @@
 
 // REQUIRES: objc_interop
 
-let _ = Bar(value: 4)               // expected-error {{'init(value:)' is unavailable in Swift}}
-let _ = Bar.init(value: 5)          // expected-error {{'init(value:)' is unavailable in Swift}}
 var something = Bar() as AnyObject
 
 something.directProperty = 123      // expected-error {{value of type 'AnyObject' has no member 'directProperty'}}

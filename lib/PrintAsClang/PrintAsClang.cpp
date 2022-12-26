@@ -23,8 +23,12 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
 
+#include "clang/Basic/FileManager.h"
 #include "clang/Basic/Module.h"
+#include "clang/Lex/HeaderSearch.h"
 
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -134,196 +138,50 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "  __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
          "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_PASTE)\n"
-         "# define SWIFT_PASTE_HELPER(x, y) x##y\n"
-         "# define SWIFT_PASTE(x, y) SWIFT_PASTE_HELPER(x, y)\n"
-         "#endif"
-         "\n"
-         "#if !defined(SWIFT_METATYPE)\n"
-         "# define SWIFT_METATYPE(X) Class\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS_PROPERTY)\n"
-         "# if __has_feature(objc_class_property)\n"
-         "#  define SWIFT_CLASS_PROPERTY(...) __VA_ARGS__\n"
-         "# else\n"
-         "#  define SWIFT_CLASS_PROPERTY(...)\n"
-         "# endif\n"
-         "#endif\n"
-         "\n"
-         "#if __has_attribute(objc_runtime_name)\n"
-         "# define SWIFT_RUNTIME_NAME(X) "
-         "__attribute__((objc_runtime_name(X)))\n"
-         "#else\n"
-         "# define SWIFT_RUNTIME_NAME(X)\n"
-         "#endif\n"
-         "#if __has_attribute(swift_name)\n"
-         "# define SWIFT_COMPILE_NAME(X) "
-         "__attribute__((swift_name(X)))\n"
-         "#else\n"
-         "# define SWIFT_COMPILE_NAME(X)\n"
-         "#endif\n"
-         "#if __has_attribute(objc_method_family)\n"
-         "# define SWIFT_METHOD_FAMILY(X) "
-         "__attribute__((objc_method_family(X)))\n"
-         "#else\n"
-         "# define SWIFT_METHOD_FAMILY(X)\n"
-         "#endif\n"
-         "#if __has_attribute(noescape)\n"
-         "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
-         "#else\n"
-         "# define SWIFT_NOESCAPE\n"
-         "#endif\n"
-         "#if __has_attribute(ns_consumed)\n"
-         "# define SWIFT_RELEASES_ARGUMENT __attribute__((ns_consumed))\n"
-         "#else\n"
-         "# define SWIFT_RELEASES_ARGUMENT\n"
-         "#endif\n"
-         "#if __has_attribute(warn_unused_result)\n"
-         "# define SWIFT_WARN_UNUSED_RESULT "
-         "__attribute__((warn_unused_result))\n"
-         "#else\n"
-         "# define SWIFT_WARN_UNUSED_RESULT\n"
-         "#endif\n"
-         "#if __has_attribute(noreturn)\n"
-         "# define SWIFT_NORETURN __attribute__((noreturn))\n"
-         "#else\n"
-         "# define SWIFT_NORETURN\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS_EXTRA)\n"
-         "# define SWIFT_CLASS_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
-         "# define SWIFT_PROTOCOL_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM_EXTRA)\n"
-         "# define SWIFT_ENUM_EXTRA\n"
-         "#endif\n"
-         "#if !defined(SWIFT_CLASS)\n"
-         "# if __has_attribute(objc_subclassing_restricted)\n"
-         "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "__attribute__((objc_subclassing_restricted)) "
-         "SWIFT_CLASS_EXTRA\n"
-         "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
-         "__attribute__((objc_subclassing_restricted)) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "# else\n"
-         "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_CLASS_EXTRA\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_RESILIENT_CLASS)\n"
-         "# if __has_attribute(objc_class_stub)\n"
-         "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) SWIFT_CLASS(SWIFT_NAME) "
-         "__attribute__((objc_class_stub))\n"
-         "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
-         "__attribute__((objc_class_stub)) "
-         "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
-         "# else\n"
-         "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) "
-         "SWIFT_CLASS(SWIFT_NAME)\n"
-         "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
-         "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
-         "# endif\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_PROTOCOL)\n"
-         "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
-         "SWIFT_PROTOCOL_EXTRA\n"
-         "# define SWIFT_PROTOCOL_NAMED(SWIFT_NAME) "
-         "SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_PROTOCOL_EXTRA\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(SWIFT_EXTENSION)\n"
-         "# define SWIFT_EXTENSION(M) SWIFT_PASTE(M##_Swift_, __LINE__)\n"
-         "#endif\n"
-         "\n"
-         "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"
-         "# if __has_attribute(objc_designated_initializer)\n"
-         "#  define OBJC_DESIGNATED_INITIALIZER "
-         "__attribute__((objc_designated_initializer))\n"
-         "# else\n"
-         "#  define OBJC_DESIGNATED_INITIALIZER\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM_ATTR)\n"
-         "# if defined(__has_attribute) && "
-         "__has_attribute(enum_extensibility)\n"
-         "#  define SWIFT_ENUM_ATTR(_extensibility) "
-         "__attribute__((enum_extensibility(_extensibility)))\n"
-         "# else\n"
-         "#  define SWIFT_ENUM_ATTR(_extensibility)\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_ENUM)\n"
-         "# define SWIFT_ENUM(_type, _name, _extensibility) "
-         "enum _name : _type _name; "
-         "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA "
-         "_name : _type\n"
-         "# if __has_feature(generalized_swift_name)\n"
-         "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
-         "_extensibility) "
-         "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-         "enum SWIFT_COMPILE_NAME(SWIFT_NAME) "
-         "SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n"
-         "# else\n"
-         "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
-         "_extensibility) SWIFT_ENUM(_type, _name, _extensibility)\n"
-         "# endif\n"
-         "#endif\n"
-         "#if !defined(SWIFT_UNAVAILABLE)\n"
-         "# define SWIFT_UNAVAILABLE __attribute__((unavailable))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_UNAVAILABLE_MSG)\n"
-         "# define SWIFT_UNAVAILABLE_MSG(msg) "
-         "__attribute__((unavailable(msg)))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_AVAILABILITY)\n"
-         "# define SWIFT_AVAILABILITY(plat, ...) "
-         "__attribute__((availability(plat, __VA_ARGS__)))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_WEAK_IMPORT)\n"
-         "# define SWIFT_WEAK_IMPORT __attribute__((weak_import))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_DEPRECATED)\n"
-         "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"
-         "#endif\n"
-         "#if !defined(SWIFT_DEPRECATED_MSG)\n"
-         "# define SWIFT_DEPRECATED_MSG(...) "
-         "__attribute__((deprecated(__VA_ARGS__)))\n"
-         "#endif\n"
-         "#if __has_feature(attribute_diagnose_if_objc)\n"
-         "# define SWIFT_DEPRECATED_OBJC(Msg) __attribute__((diagnose_if(1, "
-         "Msg, \"warning\")))\n"
-         "#else\n"
-         "# define SWIFT_DEPRECATED_OBJC(Msg) SWIFT_DEPRECATED_MSG(Msg)\n"
+         "\n";
+
+#define CLANG_MACRO_BODY(NAME, BODY) \
+  out << "#if !defined(" NAME ")\n" \
+         BODY "\n" \
          "#endif\n";
-  emitObjCConditional(out, [&] {
-    out << "#if !defined(IBSegueAction)\n"
-           "# define IBSegueAction\n"
-           "#endif\n";
-  });
-  out << "#if !defined(SWIFT_EXTERN)\n"
-         "# if defined(__cplusplus)\n"
-         "#  define SWIFT_EXTERN extern \"C\"\n"
-         "# else\n"
-         "#  define SWIFT_EXTERN extern\n"
-         "# endif\n"
+
+#define CLANG_MACRO(NAME, ARGS, VALUE) CLANG_MACRO_BODY(NAME, "# define " NAME ARGS " " VALUE)
+
+#define CLANG_MACRO_ALTERNATIVE(NAME, ARGS, CONDITION, VALUE, ALTERNATIVE) CLANG_MACRO_BODY(NAME, \
+  "# if " CONDITION "\n" \
+  "#  define " NAME ARGS " " VALUE "\n" \
+  "# else\n" \
+  "#  define " NAME ARGS " " ALTERNATIVE "\n" \
+  "# endif")
+
+#define CLANG_MACRO_OBJC(NAME, ARGS, VALUE) \
+  out << "#if defined(__OBJC__)\n" \
+         "#if !defined(" NAME ")\n" \
+         "# define " NAME ARGS " " VALUE "\n" \
+         "#endif\n" \
          "#endif\n";
+
+#define CLANG_MACRO_CXX(NAME, ARGS, VALUE, ALTERNATIVE) \
+  out << "#if defined(__cplusplus)\n" \
+         "# define " NAME ARGS " " VALUE "\n" \
+         "#else\n" \
+         "# define " NAME ARGS " " ALTERNATIVE "\n" \
+         "#endif\n";
+
+#define CLANG_MACRO_CXX_BODY(NAME, BODY) \
+  out << "#if defined(__cplusplus)\n" \
+         BODY "\n" \
+         "#endif\n";
+
+#include "swift/PrintAsClang/ClangMacros.def"
+
+  // SWIFT_IMPORT_STDLIB_SYMBOL's expansion can't be calculated in the
+  // preprocessor, so write its definition here
   auto emitMacro = [&](StringRef name, StringRef value = "") {
     out << "#if !defined(" << name << ")\n";
     out << "# define " << name << " " << value << "\n";
     out << "#endif\n";
   };
-  emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
-  emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
-  emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
-  emitMacro("SWIFT_ERROR_RESULT", "__attribute__((swift_error_result))");
   if (ctx.getStdlibModule()->isStaticLibrary()) {
     emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
   } else {
@@ -333,10 +191,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
     out << "#endif\n";
   }
-  // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
-  emitCxxConditional(
-      out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
-      [&] { emitMacro("SWIFT_NOEXCEPT"); });
+
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
@@ -386,9 +241,133 @@ static int compareImportModulesByName(const ImportModuleTy *left,
   return 1;
 }
 
+// Makes the provided path absolute and removes any "." or ".." segments from
+// the path
+static llvm::SmallString<128> normalizePath(const llvm::StringRef path) {
+  llvm::SmallString<128> result = path;
+  llvm::sys::path::remove_dots(result, /* remove_dot_dot */ true);
+  llvm::sys::fs::make_absolute(result);
+  return result;
+}
+
+// Collect the set of header includes needed to import the given Clang module
+// into an ObjectiveC program. Modeled after collectModuleHeaderIncludes in the
+// Clang frontend (FrontendAction.cpp)
+// Augment requiredTextualIncludes with the set of headers required.
+static void collectClangModuleHeaderIncludes(
+    const clang::Module *clangModule, clang::FileManager &fileManager,
+    llvm::SmallSet<llvm::SmallString<128>, 10> &requiredTextualIncludes,
+    llvm::SmallSet<const clang::Module *, 10> &visitedModules,
+    const llvm::SmallSet<llvm::SmallString<128>, 10> &includeDirs,
+    const llvm::StringRef cwd) {
+
+  if (!visitedModules.insert(clangModule).second)
+    return;
+
+  auto addHeader = [&](llvm::StringRef headerPath,
+                       llvm::StringRef pathRelativeToRootModuleDir) {
+    if (!clangModule->Directory)
+      return;
+
+    llvm::SmallString<128> textualInclude = normalizePath(headerPath);
+    llvm::SmallString<128> containingSearchDirPath;
+
+    for (auto &includeDir : includeDirs) {
+      if (textualInclude.startswith(includeDir)) {
+        if (includeDir.size() > containingSearchDirPath.size()) {
+          containingSearchDirPath = includeDir;
+        }
+      }
+    }
+
+    if (!containingSearchDirPath.empty()) {
+      llvm::SmallString<128> prefixToRemove =
+          llvm::formatv("{0}/", containingSearchDirPath);
+      llvm::sys::path::replace_path_prefix(textualInclude, prefixToRemove, "");
+    } else {
+      // If we cannot find find the module map on the search path,
+      // fallback to including the header using the provided path relative
+      // to the module map
+      textualInclude = pathRelativeToRootModuleDir;
+    }
+
+    if (clangModule->getTopLevelModule()->IsFramework) {
+      llvm::SmallString<32> frameworkName =
+          clangModule->getTopLevelModuleName();
+      llvm::SmallString<64> oldFrameworkPrefix =
+          llvm::formatv("{0}.framework/Headers", frameworkName);
+      llvm::sys::path::replace_path_prefix(textualInclude, oldFrameworkPrefix,
+                                           frameworkName);
+    }
+
+    requiredTextualIncludes.insert(textualInclude);
+  };
+
+  if (clang::Module::Header umbrellaHeader = clangModule->getUmbrellaHeader()) {
+    addHeader(umbrellaHeader.Entry->tryGetRealPathName(),
+              umbrellaHeader.PathRelativeToRootModuleDirectory);
+  } else if (clang::Module::DirectoryName umbrellaDir =
+                 clangModule->getUmbrellaDir()) {
+    SmallString<128> nativeUmbrellaDirPath;
+    std::error_code errorCode;
+    llvm::sys::path::native(umbrellaDir.Entry->getName(),
+                            nativeUmbrellaDirPath);
+    llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
+    for (llvm::vfs::recursive_directory_iterator
+             dir(fileSystem, nativeUmbrellaDirPath, errorCode),
+         end;
+         dir != end && !errorCode; dir.increment(errorCode)) {
+
+      if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
+              .Cases(".h", ".H", ".hh", ".hpp", true)
+              .Default(false)) {
+
+        // Compute path to the header relative to the root of the module
+        // (location of the module map) First compute the relative path from
+        // umbrella directory to header file
+        SmallVector<StringRef> pathComponents;
+        auto pathIt = llvm::sys::path::rbegin(dir->path());
+
+        for (int i = 0; i != dir.level() + 1; ++i, ++pathIt)
+          pathComponents.push_back(*pathIt);
+        // Then append this to the path from module root to umbrella dir
+        SmallString<128> relativeHeaderPath;
+        if (umbrellaDir.PathRelativeToRootModuleDirectory != ".")
+          relativeHeaderPath += umbrellaDir.PathRelativeToRootModuleDirectory;
+
+        for (auto it = pathComponents.rbegin(), end = pathComponents.rend();
+             it != end; ++it) {
+          llvm::sys::path::append(relativeHeaderPath, *it);
+        }
+
+        addHeader(dir->path(), relativeHeaderPath);
+      }
+    }
+  } else {
+    for (clang::Module::HeaderKind headerKind :
+         {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
+      for (const clang::Module::Header &header :
+           clangModule->Headers[headerKind]) {
+        addHeader(header.Entry->tryGetRealPathName(),
+                  header.PathRelativeToRootModuleDirectory);
+      }
+    }
+    for (auto submodule : clangModule->submodules()) {
+      if (submodule->IsExplicit)
+        continue;
+
+      collectClangModuleHeaderIncludes(submodule, fileManager,
+                                       requiredTextualIncludes, visitedModules,
+                                       includeDirs, cwd);
+    }
+  }
+}
+
 static void writeImports(raw_ostream &out,
                          llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                          ModuleDecl &M, StringRef bridgingHeader,
+                         const FrontendOptions &frontendOpts,
+                         clang::HeaderSearch &clangHeaderSearchInfo,
                          bool useCxxImport = false) {
   // Note: we can't use has_feature(modules) as it's always enabled in C++20
   // mode.
@@ -413,6 +392,45 @@ static void writeImports(raw_ostream &out,
     return import == importer->getImportedHeaderModule();
   };
 
+  clang::FileSystemOptions fileSystemOptions;
+  clang::FileManager fileManager{fileSystemOptions};
+
+  llvm::SmallSet<llvm::SmallString<128>, 10> requiredTextualIncludes;
+  llvm::SmallSet<const clang::Module *, 10> visitedModules;
+  llvm::SmallSet<llvm::SmallString<128>, 10> includeDirs;
+
+  llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
+  llvm::ErrorOr<std::string> cwd = fileSystem.getCurrentWorkingDirectory();
+
+  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+    assert(cwd && "Access to current working directory required");
+
+    for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
+         searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
+      includeDirs.insert(normalizePath(searchDir->getName()));
+    }
+
+    const clang::Module *foundationModule = clangHeaderSearchInfo.lookupModule(
+        "Foundation", clang::SourceLocation(), false, false);
+    const clang::Module *darwinModule = clangHeaderSearchInfo.lookupModule(
+        "Darwin", clang::SourceLocation(), false, false);
+
+    std::function<void(const clang::Module *)>
+        collectTransitiveSubmoduleClosure;
+    collectTransitiveSubmoduleClosure = [&](const clang::Module *module) {
+      if (!module)
+        return;
+
+      visitedModules.insert(module);
+      for (auto submodule : module->submodules()) {
+        collectTransitiveSubmoduleClosure(submodule);
+      }
+    };
+
+    collectTransitiveSubmoduleClosure(foundationModule);
+    collectTransitiveSubmoduleClosure(darwinModule);
+  }
+
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
   bool includeUnderlying = false;
@@ -425,8 +443,24 @@ static void writeImports(raw_ostream &out,
         includeUnderlying = true;
         continue;
       }
-      if (seenImports.insert(Name).second)
+      if (seenImports.insert(Name).second) {
         out << importDirective << ' ' << Name.str() << ";\n";
+        if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+          if (const clang::Module *underlyingClangModule =
+                  swiftModule->findUnderlyingClangModule()) {
+            collectClangModuleHeaderIncludes(
+                underlyingClangModule, fileManager, requiredTextualIncludes,
+                visitedModules, includeDirs, cwd.get());
+          } else if ((underlyingClangModule =
+                          clangHeaderSearchInfo.lookupModule(
+                              Name.str(), clang::SourceLocation(), true,
+                              true))) {
+            collectClangModuleHeaderIncludes(
+                underlyingClangModule, fileManager, requiredTextualIncludes,
+                visitedModules, includeDirs, cwd.get());
+          }
+        }
+      }
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
@@ -434,9 +468,21 @@ static void writeImports(raw_ostream &out,
       out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
+
+      if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+        collectClangModuleHeaderIncludes(
+            clangModule, fileManager, requiredTextualIncludes, visitedModules,
+            includeDirs, cwd.get());
+      }
     }
   }
 
+  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+    out << "#else\n";
+    for (auto header : requiredTextualIncludes) {
+      out << "#import <" << header << ">\n";
+    }
+  }
   out << "#endif\n\n";
 
   if (includeUnderlying) {
@@ -490,7 +536,8 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
                                const FrontendOptions &frontendOpts,
-                               const IRGenOptions &irGenOpts) {
+                               const IRGenOptions &irGenOpts,
+                               clang::HeaderSearch &clangHeaderSearchInfo) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
@@ -500,8 +547,10 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
   printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
-  emitObjCConditional(os,
-                      [&] { writeImports(os, imports, *M, bridgingHeader); });
+  emitObjCConditional(os, [&] {
+    writeImports(os, imports, *M, bridgingHeader, frontendOpts,
+                 clangHeaderSearchInfo);
+  });
   writePostImportPrologue(os, *M);
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
@@ -530,8 +579,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
         moduleContents, *M, interopContext,
         /*requiresExposedAttribute=*/requiresExplicitExpose);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
-    writeImports(os, deps.imports, *M, bridgingHeader, /*useCxxImport=*/true);
-
+    writeImports(os, deps.imports, *M, bridgingHeader, frontendOpts,
+                 clangHeaderSearchInfo, /*useCxxImport=*/true);
     // Embed the standard library directly.
     if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
       assert(!M->isStdlibModule());

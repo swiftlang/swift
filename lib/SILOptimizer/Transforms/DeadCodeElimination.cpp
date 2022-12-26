@@ -292,7 +292,9 @@ void DCE::markLive() {
           // Visit the end_borrows of all the borrow scopes that this
           // begin_borrow could be borrowing.
           SmallVector<SILValue, 4> roots;
-          findGuaranteedReferenceRoots(borrowInst->getOperand(), roots);
+          findGuaranteedReferenceRoots(borrowInst->getOperand(),
+                                       /*lookThroughNestedBorrows=*/false,
+                                       roots);
           for (auto root : roots) {
             visitTransitiveEndBorrows(root,
                                       [&](EndBorrowInst *endBorrow) {

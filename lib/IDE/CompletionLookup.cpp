@@ -1703,6 +1703,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
 void CompletionLookup::addGenericTypeParamRef(
     const GenericTypeParamDecl *GP, DeclVisibilityKind Reason,
     DynamicLookupInfo dynamicLookupInfo) {
+  assert(!GP->getName().empty());
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(GP, Reason, dynamicLookupInfo));
@@ -2246,7 +2247,7 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
       // member from an optional key path root.
       auto loc = IsAfterSwiftKeyPathRoot ? DotLoc.getAdvancedLoc(1) : DotLoc;
       NumBytesToEraseForOptionalUnwrap = Ctx.SourceMgr.getByteDistance(
-          loc, Ctx.SourceMgr.getCodeCompletionLoc());
+          loc, Ctx.SourceMgr.getIDEInspectionTargetLoc());
     } else {
       NumBytesToEraseForOptionalUnwrap = 0;
     }
@@ -2590,7 +2591,6 @@ void CompletionLookup::addPoundLiteralCompletions(bool needPound) {
   case MagicIdentifierLiteralExpr::NAME:                                       \
     kwKind = CodeCompletionKeywordKind::TOKEN;                                 \
     break;
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
 #include "swift/AST/MagicIdentifierKinds.def"
     }
 
@@ -2829,7 +2829,7 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
     unsigned bytesToErase = 0;
     auto &SM = CurrDeclContext->getASTContext().SourceMgr;
     if (DotLoc.isValid())
-      bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
+      bytesToErase = SM.getByteDistance(DotLoc, SM.getIDEInspectionTargetLoc());
     addKeyword("nil", T, SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_nil, bytesToErase);
   }
@@ -3088,26 +3088,27 @@ void CompletionLookup::collectPrecedenceGroups() {
   }
 }
 
-void CompletionLookup::getPrecedenceGroupCompletions(CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
+void CompletionLookup::getPrecedenceGroupCompletions(
+    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
   switch (SK) {
-  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Associativity:
+  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Associativity:
     addKeyword(getAssociativitySpelling(Associativity::None));
     addKeyword(getAssociativitySpelling(Associativity::Left));
     addKeyword(getAssociativitySpelling(Associativity::Right));
     return;
-  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Assignment:
+  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Assignment:
     addKeyword(getTokenText(tok::kw_false), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_false);
     addKeyword(getTokenText(tok::kw_true), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_true);
     return;
-  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::AttributeList:
+  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::AttributeList:
     addKeyword("associativity");
     addKeyword("higherThan");
     addKeyword("lowerThan");
     addKeyword("assignment");
     return;
-  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Relation:
+  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Relation:
     collectPrecedenceGroups();
     return;
   }
@@ -3185,7 +3186,7 @@ void CompletionLookup::getToplevelCompletions(bool OnlyTypes, bool OnlyMacros) {
   NeedLeadingMacroPound = !OnlyMacros;
 
   UsableFilteringDeclConsumer UsableFilteringConsumer(
-      Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
+      Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getIDEInspectionTargetLoc(),
       *this);
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext,
                                                       UsableFilteringConsumer);

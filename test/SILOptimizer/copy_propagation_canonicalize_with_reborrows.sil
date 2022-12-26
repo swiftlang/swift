@@ -149,7 +149,8 @@ sil [ossa] @nohoist_destroy_over_reborrow_loop : $@convention(thin) () -> () {
 entry:
   %none1 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
   %none2 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
-  br head(%none2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
+  %none_borrow_2 = begin_borrow %none2 : $FakeOptional<X>
+  br head(%none_borrow_2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
 
 head(%reborrow : @guaranteed $FakeOptional<X>, %value : @owned $FakeOptional<X>):
   cond_br undef, body, exit

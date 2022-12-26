@@ -1190,7 +1190,8 @@ void ConstraintSystem::shrink(Expr *expr) {
                 // example:
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
-                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr);
+                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
+                /*packElementOpener*/ nullptr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())
@@ -1353,6 +1354,24 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     }
   };
 
+  auto reportSolutionsToSolutionCallback = [&](const SolutionResult &result) {
+    if (!getASTContext().SolutionCallback) {
+      return;
+    }
+    switch (result.getKind()) {
+    case SolutionResult::Success:
+      getASTContext().SolutionCallback->sawSolution(result.getSolution());
+      break;
+    case SolutionResult::Ambiguous:
+      for (auto &solution : result.getAmbiguousSolutions()) {
+        getASTContext().SolutionCallback->sawSolution(solution);
+      }
+      break;
+    default:
+      break;
+    }
+  };
+
   // Take up to two attempts at solving the system. The first attempts to
   // solve a system that is expected to be well-formed, the second kicks in
   // when there is an error and attempts to salvage an ill-formed program.
@@ -1365,6 +1384,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     case SolutionResult::Success: {
       // Return the successful solution.
       dumpSolutions(solution);
+      reportSolutionsToSolutionCallback(solution);
       std::vector<Solution> result;
       result.push_back(std::move(solution).takeSolution());
       return std::move(result);
@@ -1394,6 +1414,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
       // If salvaging produced an ambiguous result, it has already been
       // diagnosed.
       if (stage == 1) {
+        reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return None;
       }
@@ -1412,12 +1433,14 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
 
     case SolutionResult::UndiagnosedError:
       if (shouldSuppressDiagnostics()) {
+        reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return None;
       }
 
       if (stage == 1) {
         diagnoseFailureFor(target);
+        reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return None;
       }
@@ -2328,15 +2351,39 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 Constraint *ConstraintSystem::selectConjunction() {
+  SmallVector<Constraint *, 4> conjunctions;
   for (auto &constraint : InactiveConstraints) {
     if (constraint.isDisabled())
       continue;
 
     if (constraint.getKind() == ConstraintKind::Conjunction)
-      return &constraint;
+      conjunctions.push_back(&constraint);
   }
 
-  return nullptr;
+  if (conjunctions.empty())
+    return nullptr;
+
+  auto &SM = getASTContext().SourceMgr;
+
+  // All of the multi-statement closures should be solved in order of their
+  // apperance in the source.
+  llvm::sort(
+      conjunctions, [&](Constraint *conjunctionA, Constraint *conjunctionB) {
+        auto *locA = conjunctionA->getLocator();
+        auto *locB = conjunctionB->getLocator();
+
+        if (!(locA && locB))
+          return false;
+
+        auto *closureA = getAsExpr<ClosureExpr>(locA->getAnchor());
+        auto *closureB = getAsExpr<ClosureExpr>(locB->getAnchor());
+
+        return closureA && closureB
+                   ? SM.isBeforeInBuffer(closureA->getLoc(), closureB->getLoc())
+                   : false;
+      });
+
+  return conjunctions.front();
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {

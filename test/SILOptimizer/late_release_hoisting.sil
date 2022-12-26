@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -late-release-hoisting -module-name=test %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift
@@ -29,6 +31,10 @@ class HasHasObj {
   var ho : HasObj
 }
 
+sil @$s4test8HasInt64CfD : $@convention(method) (@owned HasInt64) -> () {
+[%0: noescape **]
+}
+
 // The release of %lo can be hoisted over the load because it does not
 // point to any escaping references.
 //
@@ -37,7 +43,7 @@ class HasHasObj {
 // CHECK:   [[LO:%.*]] = alloc_ref $HasInt64
 // CHECK:   [[IADR:%.*]] = ref_element_addr [[LO]] : $HasInt64, #HasInt64.i
 // CHECK:   store %0 to [[IADR]] : $*Int64
-// CHECK:   strong_release [[LO]] : $HasInt64
+// CHECK-NOT-SUPPORTED-YET:   strong_release [[LO]] : $HasInt64
 // CHECK:   [[OADR:%.*]] = ref_element_addr %1 : $HasObj, #HasObj.o
 // CHECK:   [[O:%.*]] = load [[OADR]] : $*AnyObject
 // CHECK:   return [[O]] : $AnyObject

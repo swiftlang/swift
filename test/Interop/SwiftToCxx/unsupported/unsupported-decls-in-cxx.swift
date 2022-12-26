@@ -5,7 +5,8 @@
 // RUN: %target-swift-frontend %t/clean.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -disable-availability-checking -emit-clang-header-path %t/header.h
 // RUN: %FileCheck %s < %t/header.h
 
-// REQUIRES: concurrency 
+// REQUIRES: concurrency
+// REQUIRES: distributed
 
 // CHECK-NOT: Unsupported
 // CHECK: supported

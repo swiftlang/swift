@@ -120,7 +120,6 @@ static  bool fixupReferenceCounts(
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       break;

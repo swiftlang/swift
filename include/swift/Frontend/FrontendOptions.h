@@ -64,6 +64,9 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
+  /// The name of the package this module belongs to.
+  std::string PackageName;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
@@ -430,6 +433,12 @@ public:
     return llvm::hash_value(0);
   }
 
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
+    return llvm::hash_value(0);
+  }
+
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
@@ -484,6 +493,10 @@ public:
   /// This should only be used as a workaround when emitting ABI descriptor files
   /// crashes the compiler.
   bool emptyABIDescriptor = false;
+
+  /// Augment modular imports in any emitted ObjC headers with equivalent
+  /// textual imports
+  bool EmitClangHeaderWithNonModularIncludes = false;
 
 private:
   static bool canActionEmitDependencies(ActionType);

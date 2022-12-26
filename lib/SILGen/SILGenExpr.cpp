@@ -165,12 +165,8 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
 
 EndBorrowCleanup::EndBorrowCleanup(SILValue borrowedValue)
     : borrowedValue(borrowedValue) {
-  if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-    if (auto *ti = arg->getSingleTerminator()) {
-      assert(!ti->isTransformationTerminator() &&
-             "Transforming terminators do not have end_borrow");
-    }
-  }
+  assert(!SILArgument::isTerminatorResult(borrowedValue) &&
+         "Transforming terminators do not have end_borrow");
 }
 
 void EndBorrowCleanup::emit(SILGenFunction &SGF, CleanupLocation l,
@@ -448,6 +444,7 @@ namespace {
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
+    RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -1517,6 +1514,11 @@ RValue
 RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
                                       SGFContext C) {
   llvm_unreachable("not implemented for PackExpansionExpr");
+}
+
+RValue
+RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented for PackElementExpr");
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -2747,9 +2749,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   // There no real argument to pass to the underlying accessors.
   if (!storage->getDeclContext()->isTypeContext())
     return ManagedValue();
-  
-  auto paramOrigValue =
-      ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
+
+  auto paramOrigValue = paramArg->getType().isTrivial(subSGF.F)
+                            ? ManagedValue::forTrivialRValue(paramArg)
+                            : ManagedValue::forBorrowedRValue(paramArg);
+  paramOrigValue = paramOrigValue.copy(subSGF, loc);
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
@@ -2937,7 +2941,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerialized
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   if (!thunk->empty())
     return thunk;
   
@@ -2956,15 +2961,20 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     subSGF.F.getTypeExpansionContext());
 
   auto entry = thunk->begin();
-  auto resultArgTy = signature->getSingleResult().getSILStorageType(
-      SGM.M, signature, subSGF.F.getTypeExpansionContext());
-  auto baseArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature, subSGF.F.getTypeExpansionContext());
+  auto resultArgTy =
+      subSGF.silConv.getSILType(signature->getSingleResult(), signature,
+                                subSGF.F.getTypeExpansionContext());
+  auto baseArgTy =
+      subSGF.silConv.getSILType(signature->getParameters()[0], signature,
+                                subSGF.F.getTypeExpansionContext());
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
   }
-  auto resultArg = entry->createFunctionArgument(resultArgTy);
+  SILFunctionArgument *resultArg = nullptr;
+  if (SGM.M.useLoweredAddresses()) {
+    resultArg = entry->createFunctionArgument(resultArgTy);
+  }
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   // Always take indexes parameter to match callee and caller signature on WebAssembly
@@ -3012,15 +3022,21 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     resultSubst = std::move(resultRValue).getAsSingleValue(subSGF, loc);
   }
 
-  if (resultSubst.getType().getAddressType() != resultArg->getType())
+  if (resultSubst.getType().getAddressType() != resultArgTy)
     resultSubst = subSGF.emitSubstToOrigValue(loc, resultSubst,
                                          AbstractionPattern::getOpaque(),
                                          propertyType);
-  
-  resultSubst.forwardInto(subSGF, loc, resultArg);
-  scope.pop();
-  
-  subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
+
+  if (SGM.M.useLoweredAddresses()) {
+    resultSubst.forwardInto(subSGF, loc, resultArg);
+    scope.pop();
+
+    subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
+  } else {
+    auto result = resultSubst.forward(subSGF);
+    scope.pop();
+    subSGF.B.createReturn(loc, result);
+  }
 
   SGM.emitLazyConformancesForFunction(thunk);
   return thunk;
@@ -3119,7 +3135,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerialized
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   if (!thunk->empty())
     return thunk;
   
@@ -3314,7 +3331,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerialized
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
     if (!equals->empty()) {
       return;
     }
@@ -3491,7 +3509,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerialized
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
     if (!hash->empty()) {
       return;
     }

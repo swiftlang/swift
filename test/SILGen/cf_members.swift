@@ -234,14 +234,14 @@ public func foo(_ x: Double) {
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ADSdcfu1_ : $@convention(thin) (Double, Struct1) -> Struct1 {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ADSdcfu5_ : $@convention(thin) (Double, Struct1) -> Struct1 {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
@@ -253,12 +253,12 @@ public func foo(_ x: Double) {
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL:sil private [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu11_ySdcfu12_ : $@convention(thin) (Double, Struct1) -> () {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu13_yAD_SfSdtcfu14_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
-// CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 

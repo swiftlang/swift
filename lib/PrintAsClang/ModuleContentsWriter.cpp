@@ -126,7 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
-  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
+  llvm::DenseSet<const clang::Type *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -276,8 +276,18 @@ public:
     });
   }
 
-  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
-    auto it = seenClangTypes.insert(typeDecl);
+  void emitReferencedClangTypeMetadata(const TypeDecl *typeDecl) {
+    if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
+      return;
+    // Get the underlying clang type from a type alias decl or record decl.
+    auto clangType =
+        clang::QualType(
+            cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(),
+            0)
+            .getCanonicalType();
+    if (!isa<clang::RecordType>(clangType.getTypePtr()))
+      return;
+    auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
@@ -295,6 +305,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
+      } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+        if (TAD->hasClangNode())
+          emitReferencedClangTypeMetadata(TAD);
       }
       return;
     }
@@ -599,6 +612,25 @@ public:
     });
     decls.erase(newEnd, decls.end());
 
+    if (M.isStdlibModule()) {
+      llvm::SmallVector<Decl *, 2> nestedAdds;
+      for (const auto *d : decls) {
+        auto *ext = dyn_cast<ExtensionDecl>(d);
+        if (!ext ||
+            ext->getExtendedNominal() != M.getASTContext().getStringDecl())
+          continue;
+        for (auto *m : ext->getMembers()) {
+          if (auto *sd = dyn_cast<StructDecl>(m)) {
+            if (sd->getBaseIdentifier().str() == "UTF8View" ||
+                sd->getBaseIdentifier().str() == "Index") {
+              nestedAdds.push_back(sd);
+            }
+          }
+        }
+      }
+      decls.append(nestedAdds);
+    }
+
     // REVERSE sort the decls, since we are going to copy them onto a stack.
     llvm::array_pod_sort(decls.begin(), decls.end(),
                          [](Decl * const *lhs, Decl * const *rhs) -> int {
@@ -763,9 +795,17 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
+    // Embed additional STL includes.
+    os << "#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY\n";
+    os << "#include <string>\n";
+    os << "#endif\n";
+    os << "#include <new>\n";
     // Embed an overlay for the standard library.
     ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
+    // Ignore typos in Swift stdlib doc comments.
+    os << "#pragma clang diagnostic push\n";
+    os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
@@ -803,5 +843,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
+
+  if (M.isStdlibModule()) {
+    os << "#pragma clang diagnostic pop\n";
+  }
   return info;
 }

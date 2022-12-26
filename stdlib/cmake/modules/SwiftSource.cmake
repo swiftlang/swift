@@ -49,7 +49,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
       ${ARGN})
@@ -63,6 +63,7 @@ function(handle_swift_sources
                  EMBED_BITCODE_arg)
   translate_flag(${SWIFTSOURCES_STATIC} "STATIC"
                  STATIC_arg)
+  translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -95,7 +96,7 @@ function(handle_swift_sources
   endforeach()
 
   set(swift_compile_flags ${SWIFTSOURCES_COMPILE_FLAGS})
-  if (NOT SWIFTSOURCES_IS_MAIN)
+  if (NOT SWIFTSOURCES_IS_MAIN AND NOT SWIFTSOURCES_NO_LINK_NAME)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
 

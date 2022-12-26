@@ -325,7 +325,7 @@ func local_observing_property(_ arg: Int) {
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
 // CHECK-LABEL: sil private [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
-// CHECK: bb0(%0 : @guaranteed ${ var Int })
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var Int })
 // CHECK: [[POINTER:%.*]] = project_box %0 : ${ var Int }, 0
 // CHECK: // function_ref observers.zero.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s9observers4zero{{[_0-9a-zA-Z]*}}vau
@@ -389,7 +389,7 @@ func propertyWithDidSetTakingOldValue() {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
-// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
 // CHECK-NEXT:  debug_value [[ARG2_PB]] : $*Int, var, name "p", argno 2, expr op_deref

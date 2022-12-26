@@ -291,8 +291,8 @@ bool MandatoryGenericSpecializer::optimize(SILFunction *func,
     if (!rrBlocks.reachesReturn(&block) || !neBlocks.isNonErrorHandling(&block))
       continue;
   
-    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
-      changed |= optimizeInst(inst, funcBuilder, deleter, cha, invalidatedStackNesting);
+    for (SILInstruction &inst : block.reverseDeletableInstructions()) {
+      changed |= optimizeInst(&inst, funcBuilder, deleter, cha, invalidatedStackNesting);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -372,6 +372,14 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
     constFolder.processWorkList();
     deleter.forceDelete(bi);
     return true;
+  }
+  if (auto *mti = dyn_cast<MetatypeInst>(inst)) {
+    // Remove dead `metatype` instructions which only have `debug_value` uses.
+    // We lose debug info for such type variables, but this is a compromise we
+    // need to accept to get allocation/lock free code.
+    if (onlyHaveDebugUses(mti)) {
+      deleter.forceDeleteWithUsers(mti);
+    }
   }
   return false;
 }

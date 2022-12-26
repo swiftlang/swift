@@ -40,8 +40,8 @@ namespace llvm {
 }
 
 namespace swift {
-  class CodeCompletionCallbacks;
-  class CodeCompletionCallbacksFactory;
+  class IDEInspectionCallbacks;
+  class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
   class DiagnosticEngine;
   class Expr;
@@ -126,7 +126,7 @@ public:
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   ASTContext &Context;
-  CodeCompletionCallbacks *CodeCompletion = nullptr;
+  IDEInspectionCallbacks *IDECallbacks = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
   /// The current token hash, or \c None if the parser isn't computing a hash
@@ -187,12 +187,12 @@ public:
   /// the #if decl.
   bool shouldEvaluatePoundIfDecls() const;
 
-  void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
-    CodeCompletion = Callbacks;
+  void setIDECallbacks(IDEInspectionCallbacks *Callbacks) {
+    IDECallbacks = Callbacks;
   }
 
-  bool isCodeCompletionFirstPass() const {
-    return L->isCodeCompletion() && !CodeCompletion;
+  bool isIDEInspectionFirstPass() const {
+    return SourceMgr.hasIDEInspectionTargetBuffer() && !IDECallbacks;
   }
 
   bool allowTopLevelCode() const;
@@ -1897,8 +1897,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  void performCodeCompletionSecondPassImpl(
-      CodeCompletionDelayedDeclState &info);
+  void performIDEInspectionSecondPassImpl(
+      IDEInspectionDelayedDeclState &info);
 };
 
 /// Describes a parsed declaration name.

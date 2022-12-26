@@ -92,8 +92,7 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
   return false;
 }
 
-void ClangSyntaxPrinter::printNominalClangTypeReference(
-    const clang::Decl *typeDecl) {
+void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
   auto &clangCtx = typeDecl->getASTContext();
   clang::PrintingPolicy pp(clangCtx.getLangOpts());
   const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
@@ -118,7 +117,7 @@ void ClangSyntaxPrinter::printNominalClangTypeReference(
 void ClangSyntaxPrinter::printNominalTypeReference(
     const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
   if (typeDecl->hasClangNode()) {
-    printNominalClangTypeReference(typeDecl->getClangDecl());
+    printClangTypeReference(typeDecl->getClangDecl());
     return;
   }
   printModuleNamespaceQualifiersIfNeeded(typeDecl->getModuleContext(),
@@ -266,7 +265,7 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
 }
 
 void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
-    const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
+    const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     llvm::ArrayRef<GenericRequirement> genericRequirements) {
   // FIXME: Support generic requirements > 3.
   if (!genericRequirements.empty())
@@ -343,8 +342,8 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(!requirement.Protocol && "protocol requirements not supported yet!");
-  auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
+  assert(requirement.isMetadata() && "protocol requirements not supported yet!");
+  auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
   os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);

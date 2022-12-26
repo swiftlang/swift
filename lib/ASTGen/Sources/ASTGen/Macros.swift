@@ -1,3 +1,4 @@
+import SwiftDiagnostics
 import SwiftParser
 import SwiftSyntax
 import _SwiftSyntaxMacros
@@ -94,9 +95,21 @@ extension String {
   }
 }
 
+/// Diagnostic message used for thrown errors.
+fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
+  let message: String
+
+  var severity: DiagnosticSeverity { .error }
+
+  var diagnosticID: MessageID {
+    .init(domain: "SwiftSyntaxMacros", id: "ThrownErrorDiagnostic")
+  }
+}
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroPtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafePointer<UInt8>,
   sourceLocationPtr: UnsafePointer<UInt8>?,
@@ -147,10 +160,31 @@ func evaluateMacro(
         return ExprSyntax(parentExpansion)
       }
 
-      return exprMacro.expand(parentExpansion, in: &context)
+      do {
+        return try exprMacro.expansion(of: parentExpansion, in: &context)
+      } catch {
+        // Record the error
+        context.diagnose(
+          Diagnostic(
+            node: Syntax(parentExpansion),
+            message: ThrownErrorDiagnostic(message: String(describing: error))
+          )
+        )
+
+        return ExprSyntax(parentExpansion)
+      }
     }
 
-    // FIXME: Emit diagnostics accumulated in the
+    // Emit diagnostics accumulated in the context.
+    let macroName = parentExpansion.macro.withoutTrivia().description
+    for diag in context.diagnostics {
+      emitDiagnostic(
+        diagEnginePtr: diagEnginePtr,
+        sourceFileBuffer: .init(mutating: sourceFile.pointee.buffer),
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
+      )
+    }
 
     var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
     evaluatedSyntaxStr.withUTF8 { utf8 in

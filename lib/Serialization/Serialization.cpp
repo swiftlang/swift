@@ -842,6 +842,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
   BLOCK_RECORD(options_block, MODULE_ABI_NAME);
   BLOCK_RECORD(options_block, IS_CONCURRENCY_CHECKED);
+  BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1062,6 +1063,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->getABIName() != M->getName()) {
         options_block::ModuleABINameLayout ABIName(Out);
         ABIName.emit(ScratchRecord, M->getABIName().str());
+      }
+
+      if (!M->getPackageName().empty()) {
+        options_block::ModulePackageNameLayout PackageName(Out);
+        PackageName.emit(ScratchRecord, M->getPackageName().str());
       }
 
       if (M->isConcurrencyChecked()) {
@@ -4497,7 +4503,6 @@ static uint8_t getRawStableValueOwnership(swift::ValueOwnership ownership) {
 static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   switch (pc) {
   SIMPLE_CASE(ParameterConvention, Indirect_In)
-  SIMPLE_CASE(ParameterConvention, Indirect_In_Constant)
   SIMPLE_CASE(ParameterConvention, Indirect_In_Guaranteed)
   SIMPLE_CASE(ParameterConvention, Indirect_Inout)
   SIMPLE_CASE(ParameterConvention, Indirect_InoutAliasable)

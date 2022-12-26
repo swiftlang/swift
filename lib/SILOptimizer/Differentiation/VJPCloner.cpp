@@ -854,7 +854,6 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       conv = ResultConvention::Indirect;
@@ -976,7 +975,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
       pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->isSerialized(),
-      original->isDynamicallyReplaceable(), original->isDistributed());
+      original->isDynamicallyReplaceable(), original->isDistributed(),
+      original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
   return pullback;

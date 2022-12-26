@@ -2511,6 +2511,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
   llvm::Function *f =
     IGM.getAddrOfObjCMetadataUpdateFunction(D, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
+  IGM.setColocateMetadataSection(f);
 
   IRGenFunction IGF(IGM, f);
   if (IGM.DebugInfo)

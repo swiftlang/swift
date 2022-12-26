@@ -12,7 +12,7 @@ To invoke the Swift REPL (Read-Eval-Print-Loop):
 
 =over
 
-B<swift>
+B<swift> repl
 
 =back
 

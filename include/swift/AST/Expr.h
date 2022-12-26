@@ -3515,6 +3515,50 @@ public:
   }
 };
 
+/// A pack element expression spelled with the contextual \c each
+/// keyword applied to a pack reference expression.
+///
+/// \code
+///  func zip<T..., U...>(t: (each T)..., u: (each U)...) {
+///    let zipped = (each t, each u)...
+///  }
+/// \endcode
+///
+/// Pack elements can only appear in the pattern expression of a
+/// \c PackExpansionExpr.
+class PackElementExpr final : public Expr {
+  SourceLoc EachLoc;
+  Expr *PackRefExpr;
+
+  PackElementExpr(SourceLoc eachLoc, Expr *packRefExpr,
+                  bool implicit = false, Type type = Type())
+      : Expr(ExprKind::PackElement, implicit, type),
+        EachLoc(eachLoc), PackRefExpr(packRefExpr) {}
+
+public:
+  static PackElementExpr *create(ASTContext &ctx, SourceLoc eachLoc,
+                                 Expr *packRefExpr, bool implicit = false,
+                                 Type type = Type());
+
+  Expr *getPackRefExpr() const { return PackRefExpr; }
+
+  void setPackRefExpr(Expr *packRefExpr) {
+    PackRefExpr = packRefExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return EachLoc;
+  }
+
+  SourceLoc getEndLoc() const {
+    return PackRefExpr->getEndLoc();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackElement;
+  }
+};
+
 /// A pack expansion expression is a pattern expression followed by
 /// the expansion operator '...'. The pattern expression contains
 /// references to parameter packs of length N, and the expansion
@@ -3525,8 +3569,7 @@ public:
 /// call argument lists, the elements of a tuple value, and the source
 /// of a for-in loop.
 class PackExpansionExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpansionExpr,
-                                  OpaqueValueExpr *, Expr *> {
+    private llvm::TrailingObjects<PackExpansionExpr, PackElementExpr *> {
   friend TrailingObjects;
 
   Expr *PatternExpr;
@@ -3534,42 +3577,29 @@ class PackExpansionExpr final : public Expr,
   GenericEnvironment *Environment;
 
   PackExpansionExpr(Expr *patternExpr,
-                    ArrayRef<OpaqueValueExpr *> opaqueValues,
-                    ArrayRef<Expr *> bindings,
+                    ArrayRef<PackElementExpr *> packElements,
                     SourceLoc dotsLoc,
                     GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
       PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
-    assert(opaqueValues.size() == bindings.size());
-    Bits.PackExpansionExpr.NumBindings = opaqueValues.size();
-
-    assert(Bits.PackExpansionExpr.NumBindings > 0 &&
-           "PackExpansionExpr must have pack references");
-
-    std::uninitialized_copy(opaqueValues.begin(), opaqueValues.end(),
-                            getTrailingObjects<OpaqueValueExpr *>());
-    std::uninitialized_copy(bindings.begin(), bindings.end(),
-                            getTrailingObjects<Expr *>());
+    Bits.PackExpansionExpr.NumBindings = packElements.size();
+    std::uninitialized_copy(packElements.begin(), packElements.end(),
+                            getTrailingObjects<PackElementExpr *>());
   }
 
-  size_t numTrailingObjects(OverloadToken<OpaqueValueExpr *>) const {
+  size_t numTrailingObjects(OverloadToken<PackElementExpr *>) const {
     return getNumBindings();
   }
 
-  size_t numTrailingObjects(OverloadToken<Expr *>) const {
-    return getNumBindings();
-  }
-
-  MutableArrayRef<Expr *> getMutableBindings() {
-    return {getTrailingObjects<Expr *>(), getNumBindings()};
+  MutableArrayRef<PackElementExpr *> getMutableBindings() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
 public:
   static PackExpansionExpr *create(ASTContext &ctx,
                                    Expr *patternExpr,
-                                   ArrayRef<OpaqueValueExpr *> opaqueValues,
-                                   ArrayRef<Expr *> bindings,
+                                   ArrayRef<PackElementExpr *> packElements,
                                    SourceLoc dotsLoc,
                                    GenericEnvironment *environment,
                                    bool implicit = false,
@@ -3585,17 +3615,11 @@ public:
     return Bits.PackExpansionExpr.NumBindings;
   }
 
-  ArrayRef<OpaqueValueExpr *> getOpaqueValues() {
-    return {getTrailingObjects<OpaqueValueExpr *>(), getNumBindings()};
+  ArrayRef<PackElementExpr *> getPackElements() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
   }
 
-  ArrayRef<Expr *> getBindings() {
-    return {getTrailingObjects<Expr *>(), getNumBindings()};
-  }
-
-  void setBinding(unsigned i, Expr *e) {
-    getMutableBindings()[i] = e;
-  }
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
 
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
@@ -3761,11 +3785,11 @@ class AbstractClosureExpr : public DeclContext, public Expr {
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
-                      unsigned Discriminator, DeclContext *Parent)
+                      DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
-    Bits.AbstractClosureExpr.Discriminator = Discriminator;
+    Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
   CaptureInfo getCaptureInfo() const { return Captures; }
@@ -3794,11 +3818,18 @@ public:
   /// optimization and therefore make it into e.g. stack traces.
   /// Having their symbol names be stable across minor code changes is
   /// therefore pretty useful for debugging.)
-  unsigned getDiscriminator() const {
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
     return Bits.AbstractClosureExpr.Discriminator;
   }
+
   void setDiscriminator(unsigned discriminator) {
-    assert(getDiscriminator() == InvalidDiscriminator);
+    assert(getRawDiscriminator() == InvalidDiscriminator);
     assert(discriminator != InvalidDiscriminator);
     Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
@@ -3957,9 +3988,9 @@ public:
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+              DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          discriminator, parent),
+                          parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
@@ -4155,10 +4186,9 @@ public:
     AsyncLet = 3,
   };
 
-  AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
-                  DeclContext *Parent)
+  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
-                            Discriminator, Parent) {
+                            Parent) {
     if (Body != nullptr)
       setBody(Body);
 

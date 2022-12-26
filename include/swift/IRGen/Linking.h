@@ -341,6 +341,11 @@ class LinkEntity {
     /// the metadata cache once.
     CanonicalPrespecializedGenericTypeCachingOnceToken,
 
+    /// The record that describes an attribute that could be looked
+    /// up at runtime together with all types it's attached to and
+    /// generator functions.
+    RuntimeDiscoverableAttributeRecord,
+
     /// The same as AsyncFunctionPointer but with a different stored value, for
     /// use by TBDGen.
     /// The pointer is an AbstractFunctionDecl*.
@@ -1380,6 +1385,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forRuntimeDiscoverableAttributeRecord(NominalTypeDecl *attr) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::RuntimeDiscoverableAttributeRecord, attr);
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
@@ -1509,6 +1520,9 @@ public:
            getKind() == Kind::OpaqueTypeDescriptorAccessorKey ||
            getKind() == Kind::OpaqueTypeDescriptorAccessorVar;
   }
+  bool isOpaqueTypeDescriptorAccessorImpl() const {
+    return getKind() == Kind::OpaqueTypeDescriptorAccessorImpl;
+  }
   bool isAllocator() const {
     assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
            getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
@@ -1539,6 +1553,9 @@ public:
   }
   bool isDynamicallyReplaceableFunctionKey() const {
     return getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+  bool isDynamicallyReplaceableFunctionImpl() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionImpl;
   }
   bool isTypeMetadataAccessFunction() const {
     return getKind() == Kind::TypeMetadataAccessFunction;

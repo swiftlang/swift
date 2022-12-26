@@ -780,11 +780,11 @@ Result Parser::parseIfConfigRaw(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   // Find the region containing code completion token.
-  SourceLoc codeCompletionClauseLoc;
-  if (SourceMgr.hasCodeCompletionBuffer() &&
-      SourceMgr.getCodeCompletionBufferID() == L->getBufferID() &&
+  SourceLoc ideInspectionClauseLoc;
+  if (SourceMgr.hasIDEInspectionTargetBuffer() &&
+      SourceMgr.getIDEInspectionTargetBufferID() == L->getBufferID() &&
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
-                                 SourceMgr.getCodeCompletionLoc())) {
+                                 SourceMgr.getIDEInspectionTargetLoc())) {
     llvm::SaveAndRestore<Optional<StableHasher>> H(CurrentTokenHash, None);
     BacktrackingScope backtrack(*this);
     do {
@@ -792,9 +792,10 @@ Result Parser::parseIfConfigRaw(
       consumeToken();
       skipUntilConditionalBlockClose();
       auto endLoc = PreviousLoc;
-      if (SourceMgr.rangeContainsTokenLoc(SourceRange(startLoc, endLoc),
-                                          SourceMgr.getCodeCompletionLoc())){
-        codeCompletionClauseLoc = startLoc;
+      if (SourceMgr.rangeContainsTokenLoc(
+              SourceRange(startLoc, endLoc),
+              SourceMgr.getIDEInspectionTargetLoc())) {
+        ideInspectionClauseLoc = startLoc;
         break;
       }
     } while (Tok.isNot(tok::pound_endif, tok::eof));
@@ -807,7 +808,7 @@ Result Parser::parseIfConfigRaw(
       !InInactiveClauseEnvironment &&
       // If this directive contains code completion location, 'isActive' is
       // determined solely by which block has the completion token.
-      !codeCompletionClauseLoc.isValid();
+      !ideInspectionClauseLoc.isValid();
 
   bool foundActive = false;
   bool isVersionCondition = false;
@@ -850,8 +851,8 @@ Result Parser::parseIfConfigRaw(
     }
 
     // Treat the region containing code completion token as "active".
-    if (codeCompletionClauseLoc.isValid() && !foundActive)
-      isActive = (ClauseLoc == codeCompletionClauseLoc);
+    if (ideInspectionClauseLoc.isValid() && !foundActive)
+      isActive = (ClauseLoc == ideInspectionClauseLoc);
 
     foundActive |= isActive;
 

@@ -394,6 +394,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(PackExpansion);
+  NO_REFERENCE(PackElement);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -750,6 +751,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
     return false;
 
   case ExprKind::Call:
@@ -927,6 +929,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -1245,17 +1248,56 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 
 PackExpansionExpr *
 PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          ArrayRef<OpaqueValueExpr *> opaqueValues,
-                          ArrayRef<Expr *> bindings, SourceLoc dotsLoc,
-                          GenericEnvironment *environment,
+                          ArrayRef<PackElementExpr *> packElements,
+                          SourceLoc dotsLoc, GenericEnvironment *environment,
                           bool implicit, Type type) {
   size_t size =
-      totalSizeToAlloc<OpaqueValueExpr *, Expr *>(opaqueValues.size(),
-                                                  bindings.size());
+      totalSizeToAlloc<PackElementExpr *>(packElements.size());
   void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
-  return ::new (mem) PackExpansionExpr(patternExpr, opaqueValues,
-                                       bindings, dotsLoc, environment,
+  return ::new (mem) PackExpansionExpr(patternExpr, packElements,
+                                       dotsLoc, environment,
                                        implicit, type);
+}
+
+void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
+  struct PackCollector : public ASTWalker {
+    llvm::SmallVector<ASTNode, 2> packs;
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionExpr>(E)) {
+        return Action::SkipChildren(E);
+      }
+
+      if (isa<PackElementExpr>(E)) {
+        packs.push_back(E);
+      }
+
+      return Action::Continue(E);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionTypeRepr>(T)) {
+        return Action::SkipChildren();
+      }
+
+      if (isa<PackReferenceTypeRepr>(T)) {
+        packs.push_back(T);
+      }
+
+      return Action::Continue();
+    }
+  } packCollector;
+
+  getPatternExpr()->walk(packCollector);
+  packs.append(packCollector.packs.begin(), packCollector.packs.end());
+}
+
+PackElementExpr *
+PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
+                        bool implicit, Type type) {
+  return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -1848,6 +1890,27 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
         preconcurrency());
   }
   }
+}
+
+unsigned AbstractClosureExpr::getDiscriminator() const {
+  auto raw = getRawDiscriminator();
+  if (raw != InvalidDiscriminator)
+    return raw;
+
+  evaluateOrDefault(
+      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+
+  // Ill-formed code might not be able to assign discriminators, so assign
+  // a new one now.
+  if (getRawDiscriminator() == InvalidDiscriminator &&
+      getASTContext().Diags.hadAnyError()) {
+    const_cast<AbstractClosureExpr *>(this)->
+        Bits.AbstractClosureExpr.Discriminator =
+          getASTContext().NextAutoClosureDiscriminator++;
+  }
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
 }
 
 void AbstractClosureExpr::setParameterList(ParameterList *P) {

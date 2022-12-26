@@ -63,7 +63,7 @@ class ConcreteWithInt: Generic<Int> {
     set {}
   }
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s3mod15ConcreteWithIntC12complexTupleSiSg_SDySSSiGtvMAA7GenericCADxSg_SDySSxGtvMTV : $@yield_once @convention(method) @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_0 == τ_0_1, τ_0_2 == String, τ_0_3 == τ_0_4> (@guaranteed ConcreteWithInt) -> @yields @inout (Optional<τ_0_0>, Dictionary<String, τ_0_3>) for <Int, Int, String, Int, Int>
+  // CHECK-LABEL: sil private [thunk] [ossa] @$s3mod15ConcreteWithIntC12complexTupleSiSg_SDySSSiGtvMAA7GenericCADxSg_SDySSxGtvMTV : $@yield_once @convention(method) @substituted <τ_0_0, τ_0_1> (@guaranteed ConcreteWithInt) -> @yields @inout (Optional<τ_0_0>, Dictionary<String, τ_0_1>) for <Int, Int>
   override var complexTuple: (Int?, [String: Int]) {
     get { super.complexTuple }
     set {}
@@ -110,7 +110,7 @@ extension ConcreteWithInt : ProtoWithAssoc {
 
   //   var complexTuple
   // CHECK-LABEL: sil shared [ossa] @$s3mod15ConcreteWithIntC12complexTupleSiSg_SDySSSiGtvr : $@yield_once @convention(method) (@guaranteed ConcreteWithInt) -> (@yields Optional<Int>, @yields @guaranteed Dictionary<String, Int>)
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s3mod15ConcreteWithIntCAA05ProtoC5AssocA2aDP12complexTuple0F0QzSg_SDySSAHGtvMTW : $@yield_once @convention(witness_method: ProtoWithAssoc) @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4, τ_0_5 where τ_0_1 == τ_0_2, τ_0_3 == String, τ_0_4 == τ_0_5> (@inout τ_0_0) -> @yields @inout (Optional<τ_0_1>, Dictionary<String, τ_0_4>) for <ConcreteWithInt, Int, Int, String, Int, Int>
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s3mod15ConcreteWithIntCAA05ProtoC5AssocA2aDP12complexTuple0F0QzSg_SDySSAHGtvMTW : $@yield_once @convention(witness_method: ProtoWithAssoc) @substituted <τ_0_0, τ_0_1, τ_0_2> (@inout τ_0_0) -> @yields @inout (Optional<τ_0_1>, Dictionary<String, τ_0_2>) for <ConcreteWithInt, Int, Int>
 }
 
 // CHECK-LABEL: sil_vtable ConcreteWithInt {

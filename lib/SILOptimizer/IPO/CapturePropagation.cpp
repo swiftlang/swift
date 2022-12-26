@@ -199,10 +199,7 @@ void CapturePropagationCloner::cloneClosure(
 
     auto *MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
-    MappedValue->setNoImplicitCopy(
-        cast<SILFunctionArgument>(Arg)->isNoImplicitCopy());
-    MappedValue->setLifetimeAnnotation(
-        cast<SILFunctionArgument>(Arg)->getLifetimeAnnotation());
+    MappedValue->copyFlags(cast<SILFunctionArgument>(Arg));
     entryArgs.push_back(MappedValue);
   }
   assert(OrigEntryBB->args_size() - ArgIdx == PartialApplyArgs.size()
@@ -299,9 +296,10 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
-      IsNotDistributed, OrigF->getEntryCount(), OrigF->isThunk(),
-      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
-      OrigF->getEffectsKind(), /*InsertBefore*/ OrigF, OrigF->getDebugScope());
+      IsNotDistributed, IsNotRuntimeAccessible, OrigF->getEntryCount(),
+      OrigF->isThunk(), OrigF->getClassSubclassScope(),
+      OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
+      /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (!OrigF->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }

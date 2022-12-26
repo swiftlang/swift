@@ -54,7 +54,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor, Act.ID == ActorID {
+    where Act: DistributedActor {
     let id = self.idProvider.next()
     self.assignedIDsLock.withLock {
       self.assignedIDs.insert(id)

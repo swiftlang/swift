@@ -64,9 +64,9 @@ static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
   if (fixupNeeded) {
     // We need to fix up the base address. We'll need a known-good address in
     // the same image: `sections` itself will work nicely.
-    swift::SymbolInfo symbolInfo;
-    if (lookupSymbol(sections, &symbolInfo) && symbolInfo.baseAddress) {
-        sections->baseAddress.store(symbolInfo.baseAddress,
+    auto symbolInfo = SymbolInfo::lookup(sections);
+    if (symbolInfo.has_value() && symbolInfo->getBaseAddress()) {
+        sections->baseAddress.store(symbolInfo->getBaseAddress(),
                                     std::memory_order_relaxed);
     }
   }
@@ -129,6 +129,15 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
     swift::addImageAccessibleFunctionsBlockCallback(
         baseAddress, functions, accessible_funcs_section.length);
 
+  if (sections->version >= 3) {
+    const auto &runtime_attribs_section = sections->swift5_runtime_attributes;
+    const void *functions =
+        reinterpret_cast<void *>(runtime_attribs_section.start);
+    if (runtime_attribs_section.length)
+      swift::addImageRuntimeAttributesBlockCallback(
+          baseAddress, functions, runtime_attribs_section.length);
+  }
+
   // Register this section for future enumeration by clients. This should occur
   // after this function has done all other relevant work to avoid a race
   // condition when someone calls swift_enumerateAllMetadataSections() on
@@ -168,6 +177,9 @@ void swift::initializeDynamicReplacementLookup() {
 void swift::initializeAccessibleFunctionsLookup() {
 }
 
+void swift::initializeRuntimeAttributesLookup() {
+}
+
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
@@ -190,10 +202,9 @@ const swift::MetadataSections *swift_getMetadataSection(size_t index) {
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getMetadataSectionName(const swift::MetadataSections *section) {
-  swift::SymbolInfo info;
-  if (lookupSymbol(section, &info)) {
-    if (info.fileName) {
-      return info.fileName;
+  if (auto info = swift::SymbolInfo::lookup(section)) {
+    if (info->getFilename()) {
+      return info->getFilename();
     }
   }
   return "";
@@ -203,9 +214,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
                                          void const **out_actual,
                                          void const **out_expected) {
-  swift::SymbolInfo info;
-  if (lookupSymbol(section, &info)) {
-    *out_actual = info.baseAddress;
+  if (auto info = swift::SymbolInfo::lookup(section)) {
+    *out_actual = info->getBaseAddress();
   } else {
     *out_actual = nullptr;
   }

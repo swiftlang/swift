@@ -1942,6 +1942,10 @@ namespace {
   /// Lower address only types as opaque values.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void setLoweredAddresses() const override {
+      LoweredType = LoweredType.getAddressType();
+    }
+
     OpaqueValueTypeLowering(SILType type, RecursiveProperties properties,
                             TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -1950,7 +1954,7 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      if (B.getModule().useLoweredAddresses()) {
+      if (LoweredType.isAddress()) {
         B.createCopyAddr(loc, src, dest, isTake, isInit);
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
@@ -2009,6 +2013,10 @@ namespace {
         : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
                                    forExpansion) {}
 
+    void setLoweredAddresses() const override {
+      LoweredType = LoweredType.getAddressType();
+    }
+
     void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
                       SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
@@ -2046,9 +2054,13 @@ namespace {
   class LowerType
     : public TypeClassifierBase<LowerType, TypeLowering *>
   {
+    bool loweredAddresses;
+
   public:
-    LowerType(TypeConverter &TC, TypeExpansionContext Expansion)
-      : TypeClassifierBase(TC, Expansion) {}
+    LowerType(TypeConverter &TC, TypeExpansionContext Expansion,
+              bool loweredAddresses)
+        : TypeClassifierBase(TC, Expansion),
+          loweredAddresses(loweredAddresses) {}
 
     TypeLowering *handleTrivial(CanType type) {
       return handleTrivial(type, RecursiveProperties::forTrivial());
@@ -2105,7 +2117,9 @@ namespace {
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
       }
-      auto silType = SILType::getPrimitiveObjectType(type);
+      auto silType = SILType::getPrimitiveType(
+          type, loweredAddresses ? SILValueCategory::Address
+                                 : SILValueCategory::Object);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
     
@@ -2399,9 +2413,8 @@ namespace {
   };
 } // end anonymous namespace
 
-TypeConverter::TypeConverter(ModuleDecl &m)
-  : M(m), Context(m.getASTContext()) {
-}
+TypeConverter::TypeConverter(ModuleDecl &m, bool loweredAddresses)
+    : LoweredAddresses(loweredAddresses), M(m), Context(m.getASTContext()) {}
 
 TypeConverter::~TypeConverter() {
   // The bump pointer allocator destructor will deallocate but not destroy all
@@ -2602,7 +2615,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
     lowering =
-        LowerType(*this, forExpansion)
+        LowerType(*this, forExpansion, LoweredAddresses)
             .visit(key.SubstType, key.OrigType, isTypeExpansionSensitive);
 
     // Otherwise, check the table at a key that would be used by the
@@ -3064,9 +3077,8 @@ const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
         forExpansion, origType, loweredType);
   }
 
-  lowering =
-      LowerType(*this, forExpansion)
-        .visit(loweredType, origType, isTypeExpansionSensitive);
+  lowering = LowerType(*this, forExpansion, LoweredAddresses)
+                 .visit(loweredType, origType, isTypeExpansionSensitive);
 
   if (!lowering->isResilient() && !lowering->isTypeExpansionSensitive())
     insert(key.getKeyForMinimalExpansion(), lowering);
@@ -3215,6 +3227,30 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
   CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, resultTy,
                                  info);
+}
+
+/// Type of runtime discoverable attribute generator is () -> <#AttrType#>
+static CanAnyFunctionType
+getRuntimeAttributeGeneratorInterfaceType(TypeConverter &TC, SILDeclRef c) {
+  auto *attachedToDecl = c.getDecl();
+  auto *attr = c.pointer.get<CustomAttr *>();
+  auto *attrType = attachedToDecl->getRuntimeDiscoverableAttrTypeDecl(attr);
+  auto generator =
+      attachedToDecl->getRuntimeDiscoverableAttributeGenerator(attr);
+
+  auto resultTy = generator.second->getCanonicalType();
+
+  CanType canResultTy = resultTy->getReducedType(
+      attrType->getInnermostDeclContext()->getGenericSignatureOfContext());
+
+  // Remove @noescape from function return types. A @noescape
+  // function return type is a contradiction.
+  canResultTy = removeNoEscape(canResultTy);
+
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
+  return CanAnyFunctionType::get(/*genericSignature=*/nullptr,
+                                 /*params=*/{}, canResultTy, info);
 }
 
 /// Get the type of a property wrapper backing initializer,
@@ -3477,6 +3513,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getAsyncEntryPoint(Context);
   case SILDeclRef::Kind::EntryPoint:
     return getEntryPointInterfaceType(Context);
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    return getRuntimeAttributeGeneratorInterfaceType(*this, c);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -3530,6 +3568,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
     return vd->getDeclContext()->getGenericSignatureOfContext();
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
     llvm_unreachable("Doesn't have generic signature");
   }
 
@@ -4361,6 +4400,14 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
     // some place we need to keep opaque types opaque.
     CaptureTypeExpansionContexts.insert({constant, context});
   }
+}
+
+void TypeConverter::setLoweredAddresses() {
+  assert(!LoweredAddresses);
+  for (auto &pair : this->LoweredTypes) {
+    pair.getSecond()->setLoweredAddresses();
+  }
+  LoweredAddresses = true;
 }
 
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,

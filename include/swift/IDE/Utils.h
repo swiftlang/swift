@@ -18,6 +18,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Expr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
@@ -740,7 +741,7 @@ bool isDeclOverridable(ValueDecl *D);
 /// one in `SomeType`. Contrast that to `type(of: foo).classMethod()` where
 /// `classMethod` could be any `classMethod` up or down the hierarchy from the
 /// type of the \p Base expression.
-bool isDynamicRef(Expr *Base, ValueDecl *D);
+bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> getType = [](Expr *E) { return E->getType(); });
 
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,

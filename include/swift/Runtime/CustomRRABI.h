@@ -59,14 +59,21 @@ namespace swift {
 template <typename Ret, typename Param>
 Param returnTypeHelper(Ret (*)(Param)) {}
 
+#if defined(__LP64__) || defined(_LP64)
+#define REGISTER_SUBSTITUTION_PREFIX ""
+#define REGISTER_PREFIX "x"
+#else
+#define REGISTER_SUBSTITUTION_PREFIX "w"
+#define REGISTER_PREFIX "w"
+#endif
+
 // Helper macro that defines one entrypoint that takes the parameter in reg and
 // calls through to function.
 #define CUSTOM_RR_ENTRYPOINTS_DEFINE_ONE_ENTRYPOINT(reg, function)             \
-  SWIFT_RUNTIME_EXPORT decltype(function(                                      \
-      nullptr)) function##_x##reg() {                                          \
+  SWIFT_RUNTIME_EXPORT decltype(function(nullptr)) function##_x##reg() {       \
     decltype(returnTypeHelper(function)) ptr;                                  \
-    asm(".ifnc %0, x" #reg "\n"                                                \
-        "mov %0, x" #reg "\n"                                                  \
+    asm(".ifnc %" REGISTER_SUBSTITUTION_PREFIX "0, " REGISTER_PREFIX #reg "\n" \
+        "mov %" REGISTER_SUBSTITUTION_PREFIX "0, " REGISTER_PREFIX #reg "\n"   \
         ".endif"                                                               \
         : "=r"(ptr));                                                          \
     return function(ptr);                                                      \

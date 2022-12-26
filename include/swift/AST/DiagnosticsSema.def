@@ -1548,6 +1548,8 @@ ERROR(expose_unsupported_async_decl_to_cxx,none,
       "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_actor_isolated_to_cxx,none,
       "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_unsupported_client_emission_to_cxx,none,
+      "%0 %1 can not be exposed to C++ as it requires code to be emitted into client", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -5148,6 +5150,12 @@ ERROR(expansion_not_allowed,none,
       "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
       "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
+ERROR(pack_reference_outside_expansion,none,
+      "pack reference %0 can only appear in pack expansion or generic requirement",
+      (Type))
+ERROR(each_non_pack,none,
+      "'each' cannot be applied to non-pack type %0",
+      (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
@@ -5156,6 +5164,9 @@ ERROR(multiple_ellipsis_in_tuple,none,
 ERROR(expansion_not_same_shape,none,
       "variadic expansion %0 requires that %1 and %2 have the same shape",
       (Type, Type, Type))
+ERROR(expansion_expr_not_same_shape,none,
+      "pack expansion requires that %0 and %1 have the same shape",
+      (Type, Type))
 
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
@@ -6744,7 +6755,7 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
 ERROR(external_macro_not_found,none,
-      "external implementation struct '%0.%1' could not be found in for "
+      "external macro implementation type '%0.%1' could not be found for "
       "macro %2; the type must be public and provided via "
       "'-load-plugin-library'", (StringRef, StringRef, DeclName))
 NOTE(macro_note, none,
@@ -6794,6 +6805,28 @@ ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
 
 ERROR(runtime_discoverable_attrs_are_experimental,none,
       "runtime discoverable attributes are an experimental feature", ())
+
+ERROR(invalid_decl_for_runtime_discoverable_attr,none,
+      "@%0 can only be applied to non-generic types, methods, "
+      "instance properties, and global functions", (StringRef))
+
+ERROR(duplicate_runtime_discoverable_attr,none,
+      "duplicate runtime discoverable attribute", ())
+
+ERROR(runtime_attribute_requires_init,none,
+      "runtime attribute type %0 does not contain a required initializer"
+      " - init(attachedTo:)",
+      (DeclName))
+
+ERROR(runtime_attribute_type_failable_init,none,
+      "runtime attribute type initializer %0 cannot be failable", (DeclName))
+
+ERROR(runtime_attribute_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing runtime attribute type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

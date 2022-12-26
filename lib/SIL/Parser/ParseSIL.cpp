@@ -978,6 +978,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsThunk_t *isThunk,
                                  IsDynamicallyReplaceable_t *isDynamic,
                                  IsDistributed_t *isDistributed,
+                                 IsRuntimeAccessible_t *isRuntimeAccessible,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  SILFunction **usedAdHocRequirementWitness,
@@ -1014,6 +1015,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isDynamic = IsDynamic;
     else if (isDistributed && SP.P.Tok.getText() == "distributed")
       *isDistributed = IsDistributed;
+    else if (isRuntimeAccessible && SP.P.Tok.getText() == "runtime_accessible")
+      *isRuntimeAccessible = IsRuntimeAccessible;
     else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
       *isExactSelfClass = IsExactSelfClass;
     else if (isCanonical && SP.P.Tok.getText() == "canonical")
@@ -1543,6 +1546,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
     // Construct SILDeclRef.
     Result = SILDeclRef(VD, Kind, IsObjC,
                         /*distributed=*/false, /*knownToBeLocal=*/false,
+                        /*runtimeAccessible=*/false,
                         SILDeclRef::BackDeploymentKind::None, DerivativeId);
     return false;
   }
@@ -1612,6 +1616,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "defaultarg") {
         Kind = SILDeclRef::Kind::IVarInitializer;
         ParseState = 1;
+      } else if (!ParseState && Id.str() == "attrgenerator") {
+        Kind = SILDeclRef::Kind::RuntimeAttributeGenerator;
+        ParseState = 1;
       } else if (!ParseState && Id.str() == "propertyinit") {
         Kind = SILDeclRef::Kind::StoredPropertyInitializer;
         ParseState = 1;
@@ -1664,6 +1671,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   // Construct SILDeclRef.
   Result = SILDeclRef(VD, Kind, IsObjC,
                       /*distributed=*/false, /*knownToBeLocal=*/false,
+                      /*runtimeAccessible=*/false,
                       SILDeclRef::BackDeploymentKind::None, DerivativeId);
   return false;
 }
@@ -6495,16 +6503,20 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           return true;
 
         bool foundNoImplicitCopy = false;
+        bool foundClosureCapture = false;
         bool foundLexical = false;
         bool foundEagerMove = false;
-        while (auto attributeName = parseOptionalAttribute(
-                   {"noImplicitCopy", "_lexical", "_eagerMove"})) {
+        while (auto attributeName =
+                   parseOptionalAttribute({"noImplicitCopy", "_lexical",
+                                           "_eagerMove", "closureCapture"})) {
           if (*attributeName == "noImplicitCopy")
             foundNoImplicitCopy = true;
           else if (*attributeName == "_lexical")
             foundLexical = true;
           else if (*attributeName == "_eagerMove")
             foundEagerMove = true;
+          else if (*attributeName == "closureCapture")
+            foundClosureCapture = true;
           else {
             llvm_unreachable("Unexpected attribute!");
           }
@@ -6533,6 +6545,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (IsEntry) {
           auto *fArg = BB->createFunctionArgument(Ty);
           fArg->setNoImplicitCopy(foundNoImplicitCopy);
+          fArg->setClosureCapture(foundClosureCapture);
           fArg->setLifetimeAnnotation(lifetime);
           Arg = fArg;
 
@@ -6599,6 +6612,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool isCanonical = false;
   IsDynamicallyReplaceable_t isDynamic = IsNotDynamic;
   IsDistributed_t isDistributed = IsNotDistributed;
+  IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
@@ -6620,7 +6634,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &isThunk, &isDynamic, &isDistributed, &isExactSelfClass,
+          &isThunk, &isDynamic, &isDistributed, &isRuntimeAccessible,
+          &isExactSelfClass,
           &DynamicallyReplacedFunction, &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
           &isWeakImported, &needStackProtection, &availability,
@@ -6656,6 +6671,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
     FunctionState.F->setIsDistributed(isDistributed);
+    FunctionState.F->setIsRuntimeAccessible(isRuntimeAccessible);
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
@@ -6739,11 +6755,11 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                              LBraceLoc);
 
-        // Check that there are no unresolved forward definitions of opened
+        // Check that there are no unresolved forward definitions of local
         // archetypes.
-        if (M.hasUnresolvedOpenedArchetypeDefinitions())
+        if (M.hasUnresolvedLocalArchetypeDefinitions())
           llvm_unreachable(
-              "All forward definitions of opened archetypes should be resolved");
+              "All forward definitions of local archetypes should be resolved");
       }
     }
 
@@ -6862,7 +6878,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -6915,7 +6931,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, SP, M))
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6984,7 +7000,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7094,7 +7110,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, moveOnlyDeinitTableState, M))
+                           nullptr, nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -7579,7 +7595,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.
@@ -7946,8 +7962,9 @@ bool SILParserState::parseSILCoverageMap(Parser &P) {
                        LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(M, Filename.str(), FuncName.str(), PGOFuncName.str(),
-                           Hash, Regions, Builder.getExpressions());
+    SILCoverageMap::create(M, &P.SF, Filename.str(), FuncName.str(),
+                           PGOFuncName.str(), Hash, Regions,
+                           Builder.getExpressions());
   return false;
 }
 

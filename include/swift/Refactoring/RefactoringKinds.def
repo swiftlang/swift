@@ -64,6 +64,8 @@ CURSOR_REFACTORING(AddAsyncAlternative, "Add Async Alternative", add.async-alter
 
 CURSOR_REFACTORING(AddAsyncWrapper, "Add Async Wrapper", add.async-wrapper)
 
+CURSOR_REFACTORING(ExpandMacro, "Expand Macro", expand.macro)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)

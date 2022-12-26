@@ -614,14 +614,6 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
-  /// Keep track of cxx function names, params etc in order to
-  /// allow for de-duping functions that differ strictly on "constness".
-  llvm::DenseMap<const clang::DeclContext *, llvm::DenseMap<llvm::StringRef,
-                 std::pair<
-                     llvm::DenseSet<clang::FunctionDecl *>,
-                     llvm::DenseSet<clang::FunctionDecl *>>>>
-      cxxMethods;
-
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
@@ -1945,6 +1937,15 @@ inline bool requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (OperatorToken == Spelling) {                                             \
+    return "__operator" #Name;                                                 \
+  };
+#include "clang/Basic/OperatorKinds.def"
+  return "None";
 }
 
 }

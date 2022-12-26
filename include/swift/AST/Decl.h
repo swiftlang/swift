@@ -35,6 +35,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/TypeWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -2793,6 +2794,22 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+
+  /// Retrieve runtime discoverable attributes (if any) associated
+  /// with this declaration.
+  ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
+  /// Retrieve a nominal type declaration backing given runtime discoverable
+  /// attribute.
+  ///
+  /// FIXME: This should be a more general facility but its unclear where
+  ///        to place it for maximum impact.
+  NominalTypeDecl *getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const;
+
+  /// Given a runtime discoverable attribute, return a generator
+  /// which could be used to instantiate it for this declaration
+  /// together with its result type.
+  std::pair<BraceStmt *, Type>
+  getRuntimeDiscoverableAttributeGenerator(CustomAttr *) const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -3903,7 +3920,7 @@ public:
   bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
 
   /// Return a type wrapper (if any) associated with this type.
-  NominalTypeDecl *getTypeWrapper() const;
+  Optional<TypeWrapperInfo> getTypeWrapper() const;
 
   /// If this declaration has a type wrapper return a property that
   /// is used for all type wrapper related operations (mainly for
@@ -8282,11 +8299,12 @@ public:
 
 /// Provides a declaration of a macro.
 ///
+/// Macros are declared within the source code with the `macro` introducer.
+///
 /// Macros are defined externally via conformances to the 'Macro' type
 /// that is part of swift-syntax, and are introduced into the compiler via
-/// various mechanisms (built-in macros are linked in directly, plugin macros
-/// are introduced via compiler plugins, and so on). They have no explicit
-/// representation in the source code, but are still declarations.
+/// various mechanisms (e.g., in-process macros provided as builtins or
+/// loaded via shared library, and so on).
 class MacroDecl : public GenericContext, public ValueDecl {
 public:
   /// The location of the 'macro' keyword.

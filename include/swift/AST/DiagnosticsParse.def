@@ -1034,10 +1034,6 @@ ERROR(invalid_label_on_stmt,none,
 ERROR(labeled_block_needs_do,none,
       "labeled block needs 'do'", ())
 
-ERROR(snake_case_deprecated,none,
-      "%0 has been replaced with %1 in Swift 3",
-      (StringRef, StringRef))
-
 // Assignment statement
 ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())
@@ -1969,12 +1965,6 @@ ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
 
 //------------------------------------------------------------------------------
-// MARK: Consistency diagnostics
-//------------------------------------------------------------------------------
-ERROR(new_parser_failure, none,
-      "new parser has failed consistency checking; please see errors above", ())
-
-//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
@@ -2022,6 +2012,12 @@ ERROR(macro_expansion_expr_expected_macro_identifier,none,
       "expected a macro identifier for a pound literal expression", ())
 ERROR(macro_expansion_decl_expected_macro_identifier,none,
       "expected a macro identifier for a pound literal declaration", ())
+
+ERROR(parser_round_trip_error,none,
+      "source file did not round-trip through the new Swift parser", ())
+ERROR(parser_new_parser_errors,none,
+      "new Swift parser generated errors for code that C++ parser accepted",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

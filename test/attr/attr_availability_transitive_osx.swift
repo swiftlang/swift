@@ -129,6 +129,16 @@ extension Outer {
   func osx_more_available_but_still_unavailable_call_osx() {
     osx() // OK
   }
+
+  @available(OSX, unavailable)
+  func osx_double_unavailable_call_osx() {
+    osx() // OK
+  }
+
+  @available(*, unavailable)
+  func osx_universally_unavailable_call_osx() {
+    osx() // OK
+  }
   
   // rdar://92551870
   func osx_call_osx_more_available_but_still_unavailable() {

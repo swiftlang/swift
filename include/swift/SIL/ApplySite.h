@@ -386,7 +386,6 @@ public:
       return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
                               : SILArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_In_Guaranteed:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
                               : SILArgumentConvention::Indirect_In;

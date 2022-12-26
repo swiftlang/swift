@@ -1994,8 +1994,8 @@ bool MemoryToRegisters::run() {
     if (!domInfo->isReachableFromEntry(&block)) {
       continue;
     }
-    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
-      auto *asi = dyn_cast<AllocStackInst>(inst);
+    for (SILInstruction &inst : block.reverseDeletableInstructions()) {
+      auto *asi = dyn_cast<AllocStackInst>(&inst);
       if (!asi)
         continue;
 

@@ -33,7 +33,7 @@ namespace swift {
       Identifier moduleName;
 
       /// Scan the given interface file to determine dependencies.
-      llvm::ErrorOr<ModuleDependencies> scanInterfaceFile(
+      llvm::ErrorOr<ModuleDependencyInfo> scanInterfaceFile(
           Twine moduleInterfacePath, bool isFramework);
 
       InterfaceSubContextDelegate &astDelegate;
@@ -41,7 +41,7 @@ namespace swift {
       /// Location where pre-built moduels are to be built into.
       std::string moduleCachePath;
     public:
-      Optional<ModuleDependencies> dependencies;
+      Optional<ModuleDependencyInfo> dependencies;
 
       ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                               Identifier moduleName,

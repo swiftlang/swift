@@ -12,6 +12,7 @@
 
 #include "sourcekitd/Internal-XPC.h"
 #include "sourcekitd/Logging.h"
+#include "sourcekitd/Service.h"
 
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/Concurrency.h"

@@ -51,7 +51,7 @@ namespace irgen {
   createVariable(IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *objectType,
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
                  Optional<SILLocation> DebugLoc = None,
-                 StringRef DebugName = StringRef(), bool heapAllocated = false);
+                 StringRef DebugName = StringRef());
 
   llvm::GlobalVariable *
   createLinkerDirectiveVariable(IRGenModule &IGM, StringRef Name);

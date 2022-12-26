@@ -23,6 +23,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -844,6 +845,9 @@ namespace {
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
 
+    /// A stack of pack element generic environments.
+    llvm::SmallVector<GenericEnvironment *, 2> PackElementEnvironments;
+
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -1083,6 +1087,10 @@ namespace {
     }
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
+
+    void addPackElementEnvironment(GenericEnvironment *env) {
+      PackElementEnvironments.push_back(env);
+    }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
       CS.recordFix(
@@ -1409,11 +1417,23 @@ namespace {
     Type
     resolveTypeReferenceInExpression(TypeRepr *repr, TypeResolverContext resCtx,
                                      const ConstraintLocatorBuilder &locator) {
+      TypeResolutionOptions options(resCtx);
+
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+
+      // Add a PackElementOf constraint for 'each T' type reprs.
+      GenericEnvironment *elementEnv = nullptr;
+      if (!PackElementEnvironments.empty()) {
+        options |= TypeResolutionFlags::AllowPackReferences;
+        elementEnv = PackElementEnvironments.back();
+      }
+      const auto packElementOpener = OpenPackElementType(CS, locator, elementEnv);
+
       const auto result = TypeResolution::resolveContextualType(
-          repr, CS.DC, resCtx, genericOpener, placeholderHandler);
+          repr, CS.DC, options, genericOpener, placeholderHandler,
+          packElementOpener);
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
@@ -1652,14 +1672,20 @@ namespace {
         ArrayRef<TypeRepr *> specializationArgs) {
       // Resolve each type.
       SmallVector<Type, 2> specializationArgTypes;
-      const auto options =
+      auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
       for (auto specializationArg : specializationArgs) {
+        GenericEnvironment *elementEnv = nullptr;
+        if (!PackElementEnvironments.empty()) {
+          options |= TypeResolutionFlags::AllowPackReferences;
+          elementEnv = PackElementEnvironments.back();
+        }
         const auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, locator),
-            HandlePlaceholderType(CS, locator));
+            HandlePlaceholderType(CS, locator),
+            OpenPackElementType(CS, locator, elementEnv));
         if (result->hasError())
           return true;
 
@@ -1716,14 +1742,21 @@ namespace {
           // Bind the specified generic arguments to the type variables in the
           // open type.
           auto *const locator = CS.getConstraintLocator(expr);
-          const auto options =
+          auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
           for (size_t i = 0, e = specializations.size(); i < e; ++i) {
+            GenericEnvironment *elementEnv = nullptr;
+            if (!PackElementEnvironments.empty()) {
+              options |= TypeResolutionFlags::AllowPackReferences;
+              elementEnv = PackElementEnvironments.back();
+            }
+
             const auto result = TypeResolution::resolveContextualType(
                 specializations[i], CS.DC, options,
                 // Introduce type variables for unbound generics.
                 OpenUnboundGenericType(CS, locator),
-                HandlePlaceholderType(CS, locator));
+                HandlePlaceholderType(CS, locator),
+                OpenPackElementType(CS, locator, elementEnv));
             if (result->hasError())
               return Type();
 
@@ -2752,6 +2785,18 @@ namespace {
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = parentType;
+          // Perform member lookup into the external pattern metatype. e.g.
+          // `case let .test(tuple) as Test`.
+        } else if (externalPatternType) {
+          Type externalMetaType = MetatypeType::get(externalPatternType);
+
+          CS.addValueMemberConstraint(
+              externalMetaType, enumPattern->getName(), memberType, CurDC,
+              functionRefKind, {},
+              CS.getConstraintLocator(locator,
+                                      LocatorPathElt::PatternMatch(pattern)));
+
+          baseType = externalPatternType;
         } else {
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
@@ -2944,10 +2989,9 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
-      for (auto *binding : expr->getBindings()) {
-        auto type = visit(binding);
-        CS.setType(binding, type);
-      }
+      auto *elementEnv = expr->getGenericEnvironment();
+      assert(PackElementEnvironments.back() == elementEnv);
+      PackElementEnvironments.pop_back();
 
       auto *patternLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
@@ -2955,21 +2999,46 @@ namespace {
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto *elementLoc = CS.getConstraintLocator(
+          expr, LocatorPathElt::OpenedPackElement(elementEnv));
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
-                       patternTy, CS.getConstraintLocator(expr));
+                       patternTy, elementLoc);
 
       auto *shapeLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
       auto *shapeTypeVar = CS.createTypeVariable(shapeLoc,
                                                  TVO_CanBindToPack |
                                                  TVO_CanBindToHole);
-      auto packReference = expr->getBindings().front();
-      auto packType = CS.simplifyType(CS.getType(packReference))
-          ->castTo<PackExpansionType>()->getPatternType();
-      CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
-                       CS.getConstraintLocator(expr));
+
+      // Generate ShapeOf constraints between all packs expanded by this
+      // pack expansion expression through the shape type variable.
+      SmallVector<ASTNode, 2> expandedPacks;
+      expr->getExpandedPacks(expandedPacks);
+      for (auto pack : expandedPacks) {
+        Type packType;
+        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
+          packType = CS.getType(elementExpr->getPackRefExpr());
+        } else if (auto *elementType = getAsTypeRepr<PackReferenceTypeRepr>(pack)) {
+          packType = CS.getType(elementType->getPackType());
+        } else {
+          llvm_unreachable("unsupported pack reference ASTNode");
+        }
+
+        CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
+            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
+      }
 
       return PackExpansionType::get(patternTy, shapeTypeVar);
+    }
+
+    Type visitPackElementExpr(PackElementExpr *expr) {
+      auto packType = CS.getType(expr->getPackRefExpr());
+
+      // The type of a PackElementExpr is the opened pack element archetype
+      // of the pack reference.
+      OpenPackElementType openPackElement(CS, CS.getConstraintLocator(expr),
+                                          PackElementEnvironments.back());
+      return openPackElement(packType, /*packRepr*/ nullptr);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3970,6 +4039,10 @@ namespace {
         for (auto ignoredArg : ignoredArgs) {
           CS.markArgumentIgnoredForCodeCompletion(ignoredArg);
         }
+      }
+
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
+        CG.addPackElementEnvironment(expansion->getGenericEnvironment());
       }
 
       return Action::Continue(expr);

@@ -1388,7 +1388,13 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
       PrintWithColorRAII(os, DiscriminatorColor)
         << "autoclosure discriminator=";
     }
-    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getDiscriminator();
+
+    // If we aren't printing to standard error or the debugger output stream,
+    // this client expects to see the computed discriminator. Compute it now.
+    if (&os != &llvm::errs() && &os != &llvm::dbgs())
+      (void)ACE->getDiscriminator();
+
+    PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
 
@@ -1414,6 +1420,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     case InitializerKind::PropertyWrapper:
       os << "property wrapper initializer";
       break;
+    case InitializerKind::RuntimeAttribute:
+      os << "runtime attribute initializer";
     }
     break;
 
@@ -2504,6 +2512,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPackElementExpr(PackElementExpr *E) {
+    printCommon(E, "pack_element_expr") << "\n";
+    printRec(E->getPackRefExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';
@@ -2548,8 +2562,14 @@ public:
 
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
+
+    // If we aren't printing to standard error or the debugger output stream,
+    // this client expects to see the computed discriminator. Compute it now.
+    if (&OS != &llvm::errs() && &OS != &llvm::dbgs())
+      (void)E->getDiscriminator();
+
     PrintWithColorRAII(OS, DiscriminatorColor)
-      << " discriminator=" << E->getDiscriminator();
+      << " discriminator=" << E->getRawDiscriminator();
 
     switch (auto isolation = E->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
@@ -3138,6 +3158,12 @@ public:
   void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
     printCommon("pack_expansion") << '\n';
     printRec(T->getPatternType());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+    printCommon("pack_reference");
+    printRec(T->getPackType());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3942,6 +3968,7 @@ namespace {
       printField("index", T->getIndex());
       if (auto decl = T->getDecl())
         printField("decl", decl->printRef());
+      printFlag(T->isParameterPack(), "pack");
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

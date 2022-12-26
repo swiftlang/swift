@@ -518,6 +518,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
+      (unsigned)F.isRuntimeAccessible(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -646,6 +647,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
+      packedMetadata |= unsigned(SFA->isClosureCapture()) << 19;      // 1 bit
     }
     // Used: 19 bits. Free: 13.
     //

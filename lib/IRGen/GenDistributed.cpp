@@ -459,8 +459,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   }
 
   switch (param.getConvention()) {
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant: {
+  case ParameterConvention::Indirect_In: {
     // The only way to load opaque type is to allocate a temporary
     // variable on the stack for it and initialize from the given address
     // either at +0 or +1 depending on convention.
@@ -681,22 +680,21 @@ void DistributedAccessor::emit() {
     // We need this to determine the expected number of witness tables
     // to load from the buffer provided by the caller.
     llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
-    auto numDirectGenericArgs =
+    auto expandedSignature =
         expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
+    assert(expandedSignature.numShapes == 0 &&
+           "Distributed actors don't support variadic generics");
 
     // Generic arguments associated with the distributed thunk directly
     // e.g. `distributed func echo<T, U>(...)`
     assert(
         !IGM.getLLVMContext().supportsTypedPointers() ||
-        numDirectGenericArgs ==
+        expandedSignature.numTypeMetadataPtrs ==
             llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
               return type == IGM.TypeMetadataPtrTy;
             }));
 
-    auto expectedWitnessTables =
-        targetGenericArguments.size() - numDirectGenericArgs;
-
-    for (unsigned index = 0; index < numDirectGenericArgs; ++index) {
+    for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
       auto alignment =
@@ -709,7 +707,7 @@ void DistributedAccessor::emit() {
     }
 
     emitLoadOfWitnessTables(witnessTables, numWitnessTables,
-                            expectedWitnessTables, arguments);
+                            expandedSignature.numWitnessTablePtrs, arguments);
   }
 
   // Step two, let's form and emit a call to the distributed method

@@ -67,7 +67,8 @@ enum RepresentationKind { Representable, Unsupported };
 
 enum RepresentationError {
   UnrepresentableAsync,
-  UnrepresentableIsolatedInActor
+  UnrepresentableIsolatedInActor,
+  UnrepresentableRequiresClientEmission,
 };
 
 struct DeclRepresentation {

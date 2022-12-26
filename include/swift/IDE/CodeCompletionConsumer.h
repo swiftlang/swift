@@ -14,7 +14,7 @@
 #define SWIFT_IDE_CODECOMPLETIONCONSUMER
 
 #include "swift/IDE/CodeCompletionContext.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 
 namespace swift {
 namespace ide {

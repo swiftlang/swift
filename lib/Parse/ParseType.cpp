@@ -21,7 +21,7 @@
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -184,8 +184,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     ty = parseTypeTupleBody();
     break;
   case tok::code_complete:
-    if (CodeCompletion)
-      CodeCompletion->completeTypeSimpleBeginning();
+    if (IDECallbacks)
+      IDECallbacks->completeTypeSimpleBeginning();
     return makeParserCodeCompletionResult<TypeRepr>(
         new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
   case tok::l_square: {
@@ -573,8 +573,8 @@ ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion)
-      CodeCompletion->completeTypeDeclResultBeginning();
+    if (IDECallbacks)
+      IDECallbacks->completeTypeDeclResultBeginning();
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -672,8 +672,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (Tok.is(tok::kw_Any)) {
       return parseAnyType();
     } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
+      if (IDECallbacks)
+        IDECallbacks->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();
@@ -759,11 +759,11 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot(ITR);
+      if (IDECallbacks)
+        IDECallbacks->completeTypeIdentifierWithDot(ITR);
     } else {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
+      if (IDECallbacks)
+        IDECallbacks->completeTypeIdentifierWithoutDot(ITR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -780,8 +780,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
-  // Check for the opaque modifier.
-  // This is only semantically allowed in certain contexts, but we parse it
+  // Check for the contextual keyword modifiers on types.
+  // These are only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
   SourceLoc opaqueLoc;
   SourceLoc anyLoc;
@@ -793,6 +793,16 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // Treat any as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     anyLoc = consumeToken();
+  } else if (Tok.isContextualKeyword("each")) {
+    // Treat 'each' as a keyword.
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
+    SourceLoc eachLoc = consumeToken();
+    ParserResult<TypeRepr> packRef = parseTypeSimple(MessageID, reason);
+    if (packRef.isNull())
+      return packRef;
+
+    auto *typeRepr = new (Context) PackReferenceTypeRepr(eachLoc, packRef.get());
+    return makeParserResult(ParserStatus(packRef), typeRepr);
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
@@ -1365,13 +1375,18 @@ bool Parser::canParseGenericArguments() {
   if (!startsWithLess(Tok))
     return false;
   consumeStartingLess();
-  
+
+  if (startsWithGreater(Tok)) {
+    consumeStartingGreater();
+    return true;
+  }
+
   do {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
-  
+
   if (!startsWithGreater(Tok)) {
     return false;
   } else {
@@ -1387,6 +1402,8 @@ bool Parser::canParseType() {
   if (Tok.isContextualKeyword("some")) {
     consumeToken();
   } else if (Tok.isContextualKeyword("any")) {
+    consumeToken();
+  } else if (Tok.isContextualKeyword("each")) {
     consumeToken();
   }
 
@@ -1454,19 +1471,20 @@ bool Parser::canParseType() {
     break;
   }
 
-  if (!isAtFunctionTypeArrow())
+  if (isAtFunctionTypeArrow()) {
+    // Handle type-function if we have an '->' with optional
+    // 'async' and/or 'throws'.
+    while (isEffectsSpecifier(Tok))
+      consumeToken();
+
+    if (!consumeIf(tok::arrow))
+      return false;
+    
+    if (!canParseType())
+      return false;
+    
     return true;
-
-  // Handle type-function if we have an '->' with optional
-  // 'async' and/or 'throws'.
-  while (isEffectsSpecifier(Tok))
-    consumeToken();
-
-  if (!consumeIf(tok::arrow))
-    return false;
-  
-  if (!canParseType())
-    return false;
+  }
 
   // Parse pack expansion 'T...'.
   if (Tok.isEllipsis()) {

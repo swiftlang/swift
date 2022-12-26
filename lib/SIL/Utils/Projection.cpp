@@ -376,7 +376,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // and unions. This is currently only associated with structs.
   if (Start->getType().aggregateHasUnreferenceableStorage() ||
       End->getType().aggregateHasUnreferenceableStorage())
-    return llvm::NoneType::None;
+    return None;
 
   auto Iter = End;
   while (Start != Iter) {
@@ -405,7 +405,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // ProjectionPath never allow paths to be compared as a list of indices.
   // Only the encoded type+index pair will be compared.
   if (P.empty() || Start != Iter)
-    return llvm::NoneType::None;
+    return None;
 
   // Reverse to get a path from base to most-derived.
   std::reverse(P.Path.begin(), P.Path.end());
@@ -540,7 +540,7 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
                              const ProjectionPath &Prefix) {
   // We can only subtract paths that have the same base.
   if (Path.BaseType != Prefix.BaseType)
-    return llvm::NoneType::None;
+    return None;
 
   // If Prefix is greater than or equal to Path in size, Prefix can not be a
   // prefix of Path. Return None.
@@ -548,7 +548,7 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   unsigned PathSize = Path.size();
 
   if (PrefixSize >= PathSize)
-    return llvm::NoneType::None;
+    return None;
 
   // First make sure that the prefix matches.
   Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);

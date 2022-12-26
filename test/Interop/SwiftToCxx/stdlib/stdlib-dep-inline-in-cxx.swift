@@ -7,7 +7,7 @@
 
 // RUN: cat %t/stdlib.h %t/stdlib2.h > %t/two_includes.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/two_includes.h -Wno-unused-private-field -Wno-unused-function -Wno-shadow)
+// RUN: %check-interop-cxx-header-in-clang(-DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY %t/two_includes.h -Wno-unused-private-field -Wno-unused-function -Wno-shadow)
 
 @_expose(Cxx)
 public func test() -> String {

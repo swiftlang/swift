@@ -150,6 +150,10 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
+  /// The set of declarations with valid runtime discoverable attributes
+  /// located in the source file.
+  llvm::SetVector<ValueDecl *> DeclsWithRuntimeDiscoverableAttrs;
+
   /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
@@ -194,15 +198,6 @@ private:
   friend ASTContext;
 
 public:
-  /// For source files created to hold the source code created by expanding
-  /// a macro, this is the AST node that describes the macro expansion.
-  ///
-  /// The source location of this AST node is the place in the source that
-  /// triggered the creation of the macro expansion whose resulting source
-  /// code is in this source file. This field is only valid when
-  /// the \c SourceFileKind is \c MacroExpansion.
-  const ASTNode macroExpansion;
-
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.
   void addTopLevelDecl(Decl *d);
@@ -218,6 +213,10 @@ public:
   /// Add a hoisted declaration. See Decl::isHoisted().
   void addHoistedDecl(Decl *d);
 
+  /// Add a declaration with any number of runtime disoverable attributes
+  /// associated with it.
+  void addDeclWithRuntimeDiscoverableAttrs(ValueDecl *);
+
   /// Retrieves an immutable view of the list of top-level items in this file.
   ArrayRef<ASTNode> getTopLevelItems() const;
 
@@ -229,6 +228,10 @@ public:
   /// Retrieves an immutable view of the list of hoisted decls in this file.
   /// See Decl::isHoisted().
   ArrayRef<Decl *> getHoistedDecls() const;
+
+  /// Retrieves an immutable view of the set of all declaration with runtime
+  /// discoverable attributes located in this file.
+  ArrayRef<ValueDecl *> getDeclsWithRuntimeDiscoverableAttrs() const;
 
   /// Retrieves an immutable view of the top-level items if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
@@ -327,8 +330,7 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ParsingOptions parsingOpts = {}, bool isPrimary = false,
-             ASTNode macroExpansion = ASTNode());
+             ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
 
@@ -488,6 +490,15 @@ public:
       return None;
     return BufferID;
   }
+
+  /// For source files created to hold the source code created by expanding
+  /// a macro, this is the AST node that describes the macro expansion.
+  ///
+  /// The source location of this AST node is the place in the source that
+  /// triggered the creation of the macro expansion whose resulting source
+  /// code is in this source file. This will only produce a non-null value when
+  /// the \c SourceFileKind is \c MacroExpansion.
+  ASTNode getMacroExpansion() const;
 
   /// When this source file is enclosed within another source file, for example
   /// because it describes a macro expansion, return the source file it was

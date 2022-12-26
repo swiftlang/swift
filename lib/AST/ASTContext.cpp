@@ -19,7 +19,6 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
-#include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -1125,9 +1124,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
     M = getLoadedModule(Id_Cxx);
     break;
-  case KnownProtocolKind::CompilerPlugin:
-    M = getLoadedModule(Id_CompilerPluginSupport);
-    break;
   default:
     M = getStdlibModule();
     break;
@@ -1883,35 +1879,37 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-using ModuleDependencyIDSet = std::unordered_set<ModuleDependencyID, llvm::pair_hash<std::string, ModuleDependenciesKind>>;
+using ModuleDependencyIDSet =
+    std::unordered_set<ModuleDependencyID,
+                       llvm::pair_hash<std::string,
+                                       ModuleDependencyKind>>;
 static void findPath_dfs(ModuleDependencyID X,
                          ModuleDependencyID Y,
                          ModuleDependencyIDSet &visited,
                          std::vector<ModuleDependencyID> &stack,
                          std::vector<ModuleDependencyID> &result,
-                         const ModuleDependenciesCache &cache,
-                         const llvm::StringSet<> &searchPathSet) {
+                         const ModuleDependenciesCache &cache) {
   stack.push_back(X);
   if (X == Y) {
     copy(stack.begin(), stack.end(), std::back_inserter(result));
     return;
   }
   visited.insert(X);
-  auto node = cache.findDependencies(X.first, {X.second, searchPathSet});
+  auto node = cache.findDependencies(X.first, X.second);
   assert(node.has_value() && "Expected cache value for dependency.");
   for (const auto &dep : node->getModuleDependencies()) {
-    Optional<ModuleDependenciesKind> lookupKind = None;
+    Optional<ModuleDependencyKind> lookupKind = None;
     // Underlying Clang module needs an explicit lookup to avoid confusing it
     // with the parent Swift module.
     if ((dep == X.first && node->isSwiftModule()) || node->isClangModule())
-      lookupKind = ModuleDependenciesKind::Clang;
+      lookupKind = ModuleDependencyKind::Clang;
 
-    auto depNode = cache.findDependencies(dep, {lookupKind, searchPathSet});
+    auto depNode = cache.findDependencies(dep, lookupKind);
     if (!depNode.has_value())
       continue;
     auto depID = std::make_pair(dep, depNode->getKind());
     if (!visited.count(depID)) {
-      findPath_dfs(depID, Y, visited, stack, result, cache, searchPathSet);
+      findPath_dfs(depID, Y, visited, stack, result, cache);
     }
   }
   stack.pop_back();
@@ -1919,20 +1917,18 @@ static void findPath_dfs(ModuleDependencyID X,
 
 static std::vector<ModuleDependencyID>
 findPathToDependency(ModuleDependencyID dependency,
-                     const ModuleDependenciesCache &cache,
-                     const llvm::StringSet<> &searchPathSet) {
+                     const ModuleDependenciesCache &cache) {
   auto mainModuleDep = cache.findDependencies(cache.getMainModuleName(),
-                                              {ModuleDependenciesKind::SwiftSource,
-                                               searchPathSet});
+                                              ModuleDependencyKind::SwiftSource);
   // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
     return {};
   auto mainModuleID = std::make_pair(cache.getMainModuleName().str(),
-                                     ModuleDependenciesKind::SwiftSource);
+                                     ModuleDependencyKind::SwiftSource);
   auto visited = ModuleDependencyIDSet();
   auto stack = std::vector<ModuleDependencyID>();
   auto dependencyPath = std::vector<ModuleDependencyID>();
-  findPath_dfs(mainModuleID, dependency, visited, stack, dependencyPath, cache, searchPathSet);
+  findPath_dfs(mainModuleID, dependency, visited, stack, dependencyPath, cache);
   return dependencyPath;
 }
 
@@ -1941,11 +1937,10 @@ findPathToDependency(ModuleDependencyID dependency,
 static void diagnoseScannerFailure(StringRef moduleName,
                                    DiagnosticEngine &Diags,
                                    const ModuleDependenciesCache &cache,
-                                   const llvm::StringSet<> &searchPathSet,
                                    llvm::Optional<ModuleDependencyID> dependencyOf) {
   Diags.diagnose(SourceLoc(), diag::dependency_scan_module_not_found, moduleName);
   if (dependencyOf.has_value()) {
-    auto path = findPathToDependency(dependencyOf.value(), cache, searchPathSet);
+    auto path = findPathToDependency(dependencyOf.value(), cache);
     // We may fail to construct a path in some cases, such as a Swift overlay of a Clang
     // module dependnecy.
     if (path.empty())
@@ -1953,24 +1948,24 @@ static void diagnoseScannerFailure(StringRef moduleName,
     
     for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
       const auto &entry = *it;
-      auto entryNode = cache.findDependencies(entry.first, {entry.second, searchPathSet});
+      auto entryNode = cache.findDependencies(entry.first, entry.second);
       assert(entryNode.has_value());
       std::string moduleFilePath = "";
       bool isClang = false;
       switch (entryNode->getKind()) {
-        case swift::ModuleDependenciesKind::SwiftSource:
+        case swift::ModuleDependencyKind::SwiftSource:
           Diags.diagnose(SourceLoc(), diag::dependency_as_imported_by_main_module, entry.first);
           continue;
-        case swift::ModuleDependenciesKind::SwiftInterface:
+        case swift::ModuleDependencyKind::SwiftInterface:
           moduleFilePath = entryNode->getAsSwiftInterfaceModule()->swiftInterfaceFile;
           break;
-        case swift::ModuleDependenciesKind::SwiftBinary:
+        case swift::ModuleDependencyKind::SwiftBinary:
           moduleFilePath = entryNode->getAsSwiftBinaryModule()->compiledModulePath;
           break;
-        case swift::ModuleDependenciesKind::SwiftPlaceholder:
+        case swift::ModuleDependencyKind::SwiftPlaceholder:
           moduleFilePath = entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
           break;
-        case swift::ModuleDependenciesKind::Clang:
+        case swift::ModuleDependencyKind::Clang:
           moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
           isClang = true;
           break;
@@ -1986,7 +1981,7 @@ static void diagnoseScannerFailure(StringRef moduleName,
   }
 }
 
-Optional<ModuleDependencies> ASTContext::getModuleDependencies(
+Optional<ModuleDependencyInfo> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
     bool cacheOnly, llvm::Optional<ModuleDependencyID> dependencyOf) {
@@ -1996,23 +1991,20 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     // Check whether we've cached this result.
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftSource, searchPathSet}))
+              moduleName, ModuleDependencyKind::SwiftSource))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftInterface, searchPathSet}))
+              moduleName, ModuleDependencyKind::SwiftInterface))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
+              moduleName, ModuleDependencyKind::SwiftBinary))
         return found;
       if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftPlaceholder, searchPathSet}))
+              moduleName, ModuleDependencyKind::SwiftPlaceholder))
         return found;
     }
     if (auto found = cache.findDependencies(
-            moduleName, {ModuleDependenciesKind::Clang, searchPathSet}))
+            moduleName, ModuleDependencyKind::Clang))
       return found;
   } else {
     for (auto &loader : getImpl().ModuleLoaders) {
@@ -2025,14 +2017,14 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
         return dependencies;
     }
     
-    diagnoseScannerFailure(moduleName, Diags, cache, searchPathSet,
+    diagnoseScannerFailure(moduleName, Diags, cache,
                            dependencyOf);
   }
 
   return None;
 }
 
-Optional<ModuleDependencies>
+Optional<ModuleDependencyInfo>
 ASTContext::getSwiftModuleDependencies(StringRef moduleName,
                                        ModuleDependenciesCache &cache,
                                        InterfaceSubContextDelegate &delegate) {
@@ -3845,7 +3837,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 14,
+  static_assert(RecursiveTypeProperties::BitWidth == 15,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4472,7 +4464,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 14,
+  static_assert(RecursiveTypeProperties::BitWidth == 15,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();

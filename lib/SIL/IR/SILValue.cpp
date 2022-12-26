@@ -80,6 +80,16 @@ SILInstruction *ValueBase::getDefiningInstruction() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getDefiningInstructionOrTerminator() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
+  if (auto *result = SILArgument::isTerminatorResult(this))
+    return result->getSingleTerminator();
+  return nullptr;
+}
+
 SILInstruction *ValueBase::getDefiningInsertionPoint() {
   if (auto *inst = getDefiningInstruction())
     return inst;
@@ -215,7 +225,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
     value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
                                                     : OwnershipKind::Owned;
     break;
@@ -432,8 +441,6 @@ StringRef OperandOwnership::asString() const {
     return "interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
-  case OperandOwnership::GuaranteedForwardingPhi:
-    return "guaranteed-forwarding-phi";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:

@@ -206,6 +206,7 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   f->setAttributes(IGM.constructInitialAttributes());
   f->setDoesNotThrow();
   IGM.setHasNoFramePointer(f);
+  IGM.setColocateMetadataSection(f);
 
   IRGenFunction IGF(IGM, f);
 
@@ -2969,6 +2970,7 @@ namespace {
       f->setAttributes(IGM.constructInitialAttributes());
       f->setDoesNotThrow();
       IGM.setHasNoFramePointer(f);
+      IGM.setColocateMetadataSection(f);
 
       IRGenFunction IGF(IGM, f);
 
@@ -3849,13 +3851,8 @@ namespace {
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
       llvm_unreachable("Fixed class metadata cannot have generic requirements");
     }
   };
@@ -3897,16 +3894,19 @@ namespace {
       }
     }
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.WitnessTablePtrTy);
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
+      switch (requirement.getKind()) {
+      case GenericRequirement::Kind::Shape:
+        B.addInt(IGM.SizeTy, 0);
+        break;
+      case GenericRequirement::Kind::Metadata:
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        break;
+      case GenericRequirement::Kind::WitnessTable:
+        B.addNullPointer(IGM.WitnessTablePtrTy);
+        break;
+      }
     }
   };
 
@@ -4247,21 +4247,24 @@ namespace {
       return emitValueWitnessTable(relativeReference);
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      auto t = requirement.TypeParameter.subst(genericSubstitutions());
-      ConstantReference ref = IGM.getAddrOfTypeMetadata(
-          CanType(t), SymbolReferenceKind::Relative_Direct);
-      this->B.add(ref.getDirectValue());
-    }
+    void addGenericRequirement(GenericRequirement requirement) {
+      if (requirement.isMetadata()) {
+        auto t = requirement.getTypeParameter().subst(genericSubstitutions());
+        ConstantReference ref = IGM.getAddrOfTypeMetadata(
+            CanType(t), SymbolReferenceKind::Relative_Direct);
+        this->B.add(ref.getDirectValue());
+        return;
+      }
 
-    void addGenericWitnessTable(GenericRequirement requirement) {
+      assert(requirement.isWitnessTable());
       auto conformance = genericSubstitutions().lookupConformance(
-          requirement.TypeParameter->getCanonicalType(), requirement.Protocol);
+          requirement.getTypeParameter()->getCanonicalType(),
+          requirement.getProtocol());
       ProtocolConformance *concreteConformance = conformance.getConcrete();
 
       llvm::Constant *addr;
 
-      Type argument = requirement.TypeParameter.subst(genericSubstitutions());
+      Type argument = requirement.getTypeParameter().subst(genericSubstitutions());
       auto argumentNominal = argument->getAnyNominal();
       if (argumentNominal && argumentNominal->isGenericContext()) {
         // TODO: Statically specialize the witness table pattern for t's
@@ -4331,14 +4334,9 @@ namespace {
                                            const ClassLayout &fieldLayout)
         : super(IGM, type, decl, B, fieldLayout), FieldLayout(fieldLayout) {}
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *theClass) {
-      super::addGenericArgument(requirement);
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *theClass) {
-      super::addGenericWitnessTable(requirement);
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *theClass) {
+      super::addGenericRequirement(requirement);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
@@ -4797,11 +4795,7 @@ namespace {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      llvm_unreachable("Concrete type metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement) {
+    void addGenericRequirement(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
@@ -5166,11 +5160,7 @@ namespace {
                          PointerAuthEntity::Special::TypeDescriptor);
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      llvm_unreachable("Concrete type metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement) {
+    void addGenericRequirement(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
@@ -5894,7 +5884,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
-  case KnownProtocolKind::CompilerPlugin:
     return SpecialProtocol::None;
   }
 

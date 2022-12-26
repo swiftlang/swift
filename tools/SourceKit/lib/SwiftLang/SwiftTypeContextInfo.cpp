@@ -16,7 +16,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/TypeContextInfo.h"
-#include "swift/IDETool/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
@@ -151,7 +151,7 @@ void SwiftLangSupport::getExpressionContextInfo(
       [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
         ParamsResult.mapAsync<TypeContextInfoResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
-              getCompletionInstance()->typeContextInfo(
+              getIDEInspectionInstance()->typeContextInfo(
                   CIParams.Invocation, Args, fileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
                   CIParams.CancellationFlag, DeliverTransformed);

@@ -40,7 +40,7 @@ namespace llvm {
 namespace swift {
   class GenericSignatureBuilder;
   class ASTContext;
-  class CodeCompletionCallbacksFactory;
+  class IDEInspectionCallbacksFactory;
   class Decl;
   class DeclContext;
   class DiagnosticConsumer;
@@ -104,9 +104,8 @@ namespace swift {
 
   /// @}
 
-  /// Finish the code completion.
-  void performCodeCompletionSecondPass(SourceFile &SF,
-                                       CodeCompletionCallbacksFactory &Factory);
+  void performIDEInspectionSecondPass(SourceFile &SF,
+                                      IDEInspectionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(const LangOptions &LangOpts,

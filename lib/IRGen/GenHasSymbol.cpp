@@ -39,6 +39,20 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
   if (entity.isDispatchThunk())
     return IGM.getAddrOfDispatchThunk(entity.getSILDeclRef(), NotForDefinition);
 
+  if (entity.isOpaqueTypeDescriptorAccessor()) {
+    OpaqueTypeDecl *decl =
+        const_cast<OpaqueTypeDecl *>(cast<OpaqueTypeDecl>(entity.getDecl()));
+    bool isImplementation = entity.isOpaqueTypeDescriptorAccessorImpl();
+    return IGM
+        .getAddrOfOpaqueTypeDescriptorAccessFunction(decl, NotForDefinition,
+                                                     isImplementation)
+        .getDirectPointer();
+  }
+
+  // FIXME: Look up addr of the replaceable function (has "TI" mangling suffix)
+  if (entity.isDynamicallyReplaceableFunctionImpl())
+    return nullptr;
+
   return IGM.getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 }
 
@@ -46,12 +60,16 @@ class HasSymbolIRGenVisitor : public IRSymbolVisitor {
   IRGenModule &IGM;
   llvm::SmallVector<llvm::Constant *, 4> &Addrs;
 
+  void addFunction(SILFunction *fn) {
+    Addrs.emplace_back(IGM.getAddrOfSILFunction(fn, NotForDefinition));
+  }
+
   void addFunction(StringRef name) {
     SILFunction *silFn = IGM.getSILModule().lookUpFunction(name);
     // Definitions for each SIL function should have been emitted by SILGen.
     assert(silFn && "missing SIL function?");
     if (silFn) {
-      Addrs.emplace_back(IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+      addFunction(silFn);
     }
   }
 
@@ -74,9 +92,16 @@ public:
   }
 
   void addLinkEntity(LinkEntity entity) override {
+    if (entity.hasSILFunction()) {
+      addFunction(entity.getSILFunction());
+      return;
+    }
+
     auto constant = getAddrOfLLVMVariable(IGM, entity);
-    auto global = cast<llvm::GlobalValue>(constant);
-    Addrs.emplace_back(global);
+    if (constant) {
+      auto global = cast<llvm::GlobalValue>(constant);
+      Addrs.emplace_back(global);
+    }
   }
 
   void addProtocolWitnessThunk(RootProtocolConformance *C,

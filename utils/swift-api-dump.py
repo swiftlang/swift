@@ -127,6 +127,7 @@ def run_command(args):
     proc = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
+    out = out.decode('UTF8')
     exitcode = proc.returncode
     return (exitcode, out, err)
 

@@ -66,7 +66,10 @@ public:
   llvm::DenseMap<SILDeclRef, SILDeclRef> delayedFunctions;
 
   /// Queue of delayed SILFunctions that need to be forced.
-  std::deque<SILDeclRef> forcedFunctions;
+  std::deque<SILDeclRef> pendingForcedFunctions;
+
+  /// Delayed SILFunctions that need to be forced.
+  llvm::DenseSet<SILDeclRef> forcedFunctions;
 
   /// Mapping global VarDecls to their onceToken and onceFunc, respectively.
   llvm::DenseMap<VarDecl *, std::pair<SILGlobalVariable *,

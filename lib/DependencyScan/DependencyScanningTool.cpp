@@ -103,7 +103,7 @@ void DependencyScannerDiagnosticCollectingConsumer::addDiagnostic(SourceManager 
 }
 
 DependencyScanningTool::DependencyScanningTool()
-    : SharedCache(std::make_unique<GlobalModuleDependenciesCache>()),
+    : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
       VersionedPCMInstanceCacheCache(
           std::make_unique<CompilerArgInstanceCacheMap>()),
       CDC(), Alloc(), Saver(Alloc) {}
@@ -119,8 +119,9 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*SharedCache,
-                                Instance->getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(*ScanningService,
+                                Instance->getMainModule()->getNameStr().str(),
+                                Instance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
@@ -160,8 +161,9 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*SharedCache,
-                                Instance->getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(*ScanningService,
+                                Instance->getMainModule()->getNameStr().str(),
+                                Instance->getInvocation().getModuleScanningHash());
   auto BatchScanResults = performBatchModuleScan(
       *Instance.get(), cache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
@@ -174,17 +176,17 @@ void DependencyScanningTool::serializeCache(llvm::StringRef path) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, path, *SharedCache);
+      Diags, path, *ScanningService);
 }
 
 bool DependencyScanningTool::loadCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
-  SharedCache = std::make_unique<GlobalModuleDependenciesCache>();
+  ScanningService = std::make_unique<SwiftDependencyScanningService>();
   bool readFailed =
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, *SharedCache);
+          path, *ScanningService);
   if (readFailed) {
     Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
   }
@@ -192,7 +194,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 }
 
 void DependencyScanningTool::resetCache() {
-  SharedCache.reset(new GlobalModuleDependenciesCache());
+  ScanningService.reset(new SwiftDependencyScanningService());
 }
 
 void DependencyScanningTool::resetDiagnostics() {
@@ -205,8 +207,6 @@ DependencyScanningTool::initScannerForAction(
   auto instanceOrErr = initCompilerInstanceForScan(Command);
   if (instanceOrErr.getError())
     return instanceOrErr;
-  SharedCache->configureForTriple((*instanceOrErr)->getInvocation()
-                                  .getLangOptions().Target.str());
   return instanceOrErr;
 }
 
@@ -216,6 +216,9 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&CDC);
+
+  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
+  ScanningService->overlaySharedFilesystemCacheForCompilation(*Instance);
 
   // Basic error checking on the arguments
   if (CommandArgs.empty()) {

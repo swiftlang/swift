@@ -91,13 +91,15 @@ class CMakeProduct(product.Product):
                 shell.call(["env"] + cmake_build + cmake_opts)
 
             shell.call(
-                ["env"] + cmake_build + cmake_opts + ["--"] + build_args + build_targets
+                ["env"] + cmake_build + cmake_opts + ["--"] + build_args
+                        + _cmake.build_args() + build_targets
             )
 
     def test_with_cmake(self, executable_target, results_targets,
                         build_type, build_args, test_env=None):
         assert self.toolchain.cmake is not None
         cmake_build = []
+        _cmake = cmake.CMake(self.args, self.toolchain)
 
         if self.toolchain.distcc_pump:
             cmake_build.append(self.toolchain.distcc_pump)
@@ -110,7 +112,7 @@ class CMakeProduct(product.Product):
 
         cmake_args = [self.toolchain.cmake, "--build", self.build_dir,
                       "--config", build_type, "--"]
-        cmake_build.extend(cmake_args + build_args)
+        cmake_build.extend(cmake_args + build_args + _cmake.build_args())
 
         def target_flag(target):
             if self.args.cmake_generator == "Xcode":
@@ -159,10 +161,14 @@ class CMakeProduct(product.Product):
         swift_cmake_options = cmake.CMakeOptions()
 
         if host_target.startswith("android"):
+            # Clang uses a different sysroot natively on Android in the Termux
+            # app, which the Termux build scripts pass in through a $PREFIX
+            # variable.
             prefix = os.environ.get("PREFIX")
             if prefix:
                 llvm_cmake_options.define('DEFAULT_SYSROOT:STRING',
                                           os.path.dirname(prefix))
+                llvm_cmake_options.define('CLANG_DEFAULT_LINKER:STRING', 'lld')
 
             # Android doesn't support building all of compiler-rt yet.
             if not self.is_cross_compile_target(host_target):

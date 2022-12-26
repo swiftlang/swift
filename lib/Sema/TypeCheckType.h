@@ -70,6 +70,12 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// We are in a `@preconcurrency` declaration.
   Preconcurrency = 1 << 10,
+
+  /// Whether references to type parameter packs are allowed.
+  ///
+  /// Pack references are only allowed inside pack expansions
+  /// and in generic requirements.
+  AllowPackReferences = 1 << 11,
 };
 
 /// Type resolution contexts that require special handling.
@@ -474,6 +480,11 @@ using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
 using HandlePlaceholderTypeReprFn =
     llvm::function_ref<Type(ASTContext &, PlaceholderTypeRepr *)>;
 
+/// A function reference used to replace pack references with opened
+/// element archetypes when resolving a \c PackReferenceTypeRepr.
+using OpenPackElementFn =
+    llvm::function_ref<Type(Type, PackReferenceTypeRepr *)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -483,6 +494,7 @@ class TypeResolution {
   TypeResolutionOptions options;
   OpenUnboundGenericTypeFn unboundTyOpener;
   HandlePlaceholderTypeReprFn placeholderHandler;
+  OpenPackElementFn packElementOpener;
 
 private:
   GenericSignature genericSig;
@@ -490,10 +502,12 @@ private:
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
-                 HandlePlaceholderTypeReprFn placeholderHandler)
+                 HandlePlaceholderTypeReprFn placeholderHandler,
+                 OpenPackElementFn packElementOpener)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
-        placeholderHandler(placeholderHandler) {}
+        placeholderHandler(placeholderHandler),
+        packElementOpener(packElementOpener) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -502,14 +516,16 @@ public:
   static TypeResolution
   forStructural(DeclContext *dc, TypeResolutionOptions opts,
                 OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
+                HandlePlaceholderTypeReprFn placeholderHandler,
+                OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
   forInterface(DeclContext *dc, TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
-               HandlePlaceholderTypeReprFn placeholderHandler);
+               HandlePlaceholderTypeReprFn placeholderHandler,
+               OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
@@ -517,7 +533,8 @@ public:
   forInterface(DeclContext *dc, GenericSignature genericSig,
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
-               HandlePlaceholderTypeReprFn placeholderHandler);
+               HandlePlaceholderTypeReprFn placeholderHandler,
+               OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
@@ -527,12 +544,14 @@ public:
                         TypeResolutionOptions opts,
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
+                        OpenPackElementFn packElementOpener,
                         GenericParamList *silParams = nullptr);
 
   static Type resolveContextualType(
       TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
+      OpenPackElementFn packElementOpener,
       GenericParamList *silParams = nullptr);
 
 public:
@@ -557,6 +576,10 @@ public:
 
   HandlePlaceholderTypeReprFn getPlaceholderHandler() const {
     return placeholderHandler;
+  }
+
+  OpenPackElementFn getPackElementOpener() const {
+    return packElementOpener;
   }
 
   /// Retrieves the generic signature for the context, or NULL if there is

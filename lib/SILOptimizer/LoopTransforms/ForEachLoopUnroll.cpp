@@ -538,6 +538,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
                                        : forEachCall->getParentBlock();
     SILBuilderWithScope unrollBuilder(currentBB, forEachCall);
+    SILBuilderWithScope normalBuilder(&nextNormalBB->front(), forEachCall);
     SILValue borrowedElem;
     SILValue addr;
 
@@ -552,9 +553,8 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
       borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
       addr =
           unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
-      SILBuilderWithScope builder(&nextNormalBB->front(), forEachCall);
-      builder.createEndBorrow(forEachLoc, addr);
-      builder.createEndBorrow(forEachLoc, borrowedElem);
+      normalBuilder.createEndBorrow(forEachLoc, addr);
+      normalBuilder.createEndBorrow(forEachLoc, borrowedElem);
     }
 
     SILBasicBlock *errorTarget =
@@ -566,16 +566,18 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     unrollBuilder.createTryApply(forEachLoc, forEachBodyClosure,
                                  SubstitutionMap(), addr, nextNormalBB,
                                  errorTarget);
+
+    if (nextNormalBB == normalBB) {
+      // Dealloc the stack in the normalBB and also in errorBB. Note that every
+      // try_apply created during the unrolling must pass through these blocks.
+      normalBuilder.createDeallocStack(forEachLoc, allocStack);
+    }
     nextNormalBB = currentBB;
   }
-
   // Dealloc the stack in the normalBB and also in errorBB. Note that every
   // try_apply created during the unrolling must pass through these blocks.
-  SILBuilderWithScope(&normalBB->front())
-      .createDeallocStack(forEachLoc, allocStack);
   SILBuilderWithScope(&errorBB->front())
       .createDeallocStack(forEachLoc, allocStack);
-
   // Remove the forEach call as it has now been unrolled.
   removeForEachCall(forEachCall, deleter);
 }

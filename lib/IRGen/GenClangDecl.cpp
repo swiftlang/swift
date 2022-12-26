@@ -87,6 +87,14 @@ public:
     return true;
   }
 
+  bool VisitBindingDecl(clang::BindingDecl *BD) {
+    if (auto *holdingVar = BD->getHoldingVar()) {
+      if (holdingVar->hasInit())
+        TraverseStmt(holdingVar->getInit());
+    }
+    return true;
+  }
+
   // Do not traverse unevaluated expressions. Doing to might result in compile
   // errors if we try to instantiate an un-instantiatable template.
 

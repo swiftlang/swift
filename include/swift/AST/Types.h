@@ -72,6 +72,7 @@ class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
 class PackType;
+class PackReferenceTypeRepr;
 class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
@@ -168,7 +169,10 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    Last_Property = HasParameterizedExistential
+    /// This type contains an ElementArchetype.
+    HasElementArchetype = 0x4000,
+
+    Last_Property = HasElementArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -212,8 +216,18 @@ public:
   bool hasDependentMember() const { return Bits & HasDependentMember; }
 
   /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
+
+  /// Does a type with these properties structurally contain an
+  /// opened element archetype?
+  bool hasElementArchetype() const { return Bits & HasElementArchetype; }
+
+  /// Does a type with these properties structurally contain a local
+  /// archetype?
+  bool hasLocalArchetype() const {
+    return hasOpenedExistential() || hasElementArchetype();
+  }
 
   /// Does a type with these properties structurally contain a
   /// reference to DynamicSelf?
@@ -627,6 +641,16 @@ public:
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
+  }
+
+  /// Determine whether the type involves an opened element archetype.
+  bool hasElementArchetype() const {
+    return getRecursiveProperties().hasElementArchetype();
+  }
+
+  /// Determine whether the type involves a local archetype.
+  bool hasLocalArchetype() const {
+    return getRecursiveProperties().hasLocalArchetype();
   }
 
   bool hasParameterPack() const {
@@ -3708,11 +3732,6 @@ enum class ParameterConvention : uint8_t {
   Indirect_In,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee must treat the object as read-only
-  /// The callee may assume that the address does not alias any valid object.
-  Indirect_In_Constant,
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee may not modify and does not destroy
   /// the object.
   Indirect_In_Guaranteed,
@@ -3754,7 +3773,6 @@ static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
 inline bool isIndirectFormalParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -3770,7 +3788,6 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
 inline bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Owned:
     return true;
 
@@ -3796,7 +3813,6 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
     return false;
@@ -5922,8 +5938,29 @@ private:
   bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
+/// An archetype that's only valid in a portion of a local context.
+class LocalArchetypeType : public ArchetypeType {
+protected:
+  using ArchetypeType::ArchetypeType;
+
+public:
+  LocalArchetypeType *getRoot() const {
+    return cast<LocalArchetypeType>(ArchetypeType::getRoot());
+  }
+
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::OpenedArchetype ||
+           type->getKind() == TypeKind::ElementArchetype;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
+  CanLocalArchetypeType getRoot() const {
+    return CanLocalArchetypeType(getPointer()->getRoot());
+  }
+END_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
+
 /// An archetype that represents the dynamic type of an opened existential.
-class OpenedArchetypeType final : public ArchetypeType,
+class OpenedArchetypeType final : public LocalArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>
 {
   friend TrailingObjects;
@@ -6024,11 +6061,11 @@ private:
                       ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                       LayoutConstraint layout);
 };
-BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
   CanOpenedArchetypeType getRoot() const {
     return CanOpenedArchetypeType(getPointer()->getRoot());
   }
-END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
 
 /// A wrapper around a shape type to use in ArchetypeTrailingObjects
 /// for PackArchetypeType.
@@ -6062,6 +6099,8 @@ public:
     return T->getKind() == TypeKind::PackArchetype;
   }
 
+  CanTypeWrapper<PackType> getSingletonPackType();
+
 private:
   PackArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
                     Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
@@ -6071,7 +6110,7 @@ BEGIN_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 
 /// An archetype that represents the element type of a pack archetype.
-class ElementArchetypeType final : public ArchetypeType,
+class ElementArchetypeType final : public LocalArchetypeType,
     private ArchetypeTrailingObjects<ElementArchetypeType>
 {
   friend TrailingObjects;
@@ -6110,11 +6149,11 @@ private:
                        ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                        LayoutConstraint layout);
 };
-BEGIN_CAN_TYPE_WRAPPER(ElementArchetypeType, ArchetypeType)
+BEGIN_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
   CanElementArchetypeType getRoot() const {
     return CanElementArchetypeType(getPointer()->getRoot());
   }
-END_CAN_TYPE_WRAPPER(ElementArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
 
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {

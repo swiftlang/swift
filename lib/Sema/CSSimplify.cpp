@@ -1116,7 +1116,7 @@ constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
     return None;
 
   for (unsigned i : indices(*args)) {
-    if (CS.containsCodeCompletionLoc(args->getExpr(i)))
+    if (CS.containsIDEInspectionTarget(args->getExpr(i)))
       return CompletionArgInfo{i, args->getFirstTrailingClosureIndex(),
                                args->size()};
   }
@@ -2878,7 +2878,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // code completion location, since they may have just not been written yet.
   if (cs.isForCodeCompletion()) {
     if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-      if (cs.containsCodeCompletionLoc(closure) &&
+      if (cs.containsIDEInspectionTarget(closure) &&
           (closure->hasAnonymousClosureVars() ||
            (args.empty() && closure->getInLoc().isInvalid())))
           return false;
@@ -5297,8 +5297,9 @@ bool ConstraintSystem::repairFailures(
         // other (explicit) argument's so source range containment alone isn't
         // sufficient.
         bool isSynthesizedArg = arg->isImplicit() && isa<DeclRefExpr>(arg);
-        if (!isSynthesizedArg && containsCodeCompletionLoc(arg) &&
-            !lhs->isVoid() && !lhs->isUninhabited())
+        if (!isSynthesizedArg && isForCodeCompletion() &&
+            containsIDEInspectionTarget(arg) && !lhs->isVoid() &&
+            !lhs->isUninhabited())
           return true;
       }
     }
@@ -5644,8 +5645,7 @@ bool ConstraintSystem::repairFailures(
 
     auto *parentLoc = getConstraintLocator(anchor, path);
 
-    if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
-        (!lhs->is<InOutType>() && rhs->is<InOutType>())) {
+    if (lhs->is<InOutType>() != rhs->is<InOutType>()) {
       // Since `FunctionArgument` as a last locator element represents
       // a single parameter of the function type involved in a conversion
       // to another function type, see `matchFunctionTypes`. If there is already
@@ -6015,6 +6015,13 @@ bool ConstraintSystem::repairFailures(
 
     return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
                           getConstraintLocator(anchor, path));
+  }
+
+  case ConstraintLocator::PackShape: {
+    auto *shapeLocator = getConstraintLocator(locator);
+    auto *fix = SkipSameShapeRequirement::create(*this, lhs, rhs, shapeLocator);
+    conversionsOrFixes.push_back(fix);
+    break;
   }
 
   case ConstraintLocator::SequenceElementType: {
@@ -6574,6 +6581,42 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // FIXME: TuplePackMatcher doesn't correctly handle matching two
+       // abstract contextual tuple types in a generic context.
+       if (simplifyType(desugar1)->isEqual(simplifyType(desugar2)))
+         return getTypeMatchSuccess();
+
+      // If the tuple has consecutive pack expansions, packs must be
+      // resolved before matching.
+      auto delayMatching = [](TupleType *tuple) {
+        bool afterUnresolvedPack = false;
+        for (auto element : tuple->getElements()) {
+          if (afterUnresolvedPack && !element.hasName()) {
+            return true;
+          }
+
+          if (element.getType()->is<PackExpansionType>()) {
+            SmallPtrSet<TypeVariableType *, 2> typeVars;
+            element.getType()->getTypeVariables(typeVars);
+
+            afterUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
+              return tv->getImpl().canBindToPack();
+            });
+          } else {
+            afterUnresolvedPack = false;
+          }
+        }
+
+        return false;
+      };
+
+
+      auto *tuple1 = cast<TupleType>(desugar1);
+      auto *tuple2 = cast<TupleType>(desugar2);
+      if (delayMatching(tuple1) || delayMatching(tuple2)) {
+        return formUnsolvedResult();
+      }
+
       // Add each tuple type to the locator before matching the element types.
       // This is useful for diagnostics, because the error message can use the
       // full tuple type for several element mismatches. Use the original types
@@ -8560,12 +8603,13 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
   auto elementType = simplifyType(first, flags);
-  auto *loc = getConstraintLocator(locator);
+  auto packType = simplifyType(second, flags);
 
-  if (elementType->hasTypeVariable()) {
+  if (elementType->hasTypeVariable() || packType->hasTypeVariable()) {
     if (!flags.contains(TMF_GenerateConstraints))
       return SolutionKind::Unsolved;
 
+    auto *loc = getConstraintLocator(locator);
     addUnsolvedConstraint(
         Constraint::create(*this, ConstraintKind::PackElementOf,
                            first, second, loc));
@@ -8573,14 +8617,14 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
     return SolutionKind::Solved;
   }
 
-  // Replace opened element archetypes with pack archetypes
-  // for the resulting type of the pack expansion.
-  auto *environment = DC->getGenericEnvironmentOfContext();
-  auto patternType = environment->mapElementTypeIntoPackContext(
-      elementType->mapTypeOutOfContext());
-  addConstraint(ConstraintKind::Bind, second, patternType, locator);
-
-  return SolutionKind::Solved;
+  // This constraint only exists to vend bindings.
+  auto *packEnv = DC->getGenericEnvironmentOfContext();
+  if (packType->isEqual(packEnv->mapElementTypeIntoPackContext
+                        (elementType->mapTypeOutOfContext()))) {
+    return SolutionKind::Solved;
+  } else {
+    return SolutionKind::Error;
+  }
 }
 
 static bool isForKeyPathSubscript(ConstraintSystem &cs,
@@ -10595,6 +10639,27 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       return None;
 
     auto numContextualParams = fnType->getNumParams();
+
+    if (numContextualParams == 1) {
+      const auto &param = fnType->getParams()[0];
+      if (auto *tuple = param.getPlainType()->getAs<TupleType>()) {
+        // If arity is the same it's a tuple splat which is allowed
+        // for closures (see SE-0110 for more details):
+        //
+        // func test(_: ((Int, Int)) -> Void) {}
+        // test { (arg, _) in
+        //   ...
+        // }
+        if (tuple->getNumElements() == inferredClosureType->getNumParams() &&
+            param.getParameterFlags().isNone()) {
+          const auto &elt = tuple->getElement(index);
+          return AnyFunctionType::Param(elt.getType(), elt.getName());
+        }
+
+        return None;
+      }
+    }
+
     if (numContextualParams != inferredClosureType->getNumParams() ||
         numContextualParams <= index)
       return None;

@@ -628,6 +628,21 @@ namespace swift {
       return llvm::hash_combine(Target.str(), OS.str());
     }
 
+    /// Return a hash code of any components from these options that should
+    /// contribute to a Swift Dependency Scanning hash.
+    llvm::hash_code getModuleScanningHashComponents() const {
+      auto hashValue = getPCHHashComponents();
+      if (TargetVariant.has_value())
+        hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
+      if (ClangTarget.has_value())
+        hashValue = llvm::hash_combine(hashValue, ClangTarget.value().str());
+      if (SDKVersion.has_value())
+        hashValue = llvm::hash_combine(hashValue, SDKVersion.value().getAsString());
+      if (VariantSDKVersion.has_value())
+        hashValue = llvm::hash_combine(hashValue, VariantSDKVersion.value().getAsString());
+      return hashValue;
+    }
+
   private:
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
@@ -830,6 +845,12 @@ namespace swift {
                           DisableSwiftBridgeAttr,
                           DisableOverlayModules,
                           EnableClangSPI);
+    }
+
+    /// Return a hash code of any components from these options that should
+    /// contribute to a Swift Dependency Scanning hash.
+    llvm::hash_code getModuleScanningHashComponents() const {
+      return getPCHHashComponents();
     }
 
     std::vector<std::string> getRemappedExtraArgs(

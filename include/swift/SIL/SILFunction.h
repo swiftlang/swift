@@ -65,6 +65,10 @@ enum IsDistributed_t {
   IsNotDistributed,
   IsDistributed,
 };
+enum IsRuntimeAccessible_t {
+  IsNotRuntimeAccessible,
+  IsRuntimeAccessible
+};
 
 enum class PerformanceConstraints : uint8_t {
   None = 0,
@@ -266,7 +270,7 @@ private:
   /// A monotonically increasing ID which is incremented whenever a
   /// BasicBlockBitfield or NodeBitfield is constructed.
   /// For details see SILBitfield::bitfieldID;
-  uint64_t currentBitfieldID = 1;
+  int64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
@@ -350,6 +354,9 @@ private:
   /// Check whether this is a distributed method.
   unsigned IsDistributed : 1;
 
+  /// Check whether this function could be looked up at runtime via special API.
+  unsigned IsRuntimeAccessible : 1;
+
   unsigned stackProtection : 1;
 
   /// True if this function is inlined at least once. This means that the
@@ -432,7 +439,8 @@ private:
               const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
-              IsDistributed_t isDistributed);
+              IsDistributed_t isDistributed,
+              IsRuntimeAccessible_t isRuntimeAccessible);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
@@ -441,6 +449,7 @@ private:
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,
+         IsRuntimeAccessible_t isRuntimeAccessible,
          IsExactSelfClass_t isExactSelfClass,
          IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
@@ -456,7 +465,8 @@ private:
             SubclassScope classSubclassScope, Inline_t inlineStrategy,
             EffectsKind E, const SILDebugScope *DebugScope,
             IsDynamicallyReplaceable_t isDynamic,
-            IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed);
+            IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
+            IsRuntimeAccessible_t isRuntimeAccessible);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -841,6 +851,14 @@ public:
   void
   setIsDistributed(IsDistributed_t value = IsDistributed_t::IsDistributed) {
     IsDistributed = value;
+  }
+
+  IsRuntimeAccessible_t isRuntimeAccessible() const {
+    return IsRuntimeAccessible_t(IsRuntimeAccessible);
+  }
+  void setIsRuntimeAccessible(IsRuntimeAccessible_t value =
+                                  IsRuntimeAccessible_t::IsRuntimeAccessible) {
+    IsRuntimeAccessible = value;
   }
 
   bool needsStackProtection() const { return stackProtection; }

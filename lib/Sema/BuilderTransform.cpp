@@ -744,7 +744,7 @@ protected:
         // HACK: still allow empty bodies if typechecking for code
         // completion. Code completion ignores diagnostics
         // and won't get any types if we fail.
-        if (!ctx.SourceMgr.hasCodeCompletionBuffer()) {
+        if (!ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {
           hadError = true;
           return nullptr;
         }
@@ -1454,7 +1454,7 @@ protected:
         // HACK: still allow empty bodies if typechecking for code
         // completion. Code completion ignores diagnostics
         // and won't get any types if we fail.
-        if (!ctx.SourceMgr.hasCodeCompletionBuffer())
+        if (!ctx.SourceMgr.hasIDEInspectionTargetBuffer())
           return None;
       }
     }
@@ -2479,7 +2479,8 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         // If we're solving for code completion and the body contains the code
         // completion location, skipping it won't get us to a useful solution so
         // just bail.
-        if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
+        if (isForCodeCompletion() &&
+            containsIDEInspectionTarget(fn.getBody())) {
           return getTypeMatchFailure(locator);
         }
 
@@ -2562,7 +2563,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
       // If we're solving for code completion and the body contains the code
       // completion location, skipping it won't get us to a useful solution so
       // just bail.
-      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
+      if (isForCodeCompletion() && containsIDEInspectionTarget(fn.getBody())) {
         return getTypeMatchFailure(locator);
       }
 

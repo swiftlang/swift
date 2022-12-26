@@ -118,7 +118,7 @@ def llvm_install_components():
     """Convenience function for getting the default llvm install components for
     platforms.
     """
-    components = ['llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
+    components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
                   'clang-resource-headers', 'compiler-rt', 'clangd']
     if os.sys.platform == 'darwin':
         components.extend(['dsymutil'])

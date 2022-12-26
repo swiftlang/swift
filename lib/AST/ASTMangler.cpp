@@ -908,6 +908,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
+    case SymbolKind::RuntimeDiscoverableAttributeRecord:
+      return appendOperator("Ha");
   }
 }
 
@@ -1861,8 +1863,6 @@ static char getParamConvention(ParameterConvention conv) {
   // different places.
   switch (conv) {
     case ParameterConvention::Indirect_In: return 'i';
-    case ParameterConvention::Indirect_In_Constant:
-      return 'c';
     case ParameterConvention::Indirect_Inout: return 'l';
     case ParameterConvention::Indirect_InoutAliasable: return 'b';
     case ParameterConvention::Indirect_In_Guaranteed: return 'n';
@@ -2371,6 +2371,14 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
         appendInitFromProjectedValueEntity(wrapperInit->getWrappedVar());
         break;
       }
+      return;
+    }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto attrInit = cast<RuntimeAttributeInitializer>(ctx);
+
+      auto *decl = attrInit->getAttachedToDecl();
+      appendRuntimeAttributeGeneratorEntity(decl, attrInit->getAttr());
       return;
     }
     }
@@ -3659,6 +3667,14 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }
 
+std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
+    const ValueDecl *decl, CustomAttr *attr, SymbolKind SKind) {
+  beginMangling();
+  appendRuntimeAttributeGeneratorEntity(decl, attr);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
                                           ParameterizedProtocolType *PPT) {
   auto protoTy = PPT->getBaseType();
@@ -3715,4 +3731,14 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
     }
   }
   return appendOperator("XP");
+}
+
+void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                                       CustomAttr *attr) {
+  auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
+
+  appendEntity(decl, "vp", decl->isStatic());
+  appendOperator("fa");
+  appendContextOf(attrType);
+  appendDeclName(attrType);
 }

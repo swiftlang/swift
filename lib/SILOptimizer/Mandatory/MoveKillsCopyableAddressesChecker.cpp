@@ -300,25 +300,6 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
   }
 }
 
-static bool memInstMustReinitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-  auto *memInst = memOper->getUser();
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::StoreInst: {
-    auto *si = cast<StoreInst>(memInst);
-    return si->getDest() == address &&
-           si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
-  }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                               Use State
 //===----------------------------------------------------------------------===//
@@ -1177,8 +1158,8 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
       swift::getSpecializedLinkage(orig, orig->getLinkage()), clonedName,
       clonedTy, orig->getGenericEnvironment(), orig->getLocation(),
       orig->isBare(), orig->isTransparent(), serialized, IsNotDynamic,
-      IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
-      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      IsNotDistributed, IsNotRuntimeAccessible, orig->getEntryCount(),
+      orig->isThunk(), orig->getClassSubclassScope(), orig->getInlineStrategy(),
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);

@@ -34,12 +34,12 @@ void SourceManager::verifyAllBuffers() const {
   }
 }
 
-SourceLoc SourceManager::getCodeCompletionLoc() const {
-  if (CodeCompletionBufferID == 0U)
+SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
+  if (IDEInspectionTargetBufferID == 0U)
     return SourceLoc();
 
-  return getLocForBufferStart(CodeCompletionBufferID)
-      .getAdvancedLoc(CodeCompletionOffset);
+  return getLocForBufferStart(IDEInspectionTargetBufferID)
+      .getAdvancedLoc(IDEInspectionTargetOffset);
 }
 
 StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
@@ -250,6 +250,32 @@ StringRef SourceManager::extractText(CharSourceRange Range,
   StringRef Buffer = LLVMSourceMgr.getMemoryBuffer(*BufferID)->getBuffer();
   return Buffer.substr(getLocOffsetInBuffer(Range.getStart(), *BufferID),
                        Range.getByteLength());
+}
+
+void SourceManager::setGeneratedSourceInfo(
+    unsigned bufferID, GeneratedSourceInfo info
+) {
+  assert(GeneratedSourceInfos.count(bufferID) == 0);
+  GeneratedSourceInfos[bufferID] = info;
+
+  switch (info.kind) {
+  case GeneratedSourceInfo::MacroExpansion:
+    break;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    // Keep track of the replaced range.
+    ReplacedRanges[info.originalSourceRange] = info.generatedSourceRange;
+    break;
+  }
+}
+
+Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
+    unsigned bufferID
+) const {
+  auto known = GeneratedSourceInfos.find(bufferID);
+  if (known == GeneratedSourceInfos.end())
+    return None;
+  return known->second;
 }
 
 Optional<unsigned>

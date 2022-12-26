@@ -3893,8 +3893,15 @@ internal func _instantiateKeyPathBuffer(
 
 #if SWIFT_ENABLE_REFLECTION
 
-@_silgen_name("swift_keyPath_dladdr")
-fileprivate func keypath_dladdr(_: UnsafeRawPointer) -> UnsafePointer<CChar>?
+@_silgen_name("swift_keyPath_copySymbolName")
+fileprivate func keyPath_copySymbolName(
+  _: UnsafeRawPointer
+) -> UnsafePointer<CChar>?
+
+@_silgen_name("swift_keyPath_freeSymbolName")
+fileprivate func keyPath_freeSymbolName(
+  _: UnsafePointer<CChar>?
+) -> Void
 
 @_silgen_name("swift_keyPathSourceString")
 fileprivate func demangle(
@@ -3908,7 +3915,10 @@ fileprivate func dynamicLibraryAddress<Base, Leaf>(
 ) -> String {
   let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = pointer.getter()
   let pointer = unsafeBitCast(getter, to: UnsafeRawPointer.self)
-  if let cString = keypath_dladdr(UnsafeRawPointer(pointer)) {
+  if let cString = keyPath_copySymbolName(UnsafeRawPointer(pointer)) {
+    defer {
+      keyPath_freeSymbolName(cString)
+    }
     if let demangled = demangle(name: cString)
       .map({ pointer in
         defer {
@@ -3934,7 +3944,8 @@ extension AnyKeyPath: CustomDebugStringConvertible {
     return withBuffer {
       var buffer = $0
       if buffer.data.isEmpty {
-        _internalInvariantFailure("key path has no components")
+        description.append(".self")
+        return description
       }
       var valueType: Any.Type = Self.rootType
       while true {

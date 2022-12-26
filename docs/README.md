@@ -275,7 +275,7 @@ You can see the status of different proposals at
 - [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
   This whitepaper discusses the Swift calling convention (high-level semantics;
   ownership transfer; physical representation; function signature lowering).
-- [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
+- [ErrorHandlingRationale.md](/docs/ErrorHandlingRationale.md):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
 - [WeakReferences.md](/docs/WeakReferences.md):
@@ -353,7 +353,7 @@ provide greater clarity to contributors wanting to add new documentation.
 
 ### Archive
 
-- [FailableInitializers.rst](/docs/FailableInitializers.rst):
+- [FailableInitializers.md](/docs/FailableInitializers.md):
   Superseded by documentation in [The Swift Programming Language][].
 - [InitializerProblems.rst](/docs/InitializerProblems.rst):
   Describes some complexities around initialization in Swift.

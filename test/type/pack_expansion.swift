@@ -64,3 +64,13 @@ struct Outer<T...> {
     typealias Value = ((T, E<U... >)...)
   }
 }
+
+func packRef<T...>(_: (each T)...) where each T: P {}
+
+func packMemberRef<T...>(_: (each T.T)...) where each T: P {}
+
+// expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}
+func invalidPackRef(_: each Int) {}
+
+// expected-error@+1 {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+func packRefOutsideExpansion<T...>(_: each T) {}

@@ -85,6 +85,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
+  Opts.EmitClangHeaderWithNonModularIncludes |=
+      Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
+
   // FIXME: Remove this flag
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
 
@@ -265,6 +268,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
+
+  if (const Arg *A = Args.getLastArg(OPT_package_name))
+    Opts.PackageName = A->getValue();
 
   // This must be called after computing module name, module abi name,
   // and module link name. If computing module aliases is unsuccessful,

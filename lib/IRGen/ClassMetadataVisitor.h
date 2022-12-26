@@ -121,10 +121,6 @@ private:
 
       // Super class metadata is resilient if
       // the superclass is resilient when viewed from the current module.
-      // But not if the current class is defined in an external module and
-      //    not publically accessible (e.g private or internal). This would
-      //    normally not happen except if we compile theClass's module with
-      //    enable-testing.
       } else if (IGM.hasResilientMetadata(superclassDecl,
                                           ResilienceExpansion::Maximal,
                                           rootClass)) {
@@ -252,11 +248,7 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(GenericRequirement requirement, ClassDecl *forClass) {
-    addPointer();
-  }
-  void addGenericWitnessTable(GenericRequirement requirement,
-                              ClassDecl *forClass) {
+  void addGenericRequirement(GenericRequirement requirement, ClassDecl *forClass) {
     addPointer();
   }
   void addPlaceholder(MissingMemberDecl *MMD) {

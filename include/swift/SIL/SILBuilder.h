@@ -745,6 +745,7 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false) {
+    assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
@@ -831,12 +832,8 @@ public:
   }
 
   EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-      if (auto *ti = arg->getSingleTerminator()) {
-        assert(!ti->isTransformationTerminator() &&
-               "Transforming terminators do not have end_borrow");
-      }
-    }
+    assert(!SILArgument::isTerminatorResult(borrowedValue) &&
+               "terminator results do not have end_borrow");
     return insert(new (getModule())
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
@@ -2805,7 +2802,7 @@ private:
   }
 };
 
-/// An wrapper on top of SILBuilder's constructor that automatically sets the
+/// A wrapper on top of SILBuilder's constructor that automatically sets the
 /// current SILDebugScope based on the specified insertion point. This is useful
 /// for situations where a single SIL instruction is lowered into a sequence of
 /// SIL instructions.

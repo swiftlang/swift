@@ -178,7 +178,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 // Unbound generics and placeholders are
                                 // meaningless in opaque types.
                                 /*unboundTyOpener*/ nullptr,
-                                /*placeholderHandler*/ nullptr)
+                                /*placeholderHandler*/ nullptr,
+                                /*packElementOpener*/ nullptr)
                                 .resolveType(constraint);
 
       if (constraintType->hasError())
@@ -225,7 +226,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto interfaceType =
       TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
                                    /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
+                                   /*placeholderHandler*/ nullptr,
+                                   /*packElementOpener*/ nullptr)
           .resolveType(repr);
 
   // Opaque types cannot be used in parameter position.
@@ -627,7 +629,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       const auto resolution =
           TypeResolution::forStructural(GC, baseOptions,
                                         /*unboundTyOpener*/ nullptr,
-                                        /*placeholderHandler*/ nullptr);
+                                        /*placeholderHandler*/ nullptr,
+                                        /*packElementOpener*/ nullptr);
       auto params = func ? func->getParameters()
                       : subscr ? subscr->getIndices()
                       : macro->parameterList;
@@ -966,6 +969,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     context = TypeResolverContext::GenericRequirement;
   }
   auto options = TypeResolutionOptions(context);
+  options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
@@ -973,13 +977,15 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,
                                                /*unboundTyOpener*/ nullptr,
-                                               /*placeholderHandler*/ nullptr);
+                                               /*placeholderHandler*/ nullptr,
+                                               /*packElementOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution = TypeResolution::forInterface(owner.dc, options,
                                               /*unboundTyOpener*/ nullptr,
-                                              /*placeholderHandler*/ nullptr);
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr);
     break;
   }
 
@@ -1024,7 +1030,8 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   const auto type =
       TypeResolution::forStructural(typeAlias, options,
                                     /*unboundTyOpener*/ nullptr,
-                                    /*placeholderHandler*/ nullptr)
+                                    /*placeholderHandler*/ nullptr,
+                                    /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
 
   auto genericSig = typeAlias->getGenericSignature();

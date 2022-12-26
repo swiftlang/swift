@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
-#include "swift/AST/GenericRequirement.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringRef.h"
@@ -104,7 +104,7 @@ public:
                                  const ModuleDecl *moduleContext);
 
   /// Print out the C++ record qualifier for the given C++ record.
-  void printNominalClangTypeReference(const clang::Decl *typeDecl);
+  void printClangTypeReference(const clang::Decl *typeDecl);
 
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
@@ -170,7 +170,7 @@ public:
 
   /// Print the metadata accessor function for the given type declaration.
   void printCTypeMetadataTypeFunction(
-      const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
+      const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
       llvm::ArrayRef<GenericRequirement> genericRequirements);
 
   /// Print the name of the generic type param type in C++.

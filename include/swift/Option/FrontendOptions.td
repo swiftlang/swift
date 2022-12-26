@@ -1105,6 +1105,13 @@ def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
 
+def enable_collocate_metadata_functions :
+  Flag<["-"], "enable-collocate-metadata-functions">,
+  HelpText<"Enable collocate metadata functions">;
+def disable_collocate_metadata_functions :
+  Flag<["-"], "disable-collocate-metadata-functions">,
+  HelpText<"Disable collocate metadata functions">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;

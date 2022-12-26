@@ -4070,10 +4070,13 @@ The stack location must not be modified by other instructions than
 ``store_borrow``.
 All uses of the store_borrow destination ```%1`` should be via the store_borrow
 return address ``%2`` except dealloc_stack.
-The stored value is alive until the ``end_borrow``. During the its lifetime,the
+The stored value is alive until the ``end_borrow``. During its lifetime, the
 stored value must not be modified or destroyed.
-The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
+The source value ``%0`` is borrowed (i.e. not copied) and its borrow scope
 must outlive the lifetime of the stored value.
+
+Notionally, the outer borrow scope ensures that there's something to be
+addressed.  The inner borrow scope provides the address to work with.
 
 begin_borrow
 ````````````
