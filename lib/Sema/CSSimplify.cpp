@@ -2063,21 +2063,17 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
     if (path.back().is<LocatorPathElt::PatternMatch>()) {
       return true;
     } else if (path.size() > 1) {
+      auto pathElement = llvm::find_if(path, [](LocatorPathElt &elt) {
+          return elt.is<LocatorPathElt::PatternMatch>();
+      });
+      
+      if (pathElement == path.end())
+          return false;
       // sub-pattern matching as part of the enum element matching
       // where sub-element is a tuple pattern e.g.
       // `case .foo((a: 42, _)) = question`
-      auto lastIdx = path.size() - 1;
-      if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
-          path[lastIdx].is<LocatorPathElt::FunctionArgument>())
-        return true;
-      
-      if (path.size() > 5) {
-        // `case .bar(_, (_, (_, (_, (let a, _), _), _))) = question`
-        if (path[3].is<LocatorPathElt::PatternMatch>() &&
-            path[4].is<LocatorPathElt::FunctionArgument>() &&
-            path[lastIdx].is<LocatorPathElt::TupleElement>())
-            return true;
-        }
+      if (pathElement->is<LocatorPathElt::PatternMatch>())
+          return true;
     }
   }
 
