@@ -154,37 +154,37 @@ extension StaticBigIntTests {
       let negative = Wrapper(-0x00112233_44556677_8899AABB_CCDDEEFF)
       expectEqual( -1, negative.actual.signum())
       expectEqual(118, negative.actual.bitWidth)
-      if getInt(UInt.bitWidth) == 32 {
-        expectEqual(0x33221101, negative.actual[0])
-        expectEqual(0x77665544, negative.actual[1])
-        expectEqual(0xBBAA9988, negative.actual[2])
-        expectEqual(0xFFEEDDCC, negative.actual[3])
-        expectEqual(0xFFFFFFFF, negative.actual[4])
-        expectEqual(0xFFFFFFFF, negative.actual[.max])
-      } else if getInt(UInt.bitWidth) == 64 {
-        expectEqual(0x77665544_33221101, negative.actual[0])
-        expectEqual(0xFFEEDDCC_BBAA9988, negative.actual[1])
-        expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[2])
-        expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[.max])
-      }
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+      expectEqual(0x33221101, negative.actual[0])
+      expectEqual(0x77665544, negative.actual[1])
+      expectEqual(0xBBAA9988, negative.actual[2])
+      expectEqual(0xFFEEDDCC, negative.actual[3])
+      expectEqual(0xFFFFFFFF, negative.actual[4])
+      expectEqual(0xFFFFFFFF, negative.actual[.max])
+#else
+      expectEqual(0x77665544_33221101, negative.actual[0])
+      expectEqual(0xFFEEDDCC_BBAA9988, negative.actual[1])
+      expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[2])
+      expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[.max])
+#endif
     }
     do {
       let positive = Wrapper(0x00112233_44556677_8899AABB_CCDDEEFF)
       expectEqual( +1, positive.actual.signum())
       expectEqual(118, positive.actual.bitWidth)
-      if getInt(UInt.bitWidth) == 32 {
-        expectEqual(0xCCDDEEFF, positive.actual[0])
-        expectEqual(0x8899AABB, positive.actual[1])
-        expectEqual(0x44556677, positive.actual[2])
-        expectEqual(0x00112233, positive.actual[3])
-        expectEqual(0x00000000, positive.actual[4])
-        expectEqual(0x00000000, positive.actual[.max])
-      } else if getInt(UInt.bitWidth) == 64 {
-        expectEqual(0x8899AABB_CCDDEEFF, positive.actual[0])
-        expectEqual(0x00112233_44556677, positive.actual[1])
-        expectEqual(0x00000000_00000000, positive.actual[2])
-        expectEqual(0x00000000_00000000, positive.actual[.max])
-      }
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+      expectEqual(0xCCDDEEFF, positive.actual[0])
+      expectEqual(0x8899AABB, positive.actual[1])
+      expectEqual(0x44556677, positive.actual[2])
+      expectEqual(0x00112233, positive.actual[3])
+      expectEqual(0x00000000, positive.actual[4])
+      expectEqual(0x00000000, positive.actual[.max])
+#else
+      expectEqual(0x8899AABB_CCDDEEFF, positive.actual[0])
+      expectEqual(0x00112233_44556677, positive.actual[1])
+      expectEqual(0x00000000_00000000, positive.actual[2])
+      expectEqual(0x00000000_00000000, positive.actual[.max])
+#endif
     }
     if getInt(UInt.bitWidth) == 64 {
       let fibonacciSequence = Wrapper(
