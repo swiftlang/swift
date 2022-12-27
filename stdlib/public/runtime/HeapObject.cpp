@@ -354,7 +354,6 @@ static HeapObject *_swift_retain_(HeapObject *object) {
   return object;
 }
 
-SWIFT_CC(swift)
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);

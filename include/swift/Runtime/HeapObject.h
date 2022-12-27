@@ -137,7 +137,6 @@ HeapObject* swift_allocEmptyBox();
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift)
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
