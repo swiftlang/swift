@@ -192,6 +192,8 @@ jobs:
     env:
       TOOLCHAIN_CHANNEL: DEVELOPMENT
       DEVELOPER_DIR: /Applications/Xcode_13.2.1.app/Contents/Developer/
+      # https://github.com/actions/cache/blob/main/tips-and-workarounds.md#cache-segment-restore-timeout
+      SEGMENT_DOWNLOAD_TIMEOUT_MINS: 30
     needs: [build-matrix]
     if: ${{ always() }}
     strategy:
@@ -233,20 +235,19 @@ jobs:
           fetch-depth: 0
 
       - name: Prepare sccache timestamp
-        id: cache_timestamp
+        id: cache_key
         run: |
-          echo "::set-output name=timestamp::$(date +'%Y-%m-%d-%I-%M-%S')"
+          echo "SCCACHE_KEY=${{ matrix.target }}-sccache-v13-$(date +'%Y-%m-%d-%I-%M-%S')" >> $GITHUB_OUTPUT
 
       - name: Check Xcode version
         if: ${{ startsWith(matrix.build_os, 'macos-') }}
         run: |
           xcodebuild -version
 
-      - uses: actions/cache@v3
-        timeout-minutes: 30
+      - uses: actions/cache/restore@v3
         with:
           path: build-cache
-          key: ${{ matrix.target }}-sccache-v13-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ${{ steps.cache_key.outputs.SCCACHE_KEY }}
           restore-keys: |
             ${{ matrix.target }}-sccache-v13-
 
@@ -276,6 +277,11 @@ jobs:
 
       - name: Check cache hit rate
         run: sccache --show-stats
+      - uses: actions/cache/save@v3
+        if: ${{ always() }}
+        with:
+          path: build-cache
+          key: ${{ steps.cache_key.outputs.SCCACHE_KEY }}
 
       - name: Upload ${{ matrix.target }} installable archive
         uses: actions/upload-artifact@v1
