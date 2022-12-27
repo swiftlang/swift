@@ -2063,26 +2063,20 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
     if (path.back().is<LocatorPathElt::PatternMatch>()) {
       return true;
     } else if (path.size() > 1) {
-        int patternMatchIdx = 0;
-        for (int i = 0; i < (int)path.size(); i++) {
-            if (path[i].is<LocatorPathElt::PatternMatch>()) {
-                patternMatchIdx = i;
-            }
-        }
-        
-        // sub-pattern matching as part of the enum element matching
-        // where sub-element is a tuple pattern e.g.
-        // `case .foo((a: 42, _)) = question`
-        if (path[patternMatchIdx].is<LocatorPathElt::PatternMatch>() &&
-            path[patternMatchIdx + 1].is<LocatorPathElt::FunctionArgument>())
+      // sub-pattern matching as part of the enum element matching
+      // where sub-element is a tuple pattern e.g.
+      // `case .foo((a: 42, _)) = question`
+      auto lastIdx = path.size() - 1;
+      if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
+          path[lastIdx].is<LocatorPathElt::FunctionArgument>())
+        return true;
+      
+      if (path.size() > 5) {
+        // `case .bar(_, (_, (_, (_, (let a, _), _), _))) = question`
+        if (path[3].is<LocatorPathElt::PatternMatch>() &&
+            path[4].is<LocatorPathElt::FunctionArgument>() &&
+            path[lastIdx].is<LocatorPathElt::TupleElement>())
             return true;
-        
-        if (path.size() > 2) {
-            // `case .bar(_, (_, (_, (_, (let a, _), _), _))) = question`
-            if (path[patternMatchIdx].is<LocatorPathElt::PatternMatch>() &&
-                path[patternMatchIdx + 1].is<LocatorPathElt::FunctionArgument>() &&
-                path[patternMatchIdx + 2].is<LocatorPathElt::TupleElement>())
-                return true;
         }
     }
   }
@@ -2245,10 +2239,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Equal: {
     subkind = kind;
 
-      auto &e = llvm::errs();
-      e << "@@ locator dump =>";
-      locator.dump(this);
-      e << "\n";
     if (isInPatternMatchingContext(locator)) {
       if (matcher.matchInPatternMatchingContext())
         return getTypeMatchFailure(locator);
