@@ -141,7 +141,7 @@ build_target_toolchain() {
     -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES \
     -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES \
     -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="$SOURCE_PATH/swift-syntax" \
-    -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="$SOURCE_PATH/swift-experimental-string-processing" \
+    -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="$SOURCE_PATH/swift-experimental-string-processing" \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
