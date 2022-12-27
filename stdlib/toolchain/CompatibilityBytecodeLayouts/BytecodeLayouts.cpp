@@ -75,6 +75,14 @@ size_t BitVector::count() const {
   return total;
 }
 
+void BitVector::addPointer(uintptr_t byte) {
+#if __POINTER_WIDTH__ == 64
+  add((uint64_t)byte);
+#else
+  add((uint32_t)byte);
+#endif
+}
+
 void BitVector::add(uint64_t byte) {
   for (size_t i = 0; i < 64; i++)
     data.push_back(byte >> (63 - i) & 0x1);
@@ -391,7 +399,7 @@ BitVector MultiPayloadEnum::spareBits() const {
 
 static BitVector pointerSpareBitMask() {
   BitVector bv;
-  bv.add(heap_object_abi::SwiftSpareBitsMask);
+  bv.addPointer(heap_object_abi::SwiftSpareBitsMask);
   return bv;
 }
 
