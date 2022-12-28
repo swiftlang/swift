@@ -2060,16 +2060,13 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
 
   if (!path.empty()) {
     // Direct pattern matching between tuple pattern and tuple type.
-      auto pathElement = llvm::find_if(path, [](LocatorPathElt &elt) {
-          return elt.is<LocatorPathElt::PatternMatch>();
-      });
-      return pathElement != path.end();
-      // sub-pattern matching as part of the enum element matching
-      // where sub-element is a tuple pattern e.g.
-      // `case .foo((a: 42, _)) = question`
-      if (pathElement->is<LocatorPathElt::PatternMatch>())
-          return true;
-    }
+    // sub-pattern matching as part of the enum element matching
+    // where sub-element is a tuple pattern e.g.
+    // `case .foo((a: 42, _)) = question`
+    auto pathElement = llvm::find_if(path, [](LocatorPathElt &elt) {
+        return elt.is<LocatorPathElt::PatternMatch>();
+    });
+    return pathElement != path.end();
   }
 
   return false;
