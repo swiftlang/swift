@@ -101,6 +101,7 @@ jobs:
             "build_os": "ubuntu-18.04",
             "agent_query": "ubuntu-18.04",
             "target": "ubuntu18.04_x86_64",
+            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-18.04",
             "run_stdlib_test": true,
             "run_full_test": false,
             "run_e2e_test": true,
@@ -112,6 +113,7 @@ jobs:
             "build_os": "ubuntu-20.04",
             "agent_query": "ubuntu-20.04",
             "target": "ubuntu20.04_x86_64",
+            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-20.04",
             "run_stdlib_test": true,
             "run_full_test": false,
             "run_e2e_test": true,
@@ -123,6 +125,7 @@ jobs:
             "build_os": "ubuntu-22.04",
             "agent_query": "ubuntu-22.04",
             "target": "ubuntu22.04_x86_64",
+            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-22.04",
             "run_stdlib_test": true,
             "run_full_test": false,
             "run_e2e_test": true,
@@ -260,23 +263,32 @@ jobs:
             ${{ github.workspace }}/host-toolchain-sdk \
             ${{ github.workspace }}/dist-toolchain-sdk
 
+      - name: Build ${{ matrix.target }} installable archive on Docker container
+        if: ${{ matrix.container != null }}
+        run: |
+          chmod 777 -R ${{ github.workspace }}/build-cache
+          docker volume create oss-swift-package
+          docker run --name swiftwasm-ci-buildbot \
+            --security-opt=no-new-privileges \
+            --cap-add=SYS_PTRACE \
+            --security-opt seccomp=unconfined \
+            -dit \
+            -w /home/build-user/ \
+            -v ${{ github.workspace }}:/source \
+            -v oss-swift-package:/home/build-user \
+            ${{ matrix.container }}
+          docker exec swiftwasm-ci-buildbot /bin/bash -lc 'env; cp -r /source/* /home/build-user/; ./swift/utils/webassembly/ci.sh'
+          rm -rf ${{ github.workspace }}/build-cache
+          docker cp swiftwasm-ci-buildbot:/home/build-user/build-cache ${{ github.workspace }}/build-cache
+          docker cp swiftwasm-ci-buildbot:/home/build-user/swift-wasm-${{ env.TOOLCHAIN_CHANNEL }}-SNAPSHOT-${{ matrix.target }}.tar.gz .
+
       - name: Build ${{ matrix.target }} installable archive
+        if: ${{ matrix.container == null }}
         env:
           SKIP_XCODE_VERSION_CHECK: 1
         run: |
+          ./swift/utils/webassembly/ci.sh
 
-          case "${{ matrix.target }}" in
-            "amazonlinux2_x86_64" | "ubuntu22.04_x86_64" | "ubuntu20.04_x86_64" | "ubuntu18.04_x86_64" | "ubuntu20.04_aarch64" | "macos_x86_64" | "macos_arm64")
-              ./swift/utils/webassembly/ci.sh
-            ;;
-            *)
-              echo "Unrecognised target: ${{ matrix.target }}"
-              exit 1
-            ;;
-          esac
-
-      - name: Check cache hit rate
-        run: sccache --show-stats
       - uses: actions/cache/save@v3
         if: ${{ always() }}
         with:
@@ -293,7 +305,11 @@ jobs:
         run: echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
       - name: Run stdlib tests for wasi-wasm32
-        if: ${{ matrix.run_stdlib_test }}
+        if: ${{ matrix.run_stdlib_test && matrix.container != null }}
+        run: |
+          docker exec swiftwasm-ci-buildbot /bin/bash -lc "cd target-build/swift-stdlib-wasi-wasm32 && ninja check-swift-wasi-wasm32-custom"
+      - name: Run stdlib tests for wasi-wasm32
+        if: ${{ matrix.run_stdlib_test && matrix.container == null }}
         run: |
           TARGET_STDLIB_BUILD_DIR=${{ github.workspace }}/target-build/swift-stdlib-wasi-wasm32
           ninja check-swift-wasi-wasm32-custom -C "$TARGET_STDLIB_BUILD_DIR"

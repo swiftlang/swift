@@ -24,10 +24,14 @@ esac
 BUILD_SCRIPT=$UTILS_PATH/build-toolchain.sh
 RUN_TEST_BIN=$SWIFT_PATH/utils/run-test
 TARGET_STDLIB_BUILD_DIR=$SOURCE_PATH/target-build/swift-stdlib-wasi-wasm32
+BUILD_SDK_PATH="$SOURCE_PATH/build-sdk"
 
-$DEPENDENCIES_SCRIPT
+export WASMER_DIR="$BUILD_SDK_PATH/wasmer"
+
+$DEPENDENCIES_SCRIPT "$BUILD_SDK_PATH"
 $UTILS_PATH/install-build-sdk.sh
 
+export PATH="$BUILD_SDK_PATH/bin:$PATH"
 export SCCACHE_CACHE_SIZE="50G"
 export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
