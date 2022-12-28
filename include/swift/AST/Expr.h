@@ -6006,11 +6006,24 @@ class TypeJoinExpr final : public Expr,
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
 
-  TypeJoinExpr(DeclRefExpr *var, ArrayRef<Expr *> elements);
+  TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
+               ArrayRef<Expr *> elements);
+
+  static TypeJoinExpr *
+  createImpl(ASTContext &ctx,
+             llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
+             ArrayRef<Expr *> elements);
 
 public:
   static TypeJoinExpr *create(ASTContext &ctx, DeclRefExpr *var,
-                              ArrayRef<Expr *> exprs);
+                              ArrayRef<Expr *> exprs) {
+    return createImpl(ctx, var, exprs);
+  }
+
+  static TypeJoinExpr *create(ASTContext &ctx, Type joinType,
+                              ArrayRef<Expr *> exprs) {
+    return createImpl(ctx, joinType.getPointer(), exprs);
+  }
 
   SourceLoc getLoc() const { return SourceLoc(); }
   SourceRange getSourceRange() const { return SourceRange(); }

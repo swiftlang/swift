@@ -61,6 +61,14 @@ public:
       ClosureDCs.push_back(closure);
     }
 
+    if (auto *joinExpr = dyn_cast<TypeJoinExpr>(expr)) {
+      // If this join is over a known type, let's
+      // analyze it too because it can contain type
+      // variables.
+      if (!joinExpr->getVar())
+        inferVariables(joinExpr->getType());
+    }
+
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
 
