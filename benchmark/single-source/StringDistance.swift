@@ -14,38 +14,65 @@ import TestsUtils
 
 public let benchmarks: [BenchmarkInfo] = [
   BenchmarkInfo(
-    name: "StringDistance.characters",
+    name: "StringDistance.characters.mixed",
     runFunction: { n in
-      run_characters(string: sampleString, ranges: sampleRanges, n: n)
+      run_characters(string: mixedString, ranges: mixedRanges, n: n)
     },
     tags: [.api, .String],
-    setUpFunction: { _ = sampleRanges }),
+    setUpFunction: { blackHole(mixedRanges) }),
   BenchmarkInfo(
-    name: "StringDistance.scalars",
+    name: "StringDistance.scalars.mixed",
     runFunction: { n in
-      run_scalars(string: sampleString, ranges: sampleRanges, n: n)
+      run_scalars(string: mixedString, ranges: mixedRanges, n: n)
     },
     tags: [.api, .String],
-    setUpFunction: { _ = sampleRanges }),
+    setUpFunction: { blackHole(mixedRanges) }),
   BenchmarkInfo(
-    name: "StringDistance.utf16",
+    name: "StringDistance.utf16.mixed",
     runFunction: { n in
-      run_utf16(string: sampleString, ranges: sampleRanges, n: n)
+      run_utf16(string: mixedString, ranges: mixedRanges, n: n)
     },
     tags: [.api, .String],
-    setUpFunction: { _ = sampleRanges }),
+    setUpFunction: { blackHole(mixedRanges) }),
   BenchmarkInfo(
-    name: "StringDistance.utf8",
+    name: "StringDistance.utf8.mixed",
     runFunction: { n in
-      run_utf8(string: sampleString, ranges: sampleRanges, n: n)
+      run_utf8(string: mixedString, ranges: mixedRanges, n: n)
     },
     tags: [.api, .String],
-    setUpFunction: { _ = sampleRanges }),
+    setUpFunction: { blackHole(mixedRanges) }),
+  BenchmarkInfo(
+    name: "StringDistance.characters.ascii",
+    runFunction: { n in
+      run_characters(string: asciiString, ranges: asciiRanges, n: n)
+    },
+    tags: [.api, .String],
+    setUpFunction: { blackHole(asciiRanges) }),
+  BenchmarkInfo(
+    name: "StringDistance.scalars.ascii",
+    runFunction: { n in
+      run_scalars(string: asciiString, ranges: asciiRanges, n: n)
+    },
+    tags: [.api, .String],
+    setUpFunction: { blackHole(asciiRanges) }),
+  BenchmarkInfo(
+    name: "StringDistance.utf16.ascii",
+    runFunction: { n in
+      run_utf16(string: asciiString, ranges: asciiRanges, n: n)
+    },
+    tags: [.api, .String],
+    setUpFunction: { blackHole(asciiRanges) }),
+  BenchmarkInfo(
+    name: "StringDistance.utf8.ascii",
+    runFunction: { n in
+      run_utf8(string: asciiString, ranges: asciiRanges, n: n)
+    },
+    tags: [.api, .String],
+    setUpFunction: { blackHole(asciiRanges) }),
 ]
 
 
-let sampleString =
-    #"""
+let mixedString = #"""
     The powerful programming language that is also easy to learn.
     손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
     🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
@@ -62,17 +89,42 @@ let sampleString =
     e̶̢͕̦̜͔̘̘̝͈̪̖̺̥̺̹͉͎͈̫̯̯̻͑͑̿̽͂̀̽͋́̎̈́̈̿͆̿̒̈́̽̔̇͐͛̀̓͆̏̾̀̌̈́̆̽̕ͅ
     """#
 
-let sampleRanges = (
-  generateRanges(for: sampleString, by: 1)
-  + generateRanges(for: sampleString, by: 2)
-  + generateRanges(for: sampleString, by: 4)
-  + generateRanges(for: sampleString, by: 8)
-  + generateRanges(for: sampleString, by: 16)
-  + generateRanges(for: sampleString, by: 32)
-  + generateRanges(for: sampleString, by: 64)
-  + generateRanges(for: sampleString, by: 128)
-  + generateRanges(for: sampleString, by: 256)
-  + generateRanges(for: sampleString, by: 512))
+let mixedRanges = (
+  generateRanges(for: mixedString, by: 1)
+  + generateRanges(for: mixedString, by: 2)
+  + generateRanges(for: mixedString, by: 4)
+  + generateRanges(for: mixedString, by: 8)
+  + generateRanges(for: mixedString, by: 16)
+  + generateRanges(for: mixedString, by: 32)
+  + generateRanges(for: mixedString, by: 64)
+  + generateRanges(for: mixedString, by: 128)
+  + generateRanges(for: mixedString, by: 256)
+  + generateRanges(for: mixedString, by: 512))
+
+let asciiString = #"""
+  Swift is a high-performance system programming language.  It has a clean
+  and modern syntax, offers seamless access to existing C and Objective-C code
+  and frameworks, and is memory safe by default.
+
+  Although inspired by Objective-C and many other languages, Swift is not itself
+  a C-derived language. As a complete and independent language, Swift packages
+  core features like flow control, data structures, and functions, with
+  high-level constructs like objects, protocols, closures, and generics. Swift
+  embraces modules, eliminating the need for headers and the code duplication
+  they entail.
+  """#
+
+let asciiRanges = (
+  generateRanges(for: asciiString, by: 1)
+  + generateRanges(for: asciiString, by: 2)
+  + generateRanges(for: asciiString, by: 4)
+  + generateRanges(for: asciiString, by: 8)
+  + generateRanges(for: asciiString, by: 16)
+  + generateRanges(for: asciiString, by: 32)
+  + generateRanges(for: asciiString, by: 64)
+  + generateRanges(for: asciiString, by: 128)
+  + generateRanges(for: asciiString, by: 256)
+  + generateRanges(for: asciiString, by: 512))
 
 func generateRanges(for string: String, by step: Int) -> [Range<String.Index>] {
   var remaining = step
