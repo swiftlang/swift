@@ -720,7 +720,7 @@ extension String.UTF16View {
   ///
   /// - Complexity: This measures the UTF-16 distance of `idx` from its nearest
   ///    breadcrumb index (rounding down), so on average it needs to look at
-  ///    `breadcrumbStride / 2` UTF-8 code units. (In addition to the O(log(n))
+  ///    `breadcrumbStride / 2` UTF-16 code units. (In addition to the O(log(n))
   ///    cost of looking up the nearest breadcrumb, and the amortizable O(n)
   ///    cost of generating the breadcrumbs in the first place.)
   @usableFromInline
@@ -758,7 +758,7 @@ extension String.UTF16View {
   ///
   /// - Complexity: This iterates UTF-16 code units starting from the
   ///    nearest breadcrumb to `offset` (rounding down), so on
-  ///    average it needs to look at `breadcrumbStride / 2` UTF-8 code
+  ///    average it needs to look at `breadcrumbStride / 2` UTF-16 code
   ///    units. (In addition to the O(1) cost of looking up the nearest
   ///    breadcrumb, and the amortizable O(n) cost of generating the
   ///    breadcrumbs in the first place.)
