@@ -2981,8 +2981,12 @@ public:
   void visitTypeJoinExpr(TypeJoinExpr *E) {
     printCommon(E, "type_join_expr");
 
-    PrintWithColorRAII(OS, DeclColor) << " var=";
-    printRec(E->getVar());
+    if (auto *var = E->getVar()) {
+      PrintWithColorRAII(OS, DeclColor) << " var=";
+      printRec(var);
+      OS << '\n';
+    }
+
     OS << '\n';
 
     for (auto *member : E->getElements()) {
