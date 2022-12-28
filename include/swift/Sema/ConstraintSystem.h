@@ -2778,6 +2778,11 @@ struct DeclReferenceType {
   Type adjustedReferenceType;
 };
 
+/// Describes a closure that is being processed by the constriant solver.
+struct ClosureInfo {
+  FunctionType *Type;
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -2885,7 +2890,7 @@ private:
 
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
-  llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+  llvm::MapVector<const ClosureExpr *, ClosureInfo> Closures;
 
   /// This is a *global* list of all result builder bodies that have
   /// been determined to be incorrect by failing constraint generation.
@@ -3511,8 +3516,8 @@ public:
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
 
-    /// The length of \c ClosureTypes.
-    unsigned numInferredClosureTypes;
+    /// The length of \c Closures.
+    unsigned numInferredClosures;
 
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
@@ -3712,11 +3717,11 @@ public:
     return !IgnoredArguments.empty();
   }
 
-  void setClosureType(const ClosureExpr *closure, FunctionType *type) {
+  void setClosure(const ClosureExpr *closure, ClosureInfo info) {
     assert(closure);
-    assert(type && "Expected non-null type");
-    assert(ClosureTypes.count(closure) == 0 && "Cannot reset closure type");
-    ClosureTypes.insert({closure, type});
+    assert(info.Type && "Expected non-null type");
+    assert(Closures.count(closure) == 0 && "Cannot reset closure type");
+    Closures.insert({closure, info});
   }
 
   FunctionType *getClosureType(const ClosureExpr *closure) const {
@@ -3726,9 +3731,9 @@ public:
   }
 
   FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
-    auto result = ClosureTypes.find(closure);
-    if (result != ClosureTypes.end())
-      return result->second;
+    auto result = Closures.find(closure);
+    if (result != Closures.end())
+      return result->second.Type;
     return nullptr;
   }
 
