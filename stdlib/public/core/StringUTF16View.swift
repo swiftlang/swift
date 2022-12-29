@@ -204,12 +204,14 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n)
     }
 
-    let threshold = (
-      i == startIndex ? _breadcrumbStride / 2 : _breadcrumbStride)
-    if n.magnitude < threshold, !_guts.isASCII {
-      // Do not use breadcrumbs if directly computing the result is expected to
-      // be cheaper.
-      return _index(i, offsetBy: n)._knownUTF8
+    if !_guts.isASCII { // We have ASCII fast paths below
+      let threshold = (
+        i == startIndex ? _breadcrumbStride / 2 : _breadcrumbStride)
+      if n.magnitude < threshold {
+        // Do not use breadcrumbs if directly computing the result is expected to
+        // be cheaper.
+        return _index(i, offsetBy: n)._knownUTF8
+      }
     }
 
     let lowerOffset = _nativeGetOffset(for: i)
@@ -230,12 +232,14 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
 
-    let threshold = (
-      _breadcrumbStride + (i == startIndex ? 0 : _breadcrumbStride / 2))
-    if n.magnitude < threshold, !_guts.isASCII {
-      // Do not use breadcrumbs if directly computing the result is expected to
-      // be cheaper.
-      return _index(i, offsetBy: n, limitedBy: limit)?._knownUTF8
+    if !_guts.isASCII { // We have ASCII fast paths below
+      let threshold = (
+        _breadcrumbStride + (i == startIndex ? 0 : _breadcrumbStride / 2))
+      if n.magnitude < threshold {
+        // Do not use breadcrumbs if directly computing the result is expected to
+        // be cheaper.
+        return _index(i, offsetBy: n, limitedBy: limit)?._knownUTF8
+      }
     }
 
     let iOffset = _nativeGetOffset(for: i)
@@ -275,10 +279,15 @@ extension String.UTF16View: BidirectionalCollection {
     }
 
     let utf8Distance = end._encodedOffset - start._encodedOffset
+
+    if _guts.isASCII {
+      return utf8Distance
+    }
+
     let threshold = (start == startIndex || end == startIndex
       ? _breadcrumbStride / 2
       : _breadcrumbStride)
-    if utf8Distance.magnitude < threshold, !_guts.isASCII {
+    if utf8Distance.magnitude < threshold {
       // Do not use breadcrumbs if directly computing the result is expected to
       // be cheaper. The conservative threshold above assumes that each UTF-16
       // code unit will map to a single UTF-8 code unit, i.e., the worst
@@ -286,6 +295,7 @@ extension String.UTF16View: BidirectionalCollection {
       // FIXME: Figure out if a more optimistic threshold would work better.
       return _utf16Distance(from: start, to: end)
     }
+
     let lower = _nativeGetOffset(for: start)
     let upper = _nativeGetOffset(for: end)
     return upper &- lower
@@ -309,7 +319,14 @@ extension String.UTF16View: BidirectionalCollection {
       let upper = _foreignIndex(lower, offsetBy: offsets.count)
       return Range(uncheckedBounds: (lower, upper))
     }
-    if offsets.count < _breadcrumbStride / 2, !_guts.isASCII {
+
+    if _guts.isASCII {
+      let lower = self.index(start, offsetBy: offsets.lowerBound)
+      let upper = self.index(lower, offsetBy: offsets.count)
+      return Range(uncheckedBounds: (lower, upper))
+    }
+
+    if offsets.count < _breadcrumbStride / 2 {
       let lower = self.index(start, offsetBy: offsets.lowerBound)
       let upper = _index(lower, offsetBy: offsets.count)._knownUTF8
       return Range(uncheckedBounds: (lower, upper))
@@ -348,11 +365,18 @@ extension String.UTF16View: BidirectionalCollection {
     }
 
     let utf8Distance = upper._encodedOffset - lower._encodedOffset
-    if utf8Distance.magnitude <= _breadcrumbStride / 2, !_guts.isASCII {
+
+    if _guts.isASCII {
+      let lowerOffset = lower._encodedOffset - start._encodedOffset
+      return Range(uncheckedBounds: (lowerOffset, lowerOffset + utf8Distance))
+    }
+
+    if utf8Distance.magnitude <= _breadcrumbStride / 2 {
       let lowerOffset = distance(from: start, to: lower)
       let distance = _utf16Distance(from: lower, to: upper)
       return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
     }
+
     let bias = _nativeGetOffset(for: start)
     let utf8StartOffset = lower._encodedOffset - start._encodedOffset
     let lowerOffset = (
@@ -798,13 +822,12 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
     _internalInvariant(idx._encodedOffset <= _guts.count)
-    // Trivial and common: start
-    if idx == startIndex { return 0 }
-
     if _guts.isASCII {
       _internalInvariant(idx.transcodedOffset == 0)
       return idx._encodedOffset
     }
+    // Trivial and common: start
+    if idx == startIndex { return 0 }
 
     let idx = _utf16AlignNativeIndex(idx)
 
