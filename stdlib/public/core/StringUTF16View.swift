@@ -299,6 +299,70 @@ extension String.UTF16View: BidirectionalCollection {
     return _nativeGetOffset(for: endIndex)
   }
 
+  internal func _indexRange(
+    for offsets: Range<Int>,
+    from start: Index
+  ) -> Range<Index> {
+    _internalInvariant(_guts.hasMatchingEncoding(start))
+    if _slowPath(_guts.isForeign) {
+      let lower = self.index(start, offsetBy: offsets.lowerBound)
+      let upper = _foreignIndex(lower, offsetBy: offsets.count)
+      return Range(uncheckedBounds: (lower, upper))
+    }
+    if offsets.count < _breadcrumbStride / 2, !_guts.isASCII {
+      let lower = self.index(start, offsetBy: offsets.lowerBound)
+      let upper = _index(lower, offsetBy: offsets.count)._knownUTF8
+      return Range(uncheckedBounds: (lower, upper))
+    }
+
+    let bias = _nativeGetOffset(for: start)
+    let lower = (
+      offsets.lowerBound - bias <= _breadcrumbStride / 2
+      ? _index(start, offsetBy: offsets.lowerBound)
+      : _nativeGetIndex(for: bias + offsets.lowerBound))
+    let upper = _nativeGetIndex(for: bias + offsets.upperBound)
+    return Range(uncheckedBounds: (lower, upper))
+  }
+
+  internal func _offsetRange(
+    for range: Range<Index>,
+    from start: Index
+  ) -> Range<Int> {
+    let lower = _guts.ensureMatchingEncoding(range.lowerBound)
+    let upper = _guts.ensureMatchingEncoding(range.upperBound)
+    _internalInvariant(_guts.hasMatchingEncoding(start))
+
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      lower._encodedOffset <= _guts.count,
+      "String index is out of bounds")
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      upper._encodedOffset <= _guts.count,
+      "String index is out of bounds")
+
+    if _slowPath(_guts.isForeign) {
+      let lowerOffset = _foreignDistance(from: start, to: lower)
+      let distance = _foreignDistance(from: lower, to: upper)
+      return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
+    }
+
+    let utf8Distance = upper._encodedOffset - lower._encodedOffset
+    if utf8Distance.magnitude <= _breadcrumbStride / 2, !_guts.isASCII {
+      let lowerOffset = distance(from: start, to: lower)
+      let distance = _utf16Distance(from: lower, to: upper)
+      return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
+    }
+    let bias = _nativeGetOffset(for: start)
+    let utf8StartOffset = lower._encodedOffset - start._encodedOffset
+    let lowerOffset = (
+      utf8StartOffset <= _breadcrumbStride / 2
+      ? _utf16Distance(from: start, to: lower)
+      : _nativeGetOffset(for: lower) - bias)
+    let upperOffset = _nativeGetOffset(for: upper) - bias
+    return Range(uncheckedBounds: (lowerOffset, upperOffset))
+  }
+
   /// Accesses the code unit at the given position.
   ///
   /// The following example uses the subscript to print the value of a
