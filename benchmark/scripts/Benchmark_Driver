@@ -630,7 +630,7 @@ class BenchmarkDoctor(object):
         (min_i1, max_i1), (min_i2, max_i2) = [
             (min(memory_use), max(memory_use))
             for memory_use in [
-                [r.mem_pages for r in i_series]
+                [r.mem_pages for r in i_series if r.mem_pages is not None]
                 for i_series in [select(measurements, num_iters=i) for i in [1, 2]]
             ]
         ]
