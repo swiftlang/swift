@@ -4,6 +4,7 @@ set -eux
 
 SOURCE_PATH="$( cd "$(dirname "$0")/../../../" && pwd  )"
 BUILD_SDK_PATH="$SOURCE_PATH/build-sdk"
+PATCHES="$(cd "$(dirname "$0")/patches" && pwd)"
 
 install_libxml2() {
   LIBXML2_URL="https://github.com/swiftwasm/libxml2-wasm/releases/download/1.0.0/libxml2-wasm32-unknown-wasi.tar.gz"
@@ -25,6 +26,7 @@ install_wasi-sysroot() {
   curl -L "$WASI_SYSROOT_URL" | tar xz
 
   mv "wasi-sysroot" "$BUILD_SDK_PATH/wasi-sysroot"
+  patch -p1 -d "$BUILD_SDK_PATH/wasi-sysroot" < "$PATCHES/wasi-sysroot"/*.patch
 }
 
 workdir=$(mktemp -d)

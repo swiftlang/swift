@@ -1,0 +1,75 @@
+Author: Yuta Saito <kateinoigakukun@gmail.com>
+Date:   Thu Dec 29 10:50:33 2022 +0000
+
+    Without this patch, Cxx.swiftmodule build fails on macOS host environments
+
+diff --git a/include/c++/v1/module.modulemap b/include/c++/v1/module.modulemap
+index b5781b0..af10440 100644
+--- a/include/c++/v1/module.modulemap
++++ b/include/c++/v1/module.modulemap
+@@ -44,10 +44,12 @@ module std [system] {
+       header "math.h"
+       export *
+     }
++    /* XXX(swiftwasm): setjmp.h is unavailable in wasi-libc
+     module setjmp_h {
+       header "setjmp.h"
+       export *
+     }
++    */
+     // FIXME: <stdalign.h> is missing.
+     // <signal.h> provided by C library.
+     // <stdarg.h> provided by compiler.
+@@ -153,10 +155,12 @@ module std [system] {
+       header "cmath"
+       export *
+     }
++    /* XXX(swiftwasm): setjmp.h is unavailable in wasi-libc
+     module csetjmp {
+       header "csetjmp"
+       export *
+     }
++    */
+     module csignal {
+       header "csignal"
+       export *
+@@ -384,10 +388,12 @@ module std [system] {
+     header "execution"
+     export *
+   }
++  /* XXX(swiftwasm): wasi-sdk configures with LIBCXX_ENABLE_FILESYSTEM=OFF
+   module filesystem {
+     header "filesystem"
+     export *
+   }
++  */
+   module format {
+     header "format"
+     export *
+@@ -645,11 +651,13 @@ module std [system] {
+     header "scoped_allocator"
+     export *
+   }
++  /* XXX(swiftwasm): semaphore is unavailable due to lack of thread
+   module semaphore {
+     requires cplusplus14
+     header "semaphore"
+     export *
+   }
++  */
+   module set {
+     header "set"
+     export initializer_list
+@@ -816,10 +824,12 @@ module std [system] {
+       header "experimental/deque"
+       export *
+     }
++    /* XXX(swiftwasm): wasi-sdk configures with LIBCXX_ENABLE_FILESYSTEM=OFF
+     module filesystem {
+       header "experimental/filesystem"
+       export *
+     }
++    */
+     module forward_list {
+       header "experimental/forward_list"
+       export *
