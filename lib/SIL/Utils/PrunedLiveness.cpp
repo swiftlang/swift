@@ -179,10 +179,13 @@ void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   if (!discoveredBlocks) {
     OS << "No deterministic live block list\n";
   }
+  SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
     block->printAsOperand(OS);
-    OS
-      << ": " << getStringRef(this->getBlockLiveness(block, 0)) << "\n";
+    OS << ": ";
+    for (unsigned i : range(getNumBitsToTrack()))
+      OS << getStringRef(this->getBlockLiveness(block, i)) << ", ";
+    OS << "\n";
   }
 }
 
