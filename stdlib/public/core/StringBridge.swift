@@ -795,19 +795,33 @@ extension StringProtocol {
   @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
-    let lowerbound = _toUTF16Offset(indices.lowerBound)
-    let length = self.utf16.distance(
-      from: indices.lowerBound, to: indices.upperBound)
-    return Range(
-      uncheckedBounds: (lower: lowerbound, upper: lowerbound + length))
+    if Self.self == String.self {
+      let s = unsafeBitCast(self, to: String.self)
+      return s.utf16._offsetRange(for: indices, from: s.startIndex)
+    }
+    if Self.self == Substring.self {
+      let s = unsafeBitCast(self, to: Substring.self)
+      return s._slice._base.utf16._offsetRange(for: indices, from: s.startIndex)
+    }
+    let startOffset = _toUTF16Offset(indices.lowerBound)
+    let endOffset = _toUTF16Offset(indices.upperBound)
+    return Range(uncheckedBounds: (lower: startOffset, upper: endOffset))
   }
 
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
+    if Self.self == String.self {
+      let s = unsafeBitCast(self, to: String.self)
+      return s.utf16._indexRange(for: range, from: s.startIndex)
+    }
+    if Self.self == Substring.self {
+      let s = unsafeBitCast(self, to: Substring.self)
+      return s._slice._base.utf16._indexRange(for: range, from: s.startIndex)
+    }
     let lowerbound = _toUTF16Index(range.lowerBound)
-    let upperbound = self.utf16.index(lowerbound, offsetBy: range.count)
+    let upperbound = _toUTF16Index(range.upperBound)
     return Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
   }
 }
