@@ -246,6 +246,19 @@ public:
     auto optRange = makeOptionalTransformRange(baseRange, ToNonErasedValues());
     return makeTransformRange(optRange, PairWithTypeErasedOptionalSecondElt());
   }
+
+  /// Returns true if all values for all keys have been deleted.
+  ///
+  /// This is intended to be used in use cases where a frozen multi map is
+  /// filled up with a multi-map and then as we process keys, we delete values
+  /// we have handled. In certain cases, one wishes to validate after processing
+  /// that all values for all keys were properly handled. One cannot perform
+  /// this operation with getRange() in a nice way.
+  bool allValuesHaveBeenDeleted() const {
+    return llvm::all_of(storage, [](const std::pair<Key, Optional<Value>> &pair) {
+      return !pair.second.hasValue();
+    });
+  }
 };
 
 template <typename Key, typename Value, typename Storage>
