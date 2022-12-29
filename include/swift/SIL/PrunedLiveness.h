@@ -196,12 +196,10 @@ public:
 
     unsigned size() const { return bits.size() / 2; }
 
-    // FIXME: specialize this for scalar liveness, which is the critical path
-    // for all OSSA utilities.
     IsLive getLiveness(unsigned bitNo) const {
-      SmallVector<IsLive, 1> foundLiveness;
-      getLiveness(bitNo, bitNo + 1, foundLiveness);
-      return foundLiveness[0];
+      if (!bits[bitNo * 2])
+        return IsLive::Dead;
+      return bits[bitNo * 2 + 1] ? LiveOut : LiveWithin;
     }
 
     void getLiveness(unsigned startBitNo, unsigned endBitNo,
@@ -281,9 +279,12 @@ public:
 
   /// Update this liveness result for a single use.
   IsLive updateForUse(SILInstruction *user, unsigned bitNo) {
-    SmallVector<IsLive, 1> resultingLiveness;
-    updateForUse(user, bitNo, bitNo + 1, resultingLiveness);
-    return resultingLiveness[0];
+    auto *block = user->getParent();
+    auto liveness = getBlockLiveness(block, bitNo);
+    if (liveness != Dead)
+      return liveness;
+    computeUseBlockLiveness(block, bitNo, bitNo + 1);
+    return getBlockLiveness(block, bitNo);
   }
 
   /// Update this range of liveness results for a single use.
@@ -292,9 +293,12 @@ public:
                     SmallVectorImpl<IsLive> &resultingLiveness);
 
   IsLive getBlockLiveness(SILBasicBlock *bb, unsigned bitNo) const {
-    SmallVector<IsLive, 1> isLive;
-    getBlockLiveness(bb, bitNo, bitNo + 1, isLive);
-    return isLive[0];
+    auto liveBlockIter = liveBlocks.find(bb);
+    if (liveBlockIter == liveBlocks.end()) {
+      return Dead;
+    }
+
+    return liveBlockIter->second.getLiveness(bitNo);
   }
 
   // FIXME: This API should directly return the live bitset. The live bitset
