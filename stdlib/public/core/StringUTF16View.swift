@@ -138,6 +138,9 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable @inline(__always)
   public var endIndex: Index { return _guts.endIndex }
 
+  @inline(__always)
+  internal var _breadcrumbStride: Int { _StringBreadcrumbs.breadcrumbStride }
+
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
     var idx = _guts.ensureMatchingEncoding(idx)
@@ -201,7 +204,9 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n)
     }
 
-    if n.magnitude <= _StringBreadcrumbs.breadcrumbStride, !_guts.isASCII {
+    let threshold = (
+      i == startIndex ? _breadcrumbStride / 2 : _breadcrumbStride)
+    if n.magnitude < threshold, !_guts.isASCII {
       // Do not use breadcrumbs if directly computing the result is expected to
       // be cheaper.
       return _index(i, offsetBy: n)._knownUTF8
@@ -225,7 +230,9 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
 
-    if n.magnitude <= _StringBreadcrumbs.breadcrumbStride, !_guts.isASCII {
+    let threshold = (
+      _breadcrumbStride + (i == startIndex ? 0 : _breadcrumbStride / 2))
+    if n.magnitude < threshold, !_guts.isASCII {
       // Do not use breadcrumbs if directly computing the result is expected to
       // be cheaper.
       return _index(i, offsetBy: n, limitedBy: limit)?._knownUTF8
@@ -268,10 +275,10 @@ extension String.UTF16View: BidirectionalCollection {
     }
 
     let utf8Distance = end._encodedOffset - start._encodedOffset
-    if
-      utf8Distance.magnitude <= _StringBreadcrumbs.breadcrumbStride,
-      !_guts.isASCII
-    {
+    let threshold = (start == startIndex || end == startIndex
+      ? _breadcrumbStride / 2
+      : _breadcrumbStride)
+    if utf8Distance.magnitude < threshold, !_guts.isASCII {
       // Do not use breadcrumbs if directly computing the result is expected to
       // be cheaper. The conservative threshold above assumes that each UTF-16
       // code unit will map to a single UTF-8 code unit, i.e., the worst
