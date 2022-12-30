@@ -220,7 +220,6 @@ jobs:
         if: ${{ matrix.free_disk_space }}
         run: |
           df -h
-          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev libgcc-10-dev gcc-10 libstdc++-10-dev
           sudo swapoff -a
           sudo rm -f /swapfile
           sudo rm -rf /opt/hostedtoolcache
