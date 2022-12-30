@@ -119,14 +119,6 @@ jobs:
     timeout-minutes: 0
     runs-on: ${{ matrix.agent_query }}
     steps:
-      # TODO(katei): Remove this step after https://bugs.swift.org/browse/SR-15135 will be resolved
-      - name: (Workaround) Uninstall pre-installed Swift toolchain on Linux
-        if: ${{ matrix.build_os == 'ubuntu-20.04' || matrix.build_os == 'ubuntu-18.04' }}
-        run: |
-          # Installer script is here: https://github.com/actions/virtual-environments/blob/1cbea058249db750691ec74f1b3ba9a7b1605d26/images/linux/scripts/installers/swift.sh
-          rm -f /usr/local/bin/swiftc /usr/local/bin/swift
-          rm -rf /usr/share/swift/
-
       - name: Free disk space
         if: ${{ matrix.free_disk_space }}
         run: |
