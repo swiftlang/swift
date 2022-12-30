@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -459,7 +459,7 @@ extension _StringGuts {
 
     while true {
       guard let (scalar2, nextIndex) = nextScalar(index) else { break }
-      if shouldBreak(between: scalar, and: scalar2, at: index, with: &state) {
+      if state.shouldBreak(between: scalar, and: scalar2) {
         break
       }
       index = nextIndex
@@ -505,7 +505,7 @@ extension _StringGuts {
   }
 }
 
-extension _StringGuts {
+extension _GraphemeBreakingState {
   // Return true if there is an extended grapheme cluster boundary between two
   // scalars, based on state information previously collected about preceding
   // scalars.
@@ -517,11 +517,9 @@ extension _StringGuts {
   //
   // This is based on the Unicode Annex #29 for [Grapheme Cluster Boundary
   // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  internal func shouldBreak(
+  internal mutating func shouldBreak(
     between scalar1: Unicode.Scalar,
-    and scalar2: Unicode.Scalar,
-    at index: Int,
-    with state: inout _GraphemeBreakingState
+    and scalar2: Unicode.Scalar
   ) -> Bool {
     // GB3
     if scalar1.value == 0xD, scalar2.value == 0xA {
@@ -545,8 +543,8 @@ extension _StringGuts {
     var enterIndicSequence = false
 
     defer {
-      state.isInEmojiSequence = enterEmojiSequence
-      state.isInIndicSequence = enterIndicSequence
+      self.isInEmojiSequence = enterEmojiSequence
+      self.isInIndicSequence = enterIndicSequence
     }
 
     switch (x, y) {
@@ -591,14 +589,14 @@ extension _StringGuts {
       // continue the grapheme cluster by combining more scalars later. If we're
       // not currently in an emoji sequence, but our lhs scalar is a pictograph,
       // then that's a signal that it's the start of an emoji sequence.
-      if state.isInEmojiSequence || x == .extendedPictographic {
+      if self.isInEmojiSequence || x == .extendedPictographic {
         enterEmojiSequence = true
       }
 
       // If we're currently in an indic sequence (or if our lhs is a linking
       // consonant), then this check and everything underneath ensures that
       // we continue being in one and may check if this extend is a Virama.
-      if state.isInIndicSequence || scalar1._isLinkingConsonant {
+      if self.isInIndicSequence || scalar1._isLinkingConsonant {
         if y == .extend {
           let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
 
@@ -611,7 +609,7 @@ extension _StringGuts {
         enterIndicSequence = true
 
         if scalar2._isVirama {
-          state.hasSeenVirama = true
+          self.hasSeenVirama = true
         }
       }
 
@@ -627,32 +625,34 @@ extension _StringGuts {
 
     // GB11
     case (.zwj, .extendedPictographic):
-      return !state.isInEmojiSequence
+      return !self.isInEmojiSequence
 
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
       defer {
-        state.shouldBreakRI.toggle()
+        self.shouldBreakRI.toggle()
       }
 
-      return state.shouldBreakRI
+      return self.shouldBreakRI
 
     // GB999
     default:
       // GB9c
       if
-        state.isInIndicSequence,
-        state.hasSeenVirama,
+        self.isInIndicSequence,
+        self.hasSeenVirama,
         scalar2._isLinkingConsonant
       {
-        state.hasSeenVirama = false
+        self.hasSeenVirama = false
         return false
       }
 
       return true
     }
   }
+}
 
+extension _StringGuts {
   // Return true if there is an extended grapheme cluster boundary between two
   // scalars, with no previous knowledge about preceding scalars.
   //
