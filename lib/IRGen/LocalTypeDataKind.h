@@ -49,6 +49,7 @@ private:
     FormalTypeMetadata,
     RepresentationTypeMetadata,
     ValueWitnessTable,
+    Shape,
     // <- add more special cases here
 
     // The first enumerator for an individual value witness.
@@ -95,6 +96,11 @@ public:
     return LocalTypeDataKind(ValueWitnessDiscriminatorBase + (unsigned)witness);
   }
   
+  /// A reference to the shape expression of a pack type.
+  static LocalTypeDataKind forPackShapeExpression() {
+    return LocalTypeDataKind(Shape);
+  }
+
   /// A reference to a protocol witness table for an archetype.
   ///
   /// This only works for non-concrete types because in principle we might

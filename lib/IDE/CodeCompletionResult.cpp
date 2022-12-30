@@ -207,6 +207,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::MissingMember:
   case DeclKind::OpaqueType:
   case DeclKind::BuiltinTuple:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
@@ -284,6 +285,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
+  case DeclKind::Macro:
+    return CodeCompletionDeclKind::Macro;
   }
   llvm_unreachable("invalid DeclKind");
 }
@@ -434,6 +437,9 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     case CodeCompletionDeclKind::PrecedenceGroup:
       Prefix.append("[PrecedenceGroup]");
       break;
+    case CodeCompletionDeclKind::Macro:
+      Prefix.append("[Macro]");
+      break;
     }
     break;
   case CodeCompletionResultKind::Keyword:
@@ -449,7 +455,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case CodeCompletionKeywordKind::pound_##X:                                   \
     Prefix.append("[#" #X "]");                                                \
     break;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
     }
     break;
   case CodeCompletionResultKind::Pattern:

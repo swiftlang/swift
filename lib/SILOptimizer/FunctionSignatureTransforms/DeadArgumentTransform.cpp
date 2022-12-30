@@ -35,7 +35,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Analyze the argument information.
   for (unsigned i : indices(Args)) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
-    if (!A.PInfo.hasValue()) {
+    if (!A.PInfo.has_value()) {
       // It is not an argument. It could be an indirect result.
       continue;
     }

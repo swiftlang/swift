@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift -enable-testing
 // RUN: %target-swift-emit-silgen -module-name enum_resilience_testable -I %t -enable-nonfrozen-enum-exhaustivity-diagnostics -swift-version 5 %s | %FileCheck %s
 
-// This is mostly testing the same things as enum_resilienc.swift, just in a
+// This is mostly testing the same things as enum_resilience.swift, just in a
 // context where the user will never be forced to write a default case. It's the
 // same effect as -swift-version 4 and ignoring the exhaustivity warning,
 // though.
@@ -16,7 +16,7 @@
 
 // CHECK-LABEL: sil hidden [ossa] @$s24enum_resilience_testable15resilientSwitchyy0d1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[BOX]]
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:

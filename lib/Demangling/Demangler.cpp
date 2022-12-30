@@ -77,6 +77,7 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
       return true;
@@ -145,6 +146,8 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
       return true;
     default:
       return false;
@@ -825,6 +828,7 @@ recur:
     case 'H':
       switch (char c2 = nextChar()) {
       case 'A': return demangleDependentProtocolConformanceAssociated();
+      case 'a': return createNode(Node::Kind::RuntimeDiscoverableAttributeRecord);
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
@@ -1505,6 +1509,24 @@ NodePointer Demangler::popTuple() {
   return createType(Root);
 }
 
+NodePointer Demangler::popPack() {
+  NodePointer Root = createNode(Node::Kind::Pack);
+
+  if (!popNode(Node::Kind::EmptyList)) {
+    bool firstElem = false;
+    do {
+      firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty)
+        return nullptr;
+      Root->addChild(Ty, *this);
+    } while (!firstElem);
+
+    Root->reverseChildren();
+  }
+  return createType(Root);
+}
+
 NodePointer Demangler::popTypeList() {
   NodePointer Root = createNode(Node::Kind::TypeList);
 
@@ -1729,6 +1751,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::RuntimeAttributeGenerator:
       return false;
     default:
       return true;
@@ -2289,6 +2312,16 @@ NodePointer Demangler::demangleArchetype() {
     addSubstitution(T);
     return T;
   }
+  case 'p': {
+    NodePointer CountTy = popTypeAndGetChild();
+    NodePointer PatternTy = popTypeAndGetChild();
+    NodePointer PackExpansionTy = createType(
+          createWithChildren(Node::Kind::PackExpansion, PatternTy, CountTy));
+    addSubstitution(PackExpansionTy);
+    return PackExpansionTy;
+  }
+  case 'P':
+    return popPack();
   default:
     return nullptr;
   }
@@ -2675,6 +2708,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       switch (nextChar()) {
       case 'b': return createNode(Node::Kind::BackDeploymentThunk);
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
+      case 'S': return createNode(Node::Kind::HasSymbolQuery);
       default:
         return nullptr;
       }
@@ -3497,7 +3531,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     None,
     TypeAndMaybePrivateName,
     TypeAndIndex,
-    Index
+    Index,
+    ContextAndName,
   } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
@@ -3514,6 +3549,11 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
+    case 'a':
+      Args = ContextAndName;
+      Kind = Node::Kind::RuntimeAttributeGenerator;
+      break;
+    case 'm': return demangleEntity(Node::Kind::Macro);
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     case 'P':
       Args = None;
@@ -3526,7 +3566,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     default: return nullptr;
   }
 
-  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr;
+  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr,
+              Context = nullptr, Id = nullptr;
   switch (Args) {
     case None:
       break;
@@ -3541,6 +3582,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       break;
     case Index:
       NameOrIndex = demangleIndexAsNode();
+      break;
+    case ContextAndName:
+      Context = demangleOperator();
+      Id = demangleOperator();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -3558,6 +3603,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case TypeAndIndex:
       Entity = addChild(Entity, NameOrIndex);
       Entity = addChild(Entity, ParamType);
+      break;
+    case ContextAndName:
+      Entity = addChild(Entity, Context);
+      Entity = addChild(Entity, Id);
       break;
   }
   return Entity;
@@ -3661,7 +3710,7 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
   
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, Layout } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, SameShape, Layout } ConstraintKind;
 
   switch (nextChar()) {
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
@@ -3679,6 +3728,7 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'p': ConstraintKind = Protocol; TypeKind = Assoc; break;
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
+    case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
 
@@ -3712,6 +3762,9 @@ NodePointer Demangler::demangleGenericRequirement() {
         popNode(Node::Kind::Type));
   case SameType:
     return createWithChildren(Node::Kind::DependentGenericSameTypeRequirement,
+                              ConstrTy, popNode(Node::Kind::Type));
+  case SameShape:
+    return createWithChildren(Node::Kind::DependentGenericSameShapeRequirement,
                               ConstrTy, popNode(Node::Kind::Type));
   case Layout: {
     auto c = nextChar();

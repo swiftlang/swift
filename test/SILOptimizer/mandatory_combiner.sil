@@ -287,10 +287,10 @@ bb0(%0 : $*A):
  { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %10 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
   %11 = project_box %10 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
-  copy_addr %5 to [initialization] %11 : $*A
+  copy_addr %5 to [init] %11 : $*A
   %13 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
   %14 = project_box %13 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
-  copy_addr %1 to [initialization] %14 : $*A
+  copy_addr %1 to [init] %14 : $*A
   %16 = partial_apply [callee_guaranteed] %9<A>(%10, %13) : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   strong_retain %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
   %19 = metatype $@thick A.Type
@@ -366,10 +366,10 @@ bb0(%0 : $*Proto):
   %7 = function_ref @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
   %8 = alloc_box ${ var Proto }
   %9 = project_box %8 : ${ var Proto }, 0
-  copy_addr %1 to [initialization] %9 : $*Proto
+  copy_addr %1 to [init] %9 : $*Proto
   %11 = alloc_box ${ var Proto }
   %12 = project_box %11 : ${ var Proto }, 0
-  copy_addr %4 to [initialization] %12 : $*Proto
+  copy_addr %4 to [init] %12 : $*Proto
   %14 = partial_apply [callee_guaranteed] %7(%8, %11) : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
   strong_retain %14 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
   %17 = alloc_stack $Proto
@@ -434,7 +434,7 @@ bb0:
   %3 = function_ref @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
   %4 = alloc_box ${ var Proto }
   %5 = project_box %4 : ${ var Proto }, 0
-  copy_addr %0 to [initialization] %5 : $*Proto
+  copy_addr %0 to [init] %5 : $*Proto
   %7 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
   strong_retain %7 : $@callee_guaranteed (MyInt) -> MyInt
   %10 = integer_literal $Builtin.Int64, 5
@@ -464,7 +464,7 @@ bb0:
   %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %7 = alloc_box ${ var Proto }
   %8 = project_box %7 : ${ var Proto }, 0
-  copy_addr %3 to [initialization] %8 : $*Proto
+  copy_addr %3 to [init] %8 : $*Proto
   %10 = partial_apply [callee_guaranteed] %6(%7, %1) : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   strong_retain %10 : $@callee_guaranteed () -> MyInt
   %13 = apply %10() : $@callee_guaranteed () -> MyInt
@@ -492,7 +492,7 @@ bb0:
   %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %7 = alloc_box ${ var Proto }
   %8 = project_box %7 : ${ var Proto }, 0
-  copy_addr %3 to [initialization] %8 : $*Proto
+  copy_addr %3 to [init] %8 : $*Proto
   %10 = partial_apply [callee_guaranteed] %6() : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   strong_retain %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
   %13 = apply %10(%7, %1) : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
@@ -692,10 +692,10 @@ bb0(%0 : $*A):
  { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %10 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
   %11 = project_box %10 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
-  copy_addr %5 to [initialization] %11 : $*A
+  copy_addr %5 to [init] %11 : $*A
   %13 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
   %14 = project_box %13 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
-  copy_addr %1 to [initialization] %14 : $*A
+  copy_addr %1 to [init] %14 : $*A
   %16 = partial_apply [callee_guaranteed] %9<A>(%10, %13) : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %19 = metatype $@thick A.Type
   %20 = alloc_stack $A
@@ -766,10 +766,10 @@ bb0(%0 : $*Proto):
   %7 = function_ref @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
   %8 = alloc_box ${ var Proto }
   %9 = project_box %8 : ${ var Proto }, 0
-  copy_addr %1 to [initialization] %9 : $*Proto
+  copy_addr %1 to [init] %9 : $*Proto
   %11 = alloc_box ${ var Proto }
   %12 = project_box %11 : ${ var Proto }, 0
-  copy_addr %4 to [initialization] %12 : $*Proto
+  copy_addr %4 to [init] %12 : $*Proto
   %14 = partial_apply [callee_guaranteed] %7(%8, %11) : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
   %17 = alloc_stack $Proto
   %19 = apply %2(%17) : $@convention(thin) () -> @out Proto
@@ -830,7 +830,7 @@ bb0:
   %3 = function_ref @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
   %4 = alloc_box ${ var Proto }
   %5 = project_box %4 : ${ var Proto }, 0
-  copy_addr %0 to [initialization] %5 : $*Proto
+  copy_addr %0 to [init] %5 : $*Proto
   %7 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
   %10 = integer_literal $Builtin.Int64, 5
   %11 = struct $MyInt (%10 : $Builtin.Int64)
@@ -858,7 +858,7 @@ bb0:
   %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %7 = alloc_box ${ var Proto }
   %8 = project_box %7 : ${ var Proto }, 0
-  copy_addr %3 to [initialization] %8 : $*Proto
+  copy_addr %3 to [init] %8 : $*Proto
   %10 = partial_apply [callee_guaranteed] %6(%7, %1) : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %13 = apply %10() : $@callee_guaranteed () -> MyInt
   destroy_value %10 : $@callee_guaranteed () -> MyInt
@@ -884,7 +884,7 @@ bb0:
   %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %7 = alloc_box ${ var Proto }
   %8 = project_box %7 : ${ var Proto }, 0
-  copy_addr %3 to [initialization] %8 : $*Proto
+  copy_addr %3 to [init] %8 : $*Proto
   %10 = partial_apply [callee_guaranteed] %6() : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
   %13 = apply %10(%7, %1) : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
   destroy_value %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt

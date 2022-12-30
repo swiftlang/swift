@@ -27,7 +27,7 @@ func throwingFunc() throws -> Bool { return true }
 func PQtoP() {
   // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*any P & Q to $*[[OPENED_TYPE:@opened\(.*, any P & Q\) Self]]
   // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*any P, $[[OPENED_TYPE]]
-  // CHECK: copy_addr [[PQ_PAYLOAD]] to [initialization] [[P_PAYLOAD]]
+  // CHECK: copy_addr [[PQ_PAYLOAD]] to [init] [[P_PAYLOAD]]
   // CHECK: destroy_addr [[PQ]]
   // CHECK-NOT: destroy_addr [[P]]
   // CHECK-NOT: destroy_addr [[P_PAYLOAD]]

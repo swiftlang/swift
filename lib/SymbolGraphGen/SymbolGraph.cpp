@@ -72,9 +72,6 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-  if (StringRef(#SPELLING).startswith("_")) \
-    ExcludeAttrs.insert(std::make_pair("DAK_" #CLASS, DAK_##CLASS));
 #define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
 
@@ -98,6 +95,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   // In "emit modules separately" jobs, access modifiers show up as attributes,
   // but we don't want them to be printed in declarations
   ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
+  ExcludeAttrs.insert(std::make_pair("DAK_SetterAccess", DAK_SetterAccess));
 
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
@@ -267,6 +265,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::SerializedLocal:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
+    case swift::DeclContextKind::MacroDecl:
       break;
   }
 }
@@ -378,7 +377,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto VD = S.getSymbolDecl();
+  const auto VD = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (const auto &InheritanceLoc : NTD->getInherited()) {
       auto Ty = InheritanceLoc.getType();
@@ -391,7 +390,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
         continue;
       }
 
-      recordEdge(Symbol(this, VD, nullptr),
+      recordEdge(Symbol(this, NTD, nullptr),
                  Symbol(this, InheritedTypeDecl, nullptr),
                  RelationshipKind::InheritsFrom());
     }
@@ -413,11 +412,21 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
 
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
-          // protocol.
+          // protocol or the respective extension block.
           if (!Walker.isOurModule(MemberVD->getModuleContext()) && VD->getDeclContext()) {
-            if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+            if (const auto *Extension =
+                    dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
+              if (this->Walker.shouldBeRecordedAsExtension(Extension)) {
+                recordEdge(Symbol(this, VD, nullptr),
+                           Symbol(this, Extension, nullptr),
+                           RelationshipKind::MemberOf());
+                continue;
+              }
+            }
+            if (auto *ExtendedProtocol =
+                    VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
-                         Symbol(this, ExP, nullptr),
+                         Symbol(this, ExtendedProtocol, nullptr),
                          RelationshipKind::MemberOf());
             }
           }

@@ -61,7 +61,7 @@ struct OpaqueValue;
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
@@ -117,7 +117,7 @@ BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 HeapObject* swift_allocEmptyBox();
 
 /// Atomically increments the retain count of an object.
@@ -137,7 +137,6 @@ HeapObject* swift_allocEmptyBox();
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift)
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT

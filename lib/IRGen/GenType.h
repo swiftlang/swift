@@ -168,6 +168,7 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
+  const TypeInfo *convertPackType(PackType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
@@ -319,7 +320,7 @@ SILType getSingletonAggregateFieldType(IRGenModule &IGM,
 /// An IRGenFunction interface for generating type layout verifiers.
 class IRGenTypeVerifierFunction : public IRGenFunction {
 private:
-  llvm::Constant *VerifierFn;
+  FunctionPointer VerifierFn;
 
   struct VerifierArgumentBuffers {
     Address runtimeBuf, staticBuf;

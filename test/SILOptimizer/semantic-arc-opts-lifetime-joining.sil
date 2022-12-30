@@ -173,10 +173,10 @@ bb2:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'donot_join_liveranges_in_same_block_1'
-sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_5 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'join_liveranges_in_same_block_5'
+sil [ossa] @join_liveranges_in_same_block_5 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = copy_value %0 : $Builtin.NativeObject
   br bb1
@@ -792,10 +792,10 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_fail_2'
-sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_8 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_8'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_8 : $@convention(thin) () -> () {
 bb0:
   %obj = alloc_ref $Klass
   cond_br undef, bb1, bb2

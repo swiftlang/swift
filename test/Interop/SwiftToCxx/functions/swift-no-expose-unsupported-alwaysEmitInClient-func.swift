@@ -6,9 +6,7 @@
 
 // CHECK-NOT: SWIFT_EXTERN bool $s9Functions24alwaysEmitIntoClientFuncyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL; // alwaysEmitIntoClientFunc(_:)
 
-// CHECK:       namespace Functions {
-// CHECK-EMPTY:
-// CHECK-EMPTY:
+// CHECK:       namespace Functions __attribute__((swift_private)) {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions

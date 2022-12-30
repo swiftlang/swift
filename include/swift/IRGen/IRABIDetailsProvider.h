@@ -14,9 +14,9 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"

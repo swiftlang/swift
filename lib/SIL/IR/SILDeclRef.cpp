@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -123,16 +124,19 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isDistributed, bool isKnownToBeLocal,
+                       bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), 
       isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
+      isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
       pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
                        bool asDistributed, bool asDistributedKnownToBeLocal)
-    : backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
+    : isRuntimeAccessible(false),
+      backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
       defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -365,6 +369,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
+  case Kind::RuntimeAttributeGenerator:
     // Implicit decls for these don't splice in user-written code.
     return false;
   }
@@ -417,6 +422,13 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Forced-static-dispatch functions are created on-demand and have
     // at best shared linkage.
     if (fn->hasForcedStaticDispatch())
+      return Limit::OnDemand;
+  }
+  
+  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+    // The destructor of a class implemented with @_objcImplementation is only
+    // ever called by its ObjC thunk, so it should not be public.
+    if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
       return Limit::OnDemand;
   }
 
@@ -499,6 +511,9 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // class from which they come, and never get seen externally.
     return Limit::NeverPublic;
 
+  case Kind::RuntimeAttributeGenerator:
+    return Limit::NeverPublic;
+
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
@@ -564,7 +579,8 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // Stored property initializers have linkage based on the access level of
   // their nominal.
   if (isStoredPropertyInitializer())
-    decl = cast<NominalTypeDecl>(decl->getDeclContext());
+    decl = cast<NominalTypeDecl>(
+               decl->getDeclContext()->getImplementedObjCContext());
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
@@ -656,6 +672,16 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   SILDeclRef result;
   result.loc = file;
   result.kind = Kind::EntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getRuntimeAttributeGenerator(CustomAttr *attr,
+                                                    ValueDecl *decl) {
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::RuntimeAttributeGenerator;
+  result.isRuntimeAccessible = true;
+  result.pointer = attr;
   return result;
 }
 
@@ -790,7 +816,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
@@ -996,6 +1022,11 @@ bool SILDeclRef::isBackDeploymentThunk() const {
   return kind == Kind::Func;
 }
 
+bool SILDeclRef::isRuntimeAccessibleFunction() const {
+  return isRuntimeAccessible &&
+         (kind == Kind::Func || kind == Kind::RuntimeAttributeGenerator);
+}
+
 /// Use the Clang importer to mangle a Clang declaration.
 static void mangleClangDecl(raw_ostream &buffer,
                             const clang::NamedDecl *clangDecl,
@@ -1023,7 +1054,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all.
+  // As a special case, Clang functions and globals don't get mangled at all
+  // - except \c objc_direct decls.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
@@ -1041,7 +1073,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           }
           return namedClangDecl->getName().str();
         } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-          if (objcDecl->isDirectMethod()) {
+          if (objcDecl->isDirectMethod() && isForeign) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
             clang::ASTContext &ctx = clangDecl->getASTContext();
@@ -1171,6 +1203,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
   }
+
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    return mangler.mangleRuntimeAttributeGeneratorEntity(
+        loc.get<ValueDecl *>(), pointer.get<CustomAttr *>(), SKind);
   }
 
   llvm_unreachable("bad entity kind!");
@@ -1224,11 +1260,7 @@ bool SILDeclRef::requiresNewVTableEntry() const {
 }
 
 bool SILDeclRef::requiresNewWitnessTableEntry() const {
-  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-}
-
-bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
-  return func->getOverriddenDecls().empty();
+  return cast<AbstractFunctionDecl>(getDecl())->requiresNewWitnessTableEntry();
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
@@ -1497,6 +1529,45 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
+Expr *SILDeclRef::getInitializationExpr() const {
+  switch (kind) {
+  case Kind::StoredPropertyInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto *pbd = var->getParentPatternBinding();
+    unsigned idx = pbd->getPatternEntryIndexForVarDecl(var);
+    auto *init = pbd->getInit(idx);
+    assert(!pbd->isInitializerSubsumed(idx));
+
+    // If this is the backing storage for a property with an attached wrapper
+    // that was initialized with `=`, use that expression as the initializer.
+    if (auto originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
+        auto wrapperInfo =
+            originalProperty->getPropertyWrapperInitializerInfo();
+        auto *placeholder = wrapperInfo.getWrappedValuePlaceholder();
+        init = placeholder->getOriginalWrappedValue();
+        assert(init);
+      }
+    }
+    return init;
+  }
+  case Kind::PropertyWrapperBackingInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromWrappedValue());
+    return wrapperInfo.getInitFromWrappedValue();
+  }
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromProjectedValue());
+    return wrapperInfo.getInitFromProjectedValue();
+  }
+  default:
+    return nullptr;
+  }
+}
+
 unsigned SILDeclRef::getParameterListCount() const {
   // Only decls can introduce currying.
   if (!hasDecl())
@@ -1504,7 +1575,7 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   // Always uncurried even if the underlying function is curried.
   if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
-      kind == Kind::AsyncEntryPoint)
+      kind == Kind::AsyncEntryPoint || kind == Kind::RuntimeAttributeGenerator)
     return 1;
 
   auto *vd = getDecl();

@@ -31,6 +31,51 @@ class SILFunction;
 class SILArgument;
 class SILPrintContext;
 
+/// Instruction iterator which allows to "delete" instructions while iterating
+/// over the instruction list.
+///
+/// Iteration with this iterator allows to delete the current, the next or any
+/// instruction in the list while iterating.
+/// This works because instruction deletion is deferred (for details see
+/// `SILModule::scheduledForDeletion`) and removing an instruction from the list
+/// keeps the prev/next pointers (see `SILInstructionListBase`).
+template <typename IteratorBase>
+class DeletableInstructionsIterator {
+  using Self = DeletableInstructionsIterator<IteratorBase>;
+
+  IteratorBase base;
+  IteratorBase end;
+
+public:
+  using value_type = typename IteratorBase::value_type;
+  using difference_type = ptrdiff_t;
+  using pointer = value_type *;
+  using iterator_category = std::forward_iterator_tag;
+
+  DeletableInstructionsIterator(IteratorBase base, IteratorBase end)
+  : base(base), end(end) {}
+
+  value_type &operator*() const { return *base; }
+
+  SILInstruction *operator->() const { return base.operator->(); }
+
+  Self &operator++() {
+    // If the current instruction is "deleted" (which means: removed from the
+    // list), it's prev/next pointers still point to the next instruction which
+    // is still in the list - or "deleted", too.
+    ++base;
+    // Skip over all deleted instructions. Eventually we reach an instruction
+    // is still in the list (= not "deleted") or the end iterator.
+    while (base != end && base->isDeleted()) {
+      ++base;
+    }
+    return *this;
+  }
+
+  bool operator==(const Self &rhs) const { return base == rhs.base; }
+  bool operator!=(const Self &rhs) const { return !(*this == rhs); }
+};
+
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock>,
 public SwiftObjectHeader {
@@ -85,7 +130,7 @@ private:
   ///    DD and EEE are uninitialized
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  uint64_t lastInitializedBitfieldID = 0;
+  int64_t lastInitializedBitfieldID = 0;
 
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
@@ -148,9 +193,10 @@ public:
 
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
-  void remove(SILInstruction *I);
   void erase(SILInstruction *I);
   void erase(SILInstruction *I, SILModule &module);
+  static void moveInstruction(SILInstruction *inst, SILInstruction *beforeInst);
+  void moveInstructionToFront(SILInstruction *inst);
 
   void eraseAllInstructions(SILModule &module);
 
@@ -182,6 +228,20 @@ public:
   reverse_iterator rend() { return InstList.rend(); }
   const_reverse_iterator rbegin() const { return InstList.rbegin(); }
   const_reverse_iterator rend() const { return InstList.rend(); }
+
+  /// Allows deleting instructions while iterating over all instructions of the
+  /// block.
+  ///
+  /// For details see `DeletableInstructionsIterator`.
+  llvm::iterator_range<DeletableInstructionsIterator<iterator>>
+  deletableInstructions() { return {{begin(), end()}, {end(), end()}}; }
+
+  /// Allows deleting instructions while iterating over all instructions of the
+  /// block in reverse order.
+  ///
+  /// For details see `DeletableInstructionsIterator`.
+  llvm::iterator_range<DeletableInstructionsIterator<reverse_iterator>>
+  reverseDeletableInstructions() { return {{rbegin(), rend()}, {rend(), rend()}}; }
 
   TermInst *getTerminator() {
     assert(!InstList.empty() && "Can't get successors for malformed block");
@@ -308,7 +368,7 @@ public:
                                     const ValueDecl *D = nullptr);
 
   /// Remove all block arguments.
-  void dropAllArguments() { ArgumentList.clear(); }
+  void dropAllArguments();
 
   //===--------------------------------------------------------------------===//
   // Successors
@@ -440,7 +500,7 @@ public:
   /// Whether the block has any phi arguments.
   ///
   /// Note that a block could have an argument and still return false.  The
-  /// argument must also satisfy SILPhiArgument::isPhiArgument.
+  /// argument must also satisfy SILPhiArgument::isPhi.
   bool hasPhi() const;
 
   //===--------------------------------------------------------------------===//
@@ -541,6 +601,8 @@ struct PhiOperand {
 
   PhiOperand() = default;
 
+  // This if \p operand is a CondBrInst operand, then this constructs and
+  // invalid PhiOperand. The abstraction only works for non-trivial OSSA values.
   PhiOperand(Operand *operand) {
     auto *branch = dyn_cast<BranchInst>(operand->getUser());
     if (!branch)
@@ -567,8 +629,8 @@ struct PhiOperand {
   }
 
   SILPhiArgument *getValue() const {
-    auto *branch = cast<BranchInst>(predBlock->getTerminator());
-    return cast<SILPhiArgument>(branch->getDestBB()->getArgument(argIndex));
+    return
+      cast<SILPhiArgument>(getBranch()->getDestBB()->getArgument(argIndex));
   }
 
   SILValue getSource() const {
@@ -591,12 +653,10 @@ struct PhiValue {
   PhiValue() = default;
 
   PhiValue(SILValue value) {
-    auto *blockArg = dyn_cast<SILPhiArgument>(value);
-    if (!blockArg || !blockArg->isPhi())
-      return;
-
-    phiBlock = blockArg->getParent();
-    argIndex = blockArg->getIndex();
+    if (auto *blockArg = SILArgument::asPhi(value)) {
+      phiBlock = blockArg->getParent();
+      argIndex = blockArg->getIndex();
+    }
   }
 
   explicit operator bool() const { return phiBlock != nullptr; }
@@ -612,8 +672,12 @@ struct PhiValue {
   }
 
   Operand *getOperand(SILBasicBlock *predecessor) {
-    auto *branch = cast<BranchInst>(predecessor->getTerminator());
-    return &branch->getAllOperands()[argIndex];
+    auto *term = predecessor->getTerminator();
+    if (auto *branch = dyn_cast<BranchInst>(term)) {
+      return &branch->getAllOperands()[argIndex];
+    }
+    // TODO: Support CondBr for legacy reasons
+    return cast<CondBranchInst>(term)->getOperandForDestBB(phiBlock, argIndex);
   }
 
   operator SILValue() const { return getValue(); }

@@ -22,6 +22,8 @@
 // Currently, constant static arrays only work on Darwin platforms.
 // REQUIRES: VENDOR=apple
 
+// REQUIRES: rdar101126543
+
 public struct Str {
   public static let staticVariable = [ 200, 201, 202 ]
 }

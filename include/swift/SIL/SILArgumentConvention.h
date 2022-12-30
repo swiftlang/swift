@@ -25,7 +25,6 @@ namespace swift {
 struct SILArgumentConvention {
   enum ConventionType : uint8_t {
     Indirect_In,
-    Indirect_In_Constant,
     Indirect_In_Guaranteed,
     Indirect_Inout,
     Indirect_InoutAliasable,
@@ -42,9 +41,6 @@ struct SILArgumentConvention {
     switch (Conv) {
     case ParameterConvention::Indirect_In:
       Value = SILArgumentConvention::Indirect_In;
-      return;
-    case ParameterConvention::Indirect_In_Constant:
-      Value = SILArgumentConvention::Indirect_In_Constant;
       return;
     case ParameterConvention::Indirect_Inout:
       Value = SILArgumentConvention::Indirect_Inout;
@@ -81,7 +77,6 @@ struct SILArgumentConvention {
         return true;
       case SILArgumentConvention::Indirect_In_Guaranteed:
       case SILArgumentConvention::Indirect_In:
-      case SILArgumentConvention::Indirect_In_Constant:
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Direct_Unowned:
       case SILArgumentConvention::Direct_Owned:
@@ -99,7 +94,6 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
@@ -115,7 +109,6 @@ struct SILArgumentConvention {
       return true;
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
@@ -129,7 +122,6 @@ struct SILArgumentConvention {
   bool isExclusiveIndirectParameter() {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:

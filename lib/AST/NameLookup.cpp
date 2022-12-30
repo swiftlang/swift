@@ -1192,10 +1192,6 @@ void LazyConformanceLoader::anchor() {}
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
-  /// The last extension that was included within the member lookup table's
-  /// results.
-  ExtensionDecl *LastExtensionIncluded = nullptr;
-
   /// The type of the internal lookup table.
   typedef llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     LookupTable;
@@ -1211,9 +1207,6 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
-
-  /// Update a lookup table with members from newly-added extensions.
-  void updateLookupTable(NominalTypeDecl *nominal);
 
   /// Add the given member to the lookup table.
   void addMember(Decl *members);
@@ -1250,12 +1243,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &os) const {
-    os << "LastExtensionIncluded:\n";
-    if (LastExtensionIncluded)
-      LastExtensionIncluded->printContext(os, 2);
-    else
-      os << "  nullptr\n";
-
     os << "Lookup:\n  ";
     for (auto &pair : Lookup) {
       pair.getFirst().print(os);
@@ -1357,30 +1344,18 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
-void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
-  // If the last extension we included is the same as the last known extension,
-  // we're already up-to-date.
-  if (LastExtensionIncluded == nominal->LastExtension)
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
+  if (!LookupTable.getInt())
     return;
 
-  // Add members from each of the extensions that we have not yet visited.
-  for (auto next = LastExtensionIncluded
-                     ? LastExtensionIncluded->NextExtension.getPointer()
-                     : nominal->FirstExtension;
-       next;
-       (LastExtensionIncluded = next,next = next->NextExtension.getPointer())) {
-    addMembers(next->getMembers());
-  }
-}
-
-void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
-  if (!LookupTable) return;
+  auto *table = LookupTable.getPointer();
+  assert(table);
 
   if (ext->hasLazyMembers()) {
-    LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
-    LookupTable->clearLazilyCompleteCache();
+    table->addMembers(ext->getCurrentMembersWithoutLoading());
+    table->clearLazilyCompleteCache();
   } else {
-    LookupTable->addMembers(ext->getMembers());
+    table->addMembers(ext->getMembers());
   }
 }
 
@@ -1388,11 +1363,13 @@ void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it. If not, we'll pick up
   // this member when we first create the table.
   auto *vd = dyn_cast<ValueDecl>(member);
-  auto *lookup = LookupTable;
-  if (!vd || !lookup)
+  if (!vd || !LookupTable.getInt())
     return;
 
-  lookup->addMember(vd);
+  auto *table = LookupTable.getPointer();
+  assert(table);
+
+  table->addMember(vd);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
@@ -1406,9 +1383,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 }
 
 void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
-  prepareLookupTable();
-
-  LookupTable->addMember(member);
+  getLookupTable()->addMember(member);
 }
 
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
@@ -1506,37 +1481,52 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   }
 }
 
-void NominalTypeDecl::prepareLookupTable() {
-  // If we have already allocated the lookup table, then there's nothing further
-  // to do.
-  if (LookupTable) {
-    return;
+MemberLookupTable *NominalTypeDecl::getLookupTable() {
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
-  // Otherwise start the first fill.
-  auto &ctx = getASTContext();
-  LookupTable = new (ctx) MemberLookupTable(ctx);
-
-  if (hasLazyMembers()) {
-    assert(!hasUnparsedMembers());
-    LookupTable->addMembers(getCurrentMembersWithoutLoading());
-  } else {
-    LookupTable->addMembers(getMembers());
-  }
+  return LookupTable.getPointer();
 }
 
-void NominalTypeDecl::addLoadedExtensions() {
+void NominalTypeDecl::prepareLookupTable() {
+  // If we have already prepared the lookup table, then there's nothing further
+  // to do.
+  if (LookupTable.getInt())
+    return;
+
+  auto *table = getLookupTable();
+
+  // Otherwise start the first fill.
+  if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+    table->addMembers(getCurrentMembersWithoutLoading());
+  } else {
+    table->addMembers(getMembers());
+  }
+
+  // Note: this calls prepareExtensions()
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
+    //
+    // FIXME: This should be 'e->hasLazyMembers()' but that crashes` because
+    // some imported extensions don't have a Clang node, and only support
+    // LazyMemberLoader::loadAllMembers() and not
+    // LazyMemberLoader::loadNamedMembers().
     if (e->wasDeserialized() || e->hasClangNode()) {
-      LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
+      table->addMembers(e->getCurrentMembersWithoutLoading());
       continue;
     }
 
     // Else, load all the members into the table.
-    LookupTable->addMembers(e->getMembers());
+    table->addMembers(e->getMembers());
   }
+
+  // Any extensions added after this point will add their members to the
+  // lookup table.
+  LookupTable.setInt(true);
 }
 
 static TinyPtrVector<ValueDecl *>
@@ -1592,12 +1582,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
-  // properly invalidate the lazily-complete cache for any extensions brought in
-  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->addLoadedExtensions();
+  // Call prepareExtensions() to ensure we properly invalidate the
+  // lazily-complete cache for any extensions brought in by modules
+  // loaded after-the-fact. This can happen with the LLDB REPL.
+  decl->prepareExtensions();
 
-  auto &Table = *decl->LookupTable;
+  auto &Table = *decl->getLookupTable();
   if (!useNamedLazyMemberLoading) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
@@ -1606,7 +1596,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     for (auto E : decl->getExtensions())
       (void)E->getMembers();
 
-    Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     DeclBaseName baseName(name.getBaseName());
 
@@ -1701,11 +1690,24 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
+static bool inObjCImplExtension(AbstractFunctionDecl *newDecl) {
+  if (auto ext = dyn_cast<ExtensionDecl>(newDecl->getDeclContext()))
+    return ext->isObjCImplementation();
+  return false;
+}
+
 /// If there is an apparent conflict between \p newDecl and one of the methods
 /// in \p vec, should we diagnose it?
 static bool
 shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  // Conflicts between member implementations and their interfaces, or
+  // inherited inits and their overrides in @_objcImpl extensions, are spurious.
+  if (newDecl->isObjCMemberImplementation()
+      || (isa<ConstructorDecl>(newDecl) && inObjCImplExtension(newDecl)
+          && newDecl->getAttrs().hasAttribute<OverrideAttr>()))
+    return false;
+
   // Are all conflicting methods imported from ObjC and in our ObjC half or a
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
@@ -2137,11 +2139,6 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  // Avoid calling `clang::ObjCMethodDecl::isDirectMethod()`.
-  return decls;
-#endif
-
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
     return decls;
@@ -2287,7 +2284,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
     }
 
     // Make sure we didn't miss some interesting kind of type declaration.
-    assert(isa<AbstractTypeParamDecl>(typeDecl));
+    assert(isa<GenericTypeParamDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl));
   }
 
   return nominalDecls;
@@ -2518,6 +2516,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
+  case TypeReprKind::PackReference: {
+    auto packReferenceRepr = cast<PackReferenceTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packReferenceRepr->getPackType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
@@ -2709,6 +2714,20 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(result);
 }
 
+ArrayRef<ValueDecl *>
+ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  SmallVector<ValueDecl *, 4> requirements;
+
+  for (auto *member : PD->getABIMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (VD && VD->isProtocolRequirement())
+      requirements.push_back(VD);
+  }
+
+  return PD->getASTContext().AllocateCopy(requirements);
+}
+
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
@@ -2870,11 +2889,9 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     for (auto repr : typeReprs) {
    
       // Allocate a new generic parameter to represent this opaque type.
-      auto gp = GenericTypeParamDecl::create(
-          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
-          GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-          repr);
-      gp->setImplicit();
+      auto *gp = GenericTypeParamDecl::createImplicit(
+          dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
+          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr);
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
@@ -2902,10 +2919,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto &ctx = value->getASTContext();
 
     // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
-    auto *genericParam = GenericTypeParamDecl::create(
-        tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
-        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
-        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+    auto *genericParam = GenericTypeParamDecl::createImplicit(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, /*depth*/ 0, /*index*/ 0,
+        /*isParameterPack*/ true);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
                                     SourceLoc());
@@ -2945,10 +2961,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = GenericTypeParamDecl::create(
-        proto, selfId, SourceLoc(), /*type sequence=*/false,
-        /*depth=*/0, /*index=*/0, /*opaque type=*/false,
-        /*opaque type repr=*/nullptr);
+    auto selfDecl = GenericTypeParamDecl::createImplicit(
+        proto, selfId, /*depth*/ 0, /*index*/ 0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
@@ -2959,6 +2973,20 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                            SourceLoc());
     return result;
+  }
+
+  // AccessorDecl generic parameter list is the same of its storage
+  // context.
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    auto *GC = AD->getStorage()->getAsGenericContext();
+    if (!GC)
+      return nullptr;
+
+    auto *GP = GC->getGenericParams();
+    if (!GP)
+      return nullptr;
+
+    return GP->clone(AD->getDeclContext());
   }
 
   auto parsedGenericParams = value->getParsedGenericParams();
@@ -3293,8 +3321,13 @@ void FindLocalVal::checkGenericParams(GenericParamList *Params) {
   if (!Params)
     return;
 
-  for (auto P : *Params)
+  for (auto P : *Params) {
+    if (P->isOpaqueType()) {
+      // Generic param for 'some' parameter type is not "visible".
+      continue;
+    }
     checkValueDecl(P, DeclVisibilityKind::GenericParameter);
+  }
 }
 
 void FindLocalVal::checkSourceFile(const SourceFile &SF) {

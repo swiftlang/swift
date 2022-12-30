@@ -466,6 +466,7 @@ private:
 
       clangFuncPrinter.printCustomCxxFunction(
           {paramType},
+          /*NeedsReturnTypes=*/true,
           [&](auto &types) {
             // Printing function name and return type
             os << "  inline " << types[paramType] << " get" << name;
@@ -535,13 +536,13 @@ private:
               outOfLineOS << "    });\n  ";
             }
           },
-          ED->getModuleContext(), outOfLineOS);
+          ED, ED->getModuleContext(), outOfLineOS);
     };
 
     auto printStruct = [&](StringRef caseName, EnumElementDecl *elementDecl,
                            Optional<IRABIDetailsProvider::EnumElementInfo>
                                elementInfo) {
-      os << "  inline const static struct {  "
+      os << "  inline const static struct _impl_" << caseName << " {  "
          << "// impl struct for case " << caseName << '\n';
       os << "    inline constexpr operator cases() const {\n";
       os << "      return cases::";
@@ -550,19 +551,15 @@ private:
       os << "    }\n";
 
       if (elementDecl != nullptr) {
-        assert(elementInfo.hasValue());
+        assert(elementInfo.has_value());
 
-        Type paramType, objectType;
-        NominalTypeDecl *objectTypeDecl = nullptr;
-        OptionalTypeKind optKind;
+        Type paramType;
 
         // TODO: support tuple type
         if (elementDecl->hasAssociatedValues() &&
             elementDecl->getParameterList()->size() == 1) {
-          paramType = elementDecl->getParameterList()->front()->getType();
-          std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-              paramType->getNominalOrBoundGenericNominal(), paramType);
-          objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+          paramType =
+              elementDecl->getParameterList()->front()->getInterfaceType();
         }
 
         SmallVector<Type> neededTypes;
@@ -570,49 +567,98 @@ private:
           neededTypes.push_back(paramType);
         }
 
-        // FIXME: support generic constructor.
-        if (!ED->isGeneric())
-          clangFuncPrinter.printCustomCxxFunction(
-              neededTypes,
-              [&](auto &types) {
-                // Printing function name and return type
-                os << "    inline ";
-                syntaxPrinter.printBaseName(elementDecl->getParentEnum());
-                os << " operator()";
+        clangFuncPrinter.printCustomCxxFunction(
+            neededTypes,
+            /*NeedsReturnTypes=*/false,
+            [&](auto &types) {
+              const auto *ED = elementDecl->getParentEnum();
+              // Printing function name and return type
+              os << "    inline ";
+              syntaxPrinter.printNominalTypeReference(ED,
+                                                      ED->getModuleContext());
+              os << " operator()";
 
-                outOfLineOS << "  inline ";
-                outOfLineSyntaxPrinter.printBaseName(
-                    elementDecl->getParentEnum());
-                outOfLineOS << ' ';
-                outOfLineSyntaxPrinter.printBaseName(
-                    elementDecl->getParentEnum());
-                outOfLineOS << "::_impl_" << elementDecl->getNameStr()
-                            << "::operator()";
-              },
-              [&](auto &types) {
-                // Printing parameters
-                if (!paramType) {
-                  return;
-                }
-                assert(objectTypeDecl != nullptr);
-                if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                        objectTypeDecl)) {
-                  os << types[paramType] << " val";
-                  outOfLineOS << types[paramType] << " val";
+              outOfLineSyntaxPrinter
+                  .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
+              outOfLineOS << "  inline ";
+              outOfLineSyntaxPrinter.printNominalTypeReference(
+                  ED, ED->getModuleContext());
+              outOfLineOS << ' ';
+              outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                  ED, /*moduleContext=*/ED->getModuleContext());
+              outOfLineOS << "_impl_" << caseName << "::operator()";
+            },
+            [&](auto &types) {
+              // Printing parameters
+              if (!paramType) {
+                return;
+              }
+              os << types[paramType] << " val";
+              outOfLineOS << types[paramType] << " val";
+            },
+            true,
+            [&](auto &types) {
+              auto *ED = elementDecl->getParentEnum();
+              // Printing function body
+              outOfLineOS << "    auto result = ";
+              outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                  ED, ED->getModuleContext());
+              outOfLineOS << "_make();\n";
+              if (paramType) {
+                if (paramType->getAs<GenericTypeParamType>()) {
+                  auto type = types[paramType];
+                  ClangSyntaxPrinter(outOfLineOS)
+                      .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+                        // FIXME: handle C++ types.
+                        outOfLineOS << "if constexpr (std::is_base_of<::swift::"
+                                    << cxx_synthesis::getCxxImplNamespaceName()
+                                    << "::RefCountedClass, " << type
+                                    << ">::value) {\n";
+                        outOfLineOS << "    void *ptr = ::swift::"
+                                    << cxx_synthesis::getCxxImplNamespaceName()
+                                    << "::_impl_RefCountedClass::"
+                                       "copyOpaquePointer(val);\n";
+                        outOfLineOS
+                            << "    memcpy(result._getOpaquePointer(), &ptr, "
+                               "sizeof(ptr));\n";
+                        outOfLineOS << "} else if constexpr (::swift::"
+                                    << cxx_synthesis::getCxxImplNamespaceName()
+                                    << "::isValueType<" << type << ">) {\n";
+
+                        outOfLineOS << "    alignas(" << type;
+                        outOfLineOS << ") unsigned char buffer[sizeof(" << type;
+                        outOfLineOS << ")];\n";
+                        outOfLineOS << "    auto *valCopy = new(buffer) "
+                                    << type;
+                        outOfLineOS << "(val);\n";
+                        outOfLineOS << "    ";
+                        outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                    << "::";
+                        outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                        outOfLineOS << "::implClassFor<" << type;
+                        outOfLineOS << ">::type::initializeWithTake(result._"
+                                       "getOpaquePointer(), ";
+                        outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                    << "::";
+                        outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                        outOfLineOS << "::implClassFor<" << type;
+                        outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
+                        outOfLineOS << ");\n";
+                        outOfLineOS << "} else {\n";
+                        outOfLineOS
+                            << "    memcpy(result._getOpaquePointer(), &val, "
+                               "sizeof(val));\n";
+                        outOfLineOS << "}\n";
+                      });
                 } else {
-                  os << "const " << types[paramType] << " &val";
-                  outOfLineOS << "const " << types[paramType] << " &val";
-                }
-              },
-              true,
-              [&](auto &types) {
-                // Printing function body
-                outOfLineOS << "    auto result = ";
-                outOfLineSyntaxPrinter.printBaseName(
-                    elementDecl->getParentEnum());
-                outOfLineOS << "::_make();\n";
 
-                if (paramType) {
+                  OptionalTypeKind optKind;
+                  Type objectType;
+                  std::tie(objectType, optKind) =
+                      DeclAndTypePrinter::getObjectTypeAndOptionality(
+                          ED, paramType);
+                  auto objectTypeDecl =
+                      objectType->getNominalOrBoundGenericNominal();
                   assert(objectTypeDecl != nullptr);
 
                   if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
@@ -621,6 +667,8 @@ private:
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
                   } else {
+                    objectTypeDecl =
+                        paramType->getNominalOrBoundGenericNominal();
                     outOfLineOS << "    alignas(";
                     outOfLineSyntaxPrinter
                         .printModuleNamespaceQualifiersIfNeeded(
@@ -666,19 +714,20 @@ private:
                     outOfLineOS << ");\n";
                   }
                 }
+              }
 
-                outOfLineOS << "    result._destructiveInjectEnumTag(";
-                if (ED->isResilient()) {
-                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
-                              << "::" << elementInfo->globalVariableName;
-                } else {
-                  outOfLineOS << elementInfo->tag;
-                }
-                outOfLineOS << ");\n";
-                outOfLineOS << "    return result;\n";
-                outOfLineOS << "  ";
-              },
-              ED->getModuleContext(), outOfLineOS);
+              outOfLineOS << "    result._destructiveInjectEnumTag(";
+              if (ED->isResilient()) {
+                outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
+                            << "::" << elementInfo->globalVariableName;
+              } else {
+                outOfLineOS << elementInfo->tag;
+              }
+              outOfLineOS << ");\n";
+              outOfLineOS << "    return result;\n";
+              outOfLineOS << "  ";
+            },
+            ED, ED->getModuleContext(), outOfLineOS);
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
@@ -902,8 +951,6 @@ private:
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
                                      const SubscriptDecl *SD = nullptr) {
-    printDocumentationComment(AFD);
-
     Optional<ForeignAsyncConvention> asyncConvention =
         AFD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention =
@@ -930,6 +977,7 @@ private:
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
+      printDocumentationComment(AFD);
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
@@ -978,6 +1026,7 @@ private:
       // FIXME: availability
       return;
     }
+    printDocumentationComment(AFD);
 
     if (isClassMethod)
       os << "+ (";
@@ -1379,8 +1428,8 @@ private:
     os << " {\n";
     funcPrinter.printCxxThunkBody(
         FD, funcABI.getSignature(), funcABI.getSymbolName(),
-        FD->getModuleContext(), resultTy, FD->getParameters(),
-        funcTy->isThrowing(), funcTy);
+        /*typeDeclContext=*/nullptr, FD->getModuleContext(), resultTy,
+        FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
@@ -1447,8 +1496,8 @@ private:
       }
 
       // Availability for a specific platform
-      if (!AvAttr->Introduced.hasValue() && !AvAttr->Deprecated.hasValue() &&
-          !AvAttr->Obsoleted.hasValue() &&
+      if (!AvAttr->Introduced.has_value() && !AvAttr->Deprecated.has_value() &&
+          !AvAttr->Obsoleted.has_value() &&
           !AvAttr->isUnconditionallyDeprecated() &&
           !AvAttr->isUnconditionallyUnavailable()) {
         continue;
@@ -1501,22 +1550,22 @@ private:
       if (AvAttr->isUnconditionallyUnavailable()) {
         os << ",unavailable";
       } else {
-        if (AvAttr->Introduced.hasValue()) {
-          os << ",introduced=" << AvAttr->Introduced.getValue().getAsString();
+        if (AvAttr->Introduced.has_value()) {
+          os << ",introduced=" << AvAttr->Introduced.value().getAsString();
         }
-        if (AvAttr->Deprecated.hasValue()) {
-          os << ",deprecated=" << AvAttr->Deprecated.getValue().getAsString();
+        if (AvAttr->Deprecated.has_value()) {
+          os << ",deprecated=" << AvAttr->Deprecated.value().getAsString();
         } else if (AvAttr->isUnconditionallyDeprecated()) {
           // We need to specify some version, we can't just say deprecated.
           // We also can't deprecate it before it's introduced.
-          if (AvAttr->Introduced.hasValue()) {
-            os << ",deprecated=" << AvAttr->Introduced.getValue().getAsString();
+          if (AvAttr->Introduced.has_value()) {
+            os << ",deprecated=" << AvAttr->Introduced.value().getAsString();
           } else {
             os << ",deprecated=0.0.1";
           }
         }
-        if (AvAttr->Obsoleted.hasValue()) {
-          os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
+        if (AvAttr->Obsoleted.has_value()) {
+          os << ",obsoleted=" << AvAttr->Obsoleted.value().getAsString();
         }
       }
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
@@ -1588,13 +1637,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // Don't expose async functions or @_alwaysEmitIntoClient functions
-      // because they're currently unsupported
-      if (FD->hasAsync() ||
-          FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
-        return;
-      }
-
       // FIXME: Support static methods.
       if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
         return;
@@ -2566,6 +2608,15 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
+static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
+  auto ctx = VD->getDeclContext();
+  return VD->hasName() && VD->getName().isSimpleName() &&
+         VD->getBaseIdentifier().str() == Typename &&
+         isa<ExtensionDecl>(ctx->getAsDecl()) &&
+         cast<ExtensionDecl>(ctx->getAsDecl())->getExtendedNominal() ==
+             VD->getASTContext().getStringDecl();
+}
+
 static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl() && !isExtension)
@@ -2573,6 +2624,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
     if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
+      return true;
+    if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))
       return true;
     return false;
   }
@@ -2601,6 +2654,33 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
               .contains_insensitive("index"))
         return false;
     }
+    if (ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) {
+      if (isa<ValueDecl>(VD) &&
+          !cast<ValueDecl>(VD)->getName().getBaseName().isSpecial() &&
+          cast<ValueDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("utf8"))
+        return true;
+    }
+    if (isStringNestedType(ED->getExtendedNominal(), "UTF8View")) {
+      // Do not expose ambiguous 'index(after:' / 'index(before:' overloads.
+      if (isa<AbstractFunctionDecl>(VD) &&
+          cast<AbstractFunctionDecl>(VD)->getParameters()->size() == 1 &&
+          !cast<AbstractFunctionDecl>(VD)
+               ->getName()
+               .getBaseName()
+               .isSpecial() &&
+          cast<AbstractFunctionDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("index"))
+        return false;
+    }
     return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
   }
   return false;
@@ -2609,7 +2689,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
-              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
+              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
+                    cxx_translation::isExposableToCxx(VD)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
          !isAsyncAlternativeOfOtherDecl(VD);

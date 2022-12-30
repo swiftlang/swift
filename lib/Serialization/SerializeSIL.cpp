@@ -488,9 +488,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
+  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
+                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
       numAttrs++;
     });
@@ -515,12 +518,13 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
+      (unsigned)F.isRuntimeAccessible(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
 
       llvm::SmallString<64> buffer;
@@ -529,10 +533,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
       IdentifierID effectsStrID = S.addUniquedStringRef(OS.str());
       unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
+      bool isGlobalSideEffects = (argumentIndex < 0);
+      unsigned argIdx = (isGlobalSideEffects ? 0 : (unsigned)argumentIndex);
 
       SILArgEffectsAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode,
-          effectsStrID, (unsigned)argumentIndex, (unsigned)isDerived);
+          Out, ScratchRecord, abbrCode, effectsStrID,
+          argIdx, (unsigned)isGlobalSideEffects, (unsigned)isDerived);
     });
 
   if (NoBody)
@@ -641,6 +647,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
+      packedMetadata |= unsigned(SFA->isClosureCapture()) << 19;      // 1 bit
     }
     // Used: 19 bits. Free: 13.
     //
@@ -911,6 +918,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Currently we don't serialize debug variable infos, so it doesn't make
     // sense to write the instruction at all.
     // TODO: decide if we want to serialize those instructions.
+    return;
+  case SILInstructionKind::TestSpecificationInst:
+    // Instruction exists only for tests.  Ignore it.
     return;
 
   case SILInstructionKind::UnwindInst:
@@ -2481,6 +2491,23 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(mangledKey));
     break;
   }
+  case SILInstructionKind::HasSymbolInst: {
+    auto *hsi = cast<HasSymbolInst>(&SI);
+    auto *decl = hsi->getDecl();
+    // Although the instruction doesn't have them as members, we need to
+    // ensure that any SILFunctions that are technically referenced by the
+    // instruction get serialized.
+    SmallVector<SILFunction *, 4> fns;
+    hsi->getReferencedFunctions(fns);
+    SmallVector<IdentifierID, 4> functionRefs;
+    for (auto fn : fns) {
+      functionRefs.push_back(addSILFunctionRef(fn));
+    }
+    SILInstHasSymbolLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstHasSymbolLayout::Code],
+        S.addDeclRef(decl), functionRefs);
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2919,6 +2946,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
+  registerSILAbbr<SILInstHasSymbolLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

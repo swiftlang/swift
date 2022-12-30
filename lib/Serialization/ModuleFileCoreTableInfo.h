@@ -604,7 +604,7 @@ public:
     auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
                                Fingerprint::DIGEST_LENGTH};
     if (auto fp = Fingerprint::fromString(str))
-      return fp.getValue();
+      return fp.value();
     llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
     abort();
   }

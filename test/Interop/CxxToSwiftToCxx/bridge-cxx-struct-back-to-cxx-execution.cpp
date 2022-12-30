@@ -15,7 +15,7 @@
 
 //--- header.h
 
-extern "C" void puts(const char *);
+#include <stdio.h>
 
 struct Trivial {
     int x, y;
@@ -41,6 +41,8 @@ struct NonTrivialTemplate {
     }
 };
 
+using NonTrivialTemplateTrivial = NonTrivialTemplate<Trivial>;
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -50,19 +52,19 @@ module CxxTest {
 //--- use-cxx-types.swift
 import CxxTest
 
-public func retNonTrivial(y: CInt) -> NonTrivialTemplate<Trivial> {
-    return NonTrivialTemplate<Trivial>(Trivial(42, y))
+public func retNonTrivial(y: CInt) -> NonTrivialTemplateTrivial {
+    return NonTrivialTemplateTrivial(Trivial(42, y))
 }
 
-public func takeNonTrivial(_ x: NonTrivialTemplate<Trivial>) {
+public func takeNonTrivial(_ x: NonTrivialTemplateTrivial) {
     print(x)
 }
 
-public func passThroughNonTrivial(_ x: NonTrivialTemplate<Trivial>) -> NonTrivialTemplate<Trivial>{
+public func passThroughNonTrivial(_ x: NonTrivialTemplateTrivial) -> NonTrivialTemplateTrivial {
     return x
 }
 
-public func inoutNonTrivial(_ x: inout NonTrivialTemplate<Trivial>) {
+public func inoutNonTrivial(_ x: inout NonTrivialTemplateTrivial) {
     x.x.y *= 2
 }
 
@@ -90,8 +92,8 @@ public func retPassThroughGeneric<T>(_ x: T) -> T {
     return x
 }
 
-public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplate<Trivial>] {
-    return [NonTrivialTemplate<Trivial>(Trivial(x, -x))]
+public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplateTrivial] {
+    return [NonTrivialTemplateTrivial(Trivial(x, -x))]
 }
 
 //--- use-swift-cxx-types.cpp

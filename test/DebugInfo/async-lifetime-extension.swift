@@ -8,8 +8,8 @@
 
 // CHECK-LABEL: define {{.*}} void @"$s1a4fiboyS2iYaFTY0_"
 // CHECK-NEXT: entryresume.0:
-// CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[R:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[N:[0-9]+]], {{.*}}!DIExpression(DW_OP
+// CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[R:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[LHS:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[RHS:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-NOT: {{ ret }}

@@ -105,6 +105,20 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::InvalidShapeRequirement: {
+      if (error.requirement.hasError())
+        break;
+
+      auto lhs = error.requirement.getFirstType();
+      auto rhs = error.requirement.getSecondType();
+
+      // FIXME: Add tailored messages for specific issues.
+      ctx.Diags.diagnose(loc, diag::invalid_shape_requirement,
+                         lhs, rhs);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::ConflictingRequirement: {
       auto requirement = error.requirement;
       auto conflict = error.conflictingRequirement;
@@ -168,8 +182,8 @@ bool swift::rewriting::diagnoseRequirementErrors(
         break;
 
       switch (requirement.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
@@ -268,7 +282,7 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     auto requirementID = rule.getRequirementID();
 
-    if (!requirementID.hasValue()) {
+    if (!requirementID.has_value()) {
       if (!rule.isRedundant())
         nonExplicitNonRedundantRules.insert(ruleID);
 

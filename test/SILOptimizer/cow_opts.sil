@@ -15,6 +15,11 @@ struct Str {
   @_hasStorage var b: Buffer { get set }
 }
 
+struct BufferAndBool {
+  @_hasStorage var b: Buffer { get set }
+  @_hasStorage var x: Bool { get set }
+}
+
 sil @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
 
 // CHECK-LABEL: sil @test_simple
@@ -106,6 +111,29 @@ bb1(%a : $Str):
   cond_br undef, bb1(%s2 : $Str), bb2
 bb2:
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @test_cond_br_condition
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   ({{.*}}, [[B:%[0-9]+]]) = begin_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[I]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_cond_br_condition'
+sil @test_cond_br_condition : $@convention(thin) (@owned Buffer, Bool) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer, %1 : $Bool):
+  %e = end_cow_mutation %0 : $Buffer
+  %s1 = struct $BufferAndBool (%e: $Buffer, %1 : $Bool)
+  %x = struct_extract %s1 : $BufferAndBool, #BufferAndBool.x
+  %c = struct_extract %x : $Bool, #Bool._value
+  cond_br %c, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  %t = tuple (%u : $Builtin.Int1, %b : $Buffer)
   return %t : $(Builtin.Int1, Buffer)
 }
 

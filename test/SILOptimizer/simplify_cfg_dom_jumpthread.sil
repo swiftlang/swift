@@ -227,8 +227,8 @@ public final class BB {
 }
 
 // Test that SimplifyCFG does not hang when compiling an infinite loop with switch_enum.
-// CHECK-LABEL: test_inifite_loop
-sil hidden @test_inifite_loop : $@convention(method) (@owned BB) -> () {
+// CHECK-LABEL: test_infinite_loop
+sil hidden @test_infinite_loop : $@convention(method) (@owned BB) -> () {
 bb0(%0 : $BB):
   %31 = enum $Optional<BB>, #Optional.some!enumelt, %0 : $BB
   br bb4(%31 : $Optional<BB>)

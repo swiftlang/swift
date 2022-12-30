@@ -49,24 +49,11 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
     def build(self, host_target):
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.swift_build_variant)
-        self.cmake_options.define('BUILD_SHARED_LIBS:STRING', 'NO')
+        self.cmake_options.define('BUILD_SHARED_LIBS:STRING', 'YES')
 
-        (platform, arch) = host_target.split('-')
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
-        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
-        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
-        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
-
-        if host_target.startswith("macosx") or \
-           host_target.startswith("iphone") or \
-           host_target.startswith("appletv") or \
-           host_target.startswith("watch"):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "linux":
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', self.args.install_prefix)
         self.build_with_cmake(["all"], self.args.swift_build_variant, [])
 
     def should_test(self, host_target):
@@ -77,17 +64,18 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         pass
 
     def should_install(self, host_target):
-        # This product is for the swift-syntax used with the build-directory compiler.
-        # If a toolchain install is required, please use the SwiftSyntax (no 'Early')
-        # product with `--swift-syntax --install-swift-syntax`.
-        return False
+        """should_install() -> Bool
 
-    @classmethod
-    def is_ignore_install_all_product(cls):
-        # Ensures that `install_all` setting triggered by `--infer` does not
-        # affect products which specify `is_ignore_install_all_product` as
-        # True. This is useful for products which should not be installed into the
-        # toolchain (corresponding build products that use the just-built
-        # toolchain are the products that get installed, e.g. `swiftsyntax` to
-        # `earlyswiftsyntax`).
-        return True
+        Whether or not this product should be installed with the given
+        arguments.
+        """
+        return self.should_build(host_target) and self.args.install_swiftsyntax
+
+    def install(self, host_target):
+        """
+        Perform the install phase for the product.
+
+        This phase might copy the artifacts from the previous phases into a
+        destination directory.
+        """
+        self.install_with_cmake(["install"], self.host_install_destdir(host_target))

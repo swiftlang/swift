@@ -44,9 +44,9 @@ func tuple_patterns() {
   // CHECK: [[DADDR:%[0-9]+]] = alloc_box ${ var Float }
   // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
-  // CHECK: copy_addr [[READA]] to [initialization] [[PBC]]
+  // CHECK: copy_addr [[READA]] to [init] [[PBC]]
   // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
-  // CHECK: copy_addr [[READB]] to [initialization] [[PBD]]
+  // CHECK: copy_addr [[READB]] to [init] [[PBD]]
   // CHECK: [[EADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
   // CHECK: [[FADDR:%[0-9]+]] = alloc_box ${ var Float }
@@ -65,7 +65,7 @@ func tuple_patterns() {
   // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
   // CHECK-NOT: alloc_box ${ var Float }
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
-  // CHECK: copy_addr [[READA]] to [initialization] [[PBI]]
+  // CHECK: copy_addr [[READA]] to [init] [[PBI]]
   // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
   // CHECK: [[B:%[0-9]+]] = load [trivial] [[READB]]
   // CHECK-NOT: store [[B]]

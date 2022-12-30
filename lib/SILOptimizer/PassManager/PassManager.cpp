@@ -182,6 +182,37 @@ bool isFunctionSelectedForPrinting(SILFunction *F) {
   return true;
 }
 
+void printInliningDetails(StringRef passName, SILFunction *caller,
+                          SILFunction *callee, bool isCaller,
+                          bool alreadyInlined) {
+  if (!isFunctionSelectedForPrinting(caller))
+    return;
+  llvm::dbgs() << "  " << passName
+               << (alreadyInlined ? " has inlined " : " will inline ")
+               << callee->getName() << " into " << caller->getName() << ".\n";
+  auto *printee = isCaller ? caller : callee;
+  printee->dump(caller->getModule().getOptions().EmitVerboseSIL);
+  llvm::dbgs() << '\n';
+}
+
+void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/false,
+                       /*alreadyInlined=*/false);
+}
+
+void printInliningDetailsCallerBefore(StringRef passName, SILFunction *caller,
+                                      SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/false);
+}
+
+void printInliningDetailsCallerAfter(StringRef passName, SILFunction *caller,
+                                     SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/true);
+}
+
 static bool functionSelectionEmpty() {
   return SILPrintFunction.empty() && SILPrintFunctions.empty();
 }
@@ -327,7 +358,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
     : Mod(M), IRMod(IRMod),
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
-#define ANALYSIS(NAME) \
+#define SIL_ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
@@ -1028,9 +1059,13 @@ namespace {
       SmallVector<Edge, 8> Children;
     };
 
-    struct child_iterator
-        : public std::iterator<std::random_access_iterator_tag, Node *,
-                               ptrdiff_t> {
+    struct child_iterator {
+      using iterator_category = std::random_access_iterator_tag;
+      using value_type = Node*;
+      using difference_type = std::ptrdiff_t;
+      using pointer = value_type*;
+      using reference = value_type&;    
+
       SmallVectorImpl<Edge>::iterator baseIter;
 
       child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
@@ -1409,8 +1444,8 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
   case branchesChanged:
     inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     break;
-  case functionDataChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::FunctionData);
+  case effectsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::Effects);
     break;
   }
 }
@@ -1637,4 +1672,9 @@ PassContext_loadFunction(BridgedPassContext context, StringRef name) {
 SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   return mod->getOptions().EnableStackProtection;
+}
+
+SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  return mod->getOptions().EnableMoveInoutStackProtection;
 }

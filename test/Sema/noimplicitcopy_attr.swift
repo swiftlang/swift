@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking
 
 import Swift
 

@@ -82,7 +82,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // These cases perform a universal bridging conversion.
 
   // CHECK:   [[COPY:%.*]] = alloc_stack $U
-  // CHECK:   copy_addr [[GENERIC]] to [initialization] [[COPY]]
+  // CHECK:   copy_addr [[GENERIC]] to [init] [[COPY]]
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<U>([[COPY]])
@@ -93,10 +93,10 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(generic)
 
   // CHECK:   [[COPY:%.*]] = alloc_stack $any P
-  // CHECK:   copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
+  // CHECK:   copy_addr [[EXISTENTIAL]] to [init] [[COPY]]
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*any P to $*[[OPENED_TYPE:@opened\(.*, any P\) Self]],
   // CHECK:   [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
-  // CHECK:   copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
+  // CHECK:   copy_addr [[OPENED_COPY]] to [init] [[TMP]]
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
@@ -112,7 +112,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
   // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]], any Error) Self
   // CHECK:   [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]], any Error) Self
-  // CHECK:   copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
+  // CHECK:   copy_addr [[ERROR_BOX]] to [init] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK:   [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]], any Error) Self>([[ERROR_STACK]])
   // CHECK:   dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
@@ -123,10 +123,10 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(error)
 
   // CHECK:   [[COPY:%.*]] = alloc_stack $Any
-  // CHECK:   copy_addr [[ANY]] to [initialization] [[COPY]]
+  // CHECK:   copy_addr [[ANY]] to [init] [[COPY]]
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened\(.*, Any\) Self]],
   // CHECK:   [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
-  // CHECK:   copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
+  // CHECK:   copy_addr [[OPENED_COPY]] to [init] [[TMP]]
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
@@ -170,7 +170,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(optionalB)
 
   // CHECK:   [[TMP:%.*]] = alloc_stack $Optional<Any>
-  // CHECK:   copy_addr [[OPT_ANY]] to [initialization] [[TMP]]
+  // CHECK:   copy_addr [[OPT_ANY]] to [init] [[TMP]]
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<Any>([[TMP]])
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
@@ -290,7 +290,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(classExistential)
 
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $U
-  // CHECK-NEXT: copy_addr [[GENERIC]] to [initialization] [[COPY]]
+  // CHECK-NEXT: copy_addr [[GENERIC]] to [init] [[COPY]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<U>([[COPY]])
@@ -303,10 +303,10 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(generic)
 
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $any P
-  // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
+  // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [init] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*any P to $*[[OPENED_TYPE:@opened\(.*, any P\) Self]],
   // CHECK: [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
-  // CHECK: copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
+  // CHECK: copy_addr [[OPENED_COPY]] to [init] [[TMP]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
@@ -324,7 +324,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
   // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]], any Error) Self
   // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]], any Error) Self
-  // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
+  // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [init] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK-NEXT: end_borrow [[BORROWED_ERROR_COPY]]
   // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]], any Error) Self>([[ERROR_STACK]])
@@ -338,10 +338,10 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(error)
 
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
-  // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
+  // CHECK-NEXT: copy_addr [[ANY]] to [init] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened\(.*, Any\) Self]],
   // CHECK: [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
-  // CHECK: copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
+  // CHECK: copy_addr [[OPENED_COPY]] to [init] [[TMP]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
@@ -436,7 +436,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[OPEN_RESULT:%.*]] = open_existential_addr immutable_access [[NATIVE_RESULT]]
 	// CHECK:   [[TMP:%.*]] = alloc_stack
-  // CHECK:   copy_addr [[OPEN_RESULT]] to [initialization] [[TMP]]
+  // CHECK:   copy_addr [[OPEN_RESULT]] to [init] [[TMP]]
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveC{{.*}}F
   // CHECK:   [[OBJC_RESULT:%.*]] = apply [[BRIDGE_ANYTHING]]<{{.*}}>([[TMP]])
   // CHECK:   return [[OBJC_RESULT]]
@@ -481,7 +481,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:     bb0([[ANY:%.*]] : $*Any, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (AnyObject) -> ()):
   // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened\(.*, Any\) Self]],
 	// CHECK:   [[TMP:%.*]] = alloc_stack
-  // CHECK:   copy_addr [[OPENED_ANY]] to [initialization] [[TMP]]
+  // CHECK:   copy_addr [[OPENED_ANY]] to [init] [[TMP]]
   // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
@@ -603,7 +603,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  end_borrow [[BORROW_FUN]]
   // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr immutable_access [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened\(.*, Any\) Self]],
   // CHECK:       [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
-  // CHECK:       copy_addr [[OPENED]] to [initialization] [[TMP]]
+  // CHECK:       copy_addr [[OPENED]] to [init] [[TMP]]
   // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])

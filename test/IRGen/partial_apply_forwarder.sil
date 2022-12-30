@@ -94,7 +94,7 @@ sil hidden_external @takingEmptyAndQ : $@convention(thin) <τ_0_0 where  τ_0_0 
 // CHECK-LABEL: define internal swiftcc void @"$s7takingQTA"(%swift.refcounted* swiftself %0)
 // CHECK: entry:
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder7WeakBoxC*
-// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %1, i32 0, i32 0, i32 0
+// CHECK:   [[TYADDR:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* %1
 // CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
 // CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
 // CHECK-objc:   [[PARAMTYADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENPARAMSADDR]], {{(i64 10|i32 13)}}
@@ -153,7 +153,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 
 // CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.1"(%T23partial_apply_forwarder7WeakBoxC* %0, %swift.refcounted* swiftself %1)
 // CHECK: entry:
-// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %0
+// CHECK:   [[TYADDR:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* %0
 // CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
 // CHECK:   [[CAST:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* %0 to %T23partial_apply_forwarder7WeakBoxC.1*
 // CHECK:   [[TYPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
@@ -207,7 +207,7 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[WB:%.*]] = load %T23partial_apply_forwarder7WeakBoxC*, %T23partial_apply_forwarder7WeakBoxC** [[WBADDR]]
 // CHECK:   [[WBREF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
 // CHECK:   call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[WBREF]])
-// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* [[WB]], i32 0, i32 0, i32 0
+// CHECK:   [[TYADDR:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]]
 // CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
 // CHECK:   %.asUnsubstituted = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %T23partial_apply_forwarder7WeakBoxC.1*
 // CHECK:   call void @swift_release(%swift.refcounted* %0)

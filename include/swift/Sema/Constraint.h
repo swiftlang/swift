@@ -97,6 +97,9 @@ enum class ConstraintKind : char {
   ArgumentConversion,
   /// The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
+  /// The first type must be a subclass of the second type (which is a
+  /// class type).
+  SubclassOf,
   /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
@@ -212,12 +215,24 @@ enum class ConstraintKind : char {
   /// Represents an AST node contained in a body of a function/closure.
   /// It only has an AST node to generate constraints and infer the type for.
   SyntacticElement,
+  /// The first type is the opened pack element type of the second type, which
+  /// is the pattern of a pack expansion type.
+  PackElementOf,
   /// Do not add new uses of this, it only exists to retain compatibility for
   /// rdar://85263844.
   ///
   /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
   /// this discards function parameter flags.
-  BindTupleOfFunctionParams
+  BindTupleOfFunctionParams,
+  /// The first type is a type pack, and the second type is its reduced shape.
+  ShapeOf,
+  /// Represents explicit generic arguments provided for a reference to
+  /// a declaration.
+  ///
+  /// The first type is the type variable describing the bound type of
+  /// an overload. The second type is a PackType containing the explicit
+  /// generic arguments.
+  ExplicitGenericArguments,
 };
 
 /// Classification of the different kinds of constraints.
@@ -307,10 +322,6 @@ enum class ConversionRestrictionKind {
   ///    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
   ///    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
   PointerToCPointer,
-  // Convert a pack into a type with an equivalent arity.
-  // - If the arity of the pack is 1, drops the pack structure <T> => T
-  // - If the arity of the pack is n >= 1, converts the pack structure into a tuple <T, U, V> => (T, U, V)
-  ReifyPackToType,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary
@@ -673,6 +684,7 @@ public:
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
+    case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
@@ -686,6 +698,7 @@ public:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
+    case ConstraintKind::PackElementOf:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -701,6 +714,8 @@ public:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
     case ConstraintKind::BindTupleOfFunctionParams:
+    case ConstraintKind::ShapeOf:
+    case ConstraintKind::ExplicitGenericArguments:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:

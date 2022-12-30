@@ -336,7 +336,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK:      load %swift.type*
 
-// CHECK:      [[ADDR:%.*]] = getelementptr inbounds %T16class_resilience21ResilientGenericChildC, %T16class_resilience21ResilientGenericChildC* %0, i32 0, i32 0, i32 0
+// CHECK:      [[ADDR:%.*]] = bitcast %T16class_resilience21ResilientGenericChildC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s16class_resilience21ResilientGenericChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
@@ -557,7 +557,7 @@ public class ClassWithResilientThenEmpty {
 // ResilientChild.field getter dispatch thunk
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself %0)
-// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE_ADDR:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s16class_resilience14ResilientChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[BASE:%.*]] = add [[INT]] [[BASE_ADDR]], {{4|8}}
@@ -573,7 +573,7 @@ public class ClassWithResilientThenEmpty {
 // ResilientChild.field setter dispatch thunk
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
-// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %1, i32 0, i32 0, i32 0
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T16class_resilience14ResilientChildC* %1 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s16class_resilience14ResilientChildCMo", i32 0, i32 0)
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{8|16}}

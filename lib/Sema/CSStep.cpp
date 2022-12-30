@@ -105,13 +105,14 @@ void SplitterStep::computeFollowupSteps(
 
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
+    auto indent = CS.solverState->getCurrentIndent();
     // Verify that the constraint graph is valid.
     CG.verify();
 
-    log << "---Constraint graph---\n";
+    log.indent(indent) << "---Constraint graph---\n";
     CG.print(CS.getTypeVariables(), log);
 
-    log << "---Connected components---\n";
+    log.indent(indent) << "---Connected components---\n";
     CG.printConnectedComponents(CS.getTypeVariables(), log);
   }
 
@@ -359,14 +360,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   });
 
   auto *disjunction = CS.selectDisjunction();
+  auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
-    if (!potentialBindings.empty()) {
-      auto &log = getDebugLogger();
-      log << "(Potential Binding(s): " << '\n';
-      log << potentialBindings;
-    }
-
     SmallVector<Constraint *, 4> disjunctions;
     CS.collectDisjunctions(disjunctions);
     std::vector<std::string> overloadDisjunctions;
@@ -379,47 +375,66 @@ StepResult ComponentStep::take(bool prevFailed) {
         overloadDisjunctions.push_back(
             constraints[0]->getFirstType()->getString(PO));
     }
+
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << "(Potential Binding(s): " << '\n';
+      log << potentialBindings;
+    }
+
     if (!overloadDisjunctions.empty()) {
       auto &log = getDebugLogger();
-      log.indent(2);
+      log.indent(CS.solverState->getCurrentIndent() + 2);
       log << "Disjunction(s) = [";
       interleave(overloadDisjunctions, log, ", ");
       log << "]\n";
+    }
 
-      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-        auto &log = getDebugLogger();
-        log << ")\n";
-      }
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << ")\n";
     }
   }
 
-  if (CS.shouldAttemptFixes()) {
-    if ((bestBindings &&
-         (bestBindings->forClosureResult() ||
-          bestBindings->forGenericParameter()) &&
-         bestBindings->isHole()) &&
-        !disjunction) {
-      if (auto *conjunction = CS.selectConjunction()) {
-        return suspend(
-            std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-      }
+  enum class StepKind { Binding, Disjunction, Conjunction };
+
+  auto chooseStep = [&]() -> Optional<StepKind> {
+    // Bindings usually happen first, but sometimes we want to prioritize a
+    // disjunction or conjunction.
+    if (bestBindings) {
+      if (disjunction && !bestBindings->favoredOverDisjunction(disjunction))
+        return StepKind::Disjunction;
+
+      if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
+        return StepKind::Conjunction;
+
+      return StepKind::Binding;
     }
+    if (disjunction)
+      return StepKind::Disjunction;
+
+    if (conjunction)
+      return StepKind::Conjunction;
+
+    return None;
+  };
+
+  if (auto step = chooseStep()) {
+    switch (*step) {
+    case StepKind::Binding:
+      return suspend(
+          std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
+    case StepKind::Disjunction:
+      return suspend(
+          std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+    case StepKind::Conjunction:
+      return suspend(
+          std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+    }
+    llvm_unreachable("Unhandled case in switch!");
   }
 
-  if (bestBindings &&
-      (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
-    // Produce a type variable step.
-    return suspend(
-        std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
-  } else if (disjunction) {
-    // Produce a disjunction step.
-    return suspend(
-        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
-  } else if (auto *conjunction = CS.selectConjunction()) {
-    return suspend(
-        std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-  } else if (!CS.solverState->allowsFreeTypeVariables() &&
-             CS.hasFreeTypeVariables()) {
+  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
@@ -428,7 +443,9 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto printConstraints = [&](const ConstraintList &constraints) {
     for (auto &constraint : constraints)
-      constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
+      constraint.print(
+          getDebugLogger().indent(CS.solverState->getCurrentIndent()),
+          &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
   };
 
   // If we don't have any disjunction or type variable choices left, we're done
@@ -670,8 +687,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping " + reason + " ";
-      choice.print(log, &ctx.SourceMgr);
-      log << '\n';
+      choice.print(log, &ctx.SourceMgr, CS.solverState->getCurrentIndent());
+      log << ")\n";
     }
 
     return true;

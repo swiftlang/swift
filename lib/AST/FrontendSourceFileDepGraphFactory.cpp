@@ -65,7 +65,7 @@ static std::string identifierForContext(const DeclContext *DC) {
   }
 
   const auto *ext = cast<ExtensionDecl>(DC);
-  auto fp = ext->getBodyFingerprint().getValueOr(Fingerprint::ZERO());
+  auto fp = ext->getBodyFingerprint().value_or(Fingerprint::ZERO());
   auto typeStr = Mangler.mangleTypeAsContextUSR(ext->getExtendedNominal());
   return (typeStr + "@" + fp.getRawValue()).str();
 }
@@ -207,6 +207,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::AssociatedType:
   case DeclKind::Param:
   case DeclKind::OpaqueType:
+  case DeclKind::Macro:
     return cast<ValueDecl>(decl)->getBaseName().userFacingName();
 
   case DeclKind::Import:
@@ -217,6 +218,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
   case DeclKind::Module:
+  case DeclKind::MacroExpansion:
     return "";
   }
 

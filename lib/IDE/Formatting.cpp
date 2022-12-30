@@ -327,7 +327,7 @@ public:
   }
 
   bool isExact() {
-    return InnermostCtx.hasValue() &&
+    return InnermostCtx.has_value() &&
         InnermostCtx->Kind == IndentContext::Exact;
   }
 
@@ -338,7 +338,7 @@ public:
   }
 
   bool shouldAddIndentForLine() const {
-    return InnermostCtx.hasValue() && InnermostCtx->IndentLevel > 0;
+    return InnermostCtx.has_value() && InnermostCtx->IndentLevel > 0;
   }
 
   unsigned numIndentLevels() const {
@@ -927,7 +927,7 @@ class TrailingInfo {
 
 public:
   /// Whether the trailing target is on an empty line.
-  bool isEmpty() const { return !TrailingToken.hasValue(); }
+  bool isEmpty() const { return !TrailingToken.has_value(); }
 
   /// Whether the trailing target is a token with one of the given kinds.
   bool hasKind(ArrayRef<tok> Kinds) const {
@@ -2063,7 +2063,7 @@ private:
     // FIXME: Add the colon location to the AST.
     auto ColonLoc = getLastTokenOfKindInOpenRange(SM, tok::colon, ContextLoc,
                                                   StartLoc);
-    assert(ColonLoc.hasValue() && "inherits list without leading colon?");
+    assert(ColonLoc.has_value() && "inherits list without leading colon?");
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, ColonLoc->getLoc());
     for (auto TL: Inherits)
@@ -3043,7 +3043,7 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
     // default value.
     Options.TabWidth = Options.IndentWidth ? Options.IndentWidth : 4;
   }
-  auto SourceBufferID = SF.getBufferID().getValue();
+  auto SourceBufferID = SF.getBufferID().value();
   StringRef Text = SM.getLLVMSourceMgr()
     .getMemoryBuffer(SourceBufferID)->getBuffer();
   size_t Offset = getOffsetOfLine(Range.startLine(), Text, /*Trim*/true);

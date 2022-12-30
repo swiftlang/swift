@@ -231,6 +231,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PostfixOperator:
       break;
 
+    case DeclKind::Macro:
+      info.Kind = SymbolKind::Macro;
+      break;
+
     // These all reflect some sort of uninteresting syntactic structure
     // and don't merit indexing.
     case DeclKind::Import:
@@ -243,6 +247,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::Module:
     case DeclKind::OpaqueType:
     case DeclKind::BuiltinTuple:
+    case DeclKind::MacroExpansion:
       break;
   }
 

@@ -202,10 +202,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
-                                                 requiresOSSAModules,
-                                                 requiredSDK);
+                                    StringRef requiredSDK,
+                                    bool requiresRevisionMatch) {
+  auto VI = serialization::validateSerializedAST(
+      buf.getBuffer(), requiresOSSAModules, requiredSDK, requiresRevisionMatch);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -406,6 +406,7 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        !ctx.LangOpts.DebuggerSupport,
         /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
@@ -564,7 +565,8 @@ class ModuleInterfaceLoaderImpl {
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
-                                                           ctx.LangOpts.SDKName))
+                                            ctx.LangOpts.SDKName,
+                                            !ctx.LangOpts.DebuggerSupport))
       return false;
 
     // Next, check the dependencies in the forwarding file.
@@ -612,7 +614,8 @@ class ModuleInterfaceLoaderImpl {
     StringRef inParentDirName =
       path::filename(path::parent_path(interfacePath));
     if (path::extension(inParentDirName) == ".swiftmodule") {
-      assert(path::stem(inParentDirName) == moduleName);
+      assert(path::stem(inParentDirName) ==
+             ctx.getRealModuleName(ctx.getIdentifier(moduleName)).str());
       path::append(scratch, inParentDirName);
     }
     path::append(scratch, path::filename(modulePath));
@@ -675,7 +678,7 @@ class ModuleInterfaceLoaderImpl {
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
     std::pair<std::string, std::string> result;
     // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
-    bool shouldLoadAdjacentModule = true;
+    bool shouldLoadAdjacentModule = !ctx.IgnoreAdjacentModules;
 
     // Don't use the adjacent swiftmodule for frameworks from the public
     // Frameworks folder of the SDK.
@@ -1025,11 +1028,13 @@ class ModuleInterfaceLoaderImpl {
       }
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
+      Identifier realName = ctx.getRealModuleName(ctx.getIdentifier(moduleName));
       ImplicitModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
-        astDelegate, interfacePath, moduleName, cacheDir,
+        astDelegate, interfacePath, realName.str(), cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
-        Opts.disableInterfaceLock, diagnosticLoc,
+        Opts.disableInterfaceLock,
+        ctx.IgnoreAdjacentModules, diagnosticLoc,
         dependencyTracker);
       // If we found an out-of-date .swiftmodule, we still want to add it as
       // a dependency of the .swiftinterface. That way if it's updated, but
@@ -1061,7 +1066,8 @@ class ModuleInterfaceLoaderImpl {
       ImplicitModuleInterfaceBuilder fallbackBuilder(
         ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath, moduleName, cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
-        Opts.disableInterfaceLock, diagnosticLoc,
+        Opts.disableInterfaceLock,
+        ctx.IgnoreAdjacentModules, diagnosticLoc,
         dependencyTracker);
       if (rebuildInfo.sawOutOfDateModule(modulePath))
         fallbackBuilder.addExtraDependency(modulePath);
@@ -1245,7 +1251,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef OutPath, StringRef ABIOutputPath,
     bool SerializeDependencyHashes,
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
-    RequireOSSAModules_t RequireOSSAModules) {
+    RequireOSSAModules_t RequireOSSAModules,
+    bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
       SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
@@ -1254,7 +1261,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   ImplicitModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                          ModuleName, CacheDir, PrebuiltCacheDir,
                                          BackupInterfaceDir, ABIOutputPath,
-                                         LoaderOpts.disableInterfaceLock);
+                                         LoaderOpts.disableInterfaceLock,
+                                         silenceInterfaceDiagnostics);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
@@ -1272,7 +1280,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   ImplicitModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
                                                ModuleName, CacheDir, PrebuiltCacheDir,
                                                BackupInterfaceDir, ABIOutputPath,
-                                               LoaderOpts.disableInterfaceLock);
+                                               LoaderOpts.disableInterfaceLock,
+                                               silenceInterfaceDiagnostics);
   // Ensure we can rebuild module after user changed the original interface file.
   backupBuilder.addExtraDependency(InPath);
   // FIXME: We really only want to serialize 'important' dependencies here, if
@@ -1318,7 +1327,7 @@ static bool readSwiftInterfaceVersionAndArgs(
   // FIXME We should diagnose this at a location that makes sense:
   auto Vers =
       VersionParser::parseVersionString(VersMatches[1], SourceLoc(), &Diags);
-  if (!Vers.hasValue()) {
+  if (!Vers.has_value()) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1403,7 +1412,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-    RequireOSSAModules_t RequireOSSAModules) {
+    bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1416,7 +1425,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
-  if (LangOpts.ClangTarget.hasValue()) {
+  if (LangOpts.ClangTarget.has_value()) {
     genericSubInvocation.getLangOptions().ClangTarget = LangOpts.ClangTarget;
     auto triple = ArgSaver.save(genericSubInvocation.getLangOptions()
       .ClangTarget->getTriple());
@@ -1456,9 +1465,14 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   }
 
   // Inhibit warnings from the genericSubInvocation since we are assuming the user
-  // is not in a position to fix them.
+  // is not in a position to address them.
   genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
   GenericArgs.push_back("-suppress-warnings");
+  // Inherit the parent invocation's setting on whether to suppress remarks
+  if (suppressRemarks) {
+    genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
+    GenericArgs.push_back("-suppress-remarks");
+  }
 
   // Inherit this setting down so that it can affect error diagnostics (mostly
   // by making them non-fatal).
@@ -1489,6 +1503,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
       GenericArgs.push_back(ArgSaver.save(pair));
   });
+
+  if (LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    genericSubInvocation.getLangOptions().Features.insert(
+      Feature::LayoutPrespecialization);
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1531,6 +1550,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
+                                     Diags->getSuppressRemarks(),
                                      requireOSSAModules);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
@@ -1559,6 +1579,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
+  // If building an application extension, make sure API use
+  // is restricted accordingly in downstream dependnecies.
+  if (langOpts.EnableAppExtensionRestrictions) {
+    GenericArgs.push_back("-application-extension");
+  }
   // Save the parent invocation's Target Triple
   ParentInvocationTarget = langOpts.Target;
 
@@ -1574,18 +1599,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
 
-  // We need to add these extra clang flags because explicit module building
-  // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
-  // and -fmodule-file=.
-  // If we don't add these flags, the interface will be built with implicit
-  // PCMs.
-  // FIXME: With Implicit Module Builds, if sub-invocations inherit `-fmodule-map-file=` options,
-  // those modulemaps become File dependencies of all downstream PCMs and their depending Swift
-  // modules, triggering unnecessary re-builds. We work around this by only inheriting these options
-  // when building with explicit modules. While this problem will not manifest with Explicit Modules
-  // (which do not use the ClangImporter to build PCMs), we may still need a better way to
-  // decide which options must be inherited here.
-  if (LoaderOpts.disableImplicitSwiftModule) {
+  // If the compiler has been asked to be strict with ensuring downstream dependencies
+  // get the parent invocation's context, or this is an Explicit build, inherit the
+  // extra Clang arguments also.
+  if (LoaderOpts.strictImplicitModuleContext || LoaderOpts.disableImplicitSwiftModule) {
+    // Inherit any clang-specific state of the compilation (macros, clang flags, etc.)
     subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
     for (auto arg : subClangImporterOpts.ExtraArgs) {
       GenericArgs.push_back("-Xcc");
@@ -1701,7 +1719,8 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
-  return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
+  return runInSubCompilerInstance(moduleName, interfacePath, outputPath,
+                                  diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
@@ -1716,6 +1735,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                                           StringRef interfacePath,
                                                           StringRef outputPath,
                                                           SourceLoc diagLoc,
+                                                          bool silenceErrors,
                   llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
@@ -1810,7 +1830,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   ForwardingDiagnosticConsumer FDC(*Diags);
-  subInstance.addDiagnosticConsumer(&FDC);
+  if (!silenceErrors)
+    subInstance.addDiagnosticConsumer(&FDC);
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
@@ -1827,7 +1848,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     "-Xcc",
     ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
   };
-  if (!subInvocation.getLangOptions().ClangTarget.hasValue()) {
+  if (!subInvocation.getLangOptions().ClangTarget.has_value()) {
     ExtraPCMArgs.insert(ExtraPCMArgs.begin(), {"-Xcc", "-target",
                                                "-Xcc", target});
   }
@@ -1972,6 +1993,24 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   if (it == Impl.ExplicitModuleMap.end()) {
     return false;
   }
+
+  // If the caller doesn't want version info we're done.
+  if (!versionInfo)
+    return true;
+
+  // Open .swiftmodule file and read out the version
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(it->second.modulePath);
+  if (!moduleBuf) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                       it->second.modulePath);
+    return false;
+  }
+  auto metaData = serialization::validateSerializedAST(
+      (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+      Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
+  versionInfo->setVersion(metaData.userModuleVersion,
+                          ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
 }
 

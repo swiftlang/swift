@@ -1288,7 +1288,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If the base name of a method imported as "async" starts with the word
   // "get", drop the "get".
-  bool isAsync = completionHandlerIndex.hasValue();
+  bool isAsync = completionHandlerIndex.has_value();
   if (isAsync && camel_case::getFirstWord(baseName) == "get" &&
       baseName.size() > 3) {
     baseName = baseName.substr(3);

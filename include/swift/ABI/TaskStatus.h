@@ -150,15 +150,24 @@ public:
 ///
 /// A record always is a specific `TaskGroupImpl`.
 ///
+/// This record holds references to all the non-completed children of
+/// the task group.  It may also hold references to completed children
+/// which have not yet been found by `next()`.
+///
 /// The child tasks are stored as an invasive single-linked list, starting
 /// from `FirstChild` and continuing through the `NextChild` pointers of all
 /// the linked children.
 ///
-/// All children of the specific `Group` are stored "by" this record,
-/// so that they may be cancelled when this task becomes cancelled.
+/// This list structure should only ever be modified:
+/// - while holding the status record lock of the owning task, so that
+///   asynchronous operations such as cancellation can walk the structure
+///   without having to acquire a secondary lock, and
+/// - synchronously with the owning task, so that the owning task doesn't
+///   have to acquire the status record lock just to walk the structure
+///   itself.
 ///
 /// When the group exits, it may simply remove this single record from the task
-/// running it. As it has guaranteed that the tasks have already completed.
+/// running it, as it has guaranteed that the tasks have already completed.
 ///
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.

@@ -26,16 +26,7 @@ case some(T)
 // Tests //
 ///////////
 
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'no_end_borrow_error1'
-// CHECK: Guaranteed function parameter with life ending uses!
-// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: Lifetime Ending User:   br bb1(%0 : $Builtin.NativeObject)
-// CHECK: Error#: 0. End Error in Function: 'no_end_borrow_error1'
-// CHECK-LABEL: Error#: 1. Begin Error in Function: 'no_end_borrow_error1'
-// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
-// CHECK-LABEL: Error#: 1. End Error in Function: 'no_end_borrow_error1'
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'no_end_borrow_error1'
+// CHECK-NOT: Function: 'no_end_borrow_error1'
 sil [ossa] @no_end_borrow_error1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
@@ -62,47 +53,14 @@ bb1(%2 : @guaranteed $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'leak_along_path'
-// CHECK: Guaranteed function parameter with life ending uses!
-// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: Lifetime Ending User:   br bb1(%0 : $Builtin.NativeObject)
-// CHECK: Error#: 0. End Error in Function: 'leak_along_path'
-//
-// CHECK-LABEL: Error#: 1. Begin Error in Function: 'leak_along_path'
-// CHECK: Error! Found a leak due to a consuming post-dominance failure!
-// CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
-// CHECK: Post Dominating Failure Blocks:
-// CHECK: bb3
-// CHECK: Error#: 1. End Error in Function: 'leak_along_path'
-//
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_path'
-sil [ossa] @leak_along_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  br bb1(%0 : $Builtin.NativeObject)
-
-bb1(%1 : @guaranteed $Builtin.NativeObject):
-  cond_br undef, bb2, bb3
-
-bb2:
-  end_borrow %1 : $Builtin.NativeObject
-  br bb4
-
-bb3:
-  br bb4
-
-bb4:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'leak_along_path_2'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK: Value: %3 = argument of bb1 : $Builtin.NativeObject
 // CHECK: Post Dominating Failure Blocks:
 // CHECK: bb3
-// CHECK: Error#: 0. End Error in Function: 'leak_along_path_2'
+// CHECK: Error#: 0. End Error in Function: 'leak_along_path'
 //
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_path_2'
-sil [ossa] @leak_along_path_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_path'
+sil [ossa] @leak_along_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   br bb1(%1 : $Builtin.NativeObject)
@@ -124,68 +82,16 @@ bb4:
 
 // Make sure that we only flag the subargument leak and not the parent
 // argument. Also check for over consuming due to phi nodes.
-//
+
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'leak_along_subarg_path'
-// CHECK: Guaranteed function parameter with life ending uses!
-// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: Lifetime Ending User:   br bb1(%0 : $Builtin.NativeObject)
-// CHECK: Error#: 0. End Error in Function: 'leak_along_subarg_path'
-//
-// CHECK-LABEL: Error#: 1. Begin Error in Function: 'leak_along_subarg_path'
-// CHECK: Found over consume?!
-// CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
-// CHECK: Block: bb3
-// CHECK: Consuming Users:
-// CHECK:   br bb4(%2 : $Builtin.NativeObject)
-// CHECK:   end_borrow %2 : $Builtin.NativeObject
-// CHECK: Error#: 1. End Error in Function: 'leak_along_subarg_path'
-//
-// CHECK-LABEL: Error#: 2. Begin Error in Function: 'leak_along_subarg_path'
-// CHECK: Error! Found a leak due to a consuming post-dominance failure!
-// CHECK: Value: %6 = argument of bb4 : $Builtin.NativeObject
-// CHECK: Post Dominating Failure Blocks:
-// CHECK: bb6
-// CHECK: Error#: 2. End Error in Function: 'leak_along_subarg_path'
-//
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_subarg_path'
-sil [ossa] @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  br bb1(%0 : $Builtin.NativeObject)
-
-bb1(%1 : @guaranteed $Builtin.NativeObject):
-  cond_br undef, bb2, bb3
-
-bb2:
-  br bb7
-
-bb3:
-  br bb4(%1 : $Builtin.NativeObject)
-
-bb4(%2 : @guaranteed $Builtin.NativeObject):
-  cond_br undef, bb5, bb6
-
-bb5:
-  end_borrow %2 : $Builtin.NativeObject
-  br bb7
-
-bb6:
-  br bb7
-
-bb7:
-  end_borrow %1 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'leak_along_subarg_path_2'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK: Value: %7 = argument of bb3 : $Builtin.NativeObject
 // CHECK: Post Dominating Failure Blocks:
 // CHECK: bb6
-// CHECK: Error#: 0. End Error in Function: 'leak_along_subarg_path_2'
+// CHECK: Error#: 0. End Error in Function: 'leak_along_subarg_path'
 //
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_subarg_path_2'
-sil [ossa] @leak_along_subarg_path_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'leak_along_subarg_path'
+sil [ossa] @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   br bb1(%1 : $Builtin.NativeObject)
@@ -590,32 +496,24 @@ bb1(%1 : @owned $Builtin.NativeObject):
 /////////////////////////////////////////
 // Movable Guaranteed Scope Test Cases //
 /////////////////////////////////////////
-
-// Make sure that we error due to the struct_extract. We require end_borrows to
-// be on the original borrowed value.
 //
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_non_postdominating_diamond_with_forwarding_uses'
-// CHECK: Invalid End Borrow!
-// CHECK: Original Value:   %5 = begin_borrow %1 : $NativeObjectPair        // user: %6
-// CHECK: End Borrow:   br bb3(%6 : $Builtin.NativeObject)              // id: %7
-// CHECK-LABEL: Error#: 0. End Error in Function: 'simple_non_postdominating_diamond_with_forwarding_uses'
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'simple_non_postdominating_diamond_with_forwarding_uses'
-sil [ossa] @simple_non_postdominating_diamond_with_forwarding_uses : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @guaranteed NativeObjectPair) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $NativeObjectPair):
+sil [ossa] @simple_non_postdominating_diamond_with_forwarding_uses : $@convention(thin) (@in_guaranteed NativeObjectPair, @guaranteed NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $NativeObjectPair):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = load_borrow %0 : $*Builtin.NativeObject
-  br bb3(%3 : $Builtin.NativeObject)
+  %3 = load_borrow %0 : $*NativeObjectPair
+  %4 = struct_extract %3 : $NativeObjectPair, #NativeObjectPair.obj1
+  br bb3(%4 : $Builtin.NativeObject, %3 : $NativeObjectPair)
 
 bb2:
-  // Should error b/c %5 isn't balanced directly.
   %5 = begin_borrow %1 : $NativeObjectPair
   %6 = struct_extract %5 : $NativeObjectPair, #NativeObjectPair.obj1
-  br bb3(%6 : $Builtin.NativeObject)
+  br bb3(%6 : $Builtin.NativeObject, %5 : $NativeObjectPair)
 
-bb3(%7 : @guaranteed $Builtin.NativeObject):
-  end_borrow %7 : $Builtin.NativeObject
+bb3(%7 : @guaranteed $Builtin.NativeObject, %8 : @guaranteed $NativeObjectPair):
+  end_borrow %8 : $NativeObjectPair
   %9999 = tuple()
   return %9999 : $()
 }

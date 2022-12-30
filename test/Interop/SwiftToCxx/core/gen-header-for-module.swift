@@ -22,5 +22,5 @@ public func reprintedInImportedModule() -> Int {
     return 42
 }
 
-// CHECK: namespace Core {
+// CHECK: namespace Core __attribute__((swift_private)) {
 // CHECK: swift::Int reprintedInImportedModule() noexcept SWIFT_WARN_UNUSED_RESULT {

@@ -227,8 +227,8 @@ EnumPayload EnumPayload::load(IRGenFunction &IGF, Address address,
     return result;
   
   auto storageTy = getPayloadStorageType(IGF.IGM, result);
-  address = IGF.Builder.CreateBitCast(address, storageTy->getPointerTo());
-  
+  address = IGF.Builder.CreateElementBitCast(address, storageTy);
+
   if (result.PayloadValues.size() == 1) {
     result.PayloadValues.front() = IGF.Builder.CreateLoad(address);
   } else {
@@ -250,8 +250,8 @@ void EnumPayload::store(IRGenFunction &IGF, Address address) const {
     return;
 
   auto storageTy = getPayloadStorageType(IGF.IGM, *this);
-  address = IGF.Builder.CreateBitCast(address, storageTy->getPointerTo());
-  
+  address = IGF.Builder.CreateElementBitCast(address, storageTy);
+
   if (PayloadValues.size() == 1) {
     IGF.Builder.CreateStore(forcePayloadValue(PayloadValues.front()), address);
     return;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -234,10 +234,8 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = GenericTypeParamDecl::create(
-      &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
-  return genericParam;
+  return GenericTypeParamDecl::createImplicit(
+      &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
@@ -1798,6 +1796,33 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   return getBuiltinFunction(Id, { InTy }, OutTy);
 }
 
+static ValueDecl *getBitWidthOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _word);
+}
+
+static ValueDecl *getIsNegativeOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _int(1));
+}
+
+static ValueDecl *getWordAtIndexOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy, _word), _word);
+}
+
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
                                           Identifier Id) {
   auto NeverTy = Context.getNeverType();
@@ -2273,10 +2298,6 @@ static bool isValidCmpXChgOrdering(StringRef SuccessString,
 }
 
 ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return nullptr; // not needed for the parser library.
-  #endif
-
   // Builtin.TheTupleType resolves to the singleton instance of BuiltinTupleDecl.
   if (Id == Context.Id_TheTupleType)
     return Context.getBuiltinTupleDecl();
@@ -2703,7 +2724,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::AddressOfBorrowOpaque:
   case BuiltinValueKind::UnprotectedAddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
@@ -2784,6 +2807,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::BitWidth:
+    if (Types.size() != 1) return nullptr;
+    return getBitWidthOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::IsNegative:
+    if (Types.size() != 1) return nullptr;
+    return getIsNegativeOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::WordAtIndex:
+    if (Types.size() != 1) return nullptr;
+    return getWordAtIndexOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);

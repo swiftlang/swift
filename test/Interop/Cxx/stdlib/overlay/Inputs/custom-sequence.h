@@ -86,4 +86,16 @@ public:
   const ConstIterator &end() const { return e; }
 };
 
+template <typename A> struct NoDefinition;
+
+template <typename A, typename NoDef = NoDefinition<A>>
+struct HasTemplatedIterator {
+  typedef NoDef* iterator; // OpaquePointer
+
+  iterator begin() const;
+  iterator end() const;
+};
+
+typedef HasTemplatedIterator<int> HasUninstantiatableIterator;
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_SEQUENCE_H

@@ -27,7 +27,7 @@ import WinSDK
 /// prototyping stages of development where a real system is not necessary yet.
 @available(SwiftStdlib 5.7, *)
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
-  public typealias ActorID = LocalTestingActorAddress
+  public typealias ActorID = LocalTestingActorID
   public typealias ResultHandler = LocalTestingInvocationResultHandler
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
@@ -54,7 +54,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor, Act.ID == ActorID {
+    where Act: DistributedActor {
     let id = self.idProvider.next()
     self.assignedIDsLock.withLock {
       self.assignedIDs.insert(id)
@@ -114,12 +114,12 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
 
     init() {}
 
-    mutating func next() -> LocalTestingActorAddress {
+    mutating func next() -> LocalTestingActorID {
       let id: Int = self.counterLock.withLock {
         self.counter += 1
         return self.counter
       }
-      return LocalTestingActorAddress(parse: "\(id)")
+      return LocalTestingActorID(id: "\(id)")
     }
   }
 }

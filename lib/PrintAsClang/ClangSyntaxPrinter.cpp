@@ -50,13 +50,13 @@ bool ClangSyntaxPrinter::isClangKeyword(Identifier name) {
   return ClangSyntaxPrinter::isClangKeyword(name.str());
 }
 
-void ClangSyntaxPrinter::printIdentifier(StringRef name) {
+void ClangSyntaxPrinter::printIdentifier(StringRef name) const {
   os << name;
   if (ClangSyntaxPrinter::isClangKeyword(name))
     os << '_';
 }
 
-void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
+void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
   assert(decl->getName().isSimpleName());
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
@@ -83,8 +83,16 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
   return false;
 }
 
-void ClangSyntaxPrinter::printNominalClangTypeReference(
-    const clang::Decl *typeDecl) {
+bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
+    const NominalTypeDecl *typeDecl) {
+  if (!typeDecl->isGeneric())
+    return true;
+  printGenericSignatureInnerStaticAsserts(
+      typeDecl->getGenericSignature().getCanonicalSignature());
+  return false;
+}
+
+void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
   auto &clangCtx = typeDecl->getASTContext();
   clang::PrintingPolicy pp(clangCtx.getLangOpts());
   const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
@@ -109,7 +117,7 @@ void ClangSyntaxPrinter::printNominalClangTypeReference(
 void ClangSyntaxPrinter::printNominalTypeReference(
     const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
   if (typeDecl->hasClangNode()) {
-    printNominalClangTypeReference(typeDecl->getClangDecl());
+    printClangTypeReference(typeDecl->getClangDecl());
     return;
   }
   printModuleNamespaceQualifiersIfNeeded(typeDecl->getModuleContext(),
@@ -127,12 +135,23 @@ void ClangSyntaxPrinter::printNominalTypeQualifier(
   os << "::";
 }
 
+void ClangSyntaxPrinter::printModuleNamespaceStart(
+    const ModuleDecl &moduleContext) const {
+  os << "namespace ";
+  printBaseName(&moduleContext);
+  os << " __attribute__((swift_private))";
+  os << " {\n";
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
-    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+    NamespaceTrivia trivia) const {
   os << "namespace ";
   namePrinter(os);
+  if (trivia == NamespaceTrivia::AttributeSwiftPrivate)
+    os << " __attribute__((swift_private))";
   os << " {\n\n";
   bodyPrinter(os);
   os << "\n} // namespace ";
@@ -141,9 +160,9 @@ void ClangSyntaxPrinter::printNamespace(
 }
 
 void ClangSyntaxPrinter::printNamespace(
-    StringRef name,
-    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
-  printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
+    StringRef name, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+    NamespaceTrivia trivia) const {
+  printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter, trivia);
 }
 
 void ClangSyntaxPrinter::printExternC(
@@ -246,7 +265,7 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
 }
 
 void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
-    const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
+    const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     llvm::ArrayRef<GenericRequirement> genericRequirements) {
   // FIXME: Support generic requirements > 3.
   if (!genericRequirements.empty())
@@ -284,6 +303,7 @@ void ClangSyntaxPrinter::printGenericSignature(
                           printGenericTypeParamTypeName(genericParamType);
                         });
   os << ">\n";
+  os << "#ifdef __cpp_concepts\n";
   os << "requires ";
   llvm::interleave(
       signature.getInnermostGenericParams(), os,
@@ -293,7 +313,21 @@ void ClangSyntaxPrinter::printGenericSignature(
         os << ">";
       },
       " && ");
-  os << "\n";
+  os << "\n#endif // __cpp_concepts\n";
+}
+
+void ClangSyntaxPrinter::printGenericSignatureInnerStaticAsserts(
+    const CanGenericSignature &signature) {
+  os << "#ifndef __cpp_concepts\n";
+  llvm::interleave(
+      signature.getInnermostGenericParams(), os,
+      [&](const GenericTypeParamType *genericParamType) {
+        os << "static_assert(swift::isUsableInGenericContext<";
+        printGenericTypeParamTypeName(genericParamType);
+        os << ">, \"type cannot be used in a Swift generic context\");";
+      },
+      "\n");
+  os << "\n#endif // __cpp_concepts\n";
 }
 
 void ClangSyntaxPrinter::printGenericSignatureParams(
@@ -308,8 +342,8 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(!requirement.Protocol && "protocol requirements not supported yet!");
-  auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
+  assert(requirement.isMetadata() && "protocol requirements not supported yet!");
+  auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
   os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
@@ -353,4 +387,21 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
   os << "#elif __has_include(<swiftToCxx/" << headerName << ">)\n";
   os << "#include <swiftToCxx/" << headerName << ">\n";
   os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printDefine(StringRef macroName) {
+  os << "#define " << macroName << "\n";
+}
+
+void ClangSyntaxPrinter::printIgnoredDiagnosticBlock(
+    StringRef diagName, llvm::function_ref<void()> bodyPrinter) {
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-W" << diagName << "\"\n";
+  bodyPrinter();
+  os << "#pragma clang diagnostic pop\n";
+}
+
+void ClangSyntaxPrinter::printIgnoredCxx17ExtensionDiagnosticBlock(
+    llvm::function_ref<void()> bodyPrinter) {
+  printIgnoredDiagnosticBlock("c++17-extensions", bodyPrinter);
 }

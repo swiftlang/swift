@@ -137,6 +137,7 @@ private:
   void validateTestable(ModuleDecl *topLevelModule);
   void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                           SourceFile &SF);
+  void validateAllowableClient(ModuleDecl *topLevelModule, SourceFile &SF);
 
   /// Diagnoses an inability to import \p modulePath in this situation and, if
   /// \p attrs is provided and has an \p attrKind, invalidates the attribute and
@@ -371,7 +372,8 @@ getModuleImpl(ImportPath::Module modulePath, ModuleDecl *loadingModule,
   //
   // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
   // for clang overlays as well.
-  if (moduleID.Item == loadingModule->getName() && modulePath.size() == 1) {
+  if (ctx.getRealModuleName(moduleID.Item) == loadingModule->getName() &&
+      modulePath.size() == 1) {
     if (auto importer = ctx.getClangModuleLoader())
       return importer->loadModule(moduleID.Loc, modulePath);
     return nullptr;
@@ -620,6 +622,7 @@ void UnboundImport::validateOptions(NullablePtr<ModuleDecl> topLevelModule,
     // changing behavior, but it smells funny.
     validateTestable(top);
     validatePrivate(top);
+    validateAllowableClient(top, SF);
   }
 
   validateResilience(topLevelModule, SF);
@@ -709,6 +712,19 @@ void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
     return;
 
   diagnoseInvalidAttr(DAK_Testable, ctx.Diags, diag::module_not_testable);
+}
+
+void UnboundImport::validateAllowableClient(ModuleDecl *importee,
+                                            SourceFile &SF) {
+  assert(importee);
+  auto *importer = SF.getParentModule();
+  if (!importee->allowImportedBy(importer)) {
+    ASTContext &ctx = SF.getASTContext();
+    ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
+                       diag::module_allowable_client_violation,
+                       importee->getName(),
+                       importer->getName());
+  }
 }
 
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
@@ -1025,7 +1041,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
-  if (!actualKind.hasValue()) {
+  if (!actualKind.has_value()) {
     // FIXME: print entire module name?
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
                        accessPath.front().Item, module->getName());
@@ -1044,8 +1060,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
       emittedDiag.emplace(ctx.Diags.diagnose(
           importLoc, diag::imported_decl_is_wrong_kind_typealias,
           typealias->getDescriptiveKind(),
-          TypeAliasType::get(typealias, Type(), SubstitutionMap(),
-                             typealias->getUnderlyingType()),
+          typealias->getDeclaredInterfaceType(),
           getImportKindString(importKind)));
     } else {
       emittedDiag.emplace(ctx.Diags.diagnose(
@@ -1128,8 +1143,8 @@ UnboundImport::UnboundImport(
   // If either have a `@_documentation(visibility: <access>)` attribute, the
   // cross-import has the more restrictive of the two.
   if (declaringImport.docVisibility || bystandingImport.docVisibility) {
-    auto declaringAccess = declaringImport.docVisibility.getValueOr(AccessLevel::Public);
-    auto bystandingAccess = bystandingImport.docVisibility.getValueOr(AccessLevel::Public);
+    auto declaringAccess = declaringImport.docVisibility.value_or(AccessLevel::Public);
+    auto bystandingAccess = bystandingImport.docVisibility.value_or(AccessLevel::Public);
     import.docVisibility = std::min(declaringAccess, bystandingAccess);
   }
 }

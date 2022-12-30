@@ -4,5 +4,5 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/empty.h)
 
-// CHECK-LABEL: namespace Test {
+// CHECK-LABEL: namespace Test __attribute__((swift_private)) {
 // CHECK:       } // namespace Test

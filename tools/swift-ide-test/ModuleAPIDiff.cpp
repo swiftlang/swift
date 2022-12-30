@@ -394,7 +394,6 @@ struct TypealiasDecl {
 
 struct AssociatedTypeDecl {
   Identifier Name;
-  Optional<TypeName> Superclass;
   Optional<TypeName> DefaultDefinition;
   DeclAttributes Attributes;
 };
@@ -603,7 +602,6 @@ template <> struct MappingTraits<::swift::sma::TypealiasDecl> {
 template <> struct MappingTraits<::swift::sma::AssociatedTypeDecl> {
   static void mapping(IO &io, ::swift::sma::AssociatedTypeDecl &ATD) {
     io.mapRequired("Name", ATD.Name);
-    io.mapOptional("Superclass", ATD.Superclass);
     io.mapOptional("DefaultDefinition", ATD.DefaultDefinition);
     io.mapOptional("Attributes", ATD.Attributes,
                    ::swift::sma::DeclAttributes());
@@ -756,7 +754,7 @@ public:
                 convertToTypeName(Req.getSecondType())});
         break;
       case RequirementKind::Layout:
-      case RequirementKind::SameCount:
+      case RequirementKind::SameShape:
         // FIXME
         assert(false && "Not implemented");
         break;
@@ -844,7 +842,6 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
     auto ResultATD = std::make_shared<sma::AssociatedTypeDecl>();
     ResultATD->Name = convertToIdentifier(ATD->getName());
-    ResultATD->Superclass = convertToOptionalTypeName(ATD->getSuperclass());
     ResultATD->DefaultDefinition =
         convertToOptionalTypeName(ATD->getDefaultDefinitionType());
     // FIXME

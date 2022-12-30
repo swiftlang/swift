@@ -10,9 +10,6 @@ add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp
-  ParsedRawSyntaxNode.cpp
-  ParsedRawSyntaxRecorder.cpp
-  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -23,17 +20,9 @@ add_swift_host_library(swiftParse STATIC
   ParseStmt.cpp
   ParseType.cpp
   ParseVersion.cpp
-  PersistentParserState.cpp
-  SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp)
-_swift_gyb_target_sources(swiftParse PRIVATE
-    ParsedSyntaxBuilders.cpp.gyb
-    ParsedSyntaxNodes.cpp.gyb
-    ParsedSyntaxRecorder.cpp.gyb)
+  PersistentParserState.cpp)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax
-  swiftSyntaxParse
 )
 
 if (SWIFT_SWIFT_PARSER)
@@ -44,21 +33,32 @@ if (SWIFT_SWIFT_PARSER)
   #
   #   target_link_libraries(swiftParse
   #     PRIVATE
-  #     SwiftSyntax::SwiftCompilerSupport
+  #     SwiftSyntax::SwiftParser
+  #     ...
   #   )
   target_link_libraries(swiftParse
     PRIVATE
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
-    $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftParserDiagnostics
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::_SwiftSyntaxMacros
+    $<TARGET_OBJECTS:swiftASTGen>
   )
 
-  target_include_directories(swiftParse
-    PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftCompilerSupport
+  add_dependencies(swiftParse
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftParserDiagnostics
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::_SwiftSyntaxMacros
+    swiftASTGen
   )
 
   target_compile_definitions(swiftParse
@@ -67,6 +67,9 @@ if (SWIFT_SWIFT_PARSER)
   )
 endif()
 
-add_dependencies(swiftParse swift-parse-syntax-generated-headers)
+if(SWIFT_COMPILER_VERSION)
+  set_property(SOURCE ParseVersion.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DSWIFT_COMPILER_VERSION=\"\\\"${SWIFT_COMPILER_VERSION}\\\"\"")
+endif()
 
 set_swift_llvm_is_available(swiftParse)

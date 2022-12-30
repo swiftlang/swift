@@ -44,11 +44,11 @@ func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK:   cond_br {{%.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
   // CHECK: [[TRUE]]:
   // CHECK:   [[READa:%.*]] = begin_access [read] [unknown] [[PBa]]
-  // CHECK:   copy_addr [[READa]] to [initialization] [[RET]]
+  // CHECK:   copy_addr [[READa]] to [init] [[RET]]
   // CHECK:   br [[CONT:bb[0-9]+]]
   // CHECK: [[FALSE]]:
   // CHECK:   [[READb:%.*]] = begin_access [read] [unknown] [[PBb]]
-  // CHECK:   copy_addr [[READb]] to [initialization] [[RET]]
+  // CHECK:   copy_addr [[READb]] to [init] [[RET]]
   // CHECK:   br [[CONT]]
   return x ? a : b
 }

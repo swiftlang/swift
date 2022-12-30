@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-move-kills-copyable-addresses-checker | %FileCheck %s
+// RUN: %target-sil-opt %s -enable-experimental-move-only -sil-move-kills-copyable-addresses-checker | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 
@@ -34,7 +34,7 @@ case none
 // CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
 // CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
-// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [init] [[DEST_ADDR]]
 // CHECK-NEXT: debug_value [moved] undef
 // CHECK: } // end sil function 'singleBlock'
 sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -64,7 +64,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK:   cond_br undef, [[LHS:bb[0-9]+]], [[RHS:bb[0-9]+]]
 //
 // CHECK: [[LHS]]:
-// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [init] [[DEST_ADDR]]
 // CHECK:   debug_value [moved] undef : $*Builtin.NativeObject, let, name "[[VAR_NAME]]"
 // CHECK:   br bb
 //

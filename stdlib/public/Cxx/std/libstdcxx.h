@@ -11,7 +11,9 @@
 #if __has_include("charconv")
 #include "charconv"
 #endif
-#if __has_include("execution")
+// <execution> includes tbb headers, which might not be installed.
+// Only include <execution> if tbb is installed.
+#if __has_include("execution") && __has_include(<tbb/blocked_range.h>)
 #include "execution"
 #endif
 #if __has_include("filesystem")

@@ -627,9 +627,9 @@ protected:
   AccessScope getRequiredAccessScope();
 
   bool isUsableFromInlineRequired() {
-    assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
+    assert(RequiredAccessScopeAndUsableFromInline.has_value() &&
            "must check access first using getRequiredAccessScope");
-    return RequiredAccessScopeAndUsableFromInline.getValue().second;
+    return RequiredAccessScopeAndUsableFromInline.value().second;
   }
 
   /// Gather the value witnesses for the given requirement.
@@ -759,14 +759,6 @@ private:
 
   /// Whether objcMethodRequirements has been computed.
   bool computedObjCMethodRequirements = false;
-
-  // FIXME: SwiftUI source compatibility hack; see usage for details.
-  struct SwiftUIInvalidTypeWitness final {
-    AssociatedTypeDecl *AssocTypeDecl;
-    TypeAliasDecl *TypeWitnessDecl;
-    Requirement FailedReq;
-  };
-  llvm::Optional<SwiftUIInvalidTypeWitness> SwiftUIInvalidTyWitness = None;
 
   /// Retrieve the associated types that are referenced by the given
   /// requirement with a base of 'Self'.

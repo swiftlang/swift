@@ -49,7 +49,9 @@ version::Version swift::InterfaceFormatVersion({1, 0});
 /// construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ModuleInterfaceOptions const &Opts,
-                                            ModuleDecl *M) {
+                                            ModuleDecl *M,
+                                            llvm::SmallSet<StringRef, 4>
+                                              &AliasModuleNamesTargets) {
   auto &Ctx = M->getASTContext();
   auto ToolsVersion =
       getSwiftInterfaceCompilerVersionForCurrentCompiler(Ctx);
@@ -58,7 +60,32 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.Flags << "\n";
+      << Opts.Flags;
+
+  // Insert additional -module-alias flags
+  if (Opts.AliasModuleNames) {
+    StringRef moduleName = M->getNameStr();
+    AliasModuleNamesTargets.insert(M->getNameStr());
+    out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
+           moduleName << "=" << moduleName;
+
+    SmallVector<ImportedModule> imports;
+    M->getImportedModules(imports,
+                          {ModuleDecl::ImportFilterKind::Default,
+                           ModuleDecl::ImportFilterKind::Exported,
+                           ModuleDecl::ImportFilterKind::SPIOnly,
+                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+    M->getMissingImportedModules(imports);
+    for (ImportedModule import: imports) {
+      StringRef importedName = import.importedModule->getNameStr();
+      if (AliasModuleNamesTargets.insert(importedName).second) {
+        out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
+               importedName << "=" << importedName;
+      }
+    }
+  }
+  out << "\n";
+
   if (!Opts.IgnorableFlags.empty()) {
     out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
         << Opts.IgnorableFlags << "\n";
@@ -198,7 +225,7 @@ static void printImports(raw_ostream &out,
   // imports only if they are also SPI. First, list all implementation-only
   // imports and filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
-  if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
+  if (Opts.PrintPrivateInterfaceContent && Opts.ExperimentalSPIImports) {
 
     SmallVector<ImportedModule, 4> ioiImports, allImports;
     M->getImportedModules(ioiImports,
@@ -219,7 +246,7 @@ static void printImports(raw_ostream &out,
 
   /// Collect @_spiOnly imports that are not imported elsewhere publicly.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> spiOnlyImportSet;
-  if (Opts.PrintSPIs) {
+  if (Opts.PrintPrivateInterfaceContent) {
     SmallVector<ImportedModule, 4> spiOnlyImports, otherImports;
     M->getImportedModules(spiOnlyImports,
                           ModuleDecl::ImportFilterKind::SPIOnly);
@@ -278,7 +305,7 @@ static void printImports(raw_ostream &out,
     if (publicImportSet.count(import))
       out << "@_exported ";
 
-    if (Opts.PrintSPIs) {
+    if (Opts.PrintPrivateInterfaceContent) {
       // An import visible in the private swiftinterface only.
       //
       // In the long term, we want to print this attribute for consistency and
@@ -295,6 +322,8 @@ static void printImports(raw_ostream &out,
     }
 
     out << "import ";
+    if (Opts.AliasModuleNames)
+      out << MODULE_DISAMBIGUATING_PREFIX;
     importedModule->getReverseFullModuleName().printForward(out);
 
     // Write the access path we should be honoring but aren't.
@@ -369,8 +398,8 @@ class InheritedProtocolCollector {
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
   getAvailabilityAttrs(const Decl *D, Optional<AvailableAttrList> &cache) {
-    if (cache.hasValue())
-      return cache.getValue();
+    if (cache.has_value())
+      return cache.value();
 
     cache.emplace();
     while (D) {
@@ -388,7 +417,7 @@ class InheritedProtocolCollector {
       D = D->getDeclContext()->getAsDecl();
     }
 
-    return cache.getValue();
+    return cache.value();
   }
 
   static OriginallyDefinedInAttrList
@@ -754,11 +783,24 @@ bool swift::emitSwiftInterface(raw_ostream &out,
                                ModuleDecl *M) {
   assert(M);
 
-  printToolVersionAndFlagsComment(out, Opts, M);
+  llvm::SmallSet<StringRef, 4> aliasModuleNamesTargets;
+  printToolVersionAndFlagsComment(out, Opts, M, aliasModuleNamesTargets);
+
   printImports(out, Opts, M);
 
+  static bool forceUseExportedModuleNameInPublicOnly =
+    getenv("SWIFT_DEBUG_USE_EXPORTED_MODULE_NAME_IN_PUBLIC_ONLY");
+  bool useExportedModuleNameInPublicOnly =
+    M->getASTContext().LangOpts.hasFeature(Feature::ModuleInterfaceExportAs) ||
+    forceUseExportedModuleNameInPublicOnly;
+  bool useExportedModuleNames = !(useExportedModuleNameInPublicOnly &&
+                                  Opts.PrintPrivateInterfaceContent);
+
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs);
+      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
+      Opts.PrintPrivateInterfaceContent,
+      useExportedModuleNames,
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

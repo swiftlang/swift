@@ -70,10 +70,21 @@ public:
   explicit RemoteRef(StoredPointer address, const T *localBuffer)
     : Address((uint64_t)address), LocalBuffer(localBuffer) {}
 
+  // <rdar://99715218> Some versions of clang++ sometimes fail to generate the
+  // copy constructor for this type correctly - add a workaround
+  RemoteRef(const RemoteRef &other)
+    : Address(other.Address), LocalBuffer(other.LocalBuffer) {}
+
+  RemoteRef& operator=(const RemoteRef &other) {
+    Address = other.Address;
+    LocalBuffer = other.LocalBuffer;
+    return *this;
+  }
+
   uint64_t getAddressData() const {
     return Address;
   }
-  
+
   const T *getLocalBuffer() const {
     return LocalBuffer;
   }
@@ -174,6 +185,8 @@ public:
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
   using TargetClassMetadata = TargetClassMetadataType<Runtime>;
+
+  static const int defaultTypeRecursionLimit = 50;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -495,6 +508,18 @@ public:
     return result;
   }
 
+  /// Demangle a mangled name from a potentially temporary std::string. The
+  /// demangler may produce pointers into the string data, so this copies the
+  /// string into the demangler's allocation first.
+  Demangle::NodePointer demangle(uint64_t remoteAddress,
+                                 const std::string &mangledName,
+                                 MangledNameKind kind,
+                                 Demangler &dem) {
+    StringRef mangledNameCopy = dem.copyString(mangledName);
+    return demangle(RemoteRef<char>(remoteAddress, mangledNameCopy.data()),
+                    kind, dem);
+  }
+
   /// Given a demangle tree, attempt to turn it into a type.
   TypeLookupErrorOr<typename BuilderType::BuiltType>
   decodeMangledType(NodePointer Node) {
@@ -792,11 +817,24 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
-  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
-                                 bool skipArtificialSubclasses = false) {
+  BuiltType
+  readTypeFromMetadata(StoredPointer MetadataAddress,
+                       bool skipArtificialSubclasses = false,
+                       int recursion_limit = defaultTypeRecursionLimit) {
     auto Cached = TypeCache.find(MetadataAddress);
     if (Cached != TypeCache.end())
       return Cached->second;
+
+    if (recursion_limit <= 0) {
+      return nullptr;
+    }
+
+    // readTypeFromMetadata calls out to various other functions which can call
+    // back to readTypeFromMetadata. We only want to bump the recursion limit
+    // down here, not in the other functions, so that we're only counting
+    // recursive calls to readTypeFromMetadata. This decrement is the only place
+    // where we'll subtract 1.
+    recursion_limit--;
 
     // If we see garbage data in the process of building a BuiltType, and get
     // the same metadata address again, we will hit an infinite loop.
@@ -810,11 +848,12 @@ public:
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
-      return readNominalTypeFromClassMetadata(Meta, skipArtificialSubclasses);
+      return readNominalTypeFromClassMetadata(Meta, recursion_limit,
+                                              skipArtificialSubclasses);
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return readNominalTypeFromMetadata(Meta);
+      return readNominalTypeFromMetadata(Meta, recursion_limit);
     case MetadataKind::Tuple: {
       auto tupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
 
@@ -823,7 +862,8 @@ public:
 
       for (unsigned i = 0, n = tupleMeta->NumElements; i != n; ++i) {
         auto &element = tupleMeta->getElement(i);
-        if (auto elementType = readTypeFromMetadata(element.Type))
+        if (auto elementType =
+                readTypeFromMetadata(element.Type, false, recursion_limit))
           elementTypes.push_back(elementType);
         else
           return BuiltType();
@@ -845,7 +885,8 @@ public:
 
       std::vector<FunctionParam<BuiltType>> Parameters;
       for (unsigned i = 0, n = Function->getNumParameters(); i != n; ++i) {
-        auto ParamTypeRef = readTypeFromMetadata(Function->getParameter(i));
+        auto ParamTypeRef = readTypeFromMetadata(Function->getParameter(i),
+                                                 false, recursion_limit);
         if (!ParamTypeRef)
           return BuiltType();
 
@@ -855,7 +896,8 @@ public:
         Parameters.push_back(std::move(Param));
       }
 
-      auto Result = readTypeFromMetadata(Function->ResultType);
+      auto Result =
+          readTypeFromMetadata(Function->ResultType, false, recursion_limit);
       if (!Result)
         return BuiltType();
 
@@ -869,7 +911,8 @@ public:
 
       BuiltType globalActor = BuiltType();
       if (Function->hasGlobalActor()) {
-        globalActor = readTypeFromMetadata(Function->getGlobalActor());
+        globalActor = readTypeFromMetadata(Function->getGlobalActor(), false,
+                                           recursion_limit);
         if (globalActor)
           flags = flags.withGlobalActor(true);
       }
@@ -904,7 +947,8 @@ public:
       BuiltType SuperclassType = BuiltType();
       if (Exist->Flags.hasSuperclassConstraint()) {
         // The superclass is stored after the list of protocols.
-        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint());
+        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint(),
+                                              false, recursion_limit);
         if (!SuperclassType) return BuiltType();
 
         HasExplicitAnyObject = true;
@@ -960,7 +1004,7 @@ public:
       std::vector<BuiltType> builtArgs;
       for (unsigned i = 0; i < shapeArgumentCount; ++i) {
         auto remoteArg = Exist->getGeneralizationArguments()[i];
-        auto builtArg = readTypeFromMetadata(remoteArg);
+        auto builtArg = readTypeFromMetadata(remoteArg, false, recursion_limit);
         if (!builtArg)
           return BuiltType();
         builtArgs.push_back(builtArg);
@@ -1025,7 +1069,8 @@ public:
 
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
-      auto Instance = readTypeFromMetadata(Metatype->InstanceType);
+      auto Instance =
+          readTypeFromMetadata(Metatype->InstanceType, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltMetatype = Builder.createMetatypeType(Instance);
       TypeCache[MetadataAddress] = BuiltMetatype;
@@ -1045,7 +1090,8 @@ public:
     }
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
-      auto Instance = readTypeFromMetadata(Exist->InstanceType);
+      auto Instance =
+          readTypeFromMetadata(Exist->InstanceType, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltExist = Builder.createExistentialMetatypeType(Instance);
       TypeCache[MetadataAddress] = BuiltExist;
@@ -1447,7 +1493,12 @@ public:
   
     return demangledSymbol;
   }
-  
+
+  Demangle::NodePointer buildContextManglingForSymbol(const std::string &symbol,
+                                                      Demangler &dem) {
+    return buildContextManglingForSymbol(dem.copyString(symbol), dem);
+  }
+
   /// Given a read context descriptor, attempt to build a demangling tree
   /// for it.
   Demangle::NodePointer
@@ -2333,10 +2384,7 @@ private:
       // We're done.
       break;
     }
-
-    return demangle(RemoteRef<char>(address.getAddressData(),
-                                    mangledName.data()),
-                    kind, dem);
+    return demangle(address.getAddressData(), mangledName, kind, dem);
   }
 
   /// Read and demangle the name of an anonymous context.
@@ -2861,9 +2909,11 @@ private:
   template <
       typename T = BuilderType,
       typename std::enable_if_t<
-          !std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
+          !(std::is_same<
+                const bool,
+                decltype(T::needsToPrecomputeParentGenericContextShapes)>::
+                value &&
+            T::needsToPrecomputeParentGenericContextShapes),
           bool> = true>
   BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
@@ -2876,13 +2926,14 @@ private:
     return decl;
   }
 
-  template <
-      typename T = BuilderType,
-      typename std::enable_if_t<
-          std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
-          bool> = true>
+  template <typename T = BuilderType,
+            typename std::enable_if_t<
+                std::is_same<
+                    const bool,
+                    decltype(T::needsToPrecomputeParentGenericContextShapes)>::
+                        value &&
+                    T::needsToPrecomputeParentGenericContextShapes,
+                bool> = true>
   BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangler dem;
@@ -2899,12 +2950,17 @@ private:
                 countLevels(parentContext, runningCount);
 
           auto genericContext = current->getGenericContext();
-          if (!genericContext)
-            return;
-          auto contextHeader = genericContext->getGenericContextHeader();
-
-          paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
-          runningCount += paramsPerLevel.back();
+          // Only consider generic contexts of type class, enum or struct.
+          // There are other context types that can be generic, but they should
+          // not affect the generic shape.
+          if (genericContext &&
+              (current->getKind() == ContextDescriptorKind::Class ||
+               current->getKind() == ContextDescriptorKind::Enum ||
+               current->getKind() == ContextDescriptorKind::Struct)) {
+            auto contextHeader = genericContext->getGenericContextHeader();
+            paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
+            runningCount += paramsPerLevel.back();
+          }
         };
     countLevels(descriptor, runningCount);
     BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);
@@ -2937,8 +2993,9 @@ private:
   // TODO: We need to be able to produce protocol conformances for each
   // substitution type as well in order to accurately rebuild bound generic
   // types or types in protocol-constrained inner contexts.
-  std::vector<BuiltType>
-  getGenericSubst(MetadataRef metadata, ContextDescriptorRef descriptor) {
+  std::vector<BuiltType> getGenericSubst(MetadataRef metadata,
+                                         ContextDescriptorRef descriptor,
+                                         int recursion_limit) {
     auto generics = descriptor->getGenericContext();
     if (!generics)
       return {};
@@ -2975,8 +3032,8 @@ private:
             return {};
           }
           genericArgsAddr += sizeof(StoredPointer);
-          
-          auto builtArg = readTypeFromMetadata(arg);
+
+          auto builtArg = readTypeFromMetadata(arg, false, recursion_limit);
           if (!builtArg)
             return {};
           builtSubsts.push_back(builtArg);
@@ -2996,8 +3053,10 @@ private:
     return builtSubsts;
   }
 
-  BuiltType readNominalTypeFromMetadata(MetadataRef origMetadata,
-                                        bool skipArtificialSubclasses = false) {
+  BuiltType
+  readNominalTypeFromMetadata(MetadataRef origMetadata,
+                              int recursion_limit = defaultTypeRecursionLimit,
+                              bool skipArtificialSubclasses = false) {
     auto metadata = origMetadata;
     auto descriptorAddress =
       readAddressOfNominalTypeDescriptor(metadata,
@@ -3027,7 +3086,8 @@ private:
     BuiltType nominal;
     if (descriptor->isGeneric()) {
       // Resolve the generic arguments.
-      auto builtGenerics = getGenericSubst(metadata, descriptor);
+      auto builtGenerics =
+          getGenericSubst(metadata, descriptor, recursion_limit);
       if (builtGenerics.empty())
         return BuiltType();
       nominal = Builder.createBoundGenericType(typeDecl, builtGenerics);
@@ -3049,11 +3109,14 @@ private:
     return nominal;
   }
 
-  BuiltType readNominalTypeFromClassMetadata(MetadataRef origMetadata,
-                                       bool skipArtificialSubclasses = false) {
+  BuiltType
+  readNominalTypeFromClassMetadata(MetadataRef origMetadata,
+                                   int recursion_limit,
+                                   bool skipArtificialSubclasses = false) {
     auto classMeta = cast<TargetClassMetadata>(origMetadata);
     if (classMeta->isTypeMetadata())
-      return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
+      return readNominalTypeFromMetadata(origMetadata, recursion_limit,
+                                         skipArtificialSubclasses);
 
     std::string className;
     auto origMetadataPtr = getAddress(origMetadata);
@@ -3066,8 +3129,9 @@ private:
       if (!stripSignedPointer(classMeta->Superclass))
         return BuiltType();
 
-      BuiltObjCClass = readTypeFromMetadata(
-          stripSignedPointer(classMeta->Superclass), skipArtificialSubclasses);
+      BuiltObjCClass =
+          readTypeFromMetadata(stripSignedPointer(classMeta->Superclass),
+                               skipArtificialSubclasses, recursion_limit);
     }
 
     TypeCache[origMetadataPtr] = BuiltObjCClass;

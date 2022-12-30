@@ -131,6 +131,7 @@ distributed actor DistributedActor_1 {
 
   func test_inside() async throws {
     _ = self.name
+    _ = self.computed
     _ = self.computedMutable
 
     _ = try await self.distInt()

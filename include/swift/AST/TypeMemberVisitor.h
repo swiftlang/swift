@@ -41,6 +41,7 @@ public:
   BAD_MEMBER(TopLevelCode)
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
+  BAD_MEMBER(Macro)
 
   // The children of these are automatically inserted into the
   // surrounding context.
@@ -59,6 +60,24 @@ public:
       asImpl().visit(member);
     }
   }
+
+  /// A convenience method to visit all the members in the implementation
+  /// context.
+  ///
+  /// \seealso IterableDeclContext::getImplementationContext()
+  void visitImplementationMembers(NominalTypeDecl *D) {
+    for (Decl *member : D->getImplementationContext()->getMembers()) {
+      asImpl().visit(member);
+    }
+    
+    // If this is a main-interface @_objcImplementation extension and the class
+    // has a synthesized destructor, visit it now.
+    if (auto cd = dyn_cast_or_null<ClassDecl>(D)) {
+      auto dd = cd->getDestructor();
+      if (dd->getDeclContext() == cd && cd->getImplementationContext() != cd)
+        asImpl().visit(dd);
+    }
+  }
 };
 
 template<typename ImplClass, typename RetTy = void>
@@ -69,6 +88,10 @@ public:
 
   void visitMembers(ClassDecl *D) {
     TypeMemberVisitor<ImplClass, RetTy>::visitMembers(D);
+  }
+
+  void visitImplementationMembers(ClassDecl *D) {
+    TypeMemberVisitor<ImplClass, RetTy>::visitImplementationMembers(D);
   }
 };
 

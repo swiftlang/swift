@@ -72,7 +72,13 @@ namespace swift {
     FUNC(Decl)
     FUNC(Pattern)
 #undef FUNC
-    
+
+    static inline ASTNode getFromOpaqueValue(void *ptr) {
+      ASTNode result;
+      result.Val = decltype(result.Val)::getFromOpaqueValue(ptr);
+      return result;
+    }
+
     SWIFT_DEBUG_DUMP;
     void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 

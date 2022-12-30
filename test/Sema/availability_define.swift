@@ -66,6 +66,10 @@ func client() {
   if #available(_unknownMacro, *) { } // expected-error {{expected version number}}
 }
 
+public func doIt(_ closure: () -> ()) {
+  closure()
+}
+
 @inlinable
 public func forbidMacrosInInlinableCode() {
   if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
@@ -74,6 +78,9 @@ public func forbidMacrosInInlinableCode() {
   if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
   if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
   if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  doIt {
+    if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  }
 }
 
 @_alwaysEmitIntoClient
@@ -84,6 +91,9 @@ public func forbidMacrosInInlinableCode1() {
   if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
   if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
   if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  doIt {
+    if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  }
 }
 
 @available(_iOS8Aligned, *)
@@ -95,4 +105,7 @@ public func forbidMacrosInInlinableCode2() {
   if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
   if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
   if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  doIt {
+    if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  }
 }

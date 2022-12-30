@@ -69,7 +69,8 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::SequenceArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;
@@ -149,7 +150,7 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     }
 
     // Add the fulfillment.
-    hadFulfillment |= addFulfillment({type, nullptr},
+    hadFulfillment |= addFulfillment(GenericRequirement::forMetadata(type),
                                      source, std::move(path), metadataState);
     return hadFulfillment;
   }
@@ -250,8 +251,9 @@ bool FulfillmentMap::searchWitnessTable(
   // If we're not limiting the set of interesting conformances, or if
   // this is an interesting conformance, record it.
   if (!interestingConformances || interestingConformances->count(protocol)) {
-    hadFulfillment |= addFulfillment({type, protocol}, source,
-                                     std::move(path), MetadataState::Complete);
+    hadFulfillment |= addFulfillment(
+        GenericRequirement::forWitnessTable(type, protocol), source,
+        std::move(path), MetadataState::Complete);
   }
 
   return hadFulfillment;
@@ -277,44 +279,49 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
+  auto subs = type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+
   GenericTypeRequirements requirements(IGM, nominal);
-  requirements.enumerateFulfillments(
-      IGM, type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal),
-      [&](unsigned reqtIndex, CanType arg, ProtocolConformanceRef conf) {
-        // Skip uninteresting type arguments.
-        if (!keys.hasInterestingType(arg))
-          return;
 
-        // If the fulfilled value is type metadata, refine the path.
-        if (conf.isInvalid()) {
-          auto argState =
-              getPresumedMetadataStateForTypeArgument(metadataState);
-          MetadataPath argPath = path;
-          argPath.addNominalTypeArgumentComponent(reqtIndex);
-          hadFulfillment |= searchTypeMetadata(
-              IGM, arg, IsExact, argState, source, std::move(argPath), keys);
-          return;
-        }
+  for (unsigned reqtIndex : indices(requirements.getRequirements())) {
+    auto requirement = requirements.getRequirements()[reqtIndex];
+    auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
 
-        // Otherwise, it's a conformance.
+    // Skip uninteresting type arguments.
+    if (!keys.hasInterestingType(arg))
+      continue;
 
-        // Ignore it unless the type itself is interesting.
-        if (!keys.isInterestingType(arg))
-          return;
+    // If the fulfilled value is type metadata, refine the path.
+    if (requirement.isMetadata()) {
+      auto argState =
+          getPresumedMetadataStateForTypeArgument(metadataState);
+      MetadataPath argPath = path;
+      argPath.addNominalTypeArgumentComponent(reqtIndex);
+      hadFulfillment |= searchTypeMetadata(
+          IGM, arg, IsExact, argState, source, std::move(argPath), keys);
+      continue;
+    }
 
-        // Refine the path.
-        MetadataPath argPath = path;
-        argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
+    // Otherwise, it's a conformance.
+    assert(requirement.isWitnessTable());
 
-        hadFulfillment |= searchWitnessTable(IGM, arg, conf.getRequirement(),
-                                             source, std::move(argPath), keys);
-      });
+    // Ignore it unless the type itself is interesting.
+    if (!keys.isInterestingType(arg))
+      continue;
+
+    // Refine the path.
+    MetadataPath argPath = path;
+    argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
+
+    hadFulfillment |= searchWitnessTable(IGM, arg, requirement.getProtocol(),
+                                         source, std::move(argPath), keys);
+  }
 
   return hadFulfillment;
 }
 
 /// Testify that there's a fulfillment at the given path.
-bool FulfillmentMap::addFulfillment(FulfillmentKey key,
+bool FulfillmentMap::addFulfillment(GenericRequirement key,
                                     unsigned source,
                                     MetadataPath &&path,
                                     MetadataState metadataState) {
@@ -359,10 +366,8 @@ static StringRef getStateName(MetadataState state) {
 void FulfillmentMap::dump() const {
   auto &out = llvm::errs();
   for (auto &entry : Fulfillments) {
-    out << "(" << entry.first.first;
-    if (auto proto = entry.first.second) {
-      out << ", " << proto->getNameStr();
-    }
+    out << "(";
+    entry.first.dump(out);
     out << ") => " << getStateName(entry.second.getState())
         << " at sources[" << entry.second.SourceIndex
         << "]." << entry.second.Path << "\n";

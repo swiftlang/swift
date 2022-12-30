@@ -57,10 +57,10 @@ import Swift
 ///
 /// At the call site, this looks like:
 ///
-///     for await i in Counter(howHigh: 10) {
-///       print(i, terminator: " ")
+///     for await number in Counter(howHigh: 10) {
+///       print(number, terminator: " ")
 ///     }
-///     // Prints "1 2 3 4 5 6 7 8 9 10"
+///     // Prints "1 2 3 4 5 6 7 8 9 10 "
 ///
 /// ### End of Iteration
 ///

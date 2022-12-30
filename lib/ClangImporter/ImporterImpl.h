@@ -614,14 +614,6 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
-  /// Keep track of cxx function names, params etc in order to
-  /// allow for de-duping functions that differ strictly on "constness".
-  llvm::DenseMap<const clang::DeclContext *, llvm::DenseMap<llvm::StringRef,
-                 std::pair<
-                     llvm::DenseSet<clang::FunctionDecl *>,
-                     llvm::DenseSet<clang::FunctionDecl *>>>>
-      cxxMethods;
-
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
@@ -1748,8 +1740,8 @@ public:
   void dumpSwiftLookupTables();
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
-    if (PCHFilename.hasValue()) {
-      assert(llvm::sys::path::extension(PCHFilename.getValue())
+    if (PCHFilename.has_value()) {
+      assert(llvm::sys::path::extension(PCHFilename.value())
                  .endswith(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
@@ -1760,7 +1752,7 @@ public:
   /// files, we can provide the PCH filename for declaration caching,
   /// especially in code completion.
   StringRef getSinglePCHImport() const {
-    if (SinglePCHImport.hasValue())
+    if (SinglePCHImport.has_value())
       return *SinglePCHImport;
     return StringRef();
   }
@@ -1908,6 +1900,26 @@ inline Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
   if (found != foundDecls.end())
     return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
 
+  // If a swift_private attribute has been attached to the enum, its name will
+  // be prefixed with two underscores
+  llvm::SmallString<32> swiftPrivateName;
+  swiftPrivateName += "__";
+  swiftPrivateName += typedefDecl->getName();
+  foundDecls = lookupTable->lookup(
+      SerializedSwiftName(ctx.getIdentifier(swiftPrivateName)),
+      EffectiveClangContext());
+
+  auto swiftPrivateFound =
+      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+        return decl.is<clang::NamedDecl *>() &&
+               isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>()) &&
+               decl.get<clang::NamedDecl *>()
+                   ->hasAttr<clang::SwiftPrivateAttr>();
+      });
+
+  if (swiftPrivateFound != foundDecls.end())
+    return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
+
   return None;
 }
 
@@ -1925,6 +1937,15 @@ inline bool requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (OperatorToken == Spelling) {                                             \
+    return "__operator" #Name;                                                 \
+  };
+#include "clang/Basic/OperatorKinds.def"
+  return "None";
 }
 
 }

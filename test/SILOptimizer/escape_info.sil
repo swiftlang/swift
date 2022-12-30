@@ -570,7 +570,7 @@ bb2:
 
 bb3:
   %13 = unchecked_take_enum_data_addr %3 : $*E, #E.B!enumelt
-  copy_addr [take] %13 to [initialization] %0 : $*Z
+  copy_addr [take] %13 to [init] %0 : $*Z
   dealloc_stack %3 : $*E
   %15 = tuple ()
   return %15 : $()
@@ -709,10 +709,10 @@ bb1:
   br bb3
 bb2:
   destroy_value %2 : $X
-  copy_addr %1 to [initialization] %4 : $*X
+  copy_addr %1 to [init] %4 : $*X
   br bb3
 bb3:
-  copy_addr %4 to [initialization] %0 : $*X
+  copy_addr %4 to [init] %0 : $*X
   destroy_addr %4 : $*X
   dealloc_stack %4 : $*X
 
@@ -730,7 +730,7 @@ bb0:
   %1 = alloc_ref $Y
   %2 = enum $Optional<Y>, #Optional.some!enumelt, %1 : $Y
   %3 = ref_element_addr %0 : $WZ, #WZ.w
-  store_weak %2 to [initialization] %3 : $*@sil_weak Optional<Y>
+  store_weak %2 to [init] %3 : $*@sil_weak Optional<Y>
   %5 = load_weak %3 : $*@sil_weak Optional<Y>
   return %5 : $Optional<Y>
 }
@@ -744,7 +744,7 @@ bb0:
   %0 = alloc_ref $WZ
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $WZ, #WZ.u
-  store_unowned %1 to [initialization] %2 : $*@sil_unowned Y
+  store_unowned %1 to [init] %2 : $*@sil_unowned Y
   %4 = load_unowned %2 : $*@sil_unowned Y
   return %4 : $Y
 }
@@ -1305,3 +1305,17 @@ bb0:
   return %11 : $()
 }
 
+// CHECK-LABEL: Escape information for test_debug_value:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: End function test_debug_value
+sil @test_debug_value : $@convention(thin) () -> () {
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Z
+  %2 = ref_element_addr %1 : $Z, #Z.y
+  store %0 to %2 : $*Y
+  debug_value %0 : $Y
+  debug_value %2 : $*Y
+  %11 = tuple ()
+  return %11 : $()
+}

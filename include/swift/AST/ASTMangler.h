@@ -157,6 +157,8 @@ public:
     AccessibleFunctionRecord,
     BackDeploymentThunk,
     BackDeploymentFallback,
+    HasSymbolQuery,
+    RuntimeDiscoverableAttributeRecord,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
@@ -356,6 +358,12 @@ public:
   std::string mangleOpaqueTypeDecl(const ValueDecl *decl);
 
   std::string mangleGenericSignature(const GenericSignature sig);
+
+  std::string mangleHasSymbolQuery(const ValueDecl *decl);
+
+  std::string
+  mangleRuntimeAttributeGeneratorEntity(const ValueDecl *decl, CustomAttr *attr,
+                                        SymbolKind SKind = SymbolKind::Default);
 
   enum SpecialContext {
     ObjCContext,
@@ -581,6 +589,9 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
+
+  void appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                             CustomAttr *attr);
 };
 
 } // end namespace Mangle

@@ -36,6 +36,10 @@ extern swift::once_t initializeToken;
   }
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
+// Wrapper around SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues();
+
 // Wrapper around SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION that the
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration();

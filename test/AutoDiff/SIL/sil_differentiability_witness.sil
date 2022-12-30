@@ -137,7 +137,7 @@ sil_differentiability_witness [reverse] [parameters 0] [results 0] @foo : $@conv
 
 sil hidden [ossa] @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $Float):
-  copy_addr %1 to [initialization] %0 : $*T
+  copy_addr %1 to [init] %0 : $*T
   %void = tuple ()
   return %void : $()
 }

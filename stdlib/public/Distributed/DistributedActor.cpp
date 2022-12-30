@@ -110,8 +110,7 @@ static void swift_distributed_execute_target_resume(
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError(
-    const char *targetNameStart, size_t targetNameLength);
+SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError();
 
 SWIFT_CC(swiftasync)
 void swift_distributed_execute_target(
@@ -129,7 +128,7 @@ void swift_distributed_execute_target(
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
-        swift_distributed_makeDistributedTargetAccessorNotFoundError(targetNameStart, targetNameLength);
+        swift_distributed_makeDistributedTargetAccessorNotFoundError();
     auto resumeInParent =
         reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
             callerContext->ResumeParent);

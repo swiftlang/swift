@@ -933,6 +933,20 @@ public:
       return false;
     }
   }
+
+  bool isTypeParameterPack() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return false;
+    case Kind::Type:
+    case Kind::ClangType:
+    case Kind::Discard: {
+      return getType()->isParameterPack();
+    }
+    default:
+      return false;
+    }
+  }
   
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
@@ -1255,6 +1269,64 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Is the given pack type a valid substitution of this abstraction
+  /// pattern?
+  bool matchesPack(CanPackType substType);
+
+  bool isPack() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("querying invalid abstraction pattern!");
+    case Kind::Opaque:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
+    case Kind::OpaqueFunction:
+    case Kind::OpaqueDerivativeFunction:
+    case Kind::ObjCCompletionHandlerArgumentsType:
+    case Kind::Tuple:
+    case Kind::ClangType:
+      return false;
+    case Kind::Type:
+    case Kind::Discard:
+      return isa<PackType>(getType());
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  size_t getNumPackElements() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("querying invalid abstraction pattern!");
+    case Kind::Opaque:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
+    case Kind::OpaqueFunction:
+    case Kind::OpaqueDerivativeFunction:
+    case Kind::ObjCCompletionHandlerArgumentsType:
+    case Kind::Tuple:
+    case Kind::ClangType:
+      llvm_unreachable("pattern is not a pack");
+    case Kind::Type:
+    case Kind::Discard:
+      return cast<PackType>(getType())->getNumElements();
+    }
+    llvm_unreachable("bad kind");
+  }
+
   /// Given that the value being abstracted is a move only type, return the
   /// abstraction pattern with the move only bit removed.
   AbstractionPattern removingMoveOnlyWrapper() const;
@@ -1264,8 +1336,20 @@ public:
   AbstractionPattern addingMoveOnlyWrapper() const;
 
   /// Given that the value being abstracted is a tuple type, return
-  /// the abstraction pattern for its object type.
+  /// the abstraction pattern for an element type.
   AbstractionPattern getTupleElementType(unsigned index) const;
+
+  /// Given that the value being abstracted is a pack type, return
+  /// the abstraction pattern for an element type.
+  AbstractionPattern getPackElementType(unsigned index) const;
+
+  /// Give that the value being abstracted is a pack expansion type, return the
+  /// underlying pattern type.
+  AbstractionPattern getPackExpansionPatternType() const;
+
+  /// Give that the value being abstracted is a pack expansion type, return the
+  /// underlying count type.
+  AbstractionPattern getPackExpansionCountType() const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.

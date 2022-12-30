@@ -9,7 +9,8 @@ public protocol MyProto<Assoc> {
     associatedtype Assoc
 }
 
-public func pub_function()
+@discardableResult
+public func pub_function() -> Int
 
 
 [
@@ -76,17 +77,27 @@ public func pub_function()
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 119,
+    key.length: 18
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 138,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 126,
+    key.offset: 145,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 131,
+    key.offset: 150,
     key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 168,
+    key.length: 3
   }
 ]
 [
@@ -94,6 +105,12 @@ public func pub_function()
     key.kind: source.lang.swift.ref.associatedtype,
     key.offset: 81,
     key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 168,
+    key.length: 3,
+    key.is_system: 1
   }
 ]
 [
@@ -166,15 +183,21 @@ public func pub_function()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "pub_function()",
-    key.offset: 126,
-    key.length: 19,
-    key.nameoffset: 131,
+    key.offset: 145,
+    key.length: 26,
+    key.typename: "Int",
+    key.nameoffset: 150,
     key.namelength: 14,
     key.attributes: [
       {
-        key.offset: 119,
+        key.offset: 138,
         key.length: 6,
         key.attribute: source.decl.attribute.public
+      },
+      {
+        key.offset: 119,
+        key.length: 18,
+        key.attribute: source.decl.attribute.discardableResult
       }
     ]
   }

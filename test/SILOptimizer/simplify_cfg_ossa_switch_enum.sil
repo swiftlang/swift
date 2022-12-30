@@ -1,0 +1,84 @@
+// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+
+class Klass {
+}
+
+enum FakeOptional<T> {
+  case some(T)
+  case none
+}
+
+enum E1 {
+  case A(Klass)
+  case B(Klass)
+  case C(Klass)
+}
+
+enum E2 {
+  case A(Klass)
+  case B(Klass)
+  case C
+}
+
+// CHECK-LABEL: sil [ossa] @test_canonicalize_switch_enum1 :
+// CHECK-NOT: default
+// CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum1'
+sil [ossa] @test_canonicalize_switch_enum1 : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  test_specification "simplify-cfg-canonicalize-switch-enum"
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.none!enumelt: bb1, default bb2
+
+bb1:
+  br bb3
+
+bb2(%5 : @owned $Klass):
+  destroy_value %5 : $Klass
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_canonicalize_switch_enum2 :
+// CHECK: default
+// CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum2'
+sil [ossa] @test_canonicalize_switch_enum2 : $@convention(thin) (@owned E1) -> () {
+bb0(%0 : @owned $E1):
+  test_specification "simplify-cfg-canonicalize-switch-enum"
+  switch_enum %0 : $E1, case #E1.A!enumelt: bb1, default bb2
+
+bb1(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  br bb3
+
+bb2(%5 : @owned $E1):
+  destroy_value %5 : $E1
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_canonicalize_switch_enum3 :
+// CHECK: default
+// CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum3'
+sil [ossa] @test_canonicalize_switch_enum3 : $@convention(thin) (@owned E2) -> () {
+bb0(%0 : @owned $E2):
+  test_specification "simplify-cfg-canonicalize-switch-enum"
+  switch_enum %0 : $E2, case #E2.A!enumelt: bb1, default bb2
+
+bb1(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  br bb3
+
+bb2(%5 : @owned $E2):
+  destroy_value %5 : $E2
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+

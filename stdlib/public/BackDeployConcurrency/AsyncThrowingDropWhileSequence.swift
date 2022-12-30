@@ -30,7 +30,7 @@ extension AsyncSequence {
   /// throws without ever printing anything.
   ///
   ///     do {
-  ///         let stream =  Counter(howHigh: 10)
+  ///         let stream = Counter(howHigh: 10)
   ///             .drop {
   ///                 if $0 % 2 == 0 {
   ///                     throw EvenError()
@@ -38,12 +38,12 @@ extension AsyncSequence {
   ///                 return $0 < 5
   ///             }
   ///         for try await number in stream {
-  ///             print("\(number) ")
+  ///             print(number)
   ///         }
   ///     } catch {
-  ///         print ("\(error)")
+  ///         print(error)
   ///     }
-  ///     // Prints: EvenError()
+  ///     // Prints "EvenError()"
   ///
   /// After the predicate returns `false`, the sequence never executes it again,
   /// and from then on the sequence passes through elements from its underlying

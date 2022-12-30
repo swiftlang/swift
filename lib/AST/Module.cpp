@@ -46,7 +46,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
-#include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -59,6 +58,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 
@@ -514,6 +514,136 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
+void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
+  AuxiliaryFiles.push_back(&sourceFile);
+}
+
+namespace {
+  /// Compare the source location ranges for two files, as an ordering to
+  /// use for fast searches.
+  struct SourceFileRangeComparison {
+    SourceManager *sourceMgr;
+
+    bool operator()(SourceFile *lhs, SourceFile *rhs) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getStart().getOpaquePointerValue(),
+          (const char *)rhsRange.getStart().getOpaquePointerValue());
+    }
+
+    bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
+          (const char *)rhsLoc.getOpaquePointerValue());
+    }
+
+    bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsLoc.getOpaquePointerValue(),
+          (const char *)rhsRange.getEnd().getOpaquePointerValue());
+    }
+  };
+}
+
+class swift::ModuleSourceFileLocationMap {
+public:
+  unsigned numFiles = 0;
+  unsigned numAuxiliaryFiles = 0;
+  std::vector<SourceFile *> allSourceFiles;
+  SourceFile *lastSourceFile = nullptr;
+};
+
+void ModuleDecl::updateSourceFileLocationMap() {
+  // Allocate a source file location map, if we don't have one already.
+  if (!sourceFileLocationMap) {
+    ASTContext &ctx = getASTContext();
+    sourceFileLocationMap = ctx.Allocate<ModuleSourceFileLocationMap>();
+    ctx.addCleanup([sourceFileLocationMap=sourceFileLocationMap]() {
+      sourceFileLocationMap->~ModuleSourceFileLocationMap();
+    });
+  }
+
+  // If we are up-to-date, there's nothing to do.
+  if (sourceFileLocationMap->numFiles == getFiles().size() &&
+      sourceFileLocationMap->numAuxiliaryFiles ==
+          AuxiliaryFiles.size())
+    return;
+
+  // Rebuild the range structure.
+  sourceFileLocationMap->allSourceFiles.clear();
+
+  // First, add all of the source files with a backing buffer.
+  for (auto *fileUnit : getFiles()) {
+    if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
+      if (sourceFile->getBufferID())
+        sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+    }
+  }
+
+  // Next, add all of the macro expansion files.
+  for (auto *sourceFile : AuxiliaryFiles)
+    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+
+  // Finally, sort them all so we can do a binary search for lookup.
+  std::sort(sourceFileLocationMap->allSourceFiles.begin(),
+            sourceFileLocationMap->allSourceFiles.end(),
+            SourceFileRangeComparison{&getASTContext().SourceMgr});
+}
+
+SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
+  if (loc.isInvalid())
+    return nullptr;
+
+
+  // Check whether this location is in a "replaced" range, in which case
+  // we want to use the original source file.
+  auto &sourceMgr = getASTContext().SourceMgr;
+  SourceLoc adjustedLoc = loc;
+  for (const auto &pair : sourceMgr.getReplacedRanges()) {
+    if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
+      adjustedLoc = pair.first.Start;
+      break;
+    }
+  }
+
+  // Before we do any extra work, check the last source file we found a result
+  // in to see if it contains this.
+  if (sourceFileLocationMap) {
+    if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
+      auto range = sourceMgr.getRangeForBuffer(*lastSourceFile->getBufferID());
+      if (range.contains(adjustedLoc))
+        return lastSourceFile;
+    }
+  }
+
+  updateSourceFileLocationMap();
+
+  auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
+                                sourceFileLocationMap->allSourceFiles.end(),
+                                adjustedLoc,
+                                SourceFileRangeComparison{&sourceMgr});
+  if (found == sourceFileLocationMap->allSourceFiles.end())
+    return nullptr;
+
+  auto foundSourceFile = *found;
+  auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
+  if (!foundRange.contains(adjustedLoc))
+    return nullptr;
+
+  // Update the last source file.
+  sourceFileLocationMap->lastSourceFile = foundSourceFile;
+  return foundSourceFile;
+}
+
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
@@ -535,15 +665,15 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
 }
 
-SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
-                                                ModuleDecl *mod) const {
+SourceFile *IDEInspectionFileRequest::evaluate(Evaluator &evaluator,
+                                               ModuleDecl *mod) const {
   const auto &SM = mod->getASTContext().SourceMgr;
   assert(mod->isMainModule() && "Can only do completion in the main module");
-  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+  assert(SM.hasIDEInspectionTargetBuffer() && "Not in IDE inspection mode?");
 
   for (auto *file : mod->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
-    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+    if (SF && SF->getBufferID() == SM.getIDEInspectionTargetBufferID())
       return SF;
   }
   llvm_unreachable("Couldn't find the completion file?");
@@ -745,6 +875,24 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMembers(accessPath, consumer);
+}
+
+ASTNode SourceFile::getMacroExpansion() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+}
+
+SourceFile *SourceFile::getEnclosingSourceFile() const {
+  auto macroExpansion = getMacroExpansion();
+  if (!macroExpansion)
+    return nullptr;
+
+  auto sourceLoc = macroExpansion.getStartLoc();
+  return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -1186,7 +1334,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     SmallVector<TupleTypeElt, 4> genericElements;
     SmallVector<Requirement, 4> conditionalRequirements;
     for (const auto &elt : tupleType->getElements()) {
-      auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
+      auto genericParam = GenericTypeParamType::get(/*isParameterPack*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
       typeSubstitutions.push_back(elt.getType());
@@ -1535,7 +1683,7 @@ Fingerprint SourceFile::getInterfaceHash() const {
   Optional<StableHasher> interfaceHasher =
       evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
               .InterfaceHasher;
-  return Fingerprint{StableHasher{interfaceHasher.getValue()}.finalize()};
+  return Fingerprint{StableHasher{interfaceHasher.value()}.finalize()};
 }
 
 Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
@@ -1558,14 +1706,6 @@ Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
   }
 
   return Fingerprint{std::move(hash)};
-}
-
-syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
-  auto &eval = getASTContext().evaluator;
-  auto *mutableThis = const_cast<SourceFile *>(this);
-  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-              .SyntaxRoot;
 }
 
 void DirectOperatorLookupRequest::writeDependencySink(
@@ -1793,6 +1933,18 @@ Identifier ModuleDecl::getRealName() const {
   return getASTContext().getRealModuleName(getName());
 }
 
+bool ModuleDecl::allowImportedBy(ModuleDecl *importer) const {
+  if (allowableClientNames.empty())
+    return true;
+  for (auto id: allowableClientNames) {
+    if (importer->getRealName() == id)
+      return true;
+    if (importer->getABIName() == id)
+      return true;
+  }
+  return false;
+}
+
 Identifier ModuleDecl::getABIName() const {
   if (!ModuleABIName.empty())
     return ModuleABIName;
@@ -1833,6 +1985,42 @@ StringRef ModuleDecl::getModuleFilename() const {
     return StringRef();
   }
   return Result;
+}
+
+StringRef ModuleDecl::getModuleSourceFilename() const {
+  for (auto F : getFiles()) {
+    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+      continue;
+    return F->getModuleDefiningPath();
+  }
+
+  return StringRef();
+}
+
+StringRef ModuleDecl::getModuleLoadedFilename() const {
+  for (auto F : getFiles()) {
+    if (auto LF = dyn_cast<LoadedFile>(F)) {
+      return LF->getLoadedFilename();
+    }
+  }
+  return StringRef();
+}
+
+bool ModuleDecl::isSDKModule() const {
+  auto sdkPath = getASTContext().SearchPathOpts.getSDKPath();
+  if (sdkPath.empty())
+    return false;
+
+  auto modulePath = getModuleSourceFilename();
+  auto si = llvm::sys::path::begin(sdkPath),
+       se = llvm::sys::path::end(sdkPath);
+  for (auto mi = llvm::sys::path::begin(modulePath),
+       me = llvm::sys::path::end(modulePath);
+       si != se && mi != me; ++si, ++mi) {
+    if (*si != *mi)
+      return false;
+  }
+  return si == se;
 }
 
 bool ModuleDecl::isStdlibModule() const {
@@ -1902,7 +2090,7 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   if (diagLoc.isInvalid())
     return true;
 
-  assert(kind.hasValue() && "multiple entry points without attributes");
+  assert(kind.has_value() && "multiple entry points without attributes");
 
   // %select indices for UI/NSApplication-related diagnostics.
   enum : unsigned {
@@ -1911,7 +2099,7 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
     MainType = 2,
   } mainTypeDiagKind;
 
-  switch (kind.getValue()) {
+  switch (kind.value()) {
   case ArtificialMainKind::UIApplicationMain:
     mainTypeDiagKind = UIApplicationMainClass;
     break;
@@ -2035,6 +2223,14 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
       return Mod;
   }
   return nullptr;
+}
+
+bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
+  auto clangModule = findUnderlyingClangModule();
+  if (!clangModule)
+    return false;
+
+  return other->getRealName().str() == clangModule->ExportAsModule;
 }
 
 void ModuleDecl::collectBasicSourceFileInfo(
@@ -2711,11 +2907,13 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
+  auto &imports = getASTContext().getImportCache();
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
-        importedModule == import.module.importedModule) {
-      auto importedSpis = import.spiGroups;
-      spiGroups.insert(importedSpis.begin(), importedSpis.end());
+        (importedModule == import.module.importedModule ||
+         (imports.isImportedBy(importedModule, import.module.importedModule) &&
+          importedModule->isExportedAs(import.module.importedModule)))) {
+      spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
 }
@@ -3088,6 +3286,9 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
+
+  if (Kind == SourceFileKind::MacroExpansion)
+    M.addAuxiliaryFile(*this);
 }
 
 SourceFile::ParsingOptions
@@ -3095,8 +3296,6 @@ SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
   ParsingOptions opts;
   if (langOpts.DisablePoundIfEvaluation)
     opts |= ParsingFlags::DisablePoundIfEvaluation;
-  if (langOpts.BuildSyntaxTree)
-    opts |= ParsingFlags::BuildSyntaxTree;
   if (langOpts.CollectParsedToken)
     opts |= ParsingFlags::CollectParsedTokens;
   return opts;
@@ -3115,11 +3314,6 @@ bool SourceFile::shouldCollectTokens() const {
          ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
-bool SourceFile::shouldBuildSyntaxTree() const {
-  return Kind != SourceFileKind::SIL &&
-         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
-}
-
 bool SourceFile::hasDelayedBodyParsing() const {
   if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
     return false;
@@ -3128,8 +3322,6 @@ bool SourceFile::hasDelayedBodyParsing() const {
   if (Kind == SourceFileKind::SIL)
     return false;
   if (shouldCollectTokens())
-    return false;
-  if (shouldBuildSyntaxTree())
     return false;
 
   return true;
@@ -3144,12 +3336,50 @@ void SourceFile::addHoistedDecl(Decl *d) {
 ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, ParseTopLevelDeclsRequest{mutableThis}, {});
+}
+
+void SourceFile::addTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->push_back(d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+void SourceFile::prependTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->insert(Items->begin(), d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+ArrayRef<ASTNode> SourceFile::getTopLevelItems() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {}).TopLevelDecls;
+                           {}).TopLevelItems;
 }
 
 ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
   return Hoisted;
+}
+
+void SourceFile::addDeclWithRuntimeDiscoverableAttrs(ValueDecl *decl) {
+  assert(!decl->getRuntimeDiscoverableAttrs().empty());
+  DeclsWithRuntimeDiscoverableAttrs.insert(decl);
+}
+
+ArrayRef<ValueDecl *> SourceFile::getDeclsWithRuntimeDiscoverableAttrs() const {
+  return DeclsWithRuntimeDiscoverableAttrs.getArrayRef();
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
@@ -3203,20 +3433,21 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : getTopLevelDecls()) {
-#ifndef NDEBUG
-    PrettyStackTraceDecl debugStack("walking into decl", D);
-#endif
-
-    if (D->walk(walker))
-      return true;
+  for (auto Item : getTopLevelItems()) {
+    if (auto D = Item.dyn_cast<Decl *>()) {
+      if (D->walk(walker))
+        return true;
+    } else {
+      Item.walk(walker);
+    }
 
     if (walker.shouldWalkAccessorsTheOldWay()) {
       // Pretend that accessors share a parent with the storage.
       //
       // FIXME: Update existing ASTWalkers to deal with accessors appearing as
       // children of the storage instead.
-      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(
+              Item.dyn_cast<Decl *>())) {
         for (auto AD : ASD->getAllAccessors()) {
           if (AD->walk(walker))
             return true;

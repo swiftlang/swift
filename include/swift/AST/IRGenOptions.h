@@ -419,6 +419,9 @@ public:
 
   unsigned DisableReadonlyStaticObjects : 1;
 
+  /// Collocate metadata functions in their own section.
+  unsigned CollocatedMetadataFunctions : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -448,6 +451,7 @@ public:
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
   Optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
+  bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
@@ -488,7 +492,8 @@ public:
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
-        DisableReadonlyStaticObjects(false), CmdArgs(),
+        DisableReadonlyStaticObjects(false),
+        CollocatedMetadataFunctions(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {
 #ifndef NDEBUG
@@ -546,6 +551,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
     return llvm::hash_value(0);
   }
 

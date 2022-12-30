@@ -27,7 +27,7 @@ using namespace swift;
 /// %5 = alloc_ref $SomeC
 /// store %5 to %4 : $*SomeC
 /// %8 = alloc_stack $SomeP
-/// copy_addr %3 to [initialization] %8 : $*SomeP
+/// copy_addr %3 to [init] %8 : $*SomeP
 /// %10 = apply %9(%3) : $@convention(thin) (@in_guaranteed SomeP)
 /// Assumptions: Insn is a direct user of GAI (e.g., copy_addr or 
 /// apply pattern shown above) and that a valid init_existential_addr 
@@ -51,7 +51,7 @@ findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI, SILInstruction *Insn) {
   if (IEUses.empty())
     return nullptr;
 
-  /// Walk backwards from Insn instruction till the begining of the basic block
+  /// Walk backwards from Insn instruction till the beginning of the basic block
   /// looking for an InitExistential.
   InitExistentialAddrInst *SingleIE = nullptr;
   for (auto II = Insn->getIterator().getReverse(),
@@ -262,7 +262,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
       [&](CanType /*depType*/, Type /*replaceType*/,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-        // Directly providing ExistentialConformances to the SubstitionMap will
+        // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
         // function that pulls only the necessary conformances out of

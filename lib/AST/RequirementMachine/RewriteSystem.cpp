@@ -362,7 +362,7 @@ void RewriteSystem::addRules(
 
     // When this is called while adding conditional requirements, there
     // shouldn't be any new structural requirement IDs.
-    assert(ruleCount == 0 || !requirementID.hasValue());
+    assert(ruleCount == 0 || !requirementID.has_value());
 
     addExplicitRule(lhs, rhs, requirementID);
   }
@@ -551,6 +551,12 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Shape);
+      }
+
+      // A shape symbol must follow a generic param symbol
+      if (symbol.getKind() == Symbol::Kind::Shape) {
+        ASSERT_RULE(index > 0 && lhs[index - 1].getKind() == Symbol::Kind::GenericParam);
       }
 
       if (!rule.isLHSSimplified() &&
@@ -594,6 +600,15 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
+
+      if (index != lhs.size() - 1) {
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Shape);
+      }
+
+      // A shape symbol must follow a generic param symbol
+      if (symbol.getKind() == Symbol::Kind::Shape) {
+        ASSERT_RULE(index > 0 && rhs[index - 1].getKind() == Symbol::Kind::GenericParam);
+      }
 
       // Completion can introduce a rule of the form
       //

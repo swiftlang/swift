@@ -38,7 +38,7 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $any Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $any Error
 // CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
-// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
+// CHECK:         copy_addr [[VALUE_ADDR]] to [init] [[ADDR]]
 // CHECK-NOT:         destroy_addr [[OLD_EXISTENTIAL]]
 // CHECK:         [[NEW_EXISTENTIAL2:%.*]] = load [take] [[NEW_EXISTENTIALBUF]]
 // CHECK:         return [[NEW_EXISTENTIAL2]]
@@ -66,7 +66,7 @@ func test_property(_ x: Error) -> String {
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $any Error to $*[[VALUE_TYPE:@opened\(.*, any Error\) Self]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]] : $*[[VALUE_TYPE]]
+// CHECK-NEXT:    copy_addr [[VALUE]] to [init] [[COPY]] : $*[[VALUE_TYPE]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
@@ -91,10 +91,10 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[BORROWED_VALUE_BOX:%.*]] = begin_borrow [[VALUE_BOX]]
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $any Error to $*[[VALUE_TYPE:@opened\(.*, any Error\) Self]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         copy_addr [[VALUE]] to [init] [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]
 // CHECK:         [[BORROW:%.*]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK:         copy_addr [[COPY]] to [initialization] [[BORROW]]
+// CHECK:         copy_addr [[COPY]] to [init] [[BORROW]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[BORROW]])
 // CHECK:         destroy_addr [[COPY]]
@@ -210,7 +210,7 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
     // CHECK-NOT: copy_value [[GUAR]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[GUAR:%.*]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
-    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [init] [[TO_VALUE]]
     // CHECK-NOT: destroy_value [[GUAR]]
     return guaranteed
   } else if true {
@@ -219,7 +219,7 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
     // CHECK:     [[BORROWED_IMMEDIATE:%.*]] = begin_borrow [[IMMEDIATE]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[BORROWED_IMMEDIATE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
-    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [init] [[TO_VALUE]]
     // CHECK:     destroy_value [[IMMEDIATE]]
     return immediate
   } else if true {
@@ -228,7 +228,7 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
     // CHECK:     [[BORROWED_PLUS_ONE:%.*]] = begin_borrow [[PLUS_ONE]]
     // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[BORROWED_PLUS_ONE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
-    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [init] [[TO_VALUE]]
     // CHECK:     destroy_value [[PLUS_ONE]]
 
     return plusOneError()

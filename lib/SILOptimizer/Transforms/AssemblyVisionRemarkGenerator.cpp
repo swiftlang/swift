@@ -442,7 +442,7 @@ bool ValueToDeclInferrer::infer(
     // construct an argument.
     //
     // The reason why we do this is that sometimes we reform a struct from its
-    // constituant parts and then construct the debug_value from that. For
+    // constituent parts and then construct the debug_value from that. For
     // instance, if we FSOed.
     rcfi.visitRCUses(value, [&](Operand *use) {
       foundDeclFromUse |= valueUseInferrer.findDecls(use, value);

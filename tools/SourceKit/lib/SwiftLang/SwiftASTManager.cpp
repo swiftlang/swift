@@ -24,9 +24,10 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDETool/CompilerInvocation.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -647,9 +648,12 @@ SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
 }
 
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftASTManager::getMemoryBuffer(StringRef Filename, std::string &Error) {
-  return Impl.getMemoryBuffer(Filename, llvm::vfs::getRealFileSystem(), Error);
+std::unique_ptr<llvm::MemoryBuffer> SwiftASTManager::getMemoryBuffer(
+    StringRef Filename,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  return Impl.getFileContent(Filename, /*IsPrimary=*/false, FileSystem, Error)
+      .Buffer;
 }
 
 static FrontendInputsAndOutputs
@@ -796,8 +800,8 @@ ASTProducerRef
 SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
   llvm::sys::ScopedLock L(CacheMtx);
   llvm::Optional<ASTProducerRef> OptProducer = ASTCache.get(InvokRef->Impl.Key);
-  if (OptProducer.hasValue())
-    return OptProducer.getValue();
+  if (OptProducer.has_value())
+    return OptProducer.value();
   ASTProducerRef Producer = std::make_shared<ASTProducer>(InvokRef);
   ASTCache.set(InvokRef->Impl.Key, Producer);
   return Producer;

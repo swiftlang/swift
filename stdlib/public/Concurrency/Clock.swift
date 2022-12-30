@@ -38,7 +38,9 @@ public protocol Clock<Duration>: Sendable {
   var now: Instant { get }
   var minimumResolution: Instant.Duration { get }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
+#endif
 }
 
 

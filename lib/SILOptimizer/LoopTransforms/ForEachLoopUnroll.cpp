@@ -21,7 +21,7 @@
 //    initializer annotated "array.uninitialized_intrinsic". This is done in
 //    `run` method.
 //
-// 2. For every "array.uninintialized_intrinsic" initializer call, try
+// 2. For every "array.uninitialized_intrinsic" initializer call, try
 //    extracting the elements with which the array is initialized, and classify
 //    the uses of the array into incidental uses, forEach calls and uses that
 //    can write into the array. If any of the following conditions hold, give
@@ -47,7 +47,7 @@
 //
 //    Secondly, the body closure uses @in_guaranteed convention for the
 //    parameter. Therefore, an alloc_stack is created before the unrolled code
-//    begins to hold the elements, and is destoryed once the unrolled code ends.
+//    begins to hold the elements, and is destroyed once the unrolled code ends.
 //
 //    Thirdly, the body closure throws. Hence, it has to be try_applied. This
 //    means that we need to chain the try_applies in such a way that when the
@@ -368,7 +368,7 @@ void ArrayInfo::getLastDestroys(
   for (SILInstruction *frontierInst : frontier) {
     // Skip frontier instructions at the start of a basic block as they do not
     // follow a destroy_value of the array. Note that the goal is to collect
-    // the last destroys, which must always immediately preceed a frontier
+    // the last destroys, which must always immediately precede a frontier
     // instruction as it marks the end of the use of the array.
     if (frontierInst == &frontierInst->getParent()->front())
       continue;
@@ -409,7 +409,7 @@ static void removeForEachCall(TryApplyInst *forEachCall,
 ///      that contains the forEach call.
 ///    - store_borrow the element e_i into the alloc_stack A. Note that we
 ///      can use the owned copy of e_i created in the previous step.
-///    - try_apply the forEach's body closure on the the alloc_stack A.
+///    - try_apply the forEach's body closure on the alloc_stack A.
 ///      If i is not the last index, jump to b_i+1 in the normal case of the
 ///      try_apply. If i is the last index of the array jump to the normal
 ///      target of the forEach call. Jump to a new error block: err_i in the
@@ -538,6 +538,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
                                        : forEachCall->getParentBlock();
     SILBuilderWithScope unrollBuilder(currentBB, forEachCall);
+    SILBuilderWithScope normalBuilder(&nextNormalBB->front(), forEachCall);
     SILValue borrowedElem;
     SILValue addr;
 
@@ -552,9 +553,8 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
       borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
       addr =
           unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
-      SILBuilderWithScope builder(&nextNormalBB->front(), forEachCall);
-      builder.createEndBorrow(forEachLoc, addr);
-      builder.createEndBorrow(forEachLoc, borrowedElem);
+      normalBuilder.createEndBorrow(forEachLoc, addr);
+      normalBuilder.createEndBorrow(forEachLoc, borrowedElem);
     }
 
     SILBasicBlock *errorTarget =
@@ -566,16 +566,18 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     unrollBuilder.createTryApply(forEachLoc, forEachBodyClosure,
                                  SubstitutionMap(), addr, nextNormalBB,
                                  errorTarget);
+
+    if (nextNormalBB == normalBB) {
+      // Dealloc the stack in the normalBB and also in errorBB. Note that every
+      // try_apply created during the unrolling must pass through these blocks.
+      normalBuilder.createDeallocStack(forEachLoc, allocStack);
+    }
     nextNormalBB = currentBB;
   }
-
   // Dealloc the stack in the normalBB and also in errorBB. Note that every
   // try_apply created during the unrolling must pass through these blocks.
-  SILBuilderWithScope(&normalBB->front())
-      .createDeallocStack(forEachLoc, allocStack);
   SILBuilderWithScope(&errorBB->front())
       .createDeallocStack(forEachLoc, allocStack);
-
   // Remove the forEach call as it has now been unrolled.
   removeForEachCall(forEachCall, deleter);
 }

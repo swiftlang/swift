@@ -4,9 +4,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 
-// Currently failing on arm: rdar://92963081
-// REQUIRES: CPU=x86_64
-
 sil_stage canonical
 
 import Builtin
@@ -20,7 +17,7 @@ sil @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _C
 }
 
 sil @array_adopt_storage_class : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>) {
-[%0!: escape => %r.0.v**, escape c*.v** => %r.0.v**.c*.v**, escape c*.v** => %r.1.v**] 
+[%0: escape! => %r.0.v**, escape c*.v** => %r.0.v**.c*.v**, escape c*.v** => %r.1.v**] 
 }
 
 sil @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>) {

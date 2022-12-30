@@ -216,8 +216,8 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              llvm::VersionTuple version) {
   llvm::SmallString<8> buf;
   llvm::raw_svector_ostream os{buf};
-  os << version.getMajor() << '.' << version.getMinor().getValueOr(0) << '.'
-     << version.getSubminor().getValueOr(0);
+  os << version.getMajor() << '.' << version.getMinor().value_or(0) << '.'
+     << version.getSubminor().value_or(0);
   arguments.push_back(inputArgs.MakeArgString(os.str()));
 }
 
@@ -612,7 +612,7 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
 
         // The first deployment of arm64 for macOS is version 10.16;
         if (triple.isAArch64() && osVersion.getMajor() <= 10 &&
-            osVersion.getMinor().getValueOr(0) < 16) {
+            osVersion.getMinor().value_or(0) < 16) {
           osVersion = llvm::VersionTuple(/*Major=*/10, /*Minor=*/16);
           osVersion = canonicalizePlatformVersion(PlatformKind::macOS,
                                                   osVersion);
@@ -642,7 +642,7 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
 
     // Compute the SDK version.
     auto sdkVersion = getTargetSDKVersion(triple)
-        .getValueOr(llvm::VersionTuple());
+        .value_or(llvm::VersionTuple());
 
     Arguments.push_back("-platform_version");
     Arguments.push_back(platformName);
@@ -911,7 +911,7 @@ static void validateTargetVariant(const toolchains::Darwin &TC,
                                   DiagnosticEngine &diags,
                                   const llvm::opt::ArgList &args,
                                   StringRef defaultTarget) {
-  if (TC.getTargetVariant().hasValue()) {
+  if (TC.getTargetVariant().has_value()) {
     auto target = TC.getTriple();
     auto variant = *TC.getTargetVariant();
 

@@ -162,8 +162,21 @@ public:
       auto calleeYields = yield->getYieldedValues();
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
+      SmallVector<BeginBorrowInst *, 2> guaranteedYields;
       for (auto i : indices(calleeYields)) {
         auto remappedYield = getMappedValue(calleeYields[i]);
+        // When owned values are yielded @guaranteed, the mapped value must be
+        // borrowed and the result be substituted in place of the originally
+        // yielded value.  Otherwise, there could be uses of the original value
+        // which require an @guaranteed operand into which we'd be attempting to
+        // substitute an @owned operand.
+        if (calleeYields[i]->getOwnershipKind() == OwnershipKind::Owned &&
+            !yield->getOperandRef(i).isConsuming() &&
+            Builder->getFunction().hasOwnership()) {
+          auto *bbi = Builder->createBeginBorrow(Loc, remappedYield);
+          guaranteedYields.push_back(bbi);
+          remappedYield = bbi;
+        }
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
       Builder->createBranch(Loc, returnToBB);
@@ -172,11 +185,17 @@ public:
       if (EndApply) {
         SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
         SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
         auto unwindBB = remapBlock(yield->getUnwindBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
@@ -319,8 +338,8 @@ protected:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.hasValue()
-               ? Loc.getValue()
+    return Loc.has_value()
+               ? Loc.value()
                : MandatoryInlinedLocation();
   }
 
@@ -417,7 +436,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.getValue(), &getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc.value(), &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
@@ -782,6 +801,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::TestSpecificationInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -988,6 +1008,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::HasSymbolInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

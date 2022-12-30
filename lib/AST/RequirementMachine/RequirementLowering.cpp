@@ -350,6 +350,23 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 }
 
+/// Desugar same-shape requirements by equating the shapes of the
+/// root pack types, and diagnose shape requirements on non-pack
+/// types.
+static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
+                                        SmallVectorImpl<Requirement> &result,
+                                        SmallVectorImpl<RequirementError> &errors) {
+  // For now, only allow shape requirements directly between pack types.
+  if (!lhs->isParameterPack() || !rhs->isParameterPack()) {
+    errors.push_back(RequirementError::forInvalidShapeRequirement(
+        {RequirementKind::SameShape, lhs, rhs}, loc));
+  }
+
+  result.emplace_back(RequirementKind::SameShape,
+                      lhs->getRootGenericParam(),
+                      rhs->getRootGenericParam());
+}
+
 /// Convert a requirement where the subject type might not be a type parameter,
 /// or the constraint type in the conformance requirement might be a protocol
 /// composition, into zero or more "proper" requirements which can then be
@@ -361,8 +378,10 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    desugarSameShapeRequirement(firstType, req.getSecondType(),
+                                loc, result, errors);
+    break;
 
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
@@ -474,6 +493,20 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Continue;
     }
 
+    // Infer same-length requirements between pack references that
+    // are expanded in parallel.
+    if (auto packExpansion = ty->getAs<PackExpansionType>()) {
+      // Get all pack parameters referenced from the pattern.
+      SmallVector<Type, 2> packReferences;
+      packExpansion->getPatternType()->getTypeParameterPacks(packReferences);
+
+      auto countType = packExpansion->getCountType();
+      for (auto pack : packReferences) {
+        Requirement req(RequirementKind::SameShape, countType, pack);
+        desugarRequirement(req, SourceLoc(), reqs, errors);
+      }
+    }
+
     // Infer requirements from `@differentiable` function types.
     // For all non-`@noDerivative` parameter and result types:
     // - `@differentiable`, `@differentiable(_forward)`, or
@@ -577,8 +610,8 @@ void swift::rewriting::realizeRequirement(
   auto *moduleForInference = dc->getParentModule();
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
 
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
@@ -691,9 +724,27 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   auto selfTy = proto->getSelfInterfaceType();
 
+  unsigned errorCount = errors.size();
   realizeInheritedRequirements(proto, selfTy,
                                /*inferRequirements=*/false,
                                result, errors);
+
+  if (errors.size() > errorCount) {
+    // Add requirements from inherited protocols, which are obtained via
+    // getDirectlyInheritedNominalTypeDecls(). Normally this duplicates
+    // the information found in the resolved types from the inheritance
+    // clause, except when type resolution fails and returns an ErrorType.
+    //
+    // For example, in 'protocol P: Q & Blah', where 'Blah' does not exist,
+    // the type 'Q & Blah' resolves to an ErrorType, while the simpler
+    // mechanism in getDirectlyInheritedNominalTypeDecls() still finds 'Q'.
+    for (auto *inheritedProto : proto->getInheritedProtocols()) {
+      result.push_back({
+          Requirement(RequirementKind::Conformance,
+                      selfTy, inheritedProto->getDeclaredInterfaceType()),
+          SourceLoc(), /*wasInferred=*/false});
+    }
+  }
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
@@ -780,7 +831,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 }
 
 /// This request primarily emits diagnostics about typealiases and associated
-/// type declarations that override another associate type, and can better be
+/// type declarations that override another associated type, and can better be
 /// expressed as requirements in the 'where' clause.
 ///
 /// It also implements a compatibility behavior where sometimes typealiases in

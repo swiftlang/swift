@@ -46,7 +46,7 @@ public enum Empty {
 // CHECK:         enum class cases {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    };
-// CHECK:         inline const static struct {  // impl struct for case unknownDefault
+// CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault
 // CHECK-NEXT:      inline constexpr operator cases() const {
 // CHECK-NEXT:        return cases::unknownDefault;
 // CHECK-NEXT:      }
@@ -70,7 +70,7 @@ public enum Empty {
 // NEW_CASE-NEXT:   b,
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    }
-// CHECK:         inline const static struct {  // impl struct for case unknownDefault
+// CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault
 // CHECK-NEXT:      inline constexpr operator cases() const {
 // CHECK-NEXT:        return cases::unknownDefault;
 // CHECK-NEXT:      }

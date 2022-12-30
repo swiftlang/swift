@@ -60,7 +60,7 @@ CodeCompletionCache::get(const Key &K) {
     // Check whether V is up to date.
     llvm::sys::fs::file_status ModuleStatus;
     if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
-        V.getValue()->ModuleModificationTime !=
+        V.value()->ModuleModificationTime !=
         ModuleStatus.getLastModificationTime()) {
       // Cache is stale.
       V = None;

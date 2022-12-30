@@ -164,6 +164,10 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC bool
+swiftscan_swift_binary_detail_get_is_framework(
+    swiftscan_module_details_t details);
+
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t

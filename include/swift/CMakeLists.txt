@@ -9,7 +9,5 @@ if(SWIFT_INCLUDE_TOOLS)
                 ESCAPE_QUOTES @ONLY)
   add_subdirectory(AST)
   add_subdirectory(Option)
-  add_subdirectory(Parse)
-  add_subdirectory(Syntax)
 endif()
 

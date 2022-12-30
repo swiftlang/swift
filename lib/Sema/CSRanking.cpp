@@ -55,8 +55,8 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->getCurrentIndent());
-    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "  << value 
-                 << ")\n";
+    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "
+                 << value << ")\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);
@@ -73,7 +73,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
 
   if (isDebugMode()) {
     llvm::errs().indent(solverState->getCurrentIndent())
-      << "(solution is worse than the best solution)\n";
+        << "(solution is worse than the best solution)\n";
   }
 
   return true;
@@ -238,33 +238,38 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
 
-  GenericParamList *gp1 = nullptr, *gp2 = nullptr;
+  bool bothGeneric = false;
+  GenericSignature sig1, sig2;
 
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
   if (func1 && func2) {
-    gp1 = func1->getGenericParams();
-    gp2 = func2->getGenericParams();
+    bothGeneric = func1->isGeneric() && func2->isGeneric();
+
+    sig1 = func1->getGenericSignature();
+    sig2 = func2->getGenericSignature();
   }
 
   auto subscript1 = dyn_cast<SubscriptDecl>(decl1);
   auto subscript2 = dyn_cast<SubscriptDecl>(decl2);
   if (subscript1 && subscript2) {
-    gp1 = subscript1->getGenericParams();
-    gp2 = subscript2->getGenericParams();
+    bothGeneric = subscript1->isGeneric() && subscript2->isGeneric();
+
+    sig1 = subscript1->getGenericSignature();
+    sig2 = subscript2->getGenericSignature();
   }
 
-  if (gp1 && gp2) {
-    auto params1 = gp1->getParams();
-    auto params2 = gp2->getParams();
+  if (bothGeneric) {
+    auto params1 = sig1.getInnermostGenericParams();
+    auto params2 = sig2.getInnermostGenericParams();
       
     if (params1.size() == params2.size()) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
           
-        int np1 = static_cast<int>(p1->getConformingProtocols().size());
-        int np2 = static_cast<int>(p2->getConformingProtocols().size());
+        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
+        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
         int aDelta = np1 - np2;
           
         if (aDelta)
@@ -319,7 +324,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Solve the system. If the first extension is at least as specialized as the
   // second, we're done.
-  return cs.solveSingle().hasValue();
+  return cs.solveSingle().has_value();
 }
 
 /// Retrieve the adjusted parameter type for overloading purposes.
@@ -799,7 +804,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
     llvm::errs().indent(cs.solverState->getCurrentIndent())
-      << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
+        << "comparing solutions " << idx1 << " and " << idx2 << "\n";
   }
 
   // Whether the solutions are identical.
@@ -1355,13 +1360,15 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->getCurrentIndent())
-        << "Comparing " << viable.size() << " viable solutions\n";
+    auto indent = solverState->getCurrentIndent();
+    auto &log = llvm::errs();
 
+    log.indent(indent) << "Comparing " << viable.size()
+                       << " viable solutions\n";
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      llvm::errs().indent(solverState->getCurrentIndent())
-          << "\n--- Solution #" << i << " ---\n";
-      viable[i].dump(llvm::errs().indent(solverState->getCurrentIndent()));
+      log << "\n";
+      log.indent(indent) << "--- Solution #" << i << " ---\n";
+      viable[i].dump(llvm::errs(), indent);
     }
   }
 

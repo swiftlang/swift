@@ -630,7 +630,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     auto result = findBridgeToObjCFunc(functionBuilder, dynamicCast);
     if (!result)
       return nullptr;
-    std::tie(bridgedFunc, subMap) = result.getValue();
+    std::tie(bridgedFunc, subMap) = result.value();
   }
 
   SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(
@@ -679,7 +679,6 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     break;
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     // Currently this
     // cannot appear, because the _bridgeToObjectiveC protocol witness method
     // always receives the this pointer (= the source) as guaranteed.

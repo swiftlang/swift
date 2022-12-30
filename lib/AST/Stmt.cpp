@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -40,6 +41,50 @@ StringRef Stmt::getKindName(StmtKind K) {
 #include "swift/AST/StmtNodes.def"
   }
   llvm_unreachable("bad StmtKind");
+}
+
+StringRef Stmt::getDescriptiveKindName(StmtKind K) {
+  switch (K) {
+  case StmtKind::Brace:
+    return "brace";
+  case StmtKind::Return:
+    return "return";
+  case StmtKind::Yield:
+    return "yield";
+  case StmtKind::Defer:
+    return "defer";
+  case StmtKind::If:
+    return "if";
+  case StmtKind::Guard:
+    return "guard";
+  case StmtKind::While:
+    return "while";
+  case StmtKind::Do:
+    return "do";
+  case StmtKind::DoCatch:
+    return "do-catch";
+  case StmtKind::RepeatWhile:
+    return "repeat-while";
+  case StmtKind::ForEach:
+    return "for-in";
+  case StmtKind::Switch:
+    return "switch";
+  case StmtKind::Case:
+    return "case";
+  case StmtKind::Break:
+    return "break";
+  case StmtKind::Continue:
+    return "continue";
+  case StmtKind::Fallthrough:
+    return "fallthrough";
+  case StmtKind::Fail:
+    return "return";
+  case StmtKind::Throw:
+    return "throw";
+  case StmtKind::PoundAssert:
+    return "#assert";
+  }
+  llvm_unreachable("Unhandled case in switch!");
 }
 
 // Helper functions to check statically whether a method has been
@@ -160,6 +205,17 @@ SourceLoc BraceStmt::getStartLoc() const {
   if (LBLoc) {
     return LBLoc;
   }
+  return getContentStartLoc();
+}
+
+SourceLoc BraceStmt::getEndLoc() const {
+  if (RBLoc) {
+    return RBLoc;
+  }
+  return getContentEndLoc();
+}
+
+SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
     if (auto loc = elt.getStartLoc()) {
       return loc;
@@ -168,10 +224,7 @@ SourceLoc BraceStmt::getStartLoc() const {
   return SourceLoc();
 }
 
-SourceLoc BraceStmt::getEndLoc() const {
-  if (RBLoc) {
-    return RBLoc;
-  }
+SourceLoc BraceStmt::getContentEndLoc() const {
   for (auto elt : llvm::reverse(getElements())) {
     if (auto loc = elt.getEndLoc()) {
       return loc;
@@ -518,7 +571,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
   }
-  for (auto *vd : caseBodyVariables.getValueOr(MutableArrayRef<VarDecl *>())) {
+  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
     vd->setParentPatternStmt(this);
   }
 }
@@ -619,6 +672,20 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
     caseStmt->setParentStmt(theSwitch);
 
   return theSwitch;
+}
+
+LabeledStmt *BreakStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, BreakTargetRequest{this}, nullptr);
+}
+
+LabeledStmt *ContinueStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
+  return S->getStartLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is

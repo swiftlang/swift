@@ -14,8 +14,8 @@ import SIL
 
 /// This pass should only be used by sil-opt to run all the unit tests.
 ///
-let runUnitTests = FunctionPass(name: "run-unit-tests", {
-  (function: Function, context: PassContext) in
+let runUnitTests = ModulePass(name: "run-unit-tests", {
+    (context: ModulePassContext) in
 
   print("--- Run unit tests ---")
   

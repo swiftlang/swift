@@ -12,6 +12,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.7, *)
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 5.7, *)
@@ -159,3 +160,23 @@ extension Task where Success == Never, Failure == Never {
     try await sleep(until: .now + duration, clock: .continuous)
   }
 }
+#else
+@available(SwiftStdlib 5.7, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+extension Task where Success == Never, Failure == Never {
+  @available(SwiftStdlib 5.7, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func sleep<C: Clock>(
+    until deadline: C.Instant,
+    tolerance: C.Instant.Duration? = nil,
+    clock: C
+  ) async throws {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  @available(SwiftStdlib 5.7, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func sleep(for duration: Duration) async throws {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+#endif

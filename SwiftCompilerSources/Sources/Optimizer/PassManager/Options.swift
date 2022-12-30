@@ -18,4 +18,8 @@ struct Options {
   var enableStackProtection: Bool {
     SILOptions_enableStackProtection(_bridged) != 0
   }
+
+  var enableMoveInoutStackProtection: Bool {
+    SILOptions_enableMoveInoutStackProtection(_bridged) != 0
+  }
 }

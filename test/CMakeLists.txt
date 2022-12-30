@@ -65,12 +65,8 @@ function(get_test_dependencies SDK result_var_name)
       swift-llvm-opt
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test
-      swift-syntax-test)
+      swift-remoteast-test)
 
-    if(SWIFT_BUILD_SYNTAXPARSERLIB)
-      list(APPEND deps_binaries swift-syntax-parser-test)
-    endif()
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
     endif()
@@ -185,11 +181,6 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if (BOOTSTRAPPING_MODE)
-  list(APPEND SWIFT_LIT_ARGS
-       "--param" "bootstrapping_mode=${BOOTSTRAPPING_MODE}")
-endif()
-
 if (LLVM_USE_SANITIZER STREQUAL "Address")
   set(SWIFT_ASAN_BUILD TRUE)
 endif()
@@ -199,7 +190,6 @@ normalize_boolean_spelling(LLVM_ENABLE_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)
-normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
@@ -315,7 +305,7 @@ foreach(SDK ${SWIFT_SDKS})
               "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
         else()
           list(APPEND test_dependencies
-              "swift-reflection-test${VARIANT_SUFFIX}_signed")
+              "swift-reflection-test${VARIANT_SUFFIX}")
         endif()
       endif()
 

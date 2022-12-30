@@ -285,6 +285,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   case Symbol::Kind::Superclass:
   case Symbol::Kind::ConcreteType:
   case Symbol::Kind::ConcreteConformance:
+  case Symbol::Kind::Shape:
     break;
   }
 

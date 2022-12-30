@@ -12,7 +12,7 @@
 // Build the test into a binary
 // RUN: %target-build-swift %s -parse-as-library -emit-module -emit-library -module-name ExternalConformanceCheck -I %t/includes -I %S/Inputs/cmodules -o %t/ExternalConformances %t/testModA.o %t/includes/testModB.o
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/ExternalConformances -binary-filename %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/ExternalConformances %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
 
 import testModA
 import testModB

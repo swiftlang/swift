@@ -22,7 +22,7 @@ public struct BigStruct {
 sil @make_big_struct : $@convention(thin) () -> BigStruct
 sil @use_big_struct : $@convention(thin) (BigStruct) -> ()
 
-// CHECK-LABEL: sil @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_constant BigStruct {
+// CHECK-LABEL: sil @test_yield_big : $@yield_once @convention(thin) () -> @yields @in BigStruct {
 // CHECK:       bb0:
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
 // CHECK-NEXT:    // function_ref
@@ -54,13 +54,13 @@ unwind:
 // CHECK:       bb0:
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_constant BigStruct
+// CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in BigStruct
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
 //   TODO: this isn't very efficient
 // CHECK-NEXT:    [[T0:%.*]] = load [[ADDR]] : $*BigStruct
 // CHECK-NEXT:    store [[T0]] to [[TEMP]] : $*BigStruct
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_constant BigStruct) -> ()
+// CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in BigStruct) -> ()
 // CHECK-NEXT:    apply [[USE]]([[TEMP]])
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
@@ -100,7 +100,7 @@ bb2:
 
 // CHECK-LABEL: sil @test_yield_and_retain
 // CHECK:   [[S:%[0-9]+]] = alloc_stack $BigStruct
-// CHECK:   copy_addr [take] %0 to [initialization] [[S]]
+// CHECK:   copy_addr [take] %0 to [init] [[S]]
 // CHECK:   retain_value_addr [[S]]
 // CHECK:   yield [[S]] : $*BigStruct
 // CHECK: // end sil function 'test_yield_and_retain'

@@ -22,6 +22,8 @@ import LibProc
 import TestsUtils
 
 struct MeasurementMetadata {
+  // Note: maxRSS and pages subtract the RSS measured
+  // after the benchmark driver setup has finished.
   let maxRSS: Int /// Maximum Resident Set Size (B)
   let pages: Int /// Maximum Resident Set Size (pages)
   let ics: Int /// Involuntary Context Switches
@@ -30,33 +32,15 @@ struct MeasurementMetadata {
 }
 
 struct BenchResults {
-  typealias T = Int
-  private let samples: [T]
+  let samples: [Double]
   let meta: MeasurementMetadata?
-  let stats: Stats
+  let iters: Int
 
-  init(_ samples: [T], _ metadata: MeasurementMetadata?) {
-    self.samples = samples.sorted()
+  init(_ samples: [Double], _ metadata: MeasurementMetadata?, _ iters: Int) {
+    self.samples = samples
     self.meta = metadata
-    self.stats = self.samples.reduce(into: Stats(), Stats.collect)
+    self.iters = iters
   }
-
-  /// Return measured value for given `quantile`.
-  ///
-  /// Equivalent to quantile estimate type R-1, SAS-3. See:
-  /// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
-  subscript(_ quantile: Double) -> T {
-    let index = Swift.max(0,
-      Int((Double(samples.count) * quantile).rounded(.up)) - 1)
-    return samples[index]
-  }
-
-  var sampleCount: T { return samples.count }
-  var min: T { return samples.first! }
-  var max: T { return samples.last! }
-  var mean: T { return Int(stats.mean.rounded()) }
-  var sd: T { return Int(stats.standardDeviation.rounded()) }
-  var median: T { return self[0.5] }
 }
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
@@ -76,9 +60,6 @@ enum TestAction {
 }
 
 struct TestConfig {
-  /// The delimiter to use when printing output.
-  let delim: String
-
   /// Duration of the test measurement in seconds.
   ///
   /// Used to compute the number of iterations, if no fixed amount is specified.
@@ -98,12 +79,6 @@ struct TestConfig {
   /// The minimum number of samples we should take of each test.
   let minSamples: Int?
 
-  /// Quantiles to report in results.
-  let quantile: Int?
-
-  /// Report quantiles with delta encoding.
-  let delta: Bool
-
   /// Is verbose output enabled?
   let verbose: Bool
 
@@ -116,31 +91,35 @@ struct TestConfig {
   // Allow running with nondeterministic hashing?
   var allowNondeterministicHashing: Bool
 
+  // Use machine-readable output format (JSON)?
+  var jsonOutput: Bool
+
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
   let afterRunSleep: UInt32?
 
   /// The list of tests to run.
-  let tests: [(index: String, info: BenchmarkInfo)]
+  let tests: [(index: Int, info: BenchmarkInfo)]
+
+  /// Number of characters in the longest test name (for formatting)
+  let testNameLength: Int
 
   let action: TestAction
 
   init(_ registeredBenchmarks: [BenchmarkInfo]) {
 
     struct PartialTestConfig {
-      var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
       var numSamples: UInt?
       var minSamples: UInt?
       var numIters: UInt?
-      var quantile: UInt?
-      var delta: Bool?
       var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
       var logMemory: Bool?
       var logMeta: Bool?
       var allowNondeterministicHashing: Bool?
+      var jsonOutput: Bool?
       var action: TestAction?
       var tests: [String]?
     }
@@ -172,13 +151,6 @@ struct TestConfig {
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
                   parser: { UInt($0) })
-    p.addArgument("--quantile", \.quantile,
-                  help: "report quantiles instead of normal dist. stats;\n" +
-                        "use 4 to get a five-number summary with quartiles,\n" +
-                        "10 (deciles), 20 (ventiles), 100 (percentiles), etc.",
-                  parser: { UInt($0) })
-    p.addArgument("--delta", \.delta, defaultValue: true,
-                  help: "report quantiles with delta encoding")
     p.addArgument("--sample-time", \.sampleTime,
                   help: "duration of test measurement in seconds\ndefault: 1",
                   parser: finiteDouble)
@@ -188,9 +160,6 @@ struct TestConfig {
                   help: "log the change in maximum resident set size (MAX_RSS)")
     p.addArgument("--meta", \.logMeta, defaultValue: true,
                   help: "log the metadata (memory usage, context switches)")
-    p.addArgument("--delim", \.delim,
-                  help:"value delimiter used for log output; default: ,",
-                  parser: { $0 })
     p.addArgument("--tags", \PartialTestConfig.tags,
                   help: "run tests matching all the specified categories",
                   parser: tags)
@@ -208,30 +177,37 @@ struct TestConfig {
                   \.allowNondeterministicHashing, defaultValue: true,
                   help: "Don't trap when running without the \n" +
                         "SWIFT_DETERMINISTIC_HASHING=1 environment variable")
+    p.addArgument("--json",
+                  \.jsonOutput, defaultValue: true,
+                  help: "Use JSON output (suitable for consumption by scripts)")
     p.addArgument(nil, \.tests) // positional arguments
 
     let c = p.parse()
 
     // Configure from the command line arguments, filling in the defaults.
-    delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
     numIters = c.numIters.map { Int($0) }
     numSamples = c.numSamples.map { Int($0) }
     minSamples = c.minSamples.map { Int($0) }
-    quantile = c.quantile.map { Int($0) }
-    delta = c.delta ?? false
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
     logMeta = c.logMeta ?? false
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
     allowNondeterministicHashing = c.allowNondeterministicHashing ?? false
+    jsonOutput = c.jsonOutput ?? false
     tests = TestConfig.filterTests(registeredBenchmarks,
                                     tests: c.tests ?? [],
                                     tags: c.tags ?? [],
                                     skipTags: c.skipTags ?? [.unstable, .skip])
 
-    if logMemory && tests.count > 1 {
+    if tests.count > 0 {
+      testNameLength = tests.map{$0.info.name.count}.sorted().reversed().first!
+    } else {
+      testNameLength = 0
+    }
+
+    if logMemory && tests.count > 1 && !jsonOutput {
       print(
       """
       warning: The memory usage of a test, reported as the change in MAX_RSS,
@@ -241,10 +217,9 @@ struct TestConfig {
       """)
     }
 
-    // We always prepare the configuration string and call the print to have
-    // the same memory usage baseline between verbose and normal mode.
-    let testList = tests.map({ $0.1.name }).joined(separator: ", ")
-    let configuration = """
+    if verbose {
+      let testList = tests.map({ $0.1.name }).joined(separator: ", ")
+      print("""
         --- CONFIG ---
         NumSamples: \(numSamples ?? 0)
         MinSamples: \(minSamples ?? 0)
@@ -253,14 +228,12 @@ struct TestConfig {
         LogMeta: \(logMeta)
         SampleTime: \(sampleTime)
         NumIters: \(numIters ?? 0)
-        Quantile: \(quantile ?? 0)
-        Delimiter: \(String(reflecting: delim))
         Tests Filter: \(c.tests ?? [])
         Tests to run: \(testList)
 
-        --- DATA ---\n
-        """
-    print(verbose ? configuration : "", terminator:"")
+        --- DATA ---
+        """)
+    }
   }
 
   /// Returns the list of tests to run.
@@ -278,8 +251,9 @@ struct TestConfig {
     tests: [String],
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
-  ) -> [(index: String, info: BenchmarkInfo)] {
+  ) -> [(index: Int, info: BenchmarkInfo)] {
     var t = tests
+    /// TODO: Make the following less weird by using a simple `filter` operation
     let filtersIndex = t.partition { $0.hasPrefix("+") || $0.hasPrefix("-") }
     let excludesIndex = t[filtersIndex...].partition { $0.hasPrefix("-") }
     let specifiedTests = Set(t[..<filtersIndex])
@@ -288,7 +262,7 @@ struct TestConfig {
     let allTests = registeredBenchmarks.sorted()
     let indices = Dictionary(uniqueKeysWithValues:
       zip(allTests.map { $0.name },
-          (1...).lazy.map { String($0) } ))
+          (1...).lazy))
 
     func byTags(b: BenchmarkInfo) -> Bool {
       return b.tags.isSuperset(of: tags) &&
@@ -297,7 +271,7 @@ struct TestConfig {
     func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
       return specifiedTests.contains(b.name) ||
         // !! "`allTests` have been assigned an index"
-        specifiedTests.contains(indices[b.name]!) ||
+        specifiedTests.contains(indices[b.name]!.description) ||
         (includes.contains { b.name.contains($0) } &&
           excludes.allSatisfy { !b.name.contains($0) } )
     }
@@ -318,30 +292,6 @@ extension String {
     } while s.startIndex != s.endIndex
     return false
   }
-}
-
-struct Stats {
-    var n: Int = 0
-    var s: Double = 0.0
-    var mean: Double = 0.0
-    var variance: Double { return n < 2 ? 0.0 : s / Double(n - 1) }
-    var standardDeviation: Double { return variance.squareRoot() }
-
-    static func collect(_ s: inout Stats, _ x: Int){
-        Stats.runningMeanVariance(&s, Double(x))
-    }
-
-    /// Compute running mean and variance using B. P. Welford's method.
-    ///
-    /// See Knuth TAOCP vol 2, 3rd edition, page 232, or
-    /// https://www.johndcook.com/blog/standard_deviation/
-    static func runningMeanVariance(_ stats: inout Stats, _ x: Double){
-        let n = stats.n + 1
-        let (k, m_, s_) = (Double(n), stats.mean, stats.s)
-        let m = m_ + (x - m_) / k
-        let s = s_ + (x - m_) * (x - m)
-        (stats.n, stats.mean, stats.s) = (n, m, s)
-    }
 }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -529,7 +479,7 @@ final class TestRunner {
   }
 
   /// Measure the `fn` and return the average sample time per iteration (μs).
-  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Int {
+  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Double {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
@@ -542,7 +492,7 @@ final class TestRunner {
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    return lastSampleTime.microseconds / numIters
+    return Double(lastSampleTime.microseconds) / Double(numIters)
   }
 
   func logVerbose(_ msg: @autoclosure () -> String) {
@@ -560,9 +510,9 @@ final class TestRunner {
     }
     logVerbose("Running \(test.name)")
 
-    var samples: [Int] = []
+    var samples: [Double] = []
 
-    func addSample(_ time: Int) {
+    func addSample(_ time: Double) {
       logVerbose("    Sample \(samples.count),\(time)")
       samples.append(time)
     }
@@ -576,11 +526,11 @@ final class TestRunner {
     }
 
     // Determine number of iterations for testFn to run for desired time.
-    func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
+    func iterationsPerSampleTime() -> (numIters: Int, oneIter: Double) {
       let oneIter = measure(test.name, fn: testFn, numIters: 1)
       if oneIter > 0 {
-        let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
-        return (max(timePerSample / oneIter, 1), oneIter)
+        let timePerSample = c.sampleTime * 1_000_000.0 // microseconds (μs)
+        return (max(Int(timePerSample / oneIter), 1), oneIter)
       } else {
         return (1, oneIter)
       }
@@ -615,77 +565,137 @@ final class TestRunner {
     test.tearDownFunction?()
     if let lf = test.legacyFactor {
       logVerbose("    Applying legacy factor: \(lf)")
-      samples = samples.map { $0 * lf }
+      samples = samples.map { $0 * Double(lf) }
     }
 
-    return BenchResults(samples, collectMetadata())
+    return BenchResults(samples, collectMetadata(), numIters)
   }
 
-  var header: String {
-    let withUnit = {$0 + "(μs)"}
-    let withDelta = {"𝚫" + $0}
-    func quantiles(q: Int) -> [String] {
-      // See https://en.wikipedia.org/wiki/Quantile#Specialized_quantiles
-      let prefix = [
-        2: "MEDIAN", 3: "T", 4: "Q", 5: "QU", 6: "S", 7: "O", 10: "D",
-        12: "Dd", 16: "H", 20: "V", 33: "TT", 100: "P", 1000: "Pr"
-      ][q, default: "\(q)-q"]
-      let base20 = "0123456789ABCDEFGHIJ".map { String($0) }
-      let index: (Int) -> String =
-        { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
-      let tail = (1..<q).map { prefix + index($0) } + ["MAX"]
-      // QMIN identifies the quantile format, distinct from formats using "MIN"
-      return [withUnit("QMIN")] + tail.map(c.delta ? withDelta : withUnit)
+  func printJSON(index: Int, info: BenchmarkInfo, results: BenchResults?) {
+    // Write the results for a single test as a one-line JSON object
+    // This allows a script to easily consume the results by JSON-decoding
+    // each line separately.
+
+    // To avoid relying on Foundation, construct the JSON naively.  This is
+    // actually pretty robust, since almost everything is a number; the only
+    // brittle assumption is that test.name must not have \ or " in it.
+    var out = [
+      "\"number\":\(index)",
+      "\"name\":\"\(info.name)\""
+    ]
+
+    if let results = results {
+      let samples = results.samples.sorted().map({$0.description}).joined(separator: ",")
+      out.append("\"samples\":[\(samples)]")
+      out.append("\"iters\":\(results.iters)")
+      if let meta = results.meta {
+	if c.logMemory {
+	  out += [
+	    "\"max_rss\":\(meta.maxRSS)",
+	    "\"pages\":\(meta.pages)",
+	  ]
+	}
+	if c.logMeta {
+          out += [
+	    "\"ics\":\(meta.ics)",
+	    "\"yields\":\(meta.yields)",
+	  ]
+	}
+      }
     }
-    return (
-      ["#", "TEST", "SAMPLES"] +
-      (c.quantile.map(quantiles)
-        ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)) +
-      (c.logMemory ? ["MAX_RSS(B)"] : []) +
-      (c.logMeta ? ["PAGES", "ICS", "YIELD"] : [])
-    ).joined(separator: c.delim)
+    print("{ " + out.joined(separator: ", ") + " }")
+    fflush(stdout)
   }
 
-  /// Execute benchmarks and continuously report the measurement results.
+
+  enum Justification {
+  case left, right
+  }
+  func printSpaces(_ width: Int) {
+    for _ in 0..<width {
+      print(" ", terminator: "")
+    }
+  }
+  func printToWidth(_ s: String, width: Int, justify: Justification = .left) {
+    var pad = width - 1 - s.count
+    if pad <= 0 {
+      pad = 1
+    }
+    if justify == .right {
+      printSpaces(pad)
+    }
+    print(s, terminator: "")
+    if justify == .left {
+      printSpaces(pad)
+    }
+  }
+  func printDoubleToWidth(_ d: Double, fractionDigits: Int = 3, width: Int) {
+    let digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    // Handle up to 8 fraction digits
+    let scales = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000]
+    let scale = scales[fractionDigits]
+    let i = Int(d * Double(scale) + 0.5)
+    let intPart = i / scale
+    let fraction = i % scale
+    var s = intPart.description + "."
+    var f = fraction
+    for _ in 0..<fractionDigits {
+      f *= 10
+      s += digits[(f / scale) % 10]
+    }
+    printToWidth(s, width: width, justify: .right)
+  }
+
+  func printText(index: Int, info: BenchmarkInfo, results: BenchResults?) {
+    printToWidth(index.description, width: 4, justify: .right)
+    printSpaces(1)
+    printToWidth(info.name, width: c.testNameLength)
+
+    if let results = results {
+      printToWidth(String(describing:results.samples.count), width: 10, justify: .right)
+      if results.samples.count > 0 {
+	let sorted = results.samples.sorted()
+	let min = sorted.first!
+	let max = sorted.last!
+	let median = sorted[sorted.count / 2]
+	printDoubleToWidth(min, width: 10)
+	printDoubleToWidth(median, width: 10)
+	printDoubleToWidth(max, width: 10)
+      }
+    }
+    print()
+    fflush(stdout)
+  }
+
+  func printTextHeading() {
+    printToWidth("#", width: 4, justify: .right)
+    printSpaces(1)
+    printToWidth("TEST", width: c.testNameLength, justify: .left)
+    printToWidth("SAMPLES", width: 10, justify: .right)
+    printToWidth("MIN", width: 10, justify: .right)
+    printToWidth("MEDIAN", width: 10, justify: .right)
+    printToWidth("MAX", width: 10, justify: .right)
+    print()
+  }
+
+  /// Run each benchmark and emit the results in JSON
   func runBenchmarks() {
     var testCount = 0
-
-    func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
-      func values(r: BenchResults) -> [String] {
-        func quantiles(q: Int) -> [Int] {
-          let qs = (0...q).map { i in r[Double(i) / Double(q)] }
-          return c.delta ?
-            qs.reduce(into: (encoded: [], last: 0)) {
-              $0.encoded.append($1 - $0.last); $0.last = $1
-            }.encoded : qs
-        }
-        let values: [Int] = [r.sampleCount] +
-          (c.quantile.map(quantiles)
-            ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
-          (c.logMemory ? [r.meta?.maxRSS].compactMap { $0 } : []) +
-          (c.logMeta ? r.meta.map {
-            [$0.pages, $0.ics, $0.yields] } ?? [] : [])
-        return values.map { String($0) }
+    if !c.jsonOutput {
+      printTextHeading()
+    }
+    for (index, info) in c.tests {
+      if c.jsonOutput {
+	printJSON(index: index, info: info, results: run(info))
+      } else {
+	printText(index: index, info: info, results: run(info))
       }
-      let benchmarkStats = (
-        [index, t.name] + (results.map(values) ?? ["Unsupported"])
-      ).joined(separator: c.delim)
-
-      print(benchmarkStats)
-      fflush(stdout)
-
-      if (results != nil) {
-        testCount += 1
-      }
+      testCount += 1
     }
 
-    print(header)
-
-    for (index, test) in c.tests {
-      report(index, test, results:run(test))
+    if !c.jsonOutput {
+      print("\nTotal performance tests executed: \(testCount)")
     }
-
-    print("\nTotal performance tests executed: \(testCount)")
   }
 }
 
@@ -704,11 +714,18 @@ public func main() {
   let config = TestConfig(registeredBenchmarks)
   switch (config.action) {
   case .listTests:
-    print("#\(config.delim)Test\(config.delim)[Tags]")
-    for (index, t) in config.tests {
-      let testDescription = [index, t.name, t.tags.sorted().description]
-        .joined(separator: config.delim)
-      print(testDescription)
+    if config.jsonOutput {
+      for (index, t) in config.tests {
+	let tags = t.tags.sorted().map({"\"\($0.description)\""}).joined(separator: ",")
+        print("{\"number\":\(index), \"name\":\"\(t.name)\", \"tags\":[\(tags)]}")
+      }
+    } else {
+      print("# Test [Tags]")
+      for (index, t) in config.tests {
+        let testDescription = [index.description, t.name, t.tags.sorted().description]
+          .joined(separator: " ")
+        print(testDescription)
+      }
     }
   case .run:
     if !config.allowNondeterministicHashing && !Hasher.isDeterministic {

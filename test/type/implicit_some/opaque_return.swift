@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-implicit-some
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-feature ImplicitSome
+
+// REQUIRES: asserts
 
 protocol Eatery {
   func lunch()
@@ -103,3 +105,23 @@ func eat(_ myfruit: inout Basket) -> Basket {
   return myfruit
 }
 
+protocol P {
+  associatedtype A: P
+  var value: A { get }
+}
+
+struct S: P {
+  var value: P { self }
+
+  var asExistential: any P { self }
+}
+
+enum E {
+    func f() -> Int {
+        1
+    }
+}
+
+protocol Q {
+    func f() -> Int
+}

@@ -124,12 +124,13 @@ static const char *class_getName(const ClassMetadata* type) {
 }
 
 template<> void ProtocolConformanceDescriptor::dump() const {
+  llvm::Optional<SymbolInfo> info;
   auto symbolName = [&](const void *addr) -> const char * {
-    SymbolInfo info;
-    int ok = lookupSymbol(addr, &info);
-    if (!ok)
-      return "<unknown addr>";
-    return info.symbolName.get();
+    info = SymbolInfo::lookup(addr);
+    if (info.has_value() && info->getSymbolName()) {
+      return info->getSymbolName();
+    }
+    return "<unknown addr>";
   };
 
   switch (auto kind = getTypeKind()) {

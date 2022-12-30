@@ -160,6 +160,7 @@ struct SILValuePrinterInfo {
   Optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
+  bool IsCapture = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -169,13 +170,15 @@ struct SILValuePrinterInfo {
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
-                      LifetimeAnnotation Lifetime)
+                      LifetimeAnnotation Lifetime, bool IsCapture)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
-        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
+        IsCapture(IsCapture) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -190,6 +193,11 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
 
   case DeclContextKind::FileUnit:
     // Ignore the file; just print the module.
+    printFullContext(Context->getParent(), Buffer);
+    return;
+
+  case DeclContextKind::MacroDecl:
+    // Ignore the macro, which won't have anything in it; just print the module.
     printFullContext(Context->getParent(), Buffer);
     return;
 
@@ -256,7 +264,7 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
             .Case("init", false)
 #define KEYWORD(kw) \
             .Case(#kw, true)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
             .Default(false);
 
     if (shouldEscape) {
@@ -367,6 +375,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
+    break;
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    OS << "!attrgenerator";
     break;
   }
 
@@ -654,8 +665,10 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@_lexical ";
       break;
     }
+    if (i.IsCapture)
+      *this << "@closureCapture ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
-      *this << "@" << i.OwnershipKind.getValue() << " ";
+      *this << "@" << i.OwnershipKind.value() << " ";
     }
     return *this << i.Type;
   }
@@ -688,14 +701,18 @@ public:
   }
   SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy(),
-            arg->getLifetimeAnnotation()};
+            arg->getLifetimeAnnotation(), arg->isClosureCapture()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
-    return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
-            arg->isNoImplicitCopy(), arg->getLifetimeAnnotation()};
+    return {Ctx.getID(arg),
+            arg->getType(),
+            arg->getOwnershipKind(),
+            arg->isNoImplicitCopy(),
+            arg->getLifetimeAnnotation(),
+            arg->isClosureCapture()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -815,8 +832,8 @@ public:
 
     // If the basic block has a name available, print it as well
     auto debugName = BB->getDebugName();
-    if (debugName.hasValue()) {
-      *this << "// " << debugName.getValue() << '\n';
+    if (debugName.has_value()) {
+      *this << "// " << debugName.value() << '\n';
     }
 
     // Then print the name of our block, the arguments, and the block colon.
@@ -861,7 +878,7 @@ public:
             PrintState.OS << "  // "
                           << SM.extractText(
                                  {SM.getLocForLineCol(Buffer, Line, 0),
-                                  LineLength.getValueOr(0)})
+                                  LineLength.value_or(0)})
                           << "\tSourceLoc: "
                           << SM.getDisplayNameForLoc(CurSourceLoc) << ":"
                           << Line << "\n";
@@ -956,24 +973,24 @@ public:
 
   void printBranchTargets(const SILInstruction *inst) {
     if (auto condBr = dyn_cast<CondBranchInst>(inst)) {
-      if (condBr->getTrueBB()->getDebugName().hasValue()) {
-        *this << ", true->" << condBr->getTrueBB()->getDebugName().getValue();
+      if (condBr->getTrueBB()->getDebugName().has_value()) {
+        *this << ", true->" << condBr->getTrueBB()->getDebugName().value();
       }
-      if (condBr->getFalseBB()->getDebugName().hasValue()) {
-        *this << ", false->" << condBr->getFalseBB()->getDebugName().getValue();
+      if (condBr->getFalseBB()->getDebugName().has_value()) {
+        *this << ", false->" << condBr->getFalseBB()->getDebugName().value();
       }
     } else if (auto br = dyn_cast<BranchInst>(inst)) {
-      if (br->getDestBB()->getDebugName().hasValue()) {
-        *this << ", dest->" << br->getDestBB()->getDebugName().getValue();
+      if (br->getDestBB()->getDebugName().has_value()) {
+        *this << ", dest->" << br->getDestBB()->getDebugName().value();
       }
     } else if (auto termInst = dyn_cast<TermInst>(inst)) {
       // Otherwise, we just print the successors in order without pretty printing
       for (unsigned i = 0, numSuccessors = termInst->getSuccessors().size();
            i != numSuccessors; ++i) {
         auto &successor = termInst->getSuccessors()[i];
-        if (successor.getBB()->getDebugName().hasValue()) {
+        if (successor.getBB()->getDebugName().has_value()) {
           *this << ", #" << i
-                << "->" << successor.getBB()->getDebugName().getValue();
+                << "->" << successor.getBB()->getDebugName().value();
         }
       }
     }
@@ -1482,7 +1499,6 @@ public:
     // Should not apply to callees.
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -1687,12 +1703,26 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    {
+      *this << "origin ";
+
+      switch (AI->getOriginator()) {
+      case AssignByWrapperInst::Originator::TypeWrapper:
+        *this << "type_wrapper";
+        break;
+      case AssignByWrapperInst::Originator::PropertyWrapper:
+        *this << "property_wrapper";
+      }
+
+      *this << ", ";
+    }
+
     *this << getIDAndType(AI->getSrc()) << " to ";
     switch (AI->getMode()) {
     case AssignByWrapperInst::Unknown:
       break;
     case AssignByWrapperInst::Initialization:
-      *this << "[initialization] ";
+      *this << "[init] ";
       break;
     case AssignByWrapperInst::Assign:
       *this << "[assign] ";
@@ -1701,9 +1731,13 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
+
+    *this << getIDAndType(AI->getDest());
+
+    if (AI->getOriginator() == AssignByWrapperInst::Originator::PropertyWrapper)
+      *this << ", init " << getIDAndType(AI->getInitializer());
+
+    *this << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1753,7 +1787,7 @@ public:
   void visitStore##Name##Inst(Store##Name##Inst *SI) { \
     *this << Ctx.getID(SI->getSrc()) << " to "; \
     if (SI->isInitializationOfDest()) \
-      *this << "[initialization] "; \
+      *this << "[init] "; \
     *this << getIDAndType(SI->getDest()); \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -1763,7 +1797,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -1772,7 +1806,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -2392,7 +2426,11 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
-  
+
+  void visitTestSpecificationInst(TestSpecificationInst *TSI) {
+    *this << QuotedString(TSI->getArgumentsSpecification());
+  }
+
   void visitThrowInst(ThrowInst *TI) {
     *this << getIDAndType(TI->getOperand());
   }
@@ -2833,6 +2871,11 @@ public:
       *this << dwfi->getType();
     }
   }
+
+  void visitHasSymbolInst(HasSymbolInst *hsi) {
+    *this << "#";
+    printValueDecl(hsi->getDecl(), PrintState.OS);
+  }
 };
 
 } // namespace swift
@@ -2997,6 +3040,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isDistributed()) {
     OS << "[distributed] ";
   }
+  if (isRuntimeAccessible()) {
+    OS << "[runtime_accessible] ";
+  }
+
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }
@@ -3845,7 +3892,7 @@ void SILDifferentiabilityWitness::dump() const {
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_coverage_map " << QuotedString(getFile()) << " "
+  OS << "sil_coverage_map " << QuotedString(getFilename()) << " "
      << QuotedString(getName()) << " " << QuotedString(getPGOFuncName()) << " "
      << getHash() << " {\t// " << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())

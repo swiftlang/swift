@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -O -target-cpu core2 -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=x86_64
+// REQUIRES: swift_in_compiler
 
 // This is an end-to-end test to ensure that the optimizer generates
 // a simple literal for character literals.
@@ -43,7 +44,7 @@ public func singleNonAsciiChar() -> Character {
 //
 // CHECK-LABEL: define {{.*}}singleNonSmolChar
 // CHECK-NEXT: entry:
-// CHECK:   ret { i64, %swift.bridge* } { i64 1152921504606847001, %swift.bridge* {{.*}}@.str{{.*}}i64 -9223372036854775808
+// CHECK:   ret { i64, %swift.bridge* } { i64 1152921504606847001, %swift.bridge* {{.*}}@".str.25.\F0\9F\91\A9\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A6\E2\80\8D\F0\9F\91\A6" {{.*}}i64 -9223372036854775808
 public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }

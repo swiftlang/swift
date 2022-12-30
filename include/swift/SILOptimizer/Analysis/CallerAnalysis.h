@@ -180,7 +180,7 @@ private:
   void verify(SILFunction *caller, const FunctionInfo &callerInfo) const;
 };
 
-/// Auxillary information that we store about a specific caller.
+/// Auxiliary information that we store about a specific caller.
 struct CallerAnalysis::CallerInfo {
   /// Given a SILFunction F that contains at least one partial apply of the
   /// given function, map F to the minimum number of partial applied
@@ -317,7 +317,7 @@ public:
     for (const auto &iter : callerStates) {
       if (auto numArgs = iter.second.getNumPartiallyAppliedArguments()) {
         foundArg = true;
-        minArgs = std::min(minArgs, numArgs.getValue());
+        minArgs = std::min(minArgs, numArgs.value());
       }
     }
 

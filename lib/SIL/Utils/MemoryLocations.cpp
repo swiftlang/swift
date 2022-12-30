@@ -147,7 +147,6 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
     SILFunctionArgument *funcArg = cast<SILFunctionArgument>(arg);
     switch (funcArg->getArgumentConvention()) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Out:
       // These are not SIL addresses under -enable-sil-opaque-values
@@ -170,6 +169,16 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
             singleBlockLocations.push_back(ASI);
           } else {
             analyzeLocation(ASI);
+          }
+        }
+      }
+      if (auto *BAI = dyn_cast<BeginApplyInst>(&I)) {
+        auto convention = BAI->getSubstCalleeConv();
+        auto yields = convention.getYields();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yields)) {
+          if (convention.isSILIndirect(yields[index])) {
+            analyzeLocation(yieldedValues[index]);
           }
         }
       }

@@ -13,21 +13,21 @@
 #ifndef SWIFT_IDE_UTILS_H
 #define SWIFT_IDE_UTILS_H
 
-#include "llvm/ADT/PointerIntPair.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ASTPrinter.h"
-#include "swift/Frontend/FrontendOptions.h"
+#include "swift/AST/Expr.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <functional>
 #include <memory>
 #include <string>
-#include <functional>
 #include <vector>
 
 namespace llvm {
@@ -41,10 +41,8 @@ namespace clang {
 }
 
 namespace swift {
-  class ModuleDecl;
   class ValueDecl;
   class ASTContext;
-  class CompilerInvocation;
   class SourceFile;
   class TypeDecl;
   class SourceLoc;
@@ -83,20 +81,6 @@ struct SourceCompleteResult {
 SourceCompleteResult
 isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
 SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
-
-bool initCompilerInvocation(
-    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
-    StringRef UnresolvedPrimaryFile,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    const std::string &swiftExecutablePath,
-    const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
-    std::string &Error);
-
-bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
-                                    CompilerInvocation &Invok,
-                                    std::string &Error);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
@@ -145,38 +129,63 @@ enum class CursorInfoKind {
   StmtStart,
 };
 
+/// Base class of more specialized \c ResolvedCursorInfos that also represents
+/// and \c Invalid cursor info.
+/// Subclasses of \c ResolvedCursorInfo cannot add new stored properies because
+/// \c ResolvedCursorInfo is being passed around as its base class and thus any
+/// properties in subclasses would get lost.
 struct ResolvedCursorInfo {
+protected:
   CursorInfoKind Kind = CursorInfoKind::Invalid;
   SourceFile *SF = nullptr;
   SourceLoc Loc;
-  ValueDecl *ValueD = nullptr;
-  TypeDecl *CtorTyRef = nullptr;
-  ExtensionDecl *ExtTyRef = nullptr;
-  /// Declarations that were shadowed by \c ValueD using a shorthand syntax that
-  /// names both the newly declared variable and the referenced variable by the
-  /// same identifier in the source text. This includes shorthand closure
-  /// captures (`[foo]`) and shorthand if captures
-  /// (`if let foo {`).
-  /// Decls that are shadowed using shorthand syntax should be reported as
-  /// additional cursor info results.
-  SmallVector<ValueDecl *, 2> ShorthandShadowedDecls;
-  ModuleEntity Mod;
-  bool IsRef = true;
-  bool IsKeywordArgument = false;
-  Type Ty;
-  Type ContainerType;
-  Stmt *TrailingStmt = nullptr;
-  Expr *TrailingExpr = nullptr;
-  /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
-  bool IsDynamic = false;
-  /// If this is a dynamic ref, the types of the base (multiple in the case of
-  /// protocol composition).
-  SmallVector<NominalTypeDecl *, 1> ReceiverTypes;
 
+  // Technically, these structs could form a union (because only one of them is
+  // active at a time). But I had issues with C++ complaining about copy
+  // constructors and gave up. At the moment it's only wasting 3 words for non
+  // ValueRef data.
+  struct {
+    ValueDecl *ValueD = nullptr;
+    TypeDecl *CtorTyRef = nullptr;
+    ExtensionDecl *ExtTyRef = nullptr;
+    bool IsRef = true;
+    Type Ty;
+    Type ContainerType;
+    bool IsKeywordArgument = false;
+    /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
+    bool IsDynamic = false;
+    /// If this is a dynamic ref, the types of the base (multiple in the case of
+    /// protocol composition).
+    SmallVector<NominalTypeDecl *> ReceiverTypes;
+    /// Declarations that were shadowed by \c ValueD using a shorthand syntax
+    /// that names both the newly declared variable and the referenced variable
+    /// by the same identifier in the source text. This includes shorthand
+    /// closure captures (`[foo]`) and shorthand if captures
+    /// (`if let foo {`).
+    /// Decls that are shadowed using shorthand syntax should be reported as
+    /// additional cursor info results.
+    SmallVector<ValueDecl *> ShorthandShadowedDecls;
+  } ValueRefInfo;
+  struct {
+    ModuleEntity Mod;
+  } ModuleRefInfo;
+  struct {
+    Expr *TrailingExpr = nullptr;
+  } ExprStartInfo;
+  struct {
+    Stmt *TrailingStmt = nullptr;
+  } StmtStartInfo;
+
+public:
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
 
-  ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
+  CursorInfoKind getKind() const { return Kind; }
+
+  SourceFile *getSourceFile() const { return SF; }
+
+  SourceLoc getLoc() const { return Loc; }
+  void setLoc(SourceLoc Loc) { this->Loc = Loc; }
 
   friend bool operator==(const ResolvedCursorInfo &lhs,
                          const ResolvedCursorInfo &rhs) {
@@ -184,32 +193,136 @@ struct ResolvedCursorInfo {
       lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
   }
 
-  void setValueRef(ValueDecl *ValueD, TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef, bool IsRef,
-                   Type Ty, Type ContainerType) {
-    Kind = CursorInfoKind::ValueRef;
-    this->ValueD = ValueD;
-    this->CtorTyRef = CtorTyRef;
-    this->ExtTyRef = ExtTyRef;
-    this->IsRef = IsRef;
-    this->Ty = Ty;
-    this->ContainerType = ContainerType;
-  }
-  void setModuleRef(ModuleEntity Mod) {
-    Kind = CursorInfoKind::ModuleRef;
-    this->Mod = Mod;
-  }
-  void setTrailingStmt(Stmt *TrailingStmt) {
-    Kind = CursorInfoKind::StmtStart;
-    this->TrailingStmt = TrailingStmt;
-  }
-  void setTrailingExpr(Expr* TrailingExpr) {
-    Kind = CursorInfoKind::ExprStart;
-    this->TrailingExpr = TrailingExpr;
-  }
-
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
+};
+
+struct ResolvedValueRefCursorInfo : public ResolvedCursorInfo {
+  // IMPORTANT: Don't add stored properties here. See comment on
+  // ResolvedCursorInfo.
+
+  ResolvedValueRefCursorInfo() = default;
+  explicit ResolvedValueRefCursorInfo(const ResolvedCursorInfo &Base,
+                                      ValueDecl *ValueD, TypeDecl *CtorTyRef,
+                                      ExtensionDecl *ExtTyRef, bool IsRef,
+                                      Type Ty, Type ContainerType)
+      : ResolvedCursorInfo(Base) {
+    assert(Base.getKind() == CursorInfoKind::Invalid &&
+           "Can only specialize from invalid");
+    Kind = CursorInfoKind::ValueRef;
+    ValueRefInfo.ValueD = ValueD;
+    ValueRefInfo.CtorTyRef = CtorTyRef;
+    ValueRefInfo.ExtTyRef = ExtTyRef;
+    ValueRefInfo.IsRef = IsRef;
+    ValueRefInfo.Ty = Ty;
+    ValueRefInfo.ContainerType = ContainerType;
+  }
+
+  ValueDecl *getValueD() const { return ValueRefInfo.ValueD; }
+  void setValueD(ValueDecl *ValueD) { ValueRefInfo.ValueD = ValueD; }
+
+  ExtensionDecl *getExtTyRef() const { return ValueRefInfo.ExtTyRef; }
+
+  TypeDecl *getCtorTyRef() const { return ValueRefInfo.CtorTyRef; }
+
+  bool isRef() const { return ValueRefInfo.IsRef; }
+  void setIsRef(bool IsRef) { ValueRefInfo.IsRef = IsRef; }
+
+  Type getType() const { return ValueRefInfo.Ty; }
+
+  Type getContainerType() const { return ValueRefInfo.ContainerType; }
+  void setContainerType(Type Ty) { ValueRefInfo.ContainerType = Ty; }
+
+  bool isKeywordArgument() const { return ValueRefInfo.IsKeywordArgument; }
+  void setIsKeywordArgument(bool IsKeywordArgument) {
+    ValueRefInfo.IsKeywordArgument = IsKeywordArgument;
+  }
+
+  bool isDynamic() const { return ValueRefInfo.IsDynamic; }
+  void setIsDynamic(bool IsDynamic) { ValueRefInfo.IsDynamic = IsDynamic; }
+
+  ArrayRef<NominalTypeDecl *> getReceiverTypes() const {
+    return ValueRefInfo.ReceiverTypes;
+  }
+  void setReceiverTypes(const SmallVector<NominalTypeDecl *> &ReceiverTypes) {
+    ValueRefInfo.ReceiverTypes = ReceiverTypes;
+  }
+
+  ArrayRef<ValueDecl *> getShorthandShadowedDecls() const {
+    return ValueRefInfo.ShorthandShadowedDecls;
+  };
+  void setShorthandShadowedDecls(
+      const SmallVector<ValueDecl *> &ShorthandShadowedDecls) {
+    ValueRefInfo.ShorthandShadowedDecls = ShorthandShadowedDecls;
+  };
+
+  ValueDecl *typeOrValue() {
+    return ValueRefInfo.CtorTyRef ? ValueRefInfo.CtorTyRef
+                                  : ValueRefInfo.ValueD;
+  }
+
+  static bool classof(const ResolvedCursorInfo *Info) {
+    return Info->getKind() == CursorInfoKind::ValueRef;
+  }
+};
+
+struct ResolvedModuleRefCursorInfo : public ResolvedCursorInfo {
+  // IMPORTANT: Don't add stored properties here. See comment on
+  // ResolvedCursorInfo.
+
+  ResolvedModuleRefCursorInfo(const ResolvedCursorInfo &Base, ModuleEntity Mod)
+      : ResolvedCursorInfo(Base) {
+    assert(Base.getKind() == CursorInfoKind::Invalid &&
+           "Can only specialize from invalid");
+    Kind = CursorInfoKind::ModuleRef;
+    ModuleRefInfo.Mod = Mod;
+  }
+
+  ModuleEntity getMod() const { return ModuleRefInfo.Mod; }
+
+  static bool classof(const ResolvedCursorInfo *Info) {
+    return Info->getKind() == CursorInfoKind::ModuleRef;
+  }
+};
+
+struct ResolvedExprStartCursorInfo : public ResolvedCursorInfo {
+  // IMPORTANT: Don't add stored properties here. See comment on
+  // ResolvedCursorInfo.
+
+  ResolvedExprStartCursorInfo(const ResolvedCursorInfo &Base,
+                              Expr *TrailingExpr)
+      : ResolvedCursorInfo(Base) {
+    assert(Base.getKind() == CursorInfoKind::Invalid &&
+           "Can only specialize from invalid");
+    Kind = CursorInfoKind::ExprStart;
+    ExprStartInfo.TrailingExpr = TrailingExpr;
+  }
+
+  Expr *getTrailingExpr() const { return ExprStartInfo.TrailingExpr; }
+
+  static bool classof(const ResolvedCursorInfo *Info) {
+    return Info->getKind() == CursorInfoKind::ExprStart;
+  }
+};
+
+struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
+  // IMPORTANT: Don't add stored properties here. See comment on
+  // ResolvedCursorInfo.
+
+  ResolvedStmtStartCursorInfo(const ResolvedCursorInfo &Base,
+                              Stmt *TrailingStmt)
+      : ResolvedCursorInfo(Base) {
+    assert(Base.getKind() == CursorInfoKind::Invalid &&
+           "Can only specialize from invalid");
+    Kind = CursorInfoKind::StmtStart;
+    StmtStartInfo.TrailingStmt = TrailingStmt;
+  }
+
+  Stmt *getTrailingStmt() const { return StmtStartInfo.TrailingStmt; }
+
+  static bool classof(const ResolvedCursorInfo *Info) {
+    return Info->getKind() == CursorInfoKind::StmtStart;
+  }
 };
 
 void simple_display(llvm::raw_ostream &out, const ResolvedCursorInfo &info);
@@ -628,7 +741,7 @@ bool isDeclOverridable(ValueDecl *D);
 /// one in `SomeType`. Contrast that to `type(of: foo).classMethod()` where
 /// `classMethod` could be any `classMethod` up or down the hierarchy from the
 /// type of the \p Base expression.
-bool isDynamicRef(Expr *Base, ValueDecl *D);
+bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> getType = [](Expr *E) { return E->getType(); });
 
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,

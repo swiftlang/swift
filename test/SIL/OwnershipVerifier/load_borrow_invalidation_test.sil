@@ -429,7 +429,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-class ComplexStruct {
+class KlassWithStruct {
   var val : NonTrivialStruct
 }
 
@@ -440,17 +440,51 @@ struct NonTrivialStruct {
   var val : Klass
 }
 
-sil [ossa] @test_borrow : $@convention(thin) (@owned ComplexStruct) -> () {
-bb0(%0 : @owned $ComplexStruct):
-  %2 = copy_value %0 : $ComplexStruct
-  %4 = begin_borrow %2 : $ComplexStruct
-  %5 = ref_element_addr %4 : $ComplexStruct, #ComplexStruct.val
+sil [ossa] @test_borrow : $@convention(thin) (@owned KlassWithStruct) -> () {
+bb0(%0 : @owned $KlassWithStruct):
+  %2 = copy_value %0 : $KlassWithStruct
+  %4 = begin_borrow %2 : $KlassWithStruct
+  %5 = ref_element_addr %4 : $KlassWithStruct, #KlassWithStruct.val
   %6 = load_borrow %5 : $*NonTrivialStruct
-  destroy_value %0 : $ComplexStruct
+  destroy_value %0 : $KlassWithStruct
   end_borrow %6 : $NonTrivialStruct
-  end_borrow %4 : $ComplexStruct
-  destroy_value %2 : $ComplexStruct
+  end_borrow %4 : $KlassWithStruct
+  destroy_value %2 : $KlassWithStruct
   %ret = tuple ()
   return %ret : $()
 }
 
+sil [ossa] @test_overlapping_write1 : $@convention(method) (@guaranteed KlassWithStruct) -> () {
+bb0(%0 : @guaranteed $KlassWithStruct):
+  %2 = copy_value %0 : $KlassWithStruct
+  %5 = ref_element_addr %0 : $KlassWithStruct, #KlassWithStruct.val
+  %6 = begin_access [read] [dynamic] %5 : $*NonTrivialStruct
+  %7 = load_borrow %6 : $*NonTrivialStruct
+  %11 = alloc_stack $KlassWithStruct
+  store %2 to [init] %11 : $*KlassWithStruct
+  destroy_addr %11 : $*KlassWithStruct
+  dealloc_stack %11 : $*KlassWithStruct
+  end_borrow %7 : $NonTrivialStruct
+  end_access %6 : $*NonTrivialStruct
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @test_overlapping_write2 : $@convention(method) (@guaranteed KlassWithStruct) -> () {
+bb0(%0 : @guaranteed $KlassWithStruct):
+  %2 = copy_value %0 : $KlassWithStruct
+  %3 = begin_borrow %2 : $KlassWithStruct
+  %5 = ref_element_addr %3 : $KlassWithStruct, #KlassWithStruct.val
+  %6 = begin_access [read] [dynamic] %5 : $*NonTrivialStruct
+  %7 = load_borrow %6 : $*NonTrivialStruct
+  %11 = alloc_stack $KlassWithStruct
+  %12 = store_borrow %0 to %11 : $*KlassWithStruct
+  end_borrow %12 : $*KlassWithStruct
+  dealloc_stack %11 : $*KlassWithStruct
+  end_borrow %7 : $NonTrivialStruct
+  end_access %6 : $*NonTrivialStruct
+  end_borrow %3 : $KlassWithStruct
+  destroy_value %2 : $KlassWithStruct
+  %t = tuple ()
+  return %t : $()
+}

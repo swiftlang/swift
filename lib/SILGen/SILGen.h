@@ -66,7 +66,10 @@ public:
   llvm::DenseMap<SILDeclRef, SILDeclRef> delayedFunctions;
 
   /// Queue of delayed SILFunctions that need to be forced.
-  std::deque<SILDeclRef> forcedFunctions;
+  std::deque<SILDeclRef> pendingForcedFunctions;
+
+  /// Delayed SILFunctions that need to be forced.
+  llvm::DenseSet<SILDeclRef> forcedFunctions;
 
   /// Mapping global VarDecls to their onceToken and onceFunc, respectively.
   llvm::DenseMap<VarDecl *, std::pair<SILGlobalVariable *,
@@ -272,7 +275,8 @@ public:
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
-  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
@@ -290,9 +294,11 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
   void visitSubscriptDecl(SubscriptDecl *sd);
+  void visitMacroDecl(MacroDecl *d);
+  void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
-  
+
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and

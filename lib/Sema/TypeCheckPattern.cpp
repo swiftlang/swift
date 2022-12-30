@@ -494,7 +494,8 @@ public:
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        PlaceholderType::get);
+        PlaceholderType::get,
+        /*packElementOpener*/ nullptr);
 
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -615,7 +616,8 @@ public:
           },
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
-          PlaceholderType::get);
+          PlaceholderType::get,
+          /*packElementOpener*/ nullptr);
 
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
@@ -717,7 +719,8 @@ static Type
 validateTypedPattern(TypedPattern *TP, DeclContext *dc,
                      TypeResolutionOptions options,
                      OpenUnboundGenericTypeFn unboundTyOpener,
-                     HandlePlaceholderTypeReprFn placeholderHandler) {
+                     HandlePlaceholderTypeReprFn placeholderHandler,
+                     OpenPackElementFn packElementOpener) {
   if (TP->hasType()) {
     return TP->getType();
   }
@@ -727,9 +730,11 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   // property definition.
   auto &Context = dc->getASTContext();
   auto *Repr = TP->getTypeRepr();
-  if (Repr && Repr->hasOpaque()) {
+  if (Repr && (Repr->hasOpaque() ||
+               (Context.LangOpts.hasFeature(Feature::ImplicitSome) &&
+                Repr->isProtocol(dc)))) {
     auto named = dyn_cast<NamedPattern>(
-                           TP->getSubPattern()->getSemanticsProvidingPattern());
+        TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
       Context.Diags.diagnose(TP->getLoc(),
                              diag::opaque_type_unsupported_pattern);
@@ -751,7 +756,8 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   }
 
   const auto ty = TypeResolution::resolveContextualType(
-      Repr, dc, options, unboundTyOpener, placeholderHandler);
+      Repr, dc, options, unboundTyOpener, placeholderHandler,
+      packElementOpener);
 
   if (ty->hasError()) {
     return ErrorType::get(Context);
@@ -823,6 +829,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   case PatternKind::Typed: {
     OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
     HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
+    OpenPackElementFn packElementOpener = nullptr;
     if (pattern.allowsInference()) {
       unboundTyOpener = [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
@@ -834,7 +841,8 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       placeholderHandler = PlaceholderType::get;
     }
     return validateTypedPattern(cast<TypedPattern>(P), dc, options,
-                                unboundTyOpener, placeholderHandler);
+                                unboundTyOpener, placeholderHandler,
+                                packElementOpener);
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -889,6 +897,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
       OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
       HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
+      OpenPackElementFn packElementOpener = nullptr;
       if (pattern.allowsInference()) {
         unboundTyOpener = [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
@@ -902,7 +911,8 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 
       const auto type =
           validateTypedPattern(cast<TypedPattern>(somePat->getSubPattern()), dc,
-                               options, unboundTyOpener, placeholderHandler);
+                               options, unboundTyOpener, placeholderHandler,
+                               packElementOpener);
 
       if (!type->hasError()) {
         return OptionalType::get(type);
@@ -1090,7 +1100,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           // If the pattern type has a placeholder, we need to resolve it here.
           if (patternType->hasPlaceholder()) {
             validateTypedPattern(cast<TypedPattern>(TP), dc, options, nullptr,
-                                 nullptr);
+                                 nullptr, /*packElementOpener*/ nullptr);
           }
         } else {
           diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
@@ -1319,7 +1329,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         // complain about unbound generics and
         // placeholders here?
         /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr);
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
     if (castType->hasError())
       return nullptr;
     IP->setCastType(castType);
@@ -1385,16 +1396,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast: {
-      diags.diagnose(IP->getLoc(),
-                     diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastType());
-      IP->setType(ErrorType::get(Context));
-      if (Pattern *sub = IP->getSubPattern())
-        sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
-      return P;
-    }
-
+    case CheckedCastKind::SetDowncast:
     case CheckedCastKind::ValueCast:
       IP->setCastKind(castKind);
       break;

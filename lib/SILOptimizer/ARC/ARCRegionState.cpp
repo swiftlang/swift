@@ -55,7 +55,7 @@ void ARCRegionState::initSuccBottomUp(ARCRegionState &SuccRegionState) {
 void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
   // Otherwise for each [(SILValue, BottomUpState)] that we are tracking...
   for (auto &Pair : getBottomupStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILValue RefCountedValue = Pair->first;
@@ -113,7 +113,7 @@ void ARCRegionState::initPredTopDown(ARCRegionState &PredRegionState) {
 void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
   // For each [(SILValue, TopDownState)] that we are tracking...
   for (auto &Pair : getTopDownStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
     SILValue RefCountedValue = Pair->first;
 
@@ -219,7 +219,7 @@ bool ARCRegionState::processBlockBottomUp(
     // tracking...
     for (auto &OtherState : getBottomupStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If this is the state associated with the instruction that we are
@@ -279,7 +279,7 @@ bool ARCRegionState::processLoopBottomUp(
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getBottomupStates()) {
-    if (!OtherState.hasValue())
+    if (!OtherState.has_value())
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts()) {
@@ -383,7 +383,7 @@ bool ARCRegionState::processBlockTopDown(
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : getTopDownStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If we visited an increment or decrement successfully (and thus Op is
@@ -429,7 +429,7 @@ bool ARCRegionState::processLoopTopDown(
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getTopDownStates()) {
-    if (!OtherState.hasValue())
+    if (!OtherState.has_value())
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts()) {

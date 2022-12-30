@@ -220,7 +220,7 @@ public:
   SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
     assert(!calculatedValues.count(addr));
     Type valueType =
-        substituteGenericParamsAndSimpify(addr->getType().getASTType());
+        substituteGenericParamsAndSimplify(addr->getType().getASTType());
     auto *memObject = SymbolicValueMemoryObject::create(
         valueType, initialValue, evaluator.getAllocator());
     auto result = SymbolicValue::getAddress(memObject);
@@ -257,9 +257,9 @@ public:
       SILBasicBlock::iterator instI,
       SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
 
-  Type substituteGenericParamsAndSimpify(Type ty);
-  CanType substituteGenericParamsAndSimpify(CanType ty) {
-    return substituteGenericParamsAndSimpify(Type(ty))->getCanonicalType();
+  Type substituteGenericParamsAndSimplify(Type ty);
+  CanType substituteGenericParamsAndSimplify(CanType ty) {
+    return substituteGenericParamsAndSimplify(Type(ty))->getCanonicalType();
   }
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
@@ -292,7 +292,7 @@ private:
 
 /// Simplify the specified type based on knowledge of substitutions if we have
 /// any.
-Type ConstExprFunctionState::substituteGenericParamsAndSimpify(Type ty) {
+Type ConstExprFunctionState::substituteGenericParamsAndSimplify(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
@@ -314,7 +314,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // types.
   if (auto *mti = dyn_cast<MetatypeInst>(value)) {
     auto metatype = mti->getType().castTo<MetatypeType>();
-    auto type = substituteGenericParamsAndSimpify(metatype->getInstanceType())
+    auto type = substituteGenericParamsAndSimplify(metatype->getInstanceType())
         ->getCanonicalType();
     return SymbolicValue::getMetatype(type);
   }
@@ -384,7 +384,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     }
     CanType structType = value->getType().getASTType();
     return SymbolicValue::getAggregate(
-        elts, substituteGenericParamsAndSimpify(structType),
+        elts, substituteGenericParamsAndSimplify(structType),
         evaluator.getAllocator());
   }
 
@@ -887,7 +887,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       // this is.
       if (i == 0) {
         if (stringOpt) {
-          message += stringOpt.getValue();
+          message += stringOpt.value();
         } else {
           // Use a generic prefix here, as the actual prefix is not a constant.
           message += "assertion failed";
@@ -896,7 +896,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       }
       if (stringOpt) {
         message += ": ";
-        message += stringOpt.getValue();
+        message += stringOpt.value();
       }
     }
     return evaluator.getUnknown(
@@ -954,7 +954,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
 
     Type resultType =
-        substituteGenericParamsAndSimpify(apply->getType().getASTType());
+        substituteGenericParamsAndSimplify(apply->getType().getASTType());
     assert(resultType->is<TupleType>());
     Type arrayType = resultType->castTo<TupleType>()->getElementType(0);
     Type arrayEltType = getArrayElementType(arrayType);
@@ -1167,11 +1167,11 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     // Get the type of the argument and check if it is a signed or
     // unsigned integer.
     SILValue integerArgument = apply->getOperand(1);
-    CanType argumentType = substituteGenericParamsAndSimpify(
+    CanType argumentType = substituteGenericParamsAndSimplify(
         integerArgument->getType().getASTType());
     Optional<bool> isSignedIntegerType =
         getSignIfStdlibIntegerType(argumentType);
-    if (!isSignedIntegerType.hasValue()) {
+    if (!isSignedIntegerType.has_value()) {
       return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
     }
     // Load the stdlib integer's value and convert it to a string.
@@ -1186,7 +1186,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            "stdlib integer type must store only a builtin integer");
     APInt integer = builtinIntegerValue.getIntegerValue();
     SmallString<8> integerString;
-    isSignedIntegerType.getValue() ? integer.toStringSigned(integerString)
+    isSignedIntegerType.value() ? integer.toStringSigned(integerString)
                                    : integer.toStringUnsigned(integerString);
     SymbolicValue resultVal =
         SymbolicValue::getString(integerString.str(), evaluator.getAllocator());
@@ -1320,8 +1320,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   evaluator.popCallStack();
 
   // Return the error value the callee evaluation failed.
-  if (callResult.hasValue())
-    return callResult.getValue();
+  if (callResult.has_value())
+    return callResult.value();
   setValue(apply, result);
   return None;
 }
@@ -1348,8 +1348,8 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
     auto callResult = computeCallResult(apply);
 
     // If this failed, return the error code.
-    if (callResult.hasValue())
-      return callResult.getValue();
+    if (callResult.has_value())
+      return callResult.value();
 
     assert(calculatedValues.count(apply));
     return calculatedValues[apply];
@@ -1507,7 +1507,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
       auto callResult = computeCallResult(apply);
 
       // If the call failed, we're done.
-      if (callResult.hasValue())
+      if (callResult.has_value())
         return error(*callResult);
 
       // computeCallResult will have figured out the result and cached it for
@@ -1531,9 +1531,9 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
       // Try finding a writer among the users of `teai`. For example:
       //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
       //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   copy_addr %114 to [init] %183 : $*Int32
       //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //   copy_addr [take] %191 to [init] %178 : $*Int32
       //
       // The workflow is: when const-evaluating %178, we const-evaluate %191,
       // which in turn triggers const-evaluating %179, thereby enter this
@@ -1781,7 +1781,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     if (structDecl && structDecl->getStoredProperties().empty()) {
       createMemoryObject(asi, SymbolicValue::getAggregate(
                                   ArrayRef<SymbolicValue>(),
-                                  substituteGenericParamsAndSimpify(structType),
+                                  substituteGenericParamsAndSimplify(structType),
                                   evaluator.getAllocator()));
       return None;
     }
@@ -1885,7 +1885,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
   // If we can evaluate this flow sensitively, then return the next instruction.
   if (!isa<TermInst>(inst)) {
     auto fsResult = evaluateFlowSensitive(inst);
-    if (fsResult.hasValue())
+    if (fsResult.has_value())
       return {None, fsResult};
     return {++instI, None};
   }
@@ -1983,11 +1983,11 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
       // not a CheckedCastBranchAddr inst. Therefore, it has to be a struct
       // type or String or Metatype. Since the types of aggregates are not
       // tracked, we recover it from the declared type of the source operand
-      // and generic parameter subsitutions in the interpreter state.
-      sourceType = substituteGenericParamsAndSimpify(
+      // and generic parameter substitutions in the interpreter state.
+      sourceType = substituteGenericParamsAndSimplify(
                                       checkedCastInst->getSourceFormalType());
     }
-    CanType targetType = substituteGenericParamsAndSimpify(
+    CanType targetType = substituteGenericParamsAndSimplify(
         checkedCastInst->getTargetFormalType());
     DynamicCastFeasibility castResult = classifyDynamicCast(
         inst->getModule().getSwiftModule(), sourceType, targetType);
@@ -2087,11 +2087,11 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
     std::tie(nextInstOpt, errorVal) =
         state.evaluateInstructionAndGetNext(nextInst, visitedBlocks);
 
-    if (errorVal.hasValue())
+    if (errorVal.has_value())
       return errorVal;
 
-    assert(nextInstOpt.hasValue());
-    nextInst = nextInstOpt.getValue();
+    assert(nextInstOpt.has_value());
+    nextInst = nextInstOpt.value();
   }
 }
 
@@ -2173,7 +2173,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
     if (!constValOpt) {
       continue;
     }
-    auto constVal = constValOpt.getValue();
+    auto constVal = constValOpt.value();
     auto constKind = constVal.getKind();
 
     // Skip can only be invoked on value types or addresses of value types.
@@ -2203,8 +2203,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
       ApplySite applySite(applyInst);
       SILArgumentConvention convention =
         applySite.getArgumentConvention(operand);
-      if (convention == SILArgumentConvention::Indirect_In_Guaranteed ||
-          convention == SILArgumentConvention::Indirect_In_Constant) {
+      if (convention == SILArgumentConvention::Indirect_In_Guaranteed) {
         continue;
       }
     }
@@ -2301,7 +2300,7 @@ ConstExprStepEvaluator::lookupConstValue(SILValue value) {
 void ConstExprStepEvaluator::dumpState() { internalState->dump(); }
 
 bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
-  return classifyFunction(fun).hasValue();
+  return classifyFunction(fun).has_value();
 }
 
 bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
@@ -2341,7 +2340,7 @@ bool swift::isReadOnlyConstantEvaluableCall(FullApplySite applySite) {
     return false;
 
   if (auto knownFunction = classifyFunction(callee)) {
-    return isReadOnlyFunction(knownFunction.getValue());
+    return isReadOnlyFunction(knownFunction.value());
   }
   if (!hasConstantEvaluableAnnotation(callee))
     return false;

@@ -3,7 +3,7 @@
 
 // REQUIRES: objc_interop
 
-// This is an end-to-end test to ensure that the optimizer devertualizes
+// This is an end-to-end test to ensure that the optimizer devirtualizes
 // calls to a protocol composition type.
 
 public class ClassA<T> { }

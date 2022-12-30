@@ -195,6 +195,15 @@ CUSTOM_LOCATOR_PATH_ELT(PackType)
 /// An element of a pack type - the T in <T, U, V, ...>
 CUSTOM_LOCATOR_PATH_ELT(PackElement)
 
+/// Stores the generic environment for an opened pack element.
+CUSTOM_LOCATOR_PATH_ELT(OpenedPackElement)
+
+/// The shape of a parameter pack.
+SIMPLE_LOCATOR_PATH_ELT(PackShape)
+
+/// The pattern  of a pack expansion.
+SIMPLE_LOCATOR_PATH_ELT(PackExpansionPattern)
+
 /// An unresolved member.
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 

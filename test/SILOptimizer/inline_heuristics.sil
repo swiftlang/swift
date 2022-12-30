@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -compute-side-effects -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
 // REQUIRES: asserts
+
+// REQUIRES: swift_in_compiler
 
 // This test checks the inline heuristics based on the debug log output of
 // the performance inliner.
@@ -402,7 +404,7 @@ bb0(%0 : $*T, %1 : $*U):
   // function_ref action<A> (A) -> ()
   %4 = function_ref @action : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %5 = alloc_stack $T
-  copy_addr %0 to [initialization] %5 : $*T
+  copy_addr %0 to [init] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %5 : $*T
   destroy_addr %1 : $*U
@@ -420,7 +422,7 @@ bb0(%0 : $*U):
   %5 = alloc_stack $Int64
   store %4 to %5 : $*Int64
   %7 = alloc_stack $U
-  copy_addr %0 to [initialization] %7 : $*U
+  copy_addr %0 to [init] %7 : $*U
   %9 = apply %2<Int64, U>(%5, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   dealloc_stack %7 : $*U
   dealloc_stack %5 : $*Int64

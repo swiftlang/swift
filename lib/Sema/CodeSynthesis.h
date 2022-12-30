@@ -85,8 +85,9 @@ ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 // with an initial value.
 bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
 
-/// Add 'nonisolated' to the synthesized declaration when needed.
-void addNonIsolatedToSynthesized(NominalTypeDecl *nominal, ValueDecl *value);
+/// Add 'nonisolated' to the synthesized declaration when needed. Returns true
+/// if an attribute was added.
+bool addNonIsolatedToSynthesized(NominalTypeDecl *nominal, ValueDecl *value);
 
 } // end namespace swift
 

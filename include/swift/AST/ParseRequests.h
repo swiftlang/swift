@@ -21,9 +21,10 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
+
+struct ASTNode;
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
@@ -85,13 +86,12 @@ public:
 };
 
 struct SourceFileParsingResult {
-  ArrayRef<Decl *> TopLevelDecls;
+  ArrayRef<ASTNode> TopLevelItems;
   Optional<ArrayRef<Token>> CollectedTokens;
   Optional<StableHasher> InterfaceHasher;
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
-/// Parse the top-level decls of a SourceFile.
+/// Parse the top-level items of a SourceFile.
 class ParseSourceFileRequest
     : public SimpleRequest<
           ParseSourceFileRequest, SourceFileParsingResult(SourceFile *),
@@ -116,12 +116,31 @@ public:
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const CodeCompletionCallbacksFactory *factory);
+/// Parse the top-level items of a SourceFile.
+class ParseTopLevelDeclsRequest
+    : public SimpleRequest<
+          ParseTopLevelDeclsRequest, ArrayRef<Decl *>(SourceFile *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
 
-class CodeCompletionSecondPassRequest
-    : public SimpleRequest<CodeCompletionSecondPassRequest,
-                           bool(SourceFile *, CodeCompletionCallbacksFactory *),
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const IDEInspectionCallbacksFactory *factory);
+
+class IDEInspectionSecondPassRequest
+    : public SimpleRequest<IDEInspectionSecondPassRequest,
+                           bool(SourceFile *, IDEInspectionCallbacksFactory *),
                            RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -131,7 +150,7 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, SourceFile *SF,
-                CodeCompletionCallbacksFactory *Factory) const;
+                IDEInspectionCallbacksFactory *Factory) const;
 
 public:
   evaluator::DependencySource

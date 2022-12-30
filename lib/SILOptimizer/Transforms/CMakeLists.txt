@@ -7,7 +7,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
   ArrayElementValuePropagation.cpp
-  AssumeSingleThreaded.cpp
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
@@ -21,7 +20,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DifferentiabilityWitnessDevirtualizer.cpp
   EagerSpecializer.cpp
   GenericSpecializer.cpp
-  MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp
   AssemblyVisionRemarkGenerator.cpp
@@ -31,7 +29,6 @@ target_sources(swiftSILOptimizer PRIVATE
   PruneVTables.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
-  ReleaseDevirtualizer.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp

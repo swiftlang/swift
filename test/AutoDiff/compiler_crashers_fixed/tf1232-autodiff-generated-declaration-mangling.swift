@@ -1,6 +1,7 @@
 // RUN: %target-build-swift -g %s
-// FIXME: This test occasionally fails to link (https://github.com/apple/swift/issues/57125).
-// REQUIRES: SR14775
+
+// FIXME(https://github.com/apple/swift/issues/57125): This test occasionally fails to link.
+// REQUIRES: issue_57125
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for
 // AutoDiff-generated declarations: linear map structs and branching trace

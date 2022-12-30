@@ -91,7 +91,7 @@ void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {
   case Status::Executing:
-    assert(false && "destroying a task that never completed");
+    swift_unreachable("destroying a task that never completed");
 
   case Status::Success:
     resultType->vw_destroy(getStoragePtr());
@@ -1311,7 +1311,9 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                         ? ContinuationStatus::Awaited
                                         : ContinuationStatus::Pending,
                                       std::memory_order_relaxed);
-
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  context->Cond = nullptr;
+#endif
   AsyncTask *task;
 
   // A preawait immediately suspends the task.
@@ -1351,8 +1353,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
          "awaiting a corrupt or already-awaited continuation");
 
   // If the status is already Resumed, we can resume immediately.
-  // Comparing against Pending may be very slightly more compact.
-  if (oldStatus != ContinuationStatus::Pending) {
+  if (oldStatus == ContinuationStatus::Resumed) {
     if (context->isExecutorSwitchForced())
       return swift_task_switch(context, context->ResumeParent,
                                context->ResumeToExecutor);
@@ -1364,19 +1365,57 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   auto task = swift_task_getCurrent();
 #endif
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // In the task to thread model, we do not suspend the task that is waiting on
+  // the continuation resumption. Instead we simply block the thread on a
+  // condition variable keep the task alive on the thread.
+  //
+  // This condition variable can be allocated on the stack of the blocking
+  // thread - with the address of it published to the resuming thread via the
+  // context.
+  ConditionVariable Cond;
+
+  context->Cond = &Cond;
+#else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   // Flag the task as suspended.
   task->flagAsSuspended();
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
-  // Try to transition to Awaited.
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // If the cmpxchg is successful, the store release also publishes the write to
+  // the Cond in the ContinuationAsyncContext to any concurrent accessing
+  // thread.
+  //
+  // If it failed, then someone concurrently resumed the continuation in which
+  // case, we don't care about publishing the Cond in the
+  // ContinuationAsyncContext anyway.
+#endif
+  // Try to transition to Awaited
   bool success =
     sync.compare_exchange_strong(oldStatus, ContinuationStatus::Awaited,
                                  /*success*/ std::memory_order_release,
                                  /*failure*/ std::memory_order_acquire);
 
-  // If that succeeded, we have nothing to do.
   if (success) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // This lock really protects nothing but we need to hold it
+    // while calling the condition wait
+    Cond.lock();
+
+    // Condition variables can have spurious wakeups so we need to check this in
+    // a do-while loop.
+    do {
+      Cond.wait();
+      oldStatus = sync.load(std::memory_order_relaxed);
+    } while (oldStatus != ContinuationStatus::Resumed);
+
+    Cond.unlock();
+#else
+    // If that succeeded, we have nothing to do since we've successfully
+    // suspended the task
     _swift_task_clearCurrent();
     return;
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   }
 
   // If it failed, it should be because someone concurrently resumed
@@ -1384,8 +1423,14 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   assert(oldStatus == ContinuationStatus::Resumed &&
          "continuation was concurrently corrupted or awaited");
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // Since the condition variable is stack allocated, we don't need to do
+  // anything here to clean up
+#else
   // Restore the running state of the task and resume it.
   task->flagAsRunning();
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+
   if (context->isExecutorSwitchForced())
     return swift_task_switch(context, context->ResumeParent,
                              context->ResumeToExecutor);
@@ -1397,6 +1442,7 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   continuationChecking::willResume(context);
 
   auto &sync = context->AwaitSynchronization;
+
   auto status = sync.load(std::memory_order_acquire);
   assert(status != ContinuationStatus::Resumed &&
          "continuation was already resumed");
@@ -1405,27 +1451,41 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   // restarting.
   _swift_tsan_release(static_cast<Job *>(task));
 
-  // The status should be either Pending or Awaited.  If it's Awaited,
-  // which is probably the most likely option, then we should immediately
-  // enqueue; we don't need to update the state because there shouldn't
-  // be a racing attempt to resume the continuation.  If it's Pending,
-  // we need to set it to Resumed; if that fails (with a strong cmpxchg),
-  // it should be because the original thread concurrently set it to
-  // Awaited, and so we need to enqueue.
+  // The status should be either Pending or Awaited.
+  //
+  // Case 1: Status is Pending
+  // No one has awaited us, we just need to set it to Resumed; if that fails
+  // (with a strong cmpxchg), it should be because the original thread
+  // concurrently set it to Awaited, in which case, we fall into Case 2.
+  //
+  // Case 2: Status is Awaited
+  // This is probably the more frequently hit case.
+  // In task-to-thread model, we update status to be Resumed and signal the
+  // waiting thread. In regular model, we immediately enqueue the task and can
+  // skip updates to the continuation state since there shouldn't be a racing
+  // attempt to resume the continuation.
   if (status == ContinuationStatus::Pending &&
       sync.compare_exchange_strong(status, ContinuationStatus::Resumed,
                                    /*success*/ std::memory_order_release,
-                                   /*failure*/ std::memory_order_relaxed)) {
+                                   /*failure*/ std::memory_order_acquire)) {
     return;
   }
   assert(status == ContinuationStatus::Awaited &&
          "detected concurrent attempt to resume continuation");
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // If we see status == ContinuationStatus::Awaited, then we should also be
+  // seeing a pointer to the cond var since we're doing a load acquire on sync
+  // which pairs with the store release in swift_continuation_awaitImpl
+  assert(context->Cond != nullptr);
 
+  sync.store(ContinuationStatus::Resumed, std::memory_order_relaxed);
+  context->Cond->signal();
+#else
   // TODO: maybe in some mode we should set the status to Resumed here
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
-
   task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
 SWIFT_CC(swift)

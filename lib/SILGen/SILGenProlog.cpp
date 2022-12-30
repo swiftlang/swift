@@ -34,10 +34,25 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
+SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
+
+  // If we have a move only type, then mark it with mark_must_check so we can't
+  // escape it.
+  if (selfType.isMoveOnly()) {
+    // For now, we do not handle move only class deinits. This is because we
+    // need to do a bit more refactoring to handle the weird way that it deals
+    // with ownership. But for simple move only deinits (like struct/enum), that
+    // are owned, lets mark them as needing to be no implicit copy checked so
+    // they cannot escape.
+    if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
+      selfValue = B.createMarkMustCheckInst(
+          selfDecl, selfValue, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
+  }
+
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
@@ -505,34 +520,49 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto &lowering = SGF.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);
+    auto *arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    arg->setClosureCapture(true);
 
-    bool NeedToDestroyValueAtExit = false;
+    ManagedValue val = ManagedValue::forUnmanaged(arg);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
     // allow formation of the address for this captured value.  Create a
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
-      auto addr = SGF.emitTemporaryAllocation(VD, ty);
+      auto addr = SGF.emitTemporary(VD, lowering);
       // We have created a copy that needs to be destroyed.
       val = SGF.B.emitCopyValueOperation(Loc, val);
-      NeedToDestroyValueAtExit = true;
-      lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
-      val = addr;
+      // We use the SILValue version of this because the SILGenBuilder version
+      // will create a cloned cleanup, which we do not want since our temporary
+      // already has a cleanup.
+      //
+      // MG: Is this the right semantics for createStore? Seems like that
+      // should be potentially a different API.
+      SGF.B.emitStoreValueOperation(VD, val.forward(SGF), addr->getAddress(),
+                                    StoreOwnershipQualifier::Init);
+      addr->finishInitialization(SGF);
+      val = addr->getManagedAddress();
     }
 
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
-    if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
+    // If this constant is a move only type, we need to add no_copy checking to
+    // ensure that we do not consume this captured value in the function. This
+    // is because closures can be invoked multiple times which is inconsistent
+    // with consuming the move only type.
+    if (val.getType().isMoveOnly()) {
+      val = val.ensurePlusOne(SGF, Loc);
+      val = SGF.B.createMarkMustCheckInst(Loc, val,
+                                          MarkMustCheckInst::CheckKind::NoCopy);
+    }
+
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val.getValue());
+    if (auto *AllocStack = dyn_cast<AllocStackInst>(val.getValue())) {
       AllocStack->setArgNo(ArgNo);
-    else {
+    } else {
       SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-      SGF.B.createDebugValue(Loc, val, DbgVar);
+      SGF.B.createDebugValue(Loc, val.getValue(), DbgVar);
     }
 
-    // TODO: Closure contexts should always be guaranteed.
-    if (NeedToDestroyValueAtExit && !lowering.isTrivial())
-      SGF.enterDestroyCleanup(val);
     break;
   }
 
@@ -547,9 +577,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
                                            type),
         SGF.F.getGenericEnvironment(), /*mutable*/ true);
-    SILValue box = SGF.F.begin()->createFunctionArgument(
+    auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
+    box->setClosureCapture(true);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
+    if (addr->getType().isMoveOnly())
+      addr = SGF.B.createMarkMustCheckInst(
+          VD, addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
@@ -567,7 +601,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
       ty = ty.getAddressType();
     }
-    SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    fArg->setClosureCapture(true);
+    SILValue arg = SILValue(fArg);
     if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
       arg = SGF.B.createMarkMustCheckInst(
           Loc, arg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
@@ -861,13 +897,13 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     ? MetatypeRepresentation::Thick
     : MetatypeRepresentation::Thin;
 
-  ManagedValue actorMetaType =
+  CanType actorMetaType = CanMetatypeType::get(actorType, metaRepr);
+  ManagedValue actorMetaTypeValue =
     ManagedValue::forUnmanaged(B.createMetatype(loc,
-      SILType::getPrimitiveObjectType(
-        CanMetatypeType::get(actorType, metaRepr))));
+      SILType::getPrimitiveObjectType(actorMetaType)));
 
-  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
-    actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
+  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaTypeValue,
+    actorMetaType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
     subs, AccessSemantics::Ordinary, instanceType, SGFContext());
   ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
   return emitLoadActorExecutor(loc, actorInstance);
@@ -927,8 +963,8 @@ Optional<SILValue> SILGenFunction::emitExecutor(
 
   case ActorIsolation::ActorInstance: {
     // "self" here means the actor instance's "self" value.
-    assert(maybeSelf.hasValue() && "actor-instance but no self provided?");
-    auto self = maybeSelf.getValue();
+    assert(maybeSelf.has_value() && "actor-instance but no self provided?");
+    auto self = maybeSelf.value();
     return emitLoadActorExecutor(loc, self);
   }
 

@@ -80,7 +80,7 @@ public func usesWithUnsafeContinuation() async {
 
   // CHECK: bb3:
   // CHECK: [[COPY:%.*]] = alloc_stack $Any
-  // CHECK: copy_addr [take] [[BOX]] to [initialization] [[COPY]]
+  // CHECK: copy_addr [take] [[BOX]] to [init] [[COPY]]
   // CHECK: destroy_addr [[COPY]]
   // CHECK: dealloc_stack [[COPY]]
   // CHECK: dealloc_stack [[BOX]]

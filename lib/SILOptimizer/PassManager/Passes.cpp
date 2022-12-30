@@ -304,14 +304,6 @@ SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 SWIFT_FUNCTION_PASS_COMMON(ID, TAG)                                        \
 SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 
-#define SWIFT_FUNCTION_PASS_WITH_LEGACY(ID, TAG, DESCRIPTION) \
-SWIFT_FUNCTION_PASS_COMMON(ID, TAG)                                        \
-SILTransform *swift::create##ID() {                                        \
-  if (passesRegistered)                                                    \
-    return new ID##Pass();                                                 \
-  return createLegacy##ID();                                               \
-}                                                                          \
-
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
 #undef SWIFT_FUNCTION_PASS_COMMON

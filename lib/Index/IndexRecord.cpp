@@ -447,11 +447,14 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             }
           } else {
             // Serialized AST file.
-            // Only index system modules (essentially stdlib and overlays).
+            // Only index distributed system modules, and the stdlib.
             // We don't officially support binary swift modules, so normally
             // the index data for user modules would get generated while
             // building them.
+            bool isDistributedModule = mod->isSDKModule() ||
+                      mod->getASTContext().SearchPathOpts.getSDKPath().empty();
             if (mod->isSystemModule() && indexSystemModules &&
+                (isDistributedModule || mod->isStdlibModule()) &&
                 (!skipStdlib || !mod->isStdlibModule())) {
               emitDataForSwiftSerializedModule(mod, indexStorePath,
                                                indexClangModules,
@@ -506,21 +509,47 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,
                                                                 /*TimeCompareFilePath=*/filename, error);
-  if (!isUptodateOpt.hasValue()) {
+  if (!isUptodateOpt.has_value()) {
     diags.diagnose(SourceLoc(), diag::error_index_failed_status_check, error);
     return true;
   }
   if (*isUptodateOpt)
     return false;
 
-  // FIXME: Would be useful for testing if swift had clang's -Rremark system so
-  // we could output a remark here that we are going to create index data for
-  // a module file.
+  // Reload resilient modules from swiftinterface to avoid indexing
+  // internal details.
+  bool skipIndexingModule = false;
+  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+      !module->isBuiltFromInterface() &&
+      !module->isStdlibModule()) {
+    module->getASTContext().setIgnoreAdjacentModules(true);
+
+    ImportPath::Module::Builder builder(module->getName());
+    ASTContext &ctx = module->getASTContext();
+    auto reloadedModule = ctx.getModule(builder.get(),
+                                        /*AllowMemoryCached=*/false);
+
+    if (reloadedModule) {
+      module = reloadedModule;
+    } else {
+      // If we can't rebuild from the swiftinterface, don't index this module.
+      skipIndexingModule = true;
+    }
+  }
+
+  if (module->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
+    diags.diagnose(SourceLoc(),
+                   diag::remark_indexing_system_module,
+                   filename, skipIndexingModule);
+  }
 
   // Pairs of (recordFile, groupName).
   std::vector<std::pair<std::string, std::string>> records;
 
-  if (!module->isStdlibModule()) {
+  if (skipIndexingModule) {
+    // Don't add anything to records but keep going so we still mark the module
+    // as indexed to avoid rebuilds of broken swiftinterfaces.
+  } else if (!module->isStdlibModule()) {
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),

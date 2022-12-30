@@ -374,6 +374,10 @@ class VisibleDeclConsumer {
 public:
   virtual ~VisibleDeclConsumer() = default;
 
+  /// This method is called every time it look for members from a decl.
+  virtual void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                          DeclVisibilityKind Reason) {}
+
   /// This method is called by findVisibleDecls() every time it finds a decl.
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo = {}) = 0;
@@ -420,6 +424,11 @@ public:
                               VisibleDeclConsumer &consumer)
     : DC(DC), ChainedConsumer(consumer) {}
 
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override {
+    ChainedConsumer.onLookupNominalTypeMembers(NTD, Reason);
+  }
+
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
@@ -440,6 +449,11 @@ public:
                               SourceLoc loc, VisibleDeclConsumer &consumer)
       : SM(SM), DC(DC), typeContext(DC->getInnermostTypeContext()), Loc(loc),
         ChainedConsumer(consumer) {}
+
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override {
+    ChainedConsumer.onLookupNominalTypeMembers(NTD, Reason);
+  }
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
                  DynamicLookupInfo dynamicLookupInfo) override;

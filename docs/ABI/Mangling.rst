@@ -149,6 +149,7 @@ Globals
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
   global ::= global 'HF'                 // accessible function runtime record
+  global ::= global 'Ha'                 // runtime discoverable attribute record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -157,11 +158,11 @@ Globals
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
   global ::= nominal-type 'MC'           // metadata for remote mirrors: superclass descriptor
 
-  // TODO check this::
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
   global ::= mangled-name 'TQ' index               // Async await continuation partial function
   global ::= mangled-name 'TY' index               // Async suspend continuation partial function
+  global ::= mangled-name 'TwS'                    // #_hasSymbol query function
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
@@ -346,6 +347,7 @@ Entities
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
+  entity-spec ::= 'fa'                       // runtime discoverable attribute generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fW'                       // property wrapper init from projected value
@@ -362,6 +364,7 @@ Entities
   entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
+  entity-spec ::= decl-name label-list? type generic-signature? 'fm'   // macro
   entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
@@ -637,7 +640,6 @@ Types
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
   METATYPE-REPR ::= 'o'                      // ObjC metatype representation
 
-  type ::= archetype
   type ::= associated-type
   type ::= any-generic-type
   type ::= protocol-list 'p'                 // existential type
@@ -653,6 +655,13 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
+  
+  type ::= pattern-type count-type 'Qp'      // pack expansion type
+  type ::= pack-element-list 'QP'            // pack type
+
+  pack-element-list ::= type '_' type*
+  pack-element-list ::= empty-list
   
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
@@ -668,11 +677,8 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= associated-type
-
   associated-type ::= substitution
-  associated-type ::= protocol 'QP'          // self type of protocol
-  associated-type ::= archetype identifier 'Qa' // associated type
+  associated-type ::= type identifier 'Qa' // associated type
 
   assoc-type-name ::= identifier                // associated type name without protocol
   assoc-type-name ::= identifier protocol 'P'   //
@@ -884,6 +890,8 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= type assoc-type-name 'Rm' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type
   requirement ::= type assoc-type-list 'RM' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type at depth
   requirement ::= type substitution 'RM' LAYOUT-CONSTRAINT                           // layout requirement with substitution
+
+  requirement ::= type 'Rh' GENERIC-PARAM-INDEX                     // same-shape requirement (only supported on a generic parameter)
 
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1

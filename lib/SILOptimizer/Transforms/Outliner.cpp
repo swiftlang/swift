@@ -343,7 +343,8 @@ BridgedProperty::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   if (Release) {
@@ -1073,7 +1074,8 @@ ObjCMethodCall::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   // Call the outlined function.
@@ -1408,7 +1410,7 @@ public:
     }
 
     if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 };

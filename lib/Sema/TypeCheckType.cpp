@@ -30,6 +30,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -63,32 +64,38 @@ using namespace swift;
 TypeResolution
 TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               OpenUnboundGenericTypeFn unboundTyOpener,
-                              HandlePlaceholderTypeReprFn placeholderHandler) {
+                              HandlePlaceholderTypeReprFn placeholderHandler,
+                              OpenPackElementFn packElementOpener) {
   return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler);
+                        unboundTyOpener, placeholderHandler,
+                        packElementOpener);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler) {
+                             HandlePlaceholderTypeReprFn placeholderHandler,
+                             OpenPackElementFn packElementOpener) {
   return forInterface(dc, dc->getGenericSignatureOfContext(), options,
-                      unboundTyOpener, placeholderHandler);
+                      unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
                              TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler) {
+                             HandlePlaceholderTypeReprFn placeholderHandler,
+                             OpenPackElementFn packElementOpener) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler);
+                        unboundTyOpener, placeholderHandler,
+                        packElementOpener);
   result.genericSig = genericSig;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
+  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler,
+                        packElementOpener);
   result.genericSig = genericSig;
   return result;
 }
@@ -153,6 +160,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::FunctionResult:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::EnumElementDecl:
+  case TypeResolverContext::MacroDecl:
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::ImmediateOptionalTypeArgument:
@@ -647,8 +655,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   llvm_unreachable("invalid requirement check type");
 }
 
-static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
-
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -727,6 +733,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
+  auto genericArgs = generic->getGenericArgs();
+
   if (auto *protoType = type->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
 
@@ -742,8 +750,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       return ErrorType::get(ctx);
     }
 
-    auto genericArgs = generic->getGenericArgs();
-
     if (genericArgs.size() != assocTypes.size()) {
       diags.diagnose(loc,
                      diag::parameterized_protocol_type_argument_count_mismatch,
@@ -756,10 +762,11 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+    if (resolution.getOptions().isConstraintImplicitExistential() &&
+        !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
-                     protoDecl->getExistentialType(),
+                     protoDecl->getDeclaredExistentialType(),
                      /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
 
       return ErrorType::get(ctx);
@@ -809,67 +816,25 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
-  //
-  // For generic types without type sequence parameters, we require
-  // the number of declared generic parameters match the number of
-  // arguments.
-  //
-  // For generic types with type sequence parameters, we only require
-  // that the number of arguments is enough to saturate the number of
-  // regular generic parameters. The type sequence parameter will absorb
-  // any excess parameters, or will have a substitution of `Void` if there
-  // is nothing to bind. This Void-binding behavior of type sequences
-  // also explains the offset of one that isn't otherwise present in
-  // the plain generic parameter case.
-  //
-  // struct Foo<Prefix, T..., Suffix> {}
-  // typealias X = Foo<String, Int, Float, Double> // Prefix -> String, Suffix
-  // -> Double, T... -> (Int, Float) typealias X = Foo<String, Int> // Prefix ->
-  // String, Suffix -> Int, T... -> Void typealias Y = Foo<String> // error: Not
-  // enough arguments to bind Suffix.
-  //
-  // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context. The
-  // expression checker certainly only cares about the case where too many
-  // arguments are given.
-  auto genericArgs = generic->getGenericArgs();
   auto genericParams = decl->getGenericParams();
-  auto hasTypeSequence = llvm::any_of(
-      *genericParams, [](const auto *GPT) { return GPT->isTypeSequence(); });
-  if ((!hasTypeSequence && genericArgs.size() != genericParams->size()) ||
-      (hasTypeSequence && genericArgs.size() < genericParams->size() - 1)) {
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags
-          .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                    genericParams->size() - (hasTypeSequence ? 1 : 0),
-                    genericArgs.size(),
-                    genericArgs.size() < genericParams->size(), hasTypeSequence)
-          .highlight(generic->getAngleBrackets());
-      decl->diagnose(diag::kind_declname_declared_here,
-                     DescriptiveDeclKind::GenericType, decl->getName());
-    }
-    return ErrorType::get(ctx);
-  }
-
-  // In SIL mode, Optional<T> interprets T as a SIL type.
-  if (options.contains(TypeResolutionFlags::SILType)) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nominal->isOptionalDecl()) {
-        // Validate the generic argument.
-        Type objectType = resolution.resolveType(genericArgs[0], silParams);
-        if (objectType->hasError()) {
-          return ErrorType::get(ctx);
-        }
-
-        return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
-      }
-    }  
-  }
+  auto hasParameterPack = llvm::any_of(
+      *genericParams, [](auto *paramDecl) {
+          return paramDecl->isParameterPack();
+      });
 
   // Resolve the types of the generic arguments.
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::GenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
+
+  // In SIL mode, Optional<T> interprets T as a SIL type.
+  if (options.contains(TypeResolutionFlags::SILType)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      if (nominal->isOptionalDecl()) {
+        genericResolution = resolution;
+      }
+    }
+  }
 
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
@@ -879,6 +844,69 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
+  }
+
+  if (!hasParameterPack) {
+    // For generic types without type parameter packs, we require
+    // the number of declared generic parameters match the number of
+    // arguments.
+    if (genericArgs.size() != genericParams->size()) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+        diags
+            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                      genericParams->size(),
+                      genericArgs.size(),
+                      genericArgs.size() < genericParams->size(),
+                      /*hasParameterPack=*/0)
+            .highlight(generic->getAngleBrackets());
+        decl->diagnose(diag::kind_declname_declared_here,
+                       DescriptiveDeclKind::GenericType, decl->getName());
+      }
+      return ErrorType::get(ctx);
+    }
+  } else {
+    // For generic types with type parameter packs, we only require
+    // that the number of arguments is enough to saturate the number of
+    // regular generic parameters. The parameter pack will absorb
+    // zero or arguments.
+    SmallVector<Type, 2> params;
+    for (auto paramDecl : genericParams->getParams()) {
+      auto paramType = paramDecl->getDeclaredInterfaceType();
+      params.push_back(paramDecl->isParameterPack()
+                       ? PackExpansionType::get(paramType, paramType)
+                       : paramType);
+    }
+
+    PackMatcher matcher(params, args, ctx);
+    if (matcher.match()) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+        diags
+            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                      genericParams->size() - 1,
+                      genericArgs.size(),
+                      genericArgs.size() < genericParams->size(),
+                      /*hasParameterPack=*/1)
+            .highlight(generic->getAngleBrackets());
+        decl->diagnose(diag::kind_declname_declared_here,
+                       DescriptiveDeclKind::GenericType, decl->getName());
+      }
+      return ErrorType::get(ctx);
+    }
+
+    args.clear();
+    for (unsigned i : indices(params)) {
+      auto found = std::find_if(matcher.pairs.begin(),
+                                matcher.pairs.end(),
+                                [&](const MatchedPair &pair) -> bool {
+                                  return pair.lhsIdx == i;
+                                });
+      assert(found != matcher.pairs.end());
+
+      auto arg = found->rhs;
+      if (auto *expansionType = arg->getAs<PackExpansionType>())
+        arg = expansionType->getPatternType();
+      args.push_back(arg);
+    }
   }
 
   const auto result = resolution.applyUnboundGenericArguments(
@@ -941,15 +969,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
     ArrayRef<Type> genericArgs) const {
-  const bool hasTypeSequence =
-      llvm::any_of(*decl->getGenericParams(),
-                   [](const auto *GPT) { return GPT->isTypeSequence(); });
-  assert(
-      ((!hasTypeSequence &&
-        genericArgs.size() == decl->getGenericParams()->size()) ||
-       (hasTypeSequence &&
-        genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
-      "invalid arguments, use applyGenericArguments for diagnostic emitting");
+  assert(genericArgs.size() == decl->getGenericParams()->size() &&
+         "invalid arguments, use applyGenericArguments to emit diagnostics "
+         "and collect arguments to pack generic parameters");
 
   TypeSubstitutionMap subs;
 
@@ -986,6 +1008,10 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
 
     skipRequirementsCheck |= parentTy->hasTypeVariable();
+
+  // Fill in substitutions for outer generic parameters if we have a local
+  // type in generic context. This isn't actually supported all the way,
+  // but we have to put something here so we don't crash.
   } else if (auto parentSig =
                  decl->getDeclContext()->getGenericSignatureOfContext()) {
     for (auto gp : parentSig.getGenericParams()) {
@@ -1000,58 +1026,13 @@ Type TypeResolution::applyUnboundGenericArguments(
     auto origTy = innerParams[i]->getDeclaredInterfaceType();
     auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
-    if (!origGP->isTypeSequence()) {
-      auto substTy = genericArgs[i];
+    auto substTy = genericArgs[i];
 
-      // Enter a substitution.
-      subs[origGP] = substTy;
+    // Enter a substitution.
+    subs[origGP] = substTy;
 
-      skipRequirementsCheck |=
-          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-
-      continue;
-    }
-
-    // Scan backwards to find the bounds of the longest run of
-    // types we can bind to this type sequence parameter.
-    unsigned tail;
-    for (tail = 1; tail <= innerParams.size(); ++tail) {
-      auto tailTy = innerParams[innerParams.size() - tail]
-          ->getDeclaredInterfaceType();
-      auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
-      if (tailGP->isTypeSequence()) {
-        assert(tailGP->isEqual(origGP) &&
-               "Found multiple type sequence parameters!");
-
-        // Saturate the type sequence. Take care that if the prefix and suffix
-        // have bound all available arguments that we bind the type sequence
-        // parameter to `Void`.
-        const size_t sequenceLength = tail + i <= genericArgs.size()
-                                          ? genericArgs.size() - tail - i + 1
-                                          : 0;
-
-        auto substTy = PackType::get(getASTContext(),
-                                     genericArgs.slice(i, sequenceLength));
-
-        // Enter a substitution.
-        subs[origGP] = substTy;
-
-        skipRequirementsCheck |=
-            substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-
-        break;
-      }
-
-      auto substTy = genericArgs[genericArgs.size() - tail];
-
-      // Enter a substitution.
-      subs[tailGP] = substTy;
-
-      skipRequirementsCheck |=
-          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
-    }
-
-    break;
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
@@ -1700,7 +1681,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
-  auto isExtenstionBinding = options.is(TypeResolverContext::ExtensionBinding);
+  auto isExtensionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
@@ -1715,13 +1696,13 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
       if (TypeChecker::isUnsupportedMemberTypeAccess(
-              parentTy, member, hasUnboundOpener, isExtenstionBinding) !=
+              parentTy, member, hasUnboundOpener, isExtensionBinding) !=
           TypeChecker::UnsupportedMemberTypeAccessKind::None)
         return ErrorType::get(ctx);
     }
 
     switch (TypeChecker::isUnsupportedMemberTypeAccess(
-        parentTy, member, hasUnboundOpener, isExtenstionBinding)) {
+        parentTy, member, hasUnboundOpener, isExtensionBinding)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::None:
       break;
 
@@ -1910,7 +1891,9 @@ static Type applyNonEscapingIfNecessary(Type ty,
 
     // We lost the sugar to flip the isNoEscape bit.
     //
-    // FIXME(https://github.com/apple/swift/issues/45125): It would be better to add a new AttributedType sugared type, which would wrap the TypeAliasType or ParenType, and apply the isNoEscape bit when de-sugaring.
+    // FIXME(https://github.com/apple/swift/issues/45125): It would be better
+    // to add a new AttributedType sugared type, which would wrap the
+    // TypeAliasType and apply the isNoEscape bit when de-sugaring.
     return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
   }
 
@@ -2044,6 +2027,8 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
+    Type diagnoseDisallowedExistential(TypeRepr *repr, Type type);
+
     NeverNullType resolveOpenedExistentialArchetype(
         TypeAttributes &attrs, TypeRepr *repr,
         TypeResolutionOptions options);
@@ -2109,6 +2094,8 @@ namespace {
                                   TypeResolutionOptions options);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
+    NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
+                                       TypeResolutionOptions options);
     NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
@@ -2140,18 +2127,22 @@ Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, TypeResolutionOptions opts,
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener,
     GenericParamList *silParams) {
   return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
-                               opts, unboundTyOpener, placeholderHandler);
+                               opts, unboundTyOpener, placeholderHandler,
+                               packElementOpener);
 }
 
 Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener,
     GenericParamList *silParams) {
   const auto resolution = TypeResolution::forInterface(
-      dc, genericSig, opts, unboundTyOpener, placeholderHandler);
+      dc, genericSig, opts, unboundTyOpener, placeholderHandler,
+      packElementOpener);
   const auto ty = resolution.resolveType(TyR, silParams);
 
   return GenericEnvironment::mapTypeIntoContext(
@@ -2200,6 +2191,23 @@ Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+Type TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr, Type type) {
+  auto options = resolution.getOptions();
+  if (!(options & TypeResolutionFlags::SilenceErrors) &&
+      options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
+    // We're specifically looking at an existential type `any P<some Q>`,
+    // so emit a tailored diagnostic. We don't emit an ErrorType here
+    // for better recovery.
+    diagnose(repr->getLoc(),
+             diag::unsupported_opaque_type_in_existential);
+    // FIXME: We shouldn't have to invalid the type repr here, but not
+    // doing so causes a double-diagnostic.
+    repr->setInvalid();
+  }
+
+  return type;
+}
+
 NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                         TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
@@ -2244,45 +2252,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent: {
-    auto *DC = getDeclContext();
-    auto diagnoseDisallowedExistential = [&](Type ty) {
-      if (!(options & TypeResolutionFlags::SilenceErrors) &&
-          options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
-        // We're specifically looking at an existential type `any P<some Q>`,
-        // so emit a tailored diagnostic. We don't emit an ErrorType here
-        // for better recovery.
-        diagnose(repr->getLoc(),
-                 diag::unsupported_opaque_type_in_existential);
-        // FIXME: We shouldn't have to invalid the type repr here, but not
-        // doing so causes a double-diagnostic.
-        repr->setInvalid();
-      }
-      return ty;
-    };
-
-    if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
-      if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
-        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-          return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
-      }
-
-      // Check whether any of the generic parameters in the context represents
-      // this opaque type. If so, return that generic parameter.
-      if (options.isConstraintImplicitExistential()) {
-        if (auto declDC = DC->getAsDecl()) {
-          if (auto genericContext = declDC->getAsGenericContext()) {
-            if (auto genericParams = genericContext->getGenericParams()) {
-              for (auto genericParam : *genericParams) {
-                if (genericParam->getOpaqueTypeRepr() == repr)
-                  return diagnoseDisallowedExistential(
-                                                       genericParam->getDeclaredInterfaceType());
-              }
-            }
-          }
-        }
-      }
-    }
-
     return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
   }
 
@@ -2320,30 +2289,19 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
 
+  case TypeReprKind::PackReference:
+    return resolvePackReference(cast<PackReferenceTypeRepr>(repr), options);
+
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
 
     case TypeReprKind::Composition: {
       auto *DC = getDeclContext();
-      auto diagnoseDisallowedExistential = [&](Type ty) {
-        if (!(options & TypeResolutionFlags::SilenceErrors) &&
-            options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
-          // We're specifically looking at an existential type `any P<some Q>`,
-          // so emit a tailored diagnostic. We don't emit an ErrorType here
-          // for better recovery.
-          diagnose(repr->getLoc(),
-                   diag::unsupported_opaque_type_in_existential);
-          // FIXME: We shouldn't have to invalid the type repr here, but not
-          // doing so causes a double-diagnostic.
-          repr->setInvalid();
-        }
-        return ty;
-      };
-
-      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+      if (getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)) {
         if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
           if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-            return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+            return diagnoseDisallowedExistential(repr,
+                getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
         }
       }
 
@@ -2362,25 +2320,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // This decl is implicit in the source and is created in such contexts by
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
-    auto diagnoseDisallowedExistential = [&](Type ty) {
-      if (!(options & TypeResolutionFlags::SilenceErrors) &&
-          options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
-        // We're specifically looking at an existential type `any P<some Q>`,
-        // so emit a tailored diagnostic. We don't emit an ErrorType here
-        // for better recovery.
-        diagnose(opaqueRepr->getOpaqueLoc(),
-                 diag::unsupported_opaque_type_in_existential);
-        // FIXME: We shouldn't have to invalid the type repr here, but not
-        // doing so causes a double-diagnostic.
-        opaqueRepr->setInvalid();
-      }
-      return ty;
-    };
-
     auto *DC = getDeclContext();
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
       if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr))
-        return diagnoseDisallowedExistential(
+        return diagnoseDisallowedExistential(opaqueRepr,
             getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
     }
 
@@ -2391,7 +2334,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         if (auto genericParams = genericContext->getGenericParams()) {
           for (auto genericParam : *genericParams) {
             if (genericParam->getOpaqueTypeRepr() == opaqueRepr)
-              return diagnoseDisallowedExistential(
+              return diagnoseDisallowedExistential(opaqueRepr,
                   genericParam->getDeclaredInterfaceType());
           }
         }
@@ -2522,7 +2465,8 @@ TypeResolver::resolveOpenedExistentialArchetype(
   auto structuralResolution = TypeResolution::forStructural(
       dc, options,
       /*unboundTyOpener*/ nullptr,
-      /*placeholderHandler*/ nullptr);
+      /*placeholderHandler*/ nullptr,
+      /*packElementOpener*/ nullptr);
   TypeResolver interfaceTypeResolver(structuralResolution,
                                      ctx.getSelfGenericParamList(dc));
   auto interfaceType = interfaceTypeResolver.resolveType(repr, options);
@@ -2564,6 +2508,20 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
+/// \returns true iff the # of isolated params is > \c lowerBound
+static bool hasMoreIsolatedParamsThan(FunctionTypeRepr* fnTy, unsigned lowerBound) {
+  unsigned count = 0;
+  for (auto arg : fnTy->getArgsTypeRepr()->getElements()) {
+    if (isa<IsolatedTypeRepr>(arg.Type))
+      count += 1;
+
+    if (count > lowerBound)
+      break;
+  }
+
+  return count > lowerBound;
+}
+
 NeverNullType
 TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                                     TypeResolutionOptions options) {
@@ -2593,7 +2551,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Resolve global actor.
   CustomAttr *globalActorAttr = nullptr;
   Type globalActor;
-  if (isa<FunctionTypeRepr>(repr)) {
+  if (auto fnTy = dyn_cast<FunctionTypeRepr>(repr)) {
     auto foundGlobalActor = checkGlobalActorAttributes(
         repr->getLoc(), getDeclContext(),
         std::vector<CustomAttr *>(
@@ -2603,6 +2561,15 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
       if (globalActor->hasError())
         globalActor = Type();
+
+      // make sure there is no `isolated` parameter in the type
+      if (globalActorAttr->isValid()) {
+        if (globalActor && hasMoreIsolatedParamsThan(fnTy, 0)) {
+          diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
+              .warnUntilSwiftVersion(6);
+          globalActorAttr->setInvalid();
+        }
+      }
     }
   }
 
@@ -2841,12 +2808,12 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         } else {
           rep = *parsedRep;
           parsedClangFunctionType = tryParseClangType(
-              attrs.ConventionArguments.getValue(), shouldStoreClangType(rep));
+              attrs.ConventionArguments.value(), shouldStoreClangType(rep));
         }
 
         if (rep == SILFunctionType::Representation::WitnessMethod) {
           auto protocolName =
-            attrs.ConventionArguments.getValue().WitnessMethodProtocol;
+            attrs.ConventionArguments.value().WitnessMethodProtocol;
           witnessMethodProtocol = new (getASTContext())
               SimpleIdentTypeRepr(DeclNameLoc(), protocolName);
         }
@@ -2897,7 +2864,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           rep = *parsedRep;
 
           parsedClangFunctionType = tryParseClangType(
-              attrs.ConventionArguments.getValue(), shouldStoreClangType(rep));
+              attrs.ConventionArguments.value(), shouldStoreClangType(rep));
         }
       }
 
@@ -3283,11 +3250,22 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    Identifier argumentLabel;
+    Identifier parameterName;
+    if (inputRepr->getElement(i).NameLoc.isValid() &&
+        inputRepr->getElement(i).SecondNameLoc.isValid() &&
+        inputRepr->getElement(i).NameLoc !=
+            inputRepr->getElement(i).SecondNameLoc) {
+      argumentLabel = inputRepr->getElement(i).Name;
+      parameterName = inputRepr->getElement(i).SecondName;
+    } else {
+      parameterName = inputRepr->getElementName(i);
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         isolated, noDerivative, compileTimeConst);
-    elements.emplace_back(ty, Identifier(), paramFlags,
-                          inputRepr->getElementName(i));
+    elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
   return elements;
@@ -3345,6 +3323,17 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   if (auto *genericParams = repr->getGenericParams())
     saveGenericParams.emplace(this->genericParams, genericParams);
+
+  // can't have more than 1 isolated parameter.
+  if (!repr->isWarnedAbout() && hasMoreIsolatedParamsThan(repr, 1)) {
+    diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
+        .warnUntilSwiftVersion(6);
+
+    if (getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+      return ErrorType::get(getASTContext());
+    else
+      repr->setWarned();
+  }
 
   // Diagnose a couple of things that we can parse in SIL mode but we don't
   // allow in formal types.
@@ -3441,7 +3430,8 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       fieldResolution =
           TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler());
+                                       resolution.getPlaceholderHandler(),
+                                       resolution.getPackElementOpener());
     }
 
     TypeResolver fieldResolver{fieldResolution,
@@ -3527,7 +3517,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       functionResolution = TypeResolution::forInterface(
           getDeclContext(), componentTypeSig, options,
           resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler());
+          resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener());
     }
 
     TypeResolver silResolver{functionResolution, componentGenericParams};
@@ -3581,7 +3572,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       auto resolveSILParameters =
           TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler());
+                                       resolution.getPlaceholderHandler(),
+                                       resolution.getPackElementOpener());
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -3700,7 +3692,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
              ParameterConvention::Indirect_In_Guaranteed);
     checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
     checkFor(TypeAttrKind::TAK_in_constant,
-             ParameterConvention::Indirect_In_Constant);
+             ParameterConvention::Indirect_In);
     checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
     checkFor(TypeAttrKind::TAK_inout_aliasable,
              ParameterConvention::Indirect_InoutAliasable);
@@ -3823,7 +3815,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
   // We don't expect to have a reason to support multiple independent
   // error results.  (Would this be disjunctive or conjunctive?)
-  if (errorResult.hasValue()) {
+  if (errorResult.has_value()) {
     diagnose(repr->getStartLoc(),
              diag::sil_function_multiple_error_results);
     return true;
@@ -3896,7 +3888,16 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
-    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) && options.isConstraintImplicitExistential()) {
+    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
+        options.isConstraintImplicitExistential()) {
+      // Check whether this type is an implicit opaque result type.
+      if (auto *opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
+        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(IdType)) {
+          return diagnoseDisallowedExistential(IdType,
+              getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+        }
+      }
+
       // Check whether any of the generic parameters in the context represents
       // this opaque type. If so, return that generic parameter.
       if (auto declDC = dc->getAsDecl()) {
@@ -4126,6 +4127,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::ExplicitCastExpr:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::EnumElementDecl:
+  case TypeResolverContext::MacroDecl:
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
@@ -4199,18 +4201,19 @@ std::pair<Type, Type>
 TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
                                             TypeResolutionOptions options) {
   auto elementOptions = options;
+  elementOptions |= TypeResolutionFlags::AllowPackReferences;
   auto patternTy = resolveType(repr->getPatternType(), elementOptions);
   if (patternTy->hasError())
     return std::make_pair(ErrorType::get(getASTContext()), Type());
 
-  // Find the first type sequence parameter and use that as the count type.
-  SmallVector<Type, 1> rootTypeSequenceParams;
-  patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
+  // Find the first type parameter pack and use that as the count type.
+  SmallVector<Type, 1> rootParameterPacks;
+  patternTy->getTypeParameterPacks(rootParameterPacks);
 
-  if (rootTypeSequenceParams.empty())
+  if (rootParameterPacks.empty())
     return std::make_pair(patternTy, Type());
 
-  return std::make_pair(patternTy, rootTypeSequenceParams[0]);
+  return std::make_pair(patternTy, rootParameterPacks[0]);
 }
 
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
@@ -4223,19 +4226,72 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
 
   // We might not allow variadic expansions here at all.
-  if (!options.isPackExpansionSupported()) {
+  if (!options.isPackExpansionSupported(getDeclContext())) {
     diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
     return ErrorType::get(ctx);
   }
 
-  // The pattern type must contain at least one variadic generic parameter.
   if (!pair.second) {
+    // Non-pack variadic parameters parse as PackExpansionTypeReprs. These
+    // can only appear in variadic function parameter types.
+    if (options.getContext() == TypeResolverContext::VariadicFunctionInput)
+      return pair.first;
+
+    // Otherwise, the pattern type must contain at least one pack reference.
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
     return ErrorType::get(ctx);
   }
 
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    auto genericSig = resolution.getGenericSignature();
+    auto shapeType = genericSig->getReducedShape(pair.second);
+
+    auto result = PackExpansionType::get(pair.first, shapeType);
+
+    SmallVector<Type, 2> rootParameterPacks;
+    pair.first->getTypeParameterPacks(rootParameterPacks);
+    for (auto type : rootParameterPacks) {
+      if (!genericSig->haveSameShape(type, shapeType)) {
+        ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
+                           result, shapeType, type);
+      }
+    }
+    return result;
+  }
+
   return PackExpansionType::get(pair.first, pair.second);
+}
+
+NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
+                                                 TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+  auto packReference = resolveType(repr->getPackType(), options);
+
+  // If we already failed, don't diagnose again.
+  if (packReference->hasError())
+    return ErrorType::get(ctx);
+
+  if (!packReference->isParameterPack()) {
+    ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack,
+                       packReference);
+    return packReference;
+  }
+
+  if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+    ctx.Diags.diagnose(repr->getLoc(),
+                       diag::pack_reference_outside_expansion,
+                       packReference);
+    return ErrorType::get(ctx);
+  }
+
+  // Open the pack reference to an element archetype if requested.
+  if (auto openPackElement = resolution.getPackElementOpener()) {
+    auto *env = resolution.getGenericSignature().getGenericEnvironment();
+    return openPackElement(env->mapTypeIntoContext(packReference), repr);
+  }
+
+  return packReference;
 }
 
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
@@ -4595,7 +4651,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
   if (aliasDecl) {
-    if (aliasDecl->getGenericParams()) {
+    if (aliasDecl->isGeneric()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
           aliasDecl->getASTContext());
@@ -4619,7 +4675,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     if (baseTy->is<ErrorType>())
       return ErrorType::get(memberType);
 
-    subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
+    subs = baseTy->getMemberSubstitutionMap(module, member);
     resultType = memberType.subst(subs);
   } else {
     resultType = memberType;
@@ -4734,6 +4790,7 @@ public:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::PackExpansion:
+    case TypeReprKind::PackReference:
       return false;
     }
   }
@@ -4779,7 +4836,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
-                           proto->getExistentialType(),
+                           proto->getDeclaredExistentialType(),
                            /*isAlias=*/false)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
       }
@@ -4850,6 +4907,9 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
       checkExistentialTypes(ctx, funcDecl->getGenericParams());
       checkExistentialTypes(ctx, funcDecl->getTrailingWhereClause());
     }
+  } else if (auto *macroDecl = dyn_cast<MacroDecl>(decl)) {
+    checkExistentialTypes(ctx, macroDecl->getGenericParams());
+    checkExistentialTypes(ctx, macroDecl->getTrailingWhereClause());
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
@@ -4912,7 +4972,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper ||
-      typeKind == CustomAttrTypeKind::TypeWrapper) {
+      typeKind == CustomAttrTypeKind::TypeWrapper ||
+      typeKind == CustomAttrTypeKind::RuntimeMetadata) {
     unboundTyOpener = [](auto unboundTy) {
       // FIXME: Don't let unbound generic types
       // escape type resolution. For now, just
@@ -4923,7 +4984,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   const auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener,
-      /*placeholderHandler*/ nullptr);
+      /*placeholderHandler*/ nullptr, /*packElementOpener*/ nullptr);
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via

@@ -16,7 +16,8 @@ headers = [
   'locale.h',
   'math.h',
   'pty.h',
-  'setjmp.h',
+  # setjmp/longjmp is not available
+  # 'setjmp.h',
   'signal.h',
   'stdarg.h',
   'stdbool.h',

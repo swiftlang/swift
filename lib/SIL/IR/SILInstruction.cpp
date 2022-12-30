@@ -24,7 +24,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/Basic/AssertImplements.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -62,13 +61,7 @@ SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
 
 
 void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
-  assert(I->ParentBB == nullptr && "Already in a list!");
   I->ParentBB = getContainingBlock();
-}
-
-void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
-  // When an instruction is removed from a BB, clear the parent pointer.
-  I->ParentBB = nullptr;
 }
 
 void llvm::ilist_traits<SILInstruction>::
@@ -104,16 +97,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
 
-void SILInstruction::removeFromParent() {
-#ifndef NDEBUG
-  for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
-  }
-#endif
-  getParent()->remove(this);
-  ParentBB = nullptr;
-}
-
 /// eraseFromParent - This method unlinks 'self' from the containing basic
 /// block and deletes it.
 ///
@@ -127,18 +110,13 @@ void SILInstruction::eraseFromParent() {
 }
 
 void SILInstruction::moveFront(SILBasicBlock *Block) {
-  getParent()->remove(this);
-  Block->push_front(this);
+  Block->moveInstructionToFront(this);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
 /// the basic block that Later lives in, right before Later.
 void SILInstruction::moveBefore(SILInstruction *Later) {
-  if (this == Later)
-    return;
-
-  getParent()->remove(this);
-  Later->getParent()->insert(Later, this);
+  SILBasicBlock::moveInstruction(this, Later);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
@@ -1175,7 +1153,7 @@ bool SILInstruction::mayRelease() const {
     // If this is a builtin which might have side effect, but its side
     // effects do not cause reference counts to be decremented, return false.
     if (auto Kind = BI->getBuiltinKind()) {
-      switch (Kind.getValue()) {
+      switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:
           return false;
         default:
@@ -1183,7 +1161,7 @@ bool SILInstruction::mayRelease() const {
       }
     }
     if (auto ID = BI->getIntrinsicID()) {
-      switch (ID.getValue()) {
+      switch (ID.value()) {
         case llvm::Intrinsic::memcpy:
         case llvm::Intrinsic::memmove:
         case llvm::Intrinsic::memset:
@@ -1356,13 +1334,6 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
-}
-
-bool SILInstruction::maySynchronize() const {
-  // TODO: We need side-effect analysis and library annotation for this to be
-  //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this) || isa<EndApplyInst>(this) ||
-         isa<AbortApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {
@@ -1557,24 +1528,37 @@ const ValueBase *SILInstructionResultArray::back() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                           SingleValueInstruction
+//                          Defined opened archetypes
 //===----------------------------------------------------------------------===//
 
-CanOpenedArchetypeType
-SingleValueInstruction::getDefinedOpenedArchetype() const {
+bool SILInstruction::definesLocalArchetypes() const {
+  bool definesAny = false;
+  forEachDefinedLocalArchetype([&](CanLocalArchetypeType type,
+                                   SILValue dependency) {
+    definesAny = true;
+  });
+  return definesAny;
+}
+
+void SILInstruction::forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const {
   switch (getKind()) {
-  case SILInstructionKind::OpenExistentialAddrInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::OpenExistentialBoxInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-  case SILInstructionKind::OpenExistentialMetatypeInst:
-  case SILInstructionKind::OpenExistentialValueInst: {
-    const auto Ty = getOpenedArchetypeOf(getType().getASTType());
-    assert(Ty && Ty->isRoot() && "Type should be a root opened archetype");
-    return Ty;
+#define SINGLE_VALUE_SINGLE_OPEN(TYPE)                                    \
+  case SILInstructionKind::TYPE: {                                        \
+    auto I = cast<TYPE>(this);                                            \
+    auto archetype = I->getDefinedOpenedArchetype();                      \
+    assert(archetype);                                                    \
+    return fn(archetype, I);                                              \
   }
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenExistentialValueInst)
+#undef SINGLE_VALUE_SINGLE_OPEN
   default:
-    return CanOpenedArchetypeType();
+    return;
   }
 }
 

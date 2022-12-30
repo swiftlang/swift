@@ -2,7 +2,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SIL/SILDeclRef.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -108,7 +107,7 @@ SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
 
 SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root),
   ToolArgs(Info.ToolArgs),
-  JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
+  JsonFormatVer(Info.JsonFormatVer.has_value() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
@@ -1348,7 +1347,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
 
 StringRef SDKContext::getObjcName(Decl *D) {
   if (auto *OC = D->getAttrs().getAttribute<ObjCAttr>()) {
-    if (OC->getName().hasValue()) {
+    if (OC->getName().has_value()) {
       SmallString<32> Buffer;
       return buffer(OC->getName()->getString(Buffer));
     }
@@ -1491,7 +1490,7 @@ static bool isProtocolRequirement(ValueDecl *VD) {
 
 static bool requireWitnessTableEntry(ValueDecl *VD) {
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return SILDeclRef::requiresNewWitnessTableEntry(FD);
+    return FD->requiresNewWitnessTableEntry();
   }
   return false;
 }
@@ -1711,7 +1710,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
       // allowlist them if we're checking ABI.
-      if (getFixedBinaryOrder(VD).hasValue())
+      if (getFixedBinaryOrder(VD).has_value())
         return false;
       // Typealias should have no impact on ABI.
       if (isa<TypeAliasDecl>(VD))
@@ -2693,7 +2692,7 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
           break;
         }
         auto result = isFromExtensionChanged(*this, *Right);
-        if (result.hasValue() && *result) {
+        if (result.has_value() && *result) {
           emitDiag(Loc, diag::class_member_moved_to_extension);
         }
         break;

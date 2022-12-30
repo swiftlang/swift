@@ -228,7 +228,8 @@ public:
   /// function argument for an out parameter.
   ManagedValue createInputFunctionArgument(
       SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
-      LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None);
+      LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
+      bool isClosureCapture = false);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out
@@ -430,6 +431,9 @@ public:
   using SILBuilder::createMarkMustCheckInst;
   ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,
                                        MarkMustCheckInst::CheckKind kind);
+
+  using SILBuilder::emitCopyValueOperation;
+  ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
 };
 
 } // namespace Lowering

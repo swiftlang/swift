@@ -240,7 +240,7 @@ public:
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit, bool InFixedBuffer,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
@@ -612,6 +612,8 @@ private:
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
+    case DeclContextKind::MacroDecl:
+      return getOrCreateContext(DC->getParent());
     case DeclContextKind::GenericTypeDecl: {
       auto *NTD = cast<NominalTypeDecl>(DC);
       auto *Ty = NTD->getDeclaredType().getPointer();
@@ -638,9 +640,10 @@ private:
 
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType type) {
+    bool IsFragment = false;
     auto RealType = type.getASTType();
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, IGM.getTypeInfo(type),
-                                                /*isFragment*/ false);
+                                                IsFragment);
     Parameters.push_back(getOrCreateType(DbgTy));
   }
 
@@ -725,6 +728,7 @@ private:
       return cast<llvm::DIModule>(Val->second);
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
+    std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -736,7 +740,7 @@ private:
                                               : llvm::dwarf::DW_LANG_C99,
                               DIB.createFile(Name, RemappedIncludePath),
                               TheCU->getProducer(), true, StringRef(), 0,
-                              ASTFile, llvm::DICompileUnit::FullDebug,
+                              RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
         DIB.finalize();
       }
@@ -842,12 +846,12 @@ private:
     return cast<llvm::DIFile>(Scope);
   }
 
-  static Size getStorageSize(const llvm::DataLayout &DL,
-                             ArrayRef<llvm::Value *> Storage) {
-    unsigned size = 0;
+  static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
+                                       ArrayRef<llvm::Value *> Storage) {
+    unsigned SizeInBits = 0;
     for (llvm::Value *Piece : Storage)
-      size += DL.getTypeSizeInBits(Piece->getType());
-    return Size(size);
+      SizeInBits += DL.getTypeSizeInBits(Piece->getType());
+    return SizeInBits;
   }
 
   StringRef getMangledName(DebugTypeInfo DbgTy) {
@@ -871,7 +875,7 @@ private:
           return true;
         }
 
-        if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+        if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
           Sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
           return true;
         }
@@ -945,10 +949,9 @@ private:
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
     auto *Ty = getOrCreateType(DbgTy);
-    auto *DITy = DBuilder.createMemberType(
-        Scope, Name, File, 0,
-        SizeOfByte * DbgTy.getSizeValue(), 0, OffsetInBits,
-        Flags, Ty);
+    auto *DITy =
+        DBuilder.createMemberType(Scope, Name, File, 0, DbgTy.getSizeInBits(),
+                                  0, OffsetInBits, Flags, Ty);
     OffsetInBits += getSizeInBits(Ty);
     OffsetInBits = llvm::alignTo(OffsetInBits,
                                  SizeOfByte * DbgTy.getAlignment().getValue());
@@ -989,7 +992,7 @@ private:
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
               VD->getInterfaceType(),
               IGM.getTypeInfoForUnlowered(
-                  IGM.getSILTypes().getAbstractionPattern(VD), memberTy)))
+                IGM.getSILTypes().getAbstractionPattern(VD), memberTy)))
         Elements.push_back(createMemberType(*DbgTy, VD->getName().str(),
                                             OffsetInBits, Scope, File, Flags));
       else
@@ -1014,8 +1017,7 @@ private:
                                         llvm::DIFile *File, unsigned Line,
                                         llvm::DINode::DIFlags Flags) {
     StringRef Name = Decl->getName().str();
-    unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
-    unsigned SizeInBits = DbgTy.getSizeValue() * SizeOfByte;
+    unsigned SizeInBits = DbgTy.getSizeInBits();
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
@@ -1047,8 +1049,8 @@ private:
         // the storage size from the enum.
         ElemDbgTy = CompletedDebugTypeInfo::get(
             DebugTypeInfo(Decl->getRawType(), DbgTy.getFragmentStorageType(),
-                          DbgTy.getRawSize(), DbgTy.getAlignment(), true, false,
-                          DbgTy.isSizeFragmentSize()));
+                          DbgTy.getRawSizeInBits(), DbgTy.getAlignment(), true,
+                          false, DbgTy.isSizeFragmentSize()));
       else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A discriminated union. This should really be described as a
         // DW_TAG_variant_type. For now only describing the data.
@@ -1060,7 +1062,7 @@ private:
         // as the element type; there is no storage here.
         Type IntTy = IGM.Context.getIntType();
         ElemDbgTy = CompletedDebugTypeInfo::get(
-            DebugTypeInfo(IntTy, DbgTy.getFragmentStorageType(), Size(0),
+            DebugTypeInfo(IntTy, DbgTy.getFragmentStorageType(), 0,
                           Alignment(1), true, false, false));
       }
       if (!ElemDbgTy) {
@@ -1086,15 +1088,14 @@ private:
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
     DebugTypeInfo BlandDbgTy(
-        Ty, DbgTy.getFragmentStorageType(), DbgTy.getRawSize(),
+        Ty, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
         DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
         DbgTy.isMetadataType(), DbgTy.isSizeFragmentSize());
     return getOrCreateType(BlandDbgTy);
   }
 
   uint64_t getSizeOfBasicType(CompletedDebugTypeInfo DbgTy) {
-    uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    uint64_t BitWidth = DbgTy.getSizeValue() * SizeOfByte;
+    uint64_t BitWidth = DbgTy.getSizeInBits();
     llvm::Type *StorageType = DbgTy.getFragmentStorageType()
                                   ? DbgTy.getFragmentStorageType()
                                   : IGM.DataLayout.getSmallestLegalIntType(
@@ -1329,8 +1330,8 @@ private:
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
     // FIXME: SizeInBits is redundant with DbgTy, remove it.
     uint64_t SizeInBits = 0;
-    if (DbgTy.getTypeSize())
-      SizeInBits = DbgTy.getTypeSize()->getValue() * SizeOfByte;
+    if (DbgTy.getTypeSizeInBits())
+      SizeInBits = *DbgTy.getTypeSizeInBits();
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
@@ -1338,7 +1339,6 @@ private:
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
     TypeBase *BaseTy = DbgTy.getType();
-
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -1445,12 +1445,16 @@ private:
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       StringRef Name = Decl->getName().str();
-      if (DbgTy.getTypeSize())
-        return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
-      return DBuilder.createForwardDecl(
-          llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
-          llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      if (!DbgTy.getTypeSizeInBits())
+        return DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
+            llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      if (DbgTy.isFixedBuffer())
+        return DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, FwdDeclLine,
+            llvm::dwarf::DW_LANG_Swift, 0, AlignInBits, MangledName);
+      return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
+                                AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::Class: {
@@ -1553,7 +1557,8 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::SequenceArchetype: {
+    case TypeKind::ElementArchetype:
+    case TypeKind::PackArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
       if (auto depMemTy = Archetype->getInterfaceType()
@@ -1684,7 +1689,7 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.getFragmentStorageType(),
-                                 DbgTy.getRawSize(), DbgTy.getAlignment(),
+                                 DbgTy.getRawSizeInBits(), DbgTy.getAlignment(),
                                  DbgTy.hasDefaultAlignment(), false,
                                  DbgTy.isSizeFragmentSize());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
@@ -1776,8 +1781,23 @@ private:
       return createType(DbgTy, "", TheCU, MainFile);
 
     // Look in the cache first.
-    if (auto *DITy = getTypeOrNull(DbgTy.getType()))
+    if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
+      // FIXME: Enable this assertion.
+#if SWIFT_DEBUGINFO_CACHE_VERIFICATION
+      if (auto SizeInBits = DbgTy.getTypeSizeInBits()) {
+        if (unsigned CachedSizeInBits = getSizeInBits(DITy)) {
+          if (CachedSizeInBits != *SizeInBits) {
+            DITy->dump();
+            DbgTy.dump();
+            llvm::errs() << "SizeInBits = " << *SizeInBits << "\n";
+            llvm::errs() << "CachedSizeInBits = " << CachedSizeInBits << "\n";
+          }
+          assert(CachedSizeInBits == *SizeInBits);
+        }
+      }
+#endif
       return DITy;
+    }
 
     // Second line of defense: Look up the mangled name. TypeBase*'s are
     // not necessarily unique, but name mangling is too expensive to do
@@ -2080,7 +2100,6 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
     Scope = DBuilder.createLexicalBlockFile(Scope, File);
   }
 
-  // FIXME: Enable this assertion.
   assert(lineEntryIsSane(L, DS) &&
          "non-contiguous debug location in same scope at -Onone");
   LastFilenameAndLocation = L;
@@ -2366,12 +2385,12 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   llvm::DITypeArray Error = nullptr;
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
+      SILType SILTy = IGM.silConv.getSILType(
+          *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy,
                                         IGM.getMaximalTypeExpansionContext()),
-          IGM.getTypeInfo(IGM.silConv.getSILType(
-              *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext())),
-          false);
+          IGM.getTypeInfo(SILTy), false);
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
@@ -2519,8 +2538,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (DbgTy.getType()->hasOpenedExistential())
     return;
 
-  if (!DbgTy.getTypeSize())
-    DbgTy.setSize(getStorageSize(IGM.DataLayout, Storage));
+  if (!DbgTy.getTypeSizeInBits())
+    DbgTy.setSizeInBits(getStorageSizeInBits(IGM.DataLayout, Storage));
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
@@ -2858,8 +2877,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
-    Optional<SILLocation> Loc) {
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -2882,7 +2900,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     // would confuse both the user and LLDB.
     return;
 
-  if (InFixedBuffer)
+  if (DbgTy.isFixedBuffer())
     DITy = createFixedValueBufferStruct(DITy);
 
   auto L = getStartLocation(Loc);
@@ -2914,9 +2932,11 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   static const char *Tau = u8"\u03C4";
   llvm::raw_svector_ostream OS(Buf);
   OS << '$' << Tau << '_' << Depth << '_' << Index;
-  auto DbgTy = DebugTypeInfo::getArchetype(
+  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(0);
+  assert(PtrWidthInBits % 8 == 0);
+  auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
-      Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
+      Metadata->getType(), Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},
@@ -2927,7 +2947,8 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                           ArtificialValue);
 }
 
-SILLocation::FilenameAndLocation IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
+SILLocation::FilenameAndLocation
+IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
   auto &Cached = FilenameAndLocationCache[SL.getOpaquePointerValue()];
   if (Cached.filename.empty())
     Cached = sanitizeCodeViewFilenameAndLocation(SILLocation::decode(SL, SM));
@@ -3043,10 +3064,9 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, bool InFixedBuffer,
-    Optional<SILLocation> Loc) {
+    DebugTypeInfo DebugType, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
-      Storage, Name, LinkageName, DebugType, IsLocalToUnit, InFixedBuffer, Loc);
+      Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,

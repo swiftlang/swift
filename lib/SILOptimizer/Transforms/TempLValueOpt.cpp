@@ -234,7 +234,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   }
 
   if (!copyInst->isInitializationOfDest()) {
-    // Make sure the the destination is uninitialized before the liferange of
+    // Make sure the destination is uninitialized before the liferange of
     // the temporary.
     SILBuilderWithScope builder(beginOfLiferange);
     builder.createDestroyAddr(copyInst->getLoc(), destination);

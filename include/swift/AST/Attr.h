@@ -167,10 +167,12 @@ protected:
       kind : 1
     );
 
-    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute,
-                          NumKnownProtocolKindBits+1,
-      kind : NumKnownProtocolKindBits,
+    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
       isUnchecked : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
+      isCategoryNameInvalid : 1
     );
   } Bits;
 
@@ -1360,22 +1362,22 @@ public:
 /// synthesized conformances.
 class SynthesizedProtocolAttr : public DeclAttribute {
   LazyConformanceLoader *Loader;
+  ProtocolDecl *protocol;
 
 public:
-  SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
+  SynthesizedProtocolAttr(ProtocolDecl *protocol,
                           LazyConformanceLoader *Loader,
                           bool isUnchecked)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
-                    /*Implicit=*/true), Loader(Loader)
+                    /*Implicit=*/true), Loader(Loader), protocol(protocol)
   {
-    Bits.SynthesizedProtocolAttr.kind = unsigned(protocolKind);
     Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
-  KnownProtocolKind getProtocolKind() const {
-    return KnownProtocolKind(Bits.SynthesizedProtocolAttr.kind);
+  ProtocolDecl *getProtocol() const {
+    return protocol;
   }
 
   bool isUnchecked() const {
@@ -2190,20 +2192,6 @@ public:
   }
 };
 
-/// The @_typeSequence attribute, which treats a generic param decl as a variadic
-/// sequence of value/type pairs.
-class TypeSequenceAttr : public DeclAttribute {
-  TypeSequenceAttr(SourceLoc atLoc, SourceRange Range);
-
-public:
-  static TypeSequenceAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                  SourceRange Range);
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TypeSequence;
-  }
-};
-
 /// The @_unavailableFromAsync attribute, used to make function declarations
 /// unavailable from async contexts.
 class UnavailableFromAsyncAttr : public DeclAttribute {
@@ -2289,6 +2277,31 @@ public:
   }
 };
 
+class ObjCImplementationAttr final : public DeclAttribute {
+public:
+  Identifier CategoryName;
+
+  ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
+                         SourceRange Range, bool Implicit = false,
+                         bool isCategoryNameInvalid = false)
+    : DeclAttribute(DAK_ObjCImplementation, AtLoc, Range, Implicit),
+      CategoryName(CategoryName) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+  }
+
+  bool isCategoryNameInvalid() const {
+    return Bits.ObjCImplementationAttr.isCategoryNameInvalid;
+  }
+
+  void setCategoryNameInvalid(bool newValue = true) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ObjCImplementation;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2362,9 +2375,15 @@ public:
                     const Decl *D = nullptr);
 
   template <typename T, typename DERIVED>
-  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
+  class iterator_base {
     T *Impl;
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     explicit iterator_base(T *Impl) : Impl(Impl) {}
     DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
     bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
@@ -2613,13 +2632,13 @@ public:
     return true;
   }
 
-  bool hasConvention() const { return ConventionArguments.hasValue(); }
+  bool hasConvention() const { return ConventionArguments.has_value(); }
 
   /// Returns the primary calling convention string.
   ///
   /// Note: For C conventions, this may not represent the full convention.
   StringRef getConventionName() const {
-    return ConventionArguments.getValue().Name;
+    return ConventionArguments.value().Name;
   }
 
   /// Show the string enclosed between @convention(..)'s parentheses.
@@ -2643,10 +2662,10 @@ public:
 #include "swift/AST/ReferenceStorage.def"
   }
 
-  bool hasOpenedID() const { return OpenedID.hasValue(); }
+  bool hasOpenedID() const { return OpenedID.has_value(); }
   UUID getOpenedID() const { return *OpenedID; }
 
-  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  bool hasConstraintType() const { return ConstraintType.has_value(); }
   TypeRepr *getConstraintType() const { return *ConstraintType; }
 
   /// Given a name like "autoclosure", return the type attribute ID that
@@ -2663,11 +2682,16 @@ public:
   }
 
   // Iterator for the custom type attributes.
-  class iterator
-      : public std::iterator<std::forward_iterator_tag, CustomAttr *> {
+  class iterator {
     CustomAttr *attr;
 
   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = CustomAttr*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;    
+
     iterator() : attr(nullptr) { }
     explicit iterator(CustomAttr *attr) : attr(attr) { }
 

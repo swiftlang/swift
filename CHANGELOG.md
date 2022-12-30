@@ -2,13 +2,39 @@
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-## Swift 6.0
+## Swift 5.8
+
+* [#56139][]:
+
+  Сollection downcasts in cast patterns are now supported. For example:
+
+  ```swift
+  func collectionDowncast(_ arr: [Any]) {
+    switch arr {
+    case let ints as [Int]:
+      // ...
+    case is [Bool]:
+      // ...
+    }
+  }
+  ``` 
+* [SE-0370][]:
+
+  The API of `UnsafeMutableRawPointer`, `UnsafeMutableBufferPointer`, `UnsafeMutableRawBufferPointer` were improved, adding previously missing initialization (and deinitialization) methods, including more performant initialization from `Collection` types.
+
+  For `UnsafeMutablePointer<T>` and `UnsafeMutableBufferPointer<T>`, method names containing the word "assign" were renamed to use the word "update", and many more were added. Every multi-element initialization method of `UnsafeMutablePointer` and `UnsafeMutableBufferPointer` now has a corresponding "update" method.
+
+  Slices of `UnsafeBufferPointer`, `UnsafeRawBufferPointer`, `UnsafeMutableBufferPointer` and `UnsafeMutableRawBufferPointer` now share the collection-like API of their base type. For example, given an initialized `b: UnsafeMutableBufferPointer<Int>`, the following lines are synonymous:
+  ```swift
+  b.update(repeating: 0)
+  b[b.startIndex..<b.endIndex].update(repeating: 0)
+  ```
 
 * [SE-0365][]:
  
   Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
 
-  For example, the usage of implicit `self` below is now permitted:
+  For example, the usage of implicit `self` below is permitted:
 
   ```swift
   class ViewController {
@@ -43,8 +69,6 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   ```
 
   In Swift 6, the above code will no longer compile. `weak self` captures in non-escaping closures now have the same behavior as captures in escaping closures (as described in [SE-0365][]). Code relying on the previous behavior will need to be updated to either unwrap `self` (e.g. by adding a `guard let self else return` statement), or to use a different capture method (e.g. using `[self]` or `[unowned self]` instead of `[weak self]`).
-
-## Swift 5.8
 
 * [SE-0362][]:
 
@@ -921,7 +945,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   The `self` parameter of actor methods are implicitly `isolated`. The
   `nonisolated` keyword makes the `self` parameter no longer `isolated`.
 
-* [SR-14731][]:
+* [#57081][]:
 
   The compiler now correctly rejects the application of generic arguments to the
   special `Self` type:
@@ -934,7 +958,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-14878][]:
+* [#57225][]:
 
   The compiler now correctly rejects `@available` annotations on enum cases with
   associated values with an OS version newer than the current deployment target:
@@ -1393,7 +1417,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-10069][]:
+* [#52471][]:
 
   Function overloading now works in local contexts, making the following valid:
 
@@ -1492,7 +1516,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   
   In the above example, the trailing closure argument matches parameter `first`, whereas pre-Swift-5.3 it would have matched `second`. In order to ease the transition to this new rule, cases in which the forward-scan and backward-scan match a single trailing closure to different parameters, the backward-scan result is preferred and a warning is emitted. This is expected to be upgraded to an error in the next major version of Swift.
 
-* [SR-7083][]:
+* [#49631][]:
 
   Property observers such as `willSet` and `didSet` are now supported on `lazy` properties:
 
@@ -1520,7 +1544,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   This could have side-effects, for example if the lazy property's initializer is doing other work.
 
-* [SR-11700][]:
+* [#54108][]:
 
   Exclusivity violations within code that computes the `default`
   argument during Dictionary access are now diagnosed.
@@ -1629,7 +1653,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
     override func foo() where U: Equatable { ... } 
   }
 
-* [SR-75][]:
+* [#42697][]:
 
   Unapplied references to protocol methods are now supported. Previously this
   only worked for methods defined in structs, enums and classes.
@@ -1683,7 +1707,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ### 2020-03-24 (Xcode 11.4)
 
-* [SR-11841][]:
+* [#54246][]:
 
   When chaining calls to `filter(_:)` on a lazy sequence or collection, the
   filtering predicates will now be called in the same order as eager filters.
@@ -1698,7 +1722,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   
   Previously, the predicates were called in reverse order.
   
-* [SR-2790][]:
+* [apple/swift-corelibs-foundation#4326][]:
 
   The compiler will now emit a warning when attempting to pass a temporary
   pointer argument produced from an array, string, or inout argument to a
@@ -1731,7 +1755,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   temporary pointer only valid for the duration of the call they are passed to.
   Therefore the returned value in each case references a dangling pointer.
 
-* [SR-2189][]:
+* [#44797][]:
 
   The compiler now supports local functions whose default arguments capture
   values from outer scopes.
@@ -1746,7 +1770,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-11429][]:
+* [#53830][]:
 
   The compiler will now correctly strip argument labels from function references
   used with the `as` operator in a function call. As a result, the `as` operator
@@ -1778,7 +1802,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   (foo as Magic)(5)
   ```
 
-* [SR-11298][]:
+* [#53699][]:
 
   A class-constrained protocol extension, where the extended protocol does
   not impose a class constraint, will now infer the constraint implicitly.
@@ -1841,7 +1865,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
   ```
 
-* [SR-4206][]:
+* [#46789][]:
 
   A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
@@ -1860,7 +1884,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   will now be diagnosed as an error.
 
-* [SR-6118][]:
+* [#48673][]:
 
   Subscripts can now declare default arguments:
 
@@ -1879,7 +1903,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ### 2019-09-20 (Xcode 11.0)
 
-* [SR-8974][]:
+* [#51478][]:
 
   Duplicate tuple element labels are no longer allowed, because it leads
   to incorrect behavior. For example:
@@ -1947,7 +1971,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-8546][], [SR-9043][]:
+* [#51064][], [#51546][]:
 
   More thorough checking has been implemented for restrictions around
   escaping closures capturing `inout` parameters or values of noescape type.
@@ -1991,7 +2015,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-2672][]:
+* [#45277][]:
 
   Conversions between tuple types are now fully implemented.
   Previously, the following would diagnose an error:
@@ -2035,7 +2059,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   However, `Self` can now be used inside the body of a method
   without limitation.
 
-* [SR-7799][]:
+* [#50338][]:
 
   Enum cases can now be matched against an optional enum without
   requiring a '?' at the end of the pattern.
@@ -2052,12 +2076,12 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-9827][]:
+* [#52244][]:
 
   `weak` and `unowned` stored properties no longer inhibit the
    automatic synthesis of `Equatable` or `Hashable` conformance.
 
-* [SR-2688][]:
+* [#45293][]:
 
   An `@autoclosure` parameter can now be declared with a typealias type.
 
@@ -2068,7 +2092,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-7601][]:
+* [#50143][]:
 
   Methods declared `@objc` inside a class can now return `Self`:
 
@@ -2078,7 +2102,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-2176][]:
+* [#44784][]:
 
   Assigning '.none' to an optional enum which also has a 'none' case
   or comparing such an enum with '.none' will now warn. Such expressions
@@ -2173,7 +2197,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   In Swift 5 mode, `try?` with an expression of Optional type will flatten the
   resulting Optional, instead of returning an Optional of an Optional.
 
-* [SR-5719][]:
+* [#48289][]:
 
   In Swift 5 mode, `@autoclosure` parameters can no longer be forwarded to
   `@autoclosure` arguments in another function call. Instead, you must explicitly
@@ -2190,7 +2214,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-8109][]:
+* [#50641][]:
 
   Single-element labeled tuple expressions, for example `(label: 123)`, were
   allowed in some contexts but often resulted in surprising, inconsistent
@@ -2200,7 +2224,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Note that single-element labeled _types_, for example `var x: (label: Int)`,
   have already been prohibited since Swift 3.
 
-* [SR-695][]:
+* [#43310][]:
 
   In Swift 5 mode, a class method returning `Self` can no longer be overridden
   with a method returning a non-final concrete class type. Such code is not
@@ -2221,7 +2245,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 * In Swift 5 mode, the type of `self` in a convenience initializer of a non-final
   class is now the dynamic `Self` type, and not the concrete class type.
 
-* [SR-5581][]:
+* [#48153][]:
 
   Protocols can now constrain their conforming types to those that subclasses a
   given class. Two equivalent forms are supported:
@@ -2234,13 +2258,13 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Note that Swift 4.2 accepted the second form, but it was not fully implemented
   and could sometimes crash at compile time or run time.
 
-* [SR-631][]:
+* [#43248][]:
 
   Extension binding now supports extensions of nested types which themselves are
   defined inside extensions. Previously this could fail with some declaration orders,
   producing spurious "undeclared type" errors.
 
-* [SR-7139][]:
+* [#49687][]:
 
   Exclusive memory access is now enforced at runtime by default in
   optimized (`-O`/`-Osize`) builds. Programs that violate exclusivity will
@@ -2273,7 +2297,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   x(label: 1, 2) // desugars to `x.dynamicallyCall(withKeywordArguments: ["label": 1, "": 2])`
   ```
 
-* [SR-7251][]:
+* [#49799][]:
 
   In Swift 5 mode, attempting to declare a static property with the same name as a
   nested type is now always correctly rejected. Previously, it was possible to
@@ -2291,7 +2315,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* [SR-4248][]:
+* [#46831][]:
 
   In Swift 5 mode, when casting an optional value to a generic placeholder type,
   the compiler will be more conservative with the unwrapping of the value. The 
@@ -2332,7 +2356,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   The `DictionaryLiteral` type has been renamed to `KeyValuePairs`.
   A typealias preserves the old name for compatibility.
 
-* [SR-2608][]
+* [#45213][]
 
   Default arguments are now printed in SourceKit-generated interfaces for Swift
   modules, instead of just using a placeholder `default`.
@@ -2348,7 +2372,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 * Complex recursive type definitions involving classes and generics that would
   previously cause deadlocks at run time are now fully supported.
 
-* [SR-419][]
+* [#43036][]
 
   In Swift 5 mode, when setting a property from within its own `didSet` or
   `willSet` observer, the observer will now only avoid being recursively called
@@ -2559,7 +2583,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
     startup and, if it is defined, replaces the random seed with a constant
     value.
   
-* [SR-106][]
+* [#42728][]
 
   The behavior of `.description` and `.debugDescription` for floating-point
   numbers has been changed. Previously these unconditionally printed a fixed
@@ -2844,7 +2868,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   CFHash and CFEqual as the implementation. This change applies even to "Swift
   3 mode", so if you were previously adding this conformance yourself, use
   `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
-  ([SR-2388][])
+  ([#44995][])
 
 * [SE-0156][]
 
@@ -2993,7 +3017,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   slice[i..<j] = buffer[k..<l]
   ```
 
-* [SR-1529][]:
+* [#44138][]:
 
   Covariant method overrides are now fully supported, fixing many crashes
   and compile-time assertions when defining or calling such methods.
@@ -3075,7 +3099,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   side effects, leading to bugs when Swift code attempted to override
   `initialize`.
 
-* [SR-2394][]
+* [#45001][]
 
   C functions that "return twice" are no longer imported into Swift. Instead,
   they are explicitly made unavailable, so attempting to reference them will
@@ -3152,7 +3176,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   is not guaranteed to work in future versions of Swift, and will
   now raise a warning.
 
-* [SR-1446][]
+* [#44055][]
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
 
@@ -3172,7 +3196,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   extension OuterGeneric.InnerGeneric {}
   ```
 
-* [SR-1009][]:
+* [#43621][]:
 
   Constrained extensions allow same-type constraints between generic parameters and concrete types. This enables you to create extensions, for example, on `Array` with `Int` elements:
 
@@ -3393,7 +3417,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     var x2 = p as! [Int]
     ```
 
-* [SR-2131][]:
+* [#44739][]:
 
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a prefix and suffix of all strings.
 
@@ -9586,43 +9610,45 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 [SE-0362]: <https://github.com/apple/swift-evolution/blob/main/proposals/0362-piecemeal-future-features.md>
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
+[SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
 
-[SR-75]: <https://bugs.swift.org/browse/SR-75>
-[SR-106]: <https://bugs.swift.org/browse/SR-106>
-[SR-419]: <https://bugs.swift.org/browse/SR-419>
-[SR-631]: <https://bugs.swift.org/browse/SR-631>
-[SR-695]: <https://bugs.swift.org/browse/SR-695>
-[SR-1009]: <https://bugs.swift.org/browse/SR-1009>
-[SR-1446]: <https://bugs.swift.org/browse/SR-1446>
-[SR-1529]: <https://bugs.swift.org/browse/SR-1529>
-[SR-2131]: <https://bugs.swift.org/browse/SR-2131>
-[SR-2176]: <https://bugs.swift.org/browse/SR-2176>
-[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
-[SR-2388]: <https://bugs.swift.org/browse/SR-2388>
-[SR-2394]: <https://bugs.swift.org/browse/SR-2394>
-[SR-2608]: <https://bugs.swift.org/browse/SR-2608>
-[SR-2672]: <https://bugs.swift.org/browse/SR-2672>
-[SR-2688]: <https://bugs.swift.org/browse/SR-2688>
-[SR-2790]: <https://bugs.swift.org/browse/SR-2790>
-[SR-4206]: <https://bugs.swift.org/browse/SR-4206>
-[SR-4248]: <https://bugs.swift.org/browse/SR-4248>
-[SR-5581]: <https://bugs.swift.org/browse/SR-5581>
-[SR-5719]: <https://bugs.swift.org/browse/SR-5719>
-[SR-6118]: <https://bugs.swift.org/browse/SR-6118>
-[SR-7083]: <https://bugs.swift.org/browse/SR-7083>
-[SR-7139]: <https://bugs.swift.org/browse/SR-7139>
-[SR-7251]: <https://bugs.swift.org/browse/SR-7251>
-[SR-7601]: <https://bugs.swift.org/browse/SR-7601>
-[SR-7799]: <https://bugs.swift.org/browse/SR-7799>
-[SR-8109]: <https://bugs.swift.org/browse/SR-8109>
-[SR-8546]: <https://bugs.swift.org/browse/SR-8546>
-[SR-8974]: <https://bugs.swift.org/browse/SR-8974>
-[SR-9043]: <https://bugs.swift.org/browse/SR-9043>
-[SR-9827]: <https://bugs.swift.org/browse/SR-9827>
-[SR-10069]: <https://bugs.swift.org/browse/SR-10069>
-[SR-11298]: <https://bugs.swift.org/browse/SR-11298>
-[SR-11429]: <https://bugs.swift.org/browse/SR-11429>
-[SR-11700]: <https://bugs.swift.org/browse/SR-11700>
-[SR-11841]: <https://bugs.swift.org/browse/SR-11841>
-[SR-14731]: <https://bugs.swift.org/browse/SR-14731>
-[SR-14878]: <https://bugs.swift.org/browse/SR-14878>
+[#42697]: <https://github.com/apple/swift/issues/42697>
+[#42728]: <https://github.com/apple/swift/issues/42728>
+[#43036]: <https://github.com/apple/swift/issues/43036>
+[#43248]: <https://github.com/apple/swift/issues/43248>
+[#43310]: <https://github.com/apple/swift/issues/43310>
+[#43621]: <https://github.com/apple/swift/issues/43621>
+[#44055]: <https://github.com/apple/swift/issues/44055>
+[#44138]: <https://github.com/apple/swift/issues/44138>
+[#44739]: <https://github.com/apple/swift/issues/44739>
+[#44784]: <https://github.com/apple/swift/issues/44784>
+[#44797]: <https://github.com/apple/swift/issues/44797>
+[#44995]: <https://github.com/apple/swift/issues/44995>
+[#45001]: <https://github.com/apple/swift/issues/45001>
+[#45213]: <https://github.com/apple/swift/issues/45213>
+[#45277]: <https://github.com/apple/swift/issues/45277>
+[#45293]: <https://github.com/apple/swift/issues/45293>
+[apple/swift-corelibs-foundation#4326]: <https://github.com/apple/swift-corelibs-foundation/issues/4326>
+[#46789]: <https://github.com/apple/swift/issues/46789>
+[#46831]: <https://github.com/apple/swift/issues/46831>
+[#48153]: <https://github.com/apple/swift/issues/48153>
+[#48289]: <https://github.com/apple/swift/issues/48289>
+[#48673]: <https://github.com/apple/swift/issues/48673>
+[#49631]: <https://github.com/apple/swift/issues/49631>
+[#49687]: <https://github.com/apple/swift/issues/49687>
+[#49799]: <https://github.com/apple/swift/issues/49799>
+[#50143]: <https://github.com/apple/swift/issues/50143>
+[#50338]: <https://github.com/apple/swift/issues/50338>
+[#50641]: <https://github.com/apple/swift/issues/50641>
+[#51064]: <https://github.com/apple/swift/issues/51064>
+[#51478]: <https://github.com/apple/swift/issues/51478>
+[#51546]: <https://github.com/apple/swift/issues/51546>
+[#52244]: <https://github.com/apple/swift/issues/52244>
+[#52471]: <https://github.com/apple/swift/issues/52471>
+[#53699]: <https://github.com/apple/swift/issues/53699>
+[#53830]: <https://github.com/apple/swift/issues/53830>
+[#54108]: <https://github.com/apple/swift/issues/54108>
+[#54246]: <https://github.com/apple/swift/issues/54246>
+[#57081]: <https://github.com/apple/swift/issues/57081>
+[#57225]: <https://github.com/apple/swift/issues/57225>
+[#56139]: <https://github.com/apple/swift/issues/56139>

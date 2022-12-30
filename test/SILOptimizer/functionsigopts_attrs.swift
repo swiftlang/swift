@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -module-name main -O -emit-sil -primary-file %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 protocol P {
   func foo()
 }

@@ -41,7 +41,7 @@ extension TestProtocol {
     }
 }
 
-// Mark: - Case3: Illegally muatating let constant in a function scope
+// Mark: - Case3: Illegally mutating let constant in a function scope
 
 let testObject2: TestProtocol  // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 testObject2 = TestStruct(foo: 42)

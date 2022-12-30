@@ -24,6 +24,7 @@ target_sources(swiftSILOptimizer PRIVATE
   MovedAsyncVarDebugInfoPropagator.cpp
   MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp
+  MoveOnlyDiagnostics.cpp
   MoveOnlyObjectChecker.cpp
   MoveOnlyAddressChecker.cpp
   MoveOnlyDeinitInsertion.cpp

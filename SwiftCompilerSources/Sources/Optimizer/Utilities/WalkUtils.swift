@@ -106,6 +106,16 @@ extension SmallProjectionWalkingPath {
   }
 }
 
+/// A walking path which matches everything.
+///
+/// Useful for walkers which don't care about the path and unconditionally walk to all defs/uses.
+struct UnusedWalkingPath : WalkingPath {
+  func merge(with: Self) -> Self { self }
+  func pop(kind: FieldKind) -> (index: Int, path: Self)? { nil }
+  func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? { self }
+  func push(_ kind: FieldKind, index: Int) -> Self { self }
+}
+
 /// Caches the state of a walk.
 ///
 /// A client must provide this cache in a `walkUpCache` or `walkDownCache` property.
@@ -349,11 +359,14 @@ extension ValueDefUseWalker {
         return .continueWalk
       }
     case let cbr as CondBranchInst:
-      let val = cbr.getArgument(for: operand)
-      if let path = walkDownCache.needWalk(for: val, path: path) {
-        return walkDownUses(ofValue: val, path: path)
+      if let val = cbr.getArgument(for: operand) {
+        if let path = walkDownCache.needWalk(for: val, path: path) {
+          return walkDownUses(ofValue: val, path: path)
+        } else {
+          return .continueWalk
+        }
       } else {
-        return .continueWalk
+        return leafUse(value: operand, path: path)
       }
     case let se as SwitchEnumInst:
       if let (caseIdx, path) = path.pop(kind: .enumCase),

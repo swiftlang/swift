@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ASTVisitor.h"
 #include "SILGen.h"
 #include "SILGenFunction.h"
-#include "ASTVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -33,7 +35,28 @@ void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
       for (auto directResult : fnConv.getDirectSILResults()) {
         SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
             fnConv.getSILType(directResult, getTypeExpansionContext())));
-        epilogBB->createPhiArgument(resultType, OwnershipKind::Owned);
+        // @out tuples do not get flattened in the function's return type, but
+        // the epilog block expects (recursively) flattened arguments. Flatten
+        // the type now.
+        SmallVector<SILType, 4> worklist;
+        worklist.push_back(resultType);
+        while (!worklist.empty()) {
+          auto ty = worklist.pop_back_val();
+          if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
+            assert(!fnConv.useLoweredAddresses() &&
+                   "expanding tuple in non-opaque-values exit block?!");
+            // Push tuple elements in reverse order (resulting in later tuple
+            // elements appearing earlier in worklist) so that as the worklist
+            // is drained by popping the back, arguments are created for the
+            // earlier types first.
+            for (auto index :
+                 llvm::reverse(indices(tupleType->getElementTypes()))) {
+              worklist.push_back(ty.getTupleElementType(index));
+            }
+          } else {
+            epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
+          }
+        }
       }
     }
   }
@@ -61,14 +84,83 @@ void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
   CoroutineUnwindDest = JumpDest(unwindBB, getCleanupsDepth(), cleanupLoc);
 }
 
+/// View a given SILType as a type-tree under the operation of tupling and visit
+/// its nodes (tuple elements) in post-order.
+///
+/// For convenience, the index of the type in the flattened tuple is passed to
+/// the visitor.
+template <typename Visit>
+void visitTupleTypeTreeInPostOrder(SILType root, Visit visit) {
+  struct Node {
+    SILType ty;
+    unsigned index;
+  };
+  SmallVector<std::pair<Node, unsigned>, 32> stack;
+  auto tupleElementCount = [](SILType ty) -> unsigned {
+    if (auto tupleType = ty.getASTType()->getAs<TupleType>())
+      return tupleType->getNumElements();
+    return 0;
+  };
+  auto tupleElement = [](SILType ty, unsigned index) -> SILType {
+    return ty.getTupleElementType(index);
+  };
+  unsigned flattenedIndex = 0;
+  stack.push_back({{root, flattenedIndex}, 0});
+  while (!stack.empty()) {
+    while (stack.back().second != tupleElementCount(stack.back().first.ty)) {
+      auto index = stack.back().second;
+      stack.back().second++;
+      stack.push_back(
+          {{tupleElement(stack.back().first.ty, index), flattenedIndex}, 0});
+    }
+    auto node = stack.pop_back_val().first;
+    visit(node.ty, node.index);
+    if (!node.ty.getASTType()->template is<TupleType>())
+      flattenedIndex += 1;
+  }
+}
+
 /// Given a list of direct results, form the direct result value.
 ///
 /// Note that this intentionally loses any tuple sub-structure of the
-/// formal result type.
+/// formal result type, except in the case of @out tuples where it must be
+/// preserved.
 static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
                                  ArrayRef<SILValue> directResults) {
   if (directResults.size() == 1)
     return directResults[0];
+
+  auto fnConv = SGF.F.getConventions();
+  if (!fnConv.useLoweredAddresses()) {
+    // In opaque-values code, nested @out tuples are not flattened.  Reconstruct
+    // nested tuples.
+    auto resultType = SGF.F.getLoweredType(SGF.F.mapTypeIntoContext(
+        fnConv.getSILResultType(SGF.getTypeExpansionContext())));
+    SmallVector<Optional<SILValue>, 4> mutableDirectResult;
+    for (auto result : directResults) {
+      mutableDirectResult.push_back({result});
+    }
+    visitTupleTypeTreeInPostOrder(resultType, [&](SILType ty, unsigned index) {
+      if (auto tupleTy = ty.getASTType()->getAs<TupleType>()) {
+        SmallVector<SILValue, 4> elements;
+        unsigned offset = 0;
+        auto elementCount = tupleTy->getNumElements();
+        while (elements.size() < elementCount) {
+          if (mutableDirectResult[index + offset].has_value()) {
+            auto val = mutableDirectResult[index + offset].value();
+            elements.push_back(val);
+            mutableDirectResult[index + offset].reset();
+          }
+          ++offset;
+        }
+        assert(!mutableDirectResult[index].has_value());
+        auto tuple = SGF.B.createTuple(loc, ty, elements);
+        mutableDirectResult[index] = tuple;
+      }
+    });
+    assert(mutableDirectResult[0].has_value());
+    return mutableDirectResult[0].value();
+  }
 
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : directResults)
@@ -177,7 +269,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   // actually unreachable and we can just return early.
   auto returnLoc =
       prepareForEpilogBlockEmission(*this, topLevel, epilogBB, directResults);
-  if (!returnLoc.hasValue()) {
+  if (!returnLoc.has_value()) {
     return {None, topLevel};
   }
 
@@ -195,7 +287,9 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   // block.
   SILValue returnValue;
   if (!directResults.empty()) {
-    assert(directResults.size() == F.getConventions().getNumDirectSILResults());
+    assert(directResults.size() ==
+           F.getConventions().getNumExpandedDirectSILResults(
+               getTypeExpansionContext()));
     returnValue = buildReturnValue(*this, topLevel, directResults);
   }
 

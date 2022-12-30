@@ -156,10 +156,8 @@ ABSTRACT_DECL(Value, Decl)
       GENERIC_VALUE_DECL(OpaqueType, GenericTypeDecl)
       GENERIC_VALUE_DECL(TypeAlias, GenericTypeDecl)
       DECL_RANGE(GenericType, Enum, TypeAlias)
-    ABSTRACT_DECL(AbstractTypeParam, TypeDecl)
-      VALUE_DECL(GenericTypeParam, AbstractTypeParamDecl)
-      VALUE_DECL(AssociatedType, AbstractTypeParamDecl)
-      DECL_RANGE(AbstractTypeParam, GenericTypeParam, AssociatedType)
+    VALUE_DECL(GenericTypeParam, TypeDecl)
+    VALUE_DECL(AssociatedType, TypeDecl)
     CONTEXT_VALUE_DECL(Module, TypeDecl)
     DECL_RANGE(Type, Enum, Module)
   ABSTRACT_DECL(AbstractStorage, ValueDecl)
@@ -173,6 +171,7 @@ ABSTRACT_DECL(Value, Decl)
     ABSTRACT_FUNCTION_DECL(Func, AbstractFunctionDecl)
       ABSTRACT_FUNCTION_DECL(Accessor, FuncDecl)
     DECL_RANGE(AbstractFunction, Constructor, Accessor)
+  GENERIC_VALUE_DECL(Macro, ValueDecl)
   CONTEXT_VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, Enum, EnumElement)
 
@@ -192,7 +191,9 @@ ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(PostfixOperator, OperatorDecl)
   DECL_RANGE(Operator, InfixOperator, PostfixOperator)
 
-LAST_DECL(PostfixOperator)
+DECL(MacroExpansion, Decl)
+
+LAST_DECL(MacroExpansion)
 
 #undef NOMINAL_TYPE_DECL
 #undef CONTEXT_DECL

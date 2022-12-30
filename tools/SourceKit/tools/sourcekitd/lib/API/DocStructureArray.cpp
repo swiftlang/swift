@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "sourcekitd/DocStructureArray.h"
-#include "DictionaryKeys.h"
+#include "sourcekitd/CompactArray.h"
+#include "sourcekitd/DictionaryKeys.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
-#include "sourcekitd/CompactArray.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"

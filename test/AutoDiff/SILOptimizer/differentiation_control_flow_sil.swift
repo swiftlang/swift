@@ -199,7 +199,7 @@ func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
 // CHECK-SIL-LABEL: sil hidden [ossa] @enum_addr_notactivelTJrUSpSr : $@convention(thin) <τ_0_0> (@in_guaranteed AddressOnlyEnum<τ_0_0>, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[ENUM_ARG:%.*]] : $*AddressOnlyEnum<τ_0_0>, [[X_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[ENUM_ADDR:%.*]] = alloc_stack $AddressOnlyEnum<τ_0_0>
-// CHECK-SIL:   copy_addr [[ENUM_ARG]] to [initialization] [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
+// CHECK-SIL:   copy_addr [[ENUM_ARG]] to [init] [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__enum_addr_notactive_bb0__PB__src_0_wrt_1_l<τ_0_0> ()
 // CHECK-SIL:   switch_enum_addr [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>, case #AddressOnlyEnum.none!enumelt: bb1, case #AddressOnlyEnum.some!enumelt: bb2
 

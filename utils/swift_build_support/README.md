@@ -6,5 +6,5 @@ structures used by the Swift build script.
 You may run unit tests for `swift_build_support` from the command line:
 
 ```sh
-$ python utils/swift_build_support/run_tests.py
+$ python3 utils/swift_build_support/run_tests.py
 ```

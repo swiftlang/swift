@@ -253,7 +253,7 @@ public:
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Knd == RequirementFailure);
 
-    return ReqFailureInfo.getValue();
+    return ReqFailureInfo.value();
   }
 
   operator Kind() const { return Knd; }
@@ -341,8 +341,7 @@ Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
 /// typealias GX2<A> = X<A, A>
 /// typealias GX3<A, B> = X<B, A>
 /// \endcode
-bool isPassThroughTypealias(TypeAliasDecl *typealias, Type underlyingType,
-                            NominalTypeDecl *nominal);
+bool isPassThroughTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
 
 /// Determine whether one type is a subtype of another.
 ///
@@ -1498,6 +1497,22 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
 
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
+
+/// Look for closure discriminators within an AST.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
+  unsigned NextDiscriminator = 0;
+
+public:
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator();
+
+  unsigned getFirstDiscriminator() const {
+    return FirstDiscriminator;
+  }
+};
 
 } // end namespace swift
 

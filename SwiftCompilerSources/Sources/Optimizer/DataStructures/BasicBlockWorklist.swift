@@ -20,7 +20,7 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockWorklist : CustomStringConvertible, CustomReflectable {
+struct BasicBlockWorklist : CustomStringConvertible, NoReflectionChildren {
   private var worklist: Stack<BasicBlock>
   private var pushedBlocks: BasicBlockSet
 
@@ -56,7 +56,7 @@ struct BasicBlockWorklist : CustomStringConvertible, CustomReflectable {
     """
   }
 
-  var customMirror: Mirror { Mirror(self, children: []) }
+  var function: Function { pushedBlocks.function }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {

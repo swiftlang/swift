@@ -50,6 +50,7 @@ import ClassArrayGetter
 import CodableTest
 import Combos
 import CreateObjects
+import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -165,7 +166,7 @@ import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
-import SimpleArraySpecialization
+//import SimpleArraySpecialization
 import SortArrayInClass
 import SortIntPyramids
 import SortLargeExistentials
@@ -233,6 +234,7 @@ register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
+register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
@@ -349,7 +351,7 @@ register(SequenceAlgos.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)
-register(SimpleArraySpecialization.benchmarks)
+//register(SimpleArraySpecialization.benchmarks)
 register(SortArrayInClass.benchmarks)
 register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)

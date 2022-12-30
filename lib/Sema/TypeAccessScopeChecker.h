@@ -43,7 +43,7 @@ class TypeAccessScopeChecker {
 
     auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
     Scope = Scope->intersectWith(AS);
-    return Scope.hasValue();
+    return Scope.has_value();
   }
 
 public:

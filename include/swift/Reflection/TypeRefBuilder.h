@@ -87,14 +87,19 @@ public:
 };
 
 template<typename Self, typename Descriptor>
-class ReflectionSectionIteratorBase
-  : public std::iterator<std::forward_iterator_tag, Descriptor> {
+class ReflectionSectionIteratorBase {
   uint64_t OriginalSize;
 protected:
   Self &asImpl() {
     return *static_cast<Self *>(this);
   }
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Descriptor;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   RemoteRef<void> Cur;
   uint64_t Size;
   std::string Name;
@@ -558,23 +563,43 @@ public:
     auto kind = node->getKind();
     // Kinds who have a "BoundGeneric..." variant.
     if (kind != Node::Kind::Class && kind != Node::Kind::Structure &&
-        kind != Node::Kind::Enum && kind != Node::Kind::Protocol &&
-        kind != Node::Kind::OtherNominalType && kind != Node::Kind::TypeAlias &&
-        kind != Node::Kind::Function)
+        kind != Node::Kind::Enum)
       return nullptr;
     auto mangling = Demangle::mangleNode(node);
     if (!mangling.isSuccess())
       return nullptr;
 
+    if (shapeIndex >= genericParamsPerLevel.size())
+      return nullptr;
+
     auto numGenericArgs = genericParamsPerLevel[shapeIndex];
 
+    auto startOffsetFromEnd = argsIndex + numGenericArgs;
+    auto endOffsetFromEnd = argsIndex;
+    if (startOffsetFromEnd > args.size() || endOffsetFromEnd > args.size())
+      return nullptr;
+
     std::vector<const TypeRef *> genericParams(
-        args.end() - argsIndex - numGenericArgs, args.end() - argsIndex);
+        args.end() - startOffsetFromEnd, args.end() - endOffsetFromEnd);
 
     const BoundGenericTypeRef *parent = nullptr;
-    if (node->hasChildren())
-     parent = createBoundGenericTypeReconstructingParent(
-        node->getFirstChild(), decl, --shapeIndex, args, argsIndex + numGenericArgs);
+    if (node->hasChildren()) {
+      // Skip over nodes that are not of type class, enum or struct
+      auto parentNode = node->getFirstChild();
+      while (parentNode->getKind() != Node::Kind::Class &&
+             parentNode->getKind() != Node::Kind::Structure &&
+             parentNode->getKind() != Node::Kind::Enum) {
+        if (parentNode->hasChildren()) {
+          parentNode = parentNode->getFirstChild();
+        } else {
+          parentNode = nullptr;
+          break;
+        }
+      }
+      if (parentNode)
+        parent = createBoundGenericTypeReconstructingParent(
+            parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
+    }
 
     return BoundGenericTypeRef::create(*this, mangling.result(), genericParams,
                                        parent);
@@ -1099,12 +1124,12 @@ public:
   // If the target is 32 bits, the mask is in the lower 32 bits
   uint64_t getMultiPayloadEnumPointerMask() {
     unsigned pointerSize = TC.targetPointerSize();
-    if (!multiPayloadEnumPointerMask.hasValue()) {
+    if (!multiPayloadEnumPointerMask.has_value()) {
       // Ask the target for the spare bits mask
       multiPayloadEnumPointerMask
         = OpaqueIntVariableReader("_swift_debug_multiPayloadEnumPointerSpareBitsMask", pointerSize);
     }
-    if (!multiPayloadEnumPointerMask.hasValue()) {
+    if (!multiPayloadEnumPointerMask.has_value()) {
       if (pointerSize == sizeof(void *)) {
         // Most reflection tools run on the target machine,
         // in which case, they use the same configuration:
@@ -1117,7 +1142,7 @@ public:
         multiPayloadEnumPointerMask = SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
       }
     }
-    return multiPayloadEnumPointerMask.getValue();
+    return multiPayloadEnumPointerMask.value();
   }
 
   ///
@@ -1151,10 +1176,10 @@ public:
             readTypeRef(descriptor, descriptor->ProtocolTypeName));
         auto protocolName = nodeToString(protocolNode);
         clearNodeFactory();
-        if (optionalMangledTypeName.hasValue()) {
-          auto mangledTypeName = optionalMangledTypeName.getValue();
-          if (forMangledTypeName.hasValue()) {
-            if (mangledTypeName != forMangledTypeName.getValue())
+        if (optionalMangledTypeName.has_value()) {
+          auto mangledTypeName = optionalMangledTypeName.value();
+          if (forMangledTypeName.has_value()) {
+            if (mangledTypeName != forMangledTypeName.value())
               continue;
           }
 
@@ -1175,9 +1200,9 @@ public:
                 associatedType, associatedType->SubstitutedTypeName);
             auto optionalMangledSubstitutedTypeName =
                 normalizeReflectionName(substitutedTypeRef);
-            if (optionalMangledSubstitutedTypeName.hasValue()) {
+            if (optionalMangledSubstitutedTypeName.has_value()) {
               mangledSubstitutedTypeName =
-                  optionalMangledSubstitutedTypeName.getValue();
+                  optionalMangledSubstitutedTypeName.value();
             }
 
             // We intentionally do not want to resolve opaque type
@@ -1386,10 +1411,10 @@ private:
 
       auto optionalTypeName = readTypeNameFromTypeDescriptor(
           typeDescriptor, typeDescriptorTarget);
-      if (!optionalTypeName.hasValue())
+      if (!optionalTypeName.has_value())
         return llvm::None;
       else
-        typeName = optionalTypeName.getValue();
+        typeName = optionalTypeName.value();
 
       std::vector<ContextNameInfo> contextNameChain;
       contextNameChain.push_back(
@@ -1461,7 +1486,7 @@ private:
 
       std::vector<ContextNameInfo> contextNameChain;
       contextNameChain.push_back(ContextNameInfo{
-          protocolName.getValue(), protocolDescriptorAddress, false});
+          protocolName.value(), protocolDescriptorAddress, false});
       getParentContextChain(protocolDescriptorAddress, protocolDescriptor,
                             contextNameChain);
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
@@ -1491,29 +1516,29 @@ private:
               contextDescriptor)) {
         auto moduleDescriptorName = readModuleNameFromModuleDescriptor(
             moduleDescriptor, contextDescriptorAddress);
-        if (!moduleDescriptorName.hasValue())
+        if (!moduleDescriptorName.has_value())
           return llvm::None;
         else
-          return ContextNameInfo{moduleDescriptorName.getValue(),
+          return ContextNameInfo{moduleDescriptorName.value(),
                                  contextDescriptorAddress, false};
       } else if (auto typeDescriptor = dyn_cast<ExternalTypeContextDescriptor<
                      ObjCInteropKind, PointerSize>>(contextDescriptor)) {
         auto typeDescriptorName = readTypeNameFromTypeDescriptor(
             typeDescriptor, contextDescriptorAddress);
-        if (!typeDescriptorName.hasValue())
+        if (!typeDescriptorName.has_value())
           return llvm::None;
         else
-          return ContextNameInfo{typeDescriptorName.getValue(),
+          return ContextNameInfo{typeDescriptorName.value(),
                                  contextDescriptorAddress, false};
       } else if (auto anonymousDescriptor =
                      dyn_cast<ExternalAnonymousContextDescriptor<
                          ObjCInteropKind, PointerSize>>(contextDescriptor)) {
         auto anonymousDescriptorName = readAnonymousNameFromAnonymousDescriptor(
             anonymousDescriptor, contextDescriptorAddress);
-        if (!anonymousDescriptorName.hasValue())
+        if (!anonymousDescriptorName.has_value())
           return llvm::None;
         else
-          return ContextNameInfo{anonymousDescriptorName.getValue(),
+          return ContextNameInfo{anonymousDescriptorName.value(),
                                  contextDescriptorAddress, true};
       } else {
         Error = "Unexpected type of context descriptor.";
@@ -1551,10 +1576,10 @@ private:
                 parentContextDescriptorBytes.get();
         const auto parentNameInfo =
             getContextName(parentContextDescriptorAddress, parentDescriptor);
-        if (!parentNameInfo.hasValue()) {
+        if (!parentNameInfo.has_value()) {
           return;
         }
-        chain.push_back(parentNameInfo.getValue());
+        chain.push_back(parentNameInfo.value());
         if (!isModuleDescriptor(parentDescriptor)) {
           getParentContextChain(parentContextDescriptorAddress,
                                 parentDescriptor, chain);
@@ -1864,7 +1889,7 @@ private:
 
       auto fullyQualifiedName =
           NameReader.readFullyQualifiedTypeName(contextTypeDescriptorAddress);
-      if (!fullyQualifiedName.hasValue())
+      if (!fullyQualifiedName.has_value())
         return llvm::None;
       else
         return std::make_pair(mangledTypeName, *fullyQualifiedName);
@@ -1928,28 +1953,28 @@ private:
 
       auto optionalConformingTypeNamePair = getConformingTypeName(
           conformanceDescriptorAddress, *conformanceDescriptorPtr);
-      if (!optionalConformingTypeNamePair.hasValue())
+      if (!optionalConformingTypeNamePair.has_value())
         return llvm::None;
 
       auto optionalConformanceProtocol = getConformanceProtocolName(
           conformanceDescriptorAddress, *conformanceDescriptorPtr);
-      if (!optionalConformanceProtocol.hasValue())
+      if (!optionalConformanceProtocol.has_value())
         return llvm::None;
 
       std::string mangledTypeName;
-      if (optionalConformingTypeNamePair.getValue().first.empty()) {
-        auto it = typeNameToManglingMap.find(optionalConformingTypeNamePair.getValue().second);
+      if (optionalConformingTypeNamePair.value().first.empty()) {
+        auto it = typeNameToManglingMap.find(optionalConformingTypeNamePair.value().second);
         if (it != typeNameToManglingMap.end()) {
           mangledTypeName = it->second;
         } else {
           mangledTypeName = "";
         }
       } else {
-        mangledTypeName = optionalConformingTypeNamePair.getValue().first;
+        mangledTypeName = optionalConformingTypeNamePair.value().first;
       }
 
-      return ProtocolConformanceInfo{optionalConformingTypeNamePair.getValue().second,
-                                     optionalConformanceProtocol.getValue(),
+      return ProtocolConformanceInfo{optionalConformingTypeNamePair.value().second,
+                                     optionalConformanceProtocol.value(),
                                      mangledTypeName};
     }
   };
@@ -1969,8 +1994,8 @@ public:
         auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
         auto TypeName = nodeToString(demangleTypeRef(TypeRef));
         clearNodeFactory();
-        if (OptionalMangledTypeName.hasValue()) {
-          typeNameToManglingMap[TypeName] = OptionalMangledTypeName.getValue();
+        if (OptionalMangledTypeName.has_value()) {
+          typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
         }
       }
     }
@@ -1989,10 +2014,10 @@ public:
         auto optionalConformanceInfo =
             conformanceReader.readConformanceDescriptor(conformanceAddr,
                                                         typeNameToManglingMap);
-        if (!optionalConformanceInfo.hasValue())
+        if (!optionalConformanceInfo.has_value())
           result.Errors.push_back(conformanceReader.Error);
         else
-          result.Conformances.push_back(optionalConformanceInfo.getValue());
+          result.Conformances.push_back(optionalConformanceInfo.value());
       }
     }
     return result;

@@ -882,7 +882,7 @@ class ExprContextAnalyzer {
               *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),
               /*lenient=*/false);
           posInParams.push_back(pos);
-          found |= pos.hasValue();
+          found |= pos.has_value();
         }
         if (!found) {
           // If applicable overload is not found, retry with considering
@@ -897,7 +897,7 @@ class ExprContextAnalyzer {
       assert(posInParams.size() == Candidates.size());
 
       for (auto i : indices(Candidates)) {
-        if (!posInParams[i].hasValue()) {
+        if (!posInParams[i].has_value()) {
           // If the argument doesn't have a matching position in the parameters,
           // indicate that with optional nullptr param.
           if (seenArgs.insert({Identifier(), CanType()}).second)
@@ -1214,6 +1214,11 @@ class ExprContextAnalyzer {
         return;
       auto *var = initDC->getWrappedVar();
       recordPossibleType(AFD->mapTypeIntoContext(var->getInterfaceType()));
+      break;
+    }
+
+    case InitializerKind::RuntimeAttribute: {
+      // This never appears in AST.
       break;
     }
     }

@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
+// REQUIRES: rdar102364960
+
 import CustomSequence
-import Cxx
 
 func checkIntSequence<S>(_ seq: S) where S: Sequence, S.Element == Int32 {
   let contains = seq.contains(where: { $0 == 3 })

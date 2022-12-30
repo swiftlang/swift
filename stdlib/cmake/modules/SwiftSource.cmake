@@ -49,7 +49,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
       ${ARGN})
@@ -63,6 +63,7 @@ function(handle_swift_sources
                  EMBED_BITCODE_arg)
   translate_flag(${SWIFTSOURCES_STATIC} "STATIC"
                  STATIC_arg)
+  translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -95,7 +96,7 @@ function(handle_swift_sources
   endforeach()
 
   set(swift_compile_flags ${SWIFTSOURCES_COMPILE_FLAGS})
-  if (NOT SWIFTSOURCES_IS_MAIN)
+  if (NOT SWIFTSOURCES_IS_MAIN AND NOT SWIFTSOURCES_NO_LINK_NAME)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
 
@@ -491,7 +492,8 @@ function(_compile_swift_files
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
   if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
-    list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
+    list(APPEND swift_flags "-library-level" "api")
+    list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
   endif()
 
   if("${SWIFT_SDK_${SWIFTFILE_SDK}_THREADING_PACKAGE}" STREQUAL "none")
@@ -506,10 +508,18 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
 
-  if(NOT SWIFT_ENABLE_REFLECTION)
-    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
-  else()
+  if(SWIFT_ENABLE_REFLECTION)
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
+  endif()
+
+  if("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "enabled")
+    # do nothing, emitting reflection metadata is the default in swiftc
+  elseif("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "debugger-only")
+    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
+  elseif("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "disabled")
+    list(APPEND swift_flags "-Xfrontend" "-disable-reflection-metadata")
+  else()
+    message(FATAL_ERROR "Invalid SWIFT_STDLIB_REFLECTION_METADATA value: ${SWIFT_STDLIB_REFLECTION_METADATA}")
   endif()
 
   if(NOT "${SWIFT_STDLIB_TRAP_FUNCTION}" STREQUAL "")
@@ -786,7 +796,7 @@ function(_compile_swift_files
       # stdlib in the current stage is not built yet.
       if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
-      elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
+      elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
       endif()
     endif()

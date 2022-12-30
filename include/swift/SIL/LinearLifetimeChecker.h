@@ -53,7 +53,7 @@ public:
   class ErrorBuilder;
 
 private:
-  friend class ReborrowVerifier;
+  friend class GuaranteedPhiVerifier;
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
 

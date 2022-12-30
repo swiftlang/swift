@@ -39,7 +39,7 @@ public:
     asImpl().beforeVisit(BI);
 
     if (auto BuiltinKind = BI->getBuiltinKind()) {
-      switch (BuiltinKind.getValue()) {
+      switch (BuiltinKind.value()) {
       // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
 #define BUILTIN_TYPE_CHECKER_OPERATION(ID, NAME)                               \
   case BuiltinValueKind::ID:                                                   \
@@ -56,7 +56,7 @@ public:
     }
 
     if (auto IntrinsicID = BI->getIntrinsicID()) {
-      return asImpl().visitLLVMIntrinsic(BI, IntrinsicID.getValue());
+      return asImpl().visitLLVMIntrinsic(BI, IntrinsicID.value());
     }
     llvm_unreachable("Not all cases handled?!");
   }

@@ -103,7 +103,7 @@ areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &availableValues) {
 }
 
 /// This should be called in top-down order of each def that needs its uses
-/// rewrited. The order that we visit uses for a given def is irrelevant.
+/// rewritten. The order that we visit uses for a given def is irrelevant.
 void SILSSAUpdater::rewriteUse(Operand &use) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.

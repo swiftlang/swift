@@ -141,7 +141,7 @@ build_target_toolchain() {
     -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES \
     -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES \
     -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="$SOURCE_PATH/swift-syntax" \
-    -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="$SOURCE_PATH/swift-experimental-string-processing" \
+    -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="$SOURCE_PATH/swift-experimental-string-processing" \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
@@ -217,14 +217,35 @@ create_darwin_info_plist() {
   chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 }
 
+show_sccache_stats() {
+  # If sccache is installed in PATH
+  if command -v sccache &> /dev/null; then
+    sccache --show-stats
+  else
+    echo "sccache is not installed in PATH"
+  fi
+}
+
 if [ ${BUILD_HOST_TOOLCHAIN} -eq 1 ]; then
   build_host_toolchain
+  echo "=================================="
+  echo "Host toolchain built successfully!"
+  echo "=================================="
+  echo ""
+  echo "sccache stats:"
+  show_sccache_stats
   rm -rf "$DIST_TOOLCHAIN_DESTDIR"
   mkdir -p "$DIST_TOOLCHAIN_SDK"
   rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_SDK"
 fi
 
 build_target_toolchain
+echo "===================================="
+echo "Target toolchain built successfully!"
+echo "===================================="
+echo ""
+echo "sccache stats:"
+show_sccache_stats
 
 embed_wasi_sysroot
 

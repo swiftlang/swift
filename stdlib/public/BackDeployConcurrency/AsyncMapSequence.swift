@@ -34,9 +34,9 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 5)
   ///         .map { romanNumeralDict[$0] ?? "(unknown)" }
   ///     for await numeral in stream {
-  ///         print("\(numeral) ", terminator: " ")
+  ///         print(numeral, terminator: " ")
   ///     }
-  ///     // Prints: I  II  III  (unknown)  V
+  ///     // Prints "I II III (unknown) V "
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the

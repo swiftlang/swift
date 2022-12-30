@@ -77,16 +77,17 @@ SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
 //                              SILBlockArgument
 //===----------------------------------------------------------------------===//
 
-// FIXME: SILPhiArgument should only refer to branch arguments. They usually
-// need to be distinguished from projections and casts. Actual phi block
-// arguments are substitutable with their incoming values. It is also needlessly
-// expensive to call this helper instead of simply specifying phis with an
-// opcode. It results in repeated CFG traversals and repeated, unnecessary
-// switching over terminator opcodes.
+// FIXME: SILPhiArgument should only refer to phis (values merged from
+// BranchInst operands). Phis are directly substitutable with their incoming
+// values modulo control flow. They usually need to be distinguished from
+// projections and casts. It is needlessly expensive to call this helper instead
+// of simply specifying phis with an opcode. It results in repeated CFG
+// traversals and repeated, unnecessary switching over terminator opcodes.
 bool SILPhiArgument::isPhi() const {
-  // No predecessors indicates an unreachable block.
+  // No predecessors indicates an unreachable block. Treat this like a
+  // degenerate phi so we don't consider it a terminator result.
   if (getParent()->pred_empty())
-    return false;
+    return true;
 
   // Multiple predecessors require phis.
   auto *predBlock = getParent()->getSinglePredecessorBlock();
@@ -215,7 +216,6 @@ bool SILPhiArgument::getIncomingPhiValues(
     return false;
 
   const auto *parentBlock = getParent();
-  assert(!parentBlock->pred_empty());
 
   unsigned argIndex = getIndex();
   for (auto *predBlock : getParent()->getPredecessorBlocks()) {
@@ -240,9 +240,8 @@ bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
     argument->getIncomingPhiOperands(operands);
 
     for (auto *operand : operands) {
-      SILPhiArgument *forwarded;
-      if ((forwarded = dyn_cast<SILPhiArgument>(operand->get())) &&
-          forwarded->isPhi()) {
+      SILPhiArgument *forwarded = dyn_cast<SILPhiArgument>(operand->get());
+      if (forwarded && forwarded->isPhi()) {
         worklist.insert(forwarded);
       }
       if (!visitor(argument, operand))
@@ -324,14 +323,6 @@ bool SILPhiArgument::getSingleTerminatorOperands(
   return true;
 }
 
-SILValue SILPhiArgument::getSingleTerminatorOperand() const {
-  const auto *parentBlock = getParent();
-  const auto *predBlock = parentBlock->getSinglePredecessorBlock();
-  if (!predBlock)
-    return SILValue();
-  return getSingleTerminatorOperandForPred(parentBlock, predBlock, getIndex());
-}
-
 TermInst *SILPhiArgument::getSingleTerminator() const {
   auto *parentBlock = getParent();
   auto *predBlock = parentBlock->getSinglePredecessorBlock();
@@ -348,6 +339,11 @@ TermInst *SILPhiArgument::getTerminatorForResult() const {
     }
   }
   return nullptr;
+}
+
+const Operand *SILArgument::forwardedTerminatorResultOperand() const {
+  assert(isTerminatorResult() && "API is invalid for phis");
+  return getSingleTerminator()->forwardedOperand();
 }
 
 SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) {

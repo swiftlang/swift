@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 import SwiftPrivateThreadExtras
 

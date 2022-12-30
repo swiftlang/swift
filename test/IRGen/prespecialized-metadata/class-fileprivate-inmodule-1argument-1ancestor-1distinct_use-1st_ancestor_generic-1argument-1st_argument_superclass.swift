@@ -263,7 +263,7 @@ doit()
 //              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCySSGMb"
 
 //              CHECK: ; Function Attrs: noinline nounwind readnone
-//              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCyAA9Ancestor1ACLLCySSGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {
+//              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCyAA9Ancestor1ACLLCySSGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
 //         CHECK-NEXT: entry:
 //              CHECK:   [[ARGUMENT_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCySSGMb"([[INT]] 0)
 //              CHECK:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCyADySSGGMb"([[INT]] 0)

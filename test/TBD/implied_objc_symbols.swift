@@ -7,4 +7,7 @@
 
 // RUN: %FileCheck %s < %t/main.tbd
 
+// CHECK-NOT: '_OBJC_CLASS_$_CApi'
+// CHECK-NOT: '_OBJC_METACLASS_$_CApi' 
+
 // CHECK: objc-classes: [ CApi ]

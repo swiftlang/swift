@@ -1,13 +1,9 @@
 
-if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  set(SWIFTAST_LLVM_LINK_COMPONENTS)
-else()
-  set(SWIFTAST_LLVM_LINK_COMPONENTS
-    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
-    profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
-  )
-endif()
+set(SWIFTAST_LLVM_LINK_COMPONENTS
+  bitreader bitwriter coroutines coverage irreader debuginfoDWARF
+  profiledata instrumentation object objcarcopts mc mcparser
+  bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
+)
 
 add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
@@ -33,6 +29,7 @@ add_swift_host_library(swiftAST STATIC
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
+  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
@@ -70,6 +67,8 @@ add_swift_host_library(swiftAST STATIC
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
   PackConformance.cpp
+  PackExpansionMatcher.cpp
+  ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
@@ -77,6 +76,7 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   ProtocolConformanceRef.cpp
   RawComment.cpp
+  Requirement.cpp
   RequirementEnvironment.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
@@ -116,6 +116,7 @@ add_swift_host_library(swiftAST STATIC
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
+  TypeWrapper.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 
@@ -130,53 +131,43 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
     target_compile_options(swiftAST PRIVATE -O3)
   endif()
 endif()
-if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  target_link_libraries(swiftAST INTERFACE
-    clangCodeGen
-    clangIndex
-    clangFormat
-    clangToolingCore
-    clangFrontendTool
-    clangDependencyScanning
-    clangFrontend
-    clangDriver
-    clangSerialization
-    clangParse
-    clangSema
-    clangAnalysis
-    clangEdit
-    clangRewriteFrontend
-    clangRewrite
-    clangAST
-    clangLex
-    clangAPINotes
-    clangBasic)
+target_link_libraries(swiftAST INTERFACE
+  clangCodeGen
+  clangIndex
+  clangFormat
+  clangToolingCore
+  clangFrontendTool
+  clangDependencyScanning
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangParse
+  clangSema
+  clangAnalysis
+  clangEdit
+  clangRewriteFrontend
+  clangRewrite
+  clangAST
+  clangLex
+  clangAPINotes
+  clangBasic)
+
+if(SWIFT_SWIFT_PARSER)
+  target_compile_definitions(swiftAST
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+  )
 endif()
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
-  PRIVATE swiftSyntax)
-if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  # Remove dependencies from clangBasic to avoid bringing along some llvm
-  # libraries that we don't need to be building.
-  set_property(TARGET clangBasic PROPERTY LINK_LIBRARIES "")
-  set_property(TARGET clangBasic PROPERTY LINK_DEPENDS "")
-  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_LIBRARIES "")
-  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_DEPENDS "")
-  target_link_libraries(swiftAST
-    PRIVATE clangBasic)
-  target_compile_definitions(swiftAST PRIVATE
-    SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
-else()
-  target_link_libraries(swiftAST PRIVATE
-    swiftMarkup)
-endif()
+  PRIVATE swiftMarkup)
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftAST depends on these
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+add_dependencies(swift-ast-generated-headers intrinsics_gen clang-tablegen-targets)
 add_dependencies(swiftAST swift-ast-generated-headers)
 
 set_swift_llvm_is_available(swiftAST)

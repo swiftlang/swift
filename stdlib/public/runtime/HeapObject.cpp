@@ -25,6 +25,7 @@
 #include "RuntimeInvocationsTracking.h"
 #include "WeakReference.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/shims/GlobalObjects.h"
 #include "swift/shims/RuntimeShims.h"
@@ -70,7 +71,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // Check the top of the second byte instead, since Android AArch64 reserves
   // the top byte for its own pointer tagging since Android 11.
   return (intptr_t)((uintptr_t)p << 8) > 0;
-#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
+#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__riscv) && __riscv_xlen == 64) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   // On s390x it is theoretically possible to have high bit set but in practice
@@ -344,12 +345,15 @@ _swift_release_dealloc(HeapObject *object);
 SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.increment(1);
+  if (isValidPointerForNativeRetain(object)) {
+    // Return the result of increment() to make the eventual call to
+    // incrementSlow a tail call, which avoids pushing a stack frame on the fast
+    // path on ARM64.
+    return object->refCounts.increment(1);
+  }
   return object;
 }
 
-SWIFT_CC(swift)
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
@@ -357,6 +361,8 @@ HeapObject *swift::swift_retain(HeapObject *object) {
   CALL_IMPL(swift_retain, (object));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_retain)
 
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
@@ -410,6 +416,8 @@ void swift::swift_release(HeapObject *object) {
   CALL_IMPL(swift_release, (object));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_release)
 
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
@@ -707,6 +715,13 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
+  size_t retainCount = swift_retainCount(object);
+  if (SWIFT_UNLIKELY(retainCount > 1))
+    swift::fatalError(0,
+                      "Object %p deallocated with retain count %zd, reference "
+                      "may have escaped from deinit.\n",
+                      object, retainCount);
+
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
@@ -715,6 +730,7 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #else
   const bool fastDeallocSupported = true;
 #endif
+
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
     objc_destructInstance((id)object);
   }

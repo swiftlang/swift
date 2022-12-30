@@ -43,7 +43,7 @@ static constexpr const llvm::StringLiteral KnownCFTypes[] = {
 const size_t NumKnownCFTypes = sizeof(KnownCFTypes) / sizeof(*KnownCFTypes);
 
 /// Maintain a set of known CF types.
-static bool isKnownCFTypeName(StringRef name) {
+bool CFPointeeInfo::isKnownCFTypeName(StringRef name) {
   return std::binary_search(KnownCFTypes, KnownCFTypes + NumKnownCFTypes,
                             name, SortByLengthComparator());
 }

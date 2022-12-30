@@ -129,7 +129,11 @@ public:
   bool EnablePerformanceAnnotations = false;
 
   /// Enables the emission of stack protectors in functions.
-  bool EnableStackProtection = false;
+  bool EnableStackProtection = true;
+
+  /// Like `EnableStackProtection` and also enables moving of values to
+  /// temporaries for stack protection.
+  bool EnableMoveInoutStackProtection = false;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
@@ -274,6 +278,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
     return llvm::hash_value(0);
   }
 

@@ -96,7 +96,7 @@ import SubE
 // CHECK-NEXT: ]
 
 /// --------Swift module A
-// CHECK-LABEL: "modulePath": "A.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
@@ -145,7 +145,7 @@ import SubE
 
 /// --------Swift module E
 // CHECK: "swift": "E"
-// CHECK-LABEL: modulePath": "E.swiftmodule"
+// CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "Swift"
@@ -154,7 +154,7 @@ import SubE
 // CHECK-SAME: E.swiftinterface
 
 /// --------Swift module F
-// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
@@ -170,7 +170,7 @@ import SubE
 // CHECK-NEXT: ],
 
 /// --------Swift module G
-// CHECK-LABEL: "modulePath": "G.swiftmodule"
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
 // CHECK-NEXT:   "clang": "G"
@@ -202,7 +202,7 @@ import SubE
 // CHECK_CLANG_TARGET-NEXT:   ]
 
 /// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "Swift.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
@@ -210,6 +210,10 @@ import SubE
 
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "B.pcm"
+// CHECK: "contextHash": [[B_CONTEXT:"{{.*}}"]],
+// CHECK: "-o"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "%t/clang-module-cache/B-[[B_CONTEXT]].pcm",
 
 // CHECK-NEXT: sourceFiles
 // CHECK-DAG: module.modulemap
@@ -222,7 +226,11 @@ import SubE
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
-
+// CHECK: "contextHash": [[SHIMS_CONTEXT:"{{.*}}"]],
+// CHECK: "-o"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "%t/clang-module-cache/SwiftShims-[[SHIMS_CONTEXT]].pcm",
+// CHECK: "-fmodule-file=A=%t/clang-module-cache/A-{{.*}}.pcm"
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies

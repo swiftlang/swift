@@ -127,7 +127,7 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static sourcekitd_uid_t Kind##Refactoring##KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -252,7 +252,7 @@ static void skt_main(skt_args *args) {
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -583,7 +583,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   }
 
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
-  if (Opts.SourceText.hasValue()) {
+  if (Opts.SourceText.has_value()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(*Opts.SourceText, Opts.SourceFile);
   } else if (!SourceFile.empty()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(
@@ -806,7 +806,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::KIND:                                                 \
     setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
     break;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
   case SourceKitRequest::MarkupToXML: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMarkupToXML);
@@ -883,8 +883,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -893,8 +891,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, true);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -903,8 +899,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -927,16 +921,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
       sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     }
-    break;
-
-  case SourceKitRequest::SyntaxTree:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
-                                          KindSyntaxTreeFull);
-    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, true);
     break;
 
   case SourceKitRequest::DocInfo:
@@ -967,7 +951,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
-                                       Opts.ReplaceText.getValue().c_str());
+                                       Opts.ReplaceText.value().c_str());
     addRequestOptionsDirect(Req, Opts);
     break;
 
@@ -1167,11 +1151,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyFilePath,
                                              Opts.HeaderPath.c_str());
   }
-  if (Opts.CancelOnSubsequentRequest.hasValue()) {
+  if (Opts.CancelOnSubsequentRequest.has_value()) {
     sourcekitd_request_dictionary_set_int64(Req, KeyCancelOnSubsequentRequest,
                                             *Opts.CancelOnSubsequentRequest);
   }
-  if (Opts.SimulateLongRequest.hasValue()) {
+  if (Opts.SimulateLongRequest.has_value()) {
     sourcekitd_request_dictionary_set_int64(Req, KeySimulateLongRequest,
                                             *Opts.SimulateLongRequest);
   }
@@ -1408,17 +1392,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printFoundUSR(Info, SourceBuf.get(), llvm::outs());
       break;
 
-    case SourceKitRequest::SyntaxTree: {
-      // Print only the serialized syntax tree.
-      llvm::outs() << sourcekitd_variant_dictionary_get_string(
-        sourcekitd_response_get_value(Resp), KeySerializedSyntaxTree);
-      llvm::outs() << '\n';
-      break;
-    }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       printRawResponse(Resp);
-      if (Opts.ReplaceText.hasValue()) {
+      if (Opts.ReplaceText.has_value()) {
         unsigned Offset =
             resolveFromLineCol(Opts.Line, Opts.Col, SourceFile, Opts.VFSFiles);
         unsigned Length = Opts.Length;
@@ -1431,7 +1408,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         sourcekitd_request_dictionary_set_int64(EdReq, KeyOffset, Offset);
         sourcekitd_request_dictionary_set_int64(EdReq, KeyLength, Length);
         sourcekitd_request_dictionary_set_string(EdReq, KeySourceText,
-                                           Opts.ReplaceText.getValue().c_str());
+                                           Opts.ReplaceText.value().c_str());
         bool EnableSyntaxMax = Opts.Request == SourceKitRequest::SyntaxMap;
         bool EnableSubStructure = Opts.Request == SourceKitRequest::Structure;
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableSyntaxMap,
@@ -1496,7 +1473,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         printModuleGroupNames(Info, llvm::outs());
         break;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
       case SourceKitRequest::SyntacticRename:
         printSyntacticRenameEdits(Info, llvm::outs());
         break;
@@ -2134,15 +2111,15 @@ static void printFoundUSR(sourcekitd_variant_t Info,
   if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL)
     Offset = sourcekitd_variant_int64_get_value(OffsetObj);
 
-  if (!Offset.hasValue()) {
+  if (!Offset.has_value()) {
     OS << "USR NOT FOUND\n";
     return;
   }
 
   int64_t Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
 
-  auto LineCol1 = resolveToLineCol(Offset.getValue(), SourceBuf);
-  auto LineCol2 = resolveToLineCol(Offset.getValue() + Length, SourceBuf);
+  auto LineCol1 = resolveToLineCol(Offset.value(), SourceBuf);
+  auto LineCol2 = resolveToLineCol(Offset.value() + Length, SourceBuf);
   OS << '(' << LineCol1.first << ':' << LineCol1.second << '-'
             << LineCol2.first << ':' << LineCol2.second << ")\n";
 }

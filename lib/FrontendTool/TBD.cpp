@@ -21,7 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/TBDGen/TBDGen.h"
+#include "swift/IRGen/TBDGen.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"

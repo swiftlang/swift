@@ -482,10 +482,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::HasSymbolInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
+    return RuntimeEffect::NoEffect;
+  case SILInstructionKind::TestSpecificationInst:
+    // Ignore runtime calls of test-only instructions
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::GetAsyncContinuationInst:

@@ -17,8 +17,11 @@ extern "C" {
 
 #define CF_OPTIONS(_type, _name) _type __attribute__((availability(swift, unavailable))) _name; enum __CF_OPTIONS_ATTRIBUTES : _name
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
+#define NS_REFINED_FOR_SWIFT __attribute__((swift_private))
+#define UIKIT_EXTERN extern "C" __attribute__((visibility("default")))
 
 typedef unsigned long NSUInteger;
+typedef long NSInteger;
 
 typedef NS_OPTIONS(NSUInteger, NSBinarySearchingOptions) {
 	NSBinarySearchingFirstEqual = (1UL << 8),
@@ -26,4 +29,52 @@ typedef NS_OPTIONS(NSUInteger, NSBinarySearchingOptions) {
 	NSBinarySearchingInsertionIndex = (1UL << 10),
 };
 
+typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
+  NSAttributedStringFormattingInsertArgumentAttributesWithoutMerging = 1 << 0,
+  NSAttributedStringFormattingApplyReplacementIndexAttribute = 1 << 1,
+} NS_REFINED_FOR_SWIFT;
+
+@interface NSAttributedString
+@end
+
+@interface NSAttributedString (NSAttributedStringFormatting)
+- (instancetype)initWithOptions:(NSAttributedStringFormattingOptions)options
+    NS_REFINED_FOR_SWIFT;
+@end
+
+UIKIT_EXTERN
+@interface UIPrinter
+
+typedef NS_OPTIONS(NSInteger, UIPrinterJobTypes) {
+  UIPrinterJobTypeUnknown = 0,
+  UIPrinterJobTypeDocument = 1 << 0,
+  UIPrinterJobTypeEnvelope = 1 << 1,
+  UIPrinterJobTypeLabel = 1 << 2,
+  UIPrinterJobTypePhoto = 1 << 3,
+  UIPrinterJobTypeReceipt = 1 << 4,
+  UIPrinterJobTypeRoll = 1 << 5,
+  UIPrinterJobTypeLargeFormat = 1 << 6,
+  UIPrinterJobTypePostcard = 1 << 7
+};
+
+@end
 }
+
+typedef NS_OPTIONS(NSUInteger, Foo) {
+  NS_SWIFT_NAMED_OptionOne __attribute__((swift_name("SwiftOptionOne"))) = 0,
+  NS_SWIFT_NAMED_OptionTwo __attribute__((swift_name("SwiftOptionTwo"))) = 1
+                                                                           << 0,
+  NS_SWIFT_NAMED_OptionThree
+  __attribute__((swift_name("SwiftOptionThree"))) = 1 << 1,
+  NS_SWIFT_NAMED_OptionFour
+  __attribute__((swift_name("SwiftOptionFour"))) = NS_SWIFT_NAMED_OptionOne |
+                                                   NS_SWIFT_NAMED_OptionTwo
+};
+
+typedef NS_OPTIONS(NSUInteger, Bar) {
+  API_NOTES_NAMED_OptionOne = 0,
+  API_NOTES_NAMED_OptionTwo = 1 << 0,
+  API_NOTES_NAMED_OptionThree = 1 << 1,
+  API_NOTES_NAMED_OptionFour = API_NOTES_NAMED_OptionOne |
+                               API_NOTES_NAMED_OptionTwo
+};

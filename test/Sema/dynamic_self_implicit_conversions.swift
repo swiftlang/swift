@@ -40,8 +40,6 @@ class B: A {
     // CHECK-NOT: covariant_function_conversion_expr {{.*}} location={{.*}}.swift:[[@LINE+2]]
     // CHECK: covariant_return_conversion_expr implicit type='Self' location={{.*}}.swift:[[@LINE+1]]
     _ = self.method
-    // CHECK: covariant_function_conversion_expr implicit type='() -> Self' location={{.*}}.swift:[[@LINE+1]]
-    _ = self.init
     // CHECK: covariant_return_conversion_expr implicit type='Self' location={{.*}}.swift:[[@LINE+1]]
     _ = self.init()
     // CHECK: covariant_return_conversion_expr implicit type='Self' location={{.*}}.swift:[[@LINE+1]]

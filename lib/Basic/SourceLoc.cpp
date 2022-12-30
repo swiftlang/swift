@@ -34,12 +34,12 @@ void SourceManager::verifyAllBuffers() const {
   }
 }
 
-SourceLoc SourceManager::getCodeCompletionLoc() const {
-  if (CodeCompletionBufferID == 0U)
+SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
+  if (IDEInspectionTargetBufferID == 0U)
     return SourceLoc();
 
-  return getLocForBufferStart(CodeCompletionBufferID)
-      .getAdvancedLoc(CodeCompletionOffset);
+  return getLocForBufferStart(IDEInspectionTargetBufferID)
+      .getAdvancedLoc(IDEInspectionTargetOffset);
 }
 
 StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
@@ -252,6 +252,32 @@ StringRef SourceManager::extractText(CharSourceRange Range,
                        Range.getByteLength());
 }
 
+void SourceManager::setGeneratedSourceInfo(
+    unsigned bufferID, GeneratedSourceInfo info
+) {
+  assert(GeneratedSourceInfos.count(bufferID) == 0);
+  GeneratedSourceInfos[bufferID] = info;
+
+  switch (info.kind) {
+  case GeneratedSourceInfo::MacroExpansion:
+    break;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    // Keep track of the replaced range.
+    ReplacedRanges[info.originalSourceRange] = info.generatedSourceRange;
+    break;
+  }
+}
+
+Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
+    unsigned bufferID
+) const {
+  auto known = GeneratedSourceInfos.find(bufferID);
+  if (known == GeneratedSourceInfos.end())
+    return None;
+  return known->second;
+}
+
 Optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
@@ -271,13 +297,13 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
 
 unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
   auto Id = findBufferContainingLocInternal(Loc);
-  if (Id.hasValue())
+  if (Id.has_value())
     return *Id;
   llvm_unreachable("no buffer containing location found");
 }
 
 bool SourceManager::isOwning(SourceLoc Loc) const {
-  return findBufferContainingLocInternal(Loc).hasValue();
+  return findBufferContainingLocInternal(Loc).has_value();
 }
 
 void SourceRange::widen(SourceRange Other) {
@@ -384,7 +410,7 @@ SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
   auto BegOffset = resolveFromLineCol(BufferId, Line, 0);
   auto EndOffset = resolveFromLineCol(BufferId, Line, ~0u);
   if (BegOffset && EndOffset) {
-     return EndOffset.getValue() - BegOffset.getValue();
+     return EndOffset.value() - BegOffset.value();
   }
   return None;
 }
@@ -440,7 +466,7 @@ SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
   if (BufferId == 0u)
     return SourceLoc();
   auto Offset = resolveFromLineCol(BufferId, Line, Col);
-  if (!Offset.hasValue())
+  if (!Offset.has_value())
     return SourceLoc();
   return getLocForOffset(BufferId, *Offset);
 }

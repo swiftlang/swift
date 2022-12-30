@@ -387,7 +387,9 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   // Acquire the status record lock of parent - we want to synchronize with
   // concurrent cancellation or escalation as we're adding new tasks to the
   // group.
-  auto parent = swift_task_getCurrent();
+  auto parent = child->childFragment()->getParent();
+  assert(parent == swift_task_getCurrent());
+
   withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
     group->addChildTask(child);
 
@@ -400,6 +402,18 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
     // child task to a TaskGroupRecord instead, we synchronize on the
     // parent's task status and then update the child.
     updateNewChildWithParentAndGroupState(child, parentStatus, group);
+  });
+}
+
+void swift::_swift_taskGroup_detachChild(TaskGroup *group,
+                                         AsyncTask *child) {
+  // We are called synchronously from the perspective of the owning task.
+  // That doesn't necessarily mean the owning task *is* the current task,
+  // though, just that it's not concurrently running.
+  auto parent = child->childFragment()->getParent();
+
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
+    group->removeChildTask(child);
   });
 }
 
@@ -421,10 +435,12 @@ static void performCancellationAction(TaskStatusRecord *record) {
     return;
   }
 
+  // Task groups need their children to be cancelled.  Note that we do
+  // not want to formally cancel the task group itself; that property is
+  // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
-    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
-    for (AsyncTask *child: childRecord->children())
-      swift_task_cancel(child);
+    auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
+    _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
     return;
   }
 
@@ -491,22 +507,6 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     for (auto cur : newStatus.records()) {
       performCancellationAction(cur);
     }
-  });
-}
-
-SWIFT_CC(swift)
-static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
-  // Acquire the status record lock.
-  //
-  // Guaranteed to be called from the context of the parent task that created
-  // the task group once we have #40616
-  auto task = swift_task_getCurrent();
-  withStatusRecordLock(task, LockContext::OnTask,
-                       [&](ActiveTaskStatus &status) {
-    // We purposefully DO NOT make this a cancellation by itself.
-    // We are cancelling the task group, and all tasks it contains.
-    // We are NOT cancelling the entire parent task though.
-    performCancellationAction(group->getTaskRecord());
   });
 }
 

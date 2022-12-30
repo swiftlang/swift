@@ -39,7 +39,7 @@ func testAnonEnum() {
   verifyIsInt(&a)
 #elseif arch(i386) || arch(arm) || arch(arm64_32)
   verifyIsUInt64(&a)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
   verifyIsUInt(&a)
 #endif
 }

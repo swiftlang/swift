@@ -33,7 +33,7 @@ func consume<T>(_ t: T) {
   }
 }
 
-// CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
+// CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {{(section)?.*}}{
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(%swift.opaque* noalias nocapture %{{[0-9]+}}, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }>* @"$s4main5ValueVySiGMf" to %swift.full_type*), i32 0, i32 1))
 // CHECK: }
 func doit() {
@@ -42,7 +42,7 @@ func doit() {
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define{{( protected| dllexport)?}} swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, %swift.type* %1) #{{[0-9]+}} {
+// CHECK: define{{( protected| dllexport)?}} swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, %swift.type* %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE]], i8* undef, i8* undef, %swift.type_descriptor* bitcast ({{.+}}$s4main5ValueVMn{{.+}} to %swift.type_descriptor*), [[INT]]* @"$s4main5ValueVMz") #{{[0-9]+}}

@@ -366,7 +366,6 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
       AngleBrackets(AngleBrackets) {
     Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
-    assert(!GenericArgs.empty());
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
       assert(arg != nullptr);
@@ -740,6 +739,41 @@ private:
   SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return EllipsisLoc; }
   SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A pack reference spelled with the \c each keyword.
+///
+/// Pack references can only appear inside pack expansions and in
+/// generic requirements.
+///
+/// \code
+/// struct Generic<T...> {
+///   func f(value: (each T)...) where each T: P {}
+/// }
+/// \endcode
+class PackReferenceTypeRepr: public TypeRepr {
+  TypeRepr *PackType;
+  SourceLoc EachLoc;
+
+public:
+  PackReferenceTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
+    : TypeRepr(TypeReprKind::PackReference), PackType(packType),
+      EachLoc(eachLoc) {}
+
+  TypeRepr *getPackType() const { return PackType; }
+  SourceLoc getEachLoc() const { return EachLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::PackReference;
+  }
+  static bool classof(const PackReferenceTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return EachLoc; }
+  SourceLoc getEndLocImpl() const { return PackType->getEndLoc(); }
+  SourceLoc getLocImpl() const { return EachLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1337,6 +1371,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
+  case TypeReprKind::PackReference:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

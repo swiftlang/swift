@@ -495,16 +495,16 @@ private:
   template <typename T>
   void processKeyWithDefault(StringRef Key, Optional<T> &Val,
                              const Optional<T> &DefaultValue, bool Required) {
-    assert(!DefaultValue.hasValue() &&
+    assert(!DefaultValue.has_value() &&
            "Optional<T> shouldn't have a value!");
     void *SaveInfo;
     bool UseDefault;
-    const bool sameAsDefault = !Val.hasValue();
-    if (!Val.hasValue())
+    const bool sameAsDefault = !Val.has_value();
+    if (!Val.has_value())
       Val = T();
     if (this->preflightKey(Key, Required, sameAsDefault, UseDefault,
                            SaveInfo)) {
-      jsonize(*this, Val.getValue(), Required);
+      jsonize(*this, Val.value(), Required);
       this->postflightKey(SaveInfo);
     } else {
       if (UseDefault)

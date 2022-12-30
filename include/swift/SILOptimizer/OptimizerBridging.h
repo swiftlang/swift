@@ -40,6 +40,13 @@ typedef struct {
   void * _Nullable bca;
 } BridgedCalleeAnalysis;
 
+typedef bool (* _Nonnull InstructionIsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
+typedef BridgedMemoryBehavior(* _Nonnull CalleeAnalysisGetMemBehvaiorFn)(
+      BridgedPassContext context, BridgedInstruction apply, bool observeRetains);
+
+void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn,
+                             CalleeAnalysisGetMemBehvaiorFn getEffectsFn);
+
 typedef struct {
   void * _Nullable dea;
 } BridgedDeadEndBlocksAnalysis;
@@ -73,14 +80,6 @@ typedef struct {
 enum {
   BridgedSlabCapacity = 64 * sizeof(uintptr_t)
 };
-
-typedef struct {
-  void * _Nullable rcia;
-} BridgedRCIdentityAnalysis;
-
-typedef struct {
-  void * _Nonnull functionInfo;
-} BridgedRCIdentityFunctionInfo;
 
 typedef void (* _Nonnull BridgedModulePassRunFn)(BridgedPassContext);
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
@@ -127,6 +126,18 @@ BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context);
 SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated);
+
+typedef BridgedMemoryBehavior (* _Nonnull AliasAnalysisGetMemEffectFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2InstFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2ValFn)(
+      BridgedPassContext context, BridgedValue, BridgedValue);
+
+void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
+                            AliasAnalysisEscaping2InstFn isObjReleasedFn,
+                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValFn mayPointToSameAddrFn);
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
@@ -185,6 +196,7 @@ OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
 SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
+SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

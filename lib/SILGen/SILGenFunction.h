@@ -30,6 +30,7 @@
 namespace swift {
 
 class ParameterList;
+class ProfileCounterRef;
 
 namespace Lowering {
 
@@ -486,6 +487,9 @@ public:
   /// Emit code to increment a counter for profiling.
   void emitProfilerIncrement(ASTNode Node);
 
+  /// Emit code to increment a counter for profiling.
+  void emitProfilerIncrement(ProfileCounterRef Ref);
+
   /// Load the profiled execution count corresponding to \p Node, if one is
   /// available.
   ProfileCounter loadProfilerCount(ASTNode Node) const;
@@ -751,6 +755,12 @@ public:
   /// Generate a nullary function that returns the value of the given variable's
   /// expression initializer.
   void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
+
+  /// Generate a nullary function that has the given result interface type and
+  /// body.
+  void emitGeneratorFunction(SILDeclRef function, Type resultInterfaceType,
+                             BraceStmt *body,
+                             Optional<AbstractionPattern> pattern = None);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -1050,7 +1060,9 @@ public:
 
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
-  SILValue emitSelfDecl(VarDecl *selfDecl);
+  ///
+  /// This is intended to only be used for destructors.
+  SILValue emitSelfDeclForDestructor(VarDecl *selfDecl);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
@@ -1750,10 +1762,6 @@ public:
   RValue emitApplyAllocatingInitializer(SILLocation loc, ConcreteDeclRef init,
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
-
-  RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
-                         ArgumentSource &&self, PreparedArguments &&args,
-                         SGFContext C);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,

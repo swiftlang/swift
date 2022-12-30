@@ -116,7 +116,7 @@ endif()
 if(SWIFT_HOST_VARIANT_ARCH)
   set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 else()
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
     if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
@@ -577,13 +577,6 @@ option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
   "Enable global isel on arm64"
   FALSE)
 
-cmake_dependent_option(SWIFT_BUILD_SYNTAXPARSERLIB
-  "Build the Swift Syntax Parser library" TRUE
-  "SWIFT_ENABLE_DISPATCH" FALSE)
-cmake_dependent_option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  "Only build the Swift Syntax Parser library" FALSE
-  "SWIFT_BUILD_SYNTAXPARSERLIB" FALSE)
-
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
   "Build SourceKit" TRUE
   "SWIFT_ENABLE_DISPATCH" FALSE)
@@ -642,13 +635,13 @@ set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   # Only build libdispatch for the host if the host tools are being built and
   # specifically if these two libraries that depend on it are built.
-  if(SWIFT_INCLUDE_TOOLS AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
+  if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SOURCEKIT)
     set(SWIFT_BUILD_HOST_DISPATCH TRUE)
   endif()
 
   if(SWIFT_BUILD_HOST_DISPATCH OR SWIFT_CONCURRENCY_USES_DISPATCH)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SyntaxParserLib, SourceKit, and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SourceKit and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()
@@ -1183,7 +1176,7 @@ endif()
 # declares the swift-stdlib-* set of targets. These targets will then
 # implicitly depend on any targets declared with IS_STDLIB.
 #
-# https://bugs.swift.org/browse/SR-5975
+# https://github.com/apple/swift/issues/48534
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
@@ -1223,7 +1216,7 @@ if(SWIFT_INCLUDE_TOOLS)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
-  # https://bugs.swift.org/browse/SR-5975
+  # https://github.com/apple/swift/issues/48534
   add_subdirectory(tools)
 
   # Localization targets are configured in a way that assume the swift

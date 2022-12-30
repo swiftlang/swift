@@ -358,10 +358,10 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
   // CHECK:      [[DONE]]:
-  copy_addr [take] %a to [initialization] %b : $*EitherOr<T, Builtin.Int64>
+  copy_addr [take] %a to [init] %b : $*EitherOr<T, Builtin.Int64>
 
   copy_addr [take] %a to                  %b : $*EitherOr<T, Builtin.Int64>
-  copy_addr        %a to [initialization] %b : $*EitherOr<T, Builtin.Int64>
+  copy_addr        %a to [init] %b : $*EitherOr<T, Builtin.Int64>
   copy_addr        %a to                  %b : $*EitherOr<T, Builtin.Int64>
 
   return undef : $()
@@ -395,7 +395,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
   // CHECK:      [[DONE]]:
-  copy_addr [take] %a to [initialization] %b : $*EitherOr<T, C>
+  copy_addr [take] %a to [init] %b : $*EitherOr<T, C>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
   // CHECK:        switch i32 [[TAG]], label %[[TRIVIAL:[0-9]+]] [
@@ -413,7 +413,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
   // CHECK:      [[DONE]]:
-  copy_addr        %a to [initialization] %b : $*EitherOr<T, C>
+  copy_addr        %a to [init] %b : $*EitherOr<T, C>
 
   return undef : $()
 }

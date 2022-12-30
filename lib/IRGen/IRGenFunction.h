@@ -118,7 +118,7 @@ public:
   Address getCallerErrorResultSlot();
 
   /// Set the error result slot for the current function.
-  void setCallerErrorResultSlot(llvm::Value *address);
+  void setCallerErrorResultSlot(Address address);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -184,9 +184,9 @@ private:
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  llvm::Value *CalleeErrorResultSlot = nullptr;
-  llvm::Value *AsyncCalleeErrorResultSlot = nullptr;
-  llvm::Value *CallerErrorResultSlot = nullptr;
+  Address CalleeErrorResultSlot;
+  Address AsyncCalleeErrorResultSlot;
+  Address CallerErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
@@ -218,7 +218,6 @@ public:
                        const llvm::Twine &name = "");
   Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
                        const llvm::Twine &name = "");
-  Address createFixedSizeBufferAlloca(const llvm::Twine &name);
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
   StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
@@ -259,16 +258,12 @@ public:
                                               Address addr,
                                               bool isFar);
 
-  llvm::Value *
-  emitLoadOfRelativeIndirectablePointer(Address addr, bool isFar,
-                                        llvm::PointerType *expectedType,
-                                        const llvm::Twine &name = "");
   llvm::Value *emitLoadOfRelativePointer(Address addr, bool isFar,
-                                         llvm::PointerType *expectedType,
+                                         llvm::Type *expectedPointedToType,
                                          const llvm::Twine &name = "");
   llvm::Value *
   emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
-                                   llvm::PointerType *expectedType,
+                                   llvm::Type *expectedPointedToType,
                                    const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
@@ -352,6 +347,8 @@ public:
   FunctionPointer emitValueWitnessFunctionRef(SILType type,
                                               llvm::Value *&metadataSlot,
                                               ValueWitness index);
+
+  llvm::Value *emitPackShapeExpression(CanType type);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
@@ -526,8 +523,8 @@ public:
   void emitErrorStrongRetain(llvm::Value *value);
   void emitErrorStrongRelease(llvm::Value *value);
 
-  llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull);
+  llvm::Value *emitIsUniqueCall(llvm::Value *value, ReferenceCounting style,
+                                SourceLoc loc, bool isNonNull);
 
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);

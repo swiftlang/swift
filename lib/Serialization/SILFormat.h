@@ -158,6 +158,7 @@ namespace sil_block {
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
     SIL_INST_INCREMENT_PROFILER_COUNTER,
     SIL_MOVEONLY_DEINIT,
+    SIL_INST_HAS_SYMBOL,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -293,6 +294,7 @@ namespace sil_block {
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class
                      BCFixed<1>,  // is distributed
+                     BCFixed<1>,  // is runtime accessible
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -320,6 +322,7 @@ namespace sil_block {
       BCRecordLayout<SIL_ARG_EFFECTS_ATTR,
                      IdentifierIDField, // argument effects string
                      BCVBR<8>,          // argumentIndex
+                     BCFixed<1>,        // argumentIndexValid
                      BCFixed<1>         // isDerived
                      >;
 
@@ -527,6 +530,12 @@ namespace sil_block {
     IdentifierIDField,       // PGO func hash
     BCVBR<8>,                // counter index
     BCVBR<8>                 // num counters
+  >;
+
+  using SILInstHasSymbolLayout = BCRecordLayout<
+    SIL_INST_HAS_SYMBOL,
+    ValueIDField,               // decl
+    BCArray<IdentifierIDField>  // referenced functions
   >;
 }
 

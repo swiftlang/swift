@@ -261,6 +261,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
 #include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#include "swift/ConstExtract/ConstExtractTypeIDZone.def"
 #undef SWIFT_REQUEST
 
 #define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)

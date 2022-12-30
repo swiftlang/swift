@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-move-kills-copyable-values-checker | %FileCheck %s
+// RUN: %target-sil-opt %s -enable-experimental-move-only -sil-move-kills-copyable-values-checker | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 

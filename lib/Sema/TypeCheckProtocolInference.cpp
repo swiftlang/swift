@@ -317,8 +317,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
             for (auto &reqt : witnessContext->getGenericSignatureOfContext()
                                             .getRequirements()) {
               switch (reqt.getKind()) {
-              case RequirementKind::SameCount:
-                llvm_unreachable("Same-count requirement not supported here");
+              case RequirementKind::SameShape:
+                llvm_unreachable("Same-shape requirement not supported here");
 
               case RequirementKind::Conformance:
               case RequirementKind::Superclass:
@@ -1070,8 +1070,8 @@ static void sanitizeProtocolRequirements(
 
   for (const auto &req : requirements) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
@@ -1254,7 +1254,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         // for substitutions into other tentative type witnesses.
         typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
 
-        abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
+        abstractTypeWitnesses.push_back(std::move(typeWitness.value()));
         continue;
       }
 
@@ -1709,7 +1709,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
   if (!sig1 || !sig2)
     return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(/*type sequence*/ false,
+  auto selfParam = GenericTypeParamType::get(/*isParameterPack*/ false,
                                              /*depth*/ 0, /*index*/ 0,
                                              decl1->getASTContext());
 
@@ -1738,7 +1738,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       class1 = reqt.getSecondType();
       break;
 
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
       break;
@@ -1771,7 +1771,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       class2 = reqt.getSecondType();
       break;
 
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
       break;

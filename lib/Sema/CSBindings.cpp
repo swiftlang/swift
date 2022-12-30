@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
@@ -498,7 +499,7 @@ void BindingSet::finalize(
       if (!hasViableBindings()) {
         inferTransitiveProtocolRequirements(inferredBindings);
 
-        if (TransitiveProtocols.hasValue()) {
+        if (TransitiveProtocols.has_value()) {
           for (auto *constraint : *TransitiveProtocols) {
             auto protocolTy = constraint->getSecondType();
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
@@ -1065,6 +1066,14 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   return !involvesTypeVariables();
 }
 
+bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
+  if (CS.shouldAttemptFixes() && isHole()) {
+    if (forClosureResult() || forGenericParameter())
+      return false;
+  }
+  return true;
+}
+
 BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
                                             bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
@@ -1281,6 +1290,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     switch (constraint->getKind()) {
     case ConstraintKind::Subtype:
+    case ConstraintKind::SubclassOf:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
@@ -1358,6 +1368,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
+  case ConstraintKind::SubclassOf:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
@@ -1394,8 +1405,47 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::Conjunction:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::ShapeOf:
+  case ConstraintKind::ExplicitGenericArguments:
     // Constraints from which we can't do anything.
     break;
+
+  case ConstraintKind::PackElementOf: {
+    auto elementType = CS.simplifyType(constraint->getFirstType());
+    auto packType = CS.simplifyType(constraint->getSecondType());
+
+    auto *loc = constraint->getLocator();
+    auto openedElement  =
+        loc->getLastElementAs<LocatorPathElt::OpenedPackElement>();
+
+    if (elementType->isTypeVariableOrMember() && packType->isTypeVariableOrMember())
+      break;
+
+    auto *elementVar = elementType->getAs<TypeVariableType>();
+    auto *packVar = packType->getAs<TypeVariableType>();
+
+    if (elementVar == TypeVar && !packVar) {
+      // Produce a potential binding to the opened element archetype corresponding
+      // to the pack type.
+      packType = packType->mapTypeOutOfContext();
+      auto *elementEnv = openedElement->getGenericEnvironment();
+      auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
+      addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
+
+      break;
+    } else if (packVar == TypeVar && !elementVar) {
+      // Produce a potential binding to the pack archetype corresponding to
+      // the opened element type.
+      auto *packEnv = CS.DC->getGenericEnvironmentOfContext();
+      elementType = elementType->mapTypeOutOfContext();
+      auto patternType = packEnv->mapElementTypeIntoPackContext(elementType);
+      addPotentialBinding({patternType, AllowedBindingKind::Exact, constraint});
+
+      break;
+    }
+
+    break;
+  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
@@ -2204,8 +2254,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.insert(srcLocator);
 
+    // Fail if hole reporting fails.
     if (type->isPlaceholder() && reportHole())
-      return true;
+      return false;
   }
 
   if (cs.simplify())

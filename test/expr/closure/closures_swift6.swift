@@ -91,9 +91,18 @@ public class TestImplicitSelfForWeakSelfCapture {
       guard let self = self else { return }
       method()
     }
+
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      method()
+    }
     
     doVoidStuff { [weak self] in
       if let self = self {
+        method()
+      }
+
+      if let self {
         method()
       }
     }

@@ -1242,12 +1242,11 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getSrc()),
-                                      getOpValue(Inst->getDest()),
-                                      getOpValue(Inst->getInitializer()),
-                                      getOpValue(Inst->getSetter()),
-                                      Inst->getMode()));
+      Inst, getBuilder().createAssignByWrapper(
+                getOpLocation(Inst->getLoc()), Inst->getOriginator(),
+                getOpValue(Inst->getSrc()), getOpValue(Inst->getDest()),
+                getOpValue(Inst->getInitializer()),
+                getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
 template<typename ImplClass>
@@ -2632,6 +2631,15 @@ void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
                               Inst->getNumCounters(), Inst->getPGOFuncHash()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTestSpecificationInst(
+    TestSpecificationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createTestSpecificationInst(
+                                    getOpLocation(Inst->getLoc()),
+                                    Inst->getArgumentsSpecification()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
@@ -3093,6 +3101,14 @@ void SILCloner<ImplClass>
                           getBuilder().createExtractExecutor(
                             getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getExpectedExecutor())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitHasSymbolInst(HasSymbolInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createHasSymbol(getOpLocation(Inst->getLoc()),
+                                         Inst->getDecl()));
 }
 
 } // end namespace swift

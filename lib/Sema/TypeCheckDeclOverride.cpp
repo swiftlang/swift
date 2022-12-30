@@ -1573,6 +1573,7 @@ namespace  {
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
+    UNINTERESTING_ATTR(ObjCImplementation)
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
     UNINTERESTING_ATTR(RestatedObjCConformance)
@@ -1610,7 +1611,6 @@ namespace  {
     UNINTERESTING_ATTR(NoImplicitCopy)
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
-    UNINTERESTING_ATTR(TypeSequence)
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
@@ -1623,6 +1623,8 @@ namespace  {
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
+
+    UNINTERESTING_ATTR(RuntimeMetadata)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

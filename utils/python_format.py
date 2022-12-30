@@ -35,7 +35,6 @@ _KNOWN_SCRIPT_PATHS = [
     _SWIFT_PATH / "test/Driver/Inputs/fake-toolchain/ld",
     _SWIFT_PATH / "utils/80+-check",
     _SWIFT_PATH / "utils/backtrace-check",
-    _SWIFT_PATH / "utils/build-parser-lib",
     _SWIFT_PATH / "utils/build-script",
     _SWIFT_PATH / "utils/check-incremental",
     _SWIFT_PATH / "utils/coverage/coverage-build-db",
@@ -113,7 +112,7 @@ def parse_args():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Don't format the file, just return the status.",
+        help="Don't write the files back, just return the status.",
     )
 
     parser.add_argument(
@@ -121,6 +120,19 @@ def parse_args():
         "--verbose",
         action="store_true",
         help="Emit messages to stderr about files that were not changed.",
+    )
+
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="Don't write the files back, just output a diff for each file on stdout.",
+    )
+
+    parser.add_argument(
+        "-S",
+        "--skip-string-normalization",
+        action="store_true",
+        help="Don't normalize string quotes or prefixes.",
     )
 
     return parser.parse_args()
@@ -138,13 +150,17 @@ def main():
         "-m",
         "black",
         "--target-version",
-        "py27",
+        "py38",
     ]
 
     if args.check:
         command.append("--check")
     if args.verbose:
         command.append("--verbose")
+    if args.diff:
+        command.append("--diff")
+    if args.skip_string_normalization:
+        command.append("--skip-string-normalization")
 
     requested_paths = [path.resolve() for path in args.paths]
 

@@ -24,7 +24,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "ReadAccessor",
     runFunction: run_ReadAccessor,
-    tags: [.validation, .bridging],
+    tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: {
         vec = initVector()
     })

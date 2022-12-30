@@ -559,7 +559,7 @@ public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
-        BufferID(SF ? SF->getBufferID().getValueOr(-1) : -1),
+        BufferID(SF ? SF->getBufferID().value_or(-1) : -1),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {
@@ -661,7 +661,7 @@ private:
         LabelIndex++;
       }
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
-      auto *args = CallParent->getArgs();
+      auto *args = CallParent->getArgs()->getOriginalArgs();
       Args.append(args->begin(), args->end());
     }
 
@@ -1040,7 +1040,7 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
       auto BufID = SF->getBufferID();
-      if (BufID.hasValue() && *BufID == BufferID) {
+      if (BufID.has_value() && *BufID == BufferID) {
         SrcFile = SF;
         break;
       }
@@ -1104,19 +1104,19 @@ bool IndexSwiftASTWalker::visitImports(
       case FileUnitKind::Synthesized:
         break;
       case FileUnitKind::SerializedAST:
-        assert(!IsClangModuleOpt.hasValue() &&
+        assert(!IsClangModuleOpt.has_value() &&
                "cannot handle multi-file modules");
         IsClangModuleOpt = false;
         break;
       case FileUnitKind::ClangModule:
       case FileUnitKind::DWARFModule:
-        assert(!IsClangModuleOpt.hasValue() &&
+        assert(!IsClangModuleOpt.has_value() &&
                "cannot handle multi-file modules");
         IsClangModuleOpt = true;
         break;
       }
     }
-    if (!IsClangModuleOpt.hasValue())
+    if (!IsClangModuleOpt.has_value())
       continue;
     bool IsClangModule = *IsClangModuleOpt;
     // Use module real name in case module aliasing is used.
@@ -1632,7 +1632,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     if (D->isImplicit())
       Info.roles |= (unsigned)SymbolRole::Implicit;
     if (auto Group = D->getGroupName())
-      Info.group = Group.getValue();
+      Info.group = Group.value();
   }
 
   return false;
@@ -1653,7 +1653,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
   if (auto Group = ExtD->getGroupName())
-    Info.group = Group.getValue();
+    Info.group = Group.value();
   return false;
 }
 
@@ -1687,7 +1687,7 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   }
 
   if (auto Group = D->getGroupName())
-    Info.group = Group.getValue();
+    Info.group = Group.value();
   return false;
 }
 
@@ -1721,7 +1721,7 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   if (!CurrentE)
     return false;
 
-  AccessKind Kind = AccKind.hasValue() ? *AccKind : AccessKind::Read;
+  AccessKind Kind = AccKind.has_value() ? *AccKind : AccessKind::Read;
   switch (Kind) {
   case swift::AccessKind::Read:
     Info.roles |= (unsigned)SymbolRole::Read;

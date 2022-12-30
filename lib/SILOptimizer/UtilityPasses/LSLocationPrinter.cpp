@@ -93,7 +93,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
-          T.getValue().print(llvm::outs(), *M, TypeExpansionContext(Fn));
+          T.value().print(llvm::outs(), *M, TypeExpansionContext(Fn));
         }
         PPList.clear();
       }
@@ -128,7 +128,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
-          T.getValue().print(llvm::outs(), *M, TypeExpansionContext(Fn));
+          T.value().print(llvm::outs(), *M, TypeExpansionContext(Fn));
         }
         PPList.clear();
       }

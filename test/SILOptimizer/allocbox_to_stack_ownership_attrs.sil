@@ -14,7 +14,7 @@ bb0(%0 : $*T):
   %4c = mark_uninitialized [var] %4 : $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4c : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4copy = copy_value %4c : $<τ_0_0> { var τ_0_0 } <T>
-  copy_addr %0 to [initialization] %4a : $*T
+  copy_addr %0 to [init] %4a : $*T
   %6 = partial_apply %3<T>(%4copy) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   destroy_addr %0 : $*T
@@ -29,7 +29,7 @@ bb0(%0 : $*T):
 sil shared [ossa] @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 bb0(%0 : @_eagerMove $*T, %1 : @_eagerMove @owned $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %2 to [initialization] %0 : $*T
+  copy_addr %2 to [init] %0 : $*T
   destroy_value %1 : $<τ_0_0> { var τ_0_0 } <T>
   %5 = tuple ()
   return %5 : $()

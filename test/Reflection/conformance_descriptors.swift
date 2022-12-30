@@ -9,7 +9,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/Conformances.swift -parse-as-library -emit-module -emit-library -module-name ConformanceCheck -o %t/Conformances
-// RUN: %target-swift-reflection-dump -binary-filename %t/Conformances -binary-filename %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/Conformances %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
 
 // CHECK: CONFORMANCES:
 // CHECK: =============

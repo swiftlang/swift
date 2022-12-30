@@ -1,4 +1,4 @@
-f// RUN: %target-typecheck-verify-swift -parse -parse-stdlib -disable-availability-checking -verify-syntax-tree
+f// RUN: %target-typecheck-verify-swift -parse -parse-stdlib -disable-availability-checking
 
 import Swift
 

@@ -120,7 +120,7 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
 // merged block will be visited again to determine if it can be merged with it's
 // successor, and so on, so no edges are skipped.
 //
-// In rare cases, the predessor is merged with its earlier successor, which has
+// In rare cases, the predecessor is merged with its earlier successor, which has
 // already been visited. If the successor can also be merged, then it has
 // already happened, and there is no need to revisit the merged block.
 void SILGenFunction::mergeCleanupBlocks() {
@@ -150,7 +150,7 @@ void SILGenFunction::mergeCleanupBlocks() {
     auto beforeSucc = std::next(SILFunction::reverse_iterator(succBB));
 
     // Remember the position before the current predecessor to avoid skipping
-    // blocks or revisiting blocks unnecessarilly.
+    // blocks or revisiting blocks unnecessarily.
     auto beforePred = std::next(SILFunction::reverse_iterator(predBB));
     // Since succBB will be erased, move before it.
     if (beforePred == SILFunction::reverse_iterator(succBB))
@@ -752,7 +752,9 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     LexicalScope trueScope(SGF, S);
 
     auto NumTrueTaken = SGF.loadProfilerCount(S->getThenStmt());
-    auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
+    auto NumFalseTaken = ProfileCounter();
+    if (auto *Else = S->getElseStmt())
+      NumFalseTaken = SGF.loadProfilerCount(Else);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
                           NumFalseTaken);

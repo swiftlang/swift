@@ -145,7 +145,7 @@ static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
   StringRef disableArg = "-disallow-use-new-driver";
   StringRef disableEnv = "SWIFT_USE_OLD_DRIVER";
   auto shouldWarn = !llvm::sys::Process::
-    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").hasValue();
+    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").has_value();
   // If user specified using the old driver, don't forward.
   if (llvm::find_if(argv, [&](const char* arg) {
     return StringRef(arg) == disableArg;
@@ -154,7 +154,7 @@ static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableArg);
     return true;
   }
-  if (llvm::sys::Process::GetEnv(disableEnv).hasValue()) {
+  if (llvm::sys::Process::GetEnv(disableEnv).has_value()) {
     if (shouldWarn)
       diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableEnv);
     return true;

@@ -35,7 +35,8 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   // Clang declarations are public and can't be assured of having a
   // unique defining location.
-  if (isa<ClangModuleUnit>(fileContext))
+  if (isa<ClangModuleUnit>(fileContext) &&
+          !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
   switch (D->getEffectiveAccess()) {
@@ -163,7 +164,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     // a dependent type.
 
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Layout:
       continue;
 

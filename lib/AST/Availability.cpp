@@ -62,9 +62,9 @@ static bool
 mergeIntoInferredVersion(const Optional<llvm::VersionTuple> &Version,
                          Optional<llvm::VersionTuple> &Inferred,
                          MergeFunction Merge) {
-  if (Version.hasValue()) {
-    if (Inferred.hasValue()) {
-      Inferred = Merge(Inferred.getValue(), Version.getValue());
+  if (Version.has_value()) {
+    if (Inferred.has_value()) {
+      Inferred = Merge(Inferred.value(), Version.value());
       return *Inferred == *Version;
     } else {
       Inferred = Version;
@@ -102,11 +102,11 @@ createAvailableAttr(PlatformKind Platform,
                        ASTContext &Context) {
 
   llvm::VersionTuple Introduced =
-      Inferred.Introduced.getValueOr(llvm::VersionTuple());
+      Inferred.Introduced.value_or(llvm::VersionTuple());
   llvm::VersionTuple Deprecated =
-      Inferred.Deprecated.getValueOr(llvm::VersionTuple());
+      Inferred.Deprecated.value_or(llvm::VersionTuple());
   llvm::VersionTuple Obsoleted =
-      Inferred.Obsoleted.getValueOr(llvm::VersionTuple());
+      Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
   return new (Context) AvailableAttr(
       SourceLoc(), SourceRange(), Platform,
@@ -158,7 +158,7 @@ static bool isBetterThan(const AvailableAttr *newAttr,
 
   // If they belong to the same platform, the one that introduces later wins.
   if (prevAttr->Platform == newAttr->Platform)
-    return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
+    return prevAttr->Introduced.value() < newAttr->Introduced.value();
 
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr->Platform,
@@ -171,7 +171,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
+    if (AvailAttr == nullptr || !AvailAttr->Introduced.has_value() ||
         !AvailAttr->isActivePlatform(Ctx) ||
         AvailAttr->isLanguageVersionSpecific() ||
         AvailAttr->isPackageDescriptionVersionSpecific()) {
@@ -186,7 +186,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     return None;
 
   return AvailabilityContext{
-    VersionRange::allGTE(bestAvailAttr->Introduced.getValue()),
+    VersionRange::allGTE(bestAvailAttr->Introduced.value()),
     bestAvailAttr->IsSPI};
 }
 
@@ -230,6 +230,14 @@ bool Decl::isSemanticallyUnavailable() const {
   return evaluateOrDefault(eval, IsSemanticallyUnavailableRequest{this}, false);
 }
 
+bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
+    ASTContext &Ctx) const {
+  return RequiredDeploymentRange.getLowerEndpoint() <=
+         AvailabilityContext::forDeploymentTarget(Ctx)
+             .getOSVersion()
+             .getLowerEndpoint();
+}
+
 AvailabilityContext
 AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
                                                       ASTContext &ctx) {
@@ -237,7 +245,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
-    if (availAttr == nullptr || !availAttr->Introduced.hasValue() ||
+    if (availAttr == nullptr || !availAttr->Introduced.has_value() ||
         !availAttr->isActivePlatform(ctx) ||
         availAttr->isLanguageVersionSpecific() ||
         availAttr->isPackageDescriptionVersionSpecific()) {
@@ -250,7 +258,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
 
   if (bestAvailAttr) {
     return AvailabilityContext{
-      VersionRange::allGTE(bestAvailAttr->Introduced.getValue())
+      VersionRange::allGTE(bestAvailAttr->Introduced.value())
     };
   }
 
@@ -261,8 +269,8 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
                                                           ASTContext &Ctx) {
   Optional<AvailabilityContext> AnnotatedRange =
       annotatedAvailableRange(D, Ctx);
-  if (AnnotatedRange.hasValue()) {
-    return AnnotatedRange.getValue();
+  if (AnnotatedRange.has_value()) {
+    return AnnotatedRange.value();
   }
 
   // Unlike other declarations, extensions can be used without referring to them
@@ -276,8 +284,8 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
   DeclContext *DC = D->getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
     AnnotatedRange = annotatedAvailableRange(ED, Ctx);
-    if (AnnotatedRange.hasValue()) {
-      return AnnotatedRange.getValue();
+    if (AnnotatedRange.has_value()) {
+      return AnnotatedRange.value();
     }
   }
 

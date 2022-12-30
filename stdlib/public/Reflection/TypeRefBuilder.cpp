@@ -553,11 +553,11 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
       auto typeName = nodeToString(demangleTypeRef(typeRef));
       auto optionalMangledTypeName = normalizeReflectionName(typeRef);
       clearNodeFactory();
-      if (optionalMangledTypeName.hasValue()) {
+      if (optionalMangledTypeName.has_value()) {
         auto mangledTypeName =
-          optionalMangledTypeName.getValue();
-        if (forMangledTypeName.hasValue()) {
-          if (mangledTypeName != forMangledTypeName.getValue())
+          optionalMangledTypeName.value();
+        if (forMangledTypeName.has_value()) {
+          if (mangledTypeName != forMangledTypeName.value())
             continue;
         }
 
@@ -572,8 +572,8 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
             auto fieldTypeRef = readTypeRef(field, field->MangledTypeName);
             auto optionalMangledfieldTypeName =
                 normalizeReflectionName(fieldTypeRef);
-            if (optionalMangledfieldTypeName.hasValue()) {
-              mangledFieldTypeName = optionalMangledfieldTypeName.getValue();
+            if (optionalMangledfieldTypeName.has_value()) {
+              mangledFieldTypeName = optionalMangledfieldTypeName.value();
             }
             auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
             auto fieldTypeName = nodeToString(fieldTypeDemangleTree);

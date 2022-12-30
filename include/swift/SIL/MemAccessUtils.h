@@ -206,7 +206,7 @@ SILValue findOwnershipReferenceRoot(SILValue ref);
 
 /// Look through all ownership forwarding instructions to find the values which
 /// were originally borrowed.
-void findGuaranteedReferenceRoots(SILValue value,
+void findGuaranteedReferenceRoots(SILValue value, bool lookThroughNestedBorrows,
                                   SmallVectorImpl<SILValue> &roots);
 
 /// Find the aggregate containing the first owned root of the
@@ -232,11 +232,24 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
-/// Return true if \p instruction is a deinitialization barrier.
+/// Whether \p instruction accesses storage whose representation is unidentified
+/// such as by reading a pointer.
+bool mayAccessPointer(SILInstruction *instruction);
+
+/// Whether this instruction loads or copies a value whose storage does not
+/// increment the stored value's reference count.
+bool mayLoadWeakOrUnowned(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could involve a synchronization
+/// point like a memory barrier, lock or syscall.
+bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could be a barrier to hoisting
+/// destroys.
 ///
-/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow,
-/// destroy_value, and destroy_addr cannot be hoisted above them.
-bool isDeinitBarrier(SILInstruction *instruction);
+/// Does not consider function so effects, so every apply is treated as a
+/// barrier.
+bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
 
 } // end namespace swift
 
@@ -1894,6 +1907,8 @@ public:
 /// Clone all projections and casts on the access use-def chain until the
 /// checkBase predicate returns a valid base.
 ///
+/// Returns the cloned value equivalent to \p addr.
+///
 /// This will not clone ref_element_addr or ref_tail_addr because those aren't
 /// part of the access chain.
 ///
@@ -1901,7 +1916,7 @@ public:
 /// returns a valid SILValue to use as the base of the cloned access path, or an
 /// invalid SILValue to continue cloning.
 ///
-/// CheckBase must return a valid SILValue either before attempting to clone the
+/// CheckBase must return a valid SILValue before attempting to clone the
 /// access base. The most basic valid predicate is:
 ///
 ///    auto checkBase = [&](SILValue srcAddr) {
@@ -1916,6 +1931,8 @@ SILValue cloneUseDefChain(SILValue addr, SILInstruction *insertionPoint,
 
 /// Analog to cloneUseDefChain to check validity. begin_borrow and
 /// mark_dependence currently cannot be cloned.
+///
+/// Returns the cloned value equivalent to \p addr.
 template <typename CheckBase>
 bool canCloneUseDefChain(SILValue addr, CheckBase checkBase) {
   return AccessUseDefChainCloner<CheckBase>(checkBase, nullptr)

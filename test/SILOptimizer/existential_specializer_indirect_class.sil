@@ -21,13 +21,13 @@ bb0(%0 : $*ClassProtocol):
 
 // Check that all the opened types are optimized away in the specialization of test_indirect_class_protocol_guaranteed
 // CHECK-LABEL: sil shared @$s39test_indirect_class_protocol_guaranteedTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : ClassProtocol> (@in_guaranteed τ_0_0) -> ()
-// CHECK-NEXT: //
-// CHECK-NEXT: bb0(%0 : $*τ_0_0):
+// CHECK:        bb0(%0 : $*τ_0_0):
   // CHECK-NEXT: [[INPUT:%1]] = load %0
   // CHECK-NEXT: [[ARG:%.*]] = unchecked_ref_cast [[INPUT]]
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $C, #ClassProtocol.method
   // CHECK-NEXT: apply [[METHOD]]<C>([[ARG]])
   // CHECK-NEXT: return undef
+  // CHECK:      } // end sil function '$s39test_indirect_class_protocol_guaranteedTf4e_n'
   
 sil @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> () {
 bb0(%0 : $*ClassProtocol):
@@ -48,8 +48,9 @@ bb0(%0 : $*ClassProtocol):
 // Check the generated specialization of test_indirect_class_protocol
 // CHECK-LABEL: sil shared @$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5Tf4d_n : $@convention(thin) () -> ()
 // Make sure *everything* was inlined / optimized away
-// CHECK-NEXT: bb0:
+// CHECK:      bb0:
 // CHECK-NEXT: return undef
+// CHECK:      } // end sil function '$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5Tf4d_n'
 
 sil @invoke_indirect_class_protocol : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):

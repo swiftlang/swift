@@ -253,7 +253,7 @@ class SomeSwiftClass {
 
 // T must have a Swift layout, so we can load this metatype with a direct access.
 // CHECK-LABEL: define hidden swiftcc void @"$s22class_bounded_generics0a1_B9_metatype{{[_0-9a-zA-Z]*}}F"
-// CHECK:      [[T0:%.*]] = getelementptr inbounds %T22class_bounded_generics14SomeSwiftClassC, %T22class_bounded_generics14SomeSwiftClassC* {{%.*}}, i32 0, i32 0, i32 0
+// CHECK:      [[T0:%.*]] = bitcast %T22class_bounded_generics14SomeSwiftClassC* {{%.*}}
 // CHECK-NEXT: [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* [[T1]] to void (%swift.type*)**
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 10
@@ -299,7 +299,7 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
 // CHECK-LABEL: define hidden swiftcc void @"$s22class_bounded_generics029calls_archetype_with_generic_A11_constraint1ayAA1ACyxG_tlF"(%T22class_bounded_generics1AC* %0) {{.*}} {
 // CHECK:      alloca
 // CHECK:      memset
-// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T22class_bounded_generics1AC, %T22class_bounded_generics1AC* %0, i32 0, i32 0, i32 0
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC* %0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK:      [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10

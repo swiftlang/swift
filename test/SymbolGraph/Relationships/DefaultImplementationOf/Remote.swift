@@ -5,6 +5,13 @@
 // RUN: %FileCheck %s --input-file %t/Remote.symbols.json
 // RUN: %FileCheck %s --input-file %t/Remote.symbols.json --check-prefix MEMBER
 
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %S/Inputs/RemoteP.swift -module-name RemoteP -emit-module -emit-module-path %t/
+// RUN: %target-build-swift %s -module-name Remote -emit-module -emit-module-path %t/ -I %t
+// RUN: %target-swift-symbolgraph-extract -module-name Remote -I %t -pretty-print -output-dir %t -emit-extension-block-symbols
+// RUN: %FileCheck %s --input-file %t/Remote.symbols.json
+// RUN: %FileCheck %s --input-file %t/Remote.symbols.json --check-prefix MEMBER
+
 import RemoteP
 
 public protocol LocalP: RemoteP {}
@@ -13,8 +20,9 @@ public extension LocalP {
     func someFunc() {}
 }
 
-// default implementations that are for protocols in a different module should have a `memberOf`
-// relation linking them to a local symbol, if one exists
+// Default implementations that are for protocols in a different module should have a `memberOf`
+// relation linking them to a local symbol. If the default implementation is defined on a local
+// protocol, this local protocol is the target of the memberOf relationship.
 
 // CHECK:           "kind": "defaultImplementationOf"
 // CHECK-NEXT:      "source": "s:6Remote6LocalPPAAE8someFuncyyF"

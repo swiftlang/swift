@@ -683,7 +683,7 @@ swift::matchWitness(
 
     // Check that the witness has no more effects than the requirement.
     if (auto problem = checkEffects(witnessASD, reqASD))
-      return problem.getValue();
+      return problem.value();
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
@@ -725,7 +725,7 @@ swift::matchWitness(
     Optional<RequirementMatch> result;
     std::tie(result, reqType, witnessType) = setup();
     if (result) {
-      return std::move(result.getValue());
+      return std::move(result.value());
     }
   }
 
@@ -759,7 +759,7 @@ swift::matchWitness(
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-        return std::move(result.getValue());
+        return std::move(result.value());
       }
     }
 
@@ -814,7 +814,7 @@ swift::matchWitness(
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-        return std::move(result.getValue());
+        return std::move(result.value());
       }
     }
 
@@ -853,7 +853,7 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
-      return std::move(result.getValue());
+      return std::move(result.value());
     }
   }
 
@@ -906,6 +906,13 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   case FixKind::SkipSameTypeRequirement: {
     requirementKind = RequirementKind::SameType;
     auto requirementFix = (SkipSameTypeRequirement *)fix;
+    type = requirementFix->lhsType();
+    missingType = requirementFix->rhsType();
+    break;
+  }
+  case FixKind::SkipSameShapeRequirement: {
+    requirementKind = RequirementKind::SameShape;
+    auto requirementFix = (SkipSameShapeRequirement *)fix;
     type = requirementFix->lhsType();
     missingType = requirementFix->rhsType();
     break;
@@ -1544,8 +1551,8 @@ bool WitnessChecker::findBestWitness(
 }
 
 AccessScope WitnessChecker::getRequiredAccessScope() {
-  if (RequiredAccessScopeAndUsableFromInline.hasValue())
-    return RequiredAccessScopeAndUsableFromInline.getValue().first;
+  if (RequiredAccessScopeAndUsableFromInline.has_value())
+    return RequiredAccessScopeAndUsableFromInline.value().first;
 
   AccessScope result = Proto->getFormalAccessScope(DC);
 
@@ -1557,8 +1564,8 @@ AccessScope WitnessChecker::getRequiredAccessScope() {
     // and the protocol's access scope.
     auto scopeIntersection =
         result.intersectWith(adoptingNominal->getFormalAccessScope(DC));
-    assert(scopeIntersection.hasValue());
-    result = scopeIntersection.getValue();
+    assert(scopeIntersection.has_value());
+    result = scopeIntersection.value();
 
     if (!result.isPublic()) {
       witnessesMustBeUsableFromInline =
@@ -1810,10 +1817,7 @@ void MultiConformanceChecker::checkAllConformances() {
       return *checker;
     };
 
-    for (auto member : proto->getMembers()) {
-      auto req = dyn_cast<ValueDecl>(member);
-      if (!req || !req->isProtocolRequirement()) continue;
-
+    for (auto *req : proto->getProtocolRequirements()) {
       // If the requirement is unsatisfied, we might want to warn
       // about near misses; record it.
       if (isUnsatisfiedReq(getChecker(), conformance, req)) {
@@ -2073,7 +2077,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
           break;
       }
       if (diagKind) {
-        C.Diags.diagnose(ComplainLoc, diagKind.getValue(), T, ProtoType);
+        C.Diags.diagnose(ComplainLoc, diagKind.value(), T, ProtoType);
         conformance->setInvalid();
         return conformance;
       }
@@ -3372,8 +3376,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
-    if (type->hasError())
-      aliasDecl->setInvalid();
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getSelfNominalTypeDecl()) {
@@ -3389,15 +3391,15 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         Optional<AccessScope> underlyingTypeScope =
             TypeAccessScopeChecker::getAccessScope(type, DC,
                                                    /*usableFromInline*/false);
-        assert(underlyingTypeScope.hasValue() &&
+        assert(underlyingTypeScope.has_value() &&
                "the type is already invalid and we shouldn't have gotten here");
 
         AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
         Optional<AccessScope> widestPossibleScope =
             underlyingTypeScope->intersectWith(nominalAccessScope);
-        assert(widestPossibleScope.hasValue() &&
+        assert(widestPossibleScope.has_value() &&
                "we found the nominal and the type witness, didn't we?");
-        requiredAccessScope = widestPossibleScope.getValue();
+        requiredAccessScope = widestPossibleScope.value();
       }
 
       // An associated type witness can never be less than fileprivate, since
@@ -4038,7 +4040,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
             // defined.
-            fixItDiag.getValue().flush();
+            fixItDiag.value().flush();
             fixItDiag.emplace(diags.diagnose(ctor, diag::decl_declared_here,
                                              ctor->getName()));
           }
@@ -4726,23 +4728,16 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // of 'Never' if it is declared in a context that does not satisfy the
     // requirements of the conformance context.
     //
-    // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
-    // this can be removed.
+    // FIXME: Remove this eventually.
     bool skipRequirementCheck = false;
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (typeAliasDecl->getUnderlyingType()->isNever()) {
-        if (typeAliasDecl->getParentModule()->getName().is("SwiftUI")) {
+      if (typeAliasDecl->getParentModule()->getName().is("SwiftUI") &&
+          typeAliasDecl->getParentSourceFile() &&
+          typeAliasDecl->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+        if (typeAliasDecl->getUnderlyingType()->isNever()) {
           if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
               DC->getSelfNominalTypeDecl()) {
-            const auto reqs =
-                typeAliasDecl->getGenericSignature().requirementsNotSatisfiedBy(
-                    DC->getGenericSignatureOfContext());
-            if (!reqs.empty()) {
-              SwiftUIInvalidTyWitness = {assocType, typeAliasDecl,
-                                         reqs.front()};
-
-              skipRequirementCheck = true;
-            }
+            skipRequirementCheck = true;
           }
         }
       }
@@ -4895,8 +4890,8 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
 
   for (auto req : reqSig) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::SameType:
       if (req.getSecondType()->isTypeParameter()) {
@@ -4929,8 +4924,8 @@ static void diagnoseInvariantSelfRequirement(
   unsigned kind = 0;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
 
   case RequirementKind::SameType:
   if (req.getSecondType()->isTypeParameter()) {
@@ -5117,17 +5112,9 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
-  for (auto member : Proto->getMembers()) {
-    auto requirement = dyn_cast<ValueDecl>(member);
-    if (!requirement)
-      continue;
-
+  for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
-      continue;
-
-    // Type aliases don't have requirements themselves.
-    if (!requirement->isProtocolRequirement())
       continue;
 
     /// Local function to finalize the witness.
@@ -5169,13 +5156,13 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
-                  fixItDiag.getValue(), witness,
+                  fixItDiag.value(), witness,
                   witness->getObjCRuntimeName(),
                   requirement->getObjCRuntimeName());
             }
@@ -5190,13 +5177,13 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
-                  fixItDiag.getValue(), witness,
+                  fixItDiag.value(), witness,
                   witness->getObjCRuntimeName(),
                   requirement->getObjCRuntimeName());
             }
@@ -5211,7 +5198,7 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.getValue().flush();
+              fixItDiag.value().flush();
               fixItDiag.emplace(witness->diagnose(
                   diag::make_decl_objc, witness->getDescriptiveKind()));
             }
@@ -5416,32 +5403,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   if (Conformance->isInvalid()) {
     return;
   }
-
-  // As a narrow fix for a source compatibility issue with SwiftUI's
-  // swiftinterface, but only if the conformance succeeds, warn about an
-  // actually malformed conformance if we recorded a 'typealias' type witness
-  // with an underlying type of 'Never', which resides in a context that does
-  // not satisfy the requirements of the conformance context.
-  //
-  // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
-  // this can be removed.
-  if (SwiftUIInvalidTyWitness) {
-    const auto &info = SwiftUIInvalidTyWitness.getValue();
-    const auto &failedReq = info.FailedReq;
-
-    auto &diags = getASTContext().Diags;
-    diags.diagnose(Loc, diag::type_does_not_conform_swiftui_warning, Adoptee,
-                   Proto->getDeclaredInterfaceType());
-    diags.diagnose(info.AssocTypeDecl, diag::no_witnesses_type,
-                   info.AssocTypeDecl->getName());
-
-    if (failedReq.getKind() != RequirementKind::Layout) {
-      diags.diagnose(info.TypeWitnessDecl,
-                     diag::protocol_type_witness_missing_requirement,
-                     failedReq.getFirstType(), failedReq.getSecondType(),
-                     (unsigned)failedReq.getKind());
-    }
-  }
 }
 
 /// Retrieve the Objective-C method key from the given function.
@@ -5460,7 +5421,7 @@ ConformanceChecker::getObjCRequirements(ObjCMethodKey key) {
 
   // Fill in the data structure if we haven't done so yet.
   if (!computedObjCMethodRequirements) {
-    for (auto requirement : proto->getABIMembers()) {
+    for (auto requirement : proto->getProtocolRequirements()) {
       auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
       if (!funcRequirement)
         continue;
@@ -6229,7 +6190,7 @@ static void diagnoseUnstableName(ProtocolConformance *conformance,
       !hasExplicitObjCName(classDecl)) {
     C.Diags.diagnose(cast<NormalProtocolConformance>(conformance)->getLoc(),
                      diag::nscoding_unstable_mangled_name,
-                     static_cast<unsigned>(kind.getValue()),
+                     static_cast<unsigned>(kind.value()),
                      classDecl->getDeclaredInterfaceType());
     auto insertionLoc =
       classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -6812,7 +6773,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       if (req->getAttrs().isUnavailable(ctx)) continue;
 
       // Dig out the conformance.
-      if (!conformance.hasValue()) {
+      if (!conformance.has_value()) {
         SmallVector<ProtocolConformance *, 2> conformances;
         nominal->lookupConformance(proto, conformances);
         if (conformances.size() == 1)
@@ -7122,15 +7083,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     return {defaultType, defaultedAssocType};
   };
 
-  for (auto *requirement : proto->getMembers()) {
+  for (auto *requirement : proto->getProtocolRequirements()) {
     if (requirement->isInvalid())
       continue;
 
-    auto *valueDecl = dyn_cast<ValueDecl>(requirement);
-    if (!valueDecl)
-      continue;
-
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(valueDecl)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(requirement)) {
       if (assocType->getOverriddenDecls().empty()) {
         if (Type defaultType = findAssociatedTypeDefault(assocType).first)
           proto->setDefaultTypeWitness(assocType, defaultType);
@@ -7139,20 +7096,16 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       continue;
     }
 
-    if (isa<TypeDecl>(valueDecl))
-      continue;
+    assert(!isa<TypeDecl>(requirement));
 
-    if (!valueDecl->isProtocolRequirement())
-      continue;
-
-    ResolveWitnessResult result = checker.resolveWitnessViaLookup(valueDecl);
+    ResolveWitnessResult result = checker.resolveWitnessViaLookup(requirement);
 
     if (result == ResolveWitnessResult::Missing &&
         requirement->isSPI() &&
         !proto->isSPI()) {
       // SPI requirements need a default value, unless the protocol is SPI too.
-      valueDecl->diagnose(diag::spi_attribute_on_protocol_requirement,
-                          valueDecl->getName());
+      requirement->diagnose(diag::spi_attribute_on_protocol_requirement,
+                            requirement->getName());
     }
   }
 

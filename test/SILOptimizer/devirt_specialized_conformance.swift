@@ -44,7 +44,7 @@ func driver() {
 driver()
 
 // <rdar://problem/46322928> Failure to devirtualize a protocol method
-// applied to an opened existential blocks implemention of
+// applied to an opened existential blocks implementation of
 // DataProtocol.
 public protocol ContiguousBytes {
     func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R

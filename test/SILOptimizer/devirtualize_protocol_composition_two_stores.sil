@@ -54,7 +54,7 @@ bb0(%0 : $B):
 
 // This function calls @impl. The optimizer generates a specialization of impl
 // based on the arguments passed to it here. Even though this function isn't
-// directly checked, it is essentail for the optimization.
+// directly checked, it is essential for the optimization.
 // test(x:y:)
 sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int64 {
 // %0                                             // users: %5, %4, %2
@@ -74,7 +74,7 @@ bb0(%0 : $B, %1 : $C):
   return %9 : $Int64                                // id: %12
 } // end sil function 'test'
 
-// We're looking of an optimized spcialization of @impl, not @impl itself.
+// We're looking of an optimized specialization of @impl, not @impl itself.
 // CHECK-NOT: @impl
 // CHECK-LABEL: sil shared [noinline] @{{.*}}impl{{.*}}
 // In the optimization pass we look for uses of alloc_stack (aka %5).

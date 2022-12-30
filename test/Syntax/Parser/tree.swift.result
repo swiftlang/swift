@@ -1,8 +1,0 @@
-<s118><NULL/><s163><s92><NULL/><s13><NULL/><NULL/><NULL/><NULL/><NULL/><t6>// REQUIRES: syntax_parser_lib
-// RUN: %swift-syntax-parser-test %s -dump-tree > %t.result
-// RUN: diff -u %s.result %t.result
-
-|func| </t6><NULL/><t105>|test|</t105><NULL/><NULL/><NULL/><s110><NULL/><s108><NULL/><t88>|(|</t88><NULL/><s174></s174><NULL/><t89>|)| </t89></s108><NULL/><NULL/><NULL/><NULL/><NULL/><NULL/></s110><NULL/><NULL/><NULL/><s93><NULL/><t90>|{|</t90><NULL/><s163><s92><NULL/><s48><NULL/><NULL/><NULL/><t102>
-  |"|</t102><NULL/><s168><s104><NULL/><t104>|a|</t104></s104><s105><NULL/><t100>|\|</t100><NULL/><NULL/><NULL/><t88>|(|</t88><NULL/><s165><s97><NULL/><NULL/><NULL/><NULL/><NULL/><s28><NULL/><t105>|b|</t105><NULL/><NULL/></s28><NULL/><NULL/></s97></s165><NULL/><t101>|)|</t101></s105><s104><NULL/><t104>|c|</t104></s104></s168><NULL/><t102>|"|</t102><NULL/><NULL/></s48><NULL/><NULL/><NULL/><NULL/></s92></s163><NULL/><t91>
-|}|</t91></s93></s13><NULL/><NULL/><NULL/><NULL/></s92></s163><NULL/><t0>
-||</t0></s118>

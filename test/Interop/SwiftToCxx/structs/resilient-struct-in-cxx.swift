@@ -92,7 +92,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs {
+// CHECK-NEXT: namespace Structs __attribute__((swift_private)) {
 
 @frozen public struct FrozenStruct {
     private let storedInt: Int32

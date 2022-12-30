@@ -4,14 +4,21 @@
 // RUN: %empty-directory(%t/partials)
 // RUN: %empty-directory(%t/normal)
 // RUN: %empty-directory(%t/errors)
+// RUN: %empty-directory(%t/cache)
 
 /// Compile module A with a type and an empty module B.
-// RUN: %target-swift-frontend %s -emit-module-path %t/partials/A.swiftmodule -module-name A -D LIB
-// RUN: %target-swift-frontend %s -emit-module-path %t/partials/B.swiftmodule -module-name B
+// RUN: %target-swift-frontend %s -emit-module-path %t/partials/A.swiftmodule -module-name A -D LIB -enable-library-evolution
+// RUN: %target-swift-frontend %s -emit-module-path %t/partials/B.swiftmodule -module-name B -enable-library-evolution
 
 /// Compile a client using the type from A.
-// RUN: %target-swift-frontend %s -emit-module-path %t/normal/Client.swiftmodule -module-name Client -D CLIENT -I %t/partials
+// RUN: %target-swift-frontend %s -emit-module-path %t/normal/Client.swiftmodule -module-name Client -D CLIENT -I %t/partials -enable-library-evolution -emit-module-interface-path  %t/normal/Client.swiftinterface
 // RUN: %target-swift-frontend %s -emit-module-path %t/errors/Client.swiftmodule -module-name Client -D CLIENT -I %t/partials -experimental-allow-module-with-compiler-errors
+
+/// Force rebuilding from the swiftinterface.
+// RUN: mv %t/normal/Client.swiftmodule %t/swap-Client.swiftmodule
+// RUN: echo "import Client" | %target-swift-frontend -typecheck - -I %t/partials -I %t/normal -module-cache-path %t/cache/
+//2> /dev/null
+// RUN: mv %t/swap-Client.swiftmodule %t/normal/Client.swiftmodule
 
 /// Swap A and B around! A is now empty and B defines the type.
 // RUN: %target-swift-frontend %s -emit-module-path %t/partials/A.swiftmodule -module-name A
@@ -25,7 +32,7 @@
 // NORMALFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
 // NORMALFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // NORMALFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// NORMALFAILURE-NEXT: module 'Client' with full misc version {{.*}}'
+// NORMALFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source, resilient, loaded from
 // NORMALFAILURE-NEXT: Could not deserialize type for 'foo()'
 // NORMALFAILURE-NEXT: Caused by: top-level value not found
 // NORMALFAILURE-NEXT: Cross-reference to module 'A'
@@ -37,13 +44,18 @@
 // ALLOWFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
 // ALLOWFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // ALLOWFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// ALLOWFAILURE-NEXT: module 'Client' with full misc version {{.*}}' (built with -experimental-allow-module-with-compiler-errors)
+// ALLOWFAILURE-NEXT: module 'Client', builder version {{.*}}', built from source, non-resilient, built with -experimental-allow-module-with-compiler-errors, loaded from
 // ALLOWFAILURE-NEXT: Could not deserialize type for 'foo()'
 // ALLOWFAILURE-NEXT: Caused by: top-level value not found
 // ALLOWFAILURE-NEXT: Cross-reference to module 'A'
 // ALLOWFAILURE-NEXT: ... SomeType
 // ALLOWFAILURE-NEXT: Notes:
 // ALLOWFAILURE-NEXT: * There is a matching 'SomeType' in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.
+
+/// Test a swiftmodule rebuilt from the swiftinterface.
+// RUN: not --crash %target-swift-frontend -emit-sil %t/cache/Client-*.swiftmodule -module-name Client -I %t/partials -disable-deserialization-recovery 2> %t/cache_stderr
+// RUN: cat %t/cache_stderr | %FileCheck %s -check-prefixes=CACHEFAILURE
+// CACHEFAILURE: module 'Client', builder version {{.*}}', built from swiftinterface, resilient
 
 #if LIB
 public struct SomeType {

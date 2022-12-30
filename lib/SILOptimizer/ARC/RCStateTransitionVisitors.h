@@ -97,7 +97,7 @@ raw_ostream &operator<<(raw_ostream &os,
 } // end llvm namespace
 
 //===----------------------------------------------------------------------===//
-//                       BottomUpdataflowRCStateVisitor
+//                       BottomUpDataflowRCStateVisitor
 //===----------------------------------------------------------------------===//
 
 namespace swift {

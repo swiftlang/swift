@@ -31,6 +31,7 @@ class ClassDecl;
 class SILFunction;
 class SILModule;
 class SILWitnessTable;
+class SILPassManager;
 
 /// CalleeList is a data structure representing the list of potential
 /// callees at a particular apply site. It also has a query that
@@ -166,15 +167,19 @@ private:
 
 class BasicCalleeAnalysis : public SILAnalysis {
   SILModule &M;
+  SILPassManager *pm = nullptr;
   std::unique_ptr<CalleeCache> Cache;
 
 public:
+
   BasicCalleeAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::BasicCallee;
   }
+
+  virtual void initialize(SILPassManager *pm) override { this->pm = pm; }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {
@@ -228,7 +233,12 @@ public:
     updateCache();
     return Cache->getDestructors(type, isExactType);
   }
+
+  SILInstruction::MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
 };
+
+bool isDeinitBarrier(SILInstruction *const instruction,
+                     BasicCalleeAnalysis *bca);
 
 } // end namespace swift
 

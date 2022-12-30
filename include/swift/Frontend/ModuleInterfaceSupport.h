@@ -33,6 +33,10 @@ struct ModuleInterfaceOptions {
   /// interface, or should we fully-qualify them?
   bool PreserveTypesAsWritten = false;
 
+  /// Use aliases when printing references to modules to avoid ambiguities
+  /// with types sharing a name with a module.
+  bool AliasModuleNames = false;
+
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
@@ -46,8 +50,8 @@ struct ModuleInterfaceOptions {
   /// ignored by the earlier version of the compiler.
   std::string IgnorableFlags;
 
-  /// Print SPI decls and attributes.
-  bool PrintSPIs = false;
+  /// Print for a private swiftinterface file, SPI decls and attributes.
+  bool PrintPrivateInterfaceContent = false;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.

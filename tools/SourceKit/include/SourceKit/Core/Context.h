@@ -34,14 +34,14 @@ namespace SourceKit {
 class GlobalConfig {
 public:
   struct Settings {
-    struct CompletionOptions {
+    struct IDEInspectionOptions {
 
-      /// Max count of reusing ASTContext for cached code completion.
+      /// Max count of reusing ASTContext for cached IDE inspection.
       unsigned MaxASTContextReuseCount = 100;
 
-      /// Interval second for checking dependencies in cached code completion.
+      /// Interval second for checking dependencies in cached IDE inspection.
       unsigned CheckDependencyInterval = 5;
-    } CompletionOpts;
+    } IDEInspectionOpts;
   };
 
 private:
@@ -49,9 +49,9 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings update(Optional<unsigned> CompletionMaxASTContextReuseCount,
-                  Optional<unsigned> CompletionCheckDependencyInterval);
-  Settings::CompletionOptions getCompletionOpts() const;
+  Settings update(Optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+                  Optional<unsigned> IDEInspectionCheckDependencyInterval);
+  Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 
 /// Keeps track of all requests that are currently in progress and coordinates

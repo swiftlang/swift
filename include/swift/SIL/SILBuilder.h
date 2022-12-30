@@ -745,6 +745,7 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false) {
+    assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
@@ -831,12 +832,8 @@ public:
   }
 
   EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-      if (auto *ti = arg->getSingleTerminator()) {
-        assert(!ti->isTransformationTerminator() &&
-               "Transforming terminators do not have end_borrow");
-      }
-    }
+    assert(!SILArgument::isTerminatorResult(borrowedValue) &&
+               "terminator results do not have end_borrow");
     return insert(new (getModule())
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
@@ -883,14 +880,30 @@ public:
                                  Qualifier));
   }
 
-  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc,
-                                               SILValue Src, SILValue Dest,
-                                               SILValue Initializer,
-                                               SILValue Setter,
-                                               AssignByWrapperInst::Mode mode) {
+  AssignByWrapperInst *
+  createAssignByPropertyWrapper(SILLocation Loc, SILValue Src, SILValue Dest,
+                                SILValue Initializer, SILValue Setter,
+                                AssignByWrapperInst::Mode mode) {
+    return createAssignByWrapper(
+        Loc, AssignByWrapperInst::Originator::PropertyWrapper, Src, Dest,
+        Initializer, Setter, mode);
+  }
+
+  AssignByWrapperInst *
+  createAssignByTypeWrapper(SILLocation Loc, SILValue Src, SILValue Dest,
+                            SILValue Setter, AssignByWrapperInst::Mode mode) {
+    return createAssignByWrapper(
+        Loc, AssignByWrapperInst::Originator::TypeWrapper, Src, Dest,
+        SILUndef::get(Dest->getType(), getModule()), Setter, mode);
+  }
+
+  AssignByWrapperInst *
+  createAssignByWrapper(SILLocation Loc, AssignByWrapperInst::Originator origin,
+                        SILValue Src, SILValue Dest, SILValue Initializer,
+                        SILValue Setter, AssignByWrapperInst::Mode mode) {
     return insert(new (getModule())
-                  AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
-                                       Initializer, Setter, mode));
+                      AssignByWrapperInst(getSILDebugLocation(Loc), origin, Src,
+                                          Dest, Initializer, Setter, mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -970,6 +983,13 @@ public:
     if (src->getType().isAddress())
       return createDebugValueAddr(Loc, src, Var);
     return createDebugValue(Loc, src, Var);
+  }
+
+  TestSpecificationInst *
+  createTestSpecificationInst(SILLocation Loc,
+                              StringRef ArgumentsSpecification) {
+    return insert(TestSpecificationInst::create(
+        getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -2102,13 +2122,20 @@ public:
   SingleValueInstruction *
   createUncheckedReinterpretCast(SILLocation Loc, SILValue Op, SILType Ty);
 
-  /// Create an appropriate cast instruction based on result type.
+  /// Create an appropriate cast instruction based on result type. This cast
+  /// forwards ownership from the operand to the result.
   ///
-  /// NOTE: This assumes that the input and the result cast are layout
-  /// compatible. Reduces to createUncheckedReinterpretCast when ownership is
-  /// disabled.
-  SingleValueInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
-                                                 SILType Ty);
+  /// WARNING: Because it forwards ownership, this cast is only valid with the
+  /// source and destination types are layout equivalent. The destination type
+  /// must include all the same references in the same positions.
+  ///
+  /// Note: Forwarding casts do not exist outside of OSSA. When ownership is
+  /// disabled, this reduces to createUncheckedReinterpretCast, which may
+  /// fall-back to unchecked_bitwise_cast. It is the caller's responsibility to
+  /// emit the correct retains and releases.
+  SingleValueInstruction *createUncheckedForwardingCast(SILLocation Loc,
+                                                        SILValue Op,
+                                                        SILType Ty);
 
   //===--------------------------------------------------------------------===//
   // Runtime failure
@@ -2595,7 +2622,7 @@ public:
       IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     SILValue jvpAndVJPArray[2];
-    if (JVPAndVJPFunctions.hasValue()) {
+    if (JVPAndVJPFunctions.has_value()) {
       jvpAndVJPArray[0] = JVPAndVJPFunctions->first;
       jvpAndVJPArray[1] = JVPAndVJPFunctions->second;
     }
@@ -2605,7 +2632,7 @@ public:
         JVPAndVJPFunctions,
         hasOwnership()
             ? DifferentiableFunctionInst::getMergedOwnershipKind(
-                  OriginalFunction, JVPAndVJPFunctions.hasValue()
+                  OriginalFunction, JVPAndVJPFunctions.has_value()
                                         ? ArrayRef<SILValue>(jvpAndVJPArray, 2)
                                         : ArrayRef<SILValue>())
             : ValueOwnershipKind(OwnershipKind::None));
@@ -2696,6 +2723,14 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Weak linking support
+  //===--------------------------------------------------------------------===//
+  HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
+    return insert(new (getModule()) HasSymbolInst(
+        getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//
 
@@ -2767,7 +2802,7 @@ private:
   }
 };
 
-/// An wrapper on top of SILBuilder's constructor that automatically sets the
+/// A wrapper on top of SILBuilder's constructor that automatically sets the
 /// current SILDebugScope based on the specified insertion point. This is useful
 /// for situations where a single SIL instruction is lowered into a sequence of
 /// SIL instructions.

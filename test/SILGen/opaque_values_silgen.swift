@@ -478,3 +478,161 @@ enum TestEnum<T> {
   }
 }
 
+public enum EnumWithTwoSameAddressOnlyPayloads<T> {
+  case nope
+  case yes(T)
+  case and(T)
+
+// CHECK-LABEL: sil [ossa] @EnumWithTwoSameAddressOnlyPayloads_getPayload : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[RESULT_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         switch_enum [[COPY]] : $EnumWithTwoSameAddressOnlyPayloads<T>, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.nope!enumelt: {{bb[0-9]+}}, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
+// CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
+// CHECK:         [[YES_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[YES_VALUE]]
+// CHECK:         [[YES_COPY:%[^,]+]] = copy_value [[YES_LIFETIME]]
+// CHECK:         store [[YES_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK:       [[AND_BLOCK]]([[AND_VALUE:%[^,]+]] :
+// CHECK:         [[AND_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[AND_VALUE]]
+// CHECK:         [[AND_COPY:%[^,]+]] = copy_value [[AND_LIFETIME]]
+// CHECK:         store [[AND_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK-LABEL: } // end sil function 'EnumWithTwoSameAddressOnlyPayloads_getPayload'
+  public var getPayload: T? {
+    @_silgen_name("EnumWithTwoSameAddressOnlyPayloads_getPayload")
+    get {
+    switch self {
+      case .nope:
+        return nil
+      case .yes(let t), .and(let t):
+        return t
+    }
+    }
+  }
+}
+
+
+// Verify exit block arguments are ordered correctly.
+// 
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
+// CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:       [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : @owned $Value, {{%[^,]+}} : @owned $Value):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_'
+func doit<T>(_ f: () -> T) -> T {
+  f()
+}
+@_silgen_name("duplicate_with_int4")
+func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int, (Value, Value)) {
+  doit {
+    if condition {
+      return (Int(), Int(), Int(), (value, value))
+    } else {
+      return (Int(), Int(), Int(), (value, value))
+    }
+  }
+}
+
+// Verify tuple rebuilding.
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         return [[RETVAL]] : $(Value, Value)
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_'
+@_silgen_name("duplicate1")
+func duplicate1<Value>(value: Value) -> (Value, Value) {
+  doit { 
+      (value, value)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})   
+// CHECK:         return [[RETVAL]] : $(one: Value, two: Value)           
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
+@_silgen_name("duplicate2")
+func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
+  doit { 
+      (one: value, two: value)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value, {{%[^,]+}} : $Int)
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_'
+@_silgen_name("duplicate_with_int1")
+func duplicate_with_int1<Value>(value: Value) -> (Value, Value, Int) {
+  doit {
+    (value, value, 42)
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
+// CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)           
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)    
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_'
+@_silgen_name("duplicate_with_int2")
+func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
+  doit {
+    ((value, value), 42)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
+// CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)           
+// CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value) 
+// CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value)) 
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Int, [[INNERLEAST]] : $(Value, (Value, (Value, Int), Value)), {{%[^,]+}} : $Int) 
+// CHECK:         return [[RETVAL]] : $(Int, (Value, (Value, (Value, Int), Value)), Int) 
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_'
+@_silgen_name("duplicate_with_int3")
+func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, Int), Value)), Int) {
+  doit {
+    (42, (value, (value, (value, 43), value)), 44)
+  }
+}
+
+// Keypaths
+
+indirect enum IndirectEnumWithAReadableIntProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// TODO: Eliminate this copy.
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivg : $@convention(method) (@guaranteed IndirectEnumWithAReadableIntProperty) -> Int
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK'
+  var i: Int { 0 }
+}
+
+func takeReadableIntKeyPath<T>(_ kp: KeyPath<T, Int>) {
+}
+
+func giveReadableIntKeyPathInt() {
+  takeReadableIntKeyPath(\IndirectEnumWithAReadableIntProperty.i)
+}
+
+indirect enum StructWithAReadableStringProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvg : $@convention(method) (@guaranteed StructWithAReadableStringProperty) -> @owned String 
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK'
+  var s: String { "howdy" }
+}
+
+func takeKeyPathString<T>(_ kp: KeyPath<T, String>) {
+}
+
+func giveKeyPathString() {
+  takeKeyPathString(\StructWithAReadableStringProperty.s)
+}

@@ -128,6 +128,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
+  friend class ASTSourceFileScope;
 
 #pragma mark - tree state
 protected:
@@ -1184,6 +1185,35 @@ public:
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+};
+
+class MacroDeclScope final : public ASTScopeImpl {
+public:
+  MacroDecl *const decl;
+
+  MacroDeclScope(MacroDecl *e) : decl(e) {}
+  virtual ~MacroDeclScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+
+protected:
+  void printSpecifics(llvm::raw_ostream &out) const override;
+
+public:
+  virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
+  Decl *getDecl() const { return decl; }
+
+protected:
+  NullablePtr<const GenericParamList> genericParams() const override;
 };
 
 class AbstractStmtScope : public ASTScopeImpl {

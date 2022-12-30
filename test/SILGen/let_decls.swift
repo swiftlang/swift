@@ -41,7 +41,7 @@ func test2() {
 // The closure just returns its value, which it captured directly.
 
 // CHECK: sil private [ossa] @$s9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : @closureCapture $Int):
 // CHECK:  return %0 : $Int
 
 // Verify that we can close over let decls of tuple type.
@@ -112,7 +112,7 @@ func testAddressOnlyStructElt<T>(_ a : T) -> T {
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG1]])
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
-  // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
+  // CHECK-NEXT: copy_addr [[ELTADDR]] to [init] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
 }
 
@@ -255,7 +255,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}generic_identity
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value %1 : $*T, {{.*}} expr op_deref
-// CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
+// CHECK-NEXT: copy_addr %1 to [init] %0 : $*T
 // CHECK-NOT: destroy_addr %1
 // CHECK: } // end sil function '{{.*}}generic_identity{{.*}}'
 func generic_identity<T>(_ a : T) -> T {
@@ -342,7 +342,7 @@ func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int
 // CHECK:       bb0(%0 : $*any SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 0
-// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*any SimpleProtocol
+// CHECK-NEXT:    copy_addr %0 to [init] %3 : $*any SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
 // CHECK-NEXT:    destroy_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int)
@@ -440,7 +440,7 @@ struct GenericStruct<T> {
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value %1 : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
-  // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
+  // CHECK-NEXT: copy_addr %3 to [init] %0 : $*T
   // CHECK-NEXT: %5 = tuple ()
   // CHECK-NEXT: return %5 : $()
 

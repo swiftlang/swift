@@ -12,6 +12,7 @@ target_link_libraries(swift-ide-test
                         swiftDriver
                         swiftFrontend
                         swiftIDE
+                        swiftIDETool
                         swiftCompilerModules)
 
 # If libxml2 is available, make it available for swift-ide-test.

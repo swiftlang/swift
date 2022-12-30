@@ -37,7 +37,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
 
   // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ({ [[INT]], i32, i32 }, { [[INT]], i32, i32 }* @"$s18fixed_layout_class20GenericOutsideParentCMo", i32 0, i32 0)
 
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentC, %T18fixed_layout_class20GenericOutsideParentC* %0, i32 0, i32 0, i32 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %T18fixed_layout_class20GenericOutsideParentC* %0 to %swift.type**
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 
   // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ({ [[INT]], i32, i32 }, { [[INT]], i32, i32 }* @"$s18fixed_layout_class20GenericOutsideParentCMo", i32 0, i32 0)
@@ -68,7 +68,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ({ [[INT]], i32, i32 }, { [[INT]], i32, i32 }* @"$s18fixed_layout_class19GenericOutsideChildCMo", i32 0, i32 0)
 
   // CHECK: [[UPCAST:%.*]] = bitcast %T18fixed_layout_class19GenericOutsideChildC* %0 to %T18fixed_layout_class20GenericOutsideParentC*
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentC, %T18fixed_layout_class20GenericOutsideParentC* [[UPCAST]], i32 0, i32 0, i32 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %T18fixed_layout_class20GenericOutsideParentC* [[UPCAST]] to %swift.type**
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 
   // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ({ [[INT]], i32, i32 }, { [[INT]], i32, i32 }* @"$s18fixed_layout_class20GenericOutsideParentCMo", i32 0, i32 0)
@@ -80,7 +80,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
   _ = o.property
 
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T18fixed_layout_class19GenericOutsideChildC, %T18fixed_layout_class19GenericOutsideChildC* %0, i32 0, i32 0, i32 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %T18fixed_layout_class19GenericOutsideChildC* %0 to %swift.type**
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 
   // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ({ [[INT]], i32, i32 }, { [[INT]], i32, i32 }* @"$s18fixed_layout_class19GenericOutsideChildCMo", i32 0, i32 0)

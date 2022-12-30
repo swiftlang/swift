@@ -192,7 +192,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
 
   // If we can statically determine that the operation overflows,
   // warn about it if warnings are not disabled by ResultsInError being null.
-  if (ResultsInError.hasValue() && Overflow && ReportOverflow) {
+  if (ResultsInError.has_value() && Overflow && ReportOverflow) {
     if (BI->getFunction()->isSpecialization()) {
       // Do not report any constant propagation issues in specializations,
       // because they are eventually not present in the original function.
@@ -500,7 +500,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   // If the denominator is zero...
   if (DenomVal == 0) {
     // And if we are not asked to report errors, just return nullptr.
-    if (!ResultsInError.hasValue())
+    if (!ResultsInError.has_value())
       return nullptr;
 
     // Otherwise emit a diagnosis error and set ResultsInError to true.
@@ -522,7 +522,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   // If we overflowed...
   if (Overflowed) {
     // And we are not asked to produce diagnostics, just return nullptr...
-    if (!ResultsInError.hasValue())
+    if (!ResultsInError.has_value())
       return nullptr;
 
     bool IsRem = ID == BuiltinValueKind::SRem || ID == BuiltinValueKind::URem;
@@ -725,7 +725,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
   if (OverflowError) {
     // If we are not asked to emit overflow diagnostics, just return nullptr on
     // overflow.
-    if (!ResultsInError.hasValue())
+    if (!ResultsInError.has_value())
       return nullptr;
 
     SILLocation Loc = BI->getLoc();
@@ -856,7 +856,7 @@ static SILValue foldFPToIntConversion(BuiltinInst *BI,
   // Check non-negativeness of 'fpVal' for conversion to unsigned int.
   if (conversionToUnsigned && fpVal.isNegative() && !fpVal.isZero()) {
     // Stop folding and emit diagnostics if enabled.
-    if (ResultsInError.hasValue()) {
+    if (ResultsInError.has_value()) {
       SILModule &M = BI->getModule();
       const ApplyExpr *CE = BI->getLoc().getAsASTNode<ApplyExpr>();
 
@@ -880,7 +880,7 @@ static SILValue foldFPToIntConversion(BuiltinInst *BI,
 
   if (status & APFloat::opStatus::opInvalidOp) {
     // Stop folding and emit diagnostics if enabled.
-    if (ResultsInError.hasValue()) {
+    if (ResultsInError.has_value()) {
       SILModule &M = BI->getModule();
       const ApplyExpr *CE = BI->getLoc().getAsASTNode<ApplyExpr>();
 
@@ -1059,7 +1059,7 @@ static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
   // represented in the destination type.
   // Suppress all warnings if the conversion is made through an explicit
   // constructor invocation.
-  if (ResultsInError.hasValue() && !maybeExplicitFPCons(BI, Builtin)) {
+  if (ResultsInError.has_value() && !maybeExplicitFPCons(BI, Builtin)) {
     bool overflow = opStatus & APFloat::opStatus::opOverflow;
     bool tinynInexact =
         isLossyUnderflow(flitInst->getValue(), srcType, destType);
@@ -1200,7 +1200,7 @@ case BuiltinValueKind::id:
       // Check if diagnostics is enabled. If so, make sure to suppress
       // warnings for conversions through explicit initializers,
       // but do not suppress errors.
-      if (ResultsInError.hasValue() &&
+      if (ResultsInError.has_value() &&
           (overflow || !maybeExplicitFPCons(BI, Builtin))) {
         SmallString<10> SrcAsString;
         SrcVal.toString(SrcAsString, /*radix*/ 10, true /*isSigned*/);
@@ -1276,7 +1276,7 @@ case BuiltinValueKind::id:
       return nullptr;
 
     APInt VInt = V->getValue();
-    if (VInt.isNegative() && ResultsInError.hasValue()) {
+    if (VInt.isNegative() && ResultsInError.has_value()) {
       diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
                diag::wrong_non_negative_assumption,
                llvm::toString(VInt, /*Radix*/ 10, /*Signed*/ true));
@@ -1566,7 +1566,7 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
 
       if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
         if (auto kind = bi->getBuiltinKind()) {
-          if (isPolymorphicBuiltin(kind.getValue())) {
+          if (isPolymorphicBuiltin(kind.value())) {
             WorkList.insert(bi);
             continue;
           }
@@ -1809,7 +1809,7 @@ ConstantFolder::processWorkList() {
 
     if (auto *bi = dyn_cast<BuiltinInst>(I)) {
       if (auto kind = bi->getBuiltinKind()) {
-        if (SILValue v = specializePolymorphicBuiltin(bi, kind.getValue())) {
+        if (SILValue v = specializePolymorphicBuiltin(bi, kind.value())) {
           // If bi had a result, RAUW.
           if (bi->getResult(0)->getType() !=
               bi->getModule().Types.getEmptyTupleType())
@@ -1890,7 +1890,7 @@ ConstantFolder::processWorkList() {
 
         // If we did not pass in a None and the optional is set to true, add the
         // user to our error set.
-        if (ResultsInError.hasValue() && ResultsInError.getValue())
+        if (ResultsInError.has_value() && ResultsInError.value())
           ErrorSet.insert(User);
 
         // We failed to constant propagate... continue...

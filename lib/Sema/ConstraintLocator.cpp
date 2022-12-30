@@ -97,6 +97,9 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::OpenedPackElement:
+  case ConstraintLocator::PackShape:
+  case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
   case ConstraintLocator::AnyPatternDecl:
@@ -122,8 +125,8 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
     switch (kind) {
-    case RequirementKind::SameCount:
-      out << "same_length";
+    case RequirementKind::SameShape:
+      out << "same_shape";
       break;
     case RequirementKind::Conformance:
       out << "conformance";
@@ -434,13 +437,30 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::ConstraintLocator::PackType:
-    out << "pack type";
+  case ConstraintLocator::ConstraintLocator::PackType: {
+    auto packElt = elt.castTo<LocatorPathElt::PackType>();
+    out << "pack type '" << packElt.getType()->getString(PO) << "'";
     break;
+  }
 
   case ConstraintLocator::PackElement: {
     auto packElt = elt.castTo<LocatorPathElt::PackElement>();
     out << "pack element #" << llvm::utostr(packElt.getIndex());
+    break;
+  }
+
+  case ConstraintLocator::OpenedPackElement: {
+    out << "opened pack element";
+    break;
+  }
+
+  case ConstraintLocator::PackShape: {
+    out << "pack shape";
+    break;
+  }
+
+  case ConstraintLocator::PackExpansionPattern: {
+    out << "pack expansion pattern";
     break;
   }
 

@@ -31,9 +31,6 @@ class LocalContext {
   /// various identifiers.
   llvm::DenseMap<Identifier, unsigned> LocalDiscriminators;
 
-  /// The next discriminator for an explicit closure expression.
-  unsigned NextClosureDiscriminator = 0;
-
   LocalContext(const LocalContext &) = delete;
   LocalContext &operator=(const LocalContext &) = delete;
 
@@ -48,17 +45,6 @@ public:
            "maybe the name hasn't been set yet?");
     return LocalDiscriminators[name]++;
   }
-
-  /// Return a number that'll be unique in this context across all
-  /// explicit anonymous closure expressions.
-  unsigned claimNextClosureDiscriminator() {
-    return NextClosureDiscriminator++;
-  }
-
-  /// True if we saw any anonymous closures.  This is useful when
-  /// parsing an initializer context, because such contexts only
-  /// need to exist if the initializer contains closures.
-  bool hasClosures() const { return NextClosureDiscriminator != 0; }    
 };
 
 /// Information associated with parsing the top-level context.

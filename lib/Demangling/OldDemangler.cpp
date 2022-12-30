@@ -151,11 +151,11 @@ public:
 
   bool readUntil(char c, std::string &result) {
     llvm::Optional<char> c2;
-    while (!isEmpty() && (c2 = peek()).getValue() != c) {
-      result.push_back(c2.getValue());
+    while (!isEmpty() && (c2 = peek()).value() != c) {
+      result.push_back(c2.value());
       advanceOffset(1);
     }
-    return c2.hasValue() && c2.getValue() == c;
+    return c2.has_value() && c2.value() == c;
   }
 };
 
@@ -186,7 +186,7 @@ public:
 #define DEMANGLE_CHILD_AS_NODE_OR_RETURN(PARENT, CHILD_KIND, DEPTH)            \
   do {                                                                         \
     auto _kind = demangle##CHILD_KIND(DEPTH);                                  \
-    if (!_kind.hasValue())                                                     \
+    if (!_kind.has_value())                                                     \
       return nullptr;                                                          \
     addChild(PARENT,                                                           \
              Factory.createNode(Node::Kind::CHILD_KIND, unsigned(*_kind)));    \
@@ -377,12 +377,12 @@ private:
     // Value witnesses.
     if (Mangled.nextIf('w')) {
       llvm::Optional<ValueWitnessKind> w = demangleValueWitnessKind(depth + 1);
-      if (!w.hasValue())
+      if (!w.has_value())
         return nullptr;
       auto witness =
         Factory.createNode(Node::Kind::ValueWitness);
       NodePointer Idx = Factory.createNode(Node::Kind::Index,
-                                           unsigned(w.getValue()));
+                                           unsigned(w.value()));
       witness->addChild(Idx, Factory);
       DEMANGLE_CHILD_OR_RETURN(witness, Type, depth + 1);
       return witness;
@@ -789,7 +789,7 @@ private:
       isOperator = true;
       // Operator identifiers aren't valid in the contexts that are
       // building more specific identifiers.
-      if (kind.hasValue()) return nullptr;
+      if (kind.has_value()) return nullptr;
 
       char op_mode = Mangled.next();
       switch (op_mode) {
@@ -807,7 +807,7 @@ private:
       }
     }
 
-    if (!kind.hasValue()) kind = Node::Kind::Identifier;
+    if (!kind.has_value()) kind = Node::Kind::Identifier;
 
     Node::IndexType length;
     if (!demangleNatural(length, depth + 1))

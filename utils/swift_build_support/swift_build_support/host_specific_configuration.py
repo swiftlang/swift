@@ -15,6 +15,7 @@ import sys
 from argparse import ArgumentError
 
 from . import compiler_stage
+from .cmake import CMakeOptions
 from .targets import StdlibDeploymentTarget
 
 
@@ -83,7 +84,7 @@ class HostSpecificConfiguration(object):
         self.swift_benchmark_build_targets = []
         self.swift_benchmark_run_targets = []
         self.swift_flags = ''
-        self.cmake_options = ''
+        self.cmake_options = CMakeOptions()
         for deployment_target_name in stdlib_targets_to_configure:
             # Get the target object.
             deployment_target = StdlibDeploymentTarget.get_target_for_name(

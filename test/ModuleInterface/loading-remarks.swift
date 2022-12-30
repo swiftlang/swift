@@ -1,14 +1,57 @@
 /// Test the -Rmodule-loading flag.
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/cache)
+// RUN: split-file %s %t
 
-/// Create a simple module and interface.
-// RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
-// RUN: %target-swift-emit-module-interface(%t/TestModule.swiftinterface) %t/TestModule.swift
+/// Create Swift modules to import.
+// RUN: %target-swift-emit-module-interface(%t/SwiftDependency.swiftinterface) \
+// RUN:   %t/SwiftDependency.swift
+// RUN: %target-swift-frontend -emit-module -o %t/SwiftNonResilientDependency.swiftmodule \
+// RUN:   -module-name SwiftNonResilientDependency %t/SwiftDependency.swift
+// RUN: %target-swift-emit-module-interface(%t/IndirectMixedDependency.swiftinterface) \
+// RUN:   %t/IndirectMixedDependency.swift -I %t
 
 /// Use -Rmodule-loading in a client and look for the diagnostics output.
-// RUN: %target-swift-frontend -typecheck %s -I %t -Rmodule-loading 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -Rmodule-loading \
+// RUN:   -I %t -module-cache-path %t/cache 2>&1 | %FileCheck %s
 
-import TestModule
-// CHECK: remark: loaded module at {{.*}}SwiftShims-{{.*}}.pcm
-// CHECK: remark: loaded module at {{.*}}Swift.swiftmodule{{.*}}.swiftmodule
-// CHECK: remark: loaded module at {{.*}}TestModule.swiftinterface
+//--- module.modulemap
+module IndirectMixedDependency {
+  header "IndirectMixedDependency.h"
+}
+
+module DirectMixedDependency {
+  header "DirectMixedDependency.h"
+  export *
+}
+
+//--- IndirectMixedDependency.h
+
+//--- IndirectMixedDependency.swift
+
+@_exported import IndirectMixedDependency
+
+//--- DirectMixedDependency.h
+
+#include "IndirectMixedDependency.h"
+
+//--- DirectMixedDependency.swift
+
+@_exported import DirectMixedDependency
+
+//--- SwiftDependency.swift
+
+public func publicFunction() {}
+
+//--- Client.swift
+
+import SwiftDependency
+import SwiftNonResilientDependency
+import DirectMixedDependency
+
+// CHECK: remark: loaded module 'SwiftShims'; source: '{{.*}}module.modulemap', loaded: '{{.*}}SwiftShims-{{.*}}.pcm'
+// CHECK: remark: loaded module 'Swift'; source: '{{.*}}Swift.swiftmodule', loaded: '{{.*}}Swift.swiftmodule{{.*}}.swiftmodule'
+// CHECK: remark: loaded module 'SwiftDependency'; source: '{{.*}}SwiftDependency.swiftinterface', loaded: '{{.*}}SwiftDependency-{{.*}}.swiftmodule'
+// CHECK: remark: loaded module 'SwiftNonResilientDependency'; source: '{{.*}}SwiftNonResilientDependency.swiftmodule', loaded: '{{.*}}SwiftNonResilientDependency.swiftmodule'
+// CHECK: remark: loaded module 'IndirectMixedDependency' (overlay for a clang dependency); source: '{{.*}}IndirectMixedDependency.swiftinterface', loaded: '{{.*}}IndirectMixedDependency-{{.*}}.swiftmodule'
+// CHECK: remark: loaded module 'DirectMixedDependency'; source: '{{.*}}module.modulemap', loaded: '{{.*}}DirectMixedDependency-{{.*}}.pcm'

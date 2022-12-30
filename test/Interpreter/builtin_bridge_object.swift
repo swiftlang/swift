@@ -43,6 +43,12 @@ let OBJC_TAGGED_POINTER_BITS: UInt = 0
 let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
 let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
+#elseif arch(riscv64)
+
+// We have no ObjC tagged pointers, and three low spare bits due to alignment.
+let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
+let OBJC_TAGGED_POINTER_BITS: UInt = 0
+
 #endif
 
 func bitPattern(_ x: Builtin.BridgeObject) -> UInt {

@@ -82,6 +82,19 @@ AsyncTask *_swift_task_clearCurrent();
 /// Set the active task reference for the current thread.
 AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is either called from the
+/// owning task of the task group or while holding the owning task's
+/// status record lock.
+void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Remove the given task from the given task group.
+///
+/// This is an internal API; clients outside of the TaskGroup implementation
+/// should generally use a higher-level function.
+void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
+
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
 void _swift_tsan_acquire(void *addr);

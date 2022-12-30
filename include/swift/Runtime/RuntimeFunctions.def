@@ -182,7 +182,7 @@ FUNCTION(CopyPOD, swift_copyPOD, C_CC, AlwaysAvailable,
          EFFECT(NoEffect))
 
 // void *swift_retain(void *ptr);
-FUNCTION(NativeStrongRetain, swift_retain, SwiftCC, AlwaysAvailable,
+FUNCTION(NativeStrongRetain, swift_retain, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
@@ -2120,6 +2120,34 @@ FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
          ARGS(OpaquePtrTy, Int32Ty, Int32Ty, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect))
+
+// void *swift_generic_destroy(opaque*, const Metadata* type, const char*);
+FUNCTION(GenericDestroy,
+         swift_generic_destroy,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Deallocating))
+
+
+// void *swift_generic_assign(opaque* dest, opaque* src, const Metadata* type, const char*, bool isTake);
+FUNCTION(GenericAssign,
+         swift_generic_assign,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy, Int1Ty),
+         ATTRS(NoUnwind),
+         EFFECT(Refcounting, Deallocating))
+
+// void *swift_generic_initialize(opaque* dest, opaque* src, const Metadata* type, const char*, bool isTake);
+FUNCTION(GenericInitialize,
+         swift_generic_initialize,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy, Int1Ty),
+         ATTRS(NoUnwind),
+         EFFECT(Refcounting))
 
 #undef RETURNS
 #undef ARGS

@@ -82,8 +82,8 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
       /*arrowLoc=*/SourceLoc(),
       /*inLoc=*/SourceLoc(),
       /*explicitResultType=*/nullptr,
-      /*discriminator=*/0,
       /*parent=*/DC);
+  closure->setDiscriminator(0);
 
   closure->setImplicit();
 

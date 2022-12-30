@@ -31,6 +31,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftFrontend
   swiftClangImporter
   swiftIDE
+  swiftIDETool
   swiftAST
   swiftMarkup
   swiftParse
@@ -41,9 +42,9 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSema
   swiftBasic
   swiftSerialization
-  swiftSyntax
   swiftOption
   swiftSymbolGraphGen
+  swiftRefactoring
   libcmark-gfm_static
   # Clang dependencies.
   clangIndex

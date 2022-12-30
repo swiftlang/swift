@@ -60,6 +60,18 @@ func testEnum(_ e: E) {
   if #_hasSymbol(e.method) {}
 }
 
+func testOpaqueParameter<T: PAT>(_ p: T) {
+  // FIXME: Improve this diagnostic
+  if #_hasSymbol(T.A.self) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
+func testExistentialParameter(_ p: any P) {
+  if #_hasSymbol(p.requirement) {}
+  if #_hasSymbol(p.requirementWithDefaultImpl) {}
+}
+
 func testMetatypes() {
   if #_hasSymbol(P.self) {}
   if #_hasSymbol(S.self) {}
@@ -95,11 +107,11 @@ func testNotWeakDeclDiagnostics(_ s: LocalStruct) {
 
 func testInvalidExpressionsDiagnostics() {
   if #_hasSymbol(unknownDecl) {} // expected-error {{cannot find 'unknownDecl' in scope}}
-  if #_hasSymbol(noArgFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(global - 1) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(S.staticFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(C.classFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(1 as Int) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  if #_hasSymbol(noArgFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(global - 1) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(S.staticFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(C.classFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(1 as Int) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
   if #_hasSymbol(1 as S) {} // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
@@ -119,6 +131,19 @@ func doIt(_ closure: () -> ()) {
   closure()
 }
 
+@inlinable
+func testInlinable() {
+  if #_hasSymbol(noArgFunc) {}
+  doIt {
+    if #_hasSymbol(noArgFunc) {}
+  }
+}
+
+@_alwaysEmitIntoClient
+func testAEIC() {
+  if #_hasSymbol(noArgFunc) {}
+}
+
 func testClosure() {
   doIt { if #_hasSymbol(global) {} }
   doIt { if #_hasSymbol(noArgFunc) {} }
@@ -127,11 +152,11 @@ func testClosure() {
   doIt { if #_hasSymbol(ambiguousFunc) {} } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
   doIt { if #_hasSymbol(localFunc) {} } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
   doIt { if #_hasSymbol(unknownDecl) {} } // expected-error {{cannot find 'unknownDecl' in scope}}
-  doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(global - 1) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(S.staticFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(C.classFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(1 as Int) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(global - 1) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(S.staticFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(C.classFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(1 as Int) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
   doIt { if #_hasSymbol(1 as S) {} } // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
@@ -164,7 +189,7 @@ struct MyView {
   }
 
   @ViewBuilder var noArgFuncView: some View {
-    if #_hasSymbol(noArgFunc()) { image } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+    if #_hasSymbol(noArgFunc()) { image } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
     else { image }
   }
 }

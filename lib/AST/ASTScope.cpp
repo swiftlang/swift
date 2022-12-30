@@ -41,6 +41,10 @@ using namespace ast_scope;
 void ASTScope::unqualifiedLookup(
     SourceFile *SF, SourceLoc loc,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (loc.isValid()) {
+    SF = SF->getParentModule()->getSourceFileContainingLocation(loc);
+  }
+
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
   ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
@@ -146,6 +150,7 @@ DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
 DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(EnumElementScope)
+DEFINE_GET_CLASS_NAME(MacroDeclScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
 DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)

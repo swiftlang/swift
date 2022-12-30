@@ -245,9 +245,9 @@ bb0(%0 : $*Int, %1 : $Int):
   return %4 : $()
 }
 
-// CHECK-LABEL: @throwingClosureThatModifesCapture
+// CHECK-LABEL: @throwingClosureThatModifiesCapture
 // CHECK-NEXT: ([modify])
-sil private [ossa] @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error {
+sil private [ossa] @throwingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int
   end_access %1 : $*Int
@@ -258,7 +258,7 @@ bb0(%0 : $*Int):
 // CHECK-NEXT: ([modify])
 sil private [ossa] @callThrowingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
-  %1 = function_ref @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error
+  %1 = function_ref @throwingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error
   try_apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> @error Error, normal bb1, error bb2
 bb1(%3 : $()):
   %4 = tuple ()

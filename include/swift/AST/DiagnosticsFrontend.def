@@ -46,7 +46,7 @@ ERROR(error_upcoming_feature_on_by_default, none,
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
-      "expected one of 'api', 'spi' or 'other'", (StringRef))
+      "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
 
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
@@ -255,6 +255,10 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
+REMARK(remark_indexing_system_module,none,
+       "indexing system module at %0"
+       "%select{|; skipping because of a broken swiftinterface}1",
+       (StringRef, bool))
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",
@@ -395,7 +399,7 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         "public %0 %1 shadows module %2, which may cause failures when "
         "importing %3 or its clients in some configurations; please rename "
         "either the %0 %1 or the module %2, or see "
-        "https://bugs.swift.org/browse/SR-14195 for workarounds",
+        "https://github.com/apple/swift/issues/56573 for workarounds",
         (DescriptiveDeclKind, FullyQualified<Type>,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
@@ -472,6 +476,8 @@ REMARK(warning_in_access_notes_file,none,
        "ignored invalid content in access notes file: %0",
        (StringRef))
 
+WARNING(compiler_plugin_not_loaded,none,
+        "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

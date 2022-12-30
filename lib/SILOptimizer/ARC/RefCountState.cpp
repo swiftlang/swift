@@ -355,7 +355,7 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
   // If we can prove that the pointer we are tracking cannot be decremented,
   // return. On return, BottomUpRefCountState::handlePotentialUser can correctly
   // handle transition of refcount state. It transitions from a Decrement
-  // refcount state to a MighBeUsed refcount state
+  // refcount state to a MightBeUsed refcount state
   if (!mayDecrementRefCount(PotentialGuaranteedUser, getRCRoot(), AA)) {
     return false;
    }

@@ -146,7 +146,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os.indent(indent) << "] values: [\n";
     for (SymbolicClosureArgument closureArg : args) {
       Optional<SymbolicValue> value = closureArg.second;
-      if (!value.hasValue()) {
+      if (!value.has_value()) {
         os.indent(indent + 2) << "nil\n";
         continue;
       }
@@ -822,7 +822,7 @@ SymbolicClosure *SymbolicClosure::create(SILFunction *target,
       hasNonConstantCapture = true;
       break;
     }
-    SymbolicValue closureValue = closureArg.second.getValue();
+    SymbolicValue closureValue = closureArg.second.value();
     // Is capture non-constant?
     if (!closureValue.isConstant()) {
       hasNonConstantCapture = true;

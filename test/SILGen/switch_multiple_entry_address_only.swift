@@ -15,14 +15,14 @@ func multipleLabelsLet(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
+  // CHECK-NEXT: copy_addr %0 to [init] [[E_COPY]]
   // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
 
   // CHECK:      bb1:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -31,8 +31,8 @@ func multipleLabelsLet(e: E) {
   // CHECK:      bb2:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -67,14 +67,14 @@ func multipleLabelsVar(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
+  // CHECK-NEXT: copy_addr %0 to [init] [[E_COPY]]
   // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
 
   // CHECK:      bb1:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -83,8 +83,8 @@ func multipleLabelsVar(e: E) {
   // CHECK:      bb2:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -95,10 +95,10 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_box ${ var Any }, var, name "x"
   // CHECK-NEXT: [[ANY_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ANY_BOX]]
   // CHECK-NEXT: [[BOX_PAYLOAD:%.*]] = project_box [[ANY_BOX_LIFETIME]] : ${ var Any }, 0
-  // CHECK-NEXT: copy_addr [take] [[X_PHI]] to [initialization] [[BOX_PAYLOAD]]
+  // CHECK-NEXT: copy_addr [take] [[X_PHI]] to [init] [[BOX_PAYLOAD]]
   // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [read] [unknown] [[BOX_PAYLOAD]]
   // CHECK-NEXT: [[ANY_STACK:%.*]] = alloc_stack $Any
-  // CHECK-NEXT: copy_addr [[ACCESS]] to [initialization] [[ANY_STACK]]
+  // CHECK-NEXT: copy_addr [[ACCESS]] to [init] [[ANY_STACK]]
   // CHECK-NEXT: end_access [[ACCESS]]
   // CHECK:      [[FN:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN]]([[ANY_STACK]]
@@ -131,16 +131,16 @@ func fallthroughWithValue(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
+  // CHECK-NEXT: copy_addr %0 to [init] [[E_COPY]]
   // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
   
   // CHECK:      bb1:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ORIGINAL_ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ORIGINAL_ANY_BOX]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ORIGINAL_ANY_BOX]]
   // CHECK:      [[FN1:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN1]]([[ORIGINAL_ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ORIGINAL_ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [[ORIGINAL_ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -149,8 +149,8 @@ func fallthroughWithValue(e: E) {
   // CHECK:      bb2:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] $Any
-  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
-  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
+  // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
+  // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]

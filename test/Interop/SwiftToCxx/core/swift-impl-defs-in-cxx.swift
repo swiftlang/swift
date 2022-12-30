@@ -98,23 +98,12 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
-// CHECK-NEXT: /// Naive exception class that should be thrown
-// CHECK-NEXT: class NaiveException : public swift::Error {
-// CHECK-NEXT: public:
-// CHECK-NEXT: inline NaiveException(const char * _Nonnull msg) noexcept : msg_(msg) { }
-// CHECK-NEXT: inline NaiveException(NaiveException&& other) noexcept : msg_(other.msg_) { other.msg_ = nullptr; }
-// CHECK-NEXT: inline ~NaiveException() noexcept { }
-// CHECK-NEXT: void operator =(NaiveException&& other) noexcept { auto temp = msg_; msg_ = other.msg_; other.msg_ = temp; }
-// CHECK-NEXT: void operator =(const NaiveException&) noexcept = delete;
-// CHECK-NEXT: inline const char * _Nonnull getMessage() const noexcept { return(msg_); }
-// CHECK-NEXT: private:
-// CHECK-NEXT: const char * _Nonnull msg_;
-// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-NEXT: #if __cplusplus > 201402L
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<bool> = true;
 // CHECK-EMPTY:
@@ -235,7 +224,7 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
-// CHECK-NEXT: #endif
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:

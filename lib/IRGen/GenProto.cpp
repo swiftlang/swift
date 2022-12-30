@@ -238,15 +238,15 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
     auto archetype = Generics.getGenericEnvironment()
-                        ->mapTypeIntoContext(reqt.TypeParameter)
+                        ->mapTypeIntoContext(reqt.getTypeParameter())
                         ->getAs<ArchetypeType>();
     assert(archetype && "did not get an archetype by mapping param?");
     auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
     Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
-                         reqt.TypeParameter, erasedTypeParam);
+                         reqt.getTypeParameter(), erasedTypeParam);
 
     MetadataPath path;
-    Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
+    Fulfillments.addFulfillment(reqt,
                                 Sources.size() - 1, std::move(path),
                                 MetadataState::Complete);
   });
@@ -257,17 +257,28 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
                                           const RequirementCallback &callback) {
   if (!signature) return;
 
+  // Get all unique pack generic parameter shapes.
+  SmallSetVector<CanType, 2> packs;
+  for (auto gp : signature.getGenericParams()) {
+    if (gp->isParameterPack()) {
+      packs.insert(signature->getReducedShape(gp)->getCanonicalType());
+    }
+  }
+
+  for (auto type : packs)
+    callback(GenericRequirement::forShape(type));
+
   // Get all of the type metadata.
   signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (canonical)
-      callback({CanType(gp), nullptr});
+      callback(GenericRequirement::forMetadata(CanType(gp)));
   });
 
   // Get the protocol conformances.
   for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
-      case RequirementKind::SameCount:
+      case RequirementKind::SameShape:
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:
@@ -277,7 +288,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
         auto type = CanType(reqt.getFirstType());
         auto protocol = reqt.getProtocolDecl();
         if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol)) {
-          callback({type, protocol});
+          callback(GenericRequirement::forWitnessTable(type, protocol));
         }
         continue;
       }
@@ -294,16 +305,8 @@ PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback
 void PolymorphicConvention::
 enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
   enumerateRequirements([&](GenericRequirement requirement) {
-    if (requirement.Protocol) {
-      if (!Fulfillments.getWitnessTable(requirement.TypeParameter,
-                                        requirement.Protocol)) {
-        callback(requirement);
-      }
-    } else {
-      if (!Fulfillments.getTypeMetadata(requirement.TypeParameter)) {
-        callback(requirement);
-      }
-    }
+    if (!Fulfillments.getFulfillment(requirement))
+      callback(requirement);
   });
 }
 
@@ -385,7 +388,6 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
       // we don't bother, for no good reason. But if this is 'self',
       // consider passing an extra metatype.
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -440,7 +442,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
 
 void PolymorphicConvention::addSelfMetadataFulfillment(CanType arg) {
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, nullptr},
+  Fulfillments.addFulfillment(GenericRequirement::forMetadata(arg),
                               source, MetadataPath(), MetadataState::Complete);
 }
 
@@ -448,7 +450,7 @@ void PolymorphicConvention::addSelfWitnessTableFulfillment(
     CanType arg, ProtocolConformanceRef conformance) {
   auto proto = conformance.getRequirement();
   unsigned source = Sources.size() - 1;
-  Fulfillments.addFulfillment({arg, proto},
+  Fulfillments.addFulfillment(GenericRequirement::forWitnessTable(arg, proto),
                               source, MetadataPath(), MetadataState::Complete);
 
   if (conformance.isConcrete()) {
@@ -1057,9 +1059,9 @@ static llvm::Value *emitWitnessTableAccessorCall(
   auto conditionalTables =
       emitConditionalConformancesBuffer(IGF, conformance);
 
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetWitnessTableFn(),
-                                     {conformanceDescriptor, *srcMetadataCache,
-                                      conditionalTables});
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetWitnessTableFunctionPointer(),
+      {conformanceDescriptor, *srcMetadataCache, conditionalTables});
 
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
@@ -1091,13 +1093,13 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   auto cacheVariable =
       cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
           rootConformance, conformingType, ForDefinition));
-  emitCacheAccessFunction(IGM, accessor, cacheVariable, CacheStrategy::Lazy,
-                          [&](IRGenFunction &IGF, Explosion &params) {
-    llvm::Value *conformingMetadataCache = nullptr;
-    return MetadataResponse::forComplete(
-             emitWitnessTableAccessorCall(IGF, conformance,
-                                          &conformingMetadataCache));
-  });
+  emitCacheAccessFunction(
+      IGM, accessor, cacheVariable, IGM.WitnessTablePtrTy, CacheStrategy::Lazy,
+      [&](IRGenFunction &IGF, Explosion &params) {
+        llvm::Value *conformingMetadataCache = nullptr;
+        return MetadataResponse::forComplete(emitWitnessTableAccessorCall(
+            IGF, conformance, &conformingMetadataCache));
+      });
 
   return accessor;
 }
@@ -1178,7 +1180,8 @@ public:
     // Otherwise, call a lazy-cache function.
     auto accessor =
       getWitnessTableLazyAccessFunction(IGF.IGM, Conformance);
-    llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
+    llvm::CallInst *call =
+        IGF.Builder.CreateCall(accessor->getFunctionType(), accessor, {});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotAccessMemory();
     call->setDoesNotThrow();
@@ -1511,8 +1514,8 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto witness = llvm::ConstantExpr::getBitCast(typeRef, Int8PtrTy);
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(
-    witness->getType()->getPointerElementType(), witness, bitConstant);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, witness,
+                                                      bitConstant);
 }
 
 static void buildAssociatedTypeValueName(CanType depAssociatedType,
@@ -1579,7 +1582,8 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   llvm::Value *self = parameters.claimNext();
   setTypeMetadataName(IGM, self, ConcreteType);
 
-  Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
+  Address destTable(parameters.claimNext(), IGM.WitnessTableTy,
+                    IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
 
@@ -1757,7 +1761,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
 
   // Break out the parameters.
   Explosion params = IGF.collectParameters();
-  Address wtable(params.claimNext(), PointerAlignment);
+  Address wtable(params.claimNext(), IGM.WitnessTableTy, PointerAlignment);
   llvm::Value *metadata = params.claimNext();
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, metadata,
                                         MetadataState::Complete);
@@ -1765,7 +1769,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   Address conditionalTables(
       IGF.Builder.CreateBitCast(instantiationArgs,
                                 IGF.IGM.WitnessTablePtrPtrTy),
-      PointerAlignment);
+      IGM.WitnessTablePtrTy, PointerAlignment);
 
   // Register local type data for the conditional conformance witness tables.
   for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
@@ -2496,13 +2500,10 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   auto baseDescriptor =
     IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(sourceProtocol);
 
-  auto call =
-    IGF.Builder.CreateCall(IGF.IGM.getGetAssociatedConformanceWitnessFn(),
-                           {
-                             wtable, parentMetadata,
-                             associatedTypeMetadata,
-                             baseDescriptor, assocConformanceDescriptor
-                           });
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetAssociatedConformanceWitnessFunctionPointer(),
+      {wtable, parentMetadata, associatedTypeMetadata, baseDescriptor,
+       assocConformanceDescriptor});
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return call;
@@ -2533,14 +2534,14 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     auto module = IGF.getSwiftModule();
     auto subs = sourceKey.Type->getContextSubstitutionMap(module, nominal);
-    auto sub = requirement.TypeParameter.subst(subs)->getCanonicalType();
+    auto sub = requirement.getTypeParameter().subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.
     sourceKey.Type = sub;
 
     // If this is a type argument, we've fully updated sourceKey.
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
-      assert(!requirement.Protocol && "index mismatch!");
+      assert(requirement.isMetadata() && "index mismatch!");
 
       if (!source) return MetadataResponse();
 
@@ -2561,10 +2562,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     // Otherwise, we need to switch sourceKey.Kind to the appropriate
     // conformance kind.
     } else {
-      assert(requirement.Protocol && "index mismatch!");
-      auto conformance = subs.lookupConformance(requirement.TypeParameter,
-                                                requirement.Protocol);
-      assert(conformance.getRequirement() == requirement.Protocol);
+      assert(requirement.isWitnessTable() && "index mismatch!");
+      auto conformance = subs.lookupConformance(requirement.getTypeParameter(),
+                                                requirement.getProtocol());
+      assert(conformance.getRequirement() == requirement.getProtocol());
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
       if (!source) return MetadataResponse();
@@ -2881,8 +2882,9 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
   emitInitOfGenericRequirementsBuffer(
       IGF, bindings.getRequirements(), buffer,
       [&](GenericRequirement requirement) -> llvm::Value * {
-        CanType type = requirement.TypeParameter;
-        if (auto protocol = requirement.Protocol) {
+        if (requirement.isWitnessTable()) {
+          CanType type = requirement.getTypeParameter();
+          auto protocol = requirement.getProtocol();
           CanArchetypeType archetype;
           ProtocolConformanceRef conformance =
               bindings.getConformance(requirement);
@@ -2895,6 +2897,8 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
             return transform(requirement, wtable);
           }
         } else {
+          assert(requirement.isMetadata());
+          CanType type = requirement.getTypeParameter();
           auto metadata = IGF.emitTypeMetadataRef(type);
           return transform(requirement, metadata);
         }
@@ -2920,14 +2924,6 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 
 void NecessaryBindings::addTypeMetadata(CanType type) {
   assert(!isa<InOutType>(type));
-
-  // If the bindings are for an async function, we will always need the type
-  // metadata.  The opportunities to reconstruct it available in the context of
-  // partial apply forwarders are not available here.
-  if (forAsyncFunction()) {
-    addRequirement({type, nullptr});
-    return;
-  }
 
   // Bindings are only necessary at all if the type is dependent.
   if (!type->hasArchetype())
@@ -2957,7 +2953,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   // Generic types are trickier, because they can require conformances.
 
   // Otherwise, just record the need for this metadata.
-  addRequirement({type, nullptr});
+  addRequirement(GenericRequirement::forMetadata(type));
 }
 
 /// Add all the abstract conditional conformances in the specialized
@@ -2974,7 +2970,7 @@ void NecessaryBindings::addAbstractConditionalRequirements(
     auto archetype = dyn_cast<ArchetypeType>(ty);
     if (!archetype)
       continue;
-    addRequirement({ty, proto});
+    addRequirement(GenericRequirement::forWitnessTable(ty, proto));
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {
@@ -2996,25 +2992,16 @@ void NecessaryBindings::addProtocolConformance(CanType type,
         dyn_cast<SpecializedProtocolConformance>(concreteConformance);
     // The partial apply forwarder does not have the context to reconstruct
     // abstract conditional conformance requirements.
-    if (forPartialApply() && specializedConf) {
+    if (specializedConf) {
       addAbstractConditionalRequirements(specializedConf);
-    } else if (forAsyncFunction()) {
-      ProtocolDecl *protocol = conf.getRequirement();
-      GenericRequirement requirement;
-      requirement.TypeParameter = type;
-      requirement.Protocol = protocol;
-      std::pair<GenericRequirement, ProtocolConformanceRef> pair{requirement,
-                                                                 conf};
-      Conformances.insert(pair);
-      addRequirement({type, concreteConformance->getProtocol()});
     }
     return;
   }
-  assert(isa<ArchetypeType>(type) || forAsyncFunction());
+  assert(isa<ArchetypeType>(type));
 
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
-  addRequirement({type, conf.getAbstract()});
+  addRequirement(GenericRequirement::forWitnessTable(type, conf.getAbstract()));
 }
 
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
@@ -3167,8 +3154,8 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   // For now, treat all archetypes independently.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
     llvm::Value *requiredValue =
-      emitGenericRequirementFromSubstitutions(IGF, Generics,
-                                              requirement, subs);
+      emitGenericRequirementFromSubstitutions(IGF, requirement, subs,
+                                              MetadataState::Complete);
     out.add(requiredValue);
   });
 
@@ -3205,29 +3192,20 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   }
 }
 
-NecessaryBindings NecessaryBindings::forAsyncFunctionInvocation(
-    IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs) {
-  return computeBindings(IGM, origType, subs,
-                         false /*forPartialApplyForwarder*/);
-}
-
 NecessaryBindings
 NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
                                           CanSILFunctionType origType,
                                           SubstitutionMap subs,
                                           bool considerParameterSources) {
   return computeBindings(IGM, origType, subs,
-                         true  /*forPartialApplyForwarder*/,
                          considerParameterSources);
 }
 
 NecessaryBindings NecessaryBindings::computeBindings(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
-    bool forPartialApplyForwarder, bool considerParameterSources) {
+    bool considerParameterSources) {
 
   NecessaryBindings bindings;
-  bindings.kind =
-      forPartialApplyForwarder ? Kind::PartialApply : Kind::AsyncFunction;
 
   // Bail out early if we don't have polymorphic parameters.
   if (!hasPolymorphicParameters(origType))
@@ -3250,9 +3228,7 @@ NecessaryBindings NecessaryBindings::computeBindings(
     case MetadataSource::Kind::SelfMetadata:
       // Async functions pass the SelfMetadata and SelfWitnessTable parameters
       // along explicitly.
-      if (forPartialApplyForwarder) {
-        bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
-      }
+      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:
@@ -3269,13 +3245,15 @@ NecessaryBindings NecessaryBindings::computeBindings(
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
                                         [&](GenericRequirement requirement) {
-    CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
+    CanType type = requirement.getTypeParameter().subst(subs)
+        ->getCanonicalType();
 
-    if (requirement.Protocol) {
-      auto conf = subs.lookupConformance(requirement.TypeParameter,
-                                         requirement.Protocol);
+    if (requirement.isWitnessTable()) {
+      auto conf = subs.lookupConformance(requirement.getTypeParameter(),
+                                         requirement.getProtocol());
       bindings.addProtocolConformance(type, conf);
     } else {
+      assert(requirement.isMetadata());
       bindings.addTypeMetadata(type);
     }
   });
@@ -3299,7 +3277,6 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
-  Generics = generics;
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
@@ -3312,30 +3289,11 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
-    assert(generics->isReducedType(reqt.TypeParameter));
+    assert(generics->isReducedType(reqt.getTypeParameter()));
     Requirements.push_back(reqt);
   });
 
   // We do not need to consider extra sources.
-}
-
-void
-GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
-                                               SubstitutionMap subs,
-                                               FulfillmentCallback callback) {
-  if (empty()) return;
-
-  for (auto reqtIndex : indices(getRequirements())) {
-    auto &reqt = getRequirements()[reqtIndex];
-    CanType type = reqt.TypeParameter.subst(subs)->getCanonicalType();
-    if (reqt.Protocol) {
-      auto conformance =
-          subs.lookupConformance(reqt.TypeParameter, reqt.Protocol);
-      callback(reqtIndex, type, conformance);
-    } else {
-      callback(reqtIndex, type, ProtocolConformanceRef::forInvalid());
-    }
-  }
 }
 
 void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
@@ -3345,8 +3303,8 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
 
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {
-    return emitGenericRequirementFromSubstitutions(IGF, Generics,
-                                                   requirement, subs);
+    return emitGenericRequirementFromSubstitutions(IGF, requirement, subs,
+                                                   MetadataState::Complete);
   });
 }
 
@@ -3368,8 +3326,10 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     llvm::Value *value = emitRequirement(requirements[index]);
-    if (requirements[index].Protocol) {
+    if (requirements[index].isWitnessTable()) {
       slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
+    } else {
+      assert(requirements[index].isMetadata());
     }
     IGF.Builder.CreateStore(value, slot);
   }
@@ -3377,23 +3337,28 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
 
 llvm::Value *
 irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
-                                               CanGenericSignature generics,
                                                GenericRequirement requirement,
-                                               SubstitutionMap subs) {
-  CanType depTy = requirement.TypeParameter;
+                                               SubstitutionMap subs,
+                                               DynamicMetadataRequest request) {
+  CanType depTy = requirement.getTypeParameter();
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
-  if (!requirement.Protocol) {
-    auto argMetadata = IGF.emitTypeMetadataRef(argType);
-    return argMetadata;
-  }
+  switch (requirement.getKind()) {
+  case GenericRequirement::Kind::Shape:
+    return IGF.emitPackShapeExpression(argType);
 
-  auto proto = requirement.Protocol;
-  auto conformance = subs.lookupConformance(depTy, proto);
-  assert(conformance.getRequirement() == proto);
-  llvm::Value *metadata = nullptr;
-  auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);
-  return wtable;
+  case GenericRequirement::Kind::Metadata:
+    return IGF.emitTypeMetadataRef(argType, request).getMetadata();
+
+  case GenericRequirement::Kind::WitnessTable: {
+    auto proto = requirement.getProtocol();
+    auto conformance = subs.lookupConformance(depTy, proto);
+    assert(conformance.getRequirement() == proto);
+    llvm::Value *metadata = nullptr;
+    auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);
+    return wtable;
+  }
+  }
 }
 
 void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
@@ -3423,8 +3388,16 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     // Cast if necessary.
-    if (requirements[index].Protocol) {
+    switch (requirements[index].getKind()) {
+    case GenericRequirement::Kind::Shape:
+      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.SizeTy);
+      break;
+    case GenericRequirement::Kind::Metadata:
+      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.TypeMetadataPtrTy);
+      break;
+    case GenericRequirement::Kind::WitnessTable:
       slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
+      break;
     }
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);
@@ -3439,30 +3412,50 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    MetadataState metadataState,
                                    GetTypeParameterInContextFn getInContext) {
   // Get the corresponding context type.
-  auto type = getInContext(requirement.TypeParameter);
+  auto type = getInContext(requirement.getTypeParameter());
 
-  if (auto proto = requirement.Protocol) {
+  switch (requirement.getKind()) {
+  case GenericRequirement::Kind::Shape: {
+    assert(isa<ArchetypeType>(type));
+    assert(value->getType() == IGF.IGM.SizeTy);
+    auto kind = LocalTypeDataKind::forPackShapeExpression();
+    IGF.setUnscopedLocalTypeData(type, kind, value);
+    break;
+  }
+
+  case GenericRequirement::Kind::Metadata: {
+    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
+    setTypeMetadataName(IGF.IGM, value, type);
+    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
+    break;
+  }
+
+  case GenericRequirement::Kind::WitnessTable: {
+    auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
     assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
     IGF.setUnscopedLocalTypeData(type, kind, value);
-  } else {
-    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
-    setTypeMetadataName(IGF.IGM, value, type);
-    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
+    break;
+  }
   }
 }
 
 namespace {
   /// A class for expanding a polymorphic signature.
   class ExpandPolymorphicSignature : public PolymorphicConvention {
+    unsigned numShapes = 0;
+    unsigned numTypeMetadataPtrs = 0;
+    unsigned numWitnessTablePtrs = 0;
+
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(IGM, fn) {}
 
-    void expand(SmallVectorImpl<llvm::Type *> &out,
-                SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
+    ExpandedSignature
+    expand(SmallVectorImpl<llvm::Type *> &out,
+           SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
       auto outStartSize = out.size();
       (void)outStartSize;
       for (auto &source : getSources())
@@ -3471,11 +3464,24 @@ namespace {
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
           reqs->push_back(reqt);
-        out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
-                                    : IGM.TypeMetadataPtrTy);
+        switch (reqt.getKind()) {
+        case GenericRequirement::Kind::Shape:
+          out.push_back(IGM.SizeTy);
+          ++numShapes;
+          break;
+        case GenericRequirement::Kind::Metadata:
+          out.push_back(IGM.TypeMetadataPtrTy);
+          ++numTypeMetadataPtrs;
+          break;
+        case GenericRequirement::Kind::WitnessTable:
+          out.push_back(IGM.WitnessTablePtrTy);
+          ++numWitnessTablePtrs;
+          break;
+        }
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
+      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs};
     }
 
   private:
@@ -3489,6 +3495,7 @@ namespace {
       case MetadataSource::Kind::GenericLValueMetadata:
         if (reqs)
           reqs->push_back(source);
+        ++numTypeMetadataPtrs;
         return out.push_back(IGM.TypeMetadataPtrTy);
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
@@ -3502,11 +3509,11 @@ namespace {
 } // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
-void irgen::expandPolymorphicSignature(
+ExpandedSignature irgen::expandPolymorphicSignature(
     IRGenModule &IGM, CanSILFunctionType polyFn,
     SmallVectorImpl<llvm::Type *> &out,
     SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs) {
-  ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
+  return ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
 }
 
 void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
@@ -3529,9 +3536,7 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
   if (IGF.IGM.getOptions().WitnessMethodElimination) {
     // For LLVM IR WME, emit a @llvm.type.checked.load with the type of the
     // method.
-    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
-    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto slotAsPointer = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int8Ty);
     auto typeId = typeIdForMethod(IGF.IGM, member);
 
     // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
@@ -3544,8 +3549,8 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad =
-        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::type_checked_load, args);
     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
   }
 
@@ -3579,7 +3584,8 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                      : IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), member);
 
-  return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
+  return FunctionPointer::createSigned(fnType, witnessFnPtr, authInfo,
+                                       signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(
@@ -3640,12 +3646,10 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
     IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
 
   // Call swift_getAssociatedTypeWitness().
-  auto call = IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFn(),
-                                     { request.get(IGF),
-                                       wtable,
-                                       parentMetadata,
-                                       reqBaseDescriptor,
-                                       assocTypeDescriptor });
+  auto call =
+      IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFunctionPointer(),
+                             {request.get(IGF), wtable, parentMetadata,
+                              reqBaseDescriptor, assocTypeDescriptor});
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return MetadataResponse::handle(IGF, request, call);

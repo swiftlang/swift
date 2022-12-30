@@ -14,7 +14,7 @@ func testSwitchOnExistential(_ value: Any) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10switch_isa23testSwitchOnExistentialyyypF :
 // CHECK:   [[ANY:%.*]] = alloc_stack $Any
-// CHECK:   copy_addr %0 to [initialization] [[ANY]]
+// CHECK:   copy_addr %0 to [init] [[ANY]]
 // CHECK:   [[BOOL:%.*]] = alloc_stack $Bool
 // CHECK:   checked_cast_addr_br copy_on_success Any in [[ANY]] : $*Any to Bool in [[BOOL]] : $*Bool, [[IS_BOOL:bb[0-9]+]], [[IS_NOT_BOOL:bb[0-9]+]]
 // CHECK: [[IS_BOOL]]:

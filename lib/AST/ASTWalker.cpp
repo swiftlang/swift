@@ -275,23 +275,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
-    for (const auto &Inherit: TPD->getInherited()) {
+  bool visitGenericTypeParamDecl(GenericTypeParamDecl *GTPD) {
+    for (const auto &Inherit: GTPD->getInherited()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
     }
+    return false;
+  }
 
-    if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
-      if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
-        if (doIt(DefaultTy))
+  bool visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
+    for (const auto &Inherit: ATD->getInherited()) {
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(TyR))
           return true;
+    }
+    if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
+      if (doIt(DefaultTy))
+        return true;
 
-      if (auto *WhereClause = ATD->getTrailingWhereClause()) {
-        for (auto &Req: WhereClause->getRequirements()) {
-          if (doIt(Req))
-            return true;
-        }
+    if (auto *WhereClause = ATD->getTrailingWhereClause()) {
+      for (auto &Req: WhereClause->getRequirements()) {
+        if (doIt(Req))
+          return true;
       }
     }
     return false;
@@ -398,6 +404,32 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    return false;
+  }
+
+  bool visitMacroDecl(MacroDecl *MD) {
+    bool WalkGenerics = visitGenericParamListIfNeeded(MD);
+
+    if (MD->parameterList && visit(MD->parameterList))
+      return true;
+
+    if (auto resultTypeRepr = MD->resultType.getTypeRepr()) {
+      if (doIt(resultTypeRepr))
+        return true;
+    }
+
+    // Visit trailing requirements
+    if (WalkGenerics && visitTrailingRequirements(MD))
+       return true;
+
+    return false;
+  }
+
+  bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    if (MED->getArgs() && doIt(MED->getArgs()))
+      return true;
+    if (MED->getRewritten() && doIt(MED->getRewritten()))
+      return true;
     return false;
   }
 
@@ -625,16 +657,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     return E;
   }
-  Expr *visitPackExpr(PackExpr *E) {
-    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
-      if (E->getElement(i)) {
-        if (Expr *Elt = doIt(E->getElement(i)))
-          E->setElement(i, Elt);
-        else
-          return nullptr;
-      }
-    return E;
-  }
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -824,6 +846,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
+  Expr *visitPackExpansionExpr(PackExpansionExpr *E) {
+    if (Expr *pattern = doIt(E->getPatternExpr())) {
+      E->setPatternExpr(pattern);
+      return E;
+    }
+    return nullptr;
+  }
+
+  Expr *visitPackElementExpr(PackElementExpr *E) {
+    if (Expr *pattern = doIt(E->getPackRefExpr())) {
+      E->setPackRefExpr(pattern);
       return E;
     }
     return nullptr;
@@ -1237,6 +1275,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    return E;
+  }
+
+  Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    Expr *rewritten = nullptr;
+    if (E->getRewritten()) {
+      rewritten = doIt(E->getRewritten());
+      if (!rewritten) return nullptr;
+    }
+    ArgumentList *args = nullptr;
+    if (E->getArgs()) {
+      args = doIt(E->getArgs());
+      if (!args) return nullptr;
+    }
+    E->setRewritten(rewritten);
+    E->setArgs(args);
     return E;
   }
 
@@ -1947,6 +2001,10 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
 }
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
+}
+
+bool Traversal::visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+  return doIt(T->getPackType());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {

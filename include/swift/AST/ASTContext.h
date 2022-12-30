@@ -87,7 +87,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class ModuleDependencies;
+  class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -141,10 +141,6 @@ namespace namelookup {
 
 namespace rewriting {
   class RewriteContext;
-}
-
-namespace syntax {
-  class SyntaxArena;
 }
 
 namespace ide {
@@ -292,6 +288,11 @@ public:
 
   ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
+  /// A callback that will be called when the constraint system found a
+  /// solution. Called multiple times if the constraint system has ambiguous
+  /// solutions.
+  ide::TypeCheckCompletionCallback *SolutionCallback = nullptr;
+
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
 
@@ -306,6 +307,10 @@ public:
 
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
+
+  /// Should we globally ignore swiftmodule files adjacent to swiftinterface
+  /// files?
+  bool IgnoreAdjacentModules = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -492,9 +497,6 @@ public:
                                               arena),
                               setVector.size());
   }
-
-  /// Retrieve the syntax node memory manager for this context.
-  llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
@@ -991,16 +993,16 @@ public:
   ///
   /// \param isUnderlyingClangModule When true, only look for a Clang module
   /// with the given name, ignoring any Swift modules.
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<ModuleDependencyInfo> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
       bool cacheOnly = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<ModuleDependencies> getSwiftModuleDependencies(
+  Optional<ModuleDependencyInfo> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
@@ -1136,9 +1138,12 @@ public:
   ///
   /// \param ModulePath The module's \c ImportPath which describes
   /// the name of the module being loaded, possibly including submodules.
-
+  /// \param AllowMemoryCached Should we allow reuse of an already loaded
+  /// module or force reloading from disk, defaults to true.
+  ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ImportPath::Module ModulePath);
+  ModuleDecl *
+  getModule(ImportPath::Module ModulePath, bool AllowMemoryCached = true);
 
   /// Attempts to load the matching overlay module for the given clang
   /// module into this ASTContext.
@@ -1165,7 +1170,10 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
-public:
+  /// Change the behavior of all loaders to ignore swiftmodules next to
+  /// swiftinterfaces.
+  void setIgnoreAdjacentModules(bool value);
+
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.
@@ -1357,7 +1365,7 @@ public:
   /// Get a generic signature where the generic parameter τ_d_i represents
   /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
   ///
-  /// This drops the @_typeSequence attribute from each generic parameter,
+  /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig);
 
@@ -1435,6 +1443,10 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
+  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
+  /// search within the library.
+  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
+
 private:
   friend Decl;
 
@@ -1446,6 +1458,8 @@ private:
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
+
+  void loadCompilerPlugins();
 
   friend TypeBase;
   friend ArchetypeType;

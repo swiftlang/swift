@@ -409,7 +409,7 @@ void checkCompletenessOfPrespecializations(SILModule &M);
 ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                          const ReabstractionInfo &ReInfo);
 
-/// Returns a SILFunction for the symbol specified by FunctioName if it is
+/// Returns a SILFunction for the symbol specified by FunctionName if it is
 /// visible to the current SILModule. This is used to link call sites to
 /// externally defined specialization and should only be used when the function
 /// body is not required for further optimization or inlining (-Onone).

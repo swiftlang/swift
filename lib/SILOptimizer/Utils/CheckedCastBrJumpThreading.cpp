@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -52,6 +53,11 @@ class CheckedCastBrJumpThreading {
   // Enable non-trivial terminator rewriting in OSSA.
   bool EnableOSSARewriteTerminator;
 
+  InstModCallbacks callbacks;
+
+  // Shared data structures across OwnershipRAUWHelper instances.
+  OwnershipFixupContext rauwContext;
+
   // List of predecessors.
   typedef SmallVector<SILBasicBlock *, 8> PredList;
 
@@ -82,8 +88,10 @@ class CheckedCastBrJumpThreading {
     // Copy of CheckedCastBrJumpThreading::FailurePreds.
     PredList FailurePreds;
     // The argument of the dominating checked_cast_br's successor block.
-    SILValue SuccessArg;
+    SILPhiArgument *SuccessArg;
 
+    // True if the dominating check is inverted AND all the predecessors are on
+    // the dominating check's success path.
     bool InvertSuccess;
 
     // True if CheckedCastBrJumpThreading::numUnknownPreds is not 0.
@@ -92,13 +100,16 @@ class CheckedCastBrJumpThreading {
     Edit(SILBasicBlock *CCBBlock, bool InvertSuccess,
          const PredList &SuccessPreds,
          const PredList &FailurePreds,
-         bool hasUnknownPreds, SILValue SuccessArg) :
+         bool hasUnknownPreds, SILPhiArgument *SuccessArg) :
       CCBBlock(CCBBlock), SuccessPreds(SuccessPreds), FailurePreds(FailurePreds),
       SuccessArg(SuccessArg), InvertSuccess(InvertSuccess),
       hasUnknownPreds(hasUnknownPreds) { }
 
+    bool canRAUW(OwnershipFixupContext &rauwContext);
+
     void modifyCFGForFailurePreds(BasicBlockCloner &Cloner);
-    void modifyCFGForSuccessPreds(BasicBlockCloner &Cloner);
+    void modifyCFGForSuccessPreds(BasicBlockCloner &Cloner,
+                                  OwnershipFixupContext &rauwContext);
   };
 
   // Contains an entry for each checked_cast_br to be optimized.
@@ -135,6 +146,7 @@ public:
       bool EnableOSSARewriteTerminator)
       : Fn(Fn), DT(DT), deBlocks(deBlocks),
         EnableOSSARewriteTerminator(EnableOSSARewriteTerminator),
+        rauwContext(callbacks, *deBlocks),
         BlocksForWorklist(BlocksForWorklist), BlocksToEdit(Fn),
         BlocksToClone(Fn) {}
 
@@ -238,8 +250,54 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
   }
 }
 
-/// Create a copy of the BB as a landing BB
-/// for all FailurePreds.
+// Return false if an ownership RAUW is necessary but cannot be performed.
+bool CheckedCastBrJumpThreading::Edit::
+canRAUW(OwnershipFixupContext &rauwContext) {
+  if (InvertSuccess || (SuccessPreds.empty() && !hasUnknownPreds))
+    return true;
+
+  auto *ccbi = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
+  auto *oldSuccessArg = ccbi->getSuccessBB()->getArgument(0);
+  // Check the ownership validity of the RAUW transformation that will replace
+  // oldSuccessArg with SuccessArg. This is valid iff it will be valid to
+  // replace the new checked_cast_br. The new checked_cast_br will be in a
+  // cloned block reachable from a subset of the original block's predecessors,
+  // it will have equivalent operands. Checking the current uses is unnecessary,
+  // because after cloning, the only use of the cloned checked_cast_br will be
+  // a phi in the successor. It is always valid to replace a phi use, because
+  // phi itself already guarantees that lifetime extends over its own uses.
+  return OwnershipRAUWHelper::hasValidNonLexicalRAUWOwnership(oldSuccessArg,
+                                                              SuccessArg);
+}
+
+// Erase the checked_cast_br that terminates this block. The caller must replace
+// and erase the successful cast result.
+//
+// The checked_cast_br failure result's uses are replaced with the cast's
+// operand, and the block argument representing that result is deleted. Since
+// the checked_cast's uses now use its forwarded operand, they are still in
+// valid OSSA form, so this can be done before updateOSSAAfterCloning, which
+// doesn't need to know about the erased checked_cast.
+static void eraseCheckedCastBr(
+  CheckedCastBranchInst *checkedCastBr,
+  CheckedCastBranchInst::SuccessorPath successorIdx) {
+
+  SILBuilderWithScope Builder(checkedCastBr);
+  Builder.createBranch(checkedCastBr->getLoc(),
+                       checkedCastBr->getSuccessors()[successorIdx]);
+  auto *successBB = checkedCastBr->getSuccessBB();
+  assert(successBB->getNumArguments() == 1);
+  assert(successBB->getArgument(0)->use_empty());
+  successBB->eraseArgument(0);
+  if (checkedCastBr->getFunction()->hasOwnership()) {
+    auto *failureBB = checkedCastBr->getFailureBB();
+    assert(failureBB->getNumArguments() == 1);
+    failureBB->getArgument(0)->replaceAllUsesWith(checkedCastBr->getOperand());
+    failureBB->eraseArgument(0);
+  }
+  checkedCastBr->eraseFromParent();
+}
+
 void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
     BasicBlockCloner &Cloner) {
   if (FailurePreds.empty())
@@ -248,12 +306,13 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
   assert(!Cloner.wasCloned());
   Cloner.cloneBlock();
   SILBasicBlock *TargetFailureBB = Cloner.getNewBB();
+  // This cloned block branches to the FailureBB, so just delete the cast and
+  // ignore the success target which will keep it's original predecessor.
   auto *clonedCCBI =
-      cast<CheckedCastBranchInst>(TargetFailureBB->getTerminator());
-  SILBuilderWithScope Builder(clonedCCBI);
-  // This BB copy branches to the FailureBB.
-  Builder.createBranch(clonedCCBI->getLoc(), clonedCCBI->getFailureBB());
-  clonedCCBI->eraseFromParent();
+    cast<CheckedCastBranchInst>(TargetFailureBB->getTerminator());
+  auto *clonedSuccessArg = clonedCCBI->getSuccessBB()->getArgument(0);
+  clonedSuccessArg->replaceAllUsesWithUndef();
+  eraseCheckedCastBr(clonedCCBI, CheckedCastBranchInst::FailIdx);
 
   // Redirect all FailurePreds to the copy of BB.
   for (auto *Pred : FailurePreds) {
@@ -262,62 +321,93 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
     replaceBranchTarget(TI, CCBBlock, TargetFailureBB,
     /*PreserveArgs=*/true);
   }
+  Cloner.updateOSSAAfterCloning();
 }
 
-/// Create a copy of the BB or reuse BB as
-/// a landing basic block for all FailurePreds.
+/// Create a copy of the BB or reuse BB as a landing basic block for all
+/// FailurePreds.
+///
+/// Note: must be called after modifyCFGForFailurePreds and
+/// before modifyCFGForUnknownPreds.
 void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
-    BasicBlockCloner &Cloner) {
+  BasicBlockCloner &Cloner, OwnershipFixupContext &rauwContext) {
 
-  if (InvertSuccess) {
-    auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
-    SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
-                                           CCBI->getFailureBB());
-    CCBI->eraseFromParent();
+  auto *checkedCastBr = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
+  auto *oldSuccessArg = checkedCastBr->getSuccessBB()->getArgument(0);
+  if (InvertSuccess || (SuccessPreds.empty() && !hasUnknownPreds)) {
+    assert(!hasUnknownPreds && "is not handled, should have been checked");
+    // This success path is unused, so undef its uses and delete the cast.
+    oldSuccessArg->replaceAllUsesWithUndef();
+    eraseCheckedCastBr(checkedCastBr, CheckedCastBranchInst::FailIdx);
     return;
   }
-  if (hasUnknownPreds) {
-    if (!SuccessPreds.empty()) {
-      // Create a copy of the BB as a landing BB.
-      // for all SuccessPreds.
-      assert(!Cloner.wasCloned());
-      Cloner.cloneBlock();
-      SILBasicBlock *TargetSuccessBB = Cloner.getNewBB();
-      auto *clonedCCBI =
-          cast<CheckedCastBranchInst>(TargetSuccessBB->getTerminator());
-      SILBuilderWithScope Builder(clonedCCBI);
-      // This BB copy branches to SuccessBB.
-      // Take argument value from the dominating BB.
-      Builder.createBranch(clonedCCBI->getLoc(), clonedCCBI->getSuccessBB(),
-                           {SuccessArg});
-      clonedCCBI->eraseFromParent();
+  if (!hasUnknownPreds) {
+    // All predecessors are dominated by a successful cast. So the current BB
+    // can be re-used instead as their target.
+    //
+    // NOTE: Assumes that failure predecessors have already been processed and
+    // removed from the current block's predecessors.
 
-      // Redirect all SuccessPreds to the copy of BB.
-      for (auto *Pred : SuccessPreds) {
-        TermInst *TI = Pred->getTerminator();
-        // Replace branch to BB by branch to TargetSuccessBB.
-        replaceBranchTarget(TI, CCBBlock, TargetSuccessBB, /*PreserveArgs=*/true);
-      }
-    }
+    // Replace uses with SuccessArg from the dominating BB. Do this while it is
+    // still a valid terminator result, before erasing the cast.
+    OwnershipRAUWHelper rauwTransform(rauwContext, oldSuccessArg, SuccessArg);
+    assert(rauwTransform.isValid() && "sufficiently checked by canRAUW");
+    rauwTransform.perform();
+
+    eraseCheckedCastBr(checkedCastBr, CheckedCastBranchInst::SuccessIdx);
     return;
   }
-  // There are no predecessors where it is not clear
-  // if they are dominated by a success or failure branch
-  // of DomBB. Therefore, there is no need to clone
-  // the BB for SuccessPreds. Current BB can be re-used
-  // instead as their target.
+  // Only clone if there are preds on the success path.
+  if (SuccessPreds.empty())
+    return;
 
-  // Add an unconditional jump at the end of the block.
-  // Take argument value from the dominating BB
-  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
-  SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
-                                         {SuccessArg});
-  CCBI->eraseFromParent();
+  // Create a copy of the BB as a landing BB.
+  // for all SuccessPreds.
+  assert(!Cloner.wasCloned());
+  Cloner.cloneBlock();
+  SILBasicBlock *clonedCCBBlock = Cloner.getNewBB();
+  // Redirect all SuccessPreds to the copy of BB.
+  for (auto *Pred : SuccessPreds) {
+    TermInst *TI = Pred->getTerminator();
+    // Replace branch to BB by branch to TargetSuccessBB.
+    replaceBranchTarget(TI, CCBBlock, clonedCCBBlock,
+                        /*PreserveArgs=*/true);
+  }
+  // Remove the unreachable checked_cast_br target.
+  auto *clonedCCBI =
+      cast<CheckedCastBranchInst>(clonedCCBBlock->getTerminator());
+  auto *successBB = clonedCCBI->getSuccessBB();
+  // This cloned block branches to the successBB.
+  // The checked_cast_br uses are replaced with SuccessArg.
+  if (!CCBBlock->getParent()->hasOwnership()) {
+    SILBuilderWithScope Builder(clonedCCBI);
+    Builder.createBranch(clonedCCBI->getLoc(), successBB, {SuccessArg});
+    clonedCCBI->eraseFromParent();
+    Cloner.updateOSSAAfterCloning();
+    return;
+  }
+  // Remove all uses from the failure path so RAUW can erase the
+  // terminator after replacing the successor argument.
+  auto *failureBB = clonedCCBI->getFailureBB();
+  assert(failureBB->getNumArguments() == 1 && "expecting term result");
+  failureBB->getArgument(0)->replaceAllUsesWithUndef();
+
+  // Create nested borrow scopes for new phis either created for the
+  // checked_cast's results or during SSA update. This puts the SIL in
+  // valid OSSA form before calling OwnershipRAUWHelper.
+  Cloner.updateOSSAAfterCloning();
+
+  auto *clonedSuccessArg = successBB->getArgument(0);
+  OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg);
+  assert(rauwUtil.isValid() && "sufficiently checked by canRAUW");
+  rauwUtil.perform();
+
+  eraseCheckedCastBr(clonedCCBI, CheckedCastBranchInst::SuccessIdx);
 }
 
 /// Handle a special case, where ArgBB is the entry block.
-bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
-                                                CheckedCastBranchInst *DomCCBI) {
+bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(
+    SILBasicBlock *ArgBB, CheckedCastBranchInst *DomCCBI) {
   if (!ArgBB->pred_empty())
     return false;
 
@@ -644,7 +734,8 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // Record what we want to change.
     Edit *edit = new (EditAllocator.Allocate())
         Edit(BB, InvertSuccess, SuccessPreds, FailurePreds,
-             numUnknownPreds != 0, DomCCBI->getSuccessBB()->getArgument(0));
+             numUnknownPreds != 0,
+             cast<SILPhiArgument>(DomCCBI->getSuccessBB()->getArgument(0)));
     Edits.push_back(edit);
 
     return true;
@@ -680,16 +771,22 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
+    if (edit->SuccessArg->isErased())
+      continue;
+
     BasicBlockCloner Cloner(edit->CCBBlock, deBlocks);
     if (!Cloner.canCloneBlock())
       continue;
+
+   if (Fn->hasOwnership() && !edit->canRAUW(rauwContext))
+     continue;
 
     // Create a copy of the BB as a landing BB
     // for all FailurePreds.
     edit->modifyCFGForFailurePreds(Cloner);
     // Create a copy of the BB or reuse BB as
     // a landing basic block for all SuccessPreds.
-    edit->modifyCFGForSuccessPreds(Cloner);
+    edit->modifyCFGForSuccessPreds(Cloner, rauwContext);
 
     if (Cloner.wasCloned()) {
       Cloner.updateOSSAAfterCloning();

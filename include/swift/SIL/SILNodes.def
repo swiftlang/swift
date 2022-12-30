@@ -347,7 +347,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
+    SINGLE_VALUE_INST(HasSymbolInst, has_symbol,
+                      LiteralInst, MayRead, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, HasSymbolInst)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
@@ -764,6 +766,8 @@ NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugValueInst, debug_value,
+               SILInstruction, None, DoesNotRelease)
+NON_VALUE_INST(TestSpecificationInst, test_specification,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NON_VALUE_INST(Store##Name##Inst, store_##name, \

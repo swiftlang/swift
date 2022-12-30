@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
 
 import DependentTypes
 

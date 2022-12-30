@@ -41,8 +41,8 @@ void TaskProcessInformation::ResourceUsage::provideMapping(json::Output &out) {
 
 void TaskProcessInformation::provideMapping(json::Output &out) {
   out.mapRequired("real_pid", OSPid);
-  if (ProcessUsage.hasValue())
-    out.mapRequired("usage", ProcessUsage.getValue());
+  if (ProcessUsage.has_value())
+    out.mapRequired("usage", ProcessUsage.value());
 }
 }
 }

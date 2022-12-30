@@ -255,7 +255,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
       return Type();
 
     if (!isa<PrimaryArchetypeType>(archetype) &&
-        !isa<SequenceArchetypeType>(archetype))
+        !isa<PackArchetypeType>(archetype))
       return Type();
 
     type = cast<GenericTypeParamType>(
@@ -569,7 +569,7 @@ Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
       }
 
       return GenericTypeParamType::get(
-          gp->isTypeSequence(),
+          gp->isParameterPack(),
           gp->getDepth() + info.OrigDepth - info.BaseDepth,
           gp->getIndex(), info.Ctx);
     }
@@ -623,7 +623,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (how == CombineSubstitutionMaps::AtDepth) {
         if (gp->getDepth() < firstDepthOrIndex)
           return Type();
-        return GenericTypeParamType::get(gp->isTypeSequence(),
+        return GenericTypeParamType::get(gp->isParameterPack(),
                                          gp->getDepth() + secondDepthOrIndex -
                                              firstDepthOrIndex,
                                          gp->getIndex(), ctx);
@@ -633,7 +633,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (gp->getIndex() < firstDepthOrIndex)
         return Type();
       return GenericTypeParamType::get(
-          gp->isTypeSequence(), gp->getDepth(),
+          gp->isParameterPack(), gp->getDepth(),
           gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx);
     }
 

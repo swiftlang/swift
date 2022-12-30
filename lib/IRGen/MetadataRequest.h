@@ -25,6 +25,7 @@ class Constant;
 class Function;
 class GlobalVariable;
 class PHINode;
+class Type;
 class Value;
 }
 
@@ -624,11 +625,9 @@ using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
 
 /// Emit the body of a lazy cache access function.
-void emitCacheAccessFunction(IRGenModule &IGM,
-                             llvm::Function *accessor,
-                             llvm::Constant *cache,
-                             CacheStrategy cacheStrategy,
-                             CacheEmitter getValue,
+void emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
+                             llvm::Constant *cache, llvm::Type *cacheTy,
+                             CacheStrategy cacheStrategy, CacheEmitter getValue,
                              bool isReadNone = true);
 MetadataResponse
 emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,

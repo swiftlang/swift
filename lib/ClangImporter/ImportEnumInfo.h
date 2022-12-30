@@ -159,6 +159,10 @@ StringRef getCommonWordPrefix(StringRef a, StringRef b,
 ///
 /// \see getCommonWordPrefix
 StringRef getCommonPluralPrefix(StringRef singular, StringRef plural);
+
+/// Returns the underlying integer type of an enum. If clang treats the type as
+/// an elaborated type, an unwrapped type is returned.
+const clang::Type *getUnderlyingType(const clang::EnumDecl *decl);
 }
 }
 

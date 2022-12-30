@@ -51,7 +51,7 @@ class CleanupCloner;
 ///   cleanups. This is verified upon construction of an RValue.
 ///
 ///   2. All sub-ManagedValues with non-trivial ValueOwnershipKind must have the
-///   same ValueOwnershipKind. There is a subtle thing occuring here. Since all
+///   same ValueOwnershipKind. There is a subtle thing occurring here. Since all
 ///   addresses are viewed from an ownership perspective as having trivial
 ///   ownership, this causes the verification to ignore address only
 ///   values. Once we transition to opaque values, the verification will

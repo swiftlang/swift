@@ -122,6 +122,11 @@ SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
   return decl->getSourceRangeIncludingAttrs();
 }
 
+SourceRange MacroDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getSourceRangeIncludingAttrs();
+}
+
 SourceRange
 EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
@@ -140,7 +145,7 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   SourceRange range = getPatternEntry().getSourceRange();
-  if (endLoc.hasValue())
+  if (endLoc.has_value())
     range.End = *endLoc;
   return range;
 }
@@ -181,12 +186,12 @@ SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
     return SourceRange(charRange.getStart(), charRange.getEnd());
   }
 
-  if (SF->getTopLevelDecls().empty())
+  if (SF->getTopLevelItems().empty())
     return SourceRange();
 
   // Use the source ranges of the declarations in the file.
-  return SourceRange(SF->getTopLevelDecls().front()->getStartLoc(),
-                     SF->getTopLevelDecls().back()->getEndLoc());
+  return SourceRange(SF->getTopLevelItems().front().getStartLoc(),
+                     SF->getTopLevelItems().back().getEndLoc());
 }
 
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(
@@ -364,7 +369,7 @@ ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
 }
 
 bool ASTScopeImpl::isCharSourceRangeCached() const {
-  return cachedCharSourceRange.hasValue();
+  return cachedCharSourceRange.has_value();
 }
 
 SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {

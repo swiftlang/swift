@@ -21,6 +21,11 @@ private func privateNoArgs() {}
 private func privateSomeArgs(_: Int, x: Int) {}
 private func privateWithDefault(_: Int = 0) {}
 
+public dynamic func publicDynamic() {}
+
+@_dynamicReplacement(for: publicDynamic())
+public func replacementForPublicDynamic() {}
+
 @_cdecl("c_publicNoArgs") public func publicNoArgsCDecl() {}
 @_cdecl("c_publicSomeArgs") public func publicSomeArgsCDecl(_: Int, x: Int) {}
 @_cdecl("c_publicWithDefault") public func publicWithDefaultCDecl(_: Int = 0) {}

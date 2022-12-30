@@ -7,101 +7,97 @@
 
 import Foundation
 
-// CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
-// CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
-// CHECK: [[DEALLOC_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
-
 // CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = internal constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24,
 // CHECK:   i32 17,
 // CHECK:   [17 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strRealProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC11strRealPropSSvgTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC11strRealPropSSvgTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrRealProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC11strRealPropSSvsTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC11strRealPropSSvsTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strFakeProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC11strFakePropSSvgTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC11strFakePropSSvgTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrFakeProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC11strFakePropSSvsTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC11strFakePropSSvsTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrRealProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC13nsstrRealPropSo8NSStringCvgTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC13nsstrRealPropSo8NSStringCvgTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrRealProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC13nsstrRealPropSo8NSStringCvsTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC13nsstrRealPropSo8NSStringCvsTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrFakeProp)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC13nsstrFakePropSo8NSStringCvgTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC13nsstrFakePropSo8NSStringCvgTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrFakeProp:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC13nsstrFakePropSo8NSStringCvsTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC13nsstrFakePropSo8NSStringCvsTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(strResult)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC9strResultSSyFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC9strResultSSyFTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]*}} x i8], [{{[0-9]*}} x i8]* @"\01L_selector_data(strArgWithS:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC6strArg1sySS_tFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC6strArg1sySS_tFTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(nsstrResult)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasC11nsstrResultSo8NSStringCyFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC11nsstrResultSo8NSStringCyFTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(nsstrArgWithS:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @"$s11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.@16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasCACycfcTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasCACycfcTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[DEALLOC_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @".str.7.v16@0:8", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasCfDTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasCfDTo.ptrauth" to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @.str.{{[0-9]+}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @".str.10.v24@0:8@16", i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void (%3*, i8*, %4*)* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo.ptrauth" to i8*)
 // CHECK:     }

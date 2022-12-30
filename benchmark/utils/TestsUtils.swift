@@ -27,7 +27,7 @@ public enum BenchmarkCategory : String {
   case sdk
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.
-  case abstraction, safetychecks, exceptions, bridging, concurrency, existential
+  case abstraction, safetychecks, exceptions, bridging, concurrency, existential, cxxInterop
   case exclusivity, differentiation
 
   // Algorithms are "micro" that test some well-known algorithm in isolation:
@@ -307,6 +307,7 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+@_semantics("optimize.no.crossmodule")
 public func getFalse() -> Bool { return false }
 
 @available(*, deprecated, renamed: "getFalse()")

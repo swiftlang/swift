@@ -866,8 +866,7 @@ bb2:
 
 bb3:
   %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  %2a = begin_borrow %2 : $ThreeDifferingPayloadEnum
-  br bb5(%2a : $ThreeDifferingPayloadEnum)
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %3 = integer_literal $Builtin.Int32, 0
@@ -876,7 +875,6 @@ bb4:
 
 bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
   %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  end_borrow %5 : $ThreeDifferingPayloadEnum
   return %6 : $ThreeDifferingPayloadEnum
 }
 
@@ -894,18 +892,15 @@ bb2:
 
 bb3:
   %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %1 : $Builtin.NativeObject
-  %3a = begin_borrow %3 : $ThreeDifferingPayloadEnum
-  br bb5(%3a : $ThreeDifferingPayloadEnum)
+  br bb5(%3 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %4 = integer_literal $Builtin.Int32, 0
   %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %4 : $Builtin.Int32
-  %5a = begin_borrow %5 : $ThreeDifferingPayloadEnum
-  br bb5(%5a : $ThreeDifferingPayloadEnum)
+  br bb5(%5 : $ThreeDifferingPayloadEnum)
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow %6 : $ThreeDifferingPayloadEnum
   end_borrow %1 : $Builtin.NativeObject
   br bb6(%7 : $ThreeDifferingPayloadEnum)
 
@@ -1372,7 +1367,6 @@ bb2:
   br bb3(%f2thick : $@callee_owned () -> ())
 
 bb3(%fUnknown : @guaranteed $@callee_owned () -> ()):
-  end_borrow %fUnknown : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1437,4 +1431,25 @@ sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_unowned : $@conv
 bb0(%0 : @unowned $ThreeDifferingPayloadEnum):
   %1 = unchecked_enum_data %0 : $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt
   return %1 : $Builtin.Int32
+}
+
+sil [ossa] @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.Word):
+
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = integer_literal $Builtin.Word, 4
+  %5 = integer_literal $Builtin.Word, 5
+  %6 = integer_literal $Builtin.Word, 6
+  %11 = integer_literal $Builtin.Word, 11
+  %22 = integer_literal $Builtin.Word, 22
+  %33 = integer_literal $Builtin.Word, 33
+  %44 = integer_literal $Builtin.Word, 44
+  %55 = integer_literal $Builtin.Word, 55
+  %66 = integer_literal $Builtin.Word, 66
+
+  %10 = select_value %1: $Builtin.Word, case %1: %11, case %2: %22, case %4: %44, case %5: %55, case %6: %66, default %33 : $Builtin.Word
+
+  return %10 : $Builtin.Word
 }

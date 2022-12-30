@@ -46,6 +46,6 @@ func baz() {
 baz()
 
 // IRGEN-LABEL: define {{.*}} @main
-// IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}__tlcd_line
+// IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}main
 // IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}$s18coverage_optimized3bazyyF"
 // IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}$s18coverage_optimized3barSbyF"

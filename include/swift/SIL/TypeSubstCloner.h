@@ -446,8 +446,8 @@ protected:
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
           ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
           ParentFunction->isTransparent(), ParentFunction->isSerialized(),
-          IsNotDynamic, IsNotDistributed, 0, ParentFunction->isThunk(),
-          ParentFunction->getClassSubclassScope());
+          IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, 0,
+          ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
       // Increment the ref count for the inlined function, so it doesn't
       // get deleted before we can emit abstract debug info for it.
       if (!ParentFunction->isZombie()) {

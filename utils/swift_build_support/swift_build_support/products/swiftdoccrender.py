@@ -13,6 +13,7 @@
 import os
 
 from . import product
+from . import swiftdocc
 from .. import shell
 
 
@@ -69,4 +70,4 @@ class SwiftDocCRender(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return []
+        return [swiftdocc.SwiftDocC]

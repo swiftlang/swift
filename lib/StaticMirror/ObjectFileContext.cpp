@@ -521,7 +521,7 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
 }
 
 std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
-    const std::vector<const ObjectFile *> &objectFiles) {
+  const std::vector<const ObjectFile *> &objectFiles, bool ObjCInterop) {
   auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
 
   uint8_t pointerSize;
@@ -530,23 +530,27 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
 
   switch (pointerSize) {
   case 4:
-    return makeReflectionContextForMetadataReader<
-     // FIXME: This could be configurable.
- #if SWIFT_OBJC_INTEROP
-         External<WithObjCInterop<RuntimeTarget<4>>>
- #else
-         External<NoObjCInterop<RuntimeTarget<4>>>
- #endif
-         >(std::move(Reader), pointerSize);
+#define MAKE_CONTEXT(INTEROP, PTRSIZE)                                         \
+  makeReflectionContextForMetadataReader<                                      \
+      External<INTEROP<RuntimeTarget<PTRSIZE>>>>(std::move(Reader),            \
+                                                 pointerSize)
+#if SWIFT_OBJC_INTEROP
+    if (ObjCInterop)
+      return MAKE_CONTEXT(WithObjCInterop, 4);
+    else
+      return MAKE_CONTEXT(NoObjCInterop, 4);
+#else
+    return MAKE_CONTEXT(NoObjCInterop, 4);
+#endif
    case 8:
-     return makeReflectionContextForMetadataReader<
-     // FIXME: This could be configurable.
- #if SWIFT_OBJC_INTEROP
-         External<WithObjCInterop<RuntimeTarget<8>>>
- #else
-         External<NoObjCInterop<RuntimeTarget<8>>>
- #endif
-         >(std::move(Reader), pointerSize);
+#if SWIFT_OBJC_INTEROP
+    if (ObjCInterop)
+      return MAKE_CONTEXT(WithObjCInterop, 8);
+    else
+      return MAKE_CONTEXT(NoObjCInterop, 8);
+#else
+    return MAKE_CONTEXT(NoObjCInterop, 8);
+#endif
   default:
     fputs("unsupported word size in object file\n", stderr);
     abort();

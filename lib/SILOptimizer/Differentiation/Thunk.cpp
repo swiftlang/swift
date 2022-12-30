@@ -130,7 +130,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   if (!thunk->empty())
     return thunk;
 
@@ -388,7 +389,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};
@@ -669,7 +671,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};

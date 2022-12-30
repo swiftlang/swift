@@ -164,7 +164,7 @@ llvm::cl::opt<StatsOnlyInstructionsOpt, true, llvm::cl::parser<std::string>>
     StatsOnlyInstructions(
         "sil-stats-only-instructions",
         llvm::cl::desc(
-            "Comma separated list of SIL insruction names, whose stats "
+            "Comma separated list of SIL instruction names, whose stats "
             "should be collected"),
         llvm::cl::Hidden, llvm::cl::ZeroOrMore,
         llvm::cl::value_desc("instruction name"),
@@ -215,7 +215,7 @@ llvm::cl::opt<double> UsedMemoryDeltaThreshold(
 
 llvm::cl::opt<double> UsedMemoryMinDeltaThreshold(
   "sil-stats-used-memory-min-threshold", llvm::cl::init(1),
-    llvm::cl::desc("Min hreshold for reporting changed memory usage numbers"));
+    llvm::cl::desc("Min threshold for reporting changed memory usage numbers"));
 
 /// A threshold in percents for the basic blocks counter inside a SILFunction.
 /// Has effect only if it is used together with -sil-stats-functions.
@@ -456,7 +456,7 @@ public:
   }
 };
 
-/// A helper class to repesent the module stats as an analysis,
+/// A helper class to represent the module stats as an analysis,
 /// so that it is preserved across multiple passes.
 class OptimizerStatsAnalysis : public SILAnalysis {
   SILModule &M;

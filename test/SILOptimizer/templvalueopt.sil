@@ -6,7 +6,7 @@ import Builtin
 // CHECK-LABEL: sil @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NEXT:   inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_enum_with_initialize'
@@ -14,9 +14,9 @@ sil @test_enum_with_initialize : $@convention(thin) (@in Any) -> @out Optional<A
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
@@ -26,7 +26,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr %0
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NEXT:   inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_enum_without_initialize'
@@ -34,7 +34,7 @@ sil @test_enum_without_initialize : $@convention(thin) (@in Any) -> @out Optiona
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   copy_addr [take] %2 to %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
@@ -51,15 +51,15 @@ struct ConformingStruct : Proto {
 // CHECK-LABEL: sil @test_existential :
 // CHECK:      bb0(%0 : $*any Proto, %1 : $*ConformingStruct):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_existential_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_existential'
 sil @test_existential : $@convention(thin) (@in ConformingStruct) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*ConformingStruct):
   %2 = alloc_stack $Proto
   %3 = init_existential_addr %2 : $*Proto, $ConformingStruct
-  copy_addr [take] %1 to [initialization] %3 : $*ConformingStruct
-  copy_addr [take] %2 to [initialization] %0 : $*Proto
+  copy_addr [take] %1 to [init] %3 : $*ConformingStruct
+  copy_addr [take] %2 to [init] %0 : $*Proto
   dealloc_stack %2 : $*Proto
   %6 = tuple ()
   return %6 : $()
@@ -85,7 +85,7 @@ struct AddressOnlyPayload {
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
 // CHECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
 // CHECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
-// CHECK-NEXT:   copy_addr %1 to [initialization] [[A]]
+// CHECK-NEXT:   copy_addr %1 to [init] [[A]]
 // CHECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
 // CHECK-NEXT:   store %2 to [[I]]
 // CHECK-NEXT:   inject_enum_addr [[E]]
@@ -97,17 +97,17 @@ bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
   %4 = alloc_stack $Either<AddressOnlyPayload, Int>
   %5 = alloc_stack $AddressOnlyPayload
   %6 = struct_element_addr %5 : $*AddressOnlyPayload, #AddressOnlyPayload.a
-  copy_addr %1 to [initialization] %6 : $*Any
+  copy_addr %1 to [init] %6 : $*Any
   %8 = struct_element_addr %5 : $*AddressOnlyPayload, #AddressOnlyPayload.i
   store %2 to %8 : $*Int
   %10 = init_enum_data_addr %4 : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
-  copy_addr [take] %5 to [initialization] %10 : $*AddressOnlyPayload
+  copy_addr [take] %5 to [init] %10 : $*AddressOnlyPayload
   inject_enum_addr %4 : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
   dealloc_stack %5 : $*AddressOnlyPayload
   %14 = struct_element_addr %3 : $*TestStruct, #TestStruct.e
-  copy_addr [take] %4 to [initialization] %14 : $*Either<AddressOnlyPayload, Int>
+  copy_addr [take] %4 to [init] %14 : $*Either<AddressOnlyPayload, Int>
   dealloc_stack %4 : $*Either<AddressOnlyPayload, Int>
-  copy_addr %3 to [initialization] %0 : $*TestStruct
+  copy_addr %3 to [init] %0 : $*TestStruct
   destroy_addr %3 : $*TestStruct
   dealloc_stack %3 : $*TestStruct
   %20 = tuple ()
@@ -123,10 +123,10 @@ sil @bail_on_write_to_dest : $@convention(thin) (@inout Optional<Any>, @in Any) 
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   destroy_addr %0 : $*Optional<Any>
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
@@ -145,9 +145,9 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   destroy_addr %0 : $*Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
@@ -167,7 +167,7 @@ struct StructWithEnum : Proto {
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
 // CHECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
 // CHECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[OPTIONAL]] : $*Any
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
 // CHECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
 // CHECK-NOT:    copy_addr
@@ -176,12 +176,12 @@ sil @move_projections : $@convention(thin) (@in Any) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   %4 = init_existential_addr %0 : $*Proto, $StructWithEnum
   %5 = struct_element_addr %4 : $*StructWithEnum, #StructWithEnum.e
   %6 = init_enum_data_addr %5 : $*Enum, #Enum.A!enumelt
-  copy_addr [take] %2 to [initialization] %6 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %6 : $*Optional<Any>
   inject_enum_addr %5 : $*Enum, #Enum.A!enumelt
   dealloc_stack %2 : $*Optional<Any>
   %10 = tuple ()
@@ -198,11 +198,11 @@ sil @cant_move_projections : $@convention(thin) (@in Any, @in_guaranteed Builtin
 bb0(%0 : $*Any, %1 : $*Builtin.RawPointer):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %0 to [initialization] %3 : $*Any
+  copy_addr [take] %0 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   %4 = load %1 : $*Builtin.RawPointer
   %5 = pointer_to_address %4 : $Builtin.RawPointer to $*Optional<Any>
-  copy_addr [take] %2 to [initialization] %5 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %5 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %10 = tuple ()
   return %10 : $()
@@ -220,9 +220,9 @@ sil @instructions_after_copy_addr : $@convention(thin) (@in Any) -> @out Optiona
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   %4 = function_ref @init_optional : $@convention(thin) () -> @out Optional<Any>
   %5 = apply %4(%2) : $@convention(thin) () -> @out Optional<Any>
   destroy_addr %2 : $*Optional<Any>
@@ -241,9 +241,9 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
 sil @dont_optimize_swap : $@convention(thin) <T> (@inout T, @inout T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
-  copy_addr [take] %1 to [initialization] %0 : $*T
-  copy_addr [take] %2 to [initialization] %1 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
+  copy_addr [take] %2 to [init] %1 : $*T
   dealloc_stack %2 : $*T
   %78 = tuple ()
   return %78 : $()

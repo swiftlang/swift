@@ -32,6 +32,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -123,10 +124,6 @@ const clang::Module *ClangNode::getClangModule() const {
 }
 
 void ClangNode::dump() const {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return; // not needed for the parser library.
-#endif
-
   if (auto D = getAsDecl())
     D->dump();
   else if (auto M = getAsMacro())
@@ -172,6 +169,8 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
+  TRIVIAL_KIND(Macro);
+  TRIVIAL_KIND(MacroExpansion);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -183,10 +182,14 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
               ? DescriptiveDeclKind::GenericStruct
               : DescriptiveDeclKind::Struct;
 
-   case DeclKind::Class:
+   case DeclKind::Class: {
+     bool isActor = cast<ClassDecl>(this)->isActor();
      return cast<ClassDecl>(this)->getGenericParams()
-              ? DescriptiveDeclKind::GenericClass
-              : DescriptiveDeclKind::Class;
+                ? (isActor ? DescriptiveDeclKind::GenericActor
+                           : DescriptiveDeclKind::GenericClass)
+                : (isActor ? DescriptiveDeclKind::Actor
+                           : DescriptiveDeclKind::Class);
+   }
 
    case DeclKind::Var: {
      auto var = cast<VarDecl>(this);
@@ -320,10 +323,12 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Enum, "enum");
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
+  ENTRY(Actor, "actor");
   ENTRY(Protocol, "protocol");
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
+  ENTRY(GenericActor, "generic actor");
   ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(StaticSubscript, "static subscript");
@@ -351,6 +356,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
   ENTRY(OpaqueVarType, "type");
+  ENTRY(Macro, "macro");
+  ENTRY(MacroExpansion, "pound literal");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -477,6 +484,7 @@ bool Decl::isInvalid() const {
   case DeclKind::Destructor:
   case DeclKind::Func:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     return cast<ValueDecl>(this)->getInterfaceType()->hasError();
 
   case DeclKind::Accessor: {
@@ -520,6 +528,7 @@ void Decl::setInvalid() {
   case DeclKind::Func:
   case DeclKind::Accessor:
   case DeclKind::EnumElement:
+  case DeclKind::Macro:
     cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
     return;
 
@@ -545,7 +554,7 @@ bool Decl::canHaveComment() const {
   return !this->hasClangNode() &&
          (isa<ValueDecl>(this) || isa<ExtensionDecl>(this)) &&
          !isa<ParamDecl>(this) &&
-         (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
+         !isa<GenericTypeParamDecl>(this);
 }
 
 ModuleDecl *Decl::getModuleContext() const {
@@ -642,7 +651,7 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
 
 const ExternalSourceLocs *Decl::getSerializedLocs() const {
   auto &Context = getASTContext();
-  if (auto EL = Context.getExternalSourceLocs(this).getValueOr(nullptr))
+  if (auto EL = Context.getExternalSourceLocs(this).value_or(nullptr))
     return EL;
 
   static ExternalSourceLocs NullLocs{};
@@ -652,7 +661,7 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
     return &NullLocs;
 
   auto RawLocs = File->getExternalRawLocsForDecl(this);
-  if (!RawLocs.hasValue()) {
+  if (!RawLocs.has_value()) {
     // Don't read .swiftsourceinfo again on failure
     Context.setExternalSourceLocs(this, &NullLocs);
     return &NullLocs;
@@ -947,7 +956,7 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
 
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
-  if (containingContext.hasValue()) {
+  if (containingContext.has_value()) {
     // If this entity comes from the concurrency module, adjust its
     // availability for linkage purposes up to Swift 5.5, so that we use
     // weak references any time we reference those symbols when back-deploying
@@ -1186,6 +1195,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -1229,6 +1239,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Var;
 
   case DeclKind::Module:
+  case DeclKind::Macro:
     return ImportKind::Module;
   }
   llvm_unreachable("bad DeclKind");
@@ -1463,6 +1474,21 @@ Type ExtensionDecl::getExtendedType() const {
           Type()))
     return type;
   return ErrorType::get(ctx);
+}
+
+bool ExtensionDecl::isObjCImplementation() const {
+  return getAttrs().hasAttribute<ObjCImplementationAttr>();
+}
+
+Optional<Identifier>
+ExtensionDecl::getCategoryNameForObjCImplementation() const {
+  assert(isObjCImplementation());
+
+  auto attr = getAttrs().getAttribute<ObjCImplementationAttr>();
+  if (attr->isCategoryNameInvalid())
+    return None;
+
+  return attr->CategoryName;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2618,6 +2644,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -2657,6 +2684,10 @@ bool ValueDecl::isInstanceMember() const {
 
   case DeclKind::Module:
     // Modules are never instance members.
+    return false;
+
+  case DeclKind::Macro:
+    // Macros are never instance members.
     return false;
 
   case DeclKind::BuiltinTuple:
@@ -3001,7 +3032,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
         ->getCanonicalType();
   }
 
-  if (isa<EnumElementDecl>(this)) {
+  if (isa<EnumElementDecl>(this) || isa<MacroDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
@@ -3028,7 +3059,8 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+// To-Do: Replce calls to getOpaqueResultTypeRepr with getResultTypeRepr()
+TypeRepr *ValueDecl::getResultTypeRepr() const {
   TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
@@ -3039,7 +3071,7 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
         P = P->getSemanticsProvidingPattern();
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           assert(NP->getDecl() == VD);
-          (void) NP;
+          (void)NP;
 
           returnRepr = TP->getTypeRepr();
         }
@@ -3053,13 +3085,22 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   }
 
+  return returnRepr;
+}
+
+TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+  auto *returnRepr = this->getResultTypeRepr();
+
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
   
   if (returnRepr && returnRepr->hasOpaque()) {
     return returnRepr;
-  } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome) && returnRepr->isProtocol(dc)) {
-    return returnRepr;
+  } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+    auto opaqueReprs = collectOpaqueReturnTypeReprs(returnRepr,
+                                                    getASTContext(),
+                                                    getDeclContext());
+    return opaqueReprs.empty() ? nullptr : returnRepr;
   } else {
     return nullptr;
   }
@@ -3448,7 +3489,7 @@ bool ValueDecl::shouldHideFromEditor() const {
   if (auto *ClangD = getClangDecl()) {
     bool bypassSwiftPrivate = false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
-      if (AFD->getForeignAsyncConvention().hasValue()) {
+      if (AFD->getForeignAsyncConvention().has_value()) {
         // For imported 'async' declarations, visibility can be controlled by
         // 'swift_async(...)' attribute.
         if (auto *asyncAttr = ClangD->getAttr<clang::SwiftAsyncAttr>()) {
@@ -3717,6 +3758,32 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
          VD->getDeclContext()->getParentModule() == useDC->getParentModule();
 }
 
+/// Checks if \p VD is an ObjC member implementation:
+///
+/// \li It's in an \c \@_objcImplementation extension
+/// \li It's not explicitly \c final
+/// \li Its access level is not \c private or \c fileprivate
+static bool
+isObjCMemberImplementation(const ValueDecl *VD,
+                           llvm::function_ref<AccessLevel()> getAccessLevel) {
+  if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
+      auto attrDecl = isa<AccessorDecl>(VD)
+                    ? cast<AccessorDecl>(VD)->getStorage()
+                    : VD;
+      return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
+                  && getAccessLevel() >= AccessLevel::Internal;
+    }
+
+  return false;
+}
+
+bool ValueDecl::isObjCMemberImplementation() const {
+  return ::isObjCMemberImplementation(
+              this, [&]() { return this->getFormalAccess(); });
+}
+
 /// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
 /// imports into account.
 ///
@@ -3731,6 +3798,15 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         bool forConformance,
                         bool includeInlineable,
                         llvm::function_ref<AccessLevel()> getAccessLevel) {
+  // If this is an @_objcImplementation member implementation, and we aren't in
+  // a context where we would access its storage directly, forbid access. Name
+  // lookups will instead find and use the matching interface decl.
+  // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.
+  if (isObjCMemberImplementation(VD, getAccessLevel) &&
+      VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
+          != AccessSemantics::DirectToStorage)
+    return false;
+
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
@@ -4067,8 +4143,8 @@ findGenericParameterReferences(CanGenericSignature genericSig,
     auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
     for (const auto &req : opaqueSig.getRequirements()) {
       switch (req.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::Conformance:
       case RequirementKind::Layout:
@@ -4569,75 +4645,87 @@ Type TypeAliasDecl::getStructuralType() const {
   return ErrorType::get(ctx);
 }
 
-Type AbstractTypeParamDecl::getSuperclass() const {
-  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
-  assert(genericEnv != nullptr && "Too much circularity");
-
-  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *archetype = contextTy->getAs<ArchetypeType>())
-    return archetype->getSuperclass();
-
-  // FIXME: Assert that this is never queried.
-  return nullptr;
-}
-
-ArrayRef<ProtocolDecl *>
-AbstractTypeParamDecl::getConformingProtocols() const {
-  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
-  assert(genericEnv != nullptr && "Too much circularity");
-
-  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *archetype = contextTy->getAs<ArchetypeType>())
-    return archetype->getConformsTo();
-
-  // FIXME: Assert that this is never queried.
-  return { };
-}
-
 GenericTypeParamDecl::GenericTypeParamDecl(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc,
-    bool isTypeSequence, unsigned depth, unsigned index,
-    bool isOpaqueType, TypeRepr *typeRepr
-  ) : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc ellipsisLoc,
+    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
+    TypeRepr *opaqueTypeRepr)
+    : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, { }) {
+  assert(!(ellipsisLoc && !isParameterPack) &&
+         "Ellipsis always means type parameter pack");
+
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
-  Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
+  Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(isOpaqueType || !typeRepr);
+  assert(isOpaqueType || !opaqueTypeRepr);
   if (isOpaqueType)
-    *getTrailingObjects<TypeRepr *>() = typeRepr;
+    *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
+  if (isParameterPack)
+    *getTrailingObjects<SourceLoc>() = ellipsisLoc;
 
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
-  if (this->isTypeSequence())
-    props |= RecursiveTypeProperties::HasTypeSequence;
+  if (this->isParameterPack())
+    props |= RecursiveTypeProperties::HasParameterPack;
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
   setInterfaceType(MetatypeType::get(type, ctx));
 }
 
-GenericTypeParamDecl *
-GenericTypeParamDecl::create(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc,
-    bool isTypeSequence, unsigned depth, unsigned index,
-    bool isOpaqueType, TypeRepr *typeRepr) {
-  ASTContext &ctx = dc->getASTContext();
-  auto mem = ctx.Allocate(
-      totalSizeToAlloc<TypeRepr *>(isOpaqueType ? 1 : 0),
-      alignof(GenericTypeParamDecl));
-  return new (mem) GenericTypeParamDecl(
-      dc, name, nameLoc, isTypeSequence, depth, index, isOpaqueType,
-      typeRepr);
+GenericTypeParamDecl *GenericTypeParamDecl::create(
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc ellipsisLoc,
+    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
+    TypeRepr *opaqueTypeRepr) {
+  auto &ctx = dc->getASTContext();
+  auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(
+      isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
+  auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
+  return new (mem)
+      GenericTypeParamDecl(dc, name, nameLoc, ellipsisLoc, depth, index,
+                           isParameterPack, isOpaqueType, opaqueTypeRepr);
 }
 
+GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
+    DeclContext *dc, Identifier name, unsigned depth, unsigned index,
+    bool isParameterPack, bool isOpaqueType) {
+  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(), depth,
+                                      index, isParameterPack, isOpaqueType,
+                                      /*opaqueRepr*/ nullptr);
+}
+
+GenericTypeParamDecl *
+GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
+                                   SourceLoc nameLoc, SourceLoc ellipsisLoc,
+                                   unsigned index, bool isParameterPack) {
+  // We always create generic type parameters with an invalid depth.
+  // Semantic analysis fills in the depth when it processes the generic
+  // parameter list.
+  return GenericTypeParamDecl::create(
+      dc, name, nameLoc, ellipsisLoc, GenericTypeParamDecl::InvalidDepth, index,
+      isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
+}
+
+GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
+    DeclContext *dc, Identifier name, unsigned depth, unsigned index,
+    bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
+    SourceLoc nameLoc, SourceLoc ellipsisLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, ellipsisLoc,
+                                             depth, index, isParameterPack,
+                                             isOpaqueType, opaqueTypeRepr);
+  param->setImplicit();
+  return param;
+}
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
 
-  if (!getInherited().empty()) {
+  if (auto ellipsisLoc = getEllipsisLoc())
+    endLoc = ellipsisLoc;
+
+  if (!getInherited().empty())
     endLoc = getInherited().back().getSourceRange().End;
-  }
+
   return SourceRange(getNameLoc(), endLoc);
 }
 
@@ -4645,7 +4733,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
                                        TypeRepr *defaultDefinition,
                                        TrailingWhereClause *trailingWhere)
-    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+    : TypeDecl(DeclKind::AssociatedType, dc, name, nameLoc, { }),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {}
 
@@ -4654,7 +4742,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+    : TypeDecl(DeclKind::AssociatedType, dc, name, nameLoc, { }),
       KeywordLoc(keywordLoc), DefaultDefinition(nullptr),
       TrailingWhere(trailingWhere), Resolver(definitionResolver),
       ResolverContextData(resolverData) {
@@ -4690,7 +4778,7 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   if (auto cached = request.getCachedResult())
     overridden = std::move(*cached);
   else
-    overridden = AbstractTypeParamDecl::getOverriddenDecls();
+    overridden = TypeDecl::getOverriddenDecls();
 
   llvm::TinyPtrVector<AssociatedTypeDecl *> assocTypes;
   for (auto decl : overridden) {
@@ -4718,7 +4806,7 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
     auto anchor = getAssociatedTypeAnchor(assocType, searched);
     if (!anchor)
       continue;
-    if (!bestAnchor || AbstractTypeParamDecl::compare(anchor, bestAnchor) < 0)
+    if (!bestAnchor || TypeDecl::compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
   }
 
@@ -4872,7 +4960,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (auto actionToTake = action) {
     (void)evaluateOrDefault(Context.evaluator,
-        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
+        ResolveImplicitMemberRequest{this, actionToTake.value()}, {});
   }
 }
 
@@ -4911,8 +4999,8 @@ bool ClassDecl::hasResilientMetadata() const {
     return false;
 
   // If the class is not public, we can't use it outside the module at all.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+  // Take enable testing into account.
+  if (getEffectiveAccess() < AccessLevel::Public)
     return false;
 
   // Otherwise we access metadata members, such as vtable entries, resiliently.
@@ -5428,6 +5516,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.KnownProtocol = 0;
   Bits.ProtocolDecl.HasAssociatedTypes = 0;
   Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
+  Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
 
@@ -5467,7 +5556,7 @@ ProtocolDecl::getAssociatedTypeMembers() const {
     contextData->loader->loadAssociatedTypes(
         this, contextData->associatedTypesData, result);
   } else {
-    for (auto member : getMembers()) {
+    for (auto member : getProtocolRequirements()) {
       if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
         result.push_back(ATD);
       }
@@ -5476,6 +5565,12 @@ ProtocolDecl::getAssociatedTypeMembers() const {
 
   self->AssociatedTypes = getASTContext().AllocateCopy(result);
   return AssociatedTypes;
+}
+
+ArrayRef<ValueDecl *> ProtocolDecl::getProtocolRequirements() const {
+  auto *mutableSelf = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ProtocolRequirementsRequest{mutableSelf}, {});
 }
 
 ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
@@ -6274,7 +6369,7 @@ Stmt *VarDecl::getRecursiveParentPatternStmt() const {
   // Otherwise, see if we have a parent var decl. If we do not, then return
   // nullptr. Otherwise, return the case stmt that we found.
   auto result = findParentPatternCaseStmtAndPattern(this);
-  if (!result.hasValue())
+  if (!result.has_value())
     return nullptr;
   return result->first;
 }
@@ -7689,6 +7784,8 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
     return EED->getParameterList();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
     return SD->getIndices();
+  } else if (auto *MD = dyn_cast<MacroDecl>(source)) {
+    return MD->parameterList;
   }
 
   return nullptr;
@@ -7706,10 +7803,21 @@ ParameterList *swift::getParameterList(DeclContext *source) {
   return nullptr;
 }
 
+const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
+                                       unsigned index) {
+  auto *source = declRef.getDecl();
+  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+    unsigned origIndex = params->getOrigParamIndex(declRef.getSubstitutions(),
+                                                   index);
+    return params->get(origIndex);
+  }
+  return nullptr;
+}
+
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
   if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
-    return params->get(index);
+    return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
 }
@@ -7902,9 +8010,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   ASTContext &ctx = getASTContext();
 
   // Don't allow getBody() to trigger parsing of an unparsed body containing the
-  // code completion location.
+  // IDE inspection location.
   if (getBodyKind() == BodyKind::Unparsed &&
-      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
+      ctx.SourceMgr.rangeContainsIDEInspectionTarget(getBodySourceRange())) {
     return nullptr;
   }
 
@@ -8115,8 +8223,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
   Optional<ForeignErrorConvention> errorConvention
     = getForeignErrorConvention();
   unsigned numSelectorPieces
-    = argNames.size() + (asyncConvention.hasValue() ? 1 : 0)
-    + (errorConvention.hasValue() ? 1 : 0);
+    = argNames.size() + (asyncConvention.has_value() ? 1 : 0)
+    + (errorConvention.has_value() ? 1 : 0);
 
   // If we have no arguments, it's a nullary selector.
   if (numSelectorPieces == 0) {
@@ -8560,18 +8668,12 @@ bool FuncDecl::isStatic() const {
     false);
 }
 
-AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
-                                       SourceLoc declLoc,
-                                       SourceLoc accessorKeywordLoc,
-                                       AccessorKind accessorKind,
-                                       AbstractStorageDecl *storage,
-                                       SourceLoc staticLoc,
-                                       StaticSpellingKind staticSpelling,
-                                       bool async, SourceLoc asyncLoc,
-                                       bool throws, SourceLoc throwsLoc,
-                                       GenericParamList *genericParams,
-                                       DeclContext *parent,
-                                       ClangNode clangNode) {
+AccessorDecl *AccessorDecl::createImpl(
+    ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+    AccessorKind accessorKind, AbstractStorageDecl *storage,
+    SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+    SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc, DeclContext *parent,
+    ClangNode clangNode) {
   bool hasImplicitSelfDecl = parent->isTypeContext();
   size_t size = sizeof(AccessorDecl) + (hasImplicitSelfDecl
                                         ? sizeof(ParamDecl *)
@@ -8579,9 +8681,9 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   void *buffer = allocateMemoryForDecl<AccessorDecl>(ctx, size,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
-      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
-                   storage, staticLoc, staticSpelling, async, asyncLoc, throws, throwsLoc,
-                   hasImplicitSelfDecl, genericParams, parent);
+      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind, storage,
+                   staticLoc, staticSpelling, async, asyncLoc, throws,
+                   throwsLoc, hasImplicitSelfDecl, parent);
   if (clangNode)
     D->setClangNode(clangNode);
   if (hasImplicitSelfDecl)
@@ -8590,38 +8692,30 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   return D;
 }
 
-AccessorDecl *
-AccessorDecl::createDeserialized(ASTContext &ctx, AccessorKind accessorKind,
-                                 AbstractStorageDecl *storage,
-                                 StaticSpellingKind staticSpelling,
-                                 bool async, bool throws, GenericParamList *genericParams,
-                                 Type fnRetType, DeclContext *parent) {
+AccessorDecl *AccessorDecl::createDeserialized(
+    ASTContext &ctx, AccessorKind accessorKind, AbstractStorageDecl *storage,
+    StaticSpellingKind staticSpelling, bool async, bool throws, Type fnRetType,
+    DeclContext *parent) {
   assert(fnRetType && "Deserialized result type must not be null");
   auto *const D = AccessorDecl::createImpl(
       ctx, SourceLoc(), SourceLoc(), accessorKind, storage, SourceLoc(),
-      staticSpelling, async, SourceLoc(), throws, SourceLoc(), genericParams, parent, ClangNode());
+      staticSpelling, async, SourceLoc(), throws, SourceLoc(), parent,
+      ClangNode());
   D->setResultInterfaceType(fnRetType);
   return D;
 }
 
-AccessorDecl *AccessorDecl::create(ASTContext &ctx,
-                                   SourceLoc declLoc,
-                                   SourceLoc accessorKeywordLoc,
-                                   AccessorKind accessorKind,
-                                   AbstractStorageDecl *storage,
-                                   SourceLoc staticLoc,
-                                   StaticSpellingKind staticSpelling,
-                                   bool async, SourceLoc asyncLoc,
-                                   bool throws, SourceLoc throwsLoc,
-                                   GenericParamList *genericParams,
-                                   ParameterList * bodyParams,
-                                   Type fnRetType,
-                                   DeclContext *parent,
-                                   ClangNode clangNode) {
+AccessorDecl *
+AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
+                     SourceLoc accessorKeywordLoc, AccessorKind accessorKind,
+                     AbstractStorageDecl *storage, SourceLoc staticLoc,
+                     StaticSpellingKind staticSpelling, bool async,
+                     SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+                     ParameterList *bodyParams, Type fnRetType,
+                     DeclContext *parent, ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
-      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
-      staticLoc, staticSpelling, async, asyncLoc, throws, throwsLoc,
-      genericParams, parent, clangNode);
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage, staticLoc,
+      staticSpelling, async, asyncLoc, throws, throwsLoc, parent, clangNode);
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
   return D;
@@ -8788,7 +8882,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 
   return params->get(0)->getInterfaceType()->isVoid();
 }
-
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
@@ -8996,6 +9089,20 @@ Type ConstructorDecl::getInitializerInterfaceType() {
 }
 
 CtorInitializerKind ConstructorDecl::getInitKind() const {
+  const auto *ED =
+      dyn_cast_or_null<ExtensionDecl>(getDeclContext()->getAsDecl());
+  if (ED && !ED->hasBeenBound()) {
+    // When the declaration context is an extension and this is called when the
+    // extended nominal hasn't be bound yet, e.g. dumping pre-typechecked AST,
+    // there is not enough information about extended nominal to use for
+    // computing init kind on InitKindRequest as bindExtensions is done at
+    // typechecking, so in that case just look to parsed attribute in init
+    // declaration.
+    return getAttrs().hasAttribute<ConvenienceAttr>()
+               ? CtorInitializerKind::Convenience
+               : CtorInitializerKind::Designated;
+  }
+
   return evaluateOrDefault(getASTContext().evaluator,
     InitKindRequest{const_cast<ConstructorDecl *>(this)},
     CtorInitializerKind::Designated);
@@ -9483,7 +9590,7 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.
-    assert(!value.getFingerprint().hasValue() && value.getBody() == nullptr);
+    assert(!value.getFingerprint().has_value() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
@@ -9517,7 +9624,88 @@ bool ActorIsolation::isDistributedActor() const {
   return getKind() == ActorInstance && getActor()->isDistributedActor();
 }
 
-BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name,
-                                   DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
-                    ArrayRef<InheritedEntry>(), nullptr) {}
+BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
+    : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
+                      ArrayRef<InheritedEntry>(), nullptr) {}
+
+MacroDecl::MacroDecl(
+    SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
+    GenericParamList *genericParams,
+    ParameterList *parameterList,
+    SourceLoc arrowOrColonLoc,
+    TypeRepr *resultType,
+    Identifier externalModuleName,
+    SourceLoc externalModuleNameLoc,
+    Identifier externalMacroTypeName,
+    SourceLoc externalMacroTypeNameLoc,
+    DeclContext *parent
+) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
+    ValueDecl(DeclKind::Macro, parent, name, nameLoc),
+    macroLoc(macroLoc), parameterList(parameterList),
+    arrowOrColonLoc(arrowOrColonLoc),
+    resultType(resultType),
+    externalModuleName(externalModuleName),
+    externalModuleNameLoc(externalModuleNameLoc),
+    externalMacroTypeName(externalMacroTypeName),
+    externalMacroTypeNameLoc(externalMacroTypeNameLoc) {
+
+  if (parameterList)
+    parameterList->setDeclContextOfParamDecls(this);
+}
+
+Type MacroDecl::getResultInterfaceType() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<MacroDecl *>(this);
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
+}
+
+SourceRange MacroDecl::getSourceRange() const {
+  SourceLoc endLoc = externalMacroTypeNameLoc;
+  if (auto trailing = getTrailingWhereClause())
+    endLoc = trailing->getSourceRange().End;
+  return SourceRange(macroLoc, endLoc);
+}
+
+SourceRange MacroExpansionDecl::getSourceRange() const {
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
+}
+
+MacroDefinition MacroDefinition::forMissing(
+    ASTContext &ctx, Identifier externalModuleName,
+    Identifier externalMacroTypeName
+) {
+  auto def = ctx.AllocateObjectCopy(
+    MissingDefinition{externalModuleName, externalMacroTypeName}
+  );
+  return MacroDefinition{
+    Kind::Expression, ImplementationKind::Missing, def
+  };
+}
+
+NominalTypeDecl *
+ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
+  auto &ctx = getASTContext();
+  auto *nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{attr, getDeclContext()}, nullptr);
+  assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
+  return nominal;
+}
+
+ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetRuntimeDiscoverableAttributes{mutableSelf},
+                           nullptr);
+}

@@ -72,6 +72,7 @@ const ProtocolDecl *Rule::isAnyConformanceRule() const {
     case Symbol::Kind::Name:
     case Symbol::Kind::AssociatedType:
     case Symbol::Kind::GenericParam:
+    case Symbol::Kind::Shape:
       break;
     }
 
@@ -264,7 +265,7 @@ unsigned Rule::getNesting() const {
 /// Linear order on rules; compares LHS followed by RHS.
 Optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
   Optional<int> compare = LHS.compare(other.LHS, ctx);
-  if (!compare.hasValue() || *compare != 0)
+  if (!compare.has_value() || *compare != 0)
     return compare;
 
   return RHS.compare(other.RHS, ctx);

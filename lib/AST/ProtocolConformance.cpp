@@ -1052,49 +1052,50 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
 
-  auto addSynthesized = [&](KnownProtocolKind kind) {
-    if (auto *proto = getASTContext().getProtocol(kind)) {
-      if (protocols.count(proto) == 0) {
-        ConformanceTable->addSynthesizedConformance(
-            mutableThis, proto, mutableThis);
-        protocols.insert(proto);
-      }
+  auto addSynthesized = [&](ProtocolDecl *proto) {
+    if (!proto)
+      return;
+
+    if (protocols.count(proto) == 0) {
+      ConformanceTable->addSynthesizedConformance(
+          mutableThis, proto, mutableThis);
+      protocols.insert(proto);
     }
   };
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-    addSynthesized(attr->getProtocolKind());
+    addSynthesized(attr->getProtocol());
   }
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
     if (theEnum->hasCases() && theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       // Simple enumerations conform to Equatable.
-      addSynthesized(KnownProtocolKind::Equatable);
+      addSynthesized(ctx.getProtocol(KnownProtocolKind::Equatable));
 
       // Simple enumerations conform to Hashable.
-      addSynthesized(KnownProtocolKind::Hashable);
+      addSynthesized(ctx.getProtocol(KnownProtocolKind::Hashable));
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
     if (theEnum->hasRawType() && !theEnum->getRawType()->hasError()) {
-      addSynthesized(KnownProtocolKind::RawRepresentable);
+      addSynthesized(ctx.getProtocol(KnownProtocolKind::RawRepresentable));
     }
   }
 
   // Actor classes conform to the actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isDistributedActor()) {
-      addSynthesized(KnownProtocolKind::DistributedActor);
+      addSynthesized(ctx.getProtocol(KnownProtocolKind::DistributedActor));
     } else if (classDecl->isActor()) {
-      addSynthesized(KnownProtocolKind::Actor);
+      addSynthesized(ctx.getProtocol(KnownProtocolKind::Actor));
     }
   }
 
   // Global actors conform to the GlobalActor protocol.
   if (mutableThis->getAttrs().hasAttribute<GlobalActorAttr>()) {
-    addSynthesized(KnownProtocolKind::GlobalActor);
+    addSynthesized(ctx.getProtocol(KnownProtocolKind::GlobalActor));
   }
 }
 

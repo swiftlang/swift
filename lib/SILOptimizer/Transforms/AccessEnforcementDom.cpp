@@ -128,7 +128,7 @@ class DominatedAccessAnalysis {
 public:
   // The result records information for all dynamic accesses in this
   // function. If an UnpairedAccess exists, then the result will be
-  // consevatively empty.
+  // conservatively empty.
   struct Result {
     llvm::SmallDenseMap<BeginAccessInst *, DomAccessStorage, 32> accessMap;
   };
@@ -286,7 +286,7 @@ void DominatedAccessAnalysis::analyzeAccess(BeginAccessInst *BAI,
   if (!domStorage)
     return;
 
-  // Set the current accesss isInner flag if it's inside a coroutine scope.
+  // Set the current access isInner flag if it's inside a coroutine scope.
   if (!state.inScopeCoroutines.empty())
     domStorage.setIsInner();
 
@@ -389,7 +389,7 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
 }
 
 // Track this identifiable dynamic access in storageToDomMap, and optimize it if
-// possible. Return true if the optimization suceeds.
+// possible. Return true if the optimization succeeds.
 bool DominatedAccessRemoval::checkDominatedAccess(
     BeginAccessInst *BAI, DomAccessStorage currDomStorage) {
   // Attempt to add this access to storageToDomMap using its base storage

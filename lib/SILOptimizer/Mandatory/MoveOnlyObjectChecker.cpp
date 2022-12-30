@@ -31,43 +31,25 @@
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "MoveOnlyDiagnostics.h"
+#include "MoveOnlyObjectChecker.h"
+
 using namespace swift;
+using namespace swift::siloptimizer;
 
 //===----------------------------------------------------------------------===//
-//                                 Utilities
+//                         MARK: Diagnostic Utilities
 //===----------------------------------------------------------------------===//
 
-template <typename... T, typename... U>
-static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
-                     U &&...args) {
-  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
-static StringRef getVariableNameForValue(MarkMustCheckInst *mmci) {
-  StringRef varName = "unknown";
-  if (auto *use = getSingleDebugUse(mmci)) {
-    DebugVarCarryingInst debugVar(use->getUser());
-    if (auto varInfo = debugVar.getVarInfo()) {
-      varName = varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        varName = decl->getBaseName().userFacingName();
-      }
-    }
-  }
-
-  return varName;
-}
-
 //===----------------------------------------------------------------------===//
-//                                 Main Pass
+//                              MARK: Main Pass
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -78,14 +60,6 @@ struct MoveOnlyChecker {
   /// A set of mark_must_check that we are actually going to process.
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
-  /// A per mark must check, vector of uses that copy propagation says need a
-  /// copy and thus are not final consuming uses.
-  SmallVector<Operand *, 32> consumingUsesNeedingCopy;
-
-  /// A per mark must check, vector of consuming uses that copy propagation says
-  /// are actual last uses.
-  SmallVector<Operand *, 32> finalConsumingUses;
-
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
 
   /// Search through the current function for candidate mark_must_check
@@ -95,19 +69,45 @@ struct MoveOnlyChecker {
   ///
   /// \returns true if we deleted a mark_must_check inst that we didn't
   /// recognize after emitting the diagnostic.
-  bool searchForCandidateMarkMustChecks();
-
-  /// Emits an error diagnostic for \p markedValue.
-  void emitDiagnostic(MarkMustCheckInst *markedValue,
-                      bool originalValueGuaranteed);
+  bool searchForCandidateMarkMustChecks(DiagnosticEmitter &emitter);
 
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
+
+  /// After we have emitted a diagnostic, we need to clean up the instruction
+  /// stream by converting /all/ copies of move only typed things to use
+  /// explicit_copy_value so that we maintain the SIL invariant that in
+  /// canonical SIL move only types are not copied by normal copies.
+  ///
+  /// Returns true if we actually changed any instructions.
+  bool cleanupAfterEmittingDiagnostic();
 };
 
 } // namespace
 
-bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
+bool MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
+  bool changed = false;
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *cvi = dyn_cast<CopyValueInst>(&*ii);
+      ++ii;
+
+      if (!cvi || !cvi->getOperand()->getType().isMoveOnlyWrapped())
+        continue;
+
+      SILBuilderWithScope b(cvi);
+      auto *expCopy =
+          b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+      cvi->replaceAllUsesWith(expCopy);
+      cvi->eraseFromParent();
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+bool MoveOnlyChecker::searchForCandidateMarkMustChecks(
+    DiagnosticEmitter &emitter) {
   bool changed = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
@@ -299,13 +299,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       // We then RAUW the mark_must_check once we have emitted the error since
       // later passes expect that mark_must_check has been eliminated by
       // us. Since we are failing already, this is ok to do.
-      if (mmci->getType().isMoveOnlyWrapped()) {
-        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
-      } else {
-        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-                 diag::sil_moveonlychecker_not_understand_moveonly);
-      }
+      emitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
       changed = true;
@@ -314,76 +308,9 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
   return changed;
 }
 
-void MoveOnlyChecker::emitDiagnostic(MarkMustCheckInst *markedValue,
-                                     bool originalValueGuaranteed) {
-  auto &astContext = fn->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
-
-  if (originalValueGuaranteed) {
-    diagnose(astContext,
-             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
-  } else {
-    diagnose(astContext,
-             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_owned_value_consumed_more_than_once,
-             varName);
-  }
-
-  while (consumingUsesNeedingCopy.size()) {
-    auto *consumingUse = consumingUsesNeedingCopy.pop_back_val();
-
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_use_here);
-  }
-
-  while (finalConsumingUses.size()) {
-    auto *consumingUse = finalConsumingUses.pop_back_val();
-
-    // See if the consuming use is an owned moveonly_to_copyable whose only
-    // user is a return. In that case, use the return loc instead. We do this
-    // b/c it is illegal to put a return value location on a non-return value
-    // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-        loc = ri->getLoc();
-      }
-    }
-
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_use_here);
-  }
-}
-
 bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                             DominanceInfo *domTree) {
   bool changed = false;
-
-  // First search for candidates to process and emit diagnostics on any
-  // mark_must_check [noimplicitcopy] we didn't recognize.
-  changed |= searchForCandidateMarkMustChecks();
-
-  // If we didn't find any introducers to check, just return changed.
-  //
-  // NOTE: changed /can/ be true here if we had any mark_must_check
-  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
-  // and then deleting.
-  if (moveIntroducersToProcess.empty())
-    return changed;
 
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
@@ -392,44 +319,58 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
         instToDelete->eraseFromParent();
       });
   InstructionDeleter deleter(std::move(callbacks));
+  OSSACanonicalizer canonicalizer;
+  canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
+  DiagnosticEmitter diagnosticEmitter{fn, &canonicalizer, {}, {}};
 
-  auto foundConsumingUseNeedingCopy = [&](Operand *use) {
-    consumingUsesNeedingCopy.push_back(use);
-  };
-  auto foundConsumingUseNotNeedingCopy = [&](Operand *use) {
-    finalConsumingUses.push_back(use);
-  };
+  // First search for candidates to process and emit diagnostics on any
+  // mark_must_check [noimplicitcopy] we didn't recognize.
+  bool emittedDiagnostic = searchForCandidateMarkMustChecks(diagnosticEmitter);
 
-  CanonicalizeOSSALifetime canonicalizer(
-      false /*pruneDebugMode*/, accessBlockAnalysis, domTree, deleter,
-      foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
+  // If we didn't find any introducers to check, just return if we emitted an
+  // error (which is the only way we emitted a change to the instruction
+  // stream).
+  //
+  // NOTE: changed /can/ be true here if we had any mark_must_check
+  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
+  // and then deleting.
+  if (moveIntroducersToProcess.empty()) {
+    if (emittedDiagnostic) {
+      cleanupAfterEmittingDiagnostic();
+      return true;
+    }
+    return false;
+  }
+
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
-  SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
   while (!moveIntroducers.empty()) {
-    SWIFT_DEFER {
-      consumingUsesNeedingCopy.clear();
-      finalConsumingUses.clear();
-    };
+    SWIFT_DEFER { canonicalizer.clear(); };
 
     MarkMustCheckInst *markedValue = moveIntroducers.front();
     moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // First canonicalize ownership.
-    changed |= canonicalizer.canonicalizeValueLifetime(markedValue);
+    if (!canonicalizer.canonicalize(markedValue)) {
+      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
+      continue;
+    } else {
+      // Always set changed to true if we succeeded in canonicalizing since we
+      // may have rewritten copies.
+      changed = true;
+    }
 
     // If we are asked to perform guaranteed checking, emit an error if we have
     // /any/ consuming uses.
     if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
-      if (!consumingUsesNeedingCopy.empty() || !finalConsumingUses.empty()) {
-        emitDiagnostic(markedValue, true /*original value guaranteed*/);
-        valuesWithDiagnostics.insert(markedValue);
+      if (canonicalizer.foundAnyConsumingUses()) {
+        diagnosticEmitter.emitObjectGuaranteedDiagnostic(markedValue);
       }
       continue;
     }
 
-    if (consumingUsesNeedingCopy.empty()) {
+    if (!canonicalizer.foundConsumingUseRequiringCopy()) {
       // If we failed to understand how to perform the check or did not find
       // any targets... continue. In the former case we want to fail with a
       // checker did not understand diagnostic later and in the former, we
@@ -437,10 +378,10 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       continue;
     }
 
-    emitDiagnostic(markedValue, false /*original value guaranteed*/);
-    valuesWithDiagnostics.insert(markedValue);
+    diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
   }
-  bool emittedDiagnostic = valuesWithDiagnostics.size();
+
+  emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
 
   // Ok, we have success. All of our marker instructions were proven as safe or
   // we emitted a diagnostic. Now we need to clean up the IR by eliminating our
@@ -459,7 +400,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
 
     // If we didn't emit a diagnostic on a non-trivial guaranteed argument,
     // eliminate the copy_value, destroy_values, and the mark_must_check.
-    if (!valuesWithDiagnostics.count(markedInst)) {
+    if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
       if (markedInst->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
         if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
           if (auto *arg = dyn_cast<SILFunctionArgument>(cvi->getOperand())) {
@@ -485,30 +426,15 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   }
 
   // Once we have finished processing, if we emitted any diagnostics, then we
-  // may have copy_value of @moveOnly typed values. This is not valid in
-  // Canonical SIL, so we need to ensure that those copy_value become
-  // explicit_copy_value. This is ok to do since we are already going to fail
-  // the compilation and just are trying to maintain SIL invariants.
+  // may have copy_value of move only and @moveOnly wrapped type values. This is
+  // not valid in Canonical SIL, so we need to ensure that those copy_value
+  // become explicit_copy_value. This is ok to do since we are already going to
+  // fail the compilation and just are trying to maintain SIL invariants.
   //
   // It is also ok that we use a little more compile time and go over the
   // function again, since we are going to fail the compilation and not codegen.
   if (emittedDiagnostic) {
-    for (auto &block : *fn) {
-      for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-        auto *cvi = dyn_cast<CopyValueInst>(&*ii);
-        ++ii;
-
-        if (!cvi || !cvi->getOperand()->getType().isMoveOnlyWrapped())
-          continue;
-
-        SILBuilderWithScope b(cvi);
-        auto *expCopy =
-            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-        cvi->replaceAllUsesWith(expCopy);
-        cvi->eraseFromParent();
-        changed = true;
-      }
-    }
+    changed |= cleanupAfterEmittingDiagnostic();
   }
 
   return changed;
@@ -524,12 +450,19 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
+    // Only run this pass if the move only language feature is enabled.
+    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
+      return;
+
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
+
+    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
+                            << fn->getName() << '\n');
 
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();

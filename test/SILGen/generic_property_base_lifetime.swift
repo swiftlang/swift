@@ -59,7 +59,7 @@ func setIntPropGeneric<T: ProtocolA>(_ a: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolB_pF
 // CHECK:         [[PROJECTION:%.*]] = open_existential_addr immutable_access %0
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}, any ProtocolB) Self
-// CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]
+// CHECK:         copy_addr [[PROJECTION]] to [init] [[STACK]]
 // CHECK:         apply {{%.*}}([[STACK]])
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
@@ -69,7 +69,7 @@ func getIntPropExistential(_ a: ProtocolB) -> Int {
 
 // CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
-// CHECK:         copy_addr %0 to [initialization] [[STACK]]
+// CHECK:         copy_addr %0 to [init] [[STACK]]
 // CHECK:         apply {{%.*}}<T>([[STACK]])
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]

@@ -99,9 +99,16 @@ namespace irgen {
     return -1 - (int)index;
   }
 
+  struct ExpandedSignature {
+    unsigned numShapes;
+    unsigned numTypeMetadataPtrs;
+    unsigned numWitnessTablePtrs;
+  };
+
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
-  void expandPolymorphicSignature(
+  /// Returns the number of lowered parameters of each kind.
+  ExpandedSignature expandPolymorphicSignature(
       IRGenModule &IGM, CanSILFunctionType type,
       SmallVectorImpl<llvm::Type *> &types,
       SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs =

@@ -43,17 +43,17 @@ struct CommentParts {
   Optional<const swift::markup::LocalizationKeyField *> LocalizationKeyField;
 
   bool isEmpty() const {
-    return !Brief.hasValue() &&
-           !ReturnsField.hasValue() &&
-           !ThrowsField.hasValue() &&
+    return !Brief.has_value() &&
+           !ReturnsField.has_value() &&
+           !ThrowsField.has_value() &&
            BodyNodes.empty() &&
            ParamFields.empty();
   }
 
   bool hasFunctionDocumentation() const {
     return !ParamFields.empty() ||
-             ReturnsField.hasValue() ||
-             ThrowsField.hasValue();
+             ReturnsField.has_value() ||
+             ThrowsField.has_value();
   }
 };
 
@@ -569,11 +569,11 @@ public:
   StringRef getDestination() const { return Destination; }
 
   bool hasTitle() const {
-    return Title.hasValue();
+    return Title.has_value();
   }
 
   StringRef getTitle() const {
-    return StringRef(Title.getValue());
+    return StringRef(Title.value());
   }
 
   ArrayRef<MarkupASTNode *> getChildren() {
@@ -673,10 +673,10 @@ public:
   }
 
   bool isClosureParameter() const {
-    if (!Parts.hasValue())
+    if (!Parts.has_value())
       return false;
 
-    return Parts.getValue().hasFunctionDocumentation();
+    return Parts.value().hasFunctionDocumentation();
   }
 
   ArrayRef<MarkupASTNode *> getChildren() {

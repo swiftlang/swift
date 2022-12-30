@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -24,7 +25,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -104,7 +104,7 @@ private:
   void makeSubstUsableFromInline(const SubstitutionMap &substs);
 };
 
-/// Visitor for making used types of an intruction inlinable.
+/// Visitor for making used types of an instruction inlinable.
 ///
 /// We use the SILCloner for visiting types, though it sucks that we allocate
 /// instructions just to delete them immediately. But it's better than to
@@ -236,7 +236,7 @@ bool CrossModuleOptimization::canSerializeFunction(
 
 /// Returns true if \p inst can be serialized.
 ///
-/// If \p inst is a function_ref, recursivly visits the referenced function.
+/// If \p inst is a function_ref, recursively visits the referenced function.
 bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
                       FunctionFlags &canSerializeFlags, int maxDepth) {
 
@@ -264,7 +264,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
       return false;
     }
 
-    // Recursivly walk down the call graph.
+    // In some project configurations imported C functions are not necessarily
+    // public in their modules.
+    if (conservative && callee->hasClangNode())
+      return false;
+
+    // Recursively walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
       return true;
 
@@ -284,6 +289,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
         !hasPublicVisibility(global->getLinkage())) {
       return false;
     }
+
+    // In some project configurations imported C variables are not necessarily
+    // public in their modules.
+    if (conservative && global->hasClangNode())
+      return false;
+
     return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
@@ -303,7 +314,7 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     return !MI->getMember().isForeign;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
-    // In conservative mode, we don't support class field accesse of non-public
+    // In conservative mode, we don't support class field accesses of non-public
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
     return !conservative ||
@@ -435,7 +446,7 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
     return true;
 
   if (!conservative) {
-    // The basic heursitic: serialize all generic functions, because it makes a
+    // The basic heuristic: serialize all generic functions, because it makes a
     // huge difference if generic functions can be specialized or not.
     if (function->getLoweredFunctionType()->isPolymorphic())
       return true;
@@ -479,7 +490,7 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
 
 /// Prepare \p inst for serialization.
 ///
-/// If \p inst is a function_ref, recursivly visits the referenced function.
+/// If \p inst is a function_ref, recursively visits the referenced function.
 void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
                                        const FunctionFlags &canSerializeFlags) {
   // Put callees onto the worklist if they should be serialized as well.

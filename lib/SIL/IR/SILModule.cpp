@@ -124,7 +124,7 @@ SILModule::~SILModule() {
   assert(numAllocatedSlabs == freeSlabs.size() && "leaking slabs in SILModule");
 #endif
 
-  assert(!hasUnresolvedOpenedArchetypeDefinitions());
+  assert(!hasUnresolvedLocalArchetypeDefinitions());
 
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals) {
@@ -164,8 +164,8 @@ void SILModule::checkForLeaks() const {
   if (!getOptions().checkSILModuleLeaks)
     return;
 
-  int instsInModule = std::distance(scheduledForDeletion.begin(),
-                                    scheduledForDeletion.end());
+  int instsInModule = scheduledForDeletion.size();
+
   for (const SILFunction &F : *this) {
     const SILFunction *sn = &F;
     do {
@@ -259,30 +259,29 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 }
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
-  // Update RootOpenedArchetypeDefs.
-  if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      RootOpenedArchetypeDefs.erase(key);
-    }
-  }
+  // Update RootLocalArchetypeDefs.
+  I->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
+                                      SILValue dependency) {
+    LocalArchetypeKey key = {archeTy, I->getFunction()};
+    // In case `willDeleteInstruction` is called twice for the
+    // same instruction, we need to check if the archetype is really
+    // still in the map for this instruction.
+    if (RootLocalArchetypeDefs.lookup(key) == dependency)
+      RootLocalArchetypeDefs.erase(key);
+  });
 }
 
 void SILModule::scheduleForDeletion(SILInstruction *I) {
   I->dropAllReferences();
   scheduledForDeletion.push_back(I);
-  I->ParentBB = nullptr;
 }
 
 void SILModule::flushDeletedInsts() {
-  while (!scheduledForDeletion.empty()) {
-    SILInstruction *inst = &*scheduledForDeletion.begin();
-    scheduledForDeletion.erase(inst);
-    AlignedFree(inst);
+  for (SILInstruction *instToDelete : scheduledForDeletion) {
+    SILInstruction::destroy(instToDelete);
+    AlignedFree(instToDelete);
   }
+  scheduledForDeletion.clear();
 }
 
 SILWitnessTable *
@@ -705,21 +704,21 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
-                                              SILFunction *inFunction) {
+SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
+                                             SILFunction *inFunction) {
   assert(archetype->isRoot());
 
-  SILValue &def = RootOpenedArchetypeDefs[{archetype, inFunction}];
+  SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
   if (!def) {
-    numUnresolvedOpenedArchetypes++;
+    numUnresolvedLocalArchetypes++;
     def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
   }
 
   return def;
 }
 
-bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
-  return numUnresolvedOpenedArchetypes != 0;
+bool SILModule::hasUnresolvedLocalArchetypeDefinitions() {
+  return numUnresolvedLocalArchetypes != 0;
 }
 
 /// Get a unique index for a struct or class field in layout order.
@@ -765,45 +764,41 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      SILValue &val = RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}];
-      if (val) {
-        if (!isa<PlaceholderValue>(val)) {
-          // Print a useful error message (and not just abort with an assert).
-          llvm::errs() << "re-definition of root opened archetype in function "
-                       << svi->getFunction()->getName() << ":\n";
-          svi->print(llvm::errs());
-          llvm::errs() << "previously defined in function "
-                       << val->getFunction()->getName() << ":\n";
-          val->print(llvm::errs());
-          abort();
-        }
-        // The opened archetype was unresolved so far. Replace the placeholder
-        // by inst.
-        auto *placeholder = cast<PlaceholderValue>(val);
-        placeholder->replaceAllUsesWith(svi);
-        ::delete placeholder;
-        numUnresolvedOpenedArchetypes--;
+  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
+                                         SILValue dependency) {
+    SILValue &val = RootLocalArchetypeDefs[{archeTy, inst->getFunction()}];
+    if (val) {
+      if (!isa<PlaceholderValue>(val)) {
+        // Print a useful error message (and not just abort with an assert).
+        llvm::errs() << "re-definition of root local archetype in function "
+                     << inst->getFunction()->getName() << ":\n";
+        inst->print(llvm::errs());
+        llvm::errs() << "previously defined in function "
+                     << val->getFunction()->getName() << ":\n";
+        val->print(llvm::errs());
+        abort();
       }
-      val = svi;
+      // The local archetype was unresolved so far. Replace the placeholder
+      // by inst.
+      auto *placeholder = cast<PlaceholderValue>(val);
+      placeholder->replaceAllUsesWith(dependency);
+      ::delete placeholder;
+      numUnresolvedLocalArchetypes--;
     }
-  }
+    val = dependency;
+  });
 }
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (const CanOpenedArchetypeType archeTy =
-            svi->getDefinedOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, fromFunction};
-      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      RootOpenedArchetypeDefs.erase(key);
-      RootOpenedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
-    }
-  }
+  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
+                                         SILValue dependency) {
+    LocalArchetypeKey key = {archeTy, fromFunction};
+    assert(RootLocalArchetypeDefs.lookup(key) == dependency &&
+           "archetype def was not registered");
+    RootLocalArchetypeDefs.erase(key);
+    RootLocalArchetypeDefs[{archeTy, inst->getFunction()}] = dependency;
+  });
 }
 
 // TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
@@ -952,4 +947,10 @@ SourceLoc swift::extractNearestSourceLoc(const SILModule *M) {
   if (!M)
     return SourceLoc();
   return extractNearestSourceLoc(M->getSwiftModule());
+}
+
+bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
+  // If the root class was implemented in Objective-C, use Objective-C's
+  // allocation methods because they may have been overridden.
+  return theClass->getObjectModel() == ReferenceCounting::ObjC;
 }

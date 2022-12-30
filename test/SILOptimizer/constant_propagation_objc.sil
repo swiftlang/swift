@@ -31,7 +31,7 @@ sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Arra
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
 // CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
-// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB:bb[0-9]+]]
 //
@@ -103,7 +103,7 @@ bb4:
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
 // CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
-// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB:bb[0-9]+]]
 //
@@ -174,7 +174,7 @@ bb4:
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
 // CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
-// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB]]
 //
@@ -252,7 +252,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -318,7 +318,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -387,7 +387,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -458,7 +458,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -524,7 +524,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -593,7 +593,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -664,7 +664,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -730,7 +730,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -799,7 +799,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -870,7 +870,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -936,7 +936,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -1005,7 +1005,7 @@ bb4:
 //
 // CHECK: [[COND_CAST_SUCC]]:
 // CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]

@@ -55,9 +55,6 @@ private:
 };
 
 template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
-  static_assert(std::is_literal_type<Lazy<T>>::value,
-                "Lazy<T> must be a literal type");
-
   swift::once(OnceToken, initCallback, &Value);
   return unsafeGetAlreadyInitialized();
 }

@@ -22,6 +22,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Serialization/Serialization.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -732,12 +733,12 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 
     auto *File = D->getDeclContext()->getModuleScopeContext();
     auto RawLocs = cast<FileUnit>(File)->getExternalRawLocsForDecl(D);
-    if (!RawLocs.hasValue())
+    if (!RawLocs.has_value())
       return Action::Continue();
 
     // If we have handled this USR before, don't proceed
     auto USR = calculateNewUSRId(D);
-    if (!USR.hasValue())
+    if (!USR.has_value())
       return Action::Continue();
 
     llvm::SmallString<128> AbsolutePath = RawLocs->SourceFilePath;

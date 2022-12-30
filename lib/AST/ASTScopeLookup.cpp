@@ -189,6 +189,9 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
 }
+NullablePtr<const GenericParamList> MacroDeclScope::genericParams() const {
+  return decl->getParsedGenericParams();
+}
 
 #pragma mark lookInMyGenericParameters
 

@@ -28,10 +28,17 @@ func test0() throws {
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[SELF]])
 
   //   Writeback to the first temporary.
+  //
+  //   NOTE: We need to a mark dependence here to ensure that the destroy
+  //   associated with the assign to ERR_TEMP0 is not hoisted above the copy_value
+  //   of T1_COPY. If we were to allow that, we could introduce a lifetime gap
+  //   causing potentially use after frees.
+  //
   // CHECK: [[T0:%.*]] = load [trivial] [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
   // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
-  // CHECK: assign [[T1_COPY]] to [[ERR_TEMP0]]
+  // CHECK: [[T1_COPY_DEP:%.*]] = mark_dependence [[T1_COPY]] : $Optional<NSError> on [[ERR_TEMP0]]
+  // CHECK: assign [[T1_COPY_DEP]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[BOOL_OR_INT:%.*]] = struct_extract [[RESULT]]

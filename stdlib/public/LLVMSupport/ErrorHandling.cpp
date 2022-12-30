@@ -31,13 +31,14 @@
 #endif
 
 namespace {
-void error(const char *fmt, ...) {
+void error(const char *prefix, const char *msg, const char *file = nullptr, unsigned line = 0) {
   char buffer[1024];
-  va_list argp;
 
-  va_start(argp, fmt);
-  vsnprintf(buffer, sizeof(buffer), fmt, argp);
-  va_end(argp);
+  if (file) {
+    snprintf(buffer, sizeof(buffer), "%s%s at %s:%u\n", prefix, msg, file, line);
+  } else {
+    snprintf(buffer, sizeof(buffer), "%s%s\n", prefix, msg);
+  }
 
 #if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
@@ -57,7 +58,7 @@ using namespace llvm;
 
 void __swift::__runtime::llvm::report_fatal_error(const char *Reason,
                                                   bool GenCrashDiag) {
-  error("LLVM ERROR: %s\n", Reason);
+  error("LLVM ERROR: ", Reason);
   abort();
 }
 
@@ -75,7 +76,7 @@ void __swift::__runtime::llvm::report_bad_alloc_error(const char *Reason,
                                                       bool GenCrashDiag) {
   // Don't call the normal error handler. It may allocate memory. Directly write
   // an OOM to stderr and abort.
-  error("LLVM ERROR: out of memory\n");
+  error("LLVM ERROR: ", "out of memory");
   abort();
 }
 
@@ -84,12 +85,7 @@ void __swift::__runtime::llvm::llvm_unreachable_internal(
   // This code intentionally doesn't call the ErrorHandler callback, because
   // llvm_unreachable is intended to be used to indicate "impossible"
   // situations, and not legitimate runtime errors.
-  if (msg)
-    error("%s\n", msg);
-  error("UNREACHABLE executed");
-  if (file)
-    error(" at %s:%u", file, line);
-  error("!\n");
+  error("", msg ? msg : "UNREACHABLE executed!", file, line);
   abort();
 #ifdef LLVM_BUILTIN_UNREACHABLE
   // Windows systems and possibly others don't declare abort() to be noreturn,

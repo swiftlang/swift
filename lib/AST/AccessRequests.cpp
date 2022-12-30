@@ -84,7 +84,14 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     if (D->hasInterfaceType() && D->isInvalid()) {
       return AccessLevel::Private;
     } else {
-      auto container = cast<NominalTypeDecl>(D->getDeclContext());
+      auto container = dyn_cast<NominalTypeDecl>(DC);
+      if (D->getKind() == DeclKind::Destructor && !container) {
+        // A destructor in an extension means @_objcImplementation. An
+        // @_objcImplementation class's deinit is only called by the ObjC thunk,
+        // if at all, so it is nonpublic.
+        return AccessLevel::Internal;
+      }
+
       return std::max(container->getFormalAccess(), AccessLevel::Internal);
     }
   }
@@ -120,6 +127,9 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   }
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
+  case DeclContextKind::MacroDecl:
+    // There are no declarations inside a macro.
+    return AccessLevel::Private;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -236,7 +246,7 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
       maxScope = maxScope->intersectWith(scope);
     }
 
-    if (!maxScope.hasValue()) {
+    if (!maxScope.has_value()) {
       // This is an error case and will be diagnosed elsewhere.
       maxAccess = AccessLevel::Public;
     } else if (maxScope->isPublic()) {
@@ -318,8 +328,8 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
   std::pair<AccessLevel, AccessLevel> value) const {
   auto extensionDecl = std::get<0>(getStorage());
   extensionDecl->setDefaultAndMaxAccessLevelBits(value.first, value.second);
-  assert(getCachedResult().getValue().first == value.first);
-  assert(getCachedResult().getValue().second == value.second);
+  assert(getCachedResult().value().first == value.first);
+  assert(getCachedResult().value().second == value.second);
 }
 
 // Define request evaluation functions for each of the access requests.

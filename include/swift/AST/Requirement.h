@@ -58,7 +58,7 @@ public:
   Requirement subst(Args &&...args) const {
     auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
     switch (getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {

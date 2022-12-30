@@ -1667,7 +1667,7 @@ sil @generic_in_to_guaranteed_caller : $@convention(thin) <T where T : P> (@in T
 bb0(%0 : $*T):
   %2 = function_ref @generic_in_to_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> Int64
   %3 = alloc_stack $T
-  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [init] %3 : $*T
   %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> Int64
   dealloc_stack %3 : $*T
   %7 = apply %2<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> Int64
@@ -1798,9 +1798,9 @@ bb0(%0 : $*T, %1 : $*S):
 sil [noinline] @generic_func_with_multple_generic_args_and_dead_generic_arg_caller : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %2 = alloc_stack $T
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   %4 = alloc_stack $T
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   %f = function_ref @generic_func_with_multple_generic_args_and_dead_generic_arg : $@convention(thin) <T, S> (@in T, @in S) -> ()
   apply %f<T, T>(%2, %4) : $@convention(thin) <T, S> (@in T, @in S) -> () 
   dealloc_stack %4 : $*T

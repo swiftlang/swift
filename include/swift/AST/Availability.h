@@ -208,6 +208,10 @@ public:
   const VersionRange &getRequiredOSVersionRange() const {
     return RequiredDeploymentRange;
   }
+
+  /// Returns true if the required OS version range's lower endpoint is at or
+  /// below the deployment target of the given ASTContext.
+  bool requiresDeploymentTargetOrEarlier(ASTContext &Ctx) const;
 };
 
 /// Represents everything that a particular chunk of code may assume about its

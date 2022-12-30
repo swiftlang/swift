@@ -13,7 +13,7 @@
 // This benchmark checks for quadratic behavior while copying elements in hash
 // order between Dictionaries of decreasing capacity
 //
-// https://bugs.swift.org/browse/SR-3268
+// https://github.com/apple/swift/issues/45856
 
 import TestsUtils
 

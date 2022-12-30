@@ -1,7 +1,9 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -75,6 +77,12 @@ struct STXXITXXII {
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
+// This function is not a synchronization point.
+sil @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
+
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
 sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
@@ -114,14 +122,14 @@ bb1:
 
 // CHECK-LABEL: sil [ossa] @combine_copy_addr
 // CHECK:      bb0(%0 : $*S, %1 : $*S):
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0
 // CHECK-NEXT:   br bb1
 // CHECK:      bb1:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil [ossa] @combine_copy_addr : $@convention(thin) (@in S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %1 to [initialization] %0 : $*S
+  copy_addr %1 to [init] %0 : $*S
   br bb1
 bb1:
   destroy_addr %1 : $*S
@@ -162,10 +170,10 @@ bb4:
 // CHECK: [[A:%.*]] = alloc_stack $T
 // CHECK: apply
 // CHECK: debug_value [[A]] : $*T, expr op_deref
-// CHECK-OPT: copy_addr [take] [[A]] to [initialization] %0 : $*T
+// CHECK-OPT: copy_addr [take] [[A]] to [init] %0 : $*T
 // CHECKOPT-NOT: destroy_addr
 // CHECKOPT-NOT: debug_value [[A]]
-// CHECKDEB: copy_addr [[A]] to [initialization] %0 : $*T
+// CHECKDEB: copy_addr [[A]] to [init] %0 : $*T
 // CHECKDEB: debug_value [[A]]
 // CHECKDEB-NEXT: destroy_addr [[A]] : $*T
 // CHECK-LABEL: } // end sil function 'backward_init'
@@ -175,7 +183,7 @@ bb0(%0 : $*T):
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value %l1 : $*T, expr op_deref
-  copy_addr %l1 to [initialization] %0 : $*T
+  copy_addr %l1 to [init] %0 : $*T
   debug_value %0 : $*T, expr op_deref
   debug_value %l1 : $*T, expr op_deref
   destroy_addr %l1 : $*T
@@ -210,7 +218,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
   debug_value %1 : $Builtin.Int1, let, name "z", argno 2
   %4 = alloc_stack [lexical] $T, var, name "t"
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   cond_br %1, bb1, bb2
 
 bb1:
@@ -257,7 +265,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
   debug_value %1 : $Builtin.Int1, let, name "z", argno 2
   %4 = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   cond_br %1, bb1, bb2
 
 bb1:
@@ -293,7 +301,7 @@ bb3:
 sil hidden [ossa] @destroyLoop_lexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %a = alloc_stack [lexical] $T, var, name "t"
-  copy_addr %0 to [initialization] %a : $*T
+  copy_addr %0 to [init] %a : $*T
   br bb1
 
 bb1:
@@ -330,7 +338,7 @@ bb3:
 sil hidden [ossa] @destroyLoop_nonlexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %a = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %a : $*T
+  copy_addr %0 to [init] %a : $*T
   br bb1
 
 bb1:
@@ -565,7 +573,7 @@ exit:
 sil [ossa] @hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
 entry(%in_addr : $*X):
   %stack_addr = alloc_stack $X
-  copy_addr %in_addr to [initialization] %stack_addr : $*X
+  copy_addr %in_addr to [init] %stack_addr : $*X
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
   %retval = load [take] %stack_addr : $*X
@@ -731,7 +739,7 @@ entry(%instance : @owned $S):
   %inner = begin_access [read] [static] %outer : $*S
   %field_addr = struct_element_addr %inner : $*S, #S.x
   %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
-  copy_addr %field_addr to [initialization] %field_addr_2 : $*X
+  copy_addr %field_addr to [init] %field_addr_2 : $*X
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -756,7 +764,7 @@ entry(%instance : @owned $S):
   %outer = begin_access [read] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
   %inner = begin_access [read] [static] %outer : $*S
-  copy_addr %inner to [initialization] %addr_2 : $*S
+  copy_addr %inner to [init] %addr_2 : $*S
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -859,8 +867,8 @@ entry(%instance : @owned $SXXI):
     store %instance to [init] %addr : $*SXXI
     %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
     %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
-    copy_addr %x_1_addr to [initialization] %x_1_alone : $*X
-    copy_addr %x_2_addr to [initialization] %x_2_alone : $*X
+    copy_addr %x_1_addr to [init] %x_1_alone : $*X
+    copy_addr %x_2_addr to [init] %x_2_alone : $*X
     destroy_addr %addr : $*SXXI
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
     apply %barrier() : $@convention(thin) () -> ()
@@ -896,9 +904,9 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
     %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
-    copy_addr %txxi_2_x_0_addr to [initialization] %txxi_2_alone : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
     %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
     destroy_addr %addr : $*STXXITXXII
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
@@ -931,7 +939,7 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
     %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
     %txxi2 = load [copy] %txxi_2_addr : $*(X, X, I)
     destroy_addr %addr : $*STXXITXXII
@@ -1040,7 +1048,7 @@ entry(%out : $*T, %instance : @owned $AnyObject):
     %addr = alloc_stack $AnyObject
     store %instance to [init] %addr : $*AnyObject
     %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*T
-    copy_addr %cast_addr to [initialization] %out : $*T
+    copy_addr %cast_addr to [init] %out : $*T
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     %retval = tuple ()
@@ -1063,4 +1071,17 @@ entry(%instance : @owned $AnyObject):
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     return %cast : $X
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) (@in X) -> () {
+entry(%addr : $*X):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*X
+  %retval = tuple ()
+  return %retval : $()
 }

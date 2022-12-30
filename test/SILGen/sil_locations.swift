@@ -313,7 +313,7 @@ func printSinglePayloadAddressOnly(_ v:SinglePayloadAddressOnly) {
   }
   
   
-  // CHECK_LABEL: sil hidden [ossa] @$s13sil_locations29printSinglePayloadAddressOnly{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations29printSinglePayloadAddressOnly{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
   // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]], {{.*}}line:[[@LINE-10]]:3
   // CHECK: [[FALSE_BB]]:

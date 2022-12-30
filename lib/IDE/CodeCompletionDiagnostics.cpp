@@ -96,24 +96,24 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   StringRef Platform = Attr->prettyPlatformString();
   llvm::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.getValue();
+    DeprecatedVersion = Attr->Deprecated.value();
 
   if (!isSoftDeprecated) {
     if (Attr->Message.empty() && Attr->Rename.empty()) {
       getDiagnostics(severity, Out, diag::availability_deprecated,
                      RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+                     Attr->Deprecated.has_value(), DeprecatedVersion,
                      /*message*/ StringRef());
     } else if (!Attr->Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       getDiagnostics(severity, Out, diag::availability_deprecated,
                      RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+                     Attr->Deprecated.has_value(), DeprecatedVersion,
                      EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out, diag::availability_deprecated_rename,
                      RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion, false,
+                     Attr->Deprecated.has_value(), DeprecatedVersion, false,
                      /*ReplaceKind*/ 0, Attr->Rename);
     }
   } else {

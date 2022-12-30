@@ -87,11 +87,6 @@ public enum ArgumentConvention {
   case indirectIn
 
   /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee must treat the object as read-only
-  /// The callee may assume that the address does not alias any valid object.
-  case indirectInConstant
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee may not modify and does not destroy
   /// the object.
   case indirectInGuaranteed
@@ -128,10 +123,39 @@ public enum ArgumentConvention {
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
 
+  public var isIndirect: Bool {
+    switch self {
+    case .indirectIn, .indirectInGuaranteed,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed:
+      return false
+    }
+  }
+
+  public var isIndirectIn: Bool {
+    switch self {
+    case .indirectIn, .indirectInGuaranteed:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return false
+    }
+  }
+
+  public var isGuaranteed: Bool {
+    switch self {
+    case .indirectInGuaranteed, .directGuaranteed:
+      return true
+    case .indirectIn, .directOwned, .directUnowned,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return false
+    }
+  }
+
   public var isExclusiveIndirect: Bool {
     switch self {
     case .indirectIn,
-         .indirectInConstant,
          .indirectOut,
          .indirectInGuaranteed,
          .indirectInout:
@@ -152,7 +176,6 @@ public enum ArgumentConvention {
       return true
 
     case .indirectIn,
-         .indirectInConstant,
          .indirectOut,
          .indirectInGuaranteed,
          .directUnowned,
@@ -175,7 +198,6 @@ extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
       case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Constant:    return .indirectInConstant
       case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
       case ArgumentConvention_Indirect_Inout:          return .indirectInout
       case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable

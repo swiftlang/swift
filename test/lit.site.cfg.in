@@ -117,9 +117,6 @@ config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 if "@SWIFT_ENABLE_MACCATALYST@" == "TRUE":
     config.available_features.add('maccatalyst_support')
 
-if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
-    config.available_features.add('syntax_parser_lib')
-
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
@@ -151,6 +148,19 @@ config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
 # Configured in DarwinSDKs.cmake
 config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
+
+if "@BOOTSTRAPPING_MODE@" != "OFF":
+  config.available_features.add('swift_in_compiler')
+
+if "@SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR@" != "":
+  config.available_features.add('swift_swift_parser')
+
+if "@BOOTSTRAPPING_MODE@" == 'HOSTTOOLS':
+  config.available_features.add('hosttools_mode')
+elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':
+  config.available_features.add('bootstrapping_mode')
+elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING-WITH-HOSTLIBS':
+  config.available_features.add('bootstrapping_with_hostlibs_mode')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

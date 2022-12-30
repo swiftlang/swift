@@ -215,8 +215,12 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS,
   }
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:  {
-    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    const auto *NE = cast<NumberLiteralExpr>(E);
+    auto digits = NE->getDigitsText();
     assert(!digits.empty());
+    if (NE->getMinusLoc().isValid()) {
+      print("-");
+    }
     print(digits);
     return true;
   }
@@ -389,6 +393,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(InOut, getSubExpr);
 
   NO_REFERENCE(VarargExpansion);
+  NO_REFERENCE(PackExpansion);
+  NO_REFERENCE(PackElement);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -443,7 +449,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
-  PASS_THROUGH_REFERENCE(ReifyPack, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -461,8 +466,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
-  NO_REFERENCE(Pack);
   NO_REFERENCE(TypeJoin);
+  SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -745,6 +750,8 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::OpenExistential:
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
+  case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
     return false;
 
   case ExprKind::Call:
@@ -792,7 +799,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
-  case ExprKind::ReifyPack:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -810,11 +816,13 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
-  case ExprKind::Pack:
   case ExprKind::TypeJoin:
     return false;
 
   case ExprKind::Tap:
+    return true;
+
+  case ExprKind::MacroExpansion:
     return true;
   }
 
@@ -830,6 +838,8 @@ ArgumentList *Expr::getArgs() const {
     return DSE->getArgs();
   if (auto *OLE = dyn_cast<ObjectLiteralExpr>(this))
     return OLE->getArgs();
+  if (auto *ME = dyn_cast<MacroExpansionExpr>(this))
+    return ME->getArgs();
   return nullptr;
 }
 
@@ -918,6 +928,8 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::AutoClosure:
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
+  case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -980,9 +992,8 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
-  case ExprKind::ReifyPack:
-  case ExprKind::Pack:
   case ExprKind::TypeJoin:
+  case ExprKind::MacroExpansion:
     return false;
   }
 
@@ -1179,7 +1190,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1187,7 +1198,7 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1233,6 +1244,60 @@ VarargExpansionExpr *VarargExpansionExpr::createParamExpansion(ASTContext &ctx, 
 VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, ArrayExpr *AE) {
   assert(AE->getType() && "Expansion must have fully-resolved type!");
   return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
+}
+
+PackExpansionExpr *
+PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
+                          ArrayRef<PackElementExpr *> packElements,
+                          SourceLoc dotsLoc, GenericEnvironment *environment,
+                          bool implicit, Type type) {
+  size_t size =
+      totalSizeToAlloc<PackElementExpr *>(packElements.size());
+  void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
+  return ::new (mem) PackExpansionExpr(patternExpr, packElements,
+                                       dotsLoc, environment,
+                                       implicit, type);
+}
+
+void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
+  struct PackCollector : public ASTWalker {
+    llvm::SmallVector<ASTNode, 2> packs;
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionExpr>(E)) {
+        return Action::SkipChildren(E);
+      }
+
+      if (isa<PackElementExpr>(E)) {
+        packs.push_back(E);
+      }
+
+      return Action::Continue(E);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionTypeRepr>(T)) {
+        return Action::SkipChildren();
+      }
+
+      if (isa<PackReferenceTypeRepr>(T)) {
+        packs.push_back(T);
+      }
+
+      return Action::Continue();
+    }
+  } packCollector;
+
+  getPatternExpr()->walk(packCollector);
+  packs.append(packCollector.packs.begin(), packCollector.packs.end());
+}
+
+PackElementExpr *
+PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
+                        bool implicit, Type type) {
+  return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -1778,6 +1843,13 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       candidate = injectIntoOptionalExpr->getSubExpr();
       continue;
     }
+
+    // Look through open existential expressions
+    if (auto openExistentialExpr
+        = dyn_cast<OpenExistentialExpr>(candidate)) {
+      candidate = openExistentialExpr->getSubExpr();
+      continue;
+    }
     break;
   }
 
@@ -1818,6 +1890,27 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
         preconcurrency());
   }
   }
+}
+
+unsigned AbstractClosureExpr::getDiscriminator() const {
+  auto raw = getRawDiscriminator();
+  if (raw != InvalidDiscriminator)
+    return raw;
+
+  evaluateOrDefault(
+      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+
+  // Ill-formed code might not be able to assign discriminators, so assign
+  // a new one now.
+  if (getRawDiscriminator() == InvalidDiscriminator &&
+      getASTContext().Diags.hadAnyError()) {
+    const_cast<AbstractClosureExpr *>(this)->
+        Bits.AbstractClosureExpr.Discriminator =
+          getASTContext().NextAutoClosureDiscriminator++;
+  }
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
 }
 
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
@@ -2423,30 +2516,6 @@ RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
                                     /*implicit*/ false);
 }
 
-PackExpr::PackExpr(ArrayRef<Expr *> SubExprs, Type Ty)
-  : Expr(ExprKind::Pack, /*implicit*/ true, Ty) {
-  Bits.PackExpr.NumElements = SubExprs.size();
-
-  // Copy elements.
-  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
-                          getTrailingObjects<Expr *>());
-}
-
-PackExpr *PackExpr::create(ASTContext &ctx,
-                           ArrayRef<Expr *> SubExprs,
-                           Type Ty) {
-  assert(Ty->castTo<PackType>());
-
-  size_t size =
-      totalSizeToAlloc<Expr *>(SubExprs.size());
-  void *mem = ctx.Allocate(size, alignof(PackExpr));
-  return new (mem) PackExpr(SubExprs, Ty);
-}
-
-PackExpr *PackExpr::createEmpty(ASTContext &ctx) {
-  return create(ctx, {}, PackType::getEmpty(ctx));
-}
-
 TypeJoinExpr::TypeJoinExpr(DeclRefExpr *varRef, ArrayRef<Expr *> elements)
   : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(varRef) {
   assert(Var);
@@ -2462,6 +2531,18 @@ TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
   size_t size = totalSizeToAlloc<Expr *>(elements.size());
   void *mem = ctx.Allocate(size, alignof(TypeJoinExpr));
   return new (mem) TypeJoinExpr(var, elements);
+}
+
+SourceRange MacroExpansionExpr::getSourceRange() const {
+  SourceLoc endLoc;
+  if (ArgList)
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroNameLoc.getEndLoc();
+
+  return SourceRange(PoundLoc, endLoc);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

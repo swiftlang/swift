@@ -1438,12 +1438,12 @@ bool ConstraintGraph::contractEdges() {
     auto rep2 = CS.getRepresentative(tyvar2);
 
     if (CS.isDebugMode()) {
-      auto &log = llvm::errs();
-      if (CS.solverState)
-        log.indent(CS.solverState->getCurrentIndent());
+      auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
+      auto &log = llvm::errs().indent(indent);
 
       log << "Contracting constraint ";
-      constraint->print(log, &CS.getASTContext().SourceMgr);
+      constraint->print(log.indent(indent), &CS.getASTContext().SourceMgr,
+                        indent);
       log << "\n";
     }
 
@@ -1488,7 +1488,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
 
     for (auto constraint : sortedConstraints) {
       out.indent(indent + 4);
-      constraint->print(out, &TypeVar->getASTContext().SourceMgr);
+      constraint->print(out, &TypeVar->getASTContext().SourceMgr, indent + 4);
       out << "\n";
     }
   }
@@ -1545,7 +1545,8 @@ void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
   PO.PrintTypesForDebugging = true;
 
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(out, 2, PO);
+    (*this)[typeVar].print(
+        out, (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2, PO);
     out << "\n";
   }
 }
@@ -1682,7 +1683,7 @@ void ConstraintGraph::printConnectedComponents(
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
   for (const auto& component : components) {
-    out.indent(2);
+    out.indent((CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2);
     out << component.solutionIndex << ": ";
     SWIFT_DEFER {
       out << '\n';

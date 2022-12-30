@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -typecheck -verify %s -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -D ERRORS -typecheck -verify %s -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
@@ -415,9 +415,11 @@ class d0120_TestClassBase {
   required init() {}
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
-  // FIXME: Add these once we can SILGen them reasonable.
-  // init?(fail: String) { }
-  // init!(iuoFail: String) { }
+  init?(fail: String) {}
+// PASS_COMMON-NEXT: {{^}}  init?(fail: String){{$}}
+
+  init!(iuoFail: String) {}
+// PASS_COMMON-NEXT: {{^}}  init!(iuoFail: String){{$}}
 
   final func baseFunc1() {}
 // PASS_COMMON-NEXT: {{^}}  final func baseFunc1(){{$}}
@@ -433,11 +435,14 @@ class d0120_TestClassBase {
   class var baseClassVar1: Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  class var baseClassVar1: Int { get }{{$}}
 
-  // FIXME: final class var not allowed to have storage, but static is?
-  // final class var baseClassVar2: Int = 0
+// FIXME: final class var not allowed to have storage, but static is?
+#if ERRORS
+  final class var baseClassVar2: Int = 0
+  // expected-error@-1 {{class stored properties not supported in classes; did you mean 'static'?}}
+#endif
 
   final class var baseClassVar3: Int { return 0 }
-// PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
+// PASS_COMMON: {{^}}  final class var baseClassVar3: Int { get }{{$}}
   static var baseClassVar4: Int = 0
 // PASS_COMMON-NEXT: {{^}}  @_hasInitialValue static var baseClassVar4: Int{{$}}
   static var baseClassVar5: Int { return 0 }
@@ -456,6 +461,12 @@ class d0121_TestClassDerived : d0120_TestClassBase {
 
   required init() { super.init() }
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
+
+  override init?(fail: String) { nil }
+// PASS_COMMON-NEXT: {{^}}  override init?(fail: String){{$}}
+
+  override init!(iuoFail: String) { nil }
+// PASS_COMMON-NEXT: {{^}}  override init!(iuoFail: String){{$}}
 
   final override func baseFunc2() {}
 // PASS_COMMON-NEXT: {{^}}  {{(override |final )+}}func baseFunc2(){{$}}
@@ -929,8 +940,13 @@ class d0600_InClassVar1 {
 // PASS_COMMON: {{^}}  var instanceVar4: Int { get }{{$}}
 // PASS_COMMON-NOT: instanceVar4
 
-  // FIXME: uncomment when we have static vars.
-  // static var staticVar1: Int
+  static var staticVar1: Int = 42
+// PASS_COMMON: {{^}}  @_hasInitialValue static var staticVar1: Int{{$}}
+// PASS_COMMON-NOT: staticVar1
+
+  static var staticVar2: Int { 42 }
+// PASS_COMMON: {{^}}  static var staticVar2: Int { get }{{$}}
+// PASS_COMMON-NOT: staticVar2
 
   init() {
     instanceVar1 = 10
@@ -1402,7 +1418,6 @@ protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 
-  // FIXME: this same type requirement with Self should be printed here
   associatedtype A2 : QuxProtocol where A2.Qux == Self
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol where Self == Self.A2.Qux{{$}}
 }

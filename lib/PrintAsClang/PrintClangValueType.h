@@ -14,9 +14,9 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 
 #include "OutputLanguageMode.h"
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -91,8 +91,7 @@ public:
       StringRef vwTableVarName = "vwTable");
 
   static void printTypeGenericTraits(
-      raw_ostream &os, const NominalTypeDecl *typeDecl,
-      StringRef typeMetadataFuncName,
+      raw_ostream &os, const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
       ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
       const ModuleDecl *moduleContext);
 
@@ -105,7 +104,7 @@ public:
   /// Print out the type traits that allow a C++ type be used a Swift generic
   /// context.
   static void printClangTypeSwiftGenericTraits(raw_ostream &os,
-                                               const NominalTypeDecl *typeDecl,
+                                               const TypeDecl *typeDecl,
                                                const ModuleDecl *moduleContext);
 
 private:

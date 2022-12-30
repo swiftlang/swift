@@ -174,7 +174,8 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
 
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
-SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
+                                          SILType Ty) {
   // Without ownership, delegate to unchecked reinterpret cast.
   if (!hasOwnership())
     return createUncheckedReinterpretCast(Loc, Op, Ty);

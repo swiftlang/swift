@@ -74,7 +74,7 @@ enum class SILLinkage : uint8_t {
   ///
   /// This linkage is used e.g. for thunks and for specialized functions.
   ///
-  /// Public functions must be definitions, i.e. must have a body, except the
+  /// Shared functions must be definitions, i.e. must have a body, except the
   /// body is emitted by clang.
   Shared,
 

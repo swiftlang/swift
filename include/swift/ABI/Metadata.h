@@ -173,7 +173,7 @@ using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
 using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
-// FIXME: https://bugs.swift.org/browse/SR-1155
+// FIXME: https://github.com/apple/swift/issues/43763
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 
@@ -648,9 +648,9 @@ struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
   /// Return the basic bounds of all Swift class metadata.
   /// The immediate members offset will not be meaningful.
   static constexpr TargetClassMetadataBounds<Runtime> forSwiftRootClass() {
-    using Metadata = FullMetadata<TargetClassMetadataType<Runtime>>;
-    return forAddressPointAndSize(sizeof(typename Metadata::HeaderType),
-                                  sizeof(Metadata));
+    using MetadataTy = FullMetadata<TargetClassMetadataType<Runtime>>;
+    return forAddressPointAndSize(sizeof(typename MetadataTy::HeaderType),
+                                  sizeof(MetadataTy));
   }
 
   /// Return the bounds of a Swift class metadata with the given address
@@ -4735,6 +4735,45 @@ public:
 };
 
 using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
+
+/// A single entry in an runtine discoverable attribute record
+/// that relates a type attribute is attached to a generator function.
+template <typename Runtime>
+struct TargetRuntimeDiscoverableAttributeEntry {
+  ConstTargetMetadataPointer<Runtime, TargetMetadata> Type;
+  RelativeDirectPointer<TargetAccessibleFunctionRecord<Runtime>> Generator;
+};
+
+/// A record that relates a runtime discoverable attribute to all of the
+/// types (i.e. a nominal type, method, property etc.) it's attached to.
+template <typename Runtime>
+class RuntimeDiscoverableAttributeRecord
+    : private swift::ABI::TrailingObjects<
+          RuntimeDiscoverableAttributeRecord<Runtime>,
+          TargetRuntimeDiscoverableAttributeEntry<Runtime>> {
+  using TrailingObjects = swift::ABI::TrailingObjects<
+      RuntimeDiscoverableAttributeRecord<Runtime>,
+      ConstTargetMetadataPointer<Runtime, TargetMetadata>>;
+  friend TrailingObjects;
+
+  uint32_t flags;
+
+  /// The nominal type that describes the attribute.
+  TargetSignedContextPointer<Runtime, TargetTypeContextDescriptor> Attribute;
+
+  /// The number of types this attribute is associated with.
+  uint32_t numEntries;
+
+public:
+  uint32_t getFlags() { return flags; }
+
+  llvm::ArrayRef<TargetRuntimeDiscoverableAttributeEntry<Runtime>>
+  getEntries() const {
+    return {this->template getTrailingObjects<
+                TargetRuntimeDiscoverableAttributeEntry<Runtime>>(),
+            numEntries};
+  }
+};
 
 } // end namespace swift
 

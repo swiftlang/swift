@@ -3,9 +3,10 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
 
+// REQUIRES: rdar102364960
+
 import StdlibUnittest
 import CustomSequence
-import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxSequence")
 

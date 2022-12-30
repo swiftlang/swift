@@ -286,12 +286,12 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
+        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
                                              ctx.getASTContext()));
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
+        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
                                              ctx.getASTContext()));
 
         // An associated type symbol at the root means we have a dependent
@@ -303,6 +303,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
+      case Symbol::Kind::Shape:
         llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
         abort();
       }
@@ -543,7 +544,7 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
     unsigned newIndex = result.size();
     result.push_back(Term::get(term, *this));
 
-    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+    return CanGenericTypeParamType::get(/*isParameterPack=*/ false,
                                         /*depth=*/ 0, newIndex,
                                         Context);
   }));
@@ -572,7 +573,7 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
     unsigned index = result.size();
     result.push_back(getTermForType(CanType(t), proto));
 
-    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+    return CanGenericTypeParamType::get(/*isParameterPack=*/ false,
                                         /*depth=*/0, index,
                                         Context);
   }));

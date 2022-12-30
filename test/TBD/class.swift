@@ -345,3 +345,25 @@ private class PrivateGeneric<T, U, V> {
 
   private static func privateStaticGeneric<A>(_: A, default_: Int = 0) {}
 }
+
+public class PublicDynamicMembers {
+  public dynamic init() {}
+  public dynamic convenience init(x: Int) {
+    self.init()
+  }
+  public dynamic func dynamicMethod() {}
+  public dynamic class func dynamicClassMethod() {}
+}
+
+extension PublicDynamicMembers {
+  @_dynamicReplacement(for: init(x:))
+  public convenience init(y: Int) {
+    self.init()
+  }
+
+  @_dynamicReplacement(for: dynamicMethod())
+  public func methodReplacement() {}
+
+  @_dynamicReplacement(for: dynamicClassMethod())
+  public class func classMethodReplacement() {}
+}

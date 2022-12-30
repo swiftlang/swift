@@ -574,15 +574,25 @@ public func castAccess2<T : P>(_ x : __owned T) {
 // Partial Apply Tests //
 /////////////////////////
 
+public func nonEscapingpartialApplyTest<T : P>(_ x: __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move x2 // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        print(x2)
+    }
+    f()
+}
+
 // This makes sure we always fail if we are asked to check in a partial apply.
-public func partialApplyTest<T : P>(_ x: __owned T) {
+public func partialApplyTest<T : P>(_ x: __owned T) -> () -> () {
     var x2 = x
     x2 = x
     let _ = _move x2 // expected-error {{move applied to value that the compiler does not support checking}}
     let f = {
         print(x2)
     }
-    f()
+    return f
 }
 
 ////////////////////////

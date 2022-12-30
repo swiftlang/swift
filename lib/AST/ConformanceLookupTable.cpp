@@ -920,7 +920,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
       // Find a SynthesizedProtocolAttr corresponding to the protocol.
       for (auto attr : conformingNominal->getAttrs()
              .getAttributes<SynthesizedProtocolAttr>()) {
-        auto otherProto = ctx.getProtocol(attr->getProtocolKind());
+        auto otherProto = attr->getProtocol();
         if (otherProto == impliedProto) {
           // Set the conformance loader to the loader stashed inside
           // the attribute.

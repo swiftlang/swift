@@ -49,6 +49,58 @@
 #include "llvm/Support/TrailingObjects.h"
 #include <array>
 
+namespace llvm {
+namespace ilist_detail {
+
+/// The base class of the instruction list in SILBasicBlock.
+///
+/// We need a custom base class to not clear the prev/next pointers when
+/// removing an instruction from the list.
+class SILInstructionListBase : public ilist_base<false> {
+public:
+  /// Remove an instruction from the list.
+  ///
+  /// In contrast to the default implementation, it does not clear the prev/
+  /// next pointers in the node. This is needed to being able to remove
+  /// instructions from the list while iterating over the list.
+  /// For details see `DeletableInstructionsIterator`.
+  template <class T> static void remove(T &N) {
+    node_base_type *Prev = N.getPrev();
+    node_base_type *Next = N.getNext();
+    Next->setPrev(Prev);
+    Prev->setNext(Next);
+  }
+
+  template <class T> static void insertBefore(T &Next, T &N) {
+    insertBeforeImpl(Next, N);
+  }
+
+  template <class T> static void transferBefore(T &Next, T &First, T &Last) {
+    transferBeforeImpl(Next, First, Last);
+  }
+};
+
+// This template specialization is needed to replace the default instruction
+// list base class with `SILInstructionListBase`.
+template <> struct compute_node_options<::swift::SILInstruction> {
+  struct type {
+    typedef ::swift::SILInstruction value_type;
+    typedef value_type *pointer;
+    typedef value_type &reference;
+    typedef const value_type *const_pointer;
+    typedef const value_type &const_reference;
+
+    static const bool enable_sentinel_tracking = false;
+    static const bool is_sentinel_tracking_explicit = false;
+    typedef void tag;
+    typedef ilist_node_base<enable_sentinel_tracking> node_base_type;
+    typedef SILInstructionListBase list_base_type;
+  };
+};
+
+} // end namespace ilist_detail
+} // end llvm namespace
+
 namespace swift {
 
 class AllocationInst;
@@ -376,9 +428,6 @@ protected:
     NumCreatedInstructions++;
   }
 
-  /// This method unlinks 'self' from the containing basic block.
-  void removeFromParent();
-
   ~SILInstruction() {
     NumDeletedInstructions++;
   }
@@ -394,7 +443,7 @@ public:
 
   /// Returns true if this instruction is removed from its function and
   /// scheduled to be deleted.
-  bool isDeleted() const { return !ParentBB; }
+  bool isDeleted() const { return asSILNode()->isMarkedAsDeleted(); }
 
   enum class MemoryBehavior {
     None,
@@ -636,6 +685,14 @@ public:
     return getResultsImpl().getTypes();
   }
 
+  /// Run the given function for each local archetype this instruction
+  /// defines, passing the value that should be used to record the
+  /// dependency.
+  void forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType archetype,
+                              SILValue typeDependency)> function) const;
+  bool definesLocalArchetypes() const;
+
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
 
@@ -648,12 +705,6 @@ public:
 
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;
-
-  /// Involves a synchronization point like a memory barrier, lock or syscall.
-  ///
-  /// TODO: We need side-effect analysis and library annotation for this to be
-  ///       a reasonable API.  For now, this is just a placeholder.
-  bool maySynchronize() const;
 
   /// Returns true if the given instruction is completely identical to RHS.
   bool isIdenticalTo(const SILInstruction *RHS) const {
@@ -1053,10 +1104,6 @@ public:
            node->getKind() <= SILNodeKind::Last_SingleValueInstruction;
   }
 
-  /// If this is an instruction which "defines" a root opened archetype, it is
-  /// returned.
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const;
-
   SILInstruction *getPreviousInstruction() {
     return SILInstruction::getPreviousInstruction();
   }
@@ -1188,6 +1235,9 @@ public:
 ///
 /// The ownership kind is set on construction and afterwards must be changed
 /// explicitly using setOwnershipKind().
+///
+/// TODO: This name is extremely misleading because it may apply to an
+/// operation that has no operand at all, like `enum .None`.
 class FirstArgOwnershipForwardingSingleValueInst
     : public SingleValueInstruction,
       public OwnershipForwardingMixin {
@@ -1674,6 +1724,8 @@ public:
 
   Operand &getOperandRef() { return Operands[0]; }
 
+  const Operand &getOperandRef() const { return Operands[0]; }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -1811,6 +1863,10 @@ public:
   }
 
   Operand &getOperandRef() {
+    return this->getAllOperands()[0];
+  }
+
+  const Operand &getOperandRef() const {
     return this->getAllOperands()[0];
   }
 
@@ -2795,7 +2851,7 @@ public:
 
   Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
-    if (SubstCallee->getNumAllResults() != 1)
+    if (SubstCallee->getNumResults() != 1)
       return None;
     return SubstCallee->getSingleResult();
   }
@@ -4092,6 +4148,32 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+/// HasSymbolInst - Determines whether a weakly-imported declaration is
+/// available at runtime. Produces true if each of the underlying symbol
+/// addresses associated with a given declaration are non-null, false otherwise.
+class HasSymbolInst final : public LiteralInst {
+private:
+  friend SILBuilder;
+
+  ValueDecl *Decl;
+
+public:
+  HasSymbolInst(SILModule &M, SILDebugLocation Loc, ValueDecl *Decl)
+      : LiteralInst(SILInstructionKind::HasSymbolInst, Loc,
+                    SILType::getBuiltinIntegerType(1, Decl->getASTContext())),
+        Decl{Decl} {}
+
+  ValueDecl *getDecl() const { return Decl; }
+  void getReferencedFunctions(llvm::SmallVector<SILFunction *, 4> &fns) const;
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(SILNodePointer node) {
+    return node->getKind() == SILNodeKind::HasSymbolInst;
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Memory instructions.
 //===----------------------------------------------------------------------===//
@@ -4286,47 +4368,7 @@ class EndBorrowInst
   EndBorrowInst(SILDebugLocation debugLoc, SILValue borrowedValue)
       : UnaryInstructionBase(debugLoc, borrowedValue) {}
 
-public:
-  /// Return the value that this end_borrow is ending the borrow of if we are
-  /// borrowing a single value.
-  SILValue getSingleOriginalValue() const {
-    SILValue v = getOperand();
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(v))
-      return bbi->getOperand();
-    if (auto *lbi = dyn_cast<LoadBorrowInst>(v))
-      return lbi->getOperand();
-    return SILValue();
-  }
 
-  /// Return the set of guaranteed values that have scopes ended by this
-  /// end_borrow.
-  ///
-  /// Discussion: We can only have multiple values associated with an end_borrow
-  /// in the case of having Phi arguments with guaranteed inputs. This is
-  /// necessary to represent certain conditional operations such as:
-  ///
-  /// class Klass {
-  ///   let k1: Klass
-  ///   let k2: Klass
-  /// }
-  ///
-  /// func useKlass(k: Klass) { ... }
-  /// var boolValue : Bool { ... }
-  ///
-  /// func f(k: Klass) {
-  ///   useKlass(boolValue ? k.k1 : k.k2)
-  /// }
-  ///
-  /// Today, when we SILGen such code, we copy k.k1 and k.k2 before the Phi when
-  /// it could potentially be avoided. So today this just appends
-  /// getSingleOriginalValue() to originalValues.
-  ///
-  /// TODO: Once this changes, this code must be update.
-  void getOriginalValues(SmallVectorImpl<SILValue> &originalValues) const {
-    SILValue value = getSingleOriginalValue();
-    assert(value && "Guaranteed phi arguments are not supported now");
-    originalValues.emplace_back(value);
-  }
 };
 
 /// Different kinds of access.
@@ -4677,6 +4719,9 @@ class AssignByWrapperInst
   USE_SHARED_UINT8;
 
 public:
+  /// The kind of a wrapper that is being applied.
+  enum class Originator : uint8_t { TypeWrapper, PropertyWrapper };
+
   enum Mode {
     /// The mode is not decided yet (by DefiniteInitialization).
     Unknown,
@@ -4696,12 +4741,17 @@ public:
   };
 
 private:
-  AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
-                       SILValue Initializer, SILValue Setter, Mode mode);
+  Originator originator;
+
+  AssignByWrapperInst(SILDebugLocation DebugLoc, Originator origin,
+                      SILValue Src, SILValue Dest, SILValue Initializer,
+                      SILValue Setter, Mode mode);
 
 public:
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
+
+  Originator getOriginator() const { return originator; }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignByWrapperInst.mode);
@@ -4923,6 +4973,32 @@ public:
   void setTrace(bool trace = true) {
     sharedUInt8().DebugValueInst.trace = trace;
   }
+};
+
+class TestSpecificationInst final
+    : public InstructionBase<SILInstructionKind::TestSpecificationInst,
+                             NonValueInstruction>,
+      private llvm::TrailingObjects<TestSpecificationInst, char> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  unsigned ArgumentsSpecificationLength;
+
+  TestSpecificationInst(SILDebugLocation Loc,
+                        unsigned ArgumentsSpecificationLength)
+      : InstructionBase(Loc),
+        ArgumentsSpecificationLength(ArgumentsSpecificationLength) {}
+
+  static TestSpecificationInst *
+  create(SILDebugLocation Loc, StringRef argumentsSpecification, SILModule &M);
+
+public:
+  StringRef getArgumentsSpecification() const {
+    return StringRef(getTrailingObjects<char>(), ArgumentsSpecificationLength);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 /// An abstract class representing a load from some kind of reference storage.
@@ -5798,7 +5874,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -5809,11 +5885,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 
   StructDecl *getStructDecl() const {
@@ -6088,7 +6164,7 @@ public:
       // If the operand is not trivial...
       if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
-        if (!Index.hasValue()) {
+        if (!Index.has_value()) {
           Index = i;
           continue;
         }
@@ -6099,11 +6175,11 @@ public:
     }
 
     // If we did not find an index, return an empty SILValue.
-    if (!Index.hasValue())
+    if (!Index.has_value())
       return SILValue();
 
     // Otherwise, return the value associated with index.
-    return Ops[Index.getValue()].get();
+    return Ops[Index.value()].get();
   }
 };
 
@@ -6144,10 +6220,12 @@ public:
     return index;
   }
 
-  bool hasOperand() const { return OptionalOperand.hasValue(); }
+  bool hasOperand() const { return OptionalOperand.has_value(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
 
   Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
+
+  const Operand &getOperandRef() const { return OptionalOperand->asArray()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
@@ -7023,6 +7101,13 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an opaque value referring to an existential, "opens" the
@@ -7036,6 +7121,14 @@ class OpenExistentialValueInst
   OpenExistentialValueInst(SILDebugLocation debugLoc, SILValue operand,
                            SILType selfTy,
                            ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a class existential, "opens" the
@@ -7049,6 +7142,14 @@ class OpenExistentialRefInst
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
                          SILType Ty,
                          ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an existential metatype,
@@ -7063,6 +7164,14 @@ class OpenExistentialMetatypeInst
 
   OpenExistentialMetatypeInst(SILDebugLocation DebugLoc, SILValue operand,
                               SILType ty);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a boxed existential container,
@@ -7076,6 +7185,14 @@ class OpenExistentialBoxInst
 
   OpenExistentialBoxInst(SILDebugLocation DebugLoc, SILValue operand,
                          SILType ty);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given a boxed existential container, "opens" the existential by returning a
@@ -7089,6 +7206,14 @@ class OpenExistentialBoxValueInst
   OpenExistentialBoxValueInst(SILDebugLocation DebugLoc, SILValue operand,
                               SILType ty,
                               ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
 };
 
 /// Given an address to an uninitialized buffer of
@@ -8330,31 +8455,50 @@ public:
 
   TermKind getTermKind() const { return TermKind(getKind()); }
 
-  /// Returns true if this is a transformation terminator.
+  /// Returns true if this terminator may have a result, represented as a block
+  /// argument in any of its successor blocks.
   ///
-  /// The first operand is the transformed source.
-  bool isTransformationTerminator() const {
+  /// Phis (whose operands originate from BranchInst terminators) are not
+  /// terminator results.
+  ///
+  /// CondBr might produce block arguments for legacy reasons. This is gradually
+  /// being deprecated. For now, they are considered phis. In OSSA, these "phis"
+  /// must be trivial and critical edges cannot be present.
+  bool mayHaveTerminatorResult() const {
     switch (getTermKind()) {
     case TermKind::UnwindInst:
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
     case TermKind::ThrowInst:
     case TermKind::YieldInst:
-    case TermKind::TryApplyInst:
-    case TermKind::BranchInst:
     case TermKind::CondBranchInst:
-    case TermKind::SwitchValueInst:
+    case TermKind::BranchInst:
     case TermKind::SwitchEnumAddrInst:
-    case TermKind::DynamicMethodBranchInst:
     case TermKind::CheckedCastAddrBranchInst:
-    case TermKind::AwaitAsyncContinuationInst:
       return false;
-    case TermKind::SwitchEnumInst:
     case TermKind::CheckedCastBranchInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::TryApplyInst:
+    case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::DynamicMethodBranchInst:
       return true;
     }
     llvm_unreachable("Covered switch isn't covered.");
   }
+
+  /// Returns an Operand reference if this terminator forwards ownership of a
+  /// single operand to a single result for at least one successor
+  /// block. Otherwise returns nullptr.
+  ///
+  /// By convention, terminators can forward ownership of at most one operand to
+  /// at most one result. The operand value might not be directly forwarded. For
+  /// example, a switch forwards ownership of the enum type into ownership of
+  /// the payload.
+  ///
+  /// Postcondition: each successor has zero or one block arguments which
+  /// represents the forwaded result.
+  const Operand *forwardedOperand() const;
 };
 
 // Forwards the first operand to a result in each successor block.
@@ -8387,6 +8531,10 @@ public:
   }
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  Operand &getOperandRef() { return getAllOperands()[0]; }
+
+  const Operand &getOperandRef() const { return getAllOperands()[0]; }
 
   /// Create a result for this terminator on the given successor block.
   SILPhiArgument *createResult(SILBasicBlock *succ, SILType resultTy);
@@ -8946,7 +9094,7 @@ protected:
       cases[i] = CaseBBs[i].first;
       if (Counts) {
         ::new (succs + i)
-            SILSuccessor(this, CaseBBs[i].second, Counts.getValue()[i]);
+            SILSuccessor(this, CaseBBs[i].second, Counts.value()[i]);
       } else {
         ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
       }
@@ -10087,7 +10235,6 @@ public:
   }
 
   void addNodeToList(SILInstruction *I);
-  void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
                              instr_iterator first, instr_iterator last);
 

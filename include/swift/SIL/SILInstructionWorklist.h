@@ -118,7 +118,7 @@ public:
 
   /// Remove the top element from the worklist.
   SILInstruction *pop_back_val() {
-    return worklist.pop_back_val().getValueOr(nullptr);
+    return worklist.pop_back_val().value_or(nullptr);
   }
 
   /// When an instruction has been simplified, add all of its users to the

@@ -358,6 +358,12 @@ class TypeMatcher {
                                       Type secondType,
                                       Type sugaredFirstType) {
       if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
+        if (firstProtocolComposition->hasExplicitAnyObject() !=
+            secondProtocolComposition->hasExplicitAnyObject()) {
+          return mismatch(firstProtocolComposition.getPointer(), secondType,
+                          sugaredFirstType);
+        }
+
         auto firstMembers = firstProtocolComposition->getMembers();
         auto secondMembers = secondProtocolComposition->getMembers();
 

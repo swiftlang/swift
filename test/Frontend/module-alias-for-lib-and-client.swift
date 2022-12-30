@@ -23,9 +23,9 @@
 // RUN: not test -f %t/XLogging.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-Lib
-// CHECK-Lib: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-Lib: remark: loaded module {{.*}}AppleLogging.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-NOT-Lib
-// CHECK-NOT-Lib: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-NOT-Lib: remark: loaded module {{.*}}XLogging.swiftmodule
 
 /// 3a. Client1
 /// Create module Client1 that imports Lib and XLogging, WITH module aliasing for XLogging
@@ -37,10 +37,10 @@
 // RUN: test -f %t/AppleLogging.swiftmodule
 // RUN: not test -f %t/XLogging.swiftmodule
 // RUN: %FileCheck %s -input-file %t/result-Client1.output -check-prefix CHECK-CLIENT1
-// CHECK-CLIENT1: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-// CHECK-CLIENT1: remark: loaded module at {{.*}}Lib.swiftmodule
+// CHECK-CLIENT1: remark: loaded module {{.*}}AppleLogging.swiftmodule
+// CHECK-CLIENT1: remark: loaded module {{.*}}Lib.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Client1.output -check-prefix CHECK-NOT-CLIENT1
-// CHECK-NOT-CLIENT1: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-NOT-CLIENT1: remark: loaded module {{.*}}XLogging.swiftmodule
 
 /// 3b. Client2
 /// Try creating module Client2 that imports Lib and XLogging, WITHOUT module aliasing
@@ -61,10 +61,10 @@
 // RUN: not test -f %t/XLogging.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/result-Client3.output -check-prefix CHECK-CLIENT3
-// CHECK-CLIENT3: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-// CHECK-CLIENT3: remark: loaded module at {{.*}}Lib.swiftmodule
+// CHECK-CLIENT3: remark: loaded module {{.*}}AppleLogging.swiftmodule
+// CHECK-CLIENT3: remark: loaded module {{.*}}Lib.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Client3.output -check-prefix CHECK-NOT-CLIENT3
-// CHECK-NOT-CLIENT3: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-NOT-CLIENT3: remark: loaded module {{.*}}XLogging.swiftmodule
 
 // BEGIN FileLogging.swift
 public struct Logger {

@@ -413,8 +413,8 @@ bb0:
 
 // CHECK-TRACE-LABEL: *** CopyPropagation: testBorrowCopy
 // CHECK-TRACE:        Canonicalizing: %1
-// CHECK-TRACE:        Removing   destroy_value %4 : $T
-// CHECK-TRACE:        Removing   %4 = copy_value %1 : $T
+// CHECK-TRACE:        Removing   destroy_value %3 : $T
+// CHECK-TRACE:        Removing   %3 = copy_value %1 : $T
 //
 // CHECK-LABEL: sil [ossa] @testBorrowCopy : {{.*}} {
 // CHECK-LABEL: bb0:

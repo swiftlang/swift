@@ -1342,7 +1342,7 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
         Data.ValueWitnesses = &VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING);
         break;
       default:
-        assert(false && "unsupported function witness");
+        swift_unreachable("unsupported function witness");
       case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
         Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
         break;
@@ -5771,13 +5771,11 @@ static Result performOnMetadataCache(const Metadata *metadata,
     swift_unreachable("bad metadata initialization kind");
   }
 
-  auto &generics = description->getFullGenericContextHeader();
-
   auto genericArgs =
     reinterpret_cast<const void * const *>(
                                     description->getGenericArguments(metadata));
   auto &cache = getCache(*description);
-  assert(generics.Base.NumKeyArguments == cache.SigLayout.sizeInWords());
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments == cache.SigLayout.sizeInWords());
   auto key = MetadataCacheKey(cache.SigLayout, genericArgs);
 
   return std::move(callbacks).forGenericMetadata(metadata, description,

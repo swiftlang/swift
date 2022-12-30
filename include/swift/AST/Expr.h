@@ -350,6 +350,11 @@ protected:
     IsObjC : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackExpansionExpr, Expr, 32,
+    : NumPadBits,
+    NumBindings : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
     : NumPadBits,
     NumElements : 32
@@ -357,11 +362,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
     IsPlaceholder : 1
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
-    : NumPadBits,
-    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
@@ -1108,7 +1108,7 @@ public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   };
 
 private:
@@ -3399,18 +3399,6 @@ public:
   }
 };
 
-/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
-/// single value.
-class ReifyPackExpr : public ImplicitConversionExpr {
-public:
-  ReifyPackExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ReifyPack;
-  }
-};
-
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -3524,6 +3512,129 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::VarargExpansion;
+  }
+};
+
+/// A pack element expression spelled with the contextual \c each
+/// keyword applied to a pack reference expression.
+///
+/// \code
+///  func zip<T..., U...>(t: (each T)..., u: (each U)...) {
+///    let zipped = (each t, each u)...
+///  }
+/// \endcode
+///
+/// Pack elements can only appear in the pattern expression of a
+/// \c PackExpansionExpr.
+class PackElementExpr final : public Expr {
+  SourceLoc EachLoc;
+  Expr *PackRefExpr;
+
+  PackElementExpr(SourceLoc eachLoc, Expr *packRefExpr,
+                  bool implicit = false, Type type = Type())
+      : Expr(ExprKind::PackElement, implicit, type),
+        EachLoc(eachLoc), PackRefExpr(packRefExpr) {}
+
+public:
+  static PackElementExpr *create(ASTContext &ctx, SourceLoc eachLoc,
+                                 Expr *packRefExpr, bool implicit = false,
+                                 Type type = Type());
+
+  Expr *getPackRefExpr() const { return PackRefExpr; }
+
+  void setPackRefExpr(Expr *packRefExpr) {
+    PackRefExpr = packRefExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return EachLoc;
+  }
+
+  SourceLoc getEndLoc() const {
+    return PackRefExpr->getEndLoc();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackElement;
+  }
+};
+
+/// A pack expansion expression is a pattern expression followed by
+/// the expansion operator '...'. The pattern expression contains
+/// references to parameter packs of length N, and the expansion
+/// operator will repeat the pattern N times.
+///
+/// Pack expansion expressions are permitted in expression contexts
+/// that naturally accept a comma-separated list of values, including
+/// call argument lists, the elements of a tuple value, and the source
+/// of a for-in loop.
+class PackExpansionExpr final : public Expr,
+    private llvm::TrailingObjects<PackExpansionExpr, PackElementExpr *> {
+  friend TrailingObjects;
+
+  Expr *PatternExpr;
+  SourceLoc DotsLoc;
+  GenericEnvironment *Environment;
+
+  PackExpansionExpr(Expr *patternExpr,
+                    ArrayRef<PackElementExpr *> packElements,
+                    SourceLoc dotsLoc,
+                    GenericEnvironment *environment,
+                    bool implicit, Type type)
+    : Expr(ExprKind::PackExpansion, implicit, type),
+      PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
+    Bits.PackExpansionExpr.NumBindings = packElements.size();
+    std::uninitialized_copy(packElements.begin(), packElements.end(),
+                            getTrailingObjects<PackElementExpr *>());
+  }
+
+  size_t numTrailingObjects(OverloadToken<PackElementExpr *>) const {
+    return getNumBindings();
+  }
+
+  MutableArrayRef<PackElementExpr *> getMutableBindings() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
+  }
+
+public:
+  static PackExpansionExpr *create(ASTContext &ctx,
+                                   Expr *patternExpr,
+                                   ArrayRef<PackElementExpr *> packElements,
+                                   SourceLoc dotsLoc,
+                                   GenericEnvironment *environment,
+                                   bool implicit = false,
+                                   Type type = Type());
+
+  Expr *getPatternExpr() const { return PatternExpr; }
+
+  void setPatternExpr(Expr *patternExpr) {
+    PatternExpr = patternExpr;
+  }
+
+  unsigned getNumBindings() const {
+    return Bits.PackExpansionExpr.NumBindings;
+  }
+
+  ArrayRef<PackElementExpr *> getPackElements() {
+    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
+  }
+
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
+
+  GenericEnvironment *getGenericEnvironment() {
+    return Environment;
+  }
+
+  SourceLoc getStartLoc() const {
+    return PatternExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return DotsLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackExpansion;
   }
 };
 
@@ -3674,11 +3785,11 @@ class AbstractClosureExpr : public DeclContext, public Expr {
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
-                      unsigned Discriminator, DeclContext *Parent)
+                      DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
-    Bits.AbstractClosureExpr.Discriminator = Discriminator;
+    Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
   CaptureInfo getCaptureInfo() const { return Captures; }
@@ -3707,11 +3818,18 @@ public:
   /// optimization and therefore make it into e.g. stack traces.
   /// Having their symbol names be stable across minor code changes is
   /// therefore pretty useful for debugging.)
-  unsigned getDiscriminator() const {
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
     return Bits.AbstractClosureExpr.Discriminator;
   }
+
   void setDiscriminator(unsigned discriminator) {
-    assert(getDiscriminator() == InvalidDiscriminator);
+    assert(getRawDiscriminator() == InvalidDiscriminator);
     assert(discriminator != InvalidDiscriminator);
     Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
@@ -3870,9 +3988,9 @@ public:
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+              DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          discriminator, parent),
+                          parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
@@ -4068,10 +4186,9 @@ public:
     AsyncLet = 3,
   };
 
-  AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
-                  DeclContext *Parent)
+  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
-                            Discriminator, Parent) {
+                            Parent) {
     if (Body != nullptr)
       setBody(Body);
 
@@ -5875,56 +5992,6 @@ public:
   }
 };
 
-/// An expression node that aggregates a set of heterogeneous arguments into a
-/// parameter pack suitable for passing off to a variadic generic function
-/// argument.
-///
-/// There is no user-visible way to spell a pack expression, they are always
-/// implicitly created at applies. As such, any appearance of pack types outside
-/// of applies are illegal. In general, packs appearing in such positions should
-/// have a \c ReifyPackExpr to convert them to a user-available AST type.
-class PackExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpr, Expr *> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects() const {
-    return getNumElements();
-  }
-
-  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
-
-public:
-  /// Create a pack.
-  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
-
-  /// Create an empty pack.
-  static PackExpr *createEmpty(ASTContext &ctx);
-
-  SourceLoc getLoc() const { return SourceLoc(); }
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  /// Retrieve the elements of this pack.
-  MutableArrayRef<Expr *> getElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  /// Retrieve the elements of this pack.
-  ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
-
-  Expr *getElement(unsigned i) const {
-    return getElements()[i];
-  }
-  void setElement(unsigned i, Expr *e) {
-    getElements()[i] = e;
-  }
-
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
-};
-
 class TypeJoinExpr final : public Expr,
                            private llvm::TrailingObjects<TypeJoinExpr, Expr *> {
   friend TrailingObjects;
@@ -5971,6 +6038,61 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TypeJoin;
+  }
+};
+
+class MacroExpansionExpr final : public Expr {
+private:
+  SourceLoc PoundLoc;
+  DeclNameRef MacroName;
+  DeclNameLoc MacroNameLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
+  ArgumentList *ArgList;
+  Expr *Rewritten;
+
+  /// The referenced macro.
+  ConcreteDeclRef macroRef;
+
+public:
+  explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
+                              DeclNameLoc macroNameLoc,
+                              SourceLoc leftAngleLoc,
+                              ArrayRef<TypeRepr *> genericArgs,
+                              SourceLoc rightAngleLoc,
+                              ArgumentList *argList, bool isImplicit = false,
+                              Type ty = Type())
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
+        MacroName(macroName), MacroNameLoc(macroNameLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs),
+        ArgList(argList),
+        Rewritten(nullptr) { }
+
+  DeclNameRef getMacroName() const { return MacroName; }
+  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+
+  Expr *getRewritten() const { return Rewritten; }
+  void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
+
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+
+  SourceLoc getLoc() const { return PoundLoc; }
+
+  ConcreteDeclRef getMacroRef() const { return macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MacroExpansion;
   }
 };
 

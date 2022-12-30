@@ -7,7 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_swift_compiler_module(AST
-  ADD_TO_SYNTAXPARSE
   DEPENDS
     Basic
   SOURCES

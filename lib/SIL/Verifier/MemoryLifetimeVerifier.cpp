@@ -377,6 +377,13 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::EndBorrowInst: {
+        auto *ebi = cast<EndBorrowInst>(&I);
+        if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+          killBits(state, sbi->getDest());
+        }
+        break;
+      }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));
@@ -397,6 +404,39 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
           if (AS.isArgumentOperand(op)) {
             setFuncOperandBits(state, op, AS.getArgumentOperandConvention(op),
                               isa<TryApplyInst>(&I));
+          }
+        }
+        break;
+      }
+      case SILInstructionKind::BeginApplyInst: {
+        auto *BAI = cast<BeginApplyInst>(&I);
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            genBits(state, yieldedValues[index]);
+          }
+        }
+        break;
+      }
+      case SILInstructionKind::EndApplyInst:
+      case SILInstructionKind::AbortApplyInst: {
+        auto *BAI = [&]() {
+          if (auto *EAI = dyn_cast<EndApplyInst>(&I)) {
+            return EAI->getBeginApply();
+          }
+          auto *AAI = dyn_cast<AbortApplyInst>(&I);
+          return AAI->getBeginApply();
+        }();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            killBits(state, yieldedValues[index]);
           }
         }
         break;
@@ -459,7 +499,6 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         bool isTryApply) {
   switch (convention) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
       killBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -529,15 +568,16 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
         require(expectedReturnBits & ~bs.data.exitSet,
           "indirect argument is not alive at function return", term);
         require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
-          "memory is initialized at function return but shouldn't", term,
-           /*excludeTrivialEnums*/ true);
+                "memory is initialized at function return but shouldn't be",
+                term,
+                /*excludeTrivialEnums*/ true);
         break;
       case SILInstructionKind::ThrowInst:
         require(expectedThrowBits & ~bs.data.exitSet,
           "indirect argument is not alive at throw", term);
         require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
-          "memory is initialized at throw but shouldn't", term,
-           /*excludeTrivialEnums*/ true);
+                "memory is initialized at throw but shouldn't be", term,
+                /*excludeTrivialEnums*/ true);
         break;
       default:
         break;
@@ -663,8 +703,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
-        if (SILValue orig = cast<EndBorrowInst>(&I)->getSingleOriginalValue())
-          requireBitsSet(bits, orig, &I);
+        auto *ebi = cast<EndBorrowInst>(&I);
+        if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+          requireBitsSet(bits, sbi->getDest(), &I);
+          locations.clearBits(bits, sbi->getDest());
+        } else if (auto *lbi = dyn_cast<LoadBorrowInst>(ebi->getOperand())) {
+          requireBitsSet(bits, lbi->getOperand(), &I);
+        }
         break;
       }
       case SILInstructionKind::UncheckedRefCastAddrInst:
@@ -694,6 +739,48 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         }
         break;
       }
+      case SILInstructionKind::BeginApplyInst: {
+        auto *BAI = cast<BeginApplyInst>(&I);
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            requireBitsClear(bits, yieldedValues[index], &I);
+            locations.setBits(bits, yieldedValues[index]);
+          }
+        }
+        break;
+      }
+      case SILInstructionKind::EndApplyInst:
+      case SILInstructionKind::AbortApplyInst: {
+        auto *BAI = [&]() {
+          if (auto *EAI = dyn_cast<EndApplyInst>(&I)) {
+            return EAI->getBeginApply();
+          }
+          auto *AAI = dyn_cast<AbortApplyInst>(&I);
+          return AAI->getBeginApply();
+        }();
+        auto yieldedValues = BAI->getYieldedValues();
+        for (auto index : indices(yieldedValues)) {
+          auto fnType = BAI->getSubstCalleeType();
+          SILArgumentConvention argConv(
+              fnType->getYields()[index].getConvention());
+          if (argConv.isIndirectConvention()) {
+            if (argConv.isInoutConvention() ||
+                argConv.isGuaranteedConvention()) {
+              requireBitsSet(bits | ~nonTrivialLocations, yieldedValues[index],
+                             &I);
+            } else if (argConv.isOwnedConvention()) {
+              requireBitsClear(bits & nonTrivialLocations, yieldedValues[index],
+                               &I);
+            }
+            locations.clearBits(bits, yieldedValues[index]);
+          }
+        }
+        break;
+      }
       case SILInstructionKind::YieldInst: {
         auto *YI = cast<YieldInst>(&I);
         for (Operand &op : YI->getAllOperands()) {
@@ -704,11 +791,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       }
       case SILInstructionKind::DeallocStackInst: {
         SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
-        if (isStoreBorrowLocation(opVal)) {
-          requireBitsSet(bits, opVal, &I);
-        } else {
-          requireBitsClear(bits & nonTrivialLocations, opVal, &I);
-        }
+        requireBitsClear(bits & nonTrivialLocations, opVal, &I);
         // Needed to clear any bits of trivial locations (which are not required
         // to be zero).
         locations.clearBits(bits, opVal);
@@ -728,7 +811,6 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
       requireBitsSet(bits, argumentOp.get(), applyInst);
       locations.clearBits(bits, argumentOp.get());
       break;

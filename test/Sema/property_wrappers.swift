@@ -83,3 +83,40 @@ struct S2_58201 {
   // CHECK:            autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+1]]:26 range=[{{.+}}] discriminator=1 escaping
   @W_58201 var b: Bool = false
 }
+
+// https://github.com/apple/swift/issues/61570
+// rdar://problem/101813792 - Check that captured variables are re-parented to backing var initializer
+do {
+  @propertyWrapper
+  struct Wrapper {
+    init(_: String) {}
+
+    var wrappedValue: Int { return 0 }
+  }
+
+  struct TestExplicitCapture {
+    @Wrapper("\([1,2,3].map({[x = 42] in "\($0 + x)" }).reduce("", +))")
+    var wrapped: Int // Ok, becomes var _wrapped: Wrapper<Int> = Wrapper(wrappedValue: "\([1,2,3].map({[x = 42] in "\($0 + x)" }).reduce("", +)))
+  }
+
+  @propertyWrapper
+  struct Option {
+    let help: String
+    var value: Double = 0.0
+
+    var wrappedValue: Double {
+      get { value }
+      set { value = newValue }
+    }
+  }
+
+  enum TestEnum: String, CaseIterable {
+    case hello = "hello"
+    case world = "world"
+  }
+
+  struct TestImplicitCapture {
+    @Option(help: "Values: \(TestEnum.allCases.map(\.rawValue))")
+    var value // Ok - $kp$ of key path is captured implicitly by backing variable init
+  }
+}

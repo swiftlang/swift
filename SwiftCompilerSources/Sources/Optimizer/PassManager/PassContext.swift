@@ -119,7 +119,7 @@ struct PassContext {
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
-    notifyFunctionDataChanged()
+    notifyEffectsChanged()
     function._modifyEffects(body)
   }
 
@@ -139,8 +139,8 @@ struct PassContext {
     PassContext_notifyChanges(_bridged, branchesChanged)
   }
 
-  fileprivate func notifyFunctionDataChanged() {
-    PassContext_notifyChanges(_bridged, functionDataChanged)
+  fileprivate func notifyEffectsChanged() {
+    PassContext_notifyChanges(_bridged, effectsChanged)
   }
 }
 
@@ -243,7 +243,7 @@ extension RefCountingInst {
 
 extension Function {
   func set(needStackProtection: Bool, _ context: PassContext) {
-    context.notifyFunctionDataChanged()
+    context.notifyEffectsChanged()
     SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
   }
 }

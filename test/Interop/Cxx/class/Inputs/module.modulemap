@@ -18,8 +18,18 @@ module ConstructorsObjC {
   requires cplusplus
 }
 
+module CustomNewOperator {
+  header "custom-new-operator.h"
+  requires cplusplus
+}
+
 module Destructors {
   header "destructors.h"
+  requires cplusplus
+}
+
+module DestructorsWithTemporaryValues {
+  header "destructors-with-temporary-values.h"
   requires cplusplus
 }
 
@@ -58,8 +68,18 @@ module MutabilityAnnotations {
   requires cplusplus
 }
 
+module NoDiscard {
+ header "nodiscard.h"
+ requires cplusplus  
+}
+
 module ProtocolConformance {
   header "protocol-conformance.h"
+  requires cplusplus
+}
+
+module StructuredBindingsGetMethod {
+  header "structured-bindings-get-method.h"
   requires cplusplus
 }
 
@@ -109,5 +129,10 @@ module ReturnsLargeClass {
 
 module ForwardDeclaredInNamespace {
   header "forward-declared-in-namespace.h"
+  requires cplusplus
+}
+
+module ConformsTo {
+  header "conforms-to.h"
   requires cplusplus
 }

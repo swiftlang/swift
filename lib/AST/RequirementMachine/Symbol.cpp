@@ -42,7 +42,8 @@ struct Symbol::Storage final
     public llvm::TrailingObjects<Storage, unsigned, Term> {
   friend class Symbol;
 
-  llvm::PointerIntPair<const ProtocolDecl *, 3> ProtoAndKind;
+  Symbol::Kind Kind;
+  const ProtocolDecl *Proto = nullptr;
 
   union {
     Identifier Name;
@@ -52,26 +53,36 @@ struct Symbol::Storage final
   };
 
   explicit Storage(Identifier name) {
-    ProtoAndKind.setInt(unsigned(Symbol::Kind::Name));
+    Kind = Symbol::Kind::Name;
     Name = name;
   }
 
   explicit Storage(LayoutConstraint layout) {
-    ProtoAndKind.setInt(unsigned(Symbol::Kind::Layout));
+    Kind = Symbol::Kind::Layout;
     Layout = layout;
   }
 
   explicit Storage(const ProtocolDecl *proto) {
-    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::Protocol));
+    Kind = Symbol::Kind::Protocol;
+    Proto = proto;
   }
 
   explicit Storage(GenericTypeParamType *param) {
-    ProtoAndKind.setInt(unsigned(Symbol::Kind::GenericParam));
+    Kind = Symbol::Kind::GenericParam;
     GenericParam = param;
   }
 
+  /// A dummy type for overload resolution of the
+  /// 'shape' constructor for Storage.
+  struct ForShape {};
+
+  explicit Storage(ForShape shape) {
+    Kind = Kind::Shape;
+  }
+
   Storage(const ProtocolDecl *proto, Identifier name) {
-    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::AssociatedType));
+    Kind = Symbol::Kind::AssociatedType;
+    Proto = proto;
     Name = name;
   }
 
@@ -82,7 +93,7 @@ struct Symbol::Storage final
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
-    ProtoAndKind.setInt(unsigned(kind));
+    Kind = kind;
     ConcreteType = type;
 
     *getTrailingObjects<unsigned>() = substitutions.size();
@@ -95,7 +106,8 @@ struct Symbol::Storage final
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
-    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::ConcreteConformance));
+    Kind = Symbol::Kind::ConcreteConformance;
+    Proto = proto;
 
     *getTrailingObjects<unsigned>() = substitutions.size();
     ConcreteType = type;
@@ -105,10 +117,9 @@ struct Symbol::Storage final
   }
 
   size_t numTrailingObjects(OverloadToken<unsigned>) const {
-    auto kind = Symbol::Kind(ProtoAndKind.getInt());
-    return (kind == Symbol::Kind::Superclass ||
-            kind == Symbol::Kind::ConcreteType ||
-            kind == Symbol::Kind::ConcreteConformance);
+    return (Kind == Symbol::Kind::Superclass ||
+            Kind == Symbol::Kind::ConcreteType ||
+            Kind == Symbol::Kind::ConcreteConformance);
   }
 
   size_t numTrailingObjects(OverloadToken<Term>) const {
@@ -132,7 +143,7 @@ struct Symbol::Storage final
 };
 
 Symbol::Kind Symbol::getKind() const {
-  return Kind(Ptr->ProtoAndKind.getInt());
+  return Ptr->Kind;
 }
 
 /// Get the identifier associated with an unbound name symbol or an
@@ -149,7 +160,7 @@ const ProtocolDecl *Symbol::getProtocol() const {
   assert(getKind() == Kind::Protocol ||
          getKind() == Kind::AssociatedType ||
          getKind() == Kind::ConcreteConformance);
-  return Ptr->ProtoAndKind.getPointer();
+  return Ptr->Proto;
 }
 
 /// Get the generic parameter associated with a generic parameter symbol.
@@ -293,6 +304,16 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
   ctx.SymbolHistogram.add(unsigned(Kind::GenericParam));
 
   return symbol;
+}
+
+Symbol Symbol::forShape(RewriteContext &ctx) {
+  if (auto *symbol = ctx.TheShapeSymbol)
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(Storage::ForShape());
+  return (ctx.TheShapeSymbol = symbol);
 }
 
 /// Creates a layout symbol, representing a layout constraint.
@@ -441,6 +462,7 @@ const ProtocolDecl *Symbol::getRootProtocol() const {
   case Symbol::Kind::Superclass:
   case Symbol::Kind::ConcreteType:
   case Symbol::Kind::ConcreteConformance:
+  case Symbol::Kind::Shape:
     break;
   }
 
@@ -512,6 +534,7 @@ Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
     break;
   }
 
+  case Kind::Shape:
   case Kind::GenericParam: {
     auto *param = getGenericParam();
     auto *otherParam = other.getGenericParam();
@@ -553,7 +576,7 @@ Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
         auto otherTerm = other.getSubstitutions()[i];
 
         Optional<int> result = term.compare(otherTerm, ctx);
-        if (!result.hasValue() || *result != 0)
+        if (!result.has_value() || *result != 0)
           return result;
       }
 
@@ -593,6 +616,7 @@ Symbol Symbol::withConcreteSubstitutions(
   case Kind::Name:
   case Kind::Protocol:
   case Kind::AssociatedType:
+  case Kind::Shape:
   case Kind::Layout:
     break;
   }
@@ -651,7 +675,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
       os << substitution;
 
       auto key = CanType(GenericTypeParamType::get(
-          /*isTypeSequence=*/false, 0, index, ctx));
+          /*isParameterPack=*/false, 0, index, ctx));
       substitutionNames[key] = ctx.getIdentifier(s);
     }
   }
@@ -677,7 +701,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
 
   case Kind::GenericParam: {
     auto *gp = getGenericParam();
-    if (gp->isTypeSequence()) {
+    if (gp->isParameterPack()) {
       out << "(" << Type(gp) << "…)";
     } else {
       out << Type(gp);
@@ -710,15 +734,20 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     out << getProtocol()->getName();
     out << "]";
     return;
+
+  case Kind::Shape: {
+    out << "[shape]";
+    return;
+  }
   }
 
   llvm_unreachable("Bad symbol kind");
 }
 
 void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
-  id.AddInteger(ProtoAndKind.getInt());
+  id.AddInteger(unsigned(Kind));
 
-  switch (Symbol::Kind(ProtoAndKind.getInt())) {
+  switch (Kind) {
   case Symbol::Kind::Name:
     id.AddPointer(Name.get());
     return;
@@ -728,15 +757,19 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     return;
 
   case Symbol::Kind::Protocol:
-    id.AddPointer(ProtoAndKind.getPointer());
+    id.AddPointer(Proto);
     return;
 
   case Symbol::Kind::GenericParam:
     id.AddPointer(GenericParam);
     return;
 
+  case Symbol::Kind::Shape:
+    // Nothing more to add.
+    return;
+
   case Symbol::Kind::AssociatedType: {
-    id.AddPointer(ProtoAndKind.getPointer());
+    id.AddPointer(Proto);
     id.AddPointer(Name.get());
     return;
   }
@@ -752,7 +785,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   }
 
   case Symbol::Kind::ConcreteConformance: {
-    id.AddPointer(ProtoAndKind.getPointer());
+    id.AddPointer(Proto);
     id.AddPointer(ConcreteType.getPointer());
 
     id.AddInteger(getNumSubstitutions());

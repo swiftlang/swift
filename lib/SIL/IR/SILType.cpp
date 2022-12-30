@@ -27,7 +27,7 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-/// Find an opened archetype represented by this type.
+/// Find a local archetype represented by this type.
 /// It is assumed by this method that the type contains
 /// at most one opened archetype.
 /// Typically, it would be called from a type visitor.
@@ -36,13 +36,14 @@ using namespace swift::Lowering;
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
 CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  return dyn_cast_or_null<OpenedArchetypeType>(getLocalArchetypeOf(Ty));
+}
+CanLocalArchetypeType swift::getLocalArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanOpenedArchetypeType();
+    return CanLocalArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
-  if (Ty->isOpenedExistential())
-    return cast<OpenedArchetypeType>(Ty);
-  return CanOpenedArchetypeType();
+  return dyn_cast<LocalArchetypeType>(Ty);
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
@@ -783,7 +784,7 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
       ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
-      .hasValue();
+      .has_value();
 }
 
 Type
@@ -943,6 +944,13 @@ bool SILType::isMoveOnly() const {
 }
 
 bool SILType::isMoveOnlyType() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return false;
+}
+
+bool SILType::isPureMoveOnly() const {
   if (auto *nom = getNominalOrBoundGenericNominal())
     if (nom->isMoveOnly())
       return true;

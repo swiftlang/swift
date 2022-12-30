@@ -88,9 +88,10 @@ class BenchmarkDriver(object):
     def test_harness(self):
         """Full path to test harness binary."""
         suffix = self.args.optimization if hasattr(self.args, "optimization") else "O"
+        suffix += "-"
         if hasattr(self.args, "architecture") and self.args.architecture:
-            suffix += "-" + self.args.architecture + "*"
-        pattern = os.path.join(self.args.tests, "Benchmark_" + suffix)
+            suffix += self.args.architecture
+        pattern = os.path.join(self.args.tests, "Benchmark_" + suffix + "*")
         executables = []
         if hasattr(self._subprocess, "test_mode") and self._subprocess.test_mode:
             executables = [pattern]
@@ -134,22 +135,32 @@ class BenchmarkDriver(object):
 
     @property
     def _cmd_list_benchmarks(self):
-        # Use tab delimiter for easier parsing to override the default comma.
-        # (The third 'column' is always comma-separated list of tags in square
-        # brackets -- currently unused here.)
-        return [self.test_harness, "--list", "--delim=\t"] + (
+        # TODO: Switch to JSON format: add "--json" here
+        return [self.test_harness, "--list"] + (
             ["--skip-tags="] if (self.args.benchmarks or self.args.filters) else []
         )
 
     def _get_tests(self):
         """Return a list of performance tests to run."""
-        number_name_pairs = [
-            line.split("\t")[:2]
-            for line in self._invoke(self._cmd_list_benchmarks).split("\n")[1:-1]
-        ]
-        # unzip list of pairs into 2 lists
-        test_numbers, self.all_tests = map(list, zip(*number_name_pairs))
-        self.test_number = dict(zip(self.all_tests, test_numbers))
+        lines = self._invoke(self._cmd_list_benchmarks).split("\n")
+        json_tests = []
+        for line in lines:
+            columns = re.split(r'[ ,]+', line.strip())
+            try:
+                number = int(columns[0])
+                name = columns[1]
+                json_descr = {"number": number, "name": name}
+                json_tests.append(json_descr)
+            except Exception:
+                continue
+            # TODO: Replace the above with the following to
+            # use the JSON output from the benchmark driver
+            # directly
+            # if line.strip() != "":
+            #    json_tests.append(json.loads(line))
+        self.all_tests = [json["name"] for json in json_tests]
+        test_numbers = [json["number"] for json in json_tests]
+        self.test_number = dict([(json["name"], json["number"]) for json in json_tests])
         if self.args.filters:
             return self._tests_matching_patterns()
         if self.args.benchmarks:
@@ -157,25 +168,19 @@ class BenchmarkDriver(object):
         return self.all_tests
 
     def _tests_matching_patterns(self):
-        regexes = [re.compile(pattern) for pattern in self.args.filters]
-        return sorted(
-            list(
-                set(
-                    [
-                        name
-                        for pattern in regexes
-                        for name in self.all_tests
-                        if pattern.match(name)
-                    ]
-                )
-            )
-        )
+        matches = set()
+        for fil in self.args.filters:
+            pattern = re.compile(fil)
+            new_matches = filter(pattern.match, self.all_tests)
+            matches = matches.union(new_matches)
+        return sorted(list(matches))
 
     def _tests_by_name_or_number(self, test_numbers):
         benchmarks = set(self.args.benchmarks)
-        number_to_name = dict(zip(test_numbers, self.all_tests))
+        numbers = list(map(str, test_numbers))
+        number_to_name = dict(zip(numbers, self.all_tests))
         tests_by_number = [
-            number_to_name[i] for i in benchmarks.intersection(set(test_numbers))
+            number_to_name[i] for i in benchmarks.intersection(numbers)
         ]
         return sorted(
             list(benchmarks.intersection(set(self.all_tests)).union(tests_by_number))
@@ -188,8 +193,7 @@ class BenchmarkDriver(object):
         num_iters=None,
         sample_time=None,
         verbose=None,
-        measure_memory=False,
-        quantile=None,
+        measure_memory=False
     ):
         """Execute benchmark and gather results."""
         num_samples = num_samples or 0
@@ -197,11 +201,14 @@ class BenchmarkDriver(object):
         sample_time = sample_time or 0  # default is 1s
 
         cmd = self._cmd_run(
-            test, num_samples, num_iters, sample_time, verbose, measure_memory, quantile
+            test, num_samples, num_iters, sample_time, verbose, measure_memory
         )
         output = self._invoke(cmd)
         results = self.parser.results_from_string(output)
-        return list(results.items())[0][1] if test else results
+        if test:
+            return list(results.items())[0][1]
+        else:
+            return results
 
     def _cmd_run(
         self,
@@ -210,14 +217,13 @@ class BenchmarkDriver(object):
         num_iters,
         sample_time,
         verbose,
-        measure_memory,
-        quantile,
+        measure_memory
     ):
         cmd = [self.test_harness]
         if test:
             cmd.append(test)
         else:
-            cmd.extend([self.test_number.get(name, name) for name in self.tests])
+            cmd.extend([str(self.test_number.get(name, name)) for name in self.tests])
         if num_samples > 0:
             cmd.append("--num-samples={0}".format(num_samples))
         if num_iters > 0:
@@ -228,9 +234,8 @@ class BenchmarkDriver(object):
             cmd.append("--verbose")
         if measure_memory:
             cmd.append("--memory")
-        if quantile:
-            cmd.append("--quantile={0}".format(quantile))
-            cmd.append("--delta")
+# TODO: Uncomment this as soon as the new Benchmark Swift logic is available everywhere
+#        cmd.append("--json")
         return cmd
 
     def run_independent_samples(self, test):
@@ -246,12 +251,12 @@ class BenchmarkDriver(object):
         return functools.reduce(
             merge_results,
             [
-                self.run(test, measure_memory=True, num_iters=1, quantile=20)
+                self.run(test, measure_memory=True, num_iters=1)
                 for _ in range(self.args.independent_samples)
             ],
         )
 
-    def log_results(self, output, log_file=None):
+    def log_results(self, results, log_file=None):
         """Log output to `log_file`.
 
         Creates `args.output_dir` if it doesn't exist yet.
@@ -262,7 +267,8 @@ class BenchmarkDriver(object):
             os.makedirs(dir)
         print("Logging results to: %s" % log_file)
         with open(log_file, "w") as f:
-            f.write(output)
+            for r in results:
+                print(r, file=f)
 
     RESULT = "{:>3} {:<40} {:>7} {:>7} {:>6} {:>10} {:>6} {:>7} {:>10}"
 
@@ -284,7 +290,7 @@ class BenchmarkDriver(object):
         def console_log(values):
             print(format(values))
 
-        def result_values(r):
+        def summary(r):
             return list(
                 map(
                     str,
@@ -292,17 +298,17 @@ class BenchmarkDriver(object):
                         r.test_num,
                         r.name,
                         r.num_samples,
-                        r.min,
-                        r.samples.q1,
+                        r.min_value,
+                        r.q1,
                         r.median,
-                        r.samples.q3,
-                        r.max,
+                        r.q3,
+                        r.max_value,
                         r.max_rss,
                     ],
                 )
             )
 
-        header = [
+        summary_header = [
             "#",
             "TEST",
             "SAMPLES",
@@ -313,25 +319,23 @@ class BenchmarkDriver(object):
             "MAX(μs)",
             "MAX_RSS(B)",
         ]
-        console_log(header)
-        results = [header]
+        console_log(summary_header)
+        results = []
         for test in self.tests:
-            result = result_values(self.run_independent_samples(test))
-            console_log(result)
+            result = self.run_independent_samples(test)
+            console_log(summary(result))
             results.append(result)
 
         print("\nTotal performance tests executed: {0}".format(len(self.tests)))
-        return (
-            None if csv_console else ("\n".join([",".join(r) for r in results]) + "\n")
-        )  # csv_log
+        return results
 
     @staticmethod
     def run_benchmarks(args):
         """Run benchmarks and log results."""
         driver = BenchmarkDriver(args)
-        csv_log = driver.run_and_log(csv_console=(args.output_dir is None))
-        if csv_log:
-            driver.log_results(csv_log)
+        results = driver.run_and_log(csv_console=(args.output_dir is None))
+        if args.output_dir:
+            driver.log_results([r.json for r in results])
         return 0
 
 
@@ -408,8 +412,9 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            if isinstance(msg, str) and getattr(stream, "encoding", None):
-                stream.write(msg.encode(stream.encoding))
+            if isinstance(msg, str) and (getattr(stream, "encoding", None) and
+               getattr(stream, "buffer", None)):
+                stream.buffer.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)
         except UnicodeError:
@@ -444,7 +449,6 @@ class BenchmarkDoctor(object):
         Optional `driver` parameter for injecting dependency; used for testing.
         """
         super(BenchmarkDoctor, self).__init__()
-        self.driver = driver or BenchmarkDriver(args)
         self.results = {}
 
         if hasattr(args, "markdown") and args.markdown:
@@ -457,6 +461,7 @@ class BenchmarkDoctor(object):
             self.console_handler.setLevel(
                 logging.DEBUG if args.verbose else logging.INFO
             )
+        self.driver = driver or BenchmarkDriver(args)
         self.log.addHandler(self.console_handler)
         self.log.debug("Checking tests: %s", ", ".join(self.driver.tests))
         self.requirements = [
@@ -531,7 +536,7 @@ class BenchmarkDoctor(object):
             correction = setup / i
             i_series = BenchmarkDoctor._select(measurements, num_iters=i)
             for result in i_series:
-                runtimes.append(result.samples.min - correction)
+                runtimes.append(result.min_value - correction)
         runtime = min(runtimes)
 
         threshold = 1000
@@ -583,7 +588,7 @@ class BenchmarkDoctor(object):
         ti1, ti2 = [
             float(min(mins))
             for mins in [
-                [result.samples.min for result in i_series]
+                [result.min_value for result in i_series]
                 for i_series in [select(measurements, num_iters=i) for i in [1, 2]]
             ]
         ]
@@ -678,7 +683,7 @@ class BenchmarkDoctor(object):
         r = self.driver.run(
             benchmark, num_samples=3, num_iters=1, verbose=True
         )  # calibrate
-        num_samples = self._adjusted_1s_samples(r.samples.min)
+        num_samples = self._adjusted_1s_samples(r.min_value)
 
         def capped(s):
             return min(s, 200)
@@ -688,7 +693,7 @@ class BenchmarkDoctor(object):
         opts = opts if isinstance(opts, list) else [opts]
         self.log.debug(
             "Runtime {0} μs yields {1} adjusted samples per second.".format(
-                r.samples.min, num_samples
+                r.min_value, num_samples
             )
         )
         self.log.debug(

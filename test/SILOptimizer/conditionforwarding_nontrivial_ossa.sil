@@ -71,9 +71,8 @@ bb6:
   return %r : $()
 }
 
-// Currently, this is not optimized away because memory behavior of begin_borrow is conservative
 // CHECK-LABEL: sil [ossa] @simple_forwarding2 :
-// CHECK: switch_enum
+// CHECK-NOT: switch_enum
 // CHECK-LABEL: } // end sil function 'simple_forwarding2'
 sil [ossa] @simple_forwarding2 : $@convention(thin) (Builtin.Int1, @guaranteed Klass) -> () {
 bb0(%0 : $Builtin.Int1, %1 : @guaranteed $Klass):
@@ -81,13 +80,11 @@ bb0(%0 : $Builtin.Int1, %1 : @guaranteed $Klass):
 
 bb1:
   %2 = enum $E, #E.A!enumelt, %1 : $Klass
-  %borrow2 = begin_borrow %2 : $E
-  br bb3(%borrow2 : $E)
+  br bb3(%2 : $E)
 
 bb2:
   %3 = enum $E, #E.B!enumelt, %1 : $Klass
-  %borrow3 = begin_borrow %3 : $E
-  br bb3(%borrow3 : $E)
+  br bb3(%3 : $E)
 
 bb3(%14 : @guaranteed $E):
   %15 = function_ref @callee : $@convention(thin) () -> ()
@@ -101,7 +98,6 @@ bb5(%18 : @guaranteed $Klass):
   br bb6
 
 bb6:
-  end_borrow %14 : $E
   %r = tuple ()
   return %r : $()
 }
@@ -187,7 +183,7 @@ bb6:
 
 // CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding2 : 
 // CHECK: switch_enum
-// CHECK: switch_enum
+// CHECK-NOT: switch_enum
 // CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding2'
 sil [ossa] @simple_switch_enum_forwarding2 : $@convention(thin) (@guaranteed E3) -> () {
 bb0(%0 : @guaranteed $E3):
@@ -195,14 +191,12 @@ bb0(%0 : @guaranteed $E3):
 
 bb1(%1 : @guaranteed $Klass):
   %2 = enum $E, #E.A!enumelt, %1 : $Klass
-  %borrow2 = begin_borrow %2 : $E
-  br bb3(%borrow2 : $E)
+  br bb3(%2 : $E)
 
 bb2(%defaultenum : @guaranteed $E3):
   %defaultklass = unchecked_enum_data %defaultenum : $E3, #E3.B!enumelt
   %3 = enum $E, #E.B!enumelt, %defaultklass : $Klass
-  %borrow3 = begin_borrow %3 : $E
-  br bb3(%borrow3 : $E)
+  br bb3(%3 : $E)
 
 bb3(%14 : @guaranteed $E):
   %15 = function_ref @callee : $@convention(thin) () -> ()
@@ -216,7 +210,6 @@ bb5(%5 : @guaranteed $Klass):
   br bb6
 
 bb6:
-  end_borrow %14 : $E
   %r = tuple ()
   return %r : $()
 }

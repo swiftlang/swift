@@ -33,7 +33,7 @@ bb0(%0 : $*T):
 
 sil @test_copy_init : $@convention(thin) <T> (@in_guaranteed T) -> (@out T) {
 bb0(%0 : $*T, %1 : $*T):
-  copy_addr %1 to [initialization] %0 : $*T
+  copy_addr %1 to [init] %0 : $*T
   %result = tuple ()
   return %result : $()
 }
@@ -49,7 +49,7 @@ bb0(%0 : $*T, %1 : $*T):
 
 sil @test_take_init : $@convention(thin) <T> (@in T) -> (@out T) {
 bb0(%0 : $*T, %1 : $*T):
-  copy_addr [take] %1 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
   %result = tuple ()
   return %result : $()
 }

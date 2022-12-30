@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "DictionaryKeys.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"

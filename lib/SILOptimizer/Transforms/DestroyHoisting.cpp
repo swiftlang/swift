@@ -31,7 +31,7 @@ namespace {
 ///
 /// This has two benefits:
 ///
-/// * Combine a destroy_addr with a preceeding copy. For example, replace
+/// * Combine a destroy_addr with a preceding copy. For example, replace
 ///   /code
 ///     %v = load [copy] %a
 ///     ...
@@ -247,7 +247,7 @@ void DestroyHoisting::initDataflow(BitDataflow &dataFlow) {
 // a destroy_addr of location <n> (when walking backwards).
 // As we are not trying to split or combine destroy_addr instructions, a
 // destroy_addr just sets its "self" bit and not the location's subLocations
-// set (this is different compared to the detaflow in MemoryLifetimeVerifier).
+// set (this is different compared to the dataflow in MemoryLifetimeVerifier).
 void DestroyHoisting::initDataflowInBlock(SILBasicBlock *block,
                                           BlockState &state) {
   Bits usedLocs(state.entrySet.size());

@@ -655,6 +655,103 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }
+
+// https://github.com/apple/swift/issues/56139
+
+// CHECK-LABEL: sil hidden [ossa] @$s10statements31test_isa_pattern_array_downcastyySayAA9BaseClassCGF : $@convention(thin) (@guaranteed Array<BaseClass>) -> () {
+func test_isa_pattern_array_downcast(_ arr: [BaseClass]) {
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF:ss21_arrayConditionalCastySayq_GSgSayxGr0_lF]] : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case _ as [DerivedClass] = arr {}
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case _ as [DerivedClass] = arr else {}
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case _ as [DerivedClass] = arr {}
+
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case is [DerivedClass] = arr {}
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case is [DerivedClass] = arr else {}
+  // CHECK: [[ARR_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[ARR_CAST_FN]]<BaseClass, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case is [DerivedClass] = arr {}
+}
+// CHECK: } // end sil function '$s10statements31test_isa_pattern_array_downcastyySayAA9BaseClassCGF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s10statements36test_isa_pattern_dictionary_downcastyySDySSAA9BaseClassCGF : $@convention(thin) (@guaranteed Dictionary<String, BaseClass>) -> () {
+func test_isa_pattern_dictionary_downcast(_ dict: Dictionary<String, BaseClass>) {
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF:ss30_dictionaryDownCastConditionalySDyq0_q1_GSgSDyxq_GSHRzSHR0_r2_lF]] : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case _ as [String : DerivedClass] = dict {}
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case _ as [String : DerivedClass] = dict else {}
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case _ as [String : DerivedClass] = dict {}
+
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case is [String : DerivedClass] = dict {}
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case is [String : DerivedClass] = dict else {}
+  // CHECK: [[DICT_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DICT_CAST_FN]]<String, BaseClass, String, DerivedClass>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case is [String : DerivedClass] = dict {}
+}
+// CHECK: } // end sil function '$s10statements36test_isa_pattern_dictionary_downcastyySDySSAA9BaseClassCGF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s10statements29test_isa_pattern_set_downcastyyShyxGSHRzlF : $@convention(thin) <T where T : Hashable> (@guaranteed Set<T>) -> () {
+func test_isa_pattern_set_downcast<T: Hashable>(_ set: Set<T>) {
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF:ss23_setDownCastConditionalyShyq_GSgShyxGSHRzSHR_r0_lF]] : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Bool>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case let t as Set<Bool> = set {}
+  // FIXME: Get rid of these warnings when https://github.com/apple/swift/issues/60808 is fixed
+  // expected-warning@-2 {{immutable value 't' was never used; consider replacing with '_' or removing it}}
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Bool>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case let t as Set<Bool> = set else {}
+  // expected-warning@-1 {{immutable value 't' was never used; consider replacing with '_' or removing it}}
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Bool>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case let t as Set<Bool> = set {}
+  // expected-warning@-1 {{immutable value 't' was never used; consider replacing with '_' or removing it}}
+
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Int>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  if case is Set<Int> = set {}
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Int>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  guard case is Set<Int> = set else {}
+  // CHECK: [[SET_CAST_FN:%[0-9]+]] = function_ref @$[[FN_REF]]
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[SET_CAST_FN]]<T, Int>
+  // CHECK-NEXT: switch_enum [[RESULT]]
+  while case is Set<Int> = set {}
+}
+// CHECK: } // end sil function '$s10statements29test_isa_pattern_set_downcastyyShyxGSHRzlF'
+
 // CHECK-LABEL: sil hidden [ossa] @$s10statements22let_else_tuple_bindingyS2i_SitSgF
 func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 

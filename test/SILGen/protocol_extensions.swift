@@ -507,7 +507,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
+  // CHECK: copy_addr [[POPENED]] to [init] [[POPENED_COPY:%.*]] :
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEySbs5Int64Vcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[I]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
@@ -516,7 +516,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
   var b2 = p1[i]
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
+  // CHECK: copy_addr [[POPENED]] to [init] [[POPENED_COPY:%.*]] :
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE4propSbvg
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
@@ -541,13 +541,13 @@ func testExistentials2(_ p1: P1) {
 // CHECK: bb0([[P:%[0-9]+]] : $*any P1):
 func testExistentialsGetters(_ p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
+  // CHECK: copy_addr [[POPENED]] to [init] [[POPENED_COPY:%.*]] :
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvg
   // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]], any P1) Self>([[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   let b: Bool = p1.prop2
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
+  // CHECK: copy_addr [[POPENED]] to [init] [[POPENED_COPY:%.*]] :
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEyS2bcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[B]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
@@ -560,7 +560,7 @@ func testExistentialSetters(_ p1: P1, b: Bool) {
   // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var any P1 }
   // CHECK: [[PLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[PBOX]]
   // CHECK: [[PBP:%[0-9]+]] = project_box [[PLIFETIME]]
-  // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PBP]] : $*any P1
+  // CHECK-NEXT: copy_addr [[P]] to [init] [[PBP]] : $*any P1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvs
@@ -594,11 +594,11 @@ func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box ${ var HasAP1 }
   // CHECK: [[HASP1_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[HASP1_BOX]]
   // CHECK: [[PBHASP1:%[0-9]+]] = project_box [[HASP1_LIFETIME]]
-  // CHECK-NEXT: copy_addr [[HASP1]] to [initialization] [[PBHASP1]] : $*HasAP1
+  // CHECK-NEXT: copy_addr [[HASP1]] to [init] [[PBHASP1]] : $*HasAP1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBHASP1]]
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $any P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
-  // CHECK-NEXT: copy_addr [[WRITE]] to [initialization] [[HASP1_COPY]] : $*HasAP1
+  // CHECK-NEXT: copy_addr [[WRITE]] to [init] [[HASP1_COPY]] : $*HasAP1
   // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions6HasAP1V6someP1AA0F0_pvg : $@convention(method) (@in_guaranteed HasAP1) -> @out any P1
   // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], [[HASP1_COPY]]) : $@convention(method) (@in_guaranteed HasAP1) -> @out any P1
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr mutable_access [[P1_COPY]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
@@ -628,7 +628,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   
   // -- Need a guaranteed copy because it's immutable
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
-  // CHECK: copy_addr [[READ]] to [initialization] [[IMMEDIATE:%.*]] :
+  // CHECK: copy_addr [[READ]] to [init] [[IMMEDIATE:%.*]] :
   // CHECK: [[VALUE:%.*]] = open_existential_addr immutable_access [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
@@ -712,7 +712,7 @@ extension InitRequirement {
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
-    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
     // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_BOX_LIFETIME]]
@@ -735,7 +735,7 @@ extension InitRequirement {
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
-    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
     // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
@@ -761,7 +761,7 @@ extension InitRequirement {
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[ACCESS]]
     // CHECK-NEXT: end_access [[ACCESS]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
-    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
+    // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
     // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]

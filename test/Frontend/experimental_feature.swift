@@ -10,7 +10,7 @@ let x = BOOM
 #endif
 
 // Use variadic generics
-func debugPrint<@_typeSequence T>(_ items: T...)
+func debugPrint<T...>(_ items: T...)
   where T: CustomDebugStringConvertible
 {
 }

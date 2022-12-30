@@ -44,13 +44,15 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static bool
-validateModule(llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
-               swift::serialization::ValidationInfo &info,
-               swift::serialization::ExtendedValidationInfo &extendedInfo) {
-  info = swift::serialization::validateSerializedAST(data, requiresOSSAModules,
-                                                     /*requiredSDK*/StringRef(),
-                                                     &extendedInfo);
+static bool validateModule(
+    llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
+    swift::serialization::ValidationInfo &info,
+    swift::serialization::ExtendedValidationInfo &extendedInfo,
+    llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
+  info = swift::serialization::validateSerializedAST(
+      data, requiresOSSAModules,
+      /*requiredSDK*/ StringRef(), /*requiresRevisionMatch*/ false,
+      &extendedInfo, /* dependencies*/ nullptr, &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;
@@ -77,6 +79,14 @@ validateModule(llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
       for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
         llvm::outs() << " " << option;
       llvm::outs() << "\n";
+    }
+    llvm::outs() << "- Search Paths:\n";
+    for (auto searchPath : searchPaths) {
+      llvm::outs() << "    Path: " << searchPath.Path;
+      llvm::outs() << ", framework="
+                   << (searchPath.IsFramework ? "true" : "false");
+      llvm::outs() << ", system=" << (searchPath.IsSystem ? "true" : "false")
+                   << "\n";
     }
   }
 
@@ -284,11 +294,12 @@ int main(int argc, char **argv) {
 
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
+  llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
   for (auto &Module : Modules) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, info, extendedInfo)) {
+                        EnableOSSAModules, info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
     }

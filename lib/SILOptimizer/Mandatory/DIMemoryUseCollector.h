@@ -164,6 +164,11 @@ public:
   /// actor's initializer. Otherwise, returns nullptr.
   ConstructorDecl *getActorInitSelf() const;
 
+  /// If \c TheMemory is a temporary variable that is responsible for
+  /// member-by-member initialization of `$Storage` in a user-defined
+  /// initializer of a type wrapped type, return its declaration.
+  VarDecl *getAsTypeWrapperLocalStorageVar() const;
+
   /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const { return MemoryInst->isDerivedClassSelf(); }
 
@@ -351,6 +356,15 @@ struct DIElementUseInfo {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               DIElementUseInfo &UseInfo);
+
+/// Check whether given function is a user-defined initializer of a
+/// type wrapped type.
+bool canHaveTypeWrapperLocalStorageVar(SILFunction &F);
+
+/// Check whether this instruction represents `_storage` variable
+/// injected by type-checker into user-defined designated initializer
+/// of a type wrapped type.
+bool isTypeWrapperLocalStorageVar(SILFunction &F, MarkUninitializedInst *Inst);
 
 } // end namespace ownership
 } // end namespace swift

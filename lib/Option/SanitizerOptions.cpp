@@ -134,12 +134,12 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     Optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
-    if (!optKind.hasValue()) {
+    if (!optKind.has_value()) {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
           A->getOption().getPrefixedName(), arg);
       continue;
     }
-    SanitizerKind kind = optKind.getValue();
+    SanitizerKind kind = optKind.value();
 
     // Support is determined by existence of the sanitizer library.
     auto fileName = toFileName(kind);
@@ -225,12 +225,12 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
     Optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
-    if (!optKind.hasValue()) {
+    if (!optKind.has_value()) {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                      A->getOption().getPrefixedName(), arg);
       continue;
     }
-    SanitizerKind kind = optKind.getValue();
+    SanitizerKind kind = optKind.value();
 
     // Only support ASan for now.
     if (kind != SanitizerKind::Address) {

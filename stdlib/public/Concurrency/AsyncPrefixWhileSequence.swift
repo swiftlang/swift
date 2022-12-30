@@ -31,7 +31,7 @@ extension AsyncSequence {
   ///     for try await number in stream {
   ///         print(number, terminator: " ")
   ///     }
-  ///     // Prints "1 2 3 4 5"
+  ///     // Prints "1 2 3 4 5 "
   ///     
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether the element should be

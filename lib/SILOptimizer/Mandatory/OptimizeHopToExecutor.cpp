@@ -191,7 +191,7 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 }
 
 /// Returns true if \p inst is a suspension point or an async call.
-static bool isSuspentionPoint(SILInstruction *inst) {
+static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
     if (applySite.isAsync())
       return true;
@@ -213,7 +213,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
                      BlockState::Unknown : BlockState::NotSet);
     state.intra = BlockState::NotSet;
     for (SILInstruction &inst : *state.block) {
-      if (isSuspentionPoint(&inst)) {
+      if (isSuspensionPoint(&inst)) {
         // A suspension point (like an async call) can switch to another
         // executor.
         state.intra = BlockState::Unknown;
@@ -234,7 +234,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
     int actorIdx = state.entry;
     for (auto iter = state.block->begin(); iter != state.block->end();) {
       SILInstruction *inst = &*iter++;
-      if (isSuspentionPoint(inst)) {
+      if (isSuspensionPoint(inst)) {
         actorIdx = BlockState::Unknown;
         continue;
       }
@@ -266,7 +266,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
 bool OptimizeHopToExecutor::removeDeadHopToExecutors() {
 
   // Initialize the dataflow: go bottom up and if we see any instruction which
-  // might require a dedicated executor, don't remove a preceeding
+  // might require a dedicated executor, don't remove a preceding
   // hop_to_executor instruction.
   for (BlockState &state : blockStates) {
     state.exit = (state.block->getSuccessors().empty() ?
@@ -311,7 +311,7 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
-  if (isSuspentionPoint(inst)) {
+  if (isSuspensionPoint(inst)) {
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
@@ -335,7 +335,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
 }
 
 bool OptimizeHopToExecutor::isGlobalMemory(SILValue addr) {
-  // TODO: use esacpe analysis to rule out locally allocated non-stack objects.
+  // TODO: use escape analysis to rule out locally allocated non-stack objects.
   SILValue base = getAccessBase(addr);
   return !isa<AllocStackInst>(base);
 }

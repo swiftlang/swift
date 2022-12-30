@@ -37,6 +37,7 @@ using TaskFutureWaitThrowing_t = SWIFT_CC(swiftasync) void(
                               ThrowingTaskFutureWaitContinuationFunction *resumeFn,
                               AsyncContext *callContext);
 
+__attribute__((weak, visibility("hidden")))
 void SWIFT_CC(swiftasync) swift56override_swift_task_future_wait(
                                             OpaqueValue *,
                                             SWIFT_ASYNC_CONTEXT AsyncContext *,
@@ -45,6 +46,7 @@ void SWIFT_CC(swiftasync) swift56override_swift_task_future_wait(
                                             AsyncContext *,
                                             TaskFutureWait_t *original);
 
+__attribute__((weak, visibility("hidden")))
 void SWIFT_CC(swiftasync) swift56override_swift_task_future_wait_throwing(
                                             OpaqueValue *,
                                             SWIFT_ASYNC_CONTEXT AsyncContext *,
@@ -52,10 +54,4 @@ void SWIFT_CC(swiftasync) swift56override_swift_task_future_wait_throwing(
                                             ThrowingTaskFutureWaitContinuationFunction *,
                                             AsyncContext *,
                                             TaskFutureWaitThrowing_t *original);
-
-
-using AsyncMainDrainQueue_t = SWIFT_CC(swift) void();
-
-void SWIFT_CC(swift) swift56override_swift_asyncMainDrainQueue(AsyncMainDrainQueue_t *);
-
 } // namespace swift

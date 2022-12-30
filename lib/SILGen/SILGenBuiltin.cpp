@@ -478,6 +478,17 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
   // naturally emitted borrowed in memory.
   auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
      .getAsSingleValue(SGF, argument);
+  if (!SGF.F.getConventions().useLoweredAddresses()) {
+    auto &context = SGF.getASTContext();
+    auto identifier =
+        stackProtected
+            ? context.getIdentifier("addressOfBorrowOpaque")
+            : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
+    auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
+                                       substitutions, {borrow.getValue()});
+    return ManagedValue::forUnmanaged(builtin);
+  }
+
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
     return SGF.emitUndef(rawPointerType);
@@ -1519,7 +1530,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))
@@ -1545,7 +1556,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .build();
   auto genericSig = subs.getGenericSignature().getCanonicalSignature();
   auto genericResult =
-      GenericTypeParamType::get(/*type sequence*/ false,
+      GenericTypeParamType::get(/*isParameterPack*/ false,
                                 /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
   // <T> () async throws -> T
   CanType functionTy =
@@ -1577,7 +1588,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))

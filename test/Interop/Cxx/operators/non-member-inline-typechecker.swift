@@ -22,6 +22,9 @@ let resultExclaimEqual = lhs != rhs
 let resultLessEqual = lhs <= rhs
 let resultGreaterEqual = lhs >= rhs
 
+var lhsMutable = LoadableIntWrapper(value: 42)
+lhsMutable /= rhs
+
 public func ==(ptr: UnsafePointer<UInt8>, count: Int) -> Bool {
   let lhs = UnsafeBufferPointer<UInt8>(start: ptr, count: count)
   let rhs = UnsafeBufferPointer<UInt8>(start: ptr, count: count)

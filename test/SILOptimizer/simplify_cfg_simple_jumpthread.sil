@@ -22,7 +22,7 @@ sil @getC : $@convention(thin) () -> C
 
 protocol P {}
 
-// Test that debug_value is not unnecessarilly lost during address projection sinking.
+// Test that debug_value is not unnecessarily lost during address projection sinking.
 public class CC<R> {
   let r : R
   init(_ _r: R) { r = _r }

@@ -29,6 +29,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -330,7 +331,6 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return SGF.emitManagedRValueWithCleanup(value, valueTL);
     }
 
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("unexpected convention");
   }
@@ -431,7 +431,6 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
         break;
         
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -1135,7 +1134,7 @@ static ManagedValue emitCBridgedToNativeValue(
     }
 
     // Otherwise, we use more complicated logic that handles results that
-    // were unexpetedly null.
+    // were unexpectedly null.
 
     assert(bridgedType.isAnyClassReferenceType());
 
@@ -1368,8 +1367,8 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   assert(nativeInputs.size() == bridgedFormalTypes.size());
   assert(nativeInputs.size() == nativeFormalTypes.size());
   assert(inputs.size() ==
-           nativeInputs.size() + unsigned(foreignError.hasValue())
-                               + unsigned(foreignAsync.hasValue()));
+           nativeInputs.size() + unsigned(foreignError.has_value())
+                               + unsigned(foreignAsync.has_value()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = SGF.getSILType(inputs[i], objcFnTy);
     SILValue arg = SGF.F.begin()->createFunctionArgument(argTy);
@@ -1411,8 +1410,8 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   }
 
   assert(bridgedArgs.size()
-           + unsigned(foreignError.hasValue())
-           + unsigned(foreignAsync.hasValue())
+           + unsigned(foreignError.has_value())
+           + unsigned(foreignAsync.has_value())
         == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
   assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
@@ -1525,7 +1524,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
                                               ProfileCounter(),
                                               IsThunk,
                                               IsNotDynamic,
-                                              IsNotDistributed);
+                                              IsNotDistributed,
+                                              IsNotRuntimeAccessible);
   
   auto closureRef = B.createFunctionRef(loc, closure);
   
@@ -1784,8 +1784,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     };
     
     unsigned numResults
-      = completionTy->getParameters().size() - errorParamIndex.hasValue()
-                                             - errorFlagIndex.hasValue();
+      = completionTy->getParameters().size() - errorParamIndex.has_value()
+                                             - errorFlagIndex.has_value();
     
     if (numResults == 1) {
       for (unsigned i = 0; i < completionTy->getNumParameters(); ++i) {
@@ -2022,25 +2022,30 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   B.createReturn(loc, result);
 }
 
-static SILValue
-getThunkedForeignFunctionRef(SILGenFunction &SGF,
-                             SILLocation loc,
-                             SILDeclRef foreign,
-                             ArrayRef<ManagedValue> args,
-                             const SILConstantInfo &foreignCI) {
+static SILValue getThunkedForeignFunctionRef(SILGenFunction &SGF,
+                                             AbstractFunctionDecl *fd,
+                                             SILDeclRef foreign,
+                                             ArrayRef<ManagedValue> args,
+                                             const SILConstantInfo &foreignCI) {
   assert(foreign.isForeign);
 
   // Produce an objc_method when thunking ObjC methods.
-  if (foreignCI.SILFnType->getRepresentation()
-        == SILFunctionTypeRepresentation::ObjCMethod) {
-    SILValue thisArg = args.back().getValue();
+  if (foreignCI.SILFnType->getRepresentation() ==
+      SILFunctionTypeRepresentation::ObjCMethod) {
+    auto *objcDecl =
+        dyn_cast_or_null<clang::ObjCMethodDecl>(fd->getClangDecl());
+    const bool isObjCDirect = objcDecl && objcDecl->isDirectMethod();
+    if (isObjCDirect) {
+      auto *fn = SGF.SGM.getFunction(foreign, NotForDefinition);
+      return SGF.B.createFunctionRef(fd, fn);
+    }
 
-    return SGF.B.createObjCMethod(loc, thisArg, foreign,
-                                  foreignCI.getSILType());
+    SILValue thisArg = args.back().getValue();
+    return SGF.B.createObjCMethod(fd, thisArg, foreign, foreignCI.getSILType());
   }
 
   // Otherwise, emit a function_ref.
-  return SGF.emitGlobalFunctionRef(loc, foreign);
+  return SGF.emitGlobalFunctionRef(fd, foreign);
 }
 
 /// Generate code to emit a thunk with native conventions that calls a
@@ -2179,8 +2184,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = emitManagedRValueWithCleanup(tmp);
           break;
         }
-        case ParameterConvention::Indirect_In_Constant:
-          llvm_unreachable("unsupported convention");
         }
 
         while (maybeAddForeignArg());

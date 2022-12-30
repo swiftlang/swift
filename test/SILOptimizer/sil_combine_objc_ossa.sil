@@ -94,7 +94,7 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
   return %3 : $Bool                               // id: %4
 }
 
-// Mimicks Swift._allocateUninitializedArray
+// Mimics Swift._allocateUninitializedArray
 sil [_semantics "array.uninitialized"] @dead_array_alloc : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
 
 // <rdar://problem/20980377> HeapBuffer.swift test case spuriously reports a "unique" buffer

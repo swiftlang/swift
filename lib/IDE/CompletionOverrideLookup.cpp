@@ -178,7 +178,7 @@ void CompletionOverrideLookup::addValueOverride(
   // Erase existing introducer (e.g. 'func') if any modifiers are added.
   if (hasDeclIntroducer && modifierAdded) {
     auto dist = Ctx.SourceMgr.getByteDistance(
-        introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+        introducerLoc, Ctx.SourceMgr.getIDEInspectionTargetLoc());
     if (dist <= CodeCompletionResult::MaxNumBytesToErase) {
       Builder.setNumBytesToErase(dist);
       hasDeclIntroducer = false;

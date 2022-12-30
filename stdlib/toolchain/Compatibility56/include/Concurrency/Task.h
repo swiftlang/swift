@@ -222,9 +222,9 @@ public:
     void *Storage[14];
 
     /// Initialize this storage during the creation of a task.
-    void initialize(JobPriority basePri);
-    void initializeWithSlab(JobPriority basePri, void *slab,
-                            size_t slabCapacity);
+    void initialize(AsyncTask *task);
+    void initializeWithSlab(AsyncTask *task,
+                            void *slab, size_t slabCapacity);
 
     /// React to the completion of the enclosing task's execution.
     void complete(AsyncTask *task);
@@ -235,6 +235,7 @@ public:
     PrivateStorage &get();
     const PrivateStorage &get() const;
   };
+  /// Private storage for the use of the runtime.
   PrivateStorage &_private();
   const PrivateStorage &_private() const;
 
@@ -313,9 +314,11 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   void flagAsRunning();
+  void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.
   void flagAsSuspended();
+  void flagAsSuspended_slow();
 
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it

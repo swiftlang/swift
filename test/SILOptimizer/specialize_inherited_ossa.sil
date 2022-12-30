@@ -57,8 +57,8 @@ bb0(%0 : $*Key, %1 : $Int, %2 : @owned $MMStorage<Key, Value>):
   %26 = witness_method $Key, #Equatable."==" : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %27 = alloc_stack $Key
   %33 = alloc_stack $Key
-  copy_addr %0 to [initialization] %27 : $*Key
-  copy_addr %0 to [initialization] %33 : $*Key
+  copy_addr %0 to [init] %27 : $*Key
+  copy_addr %0 to [init] %33 : $*Key
   // CHECK: apply [[ID2]]<Key>
   %35 = apply %26<Key>(%27, %33, %25) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   dealloc_stack %33 : $*Key

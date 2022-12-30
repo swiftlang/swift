@@ -138,7 +138,7 @@ bb0:
 // ... dealloc_ref also does the same thing.
 
 // CHECK-NEXT: [[SELF:%.*]] = bitcast %swift.refcounted* [[ALLOC]] to %T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC*
-// CHECK-NEXT: [[ISA_ADDR:%.*]] = getelementptr inbounds %T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC, %T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC* [[SELF]], i32 0, i32 0, i32 0
+// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC* [[SELF]] to %swift.type**
 // CHECK-NEXT: [[META:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[META_ADDR:%.*]] = bitcast %swift.type* [[META]] to i8*
 // CHECK-32-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[META_ADDR]], i32 28

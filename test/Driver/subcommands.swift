@@ -3,10 +3,11 @@
 
 // RUN: rm -rf %t.dir
 // RUN: mkdir -p %t.dir/usr/bin
+// RUN: mkdir -p %t.dir/usr/lib
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t.dir/usr/bin/swift)
 
-// RUN: %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
-// RUN: %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
+// RUN: %host-library-env %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
+// RUN: %host-library-env %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 
 // CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift{{.*}} -repl
 
@@ -22,7 +23,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: bootstrapping_mode
+// UNSUPPORTED: swift_in_compiler
 
 // CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 

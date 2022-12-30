@@ -138,8 +138,8 @@ class BestMatchMatcher : public NodeMatcher {
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
         continue;
-      if (!Best.hasValue() ||
-          IsFirstMatchBetter({Pin, Can}, {Pin, Best.getValue()}))
+      if (!Best.has_value() ||
+          IsFirstMatchBetter({Pin, Can}, {Pin, Best.value()}))
         Best = Can;
     }
     return Best;
@@ -158,8 +158,8 @@ public:
   void match() override {
     for (auto L : Left) {
       if (auto Best = findBestMatch(L, Right)) {
-        MatchedRight.insert(Best.getValue());
-        Listener.foundMatch(L, Best.getValue(), Reason);
+        MatchedRight.insert(Best.value());
+        Listener.foundMatch(L, Best.value(), Reason);
       }
     }
   }
@@ -248,7 +248,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     for (auto Child : A->getChildren()) {
       if (auto VC = dyn_cast<SDKNodeDeclVar>(Child)) {
       auto LastPartOfA = getLastPartOfUsr(VC);
-        if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
+        if (LastPartOfA && LastPartOfR.value() == LastPartOfA.value()) {
           std::string FullName = (llvm::Twine(A->getName()) + "." +
             Child->getName()).str();
           R->annotate(NodeAnnotation::ModernizeEnum,
@@ -266,7 +266,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       return false;
     auto LastR = getLastPartOfUsr(R);
     auto LastA = getLastPartOfUsr(A);
-    if (LastR && LastA && LastR.getValue() == LastA.getValue()) {
+    if (LastR && LastA && LastR.value() == LastA.value()) {
       foundMatch(R, A, NodeMatchReason::Name);
       return true;
     }
@@ -486,7 +486,7 @@ void SameNameNodeMatcher::match() {
 
       // If LN and RN have the same name for some reason, keep track of RN.
       if (auto Kind = getNameMatchKind(LN, RN))
-        Candidates.push_back({RN, Kind.getValue()});
+        Candidates.push_back({RN, Kind.value()});
     }
 
     // Try to find the best match among all the candidates by the priority name
@@ -1674,7 +1674,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
             findUpdateCounterpart(PD))) {
           // Look up by the printed name in the counterpart.
           FoundInSuperclass =
-            RTD->lookupChildByPrintedName(Node->getPrintedName()).hasValue();
+            RTD->lookupChildByPrintedName(Node->getPrintedName()).has_value();
         }
       }
     }
@@ -2428,7 +2428,7 @@ public:
       bool isValid = false;
       if (auto Version = VersionParser::parseVersionString(
               SwiftVersion, SourceLoc(), nullptr)) {
-        if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+        if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
           InitInvoke.getLangOptions().EffectiveLanguageVersion = *Effective;
           isValid = true;
         }

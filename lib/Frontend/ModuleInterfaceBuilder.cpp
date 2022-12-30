@@ -124,8 +124,8 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
 
     // Serialize the paths of dependencies in the SDK relative to it.
     Optional<StringRef> SDKRelativePath = getRelativeDepPath(DepName, SDKPath);
-    StringRef DepNameToStore = SDKRelativePath.getValueOr(DepName);
-    bool IsSDKRelative = SDKRelativePath.hasValue();
+    StringRef DepNameToStore = SDKRelativePath.value_or(DepName);
+    bool IsSDKRelative = SDKRelativePath.has_value();
 
     // Forwarding modules add the underlying prebuilt module to their
     // dependency list -- don't serialize that.
@@ -249,6 +249,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
 
   SILOptions &SILOpts = Invocation.getSILOptions();
   auto Mod = Instance.getMainModule();
+  Mod->setIsBuiltFromInterface(true);
   auto &TC = Instance.getSILTypes();
   auto SILMod = performASTLowering(Mod, TC, SILOpts);
   if (!SILMod) {
@@ -265,6 +266,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   SerializationOpts.AutolinkForceLoad =
       !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
+  SerializationOpts.AllowableClients = FEOpts.AllowableClients;
 
   // Record any non-SDK module interface files for the debug info.
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
@@ -319,11 +321,20 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
+    Optional<DiagnosticEngine> localDiags;
+    DiagnosticEngine *rebuildDiags = diags;
+    if (silenceInterfaceDiagnostics) {
+      // To silence diagnostics, use a local temporary engine.
+      localDiags.emplace(sourceMgr);
+      rebuildDiags = &*localDiags;
+    }
+
     SubError = (bool)subASTDelegate.runInSubCompilerInstance(
         moduleName, interfacePath, OutPath, diagnosticLoc,
+        silenceInterfaceDiagnostics,
         [&](SubCompilerInstanceInfo &info) {
           auto EBuilder = ExplicitModuleInterfaceBuilder(
-              *info.Instance, diags, sourceMgr, moduleCachePath, backupInterfaceDir,
+              *info.Instance, rebuildDiags, sourceMgr, moduleCachePath, backupInterfaceDir,
               prebuiltCachePath, ABIDescriptorPath, extraDependencies, diagnosticLoc,
               dependencyTracker);
           return EBuilder.buildSwiftModuleFromInterface(

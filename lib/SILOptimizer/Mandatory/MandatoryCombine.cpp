@@ -13,7 +13,7 @@
 ///  \file
 ///
 ///  Defines the MandatoryCombiner function transform.  The pass contains basic
-///  instruction combines to be performed at the begining of both the Onone and
+///  instruction combines to be performed at the beginning of both the Onone and
 ///  also the performance pass pipelines, after the diagnostics passes have been
 ///  run.  It is intended to be run before and to be independent of other
 ///  transforms.
@@ -244,7 +244,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
-  MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
+  MandatoryCombineCanonicalize mcCanonicalize(worklist, deadEndBlocks);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
@@ -261,7 +261,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
         }
       }
 
-      if (mcCanonicialize.tryCanonicalize(instruction)) {
+      if (mcCanonicalize.tryCanonicalize(instruction)) {
         madeChange = true;
         continue;
       }

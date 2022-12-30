@@ -198,7 +198,8 @@ namespace irgen {
                                        llvm::Value *fnPtr,
                                        llvm::Value *contextPtr,
                                        CalleeInfo &&info,
-                                       bool castOpaqueToRefcountedContext);
+                                       bool castOpaqueToRefcountedContext,
+                                       bool isClosure);
 
   Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);

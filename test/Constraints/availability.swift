@@ -44,24 +44,23 @@ func f_55700(_ arr: [Int]) {
   for x in arr where unavailableFunction(x) {} // expected-error {{'unavailableFunction' is unavailable}}
 }
 
-// rdar://92364955 - ambiguity with member declared in unavailable extension
- struct WithUnavailableExt {
- }
+// rdar://101814209
+public struct Box<T> {
+  @usableFromInline
+  let value: T
+}
 
- @available(*, unavailable)
- extension WithUnavailableExt {
-   static var foo: WithUnavailableExt = WithUnavailableExt()
- }
+@available(macOS, unavailable)
+extension Box where T == Int {
+  @usableFromInline
+  init(value: T) {
+    self.value = value
+  }
+}
 
- func test_no_ambiguity_with_unavailable_ext() {
-   struct A {
-     static var foo: A = A()
-   }
-
-   struct Test {
-     init(_: A) {}
-     init(_: WithUnavailableExt) {}
-   }
-
-   _ = Test(.foo) // Ok `A.foo` since `foo` from `WithUnavailableExt` is unavailable
- }
+@available(macOS, unavailable)
+@_alwaysEmitIntoClient public func aeicFunction() {
+  // Select the unavailable @usableFromInline init over the synthesized internal
+  // memberwise initializer.
+  _ = Box(value: 42)
+}

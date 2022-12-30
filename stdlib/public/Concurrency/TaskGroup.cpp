@@ -313,8 +313,9 @@ private:
   /// AsyncTask.
   NaiveQueue<ReadyQueueItem> readyQueue;
 
-  /// Single waiting `AsyncTask` currently waiting on `group.next()`,
-  /// or `nullptr` if no task is currently waiting.
+  /// The task currently waiting on `group.next()`.  Since only the owning
+  /// task can ever be waiting on a group, this is just either a reference
+  /// to that task or null.
   std::atomic<AsyncTask *> waitQueue;
 
   const Metadata *successType;
@@ -504,16 +505,35 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 }
 
 // =============================================================================
-// ==== add / attachChild ------------------------------------------------------
+// ==== child task management --------------------------------------------------
 
 void TaskGroup::addChildTask(AsyncTask *child) {
   SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, this);
 
-  // The counterpart of this (detachChild) is performed by the group itself,
-  // when it offers the completed (child) task's value to a waiting task -
-  // during the implementation of `await group.next()`.
+  // Add the child task to this task group.  The corresponding removal
+  // won't happen until the parent task successfully polls for this child
+  // task, either synchronously in poll (if a task is available
+  // synchronously) or asynchronously in offer (otherwise).  In either
+  // case, the work ends up being non-concurrent with the parent task.
+
+  // The task status record lock is held during this operation, which
+  // prevents us from racing with cancellation or escalation.  We don't
+  // need to acquire the task group lock because the child list is only
+  // accessed under the task status record lock.
   auto groupRecord = asImpl(this)->getTaskRecord();
   groupRecord->attachChild(child);
+}
+
+void TaskGroup::removeChildTask(AsyncTask *child) {
+  SWIFT_TASK_DEBUG_LOG("detach child task = %p from group = %p", child, this);
+
+  auto groupRecord = asImpl(this)->getTaskRecord();
+
+  // The task status record lock is held during this operation, which
+  // prevents us from racing with cancellation or escalation.  We don't
+  // need to acquire the task group lock because the child list is only
+  // accessed under the task status record lock.
+  groupRecord->detachChild(child);
 }
 
 // =============================================================================
@@ -585,18 +605,18 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
 // TaskGroup is locked upon entry and exit
 void TaskGroupImpl::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
-    // Retain the task while it is in the queue;
-    // it must remain alive until the task group is alive.
-    swift_retain(completedTask);
+  // Retain the task while it is in the queue; it must remain alive until
+  // it is found by poll.  This retain will balanced by the release in poll.
+  swift_retain(completedTask);
 
-    auto readyItem = ReadyQueueItem::get(
-        hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success,
-        completedTask
-    );
+  auto readyItem = ReadyQueueItem::get(
+      hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success,
+      completedTask
+  );
 
-    assert(completedTask == readyItem.getTask());
-    assert(readyItem.getTask()->isFuture());
-    readyQueue.enqueue(readyItem);
+  assert(completedTask == readyItem.getTask());
+  assert(readyItem.getTask()->isFuture());
+  readyQueue.enqueue(readyItem);
 }
 
 void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
@@ -606,6 +626,15 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
   SWIFT_TASK_DEBUG_LOG("offer task %p to group %p", completedTask, this);
+
+  // The current ownership convention is that we are *not* given ownership
+  // of a retain on completedTask; we're called from the task completion
+  // handler, and the task will release itself.  So if we need the task
+  // to survive this call (e.g. because there isn't an immediate waiting
+  // task), we will need to retain it, which we do in enqueueCompletedTask.
+  // This is wasteful, and the task completion function should be fixed to
+  // transfer ownership of a retain into this function, in which case we
+  // will need to release in the other path.
 
   lock(); // TODO: remove fragment lock, and use status for synchronization
 
@@ -641,20 +670,25 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
           waitingTask, nullptr,
           /*success*/ std::memory_order_release,
           /*failure*/ std::memory_order_acquire)) {
-#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-         // We have completed a child task in a task group task and we know
-         // there is a waiting task who will reevaluate TaskGroupImpl::poll once
-         // we return, by virtue of being in the task-to-thread model.
-         // We want poll() to then satisfy the condition of having readyTasks()
-         // that it can dequeue from the readyQueue so we need to enqueue our
-         // completion.
 
-         // TODO (rokhinip): There's probably a more efficient way to deal with
-         // this since the child task can directly offer the result to the
-         // parent who will run next but that requires a fair bit of plumbing
-         enqueueCompletedTask(completedTask, hadErrorResult);
-         unlock(); // TODO: remove fragment lock, and use status for synchronization
-         return;
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+        // In the task-to-thread model, child tasks are always actually
+        // run synchronously on the parent task's thread.  For task groups
+        // specifically, this means that poll() will pick a child task
+        // that was added to the group and run it to completion as a
+        // subroutine.  Therefore, when we enter offer(), we know that
+        // the parent task is waiting and we can just return to it.
+
+        // The task-to-thread logic in poll() currently expects the child
+        // task to enqueue itself instead of just filling in the result in
+        // the waiting task.  This is a little wasteful; there's no reason
+        // we can't just have the parent task set itself up as a waiter.
+        // But since it's what we're doing, we basically take the same
+        // path as we would if there wasn't a waiter.
+        enqueueCompletedTask(completedTask, hadErrorResult);
+        unlock(); // TODO: remove fragment lock, and use status for synchronization
+        return;
+
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
         if (statusCompletePendingReadyWaiting(assumed)) {
           // Run the task.
@@ -662,16 +696,28 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
 
           unlock(); // TODO: remove fragment lock, and use status for synchronization
 
+          // Remove the child from the task group's running tasks list.
+          // The parent task isn't currently running (we're about to wake
+          // it up), so we're still synchronous with it.  We can safely
+          // acquire our parent's status record lock here (which would
+          // ordinarily run the risk of deadlock, since e.g. cancellation
+          // does a parent -> child traversal while recursively holding
+          // locks) because we know that the child task is completed and
+          // we can't be holding its locks ourselves.
+          _swift_taskGroup_detachChild(asAbstract(this), completedTask);
+
           auto waitingContext =
               static_cast<TaskFutureWaitAsyncContext *>(
                   waitingTask->ResumeContext);
 
           fillGroupNextResult(waitingContext, result);
-          detachChild(result.retainedTask);
 
           _swift_tsan_acquire(static_cast<Job *>(waitingTask));
           // TODO: allow the caller to suggest an executor
           waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
+
+          // completedTask will be released by the remainder of its
+          // completion function.
           return;
         } // else, try again
 #endif
@@ -766,9 +812,11 @@ static void swift_taskGroup_wait_next_throwingImpl(
                          group, waitingTask, polled.retainedTask);
     fillGroupNextResult(context, polled);
     if (auto completedTask = polled.retainedTask) {
-      // it would be null for PollStatus::Empty, then we don't need to release
-      group->detachChild(polled.retainedTask);
-      swift_release(polled.retainedTask);
+      // Remove the child from the task group's running tasks list.
+      _swift_taskGroup_detachChild(asAbstract(group), completedTask);
+
+      // Balance the retain done by enqueueCompletedTask.
+      swift_release(completedTask);
     }
 
     return waitingTask->runInFullyEstablishedContext();
@@ -788,7 +836,9 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
   bool hasSuspended = false;
   bool haveRunOneChildTaskInline = false;
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
 reevaluate_if_taskgroup_has_results:;
+#endif
   auto assumed = statusMarkWaitingAssumeAcquire();
   if (haveRunOneChildTaskInline) {
     assert(assumed.readyTasks());
@@ -839,6 +889,10 @@ reevaluate_if_taskgroup_has_results:;
       // be swift_release'd; we kept it alive while it was in the readyQueue by
       // an additional retain issued as we enqueued it there.
       result.retainedTask = item.getTask();
+
+      // Note that the task was detached from the task group when it
+      // completed, so we don't need to do that bit of record-keeping here.
+
       switch (item.getStatus()) {
         case ReadyStatus::Success:
           // Immediately return the polled value
@@ -933,6 +987,7 @@ static bool swift_taskGroup_isCancelledImpl(TaskGroup *group) {
 
 // =============================================================================
 // ==== cancelAll --------------------------------------------------------------
+
 SWIFT_CC(swift)
 static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
   asImpl(group)->cancelAll();
@@ -941,17 +996,43 @@ static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
 bool TaskGroupImpl::cancelAll() {
   SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p", this);
 
-  // store the cancelled bit
+  // Flag the task group itself as cancelled.  If this was already
+  // done, any existing child tasks should already have been cancelled,
+  // and cancellation should automatically flow to any new child tasks,
+  // so there's nothing else for us to do.
   auto old = statusCancel();
   if (old.isCancelled()) {
-    // already was cancelled previously, nothing to do?
     return false;
   }
 
-  // FIXME: must also remove the records!!!!
-  // cancel all existing tasks within the group
-  swift_task_cancel_group_child_tasks(asAbstract(this));
+  // Cancel all the child tasks.  TaskGroup is not a Sendable type,
+  // so cancelAll() can only be called from the owning task.  This
+  // satisfies the precondition on cancelAllChildren().
+  _swift_taskGroup_cancelAllChildren(asAbstract(this));
+
   return true;
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
+  // TaskGroup is not a Sendable type, and so this operation (which is not
+  // currently exposed in the API) can only be called from the owning
+  // task.  This satisfies the precondition on cancelAllChildren().
+  _swift_taskGroup_cancelAllChildren(group);
+}
+
+/// Cancel all the children of the given task group.
+///
+/// The caller must guarantee that this is either called from the
+/// owning task of the task group or while holding the owning task's
+/// status record lock.
+void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
+  // Because only the owning task of the task group can modify the
+  // child list of a task group status record, and it can only do so
+  // while holding the owning task's status record lock, we do not need
+  // any additional synchronization within this function.
+  for (auto childTask: group->getTaskRecord()->children())
+    swift_task_cancel(childTask);
 }
 
 // =============================================================================

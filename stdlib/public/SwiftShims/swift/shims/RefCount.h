@@ -703,7 +703,7 @@ class RefCounts {
   // Out-of-line slow paths.
 
   SWIFT_NOINLINE
-  void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
+  HeapObject *incrementSlow(RefCountBits oldbits, uint32_t inc);
 
   SWIFT_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
@@ -799,14 +799,18 @@ class RefCounts {
   }
 
   // Increment the reference count.
+  //
+  // This returns the enclosing HeapObject so that it the result of this call
+  // can be directly returned from swift_retain. This makes the call to
+  // incrementSlow() a tail call.
   SWIFT_ALWAYS_INLINE
-  void increment(uint32_t inc = 1) {
+  HeapObject *increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
     // constant propagation will remove this in swift_retain, it should only
     // be present in swift_retain_n
     if (inc != 1 && oldbits.isImmortal(true)) {
-      return;
+      return getHeapObject();
     }
     
     RefCountBits newbits;
@@ -815,11 +819,12 @@ class RefCounts {
       bool fast = newbits.incrementStrongExtraRefCount(inc);
       if (SWIFT_UNLIKELY(!fast)) {
         if (oldbits.isImmortal(false))
-          return;
+          return getHeapObject();
         return incrementSlow(oldbits, inc);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+    return getHeapObject();
   }
 
   SWIFT_ALWAYS_INLINE

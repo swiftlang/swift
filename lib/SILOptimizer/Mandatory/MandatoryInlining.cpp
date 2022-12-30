@@ -40,6 +40,27 @@ STATISTIC(NumMandatoryInlines,
           "Number of function application sites inlined by the mandatory "
           "inlining pass");
 
+//===----------------------------------------------------------------------===//
+//                           Printing Helpers
+//===----------------------------------------------------------------------===//
+
+extern llvm::cl::opt<bool> SILPrintInliningCallee;
+
+extern llvm::cl::opt<bool> SILPrintInliningCallerBefore;
+
+extern llvm::cl::opt<bool> SILPrintInliningCallerAfter;
+
+extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                       SILFunction *callee);
+
+extern void printInliningDetailsCallerBefore(StringRef passName,
+                                             SILFunction *caller,
+                                             SILFunction *callee);
+
+extern void printInliningDetailsCallerAfter(StringRef passName,
+                                            SILFunction *caller,
+                                            SILFunction *callee);
+
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
@@ -99,7 +120,6 @@ static  bool fixupReferenceCounts(
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       break;
@@ -166,7 +186,7 @@ static  bool fixupReferenceCounts(
           });
 
       // Since our applySite is in a different loop than our partial apply means
-      // thatour leak code will have lifetime extended the value over the
+      // that our leak code will have lifetime extended the value over the
       // loop. So we should /not/ insert a destroy after the apply site. In
       // contrast, if we do not have a loop, we must have been compensating for
       // uses in the top of a diamond and need to insert a destroy after the
@@ -463,10 +483,10 @@ public:
   // instructions. This assumes that DeadFunctionValSet::erase() is stable.
   void cleanupDeadClosures(SILFunction *F) {
     for (Optional<SILInstruction *> I : deadFunctionVals) {
-      if (!I.hasValue() || I.getValue()->isDeleted())
+      if (!I.has_value() || I.value()->isDeleted())
         continue;
 
-      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.value()))
         cleanupCalleeValue(SVI, invalidatedStackNesting);
     }
   }
@@ -923,11 +943,21 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
 
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
+      if (SILPrintInliningCallee) {
+        printInliningDetailsCallee("MandatoryInlining", F, CalleeFunction);
+      }
+      if (SILPrintInliningCallerBefore) {
+        printInliningDetailsCallerBefore("MandatoryInlining", F,
+                                         CalleeFunction);
+      }
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      if (SILPrintInliningCallerAfter) {
+        printInliningDetailsCallerAfter("MandatoryInlining", F, CalleeFunction);
+      }
       nextBB = lastBB->getReverseIterator();
       ++NumMandatoryInlines;
 
@@ -1008,7 +1038,7 @@ class MandatoryInlining : public SILModuleTransform {
     if (getOptions().DebugSerialization)
       return;
     for (auto *F : changedFunctions) {
-      invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 

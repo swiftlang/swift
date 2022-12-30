@@ -214,5 +214,21 @@ REMARK(remark_save_cache, none,
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: macro diagnostics
+//------------------------------------------------------------------------------
+NOTE(in_macro_expansion,none,
+     "in expansion of macro %0 here", (DeclName))
+
+//------------------------------------------------------------------------------
+// MARK: bridged diagnostics
+//------------------------------------------------------------------------------
+
+NOTE(bridged_note, none, "%0", (StringRef))
+WARNING(bridged_warning, none,"%0", (StringRef))
+ERROR(bridged_error, none, "%0", (StringRef))
+ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
+REMARK(bridged_remark, none, "%0", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

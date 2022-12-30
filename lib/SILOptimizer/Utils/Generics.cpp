@@ -265,7 +265,7 @@ public:
 
   void setResultType(SILType type) { resultType = type; }
 
-  bool hasResultType() const { return resultType.hasValue(); }
+  bool hasResultType() const { return resultType.has_value(); }
 
   const llvm::MapVector<unsigned, CanType> &getIndirectResultTypes() const {
     return indirectResultTypes;
@@ -423,7 +423,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
   auto Replacements2 = Subs2.getReplacementTypes();
   assert(Replacements1.size() == Replacements2.size());
   TypeComparator TypeCmp;
-  // Perform component-wise comparisions for substitutions.
+  // Perform component-wise comparisons for substitutions.
   for (unsigned idx : indices(Replacements1)) {
     auto Type1 = Replacements1[idx]->getCanonicalType();
     auto Type2 = Replacements2[idx]->getCanonicalType();
@@ -446,7 +446,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
     // They are not comparable in this sense.
   }
 
-  // The substitition list is not growing.
+  // The substitution list is not growing.
   return false;
 }
 
@@ -893,7 +893,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
         hasConvertedResilientParams = true;
       }
       break;
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       break;
@@ -1119,7 +1118,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // FIXME: Second type of a superclass requirement may contain
       // generic parameters.
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1171,7 +1170,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
           CurrentGP)
         CollectedReqs.push_back(Req);
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1270,8 +1269,8 @@ shouldBePartiallySpecialized(Type Replacement,
         UsedArchetypes.insert(Primary);
       }
 
-      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-        UsedArchetypes.insert(Seq);
+      if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+        UsedArchetypes.insert(Pack);
       }
     }
   });
@@ -1474,7 +1473,7 @@ public:
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
-  auto GP = GenericTypeParamType::get(/*type sequence*/ false, 0, GPIdx++, Ctx);
+  auto GP = GenericTypeParamType::get(/*isParameterPack*/ false, 0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
   return GP;
 }
@@ -1500,8 +1499,8 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
           UsedCallerArchetypes.insert(Primary);
         }
 
-        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-          UsedCallerArchetypes.insert(Seq);
+        if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+          UsedCallerArchetypes.insert(Pack);
         }
       }
     });
@@ -2337,7 +2336,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     SILBasicBlock *resultBlock = tai->getNormalBB();
     assert(resultBlock->getSinglePredecessorBlock() == tai->getParent());
     // First insert the cleanups for our arguments int he appropriate spot.
-    FullApplySite(tai).insertAfterFullEvaluation(
+    FullApplySite(tai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2363,7 +2362,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   }
   case ApplySiteKind::ApplyInst: {
     auto *ai = cast<ApplyInst>(applySite);
-    FullApplySite(ai).insertAfterFullEvaluation(
+    FullApplySite(ai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2400,7 +2399,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   case ApplySiteKind::BeginApplyInst: {
     auto *bai = cast<BeginApplyInst>(applySite);
     assert(!resultOut);
-    FullApplySite(bai).insertAfterFullEvaluation(
+    FullApplySite(bai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2520,7 +2519,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
       ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed);
+      IsNotDistributed, IsNotRuntimeAccessible);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2546,10 +2545,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
       auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
                                                      SpecArg->getDecl());
-      NewArg->setNoImplicitCopy(
-          cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
-      NewArg->setLifetimeAnnotation(
-          cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
+      NewArg->copyFlags(cast<SILFunctionArgument>(SpecArg));
       Arguments.push_back(NewArg);
     }
     FullApplySite ApplySite = createReabstractionThunkApply(Builder);
@@ -2582,7 +2578,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   // Now that we have finished constructing our CFG (note the return above),
   // insert any compensating end borrows that we need.
-  ApplySite.insertAfterFullEvaluation([&](SILBuilder &argBuilder) {
+  ApplySite.insertAfterApplication([&](SILBuilder &argBuilder) {
     cleanupCallArguments(argBuilder, Loc, Arguments, ArgsThatNeedEndBorrow);
   });
 
@@ -2652,6 +2648,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
         cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
     NewArg->setLifetimeAnnotation(
         cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
+    NewArg->setClosureCapture(
+        cast<SILFunctionArgument>(SpecArg)->isClosureCapture());
     Arguments.push_back(NewArg);
   };
   // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
@@ -2697,6 +2695,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
           cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
       NewArg->setLifetimeAnnotation(
           cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
+      NewArg->setClosureCapture(
+          cast<SILFunctionArgument>(SpecArg)->isClosureCapture());
       if (!NewArg->getArgumentConvention().isGuaranteedConvention()) {
         SILValue argVal = Builder.emitLoadValueOperation(
             Loc, NewArg, LoadOwnershipQualifier::Take);

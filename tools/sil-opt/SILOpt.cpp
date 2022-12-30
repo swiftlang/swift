@@ -136,6 +136,10 @@ static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
 
+static llvm::cl::opt<bool> EnableExperimentalTypeWrappers(
+    "enable-experimental-type-wrappers",
+    llvm::cl::desc("Enable experimental type wrappers."));
+
 static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
@@ -143,6 +147,10 @@ VerifyExclusivity("enable-verify-exclusivity",
 static llvm::cl::opt<bool>
 EnableSpeculativeDevirtualization("enable-spec-devirt",
                   llvm::cl::desc("Enable Speculative Devirtualization pass."));
+
+static llvm::cl::opt<bool>
+EnableMoveInoutStackProtection("enable-move-inout-stack-protector",
+                  llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
 static llvm::cl::opt<bool> EnableOSSAModules(
     "enable-ossa-modules",
@@ -581,6 +589,10 @@ int main(int argc, char **argv) {
         Feature::DifferentiableProgramming);
   }
 
+  if (EnableExperimentalTypeWrappers) {
+    Invocation.getLangOptions().Features.insert(Feature::TypeWrappers);
+  }
+
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
   Invocation.getDiagnosticOptions().VerifyMode =
@@ -599,6 +611,7 @@ int main(int argc, char **argv) {
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
   SILOpts.EnableStackProtection = true;
+  SILOpts.EnableMoveInoutStackProtection = EnableMoveInoutStackProtection;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

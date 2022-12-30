@@ -115,8 +115,8 @@ bb0(%0 : @owned $@moveOnly Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [ossa] @test_explicit_copy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: explicit_copy_addr %{{[0-9]+}} to [initialization] %{{[0-9]+}} :
-// CHECK: explicit_copy_addr [take] %{{[0-9]+}} to [initialization] %{{[0-9]+}} :
+// CHECK: explicit_copy_addr %{{[0-9]+}} to [init] %{{[0-9]+}} :
+// CHECK: explicit_copy_addr [take] %{{[0-9]+}} to [init] %{{[0-9]+}} :
 // CHECK: explicit_copy_addr [take] %{{[0-9]+}} to %{{[0-9]+}} :
 // CHECK: explicit_copy_addr %{{[0-9]+}} to %{{[0-9]+}} :
 // CHECK: } // end sil function 'test_explicit_copy_addr'
@@ -128,8 +128,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
   %0a = copy_value %0 : $Builtin.NativeObject
   store %0a to [init] %1 : $*Builtin.NativeObject
-  explicit_copy_addr %1 to [initialization] %2 : $*Builtin.NativeObject  
-  explicit_copy_addr [take] %2 to [initialization] %3 : $*Builtin.NativeObject
+  explicit_copy_addr %1 to [init] %2 : $*Builtin.NativeObject  
+  explicit_copy_addr [take] %2 to [init] %3 : $*Builtin.NativeObject
   explicit_copy_addr [take] %3 to %1 : $*Builtin.NativeObject
 
   store %0 to [init] %2 : $*Builtin.NativeObject

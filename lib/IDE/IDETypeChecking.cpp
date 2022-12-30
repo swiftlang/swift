@@ -149,7 +149,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // If not from the same file, sort by file name.
       if (auto LFile = Ext->getSourceFileName()) {
         if (auto RFile = Rhs.Ext->getSourceFileName()) {
-          int Result = LFile.getValue().compare(RFile.getValue());
+          int Result = LFile.value().compare(RFile.value());
           if (Result != 0)
             return Result < 0;
         }
@@ -158,7 +158,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // Otherwise, sort by source order.
       if (auto LeftOrder = Ext->getSourceOrder()) {
         if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
-          return LeftOrder.getValue() < RightOrder.getValue();
+          return LeftOrder.value() < RightOrder.value();
         }
       }
 
@@ -630,6 +630,9 @@ class ExpressionTypeCollector: public SourceEntityWalker {
   // these protocols.
   llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols;
 
+  // Specified by the client whether we should print fully qualified types
+  const bool FullyQualified;
+
   // Specified by the client whether we should canonicalize types before printing
   const bool CanonicalType;
 
@@ -676,16 +679,15 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
 
 public:
-  ExpressionTypeCollector(SourceFile &SF,
-              llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols,
-                          std::vector<ExpressionTypeInfo> &Results,
-                          bool CanonicalType,
-                          llvm::raw_ostream &OS): Module(*SF.getParentModule()),
-                            SM(SF.getASTContext().SourceMgr),
-                            BufferId(*SF.getBufferID()),
-                            Results(Results), OS(OS),
-                            InterestedProtocols(InterestedProtocols),
-                            CanonicalType(CanonicalType) {}
+  ExpressionTypeCollector(
+      SourceFile &SF,
+      llvm::MapVector<ProtocolDecl *, StringRef> &InterestedProtocols,
+      std::vector<ExpressionTypeInfo> &Results, bool FullyQualified,
+      bool CanonicalType, llvm::raw_ostream &OS)
+      : Module(*SF.getParentModule()), SM(SF.getASTContext().SourceMgr),
+        BufferId(*SF.getBufferID()), Results(Results), OS(OS),
+        InterestedProtocols(InterestedProtocols),
+        FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return true;
@@ -701,10 +703,12 @@ public:
     {
       llvm::raw_svector_ostream OS(Buffer);
       auto Ty = E->getType()->getRValueType();
+      PrintOptions printOptions = PrintOptions();
+      printOptions.FullyQualifiedTypes = FullyQualified;
       if (CanonicalType) {
-        Ty->getCanonicalType()->print(OS);
+        Ty->getCanonicalType()->print(OS, printOptions);
       } else {
-        Ty->reconstituteSugar(true)->print(OS);
+        Ty->reconstituteSugar(true)->print(OS, printOptions);
       }
     }
     auto Ty = getTypeOffsets(Buffer.str());
@@ -729,12 +733,10 @@ ProtocolDecl* swift::resolveProtocolName(DeclContext *dc, StringRef name) {
                            nullptr);
 }
 
-ArrayRef<ExpressionTypeInfo>
-swift::collectExpressionType(SourceFile &SF,
-                             ArrayRef<const char *> ExpectedProtocols,
-                             std::vector<ExpressionTypeInfo> &Scratch,
-                             bool CanonicalType,
-                             llvm::raw_ostream &OS) {
+ArrayRef<ExpressionTypeInfo> swift::collectExpressionType(
+    SourceFile &SF, ArrayRef<const char *> ExpectedProtocols,
+    std::vector<ExpressionTypeInfo> &Scratch, bool FullyQualified,
+    bool CanonicalType, llvm::raw_ostream &OS) {
   llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
   for (auto Name: ExpectedProtocols) {
     if (auto *pd = resolveProtocolName(&SF, Name)) {
@@ -744,7 +746,7 @@ swift::collectExpressionType(SourceFile &SF,
     }
   }
   ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
-    CanonicalType, OS);
+                                 FullyQualified, CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
 }
@@ -758,6 +760,9 @@ private:
 
   /// The range in which variable types are to be collected.
   SourceRange TotalRange;
+
+  // Specified by the client whether we should print fully qualified types
+  const bool FullyQualified;
 
   /// The output vector for VariableTypeInfos emitted during traversal.
   std::vector<VariableTypeInfo> &Results;
@@ -791,10 +796,12 @@ private:
 
 public:
   VariableTypeCollector(const SourceFile &SF, SourceRange Range,
+                        bool FullyQualified,
                         std::vector<VariableTypeInfo> &Results,
                         llvm::raw_ostream &OS)
       : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
-        TotalRange(Range), Results(Results), OS(OS) {}
+        TotalRange(Range), FullyQualified(FullyQualified), Results(Results),
+        OS(OS) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
     if (DeclNameRange.isInvalid()) {
@@ -814,6 +821,7 @@ public:
         llvm::raw_svector_ostream OS(Buffer);
         PrintOptions Options;
         Options.SynthesizeSugarOnTypes = true;
+        Options.FullyQualifiedTypes = FullyQualified;
         auto Ty = VD->getType();
         // Skip this declaration and its children if the type is an error type.
         if (Ty->is<ErrorType>()) {
@@ -854,9 +862,10 @@ VariableTypeInfo::VariableTypeInfo(uint32_t Offset, uint32_t Length,
       TypeOffset(TypeOffset) {}
 
 void swift::collectVariableType(
-    SourceFile &SF, SourceRange Range,
+    SourceFile &SF, SourceRange Range, bool FullyQualified,
     std::vector<VariableTypeInfo> &VariableTypeInfos, llvm::raw_ostream &OS) {
-  VariableTypeCollector Walker(SF, Range, VariableTypeInfos, OS);
+  VariableTypeCollector Walker(SF, Range, FullyQualified, VariableTypeInfos,
+                               OS);
   Walker.walk(SF);
 }
 
@@ -906,13 +915,22 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
 }
 
 SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-swift::getShorthandShadows(CaptureListExpr *CaptureList) {
+swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (auto Capture : CaptureList->getCaptureList()) {
     if (Capture.PBD->getPatternList().size() != 1) {
       continue;
     }
-    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Capture.PBD->getInit(0));
+    Expr *Init = Capture.PBD->getInit(0);
+    if (!Init) {
+      continue;
+    }
+    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
+      if (DC) {
+        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
+      }
+    }
+    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Init);
     if (!DRE) {
       continue;
     }
@@ -937,17 +955,23 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList) {
 }
 
 SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-swift::getShorthandShadows(LabeledConditionalStmt *CondStmt) {
+swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (const StmtConditionElement &Cond : CondStmt->getCond()) {
     if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
       continue;
     }
-    auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
-    if (!Init) {
+    Expr *Init = Cond.getInitializer();
+    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
+      if (DC) {
+        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
+      }
+    }
+    auto InitDeclRef = dyn_cast<DeclRefExpr>(Init);
+    if (!InitDeclRef) {
       continue;
     }
-    auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
+    auto ReferencedVar = dyn_cast_or_null<VarDecl>(InitDeclRef->getDecl());
     if (!ReferencedVar) {
       continue;
     }

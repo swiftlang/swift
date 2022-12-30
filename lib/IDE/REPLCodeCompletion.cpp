@@ -159,6 +159,10 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::GlobalVar:
           OS << ": ";
           break;
+
+        case CodeCompletionDeclKind::Macro:
+          OS << ": ";
+          break;
         }
       } else {
         OS << ": ";
@@ -209,14 +213,14 @@ REPLCompletions::REPLCompletions()
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
-  CompletionCallbacksFactory.reset(
+  IDEInspectionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                               *Consumer));
 }
 
 static void
 doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
-                 CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
+                 IDEInspectionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticSuppression SuppressedDiags(Ctx.Diags);
@@ -227,7 +231,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
 
-  Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
+  Ctx.SourceMgr.setIDEInspectionTarget(*BufferID, CodeCompletionOffset);
 
   // Import the last module.
   auto *lastModule = SF.getParentModule();
@@ -254,7 +258,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   performImportResolution(newSF);
   bindExtensions(*newModule);
 
-  performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
+  performIDEInspectionSecondPass(newSF, *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
@@ -271,7 +275,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,
-                   CompletionCallbacksFactory.get());
+                   IDEInspectionCallbacksFactory.get());
 
   ASTContext &Ctx = SF.getASTContext();
   std::vector<Token> Tokens = tokenize(Ctx.LangOpts, Ctx.SourceMgr, BufferID);
@@ -288,7 +292,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
                                                            BufferID);
 
       doCodeCompletion(SF, EnteredCode.substr(0, Offset),
-                       &BufferID, CompletionCallbacksFactory.get());
+                       &BufferID, IDEInspectionCallbacksFactory.get());
     }
   }
 
@@ -302,11 +306,11 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
 StringRef REPLCompletions::getRoot() const {
   if (Root)
-    return Root.getValue();
+    return Root.value();
 
   if (CookedResults.empty()) {
     Root = std::string();
-    return Root.getValue();
+    return Root.value();
   }
 
   std::string RootStr = CookedResults[0].InsertableString.str();
@@ -320,7 +324,7 @@ StringRef REPLCompletions::getRoot() const {
     RootStr.resize(MismatchPlace.first - RootStr.begin());
   }
   Root = RootStr;
-  return Root.getValue();
+  return Root.value();
 }
 
 REPLCompletions::CookedResult REPLCompletions::getPreviousStem() const {

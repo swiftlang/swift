@@ -10,7 +10,7 @@ sil  @test : $@convention(thin) (@in Proto) -> @out Any {
 bb0(%0 : $*Any, %1 : $*Proto):
   // init_existential_addr should be able to put an existential container inside an existential container
   %2 = init_existential_addr %0 : $*Any, $Proto
-  copy_addr [take] %1 to [initialization] %2 : $*Proto
+  copy_addr [take] %1 to [init] %2 : $*Proto
   %4 = tuple ()
   return %4 : $()
 }

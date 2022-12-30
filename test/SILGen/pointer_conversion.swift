@@ -250,7 +250,13 @@ func classInoutToPointer() {
   // CHECK: [[UNOWNED_OUT:%.*]] = load [trivial] [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
   // CHECK: [[OWNED_OUT_COPY:%.*]] = copy_value [[OWNED_OUT]]
-  // CHECK: assign [[OWNED_OUT_COPY]] to [[WRITE2]]
+  //
+  // DISCUSSION: We need a mark_dependence here to ensure that the destroy of
+  // the value in WRITE2 is not hoisted above the copy of OWNED_OUT. Otherwise,
+  // we may have a use-after-free if ref counts are low enough.
+  //
+  // CHECK: [[OWNED_OUT_COPY_DEP:%.*]] = mark_dependence [[OWNED_OUT_COPY]] : $C on [[WRITE2]]
+  // CHECK: assign [[OWNED_OUT_COPY_DEP]] to [[WRITE2]]
 
   var cq: C? = C()
   takesPlusZeroOptionalPointer(&cq)

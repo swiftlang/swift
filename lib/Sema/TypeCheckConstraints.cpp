@@ -144,10 +144,10 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
          locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
-bool TypeVariableType::Implementation::isTypeSequence() const {
+bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isTypeSequence();
+      && locator->getGenericParameter()->isParameterPack();
 }
 
 bool TypeVariableType::Implementation::isCodeCompletionToken() const {
@@ -159,18 +159,21 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
-                                      ArrayRef<TupleTypeElt> toTuple,
+bool constraints::computeTupleShuffle(TupleType *fromTuple,
+                                      TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
   const unsigned unassigned = -1;
   
-  SmallVector<bool, 4> consumed(fromTuple.size(), false);
+  auto fromElts = fromTuple->getElements();
+  auto toElts = toTuple->getElements();
+
+  SmallVector<bool, 4> consumed(fromElts.size(), false);
   sources.clear();
-  sources.assign(toTuple.size(), unassigned);
+  sources.assign(toElts.size(), unassigned);
 
   // Match up any named elements.
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
-    const auto &toElt = toTuple[i];
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
+    const auto &toElt = toElts[i];
 
     // Skip unnamed elements.
     if (!toElt.hasName())
@@ -180,7 +183,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple) {
+      for (auto field : fromElts) {
         if (field.getName() == toElt.getName() && !consumed[index]) {
           matched = index;
           break;
@@ -197,14 +200,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
   }  
 
   // Resolve any unmatched elements.
-  unsigned fromNext = 0, fromLast = fromTuple.size();
+  unsigned fromNext = 0, fromLast = fromElts.size();
   auto skipToNextAvailableInput = [&] {
     while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
   };
   skipToNextAvailableInput();
 
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
     // Check whether we already found a value for this element.
     if (sources[i] != unassigned)
       continue;
@@ -215,11 +218,11 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     }
 
     // Otherwise, assign this input to the next output element.
-    const auto &elt2 = toTuple[i];
+    const auto &elt2 = toElts[i];
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
-    if (fromTuple[fromNext].hasName() && elt2.hasName())
+    if (fromElts[fromNext].hasName() && elt2.hasName())
       return true;
 
     sources[i] = fromNext;
@@ -649,8 +652,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::SameType: {
         auto lhsTy = requirement.getFirstType();
@@ -729,6 +732,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   cs.applySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
+    // Perform syntactic diagnostics on the type-checked target.
+    performSyntacticDiagnosticsForTarget(*result, /*isExprStmt=*/false);
     defaultValue = result->getAsExpr();
     return defaultValue->getType();
   }
@@ -1003,7 +1008,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         // for nested types applies.
         if (root != archetypeType)
           return Type();
-        
+
         auto locator = cs.getConstraintLocator({});
         auto replacement = cs.createTypeVariable(locator,
                                                  TVO_CanBindToNoEscape);
@@ -1270,20 +1275,19 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   }
 }
 
-void Solution::dump() const {
-  dump(llvm::errs());
-}
+void Solution::dump() const { dump(llvm::errs(), 0); }
 
-void Solution::dump(raw_ostream &out) const {
+void Solution::dump(raw_ostream &out, unsigned indent) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
-  out << "Fixed score:";
+  out.indent(indent) << "Fixed score:";
   FixedScore.print(out);
 
-  out << "\nType variables:\n";
+  out << "\n";
+  out.indent(indent) << "Type variables:\n";
   std::vector<std::pair<TypeVariableType *, Type>> bindings(
       typeBindings.begin(), typeBindings.end());
   llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
@@ -1292,7 +1296,7 @@ void Solution::dump(raw_ostream &out) const {
   });
   for (auto binding : bindings) {
     auto &typeVar = binding.first;
-    out.indent(2);
+    out.indent(indent + 2);
     Type(typeVar).print(out, PO);
     out << " as ";
     binding.second.print(out, PO);
@@ -1304,11 +1308,12 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!overloadChoices.empty()) {
-    out << "\nOverload choices:";
+    out << "\n";
+    out.indent(indent) << "Overload choices:";
     for (auto ovl : overloadChoices) {
       if (ovl.first) {
         out << "\n";
-        out.indent(2);
+        out.indent(indent + 2);
         ovl.first->dump(sm, out);
       }
 
@@ -1320,18 +1325,18 @@ void Solution::dump(raw_ostream &out) const {
 
 
   if (!ConstraintRestrictions.empty()) {
-    out << "\nConstraint restrictions:\n";
+    out.indent(indent) << "Constraint restrictions:\n";
     for (auto &restriction : ConstraintRestrictions) {
-      out.indent(2) << restriction.first.first
-                    << " to " << restriction.first.second
-                    << " is " << getName(restriction.second) << "\n";
+      out.indent(indent + 2)
+          << restriction.first.first << " to " << restriction.first.second
+          << " is " << getName(restriction.second) << "\n";
     }
   }
 
   if (!argumentMatchingChoices.empty()) {
-    out << "\nTrailing closure matching:\n";
+    out.indent(indent) << "Trailing closure matching:\n";
     for (auto &argumentMatching : argumentMatchingChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       argumentMatching.first->dump(sm, out);
       switch (argumentMatching.second.trailingClosureMatching) {
       case TrailingClosureMatching::Forward:
@@ -1345,18 +1350,18 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!DisjunctionChoices.empty()) {
-    out << "\nDisjunction choices:\n";
+    out.indent(indent) << "Disjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       choice.first->dump(sm, out);
       out << " is #" << choice.second << "\n";
     }
   }
 
   if (!OpenedTypes.empty()) {
-    out << "\nOpened types:\n";
+    out.indent(indent) << "Opened types:\n";
     for (const auto &opened : OpenedTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       opened.first->dump(sm, out);
       out << " opens ";
       llvm::interleave(
@@ -1388,9 +1393,9 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!OpenedExistentialTypes.empty()) {
-    out << "\nOpened existential types:\n";
+    out.indent(indent) << "Opened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       openedExistential.first->dump(sm, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
@@ -1398,18 +1403,19 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints: ";
+    out.indent(indent) << "Defaulted constraints: ";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(sm, out);
     }, [&] {
       out << ", ";
     });
+    out << "\n";
   }
 
   if (!Fixes.empty()) {
-    out << "\nFixes:\n";
+    out.indent(indent) << "Fixes:\n";
     for (auto *fix : Fixes) {
-      out.indent(2);
+      out.indent(indent + 2);
       fix->print(out);
       out << "\n";
     }
@@ -1441,7 +1447,8 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
     return Type();
   };
 
-  E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent,
+          solverState ? solverState->getCurrentIndent() : 0);
   out << "\n";
 }
 
@@ -1450,13 +1457,15 @@ void ConstraintSystem::print(raw_ostream &out) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
-  out << "Score:";
+  auto indent = solverState ? solverState->getCurrentIndent() : 0;
+  out.indent(indent) << "Score:";
   CurrentScore.print(out);
 
   for (const auto &contextualTypeEntry : contextualTypes) {
     auto info = contextualTypeEntry.second.first;
     if (!info.getType().isNull()) {
-      out << "\nContextual Type: " << info.getType().getString(PO);
+      out << "\n";
+      out.indent(indent) << "Contextual Type: " << info.getType().getString(PO);
       if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
         out << " at ";
         TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
@@ -1464,7 +1473,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }
   }
 
-  out << "\nType Variables:\n";
+  out << "\n";
+  out.indent(indent) << "Type Variables:\n";
   std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
                                                 getTypeVariables().end());
   llvm::sort(typeVariables,
@@ -1472,7 +1482,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
                return lhs->getID() < rhs->getID();
              });
   for (auto tv : typeVariables) {
-    out.indent(2);
+    out.indent(indent + 2);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -1497,34 +1507,34 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!ActiveConstraints.empty()) {
-    out << "\nActive Constraints:\n";
+    out.indent(indent) << "Active Constraints:\n";
     for (auto &constraint : ActiveConstraints) {
-      out.indent(2);
+      out.indent(indent + 2);
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     }
   }
 
   if (!InactiveConstraints.empty()) {
-    out << "\nInactive Constraints:\n";
-     for (auto &constraint : InactiveConstraints) {
-       out.indent(2);
-       constraint.print(out, &getASTContext().SourceMgr);
-       out << "\n";
-     }
+    out.indent(indent) << "Inactive Constraints:\n";
+    for (auto &constraint : InactiveConstraints) {
+      out.indent(indent + 2);
+      constraint.print(out, &getASTContext().SourceMgr);
+      out << "\n";
+    }
   }
 
   if (solverState && solverState->hasRetiredConstraints()) {
-    out << "\nRetired Constraints:\n";
+    out.indent(indent) << "Retired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(2);
+      out.indent(indent + 2);
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     });
   }
 
   if (!ResolvedOverloads.empty()) {
-    out << "\nResolved overloads:\n";
+    out.indent(indent) << "Resolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
     for (auto elt : ResolvedOverloads) {
@@ -1567,18 +1577,18 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DisjunctionChoices.empty()) {
-    out << "\nDisjunction choices:\n";
+    out.indent(indent) << "Disjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       choice.first->dump(&getASTContext().SourceMgr, out);
       out << " is #" << choice.second << "\n";
     }
   }
 
   if (!OpenedTypes.empty()) {
-    out << "\nOpened types:\n";
+    out.indent(indent) << "Opened types:\n";
     for (const auto &opened : OpenedTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
       llvm::interleave(
@@ -1598,9 +1608,9 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!OpenedExistentialTypes.empty()) {
-    out << "\nOpened existential types:\n";
+    out.indent(indent) << "Opened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       openedExistential.first->dump(&getASTContext().SourceMgr, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
@@ -1608,7 +1618,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints:\n";
+    out.indent(indent) << "Defaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
@@ -1618,16 +1628,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (failedConstraint) {
-    out << "\nFailed constraint:\n";
-    out.indent(2);
-    failedConstraint->print(out, &getASTContext().SourceMgr);
+    out.indent(indent) << "Failed constraint:\n";
+    failedConstraint->print(out.indent(indent + 2), &getASTContext().SourceMgr,
+                            indent + 2);
     out << "\n";
   }
 
   if (!Fixes.empty()) {
-    out << "\nFixes:\n";
+    out.indent(indent) << "Fixes:\n";
     for (auto *fix : Fixes) {
-      out.indent(2);
+      out.indent(indent + 2);
       fix->print(out);
       out << "\n";
     }

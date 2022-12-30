@@ -530,6 +530,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<SubscriptDecl>(this)->walk(Walker);
   case DeclContextKind::EnumElementDecl:
     return cast<EnumElementDecl>(this)->walk(Walker);
+  case DeclContextKind::MacroDecl:
+    return cast<MacroDecl>(this)->walk(Walker);
   case DeclContextKind::SerializedLocal:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
@@ -624,6 +626,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   case DeclContextKind::EnumElementDecl:  Kind = "EnumElementDecl"; break;
+  case DeclContextKind::MacroDecl:    Kind = "MacroDecl"; break;
   }
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
@@ -690,6 +693,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       OS << " : (no type set)";
     break;
   }
+  case DeclContextKind::MacroDecl: {
+    auto *MD = cast<MacroDecl>(this);
+    OS << " name=" << MD->getBaseName();
+    if (MD->hasInterfaceType())
+      OS << " : " << MD->getInterfaceType();
+    else
+      OS << " : (no type set)";
+    break;
+  }
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(this)->getInitializerKind()) {
     case InitializerKind::PatternBinding: {
@@ -715,6 +727,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
         break;
       }
       break;
+    }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto init = cast<RuntimeAttributeInitializer>(this);
+      auto *decl = init->getAttachedToDecl();
+
+      OS << "RuntimeAttribute attachedTo="
+         << init->getAttachedToDecl()->getName() << ", attribute=";
+      init->getAttr()->print(OS, decl);
     }
     }
     break;
@@ -1224,6 +1245,8 @@ DeclContextKind DeclContext::getContextKind() const {
       return DeclContextKind::EnumElementDecl;
     case DeclKind::Extension:
       return DeclContextKind::ExtensionDecl;
+    case DeclKind::Macro:
+      return DeclContextKind::MacroDecl;
     default:
       llvm_unreachable("Unhandled Decl kind");
     }
@@ -1256,6 +1279,7 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::MacroDecl:
     return false;
   case DeclContextKind::FileUnit:
     if (const SourceFile *sf = dyn_cast<SourceFile>(this))
@@ -1288,6 +1312,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::MacroDecl:
     return extractNearestSourceLoc(dc->getAsDecl());
 
   case DeclContextKind::AbstractClosureExpr: {

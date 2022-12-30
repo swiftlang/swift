@@ -1699,7 +1699,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       diffGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, jvp->isSerialized(),
       original->isDynamicallyReplaceable(),
-      original->isDistributed());
+      original->isDistributed(),
+      original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
 

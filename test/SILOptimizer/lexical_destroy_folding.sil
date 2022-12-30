@@ -5,6 +5,7 @@
 // =============================================================================
 
 class C {}
+class D {}
 
 sil [ossa] @barrier : $@convention(thin) () -> ()
 sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
@@ -205,7 +206,7 @@ exit:
   return %retval : $()
 }
 
-// Enclose a single guaranteed lexical scope that contains two paralell
+// Enclose a single guaranteed lexical scope that contains two parallel
 // applies of owned arguments with the destroy at a noncanonical position
 // within a single owned lexical scope.
 //
@@ -573,8 +574,8 @@ exit:
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
+// CHECK:         destroy_value [[COPY]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -854,6 +855,30 @@ entry(%instance : @owned $@convention(thick) () -> ()):
   destroy_value %instance : $@convention(thick) () -> ()
   %retval = tuple ()
   return %retval : $()
+}
+
+// Lexical destroy folding cannot handle a PointerEscape.
+//
+// CHECK-LABEL: sil [ossa] @dont_fold_over_escape : $@convention(thin) (@owned C) -> @owned D {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $C to $D
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
+// CHECK:   [[COPY0:%.*]] = copy_value [[BORROW]] : $C
+// CHECK:   apply %{{.*}}([[COPY0]]) : $@convention(thin) (@owned C) -> ()
+// CHECK:   [[COPY1:%.*]] = copy_value [[CAST]] : $D
+// CHECK:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'dont_fold_over_escape'
+sil [ossa] @dont_fold_over_escape : $@convention(thin) (@owned C) -> @owned D {
+bb0(%0 : @owned $C):
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %cast = unchecked_bitwise_cast %0 : $C to $D
+  %lifetime = begin_borrow [lexical] %0 : $C
+  %copy0 = copy_value %lifetime : $C
+  apply %callee_owned(%copy0) : $@convention(thin) (@owned C) -> ()
+  end_borrow %lifetime : $C
+  %copy = copy_value %cast : $D
+  destroy_value %0 : $C
+  return %copy : $D
 }
 
 // =============================================================================

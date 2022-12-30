@@ -14,6 +14,24 @@ struct Butt {
     static prefix func !=< (a: Butt) -> Butt { return a }
 }
 
+class AbstractButt {
+    required init(x: Int) {}
+
+    class func create(x: Int) -> Self { return self.init(x: x) }
+}
+
+class AbstractGenericButt<T> {
+    required init(c: Int) {}
+    class func create(c: Int) -> Self { return self.init(c: c) }
+}
+
+func abstractButtFactory() -> AbstractButt.Type { return AbstractButt.self }
+
+protocol Buttable {
+    init(p: Int)
+    static func create(p: Int) -> Self
+}
+
 // CHECK-LABEL: sil {{.*}} @{{.*}}reabstractCaptureListExprArgument
 // CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}U_
 // CHECK:         [[CLOSURE:%.*]] = partial_apply {{.*}}[[CLOSURE_FN]]
@@ -65,7 +83,110 @@ func reabstractCoercedMemberOperatorRef() {
     gen(f: (!=<) as (Butt) -> Butt)
 }
 
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractDynamicMetatypeInitializerRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
+// CHECK:         apply {{.*}}<Int, AbstractButt>([[CLOSURE_NE]])
+func reabstractDynamicMetatypeInitializerRef() {
+    gen(f: abstractButtFactory().init)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractDynamicMetatypeStaticMemberRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
+// CHECK:         apply {{.*}}<Int, AbstractButt>([[CLOSURE_NE]])
+func reabstractDynamicMetatypeStaticMemberRef() {
+    gen(f: abstractButtFactory().create)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractGenericInitializerRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, T>([[CLOSURE_NE]])
+func reabstractGenericInitializerRef<T: Buttable>(butt: T) {
+    gen(f: T.init)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractGenericStaticMemberRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, T>([[CLOSURE_NE]])
+func reabstractGenericStaticMemberRef<T: Buttable>(butt: T) {
+    gen(f: T.create)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractDynamicGenericStaticMemberRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>(%0)
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, T>([[CLOSURE_NE]])
+func reabstractDynamicGenericStaticMemberRef<T: Buttable>(t: T.Type) {
+    gen(f: t.create)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractExistentialInitializerRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]](%0)
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
+// CHECK:         apply {{.*}}<Int, any Buttable>([[CLOSURE_NE]])
+func reabstractExistentialInitializerRef(butt: any Buttable.Type) {
+    gen(f: butt.init)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractExistentialStaticMemberRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]](%0)
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
+// CHECK:         apply {{.*}}<Int, any Buttable>([[CLOSURE_NE]])
+func reabstractExistentialStaticMemberRef(butt: any Buttable.Type) {
+    gen(f: butt.create)
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractClassCompInitializerRefs
+func reabstractClassCompInitializerRefs<T>(
+    butt: any (AbstractGenericButt<T> & Buttable).Type
+) {
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>(%0)
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+    gen(f: butt.init(c:))
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u0_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>(%0)
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+    gen(f: butt.init(p:))
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractClassCompStaticMemberRefs
+func reabstractClassCompStaticMemberRefs<T>(
+    butt: any (AbstractGenericButt<T> & Buttable).Type
+) {
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>(%0)
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+    gen(f: butt.create(c:))
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u0_
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>(%0)
+// CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
+// CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
+// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+    gen(f: butt.create(p:))
+}
+
 // TODO
+
 func reabstractInstanceMethodRef(instance: Butt) {
     gen(f: instance.getX)
 }

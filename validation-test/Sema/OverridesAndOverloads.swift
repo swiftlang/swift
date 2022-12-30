@@ -165,18 +165,21 @@ Overrides.test("contravariant return type override, protocol to protocol") {
   // FIXME: https://github.com/apple/swift/issues/43348
   // Contravariant overrides on return type don't work with protocols
   class Base {
+    // expected-note@+1 {{found this candidate}}
     func foo() -> P1 { which = "Base.foo() -> P1"; return P1ImplS1() }
   }
   class Derived : Base {
+    // expected-note@+1 {{found this candidate}}
     /*FIXME: override */ func foo() -> P1x {
       which = "Derived.foo() -> P1x"; return P1xImplS1()
     }
   }
 
-  // https://github.com/apple/swift/issues/43348
-  // FIXME: uncomment when the bug is fixed.
-  // Derived().foo() as P1 // error: ambiguous use of 'foo()'
-  // expectEqual("Derived.foo() -> P1x", which)
+#if ERRORS
+  // FIXME: https://github.com/apple/swift/issues/43348
+  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()'}}
+  expectEqual("Derived.foo() -> P1x", which)
+#endif
 
   _ = Derived().foo() as P1x
   expectEqual("Derived.foo() -> P1x", which)
@@ -186,18 +189,21 @@ Overrides.test("contravariant return type override, protocol to struct") {
   // FIXME: https://github.com/apple/swift/issues/43348
   // Contravariant overrides on return type don't work with protocols
   class Base {
+    // expected-note@+1 {{found this candidate}}
     func foo() -> P1 { which = "Base.foo() -> P1"; return P1ImplS1() }
   }
   class Derived : Base {
+    // expected-note@+1 {{found this candidate}}
     /*FIXME: override */ func foo() -> P1ImplS1 {
       which = "Derived.foo() -> P1ImplS1"; return P1ImplS1()
     }
   }
 
-  // https://github.com/apple/swift/issues/43348
-  // FIXME: uncomment when the bug is fixed.
-  // Derived().foo() as P1 // error: ambiguous use of 'foo()'
-  // expectEqual("Derived.foo() -> P1ImplS1", which)
+#if ERRORS
+  // FIXME: https://github.com/apple/swift/issues/43348
+  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()'}}
+  expectEqual("Derived.foo() -> P1ImplS1", which)
+#endif
 
   _ = Derived().foo() as P1ImplS1
   expectEqual("Derived.foo() -> P1ImplS1", which)

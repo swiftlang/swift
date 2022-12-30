@@ -140,6 +140,7 @@ extension IntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
@@ -149,6 +150,13 @@ extension IntArray {
   @_backDeploy(before: BackDeploy 2.0)
   public var rawValues: [Int] {
     _read { yield _values }
+  }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public mutating func removeLast() -> Int? {
+    defer { _values.removeLast() }
+    return _values.last
   }
 }
 
@@ -180,6 +188,7 @@ extension ReferenceIntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public final subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
@@ -189,6 +198,13 @@ extension ReferenceIntArray {
   @_backDeploy(before: BackDeploy 2.0)
   public final var rawValues: [Int] {
     _read { yield _values }
+  }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public final func removeLast() -> Int? {
+    defer { _values.removeLast() }
+    return _values.last
   }
 }
 

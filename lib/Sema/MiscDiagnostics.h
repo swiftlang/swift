@@ -136,6 +136,9 @@ private:
   static bool shouldWalkIntoDeclInClosureContext(Decl *D);
 };
 
+void diagnoseCopyableTypeContainingMoveOnlyType(
+    NominalTypeDecl *copyableNominalType);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

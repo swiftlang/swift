@@ -134,12 +134,20 @@ void IRGenThunk::prepareArguments() {
     witnessMetadata.SelfMetadata = original.takeLast();
   }
 
+  SILFunctionConventions conv(origTy, IGF.getSILModule());
+
   if (origTy->hasErrorResult()) {
     if (isAsync) {
       // nothing to do.
     } else {
       errorResult = original.takeLast();
-      IGF.setCallerErrorResultSlot(errorResult);
+      auto errorType =
+          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
+
+      IGF.setCallerErrorResultSlot(Address(errorResult,
+                                           errorTI.getStorageType(),
+                                           IGF.IGM.getPointerAlignment()));
     }
   }
 
@@ -150,7 +158,6 @@ void IRGenThunk::prepareArguments() {
   selfValue = original.takeLast();
 
   // Prepare indirect results, if any.
-  SILFunctionConventions conv(origTy, IGF.getSILModule());
   SILType directResultType = conv.getSILResultType(expansionContext);
   auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
@@ -292,6 +299,7 @@ void IRGenThunk::emit() {
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
   if (schema.requiresIndirect()) {
     Address indirectReturnAddr(indirectReturnSlot,
+                               IGF.IGM.getStorageType(directResultType),
                                directResultTL.getBestKnownAlignment());
     emission->emitToMemory(indirectReturnAddr,
                            cast<LoadableTypeInfo>(directResultTL), false);
@@ -409,11 +417,11 @@ IRGenModule::getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp) {
   return nullptr;
 }
 
-llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
-                                                       NominalTypeDecl *nominalDecl,
-                                                       llvm::Constant *definition) {
+llvm::GlobalValue *IRGenModule::defineMethodDescriptor(
+    SILDeclRef declRef, NominalTypeDecl *nominalDecl,
+    llvm::Constant *definition, llvm::Type *typeOfDefinitionValue) {
   auto entity = LinkEntity::forMethodDescriptor(declRef);
-  return defineAlias(entity, definition);
+  return defineAlias(entity, definition, typeOfDefinitionValue);
 }
 
 /// Get or create a method descriptor variable.
@@ -529,7 +537,7 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
   
   // Use the runtime to look up vtable entries.
-  auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFn(),
+  auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFunctionPointer(),
                                         {metadata, method, description});
   IGF.Builder.CreateRet(result);
 }

@@ -26,9 +26,9 @@
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -62,7 +62,7 @@ using swift::index::SymbolRoleSet;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static UIdent Attr_IBAction("source.decl.attribute.ibaction");
 static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
@@ -126,6 +126,7 @@ public:
   UID_FOR(Destructor)
   UID_FOR(Subscript)
   UID_FOR(OpaqueType)
+  UID_FOR(Macro)
 #undef UID_FOR
 };
 
@@ -260,11 +261,11 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
 };
 }
 
-static void
-configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
-                            std::shared_ptr<GlobalConfig> GlobalConfig) {
-  auto Opts = GlobalConfig->getCompletionOpts();
-  CompletionInst->setOptions({
+static void configureIDEInspectionInstance(
+    std::shared_ptr<IDEInspectionInstance> IDEInspectionInst,
+    std::shared_ptr<GlobalConfig> GlobalConfig) {
+  auto Opts = GlobalConfig->getIDEInspectionOpts();
+  IDEInspectionInst->setOptions({
     Opts.MaxASTContextReuseCount,
     Opts.CheckDependencyInterval
   });
@@ -286,9 +287,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
       SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
 
-  CompletionInst = std::make_shared<CompletionInstance>();
+  IDEInspectionInst = std::make_shared<IDEInspectionInstance>();
 
-  configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
+  configureIDEInspectionInstance(IDEInspectionInst,
+                                 SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -302,11 +304,11 @@ SwiftLangSupport::~SwiftLangSupport() {
 
 void SwiftLangSupport::globalConfigurationUpdated(
     std::shared_ptr<GlobalConfig> Config) {
-  configureCompletionInstance(CompletionInst, Config);
+  configureIDEInspectionInstance(IDEInspectionInst, Config);
 }
 
 void SwiftLangSupport::dependencyUpdated() {
-  CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
+  IDEInspectionInst->markCachedCompilerInstanceShouldBeInvalidated();
 }
 
 UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {
@@ -377,7 +379,7 @@ UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
   case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
 #define REFACTORING(KIND, NAME, ID)                                            \
   case ide::RefactoringKind::KIND: return KindRefactoring##KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
   }
 }
 
@@ -412,6 +414,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::InstanceVar: return KindRefVarInstance;
     case CodeCompletionDeclKind::LocalVar: return KindRefVarLocal;
     case CodeCompletionDeclKind::GlobalVar: return KindRefVarGlobal;
+    case CodeCompletionDeclKind::Macro: return KindRefMacro;
     }
   }
 
@@ -440,6 +443,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::InstanceVar: return KindDeclVarInstance;
   case CodeCompletionDeclKind::LocalVar: return KindDeclVarLocal;
   case CodeCompletionDeclKind::GlobalVar: return KindDeclVarGlobal;
+  case CodeCompletionDeclKind::Macro: return KindDeclMacro;
   }
 
   llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
@@ -853,7 +857,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
 
   for (auto Attr : Attrs) {
     if (auto AttrUID = getUIDForDeclAttribute(Attr)) {
-      AttrUIDs.push_back(AttrUID.getValue());
+      AttrUIDs.push_back(AttrUID.value());
     }
   }
 
@@ -1006,7 +1010,7 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
 
 void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
+    bool InsertCodeCompletionToken, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
@@ -1024,8 +1028,18 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Create a buffer for code completion. This contains '\0' at 'Offset'
   // position of 'UnresolvedInputFile' buffer.
   auto origOffset = Offset;
-  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  // If we inserted a code completion token into the buffer, this keeps the
+  // buffer alive. Should never be accessed, `buffer` should be used instead.
+  std::unique_ptr<llvm::MemoryBuffer> codeCompletionBuffer;
+  llvm::MemoryBuffer *buffer;
+  if (InsertCodeCompletionToken) {
+    codeCompletionBuffer = ide::makeCodeCompletionMemoryBuffer(
+        UnresolvedInputFile, Offset, bufferIdentifier);
+    buffer = codeCompletionBuffer.get();
+  } else {
+    buffer = UnresolvedInputFile;
+  }
 
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -1053,7 +1067,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
       Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
-      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
+      buffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
@@ -1066,14 +1080,14 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   }
 
   // Pin completion instance.
-  auto CompletionInst = getCompletionInstance();
+  auto CompletionInst = getIDEInspectionInstance();
 
   auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
   ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
     CancellationFlag->store(true, std::memory_order_relaxed);
   });
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+  CompletionLikeOperationParams Params = {Invocation, buffer, &CIDiags,
                                           CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));

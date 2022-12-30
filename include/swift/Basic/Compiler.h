@@ -94,14 +94,13 @@
 #endif
 
 #define SWIFT_BUG_REPORT_MESSAGE_BASE \
-  "submit a bug report (" SWIFT_BUG_REPORT_URL \
-  ") and include the project"
+  "submit a bug report (" SWIFT_BUG_REPORT_URL ")"
 
 #define SWIFT_BUG_REPORT_MESSAGE \
   "please " SWIFT_BUG_REPORT_MESSAGE_BASE
 
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
-  "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and the crash backtrace."
+  "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and include the crash backtrace."
 
 // Conditionally exclude declarations or statements that are only needed for
 // assertions from release builds (NDEBUG) without cluttering the surrounding
@@ -185,6 +184,12 @@
   __attribute__((swift_attr("release:immortal")))
 #else
 #define SWIFT_IMPORT_REFERENCE
+#endif
+
+#if __has_attribute(enum_extensibility)
+#define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
+#else
+#define ENUM_EXTENSIBILITY_ATTR(arg)
 #endif
 
 #endif // SWIFT_BASIC_COMPILER_H

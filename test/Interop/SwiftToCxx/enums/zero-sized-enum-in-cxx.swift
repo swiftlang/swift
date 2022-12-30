@@ -5,7 +5,7 @@
 public enum EmptyEnum {}
 public enum SingleCaseEnum { case first }
 
-// CHECK: namespace Enums {
+// CHECK: namespace Enums __attribute__((swift_private)) {
 // CHECK-NOT: class EmptyEnum final {
 // CHECK-NOT: class SingleCaseEnum final {
 // CHECK: } // namespace Enums

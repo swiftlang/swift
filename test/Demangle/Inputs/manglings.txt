@@ -439,3 +439,14 @@ $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTQ0_ ---> {T:} (1) awai
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTY0_ ---> {T:} (1) suspend resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTY_ ---> {T:} (0) suspend resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTQ12_ ---> {T:} (13) await resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
+$s7Library3fooyyFTwS ---> #_hasSymbol query for Library.foo() -> ()
+$s7Library5KlassCTwS ---> #_hasSymbol query for Library.Klass
+$s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swift_ide_test.myColorLiteral(red: Swift.Float, green: Swift.Float, blue: Swift.Float, alpha: Swift.Float) -> swift_ide_test.Color
+$s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
+$s4main4FlagVHa ---> runtime discoverable attribute record for main.Flag
+$s4main4TestV11doSomethingyycvpfaAA4FlagHF ---> accessible function runtime record for runtime attribute generator of main.Test.doSomething : () -> () for attribute = main.Flag
+$s4main10globalTest1a_ySi_SStcvpfaAA4Flag ---> runtime attribute generator of main.globalTest : (a: Swift.Int, _: Swift.String) -> () for attribute = main.Flag
+$s4main4TestV11doSomethingyycvpfaAA4Flag ---> runtime attribute generator of main.Test.doSomething : () -> () for attribute = main.Flag
+$s4main4TestV11doSomethingyycvpZfaAA4Flag ---> runtime attribute generator of static main.Test.doSomething : () -> () for attribute = main.Flag
+$s4main4TestV1xSivpfaAA4Flag ---> runtime attribute generator of main.Test.x : Swift.Int for attribute = main.Flag
+$s4main4TestAaBVmvpfaAA9OtherFlag ---> runtime attribute generator of main.Test : main.Test.Type for attribute = main.OtherFlag

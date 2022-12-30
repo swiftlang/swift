@@ -24,6 +24,12 @@
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
+#if !defined(SWIFT_CALL)
+# define SWIFT_CALL __attribute__((swiftcall))
+#endif
+
+// FIXME: Use always_inline, artificial.
+#define SWIFT_INLINE_THUNK inline
 
 namespace swift {
 namespace _impl {
@@ -125,6 +131,11 @@ public:
   static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
     return object._opaquePointer;
   }
+  static inline void *_Nonnull copyOpaquePointer(
+      const RefCountedClass &object) {
+    swift_retain(object._opaquePointer);
+    return object._opaquePointer;
+  }
 };
 
 } // namespace _impl
@@ -183,32 +194,6 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
 }
 
 } // namespace _impl
-
-extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
-
-extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
-
-class Error {
-public:
-  Error() {}
-  Error(void* _Nonnull swiftError) { opaqueValue = swiftError; }
-  ~Error() {
-    if (opaqueValue)
-      swift_errorRelease(opaqueValue);
-  }
-  void* _Nonnull getPointerToOpaquePointer() { return opaqueValue; }
-  Error(Error &&other) : opaqueValue(other.opaqueValue) {
-    other.opaqueValue = nullptr;
-  }
-  Error(const Error &other) {
-    if (other.opaqueValue)
-      swift_errorRetain(other.opaqueValue);
-    opaqueValue = other.opaqueValue;
-  }
-
-private:
-  void * _Nonnull opaqueValue = nullptr;
-};
 
 #pragma clang diagnostic pop
 

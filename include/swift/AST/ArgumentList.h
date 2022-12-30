@@ -154,7 +154,7 @@ class alignas(Argument) ArgumentList final
     assert(!firstTrailingClosureIndex || *firstTrailingClosureIndex < numArgs &&
            "Invalid trailing closure index");
     RawFirstTrailingClosureIndex =
-        firstTrailingClosureIndex.getValueOr(numArgs);
+        firstTrailingClosureIndex.value_or(numArgs);
   }
 
   ArgumentList(const ArgumentList &) = delete;
@@ -400,7 +400,7 @@ public:
 
   /// Whether any unlabeled or labeled trailing closures are present.
   bool hasAnyTrailingClosures() const {
-    return getOriginalArgs()->getFirstTrailingClosureIndex().hasValue();
+    return getOriginalArgs()->getFirstTrailingClosureIndex().has_value();
   }
 
   /// Whether a given index is for an unlabeled trailing closure, which is the
@@ -443,7 +443,7 @@ public:
   iterator_range<iterator> getNonTrailingArgs() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
+    if (!idx.has_value())
       return *this;
 
     return {begin(), iterator(this, *idx)};
@@ -456,7 +456,7 @@ public:
   iterator_range<iterator> getTrailingClosures() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
+    if (!idx.has_value())
       return {end(), end()};
 
     return {iterator(this, *idx), end()};
@@ -470,7 +470,7 @@ public:
   Optional<Argument> getFirstTrailingClosure() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
+    if (!idx.has_value())
       return None;
     return get(*idx);
   }

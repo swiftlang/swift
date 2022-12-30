@@ -214,11 +214,8 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
   // <R: Self.SerializationRequirement>
   // We create the generic param at invalid depth, which means it'll be filled
   // by semantic analysis.
-  auto resultGenericParamDecl = GenericTypeParamDecl::create(
-      parentFunc, C.getIdentifier("R"), sloc, /*isTypeSequence=*/false,
-      /*depth=*/0, /*index=*/0,
-      /*isOpaqueType=*/false,
-      /*opaqueTypeRepr=*/nullptr);
+  auto *resultGenericParamDecl = GenericTypeParamDecl::createImplicit(
+      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0);
   GenericParamList *doInvokeGenericParamList =
       GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
 

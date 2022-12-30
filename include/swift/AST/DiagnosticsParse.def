@@ -91,9 +91,6 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
-ERROR(regex_literal_parsing_error,none,
-      "%0", (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -539,6 +536,8 @@ ERROR(expected_sil_profiler_counter_total,none,
       "expected profiler counter total", ())
 ERROR(expected_sil_profiler_counter_hash,none,
       "expected profiler counter hash", ())
+ERROR(expected_sil_test_specification_body,none,
+      "expected a string consisting of the space-separated test arguments", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -1035,10 +1034,6 @@ ERROR(invalid_label_on_stmt,none,
 ERROR(labeled_block_needs_do,none,
       "labeled block needs 'do'", ())
 
-ERROR(snake_case_deprecated,none,
-      "%0 has been replaced with %1 in Swift 3",
-      (StringRef, StringRef))
-
 // Assignment statement
 ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())
@@ -1469,6 +1464,9 @@ ERROR(attr_expected_integer_literal,none,
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
+ERROR(attr_expected_option_identifier,none,
+      "expected '%0' option to be an identifier", (StringRef))
+
 ERROR(attr_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
@@ -1482,17 +1480,8 @@ ERROR(attr_expected_colon_after_label,none,
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
-ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
-      "@_swift_native_objc_runtime_base class name must be an identifier", ())
-
-ERROR(objc_runtime_name_must_be_identifier,none,
-      "@_objcRuntimeName name must be an identifier", ())
-
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
-
-ERROR(projection_value_property_not_identifier,none,
-      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,
@@ -1969,6 +1958,13 @@ ERROR(attr_requires_concurrency, none,
       (StringRef, bool))
 
 //------------------------------------------------------------------------------
+// MARK: Variadics
+//------------------------------------------------------------------------------
+
+ERROR(associatedtype_cannot_be_variadic,none,
+      "associated types cannot be variadic", ())
+
+//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
@@ -1984,6 +1980,44 @@ ERROR(expected_closure_literal,none,
 
 ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
+
+//------------------------------------------------------------------------------
+// MARK: diagnostics emitted by Swift libraries
+//------------------------------------------------------------------------------
+
+ERROR(foreign_diagnostic,none,
+      "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: macros
+//------------------------------------------------------------------------------
+ERROR(expected_macro_value_type,PointsToFirstBadToken,
+      "expected macro value type following ':'", ())
+ERROR(no_default_arg_macro,none,
+      "default arguments are not allowed in macros", ())
+ERROR(expected_lparen_macro,PointsToFirstBadToken,
+      "expected '(' for macro parameters or ':' for a value-like macro", ())
+ERROR(expected_type_macro_result,PointsToFirstBadToken,
+      "expected macro result type", ())
+ERROR(macro_decl_expected_equal,PointsToFirstBadToken,
+      "expected '=' to introduce external macro name", ())
+ERROR(macro_decl_expected_macro_module,PointsToFirstBadToken,
+      "expected external macro name", ())
+ERROR(macro_decl_expected_period,PointsToFirstBadToken,
+      "expected '.' between external macro module and type name", ())
+ERROR(macro_decl_expected_macro_type,PointsToFirstBadToken,
+      "expected external macro type name", ())
+
+ERROR(macro_expansion_expr_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal expression", ())
+ERROR(macro_expansion_decl_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal declaration", ())
+
+ERROR(parser_round_trip_error,none,
+      "source file did not round-trip through the new Swift parser", ())
+ERROR(parser_new_parser_errors,none,
+      "new Swift parser generated errors for code that C++ parser accepted",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

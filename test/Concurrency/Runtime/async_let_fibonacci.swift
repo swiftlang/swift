@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: freestanding
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
@@ -42,7 +43,7 @@ func asyncFib(_ n: Int) async -> Int {
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
-  print()
+  print("")
   print("Async fib = \(result), sequential fib = \(fib(n))")
   assert(result == fib(n))
 }

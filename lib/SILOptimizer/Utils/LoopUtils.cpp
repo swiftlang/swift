@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-loop-utils"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
@@ -32,7 +33,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   llvm::SmallVector<SILValue, 8> Args;
   for (auto *HeaderArg : Header->getArguments()) {
     Args.push_back(Preheader->createPhiArgument(HeaderArg->getType(),
-                                                OwnershipKind::Owned));
+                                                HeaderArg->getOwnershipKind()));
   }
 
   // Create the branch to the header.
@@ -214,6 +215,106 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
 
   return MadeChange;
 }
+
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
+  SinkAddressProjections sinkProj;
+  for (auto res : I->getResults()) {
+    if (!res->getType().isAddress()) {
+      continue;
+    }
+    auto canSink = sinkProj.analyzeAddressProjections(I);
+    if (!canSink) {
+      return false;
+    }
+  }
+
+  // The deallocation of a stack allocation must be in the loop, otherwise the
+  // deallocation will be fed by a phi node of two allocations.
+  if (I->isAllocatingStack()) {
+    for (auto *UI : cast<SingleValueInstruction>(I)->getUses()) {
+      if (UI->getUser()->isDeallocatingStack()) {
+        if (!L->contains(UI->getUser()->getParent()))
+          return false;
+      }
+    }
+    return true;
+  }
+  if (I->isDeallocatingStack()) {
+    SILInstruction *alloc = nullptr;
+    if (auto *dealloc = dyn_cast<DeallocStackInst>(I)) {
+      SILValue address = dealloc->getOperand();
+      if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
+        alloc = cast<SingleValueInstruction>(address);
+    }
+    if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
+      alloc = dealloc->getAllocRef();
+
+    return alloc && L->contains(alloc);
+  }
+
+  // CodeGen can't build ssa for objc methods.
+  if (auto *Method = dyn_cast<MethodInst>(I)) {
+    if (Method->getMember().isForeign) {
+      for (auto *UI : Method->getUses()) {
+        if (!L->contains(UI->getUser()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // We can't have a phi of two openexistential instructions of different UUID.
+  if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) ||
+      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
+      isa<OpenExistentialBoxValueInst>(I)) {
+    SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
+    for (auto *UI : OI->getUses())
+      if (!L->contains(UI->getUser()))
+        return false;
+    return true;
+  }
+
+  if (isa<ThrowInst>(I))
+    return false;
+
+  // The entire access must be within the loop.
+  if (auto BAI = dyn_cast<BeginAccessInst>(I)) {
+    for (auto *UI : BAI->getUses()) {
+      if (!L->contains(UI->getUser()))
+        return false;
+    }
+    return true;
+  }
+  // The entire coroutine execution must be within the loop.
+  // Note that we don't have to worry about the reverse --- a loop which
+  // contains an end_apply or abort_apply of an external begin_apply ---
+  // because that wouldn't be structurally valid in the first place.
+  if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
+    for (auto UI : BAI->getTokenResult()->getUses()) {
+      auto User = UI->getUser();
+      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User));
+      if (!L->contains(User))
+        return false;
+    }
+    return true;
+  }
+
+  if (isa<DynamicMethodBranchInst>(I))
+    return false;
+
+  // Can't duplicate get/await_async_continuation.
+  if (isa<AwaitAsyncContinuationInst>(I) ||
+      isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
+    return false;
+
+  // Some special cases above that aren't considered isTriviallyDuplicatable
+  // return true early.
+  assert(I->isTriviallyDuplicatable() &&
+    "Code here must match isTriviallyDuplicatable in SILInstruction");
+  return true;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                Loop Visitor

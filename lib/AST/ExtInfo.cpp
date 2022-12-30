@@ -97,10 +97,6 @@ Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
 }
 
 void UnexpectedClangTypeError::dump() {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return; // not needed for the parser library.
-#endif
-
   auto &e = llvm::errs();
   using Kind = UnexpectedClangTypeError::Kind;
   switch (errorKind) {
@@ -153,7 +149,7 @@ void ASTExtInfoBuilder::checkInvariants() const {
   // See [NOTE: ExtInfo-Clang-type-invariant]
   if (auto error = UnexpectedClangTypeError::checkClangType(
           getSILRepresentation(), clangTypeInfo.getType(), false, false)) {
-    error.getValue().dump();
+    error.value().dump();
     llvm_unreachable("Ill-formed ASTExtInfoBuilder.");
   }
 }
@@ -173,7 +169,7 @@ void SILExtInfoBuilder::checkInvariants() const {
   // is removed.
   if (auto error = UnexpectedClangTypeError::checkClangType(
           getRepresentation(), clangTypeInfo.getType(), false, true)) {
-    error.getValue().dump();
+    error.value().dump();
     llvm_unreachable("Ill-formed SILExtInfoBuilder.");
   }
 }

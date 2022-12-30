@@ -186,7 +186,7 @@ public:
       InstModCallbacks callbacks) &&;
 
   /// Given a new guaranteed value, insert end_borrow for the newGuaranteedValue
-  /// at all of our destroy_values in prepration for converting from owned to
+  /// at all of our destroy_values in preparation for converting from owned to
   /// guaranteed.
   ///
   /// This is used when converting load [copy] -> load_borrow.

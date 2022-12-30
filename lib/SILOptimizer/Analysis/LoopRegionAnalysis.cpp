@@ -188,7 +188,7 @@ void LoopRegionFunctionInfo::verify() {
 
     // If this node does not have a parent, it should have no non-local
     // successors.
-    if (!R->ParentID.hasValue()) {
+    if (!R->ParentID.has_value()) {
       auto NLSuccs = R->getNonLocalSuccs();
       assert(NLSuccs.begin() == NLSuccs.end() &&
              "Cannot have non local "
@@ -208,7 +208,7 @@ void LoopRegionFunctionInfo::verify() {
       assert(ID.ID < NumParentSuccs && "Non local successor pointing off the "
                                        "parent node successor list?!");
       // Since we are not dead, make sure our parent is not dead.
-      assert(ParentRegion->Succs[ID.ID].hasValue() &&
+      assert(ParentRegion->Succs[ID.ID].has_value() &&
              "non-local successor edge sources should have the same liveness "
              "properties as non-local successor edge targets");
       // Make sure that we can look up the local region corresponding to this
@@ -244,8 +244,8 @@ LoopRegionFunctionInfo::getRegion(BlockTy *BB) const {
 
 LoopRegionFunctionInfo::RegionTy *
 LoopRegionFunctionInfo::getRegion(FunctionTy *F) const {
-  if (FunctionRegionID.hasValue()) {
-    return IDToRegionMap[FunctionRegionID.getValue()];
+  if (FunctionRegionID.has_value()) {
+    return IDToRegionMap[FunctionRegionID.value()];
   }
 
   auto &Self = const_cast<LoopRegionFunctionInfo &>(*this);
@@ -737,7 +737,7 @@ propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent) {
 
         // If the non-local successor edge points to a parent successor that is
         // not dead continue.
-        if (R->Succs[SuccID->ID].hasValue()) {
+        if (R->Succs[SuccID->ID].has_value()) {
           HasNoLiveLocalEdges = false;
           continue;
         }
@@ -776,7 +776,7 @@ getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
 
   do {
     Iter = getRegion(*Iter->getParentID());
-    Succ = Iter->Succs[SuccID].getValue();
+    Succ = Iter->Succs[SuccID].value();
     SuccID = Succ.ID;
   } while (Succ.IsNonLocal);
 
@@ -929,8 +929,13 @@ struct LoopRegionWrapper {
 
 /// An iterator on Regions that first iterates over subregions and then over
 /// successors.
-struct alledge_iterator
-    : std::iterator<std::forward_iterator_tag, LoopRegionWrapper> {
+struct alledge_iterator {
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = LoopRegionWrapper;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   LoopRegionWrapper *Wrapper;
   LoopRegion::subregion_iterator SubregionIter;
   LoopRegion::backedge_iterator BackedgeIter;

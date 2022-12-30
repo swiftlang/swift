@@ -16,6 +16,16 @@ extension P {
   public func requirementWithDefaultImpl() {}
 }
 
+public protocol PAT {
+  associatedtype A
+  func requirement() -> A
+  func requirementWithDefaultImpl()
+}
+
+extension PAT {
+  public func requirementWithDefaultImpl() {}
+}
+
 public struct S {
   public static var staticMember: Int = 0
   public static func staticFunc() {}
