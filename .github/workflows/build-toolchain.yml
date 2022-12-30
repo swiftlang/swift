@@ -92,104 +92,15 @@ jobs:
     outputs:
       entries: ${{ steps.generate.outputs.entries }}
     steps:
+      - uses: actions/checkout@v3
       - name: Generate entries
         id: generate
         run: |
-          MATRIX_ENTRIES="["
-          MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
-          {
-            "build_os": "ubuntu-18.04",
-            "agent_query": "ubuntu-18.04",
-            "target": "ubuntu18.04_x86_64",
-            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-18.04",
-            "run_stdlib_test": true,
-            "run_full_test": false,
-            "run_e2e_test": true,
-            "build_hello_wasm": true,
-            "clean_build_dir": false,
-            "free_disk_space": true
-          },
-          {
-            "build_os": "ubuntu-20.04",
-            "agent_query": "ubuntu-20.04",
-            "target": "ubuntu20.04_x86_64",
-            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-20.04",
-            "run_stdlib_test": true,
-            "run_full_test": false,
-            "run_e2e_test": true,
-            "build_hello_wasm": true,
-            "clean_build_dir": false,
-            "free_disk_space": true
-          },
-          {
-            "build_os": "ubuntu-22.04",
-            "agent_query": "ubuntu-22.04",
-            "target": "ubuntu22.04_x86_64",
-            "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-22.04",
-            "run_stdlib_test": true,
-            "run_full_test": false,
-            "run_e2e_test": true,
-            "build_hello_wasm": true,
-            "clean_build_dir": false,
-            "free_disk_space": true
-          },
-          {
-            "build_os": "macos-11",
-            "agent_query": "macos-11",
-            "target": "macos_x86_64",
-            "run_stdlib_test": false,
-            "run_full_test": false,
-            "run_e2e_test": false,
-            "build_hello_wasm": false,
-            "clean_build_dir": false
-          },
-          {
-            "build_os": "macos-11",
-            "agent_query": ["self-hosted", "macOS", "ARM64"],
-            "target": "macos_arm64",
-            "run_stdlib_test": false,
-            "run_full_test": false,
-            "run_e2e_test": false,
-            "build_hello_wasm": true,
-            "clean_build_dir": true
-          }
-          EOS
-          )
-
-          if [[ ${{ needs.start-runner.result }} == "success" ]]; then
-          #   MATRIX_ENTRIES="$MATRIX_ENTRIES,"
-          #   MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
-          # {
-          #   "build_os": "amazon-linux-2",
-          #   "agent_query": "${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}",
-          #   "target": "amazonlinux2_x86_64",
-          #   "run_stdlib_test": false,
-          #   "run_full_test": false,
-          #   "run_e2e_test": false,
-          #   "build_hello_wasm": true,
-          #   "clean_build_dir": false
-          # }
-          # EOS
-          #   )
- 
-            MATRIX_ENTRIES="$MATRIX_ENTRIES,"
-            MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
-          {
-            "build_os": "ubuntu-20.04",
-            "agent_query": "${{ needs.start-runner.outputs.ubuntu20_04_aarch64-label }}",
-            "target": "ubuntu20.04_aarch64",
-            "run_stdlib_test": false,
-            "run_full_test": false,
-            "run_e2e_test": false,
-            "build_hello_wasm": true,
-            "clean_build_dir": false
-          }
-          EOS
-            )
-          fi
-          MATRIX_ENTRIES="$MATRIX_ENTRIES]"
-          MATRIX_ENTRIES="${MATRIX_ENTRIES//$'\n'/''}"
-          echo "::set-output name=entries::$MATRIX_ENTRIES"
+          START_RUNNER_JSON="${{ runner.temp }}/start-runner.json"
+          cat <<EOF > "$START_RUNNER_JSON"
+          ${{ toJson(needs.start-runner) }}
+          EOF
+          echo "entries=$(ruby .github/scripts/build-matrix.rb --runner $START_RUNNER_JSON)" >> $GITHUB_OUTPUT
 
   build-toolchain:
     env:
