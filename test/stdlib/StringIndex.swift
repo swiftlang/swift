@@ -656,8 +656,8 @@ suite.test("Fully exhaustive index interchange")
 
 #if _runtime(_ObjC)
 suite.test("Fully exhaustive index interchange/GraphemeBreakTests") {
-  for string in graphemeBreakTests.map { $0.0 } {
-    fullyExhaustiveIndexInterchange(string)
+  for test in graphemeBreakTests {
+    fullyExhaustiveIndexInterchange(test.string)
   }
 }
 #endif
