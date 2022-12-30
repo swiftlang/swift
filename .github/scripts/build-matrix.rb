@@ -72,11 +72,12 @@ def main
   matrix_entries = BASE_MATRIX_ENTRIES.dup
   if options[:runner]
     runner = JSON.parse(File.read(options[:runner]))
-    if label = runner["outputs"]["ubuntu20_04_aarch64-label"]
+    if label = runner["outputs"]["amazonlinux2_x86_64-label"]
       matrix_entries << {
         "build_os": "amazon-linux-2",
         "agent_query": label,
         "target": "amazonlinux2_x86_64",
+        "container": "ghcr.io/swiftwasm/swift-ci:main-amazon-linux-2",
         "run_stdlib_test": false,
         "run_full_test": false,
         "run_e2e_test": false,
@@ -89,6 +90,7 @@ def main
         "build_os": "ubuntu-20.04",
         "agent_query": label,
         "target": "ubuntu20.04_aarch64",
+        "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-20.04",
         "run_stdlib_test": false,
         "run_full_test": false,
         "run_e2e_test": false,
