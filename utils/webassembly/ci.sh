@@ -8,11 +8,9 @@ UTILS_PATH=$SWIFT_PATH/utils/webassembly
 
 case $(uname -s) in
   Darwin)
-    DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
     HOST_SUFFIX=macosx-$(uname -m)
   ;;
   Linux)
-    DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
     HOST_SUFFIX=linux-$(uname -m)
   ;;
   *)
@@ -28,7 +26,7 @@ BUILD_SDK_PATH="$SOURCE_PATH/build-sdk"
 
 export WASMER_DIR="$BUILD_SDK_PATH/wasmer"
 
-$DEPENDENCIES_SCRIPT "$BUILD_SDK_PATH"
+$UTILS_PATH/install-dependencies.sh "$BUILD_SDK_PATH"
 $UTILS_PATH/install-build-sdk.sh
 
 export PATH="$BUILD_SDK_PATH/bin:$PATH"
