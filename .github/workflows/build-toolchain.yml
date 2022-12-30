@@ -150,6 +150,7 @@ jobs:
           xcodebuild -version
 
       - uses: actions/cache/restore@v3
+        id: build-cache
         with:
           path: build-cache
           key: ${{ steps.cache_key.outputs.SCCACHE_KEY }}
@@ -165,10 +166,11 @@ jobs:
             ${{ github.workspace }}/host-toolchain-sdk \
             ${{ github.workspace }}/dist-toolchain-sdk
 
+      - run: chmod 777 -R ./build-cache
+        if: ${{ steps.build-cache.outputs.cache-hit == 'true' }}
       - name: Build ${{ matrix.target }} installable archive on Docker container
         if: ${{ matrix.container != null }}
         run: |
-          chmod 777 -R ${{ github.workspace }}/build-cache
           docker volume create oss-swift-package
           docker run --name swiftwasm-ci-buildbot \
             --security-opt=no-new-privileges \
