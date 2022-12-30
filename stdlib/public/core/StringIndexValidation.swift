@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,6 +54,7 @@ extension _StringGuts {
     return i
   }
 
+  @_alwaysEmitIntoClient
   internal func validateInclusiveSubscalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -175,6 +176,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
   internal func validateInclusiveScalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
