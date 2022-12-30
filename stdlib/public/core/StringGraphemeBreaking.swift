@@ -436,6 +436,70 @@ internal struct _GraphemeBreakingState {
   var shouldBreakRI = false
 }
 
+extension Unicode {
+  /// A state machine for recognizing `Character` (i.e., extended grapheme
+  /// cluster) boundaries in an arbitrary series of Unicode scalars.
+  ///
+  /// The recognizer needs to be initialized with the first scalar in the
+  /// series. Subsequent scalars must then be fed one by one to the
+  /// `hasCharacterBoundary(before:)` method, which returns a Boolean value
+  /// indicating whether the given scalar starts a new `Character`.
+  ///
+  /// The results produced by this state machine are guaranteed to match the way
+  /// `String` splits its contents into `Character` values.
+  @available(SwiftStdlib 5.8, *)
+  public // SPI(Foundation) FIXME: We need API for this
+  struct _CharacterRecognizer {
+    internal var _previous: Unicode.Scalar
+    internal var _state: _GraphemeBreakingState
+
+    /// Returns a non-nil value if it can be determined whether there is a
+    /// `Character` break between `scalar1` and `scalar2` without knowing
+    /// anything about the scalars that precede `scalar1`. This can be used as a
+    /// fast (but incomplete) test before spinning up a full state machine
+    /// session.
+    @_effects(releasenone)
+    public static func quickBreak(
+      between scalar1: Unicode.Scalar,
+      and scalar2: Unicode.Scalar
+    ) -> Bool? {
+      if scalar1.value == 0xD, scalar2.value == 0xA {
+        return false
+      }
+      if _hasGraphemeBreakBetween(scalar1, scalar2) {
+        return true
+      }
+      return nil
+    }
+
+    /// Initialize a new `Character` recognizer, feeding it the given value as
+    /// the first Unicode scalar in the series. The state machine assumes that
+    /// `first` is supposed to start a new extended grapheme cluster.
+    public init(first: Unicode.Scalar) {
+      _state = _GraphemeBreakingState()
+      _previous = first
+    }
+
+    /// Feeds the next scalar to the state machine, returning a Boolean value
+    /// indicating whether it starts a new `Character`.
+    ///
+    /// The state machine does not carry information across `Character`
+    /// boundaries. I.e., if this method returns true, then `self` after the
+    /// call is equivalent to `_CharacterRecognizer(first: next)`.
+    @_effects(releasenone)
+    public mutating func hasCharacterBoundary(
+      before next: Unicode.Scalar
+    ) -> Bool {
+      let r = _state.shouldBreak(between: _previous, and: next)
+      if r {
+        _state = _GraphemeBreakingState()
+      }
+      _previous = next
+      return r
+    }
+  }
+}
+
 extension _StringGuts {
   // Returns the stride of the grapheme cluster starting at offset `index`,
   // assuming it is on a grapheme cluster boundary.
