@@ -101,7 +101,7 @@ let mixedRanges = (
   + generateRanges(for: mixedString, by: 256)
   + generateRanges(for: mixedString, by: 512))
 
-let asciiString = #"""
+let _asciiString = #"""
   Swift is a high-performance system programming language.  It has a clean
   and modern syntax, offers seamless access to existing C and Objective-C code
   and frameworks, and is memory safe by default.
@@ -130,6 +130,7 @@ let asciiString = #"""
   directory you run the script with a filename of the form:
   ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
   """#
+let asciiString = String(repeating: _asciiString, count: 10)
 
 let asciiRanges = (
   generateRanges(for: asciiString, by: 1)
