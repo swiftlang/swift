@@ -134,7 +134,7 @@ jobs:
           fi
           df -h
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: swift
           fetch-depth: 0
@@ -198,7 +198,7 @@ jobs:
           key: ${{ steps.cache_key.outputs.SCCACHE_KEY }}
 
       - name: Upload ${{ matrix.target }} installable archive
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.target }}-installable
           path: swift-wasm-${{ env.TOOLCHAIN_CHANNEL }}-SNAPSHOT-${{ matrix.target }}.tar.gz
@@ -228,7 +228,7 @@ jobs:
         run: |
           tar cJf ./swift-test-results.tar.gz target-build/swift-stdlib-wasi-wasm32/swift-test-results
       - name: Upload test results
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         if: ${{ matrix.run_full_test }}
         with:
           name: ${{ matrix.target }}-test-results
@@ -252,13 +252,13 @@ jobs:
                 echo "Successfully linked hello.wasm"
       - name: Upload hello.wasm
         if: ${{ matrix.build_hello_wasm }}
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.target }}-hello.wasm
           path: hello.wasm
       - name: Checkout integration-tests
         if: ${{ matrix.run_e2e_test }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: swiftwasm/integration-tests
           path: integration-tests
