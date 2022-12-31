@@ -2055,8 +2055,6 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void)locator.getLocatorParts(path);
 
-  // Direct pattern or sub-pattern matching of tuple element.
-  // e.g.`case .foo((a: 42, _)) = question`
   auto pathElement = llvm::find_if(path, [](LocatorPathElt &elt) {
     return elt.is<LocatorPathElt::PatternMatch>();
   });
