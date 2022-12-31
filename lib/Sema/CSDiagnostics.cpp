@@ -8539,3 +8539,77 @@ bool AddMissingMacroArguments::diagnoseAsError() {
       macro->getName());
   return true;
 }
+
+bool GlobalActorFunctionMismatchFailure::diagnoseTupleElement() {
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  if (path.empty())
+    return false;
+
+  if (path.back().getKind() == ConstraintLocator::TupleElement) {
+    auto anchor = getRawAnchor();
+    if (isExpr<ArrayExpr>(anchor)) {
+      emitDiagnostic(diag::cannot_convert_global_actor_mismatch_element,
+                     getFromType(), getToType());
+      return true;
+    }
+
+    auto eltLoc = locator->castLastElementTo<LocatorPathElt::TupleElement>();
+    // Only handle values because functions cannot be hashable, is not
+    // possible for them to be keys.
+    if (isExpr<DictionaryExpr>(anchor) && eltLoc.getIndex() == 1) {
+      emitDiagnostic(diag::cannot_convert_global_actor_mismatch_dict_value,
+                     getFromType(), getToType());
+    } else {
+      emitDiagnostic(diag::cannot_convert_global_actor_mismatch_tuple_element,
+                     getFromType(), getToType(), eltLoc.getIndex());
+    }
+    return true;
+  }
+  return false;
+}
+
+Diag<Type, Type>
+GlobalActorFunctionMismatchFailure::getDiagnosticMessage() const {
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  if (path.empty()) {
+    auto anchor = getAnchor();
+    if (isExpr<CoerceExpr>(anchor)) {
+      return diag::cannot_convert_global_actor_coercion;
+    } else {
+      return diag::cannot_convert_global_actor;
+    }
+  }
+
+  auto last = path.back();
+  switch (last.getKind()) {
+  case ConstraintLocator::ApplyArgToParam: {
+    return diag::cannot_convert_argument_value_global_actor;
+  }
+  case ConstraintLocator::ContextualType: {
+    return diag::cannot_convert_global_actor_contextual;
+  }
+  case ConstraintLocator::ClosureBody:
+  case ConstraintLocator::ClosureResult: {
+    return diag::cannot_convert_closure_result_global_actor;
+  }
+  case ConstraintLocator::TernaryBranch: {
+    return diag::ternary_expr_cases_global_actor_mismatch;
+  }
+  default:
+    break;
+  }
+  return diag::cannot_convert_global_actor;
+}
+
+bool GlobalActorFunctionMismatchFailure::diagnoseAsError() {
+  if (diagnoseTupleElement())
+    return true;
+
+  const auto message = getDiagnosticMessage();
+  emitDiagnostic(message, getFromType(), getToType());
+  return true;
+}

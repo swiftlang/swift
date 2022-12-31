@@ -2625,3 +2625,17 @@ MacroMissingArguments::create(ConstraintSystem &cs, MacroDecl *macro,
                               ConstraintLocator *locator) {
   return new (cs.getAllocator()) MacroMissingArguments(cs, macro, locator);
 }
+
+bool AllowGlobalActorMismatch::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  GlobalActorFunctionMismatchFailure failure(solution, getFromType(),
+                                             getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowGlobalActorMismatch *
+AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
+                                 Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowGlobalActorMismatch(cs, fromType, toType, locator);
+}

@@ -401,6 +401,34 @@ NOTE(generic_parameter_inferred_from_result_context,none,
      "generic parameter %0 inferred as %1 from context",
      (Type, Type))
 
+ERROR(cannot_convert_global_actor,none,
+      "cannot convert function actor-isolated to %0 to function actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_coercion,none,
+      "cannot convert value actor-isolated to %0 to function actor-isolated to %1 in coercion",
+      (Type,Type))
+ERROR(cannot_convert_argument_value_global_actor,none,
+      "cannot convert value actor-isolated to %0 to expected argument type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_contextual,none,
+      "cannot convert value actor-isolated to %0 to specified type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_closure_result_global_actor,none,
+      "cannot convert value actor-isolated to %0 to expected closure result type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_element,none,
+      "cannot convert value actor-isolated to %0 to expected element type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_dict_value,none,
+      "cannot convert value actor-isolated to %0 to expected dictionary value type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_tuple_element,none,
+      "cannot convert type actor-isolated to %0 to type actor-isolated to %1 at tuple element '#%2'",
+      (Type,Type, unsigned))
+ERROR(ternary_expr_cases_global_actor_mismatch,none,
+      "result values in '? :' expression are functions isolated to different actors (%0 vs. %1)",
+      (Type, Type))
+
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "
