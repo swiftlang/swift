@@ -147,8 +147,8 @@ jobs:
             ${{ github.workspace }}/host-toolchain-sdk \
             ${{ github.workspace }}/dist-toolchain-sdk
 
-      - run: chmod 777 -R ./build-cache
-        if: ${{ steps.build-cache.outputs.cache-hit == 'true' }}
+      - run: chmod -R 777 ./build-cache
+        if: ${{ steps.build-cache.outputs.cache-hit }}
       - name: Build ${{ matrix.target }} installable archive on Docker container
         if: ${{ matrix.container != null }}
         timeout-minutes: 300 # Exit before 6 hours limit to allow cache upload
