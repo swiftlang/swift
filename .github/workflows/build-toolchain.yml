@@ -151,6 +151,7 @@ jobs:
         if: ${{ steps.build-cache.outputs.cache-hit == 'true' }}
       - name: Build ${{ matrix.target }} installable archive on Docker container
         if: ${{ matrix.container != null }}
+        timeout-minutes: 300 # Exit before 6 hours limit to allow cache upload
         run: |
           docker volume create oss-swift-package
           docker run --name swiftwasm-ci-buildbot \
@@ -163,12 +164,17 @@ jobs:
             -v oss-swift-package:/home/build-user \
             ${{ matrix.container }}
           docker exec swiftwasm-ci-buildbot /bin/bash -lc 'env; cp -r /source/* /home/build-user/; ./swift/utils/webassembly/ci.sh'
+          docker cp swiftwasm-ci-buildbot:/home/build-user/swift-wasm-${{ env.TOOLCHAIN_CHANNEL }}-SNAPSHOT-${{ matrix.target }}.tar.gz .
+
+      - name: Extract build-cache from Docker container
+        if: ${{ matrix.container != null && always() }}
+        run: |
           rm -rf ${{ github.workspace }}/build-cache
           docker cp swiftwasm-ci-buildbot:/home/build-user/build-cache ${{ github.workspace }}/build-cache
-          docker cp swiftwasm-ci-buildbot:/home/build-user/swift-wasm-${{ env.TOOLCHAIN_CHANNEL }}-SNAPSHOT-${{ matrix.target }}.tar.gz .
 
       - name: Build ${{ matrix.target }} installable archive
         if: ${{ matrix.container == null }}
+        timeout-minutes: 300 # Exit before 6 hours limit to allow cache upload
         env:
           SKIP_XCODE_VERSION_CHECK: 1
         run: |
