@@ -628,9 +628,9 @@ class BenchmarkDoctor(object):
     def _constant_memory_use(measurements):
         select = BenchmarkDoctor._select
         (min_i1, max_i1), (min_i2, max_i2) = [
-            (min(memory_use + [0]), max(memory_use + [0]))
+            (min(memory_use), max(memory_use))
             for memory_use in [
-                [r.mem_pages for r in i_series if r.mem_pages is not None]
+                [r.mem_pages for r in i_series]
                 for i_series in [select(measurements, num_iters=i) for i in [1, 2]]
             ]
         ]
