@@ -1086,3 +1086,90 @@ suite.test("Substring.removeSubrange entire range")
   expectTrue(b.isEmpty)
 #endif
 }
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("String index rounding/Characters")
+  .forEach(in: examples) { string in
+    for index in string.allIndices(includingEnd: true) {
+      let end = string.endIndex
+      let expected = (index < end
+        ? string.indices.lastIndex { $0 <= index }!
+        : end)
+      let actual = string._index(roundingDown: index)
+      expectEqual(actual, expected,
+        """
+        index: \(index._description)
+        actual: \(actual._description)
+        expected: \(expected._description)
+        """)
+    }
+  }
+}
+
+suite.test("String index rounding/Scalars")
+.forEach(in: examples) { string in
+  for index in string.allIndices(includingEnd: true) {
+    let end = string.unicodeScalars.endIndex
+    let expected = (index < end
+      ? string.unicodeScalars.indices.lastIndex { $0 <= index }!
+      : end)
+    let actual = string.unicodeScalars._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-16")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf16Indices = Set(string.utf16.indices)
+  utf16Indices.insert(string.utf16.endIndex)
+
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf16Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-16 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-16 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf16._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-8")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf8Indices = Set(string.utf8.indices)
+  utf8Indices.insert(string.utf8.endIndex)
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf8Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-8 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-8 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf8._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
+}
