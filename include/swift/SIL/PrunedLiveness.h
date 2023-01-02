@@ -209,13 +209,6 @@ public:
       unsigned actualStartBitNo = startBitNo * 2;
       unsigned actualEndBitNo = endBitNo * 2;
 
-      // NOTE: We pad both before/after with Dead to ensure that we are
-      // returning an array that acts as a bit mask and thus can be directly
-      // compared against other such bitmasks. This invariant is used when
-      // computing boundaries.
-      for (unsigned i = 0; i != startBitNo; ++i) {
-        resultingFoundLiveness.push_back(Dead);
-      }
       for (unsigned i = actualStartBitNo, e = actualEndBitNo; i != e; i += 2) {
         if (!bits[i]) {
           resultingFoundLiveness.push_back(Dead);
@@ -223,9 +216,6 @@ public:
         }
 
         resultingFoundLiveness.push_back(bits[i + 1] ? LiveOut : LiveWithin);
-      }
-      for (unsigned i = endBitNo, e = size(); i != e; ++i) {
-        resultingFoundLiveness.push_back(Dead);
       }
     }
 
@@ -314,7 +304,7 @@ public:
                         SmallVectorImpl<IsLive> &foundLivenessInfo) const {
     auto liveBlockIter = liveBlocks.find(bb);
     if (liveBlockIter == liveBlocks.end()) {
-      for (unsigned i : range(numBitsToTrack)) {
+      for (unsigned i : range(endBitNo - startBitNo)) {
         (void)i;
         foundLivenessInfo.push_back(Dead);
       }
