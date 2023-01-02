@@ -39,6 +39,18 @@ BASE_MATRIX_ENTRIES = [
     "free_disk_space": true
   },
   {
+    "build_os": "amazon-linux-2",
+    "agent_query": "ubuntu-22.04",
+    "target": "amazonlinux2_x86_64",
+    "container": "ghcr.io/swiftwasm/swift-ci:main-amazon-linux-2",
+    "run_stdlib_test": false,
+    "run_full_test": false,
+    "run_e2e_test": false,
+    "build_hello_wasm": true,
+    "clean_build_dir": false,
+    "free_disk_space": true
+  },
+  {
     "build_os": "macos-11",
     "agent_query": "macos-11",
     "target": "macos_x86_64",
@@ -72,19 +84,6 @@ def main
   matrix_entries = BASE_MATRIX_ENTRIES.dup
   if options[:runner]
     runner = JSON.parse(File.read(options[:runner]))
-    if label = runner["outputs"]["amazonlinux2_x86_64-label"]
-      matrix_entries << {
-        "build_os": "amazon-linux-2",
-        "agent_query": label,
-        "target": "amazonlinux2_x86_64",
-        "container": "ghcr.io/swiftwasm/swift-ci:main-amazon-linux-2",
-        "run_stdlib_test": false,
-        "run_full_test": false,
-        "run_e2e_test": false,
-        "build_hello_wasm": true,
-        "clean_build_dir": false
-      }
-    end
     if label = runner["outputs"]["ubuntu20_04_aarch64-label"]
       matrix_entries << {
         "build_os": "ubuntu-20.04",
