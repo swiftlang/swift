@@ -12,6 +12,7 @@ targets=($TARGETS_TO_DIST)
 DARWIN_TOOLCHAIN_APPLICATION_CERT=${DARWIN_TOOLCHAIN_APPLICATION_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
 DARWIN_TOOLCHAIN_INSTALLER_CERT=${DARWIN_TOOLCHAIN_INSTALLER_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
 DARWIN_TOOLCHAIN_NOTARIZE_EMAIL=${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL:?"Please set DARWIN_TOOLCHAIN_NOTARIZE_EMAIL"}
+DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID=${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID:?"Please set DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID"}
 
 gh_api=https://api.github.com
 
@@ -130,37 +131,13 @@ create_installer() {
     "${darwin_toolchain_version}" "${swift_source_dir}/utils/darwin-installer-scripts"
 
   # Notarize the toolchain installer
-  local notarize_command=("xcrun" "altool" "--notarize-app" "--type" "osx" \
-      "--file" "${darwin_toolchain_installer_package}" \
-      "--primary-bundle-id" "${darwin_toolchain_bundle_identifier}" \
-      "-u" "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
-      "-p" "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+  xcrun notarytool submit "${darwin_toolchain_installer_package}" \
+      --wait \
+      --apple-id "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
+      --team-id "${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID}" \
+      --password "${DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD}"
 
-  if [ -n "${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID}" ]; then
-    notarize_command=("${notarize_command[@]}" "--asc-provider" "${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID}")
-  fi
-
-  local request_output=$(${notarize_command[@]})
-
-  local request_uuid=$(echo "$request_output" | grep "RequestUUID = " | awk '{print $3}')
-
-  local request_status=$(xcrun altool --notarization-info "$request_uuid" \
-      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
-      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
-  # Wait until finished
-  while echo "$request_status" | grep -q "Status: in progress" ; do
-    sleep 60
-    request_status=$(xcrun altool --notarization-info "$request_uuid" \
-      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
-      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
-  done
-
-  if echo "$request_status" | grep -q "Status: success"; then
-    xcrun stapler staple "${darwin_toolchain_installer_package}"
-  else
-    echo "Failed to notarize the toolchain $darwin_toolchain_installer_package: $request_status"
-    exit 1
-  fi
+  xcrun stapler staple "${darwin_toolchain_installer_package}"
 }
 
 package_darwin_toolchain() {
