@@ -1031,12 +1031,24 @@ private:
 
         SmallVector<Expr *, 4> resultExprs;
         for (auto *R : info->getReturns()) {
-          // TODO: This would have to become a check which would
-          //       use the type of the return as an element in the type-join.
-          assert(!info->solveReturnIndividually(R));
+          Expr *resultExpr = nullptr;
 
-          auto target = createTargetForReturn(R);
-          resultExprs.push_back(target.getAsExpr());
+          // If this `return` has already been type-checked,
+          // let's use a placeholder opaque value expression
+          // to inject its type into the join.
+          if (info->solveReturnIndividually(R)) {
+            auto target = *cs.getSolutionApplicationTarget(R);
+            resultExpr = new (ctx) OpaqueValueExpr(
+                /*Range=*/SourceRange(),
+                cs.simplifyType(cs.getType(target.getAsExpr())),
+                /*isPlaceholder=*/true);
+          } else {
+            auto target = createTargetForReturn(R);
+            resultExpr = target.getAsExpr();
+          }
+
+          assert(resultExpr);
+          resultExprs.push_back(resultExpr);
         }
 
         ASTNode join = TypeJoinExpr::create(cs.getASTContext(),
