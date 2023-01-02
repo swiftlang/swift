@@ -283,7 +283,7 @@ public:
     auto liveness = getBlockLiveness(block, bitNo);
     if (liveness != Dead)
       return liveness;
-    computeUseBlockLiveness(block, bitNo, bitNo + 1);
+    computeScalarUseBlockLiveness(block, bitNo);
     return getBlockLiveness(block, bitNo);
   }
 
@@ -348,8 +348,14 @@ protected:
     }
   }
 
-  void computeUseBlockLiveness(SILBasicBlock *userBB, unsigned startBitNo,
-                               unsigned endBitNo);
+private:
+  /// A helper routine that as a fast path handles the scalar case. We do not
+  /// handle the mult-bit case today since the way the code is written today
+  /// assumes we process a bit at a time.
+  ///
+  /// TODO: Make a multi-bit query for efficiency reasons.
+  void computeScalarUseBlockLiveness(SILBasicBlock *userBB,
+                                     unsigned startBitNo);
 };
 
 /// If inner borrows are 'Contained', then liveness is fully described by the
