@@ -202,6 +202,8 @@ public:
       return bits[bitNo * 2 + 1] ? LiveOut : LiveWithin;
     }
 
+    /// Returns the liveness in \p resultingFoundLiveness. We only return the
+    /// bits for endBitNo - startBitNo.
     void getLiveness(unsigned startBitNo, unsigned endBitNo,
                      SmallVectorImpl<IsLive> &resultingFoundLiveness) const {
       unsigned actualStartBitNo = startBitNo * 2;
@@ -301,8 +303,8 @@ public:
     return liveBlockIter->second.getLiveness(bitNo);
   }
 
-  // FIXME: This API should directly return the live bitset. The live bitset
-  // type should have an api for querying and iterating over the live fields.
+  /// FIXME: This API should directly return the live bitset. The live bitset
+  /// type should have an api for querying and iterating over the live fields.
   void getBlockLiveness(SILBasicBlock *bb, unsigned startBitNo,
                         unsigned endBitNo,
                         SmallVectorImpl<IsLive> &foundLivenessInfo) const {
@@ -324,11 +326,6 @@ public:
 
 protected:
   void markBlockLive(SILBasicBlock *bb, unsigned bitNo, IsLive isLive) {
-    markBlockLive(bb, bitNo, bitNo + 1, isLive);
-  }
-
-  void markBlockLive(SILBasicBlock *bb, unsigned startBitNo, unsigned endBitNo,
-                     IsLive isLive) {
     assert(isLive != Dead && "erasing live blocks isn't implemented.");
     auto iterAndInserted =
         liveBlocks.insert(std::make_pair(bb, LivenessSmallBitVector()));
@@ -338,13 +335,33 @@ protected:
       // we have more than SmallBitVector's small size number of bits.
       auto &insertedBV = iterAndInserted.first->getSecond();
       insertedBV.init(numBitsToTrack);
-      insertedBV.setLiveness(startBitNo, endBitNo, isLive);
+      insertedBV.setLiveness(bitNo, bitNo + 1, isLive);
       if (discoveredBlocks)
         discoveredBlocks->push_back(bb);
-    } else if (isLive == LiveOut) {
-      // Update the existing entry to be live-out.
-      iterAndInserted.first->getSecond().setLiveness(startBitNo, endBitNo,
-                                                     LiveOut);
+    } else {
+      // If we are dead, always update to the new liveness.
+      switch (iterAndInserted.first->getSecond().getLiveness(bitNo)) {
+      case Dead:
+        iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                       isLive);
+        break;
+      case LiveWithin:
+        if (isLive == LiveOut) {
+          // Update the existing entry to be live-out.
+          iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                         LiveOut);
+        }
+        break;
+      case LiveOut:
+        break;
+      }
+    }
+  }
+
+  void markBlockLive(SILBasicBlock *bb, unsigned startBitNo, unsigned endBitNo,
+                     IsLive isLive) {
+    for (unsigned index : range(startBitNo, endBitNo)) {
+      markBlockLive(bb, index, isLive);
     }
   }
 
