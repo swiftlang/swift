@@ -2780,7 +2780,33 @@ struct DeclReferenceType {
 
 /// Describes a closure that is being processed by the constriant solver.
 struct ClosureInfo {
+private:
   FunctionType *Type;
+  SmallVector<ReturnStmt *, 2> Returns;
+
+public:
+  ClosureInfo(FunctionType *closureType, ArrayRef<ReturnStmt *> returns)
+      : Type(closureType), Returns(returns.begin(), returns.end()) {}
+
+  FunctionType *getType() const { return Type; }
+  ArrayRef<ReturnStmt *> getReturns() const { return Returns; }
+
+  bool solveReturnIndividually(ReturnStmt *R) const {
+    if (!hasMultipleReturns())
+      return true;
+
+    // Implement the logic to determine whether the return
+    // should be solved separately from others.
+    //
+    // For example: if there are no literal expressions
+    // in the given return statement it should be possible
+    // to solve it separately and simply use the resulting
+    // type in the join.
+
+    return false;
+  }
+
+  bool hasMultipleReturns() const { return Returns.size() > 1; }
 };
 
 /// Describes a system of constraints on type variables, the
@@ -3717,11 +3743,18 @@ public:
     return !IgnoredArguments.empty();
   }
 
-  void setClosure(const ClosureExpr *closure, ClosureInfo info) {
+  void setClosure(const ClosureExpr *closure, ClosureInfo &&info) {
     assert(closure);
-    assert(info.Type && "Expected non-null type");
-    assert(Closures.count(closure) == 0 && "Cannot reset closure type");
-    Closures.insert({closure, info});
+    assert(info.getType() && "Expected non-null type");
+    assert(Closures.count(closure) == 0 && "Cannot reset closure info");
+    (void)Closures.insert({closure, std::move(info)});
+  }
+
+  NullablePtr<ClosureInfo> getClosureInfo(const ClosureExpr *closure) const {
+    auto result = Closures.find(closure);
+    if (result != Closures.end())
+      return const_cast<ClosureInfo *>(&result->second);
+    return {};
   }
 
   FunctionType *getClosureType(const ClosureExpr *closure) const {
@@ -3733,7 +3766,7 @@ public:
   FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
     auto result = Closures.find(closure);
     if (result != Closures.end())
-      return result->second.Type;
+      return result->second.getType();
     return nullptr;
   }
 
