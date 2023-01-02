@@ -990,6 +990,11 @@ private:
       }
     }
 
+    NullablePtr<ClosureInfo> closureInfo;
+    if (auto closure = context.getAsClosureExpr()) {
+      closureInfo = cs.getClosureInfo(closure.get());
+    }
+
     SmallVector<ElementInfo, 4> elements;
     for (auto element : braceStmt->getElements()) {
       bool isDiscarded =
@@ -1003,11 +1008,44 @@ private:
         }
       }
 
+      // Skip all of the return statements, they are going to be
+      // handled at the end by a type-join expression.
+      if (closureInfo) {
+        auto *R = getAsStmt<ReturnStmt>(element);
+        if (R && !closureInfo.get()->solveReturnIndividually(R))
+          continue;
+      }
+
       elements.push_back(
           makeElement(element,
                       cs.getConstraintLocator(
                           locator, LocatorPathElt::SyntacticElement(element)),
                       /*contextualInfo=*/{}, isDiscarded));
+    }
+
+    if (locator->directlyAt<ClosureExpr>()) {
+      auto *info = closureInfo.get();
+
+      if (info->hasMultipleReturns()) {
+        auto context = getContextualResultInfo();
+
+        SmallVector<Expr *, 4> resultExprs;
+        for (auto *R : info->getReturns()) {
+          // TODO: This would have to become a check which would
+          //       use the type of the return as an element in the type-join.
+          assert(!info->solveReturnIndividually(R));
+
+          auto target = createTargetForReturn(R);
+          resultExprs.push_back(target.getAsExpr());
+        }
+
+        ASTNode join = TypeJoinExpr::create(cs.getASTContext(),
+                                            context.getType(), resultExprs);
+
+        elements.push_back(makeElement(join, locator,
+                                       /*contextualTypeInfo=*/{},
+                                       /*isDiscarded=*/true));
+      }
     }
 
     createConjunction(cs, elements, locator);
@@ -1039,34 +1077,11 @@ private:
       return;
     }
 
-    Expr *resultExpr;
-
-    if (returnStmt->hasResult()) {
-      resultExpr = returnStmt->getResult();
-      assert(resultExpr && "non-empty result without expression?");
-    } else {
-      // If this is simplify `return`, let's create an empty tuple
-      // which is also useful if contextual turns out to be e.g. `Void?`.
-      // Also, attach return stmt source location so if there is a contextual
-      // mismatch we can produce a diagnostic in a valid source location.
-      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
-    }
-
-    auto contextualResultInfo = getContextualResultInfo();
-    SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     contextualResultInfo.purpose,
-                                     contextualResultInfo.getType(),
-                                     /*isDiscarded=*/false);
-
+    auto target = createTargetForReturn(returnStmt);
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
       hadError = true;
       return;
     }
-
-    cs.setContextualType(target.getAsExpr(),
-                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
-                         contextualResultInfo.purpose);
-    cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
   ContextualTypeInfo getContextualResultInfo() const {
@@ -1105,6 +1120,34 @@ private:
     auto parentElt =
         locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
     return parentElt ? parentElt->getElement().isStmt(kind) : false;
+  }
+
+  SolutionApplicationTarget createTargetForReturn(ReturnStmt *returnStmt) {
+    Expr *resultExpr;
+
+    if (returnStmt->hasResult()) {
+      resultExpr = returnStmt->getResult();
+      assert(resultExpr && "non-empty result without expression?");
+    } else {
+      // If this is simplify `return`, let's create an empty tuple
+      // which is also useful if contextual turns out to be e.g. `Void?`.
+      // Also, attach return stmt source location so if there is a contextual
+      // mismatch we can produce a diagnostic in a valid source location.
+      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
+    }
+
+    auto contextualResultInfo = getContextualResultInfo();
+    SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
+                                     contextualResultInfo.purpose,
+                                     contextualResultInfo.getType(),
+                                     /*isDiscarded=*/false);
+
+    cs.setContextualType(target.getAsExpr(),
+                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
+                         contextualResultInfo.purpose);
+    cs.setSolutionApplicationTarget(returnStmt, target);
+
+    return target;
   }
 
   bool recordInferredSwitchCasePatternVars(CaseStmt *caseStmt) {

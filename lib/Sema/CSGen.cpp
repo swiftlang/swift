@@ -3760,8 +3760,14 @@ namespace {
 
 
       for (auto *element : expr->getElements()) {
+        auto contextualTypePurpose = CS.getContextualTypePurpose(element);
+
         elements.emplace_back(CS.getType(element),
-                              CS.getConstraintLocator(element));
+                              contextualTypePurpose == CTP_Unused
+                                  ? CS.getConstraintLocator(element)
+                                  : CS.getConstraintLocator(
+                                        element, LocatorPathElt::ContextualType(
+                                                     contextualTypePurpose)));
       }
 
       Type resultTy;

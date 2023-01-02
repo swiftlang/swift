@@ -10,9 +10,7 @@ struct Value {
 }
 
 func test(allValues: [Value]) {
-  // Type for `return nil` cannot be inferred at the moment because there is no join for result expressions.
-  let owners = Set(allValues.compactMap { // expected-error {{generic parameter 'Element' could not be inferred}}
-      // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  let _ = Set(allValues.compactMap {
       guard let id = $0.ID else { return nil }
       return Description(name: "", id: id)
     })
