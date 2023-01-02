@@ -995,6 +995,50 @@ suite.test("Index encoding correction/UTF-8→16/conversions/UTF-16") {
 }
 #endif
 
+suite.test("UTF-16 breadcrumbs") {
+
+  let string = #"""
+    The powerful programming language that is also easy to learn.
+    손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
+    🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
+    some🔩times 🛺 placed 🎣 in 🥌 the 🆘 mid🔀dle 🇦🇶or🏁 around 🏳️‍🌈 a 🍇 w🍑o🥒r🥨d
+    Unicode is such fun!
+    U̷n̷i̷c̷o̴d̴e̷ ̶i̸s̷ ̸s̵u̵c̸h̷ ̸f̵u̷n̴!̵
+    U̴̡̲͋̾n̵̻̳͌ì̶̠̕c̴̭̈͘ǫ̷̯͋̊d̸͖̩̈̈́ḛ̴́ ̴̟͎͐̈i̴̦̓s̴̜̱͘ ̶̲̮̚s̶̙̞͘u̵͕̯̎̽c̵̛͕̜̓h̶̘̍̽ ̸̜̞̿f̵̤̽ṷ̴͇̎͘ń̷͓̒!̷͍̾̚
+    U̷̢̢̧̨̼̬̰̪͓̞̠͔̗̼̙͕͕̭̻̗̮̮̥̣͉̫͉̬̲̺͍̺͊̂ͅ\#
+    n̶̨̢̨̯͓̹̝̲̣̖̞̼̺̬̤̝̊̌́̑̋̋͜͝ͅ\#
+    ḭ̸̦̺̺͉̳͎́͑\#
+    c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
+    """#
+
+  print(string.utf16.count)
+  let indices = Array(string.utf16.indices) + [string.utf16.endIndex]
+  for i in 0 ..< indices.count {
+    for j in 0 ..< indices.count {
+      // print(
+      //   """
+      //   i: \(i), indices[i]: \(indices[i]._description); \
+      //   j: \(j), indices[j]: \(indices[j]._description)
+      //   """)
+
+      let distance = string.utf16.distance(from: indices[i], to: indices[j])
+      expectEqual(distance, j - i,
+        """
+        i: \(i), indices[i]: \(indices[i]._description)
+        j: \(j), indices[j]: \(indices[j]._description)
+        """)
+
+      let target = string.utf16.index(indices[i], offsetBy: j - i)
+      expectEqual(target, indices[j],
+        """
+        i: \(i), indices[i]: \(indices[i]._description)
+        j: \(j), indices[j]: \(indices[j]._description)
+        target: \(target._description)
+        """)
+    }
+  }
+}
+
 suite.test("String.replaceSubrange index validation")
 .forEach(in: examples) { string in
   guard #available(SwiftStdlib 5.7, *) else {
