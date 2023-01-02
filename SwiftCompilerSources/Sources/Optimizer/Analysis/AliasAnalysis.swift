@@ -78,7 +78,7 @@ struct AliasAnalysis {
             case (true, true):   return MayReadWriteBehavior
           }
         }
-        if val.at(path).isAddressEscaping(using: EscapesToInstructionVisitor(target: inst), context) {
+        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true), context) {
           return MayReadWriteBehavior
         }
         return NoneBehavior
@@ -94,7 +94,7 @@ struct AliasAnalysis {
           let effect = getOwnershipEffect(of: apply, for: obj, path: path, context)
           return effect.destroy
         }
-        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst), context)
+        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false), context)
       },
 
       // isAddrVisibleFromObj
@@ -124,11 +124,11 @@ struct AliasAnalysis {
 
 private func getMemoryEffect(of apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: PassContext) -> SideEffects.Memory {
   let calleeAnalysis = context.calleeAnalysis
-  let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: calleeAnalysis)
+  let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: calleeAnalysis, isAddress: true)
   let memoryEffects: SideEffects.Memory
 
   // First try to figure out to which argument(s) the address "escapes" to.
-  if let result = address.at(path).visitAddress(using: visitor, context) {
+  if let result = address.at(path).visit(using: visitor, context) {
     // The resulting effects are the argument effects to which `address` escapes to.
     memoryEffects = result.memory
   } else {
@@ -146,7 +146,7 @@ private func getMemoryEffect(of apply: ApplySite, for address: Value, path: Smal
 }
 
 private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: PassContext) -> SideEffects.Ownership {
-  let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis)
+  let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
   if let result = value.at(path).visit(using: visitor, context) {
     // The resulting effects are the argument effects to which `value` escapes to.
     return result.ownership
@@ -159,6 +159,7 @@ private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: Sma
 private struct SideEffectsVisitor : EscapeVisitorWithResult {
   let apply: ApplySite
   let calleeAnalysis: CalleeAnalysis
+  let isAddress: Bool
   var result = SideEffects.GlobalEffects()
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
@@ -175,6 +176,30 @@ private struct SideEffectsVisitor : EscapeVisitorWithResult {
     }
     return .continueWalk
   }
+
+  var followTrivialTypes: Bool { isAddress }
+  var followLoads: Bool { !isAddress }
+}
+
+/// Lets `ProjectedValue.isEscaping` return true if the value is "escaping" to the `target` instruction.
+private struct EscapesToInstructionVisitor : EscapeVisitor {
+  let target: Instruction
+  let isAddress: Bool
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    let user = operand.instruction
+    if user == target {
+      return .abort
+    }
+    if user is ReturnInst {
+      // Anything which is returned cannot escape to an instruction inside the function.
+      return .ignore
+    }
+    return .continueWalk
+  }
+
+  var followTrivialTypes: Bool { isAddress }
+  var followLoads: Bool { !isAddress }
 }
 
 private extension Value {

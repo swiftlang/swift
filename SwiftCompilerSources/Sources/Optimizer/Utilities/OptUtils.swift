@@ -77,3 +77,47 @@ extension Value {
     return copiedValue.makeAvailable(in: destBlock, context)
   }
 }
+
+extension ProjectedValue {
+  /// Returns true if the address can alias with `rhs`.
+  ///
+  /// Example:
+  ///   %1 = struct_element_addr %s, #field1
+  ///   %2 = struct_element_addr %s, #field2
+  ///
+  /// `%s`.canAddressAlias(with: `%1`) -> true
+  /// `%s`.canAddressAlias(with: `%2`) -> true
+  /// `%1`.canAddressAlias(with: `%2`) -> false
+  ///
+  func canAddressAlias(with rhs: ProjectedValue, _ context: PassContext) -> Bool {
+    // self -> rhs will succeed (= return false) if self is a non-escaping "local" object,
+    // but not necessarily rhs.
+    if !isEscaping(using: EscapesToValueVisitor(target: rhs), context) {
+      return false
+    }
+    // The other way round: rhs -> self will succeed if rhs is a non-escaping "local" object,
+    // but not necessarily self.
+    if !rhs.isEscaping(using: EscapesToValueVisitor(target: self), context) {
+      return false
+    }
+    return true
+  }
+}
+
+private struct EscapesToValueVisitor : EscapeVisitor {
+  let target: ProjectedValue
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
+      return .abort
+    }
+    if operand.instruction is ReturnInst {
+      // Anything which is returned cannot escape to an instruction inside the function.
+      return .ignore
+    }
+    return .continueWalk
+  }
+
+  var followTrivialTypes: Bool { true }
+  var followLoads: Bool { false }
+}

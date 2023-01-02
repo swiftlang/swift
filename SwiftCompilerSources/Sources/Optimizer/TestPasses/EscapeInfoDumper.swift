@@ -101,6 +101,9 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
       }
       return .continueWalk
     }
+
+    var followTrivialTypes: Bool { true }
+    var followLoads: Bool { false }
   }
 
   // test `isEscaping(addressesOf:)`
@@ -109,7 +112,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
     for apply in applies {
       let path = AliasAnalysis.getPtrOrAddressPath(for: value)
       
-      if value.at(path).isAddressEscaping(using: Visitor(apply: apply), context) {
+      if value.at(path).isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")

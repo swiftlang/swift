@@ -483,9 +483,7 @@ private extension PartialApplyInst {
           return .continueWalk
         }
       }
-      func hasRelevantType(_ value: Value, at path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
-        true
-      }
+      var followTrivialTypes: Bool { true }
     }
 
     return self.isEscapingWhenWalkingDown(using: EscapesToApply(), context)
