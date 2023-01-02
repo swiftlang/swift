@@ -65,7 +65,7 @@ struct AliasAnalysis {
     AliasAnalysis_register(
       // getMemEffectsFn
       { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
-        let context = PassContext(_bridged: bridgedCtxt)
+        let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
         let path = AliasAnalysis.getPtrOrAddressPath(for: val)
@@ -86,7 +86,7 @@ struct AliasAnalysis {
 
       // isObjReleasedFn
       { (bridgedCtxt: BridgedPassContext, bridgedObj: BridgedValue, bridgedInst: BridgedInstruction) -> Bool in
-        let context = PassContext(_bridged: bridgedCtxt)
+        let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let obj = bridgedObj.value
         let path = SmallProjectionPath(.anyValueFields)
@@ -99,7 +99,7 @@ struct AliasAnalysis {
 
       // isAddrVisibleFromObj
       { (bridgedCtxt: BridgedPassContext, bridgedAddr: BridgedValue, bridgedObj: BridgedValue) -> Bool in
-        let context = PassContext(_bridged: bridgedCtxt)
+        let context = FunctionPassContext(_bridged: bridgedCtxt)
         let addr = bridgedAddr.value.at(AliasAnalysis.getPtrOrAddressPath(for: bridgedAddr.value))
 
         // This is similar to `canReferenceSameFieldFn`, except that all addresses of all objects are
@@ -110,7 +110,7 @@ struct AliasAnalysis {
 
       // canReferenceSameFieldFn
       { (bridgedCtxt: BridgedPassContext, bridgedLhs: BridgedValue, bridgedRhs: BridgedValue) -> Bool in
-        let context = PassContext(_bridged: bridgedCtxt)
+        let context = FunctionPassContext(_bridged: bridgedCtxt)
 
         // If `lhs` or `rhs` is not an address, but an object, it means: check for alias of any class
         // field address of the object.
@@ -122,7 +122,7 @@ struct AliasAnalysis {
   }
 }
 
-private func getMemoryEffect(of apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: PassContext) -> SideEffects.Memory {
+private func getMemoryEffect(of apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
   let calleeAnalysis = context.calleeAnalysis
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: calleeAnalysis, isAddress: true)
   let memoryEffects: SideEffects.Memory
@@ -145,7 +145,7 @@ private func getMemoryEffect(of apply: ApplySite, for address: Value, path: Smal
   return memoryEffects
 }
 
-private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: PassContext) -> SideEffects.Ownership {
+private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Ownership {
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
   if let result = value.at(path).visit(using: visitor, context) {
     // The resulting effects are the argument effects to which `value` escapes to.

@@ -18,7 +18,7 @@ import SIL
 ///
 /// This pass is used for testing EscapeInfo.
 let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   print("Escape information for \(function.name):")
   
@@ -70,7 +70,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
 ///
 /// This pass is used for testing EscapeInfo.
 let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   print("Address escape information for \(function.name):")
 

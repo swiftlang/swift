@@ -18,19 +18,18 @@ import SIL
 // Note that `simplifyStrongRetainPass` and `simplifyStrongReleasePass` can
 // even remove "unbalanced" retains/releases of a `global_value`, but this
 // requires a minimum deployment target.
-let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
-  name: "simplify-global_value", {
-  (globalValue: GlobalValueInst, context: PassContext) in
+extension GlobalValueInst : SILCombineSimplifyable {
+  func simplify(_ context: SimplifyContext) {
+    var users = Stack<Instruction>(context)
+    defer { users.deinitialize() }
 
-  var users = Stack<Instruction>(context)
-  defer { users.deinitialize() }
-  
-  if checkUsers(of: globalValue, users: &users) {
-    for inst in users {
-      context.erase(instruction: inst)
+    if checkUsers(of: self, users: &users) {
+      for inst in users {
+        context.erase(instruction: inst)
+      }
     }
   }
-})
+}
 
 /// Returns true if reference counting and debug_value users of a global_value
 /// can be deleted.

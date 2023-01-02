@@ -69,7 +69,7 @@ let releaseDevirtualizerPass = FunctionPass(
 
 /// Tries to de-virtualize the final release of a stack-promoted object.
 private func tryDevirtualizeReleaseOfObject(
-  _ context: PassContext,
+  _ context: FunctionPassContext,
   _ release: RefCountingInst,
   _ deallocStackRef: DeallocStackRefInst
 ) {

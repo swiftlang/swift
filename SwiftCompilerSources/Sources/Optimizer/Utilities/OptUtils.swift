@@ -20,7 +20,7 @@ extension Value {
 
 extension Builder {
   static func insert(after inst: Instruction, location: Location,
-                     _ context: PassContext, insertFunc: (Builder) -> ()) {
+                     _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     if inst is TermInst {
       for succ in inst.parentBlock.successors {
         assert(succ.hasSinglePredecessor,
@@ -43,7 +43,7 @@ extension Value {
   /// is in a different control region than this value. For example, if `destBlock` is
   /// in a loop while this value is not in that loop, the value has to be copied for
   /// each loop iteration.
-  func makeAvailable(in destBlock: BasicBlock, _ context: PassContext) -> Value {
+  func makeAvailable(in destBlock: BasicBlock, _ context: some MutatingContext) -> Value {
     assert(uses.isEmpty)
     assert(ownership == .owned)
 
@@ -71,7 +71,7 @@ extension Value {
   ///
   /// For details see `makeAvailable`.
   func copy(at insertionPoint: Instruction, andMakeAvailableIn destBlock: BasicBlock,
-            _ context: PassContext) -> Value {
+            _ context: some MutatingContext) -> Value {
     let builder = Builder(at: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
@@ -89,7 +89,7 @@ extension ProjectedValue {
   /// `%s`.canAddressAlias(with: `%2`) -> true
   /// `%1`.canAddressAlias(with: `%2`) -> false
   ///
-  func canAddressAlias(with rhs: ProjectedValue, _ context: PassContext) -> Bool {
+  func canAddressAlias(with rhs: ProjectedValue, _ context: some Context) -> Bool {
     // self -> rhs will succeed (= return false) if self is a non-escaping "local" object,
     // but not necessarily rhs.
     if !isEscaping(using: EscapesToValueVisitor(target: rhs), context) {

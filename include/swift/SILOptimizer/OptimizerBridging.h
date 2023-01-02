@@ -89,7 +89,7 @@ void SILPassManager_registerModulePass(llvm::StringRef name,
                                        BridgedModulePassRunFn runFn);
 void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn);
-void SILCombine_registerInstructionPass(llvm::StringRef name,
+void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
                                         BridgedInstructionPassRunFn runFn);
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);

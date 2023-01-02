@@ -13,7 +13,7 @@
 import SIL
 
 let rangeDumper = FunctionPass(name: "dump-ranges", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   var begin: Instruction?
   var ends = Stack<Instruction>(context)
@@ -75,7 +75,7 @@ let rangeDumper = FunctionPass(name: "dump-ranges", {
   }
 })
 
-private func verify(_ blockRange: BasicBlockRange, _ context: PassContext) {
+private func verify(_ blockRange: BasicBlockRange, _ context: FunctionPassContext) {
   var inRange = BasicBlockSet(context)
   defer { inRange.deinitialize() }
   for b in blockRange.range {

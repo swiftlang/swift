@@ -65,17 +65,16 @@
 #define SWIFT_FUNCTION_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
-/// SWIFT_INSTRUCTION_PASS(Inst, Tag)
+/// SWIFT_SILCOMBINE_PASS(Inst, Tag)
 ///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
 ///   implemented in swift and is run by the SILCombiner.
-///   The \p Inst argument specifies the instruction class, and \p Tag a name
-///   for the pass.
+///   The \p Inst argument specifies the instruction class.
 ///
 ///   No further code is need on the C++ side. On the swift side an instruction
-///   pass with the same name must be registered with 'registerPass()'.
+///   pass must be registered for the instruction class with 'registerPass()'.
 ///
-#ifndef SWIFT_INSTRUCTION_PASS
-#define SWIFT_INSTRUCTION_PASS(Inst, Tag)
+#ifndef SWIFT_SILCOMBINE_PASS
+#define SWIFT_SILCOMBINE_PASS(Inst)
 #endif
 
 /// PASS_RANGE(RANGE_ID, START, END)
@@ -390,6 +389,8 @@ PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
+SWIFT_FUNCTION_PASS(Simplify, "simplify",
+     "Simplify instructions via peephole optimizations")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
@@ -463,14 +464,14 @@ PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
-SWIFT_INSTRUCTION_PASS(BeginCOWMutationInst, "simplify-begin_cow_mutation")
-SWIFT_INSTRUCTION_PASS(GlobalValueInst, "simplify-global_value")
-SWIFT_INSTRUCTION_PASS(StrongRetainInst, "simplify-strong_retain")
-SWIFT_INSTRUCTION_PASS(StrongReleaseInst, "simplify-strong_release")
+SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
+SWIFT_SILCOMBINE_PASS(GlobalValueInst)
+SWIFT_SILCOMBINE_PASS(StrongRetainInst)
+SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
-#undef SWIFT_INSTRUCTION_PASS
+#undef SWIFT_SILCOMBINE_PASS
 #undef PASS
 #undef PASS_RANGE

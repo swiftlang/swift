@@ -23,12 +23,12 @@ import OptimizerBridging
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
 
-  private let context: PassContext
+  private let context: BridgedPassContext
   private let bridged: BridgedBasicBlockSet
     
-  init(_ context: PassContext) {
-    self.context = context
-    self.bridged = PassContext_allocBasicBlockSet(context._bridged)
+  init(_ context: some Context) {
+    self.context = context._bridged
+    self.bridged = PassContext_allocBasicBlockSet(self.context)
   }
 
   func contains(_ block: BasicBlock) -> Bool {
@@ -55,7 +55,7 @@ struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
-    PassContext_freeBasicBlockSet(context._bridged, bridged)
+    PassContext_freeBasicBlockSet(context, bridged)
   }
 }
 
@@ -69,12 +69,12 @@ struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct ValueSet : CustomStringConvertible, NoReflectionChildren {
 
-  private let context: PassContext
+  private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
     
-  init(_ context: PassContext) {
-    self.context = context
-    self.bridged = PassContext_allocNodeSet(context._bridged)
+  init(_ context: some Context) {
+    self.context = context._bridged
+    self.bridged = PassContext_allocNodeSet(self.context)
   }
 
   func contains(_ value: Value) -> Bool {
@@ -114,7 +114,7 @@ struct ValueSet : CustomStringConvertible, NoReflectionChildren {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
-    PassContext_freeNodeSet(context._bridged, bridged)
+    PassContext_freeNodeSet(context, bridged)
   }
 }
 
@@ -128,12 +128,12 @@ struct ValueSet : CustomStringConvertible, NoReflectionChildren {
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct InstructionSet : CustomStringConvertible, NoReflectionChildren {
 
-  private let context: PassContext
+  private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
     
-  init(_ context: PassContext) {
-    self.context = context
-    self.bridged = PassContext_allocNodeSet(context._bridged)
+  init(_ context: some Context) {
+    self.context = context._bridged
+    self.bridged = PassContext_allocNodeSet(self.context)
   }
 
   func contains(_ inst: Instruction) -> Bool {
@@ -164,6 +164,6 @@ struct InstructionSet : CustomStringConvertible, NoReflectionChildren {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
-    PassContext_freeNodeSet(context._bridged, bridged)
+    PassContext_freeNodeSet(context, bridged)
   }
 }

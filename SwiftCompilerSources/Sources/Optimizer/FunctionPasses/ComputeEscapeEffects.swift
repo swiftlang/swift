@@ -26,7 +26,7 @@ import SIL
 /// The pass does not try to change or re-compute _defined_ effects.
 ///
 let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   var newEffects = function.effects.escapeEffects.arguments.filter {!$0.isDerived }
 
@@ -80,7 +80,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
 private
 func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
                    to newEffects: inout [EscapeEffects.ArgumentEffect],
-                   _ returnInst: ReturnInst?, _ context: PassContext) -> Bool {
+                   _ returnInst: ReturnInst?, _ context: FunctionPassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
@@ -203,7 +203,7 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
 private
 func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjectionPath,
                                toPath: SmallProjectionPath,
-                               returnInst: ReturnInst, _ context: PassContext) -> Bool {
+                               returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
   struct IsExclusiveReturnEscapeVisitor : EscapeVisitor {
     let fromArgument: Argument
     let fromPath: SmallProjectionPath
@@ -237,7 +237,7 @@ func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjection
 
 private
 func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjectionPath,
-                                 toArgumentIndex: Int, toPath: SmallProjectionPath, _ context: PassContext) -> Bool {
+                                 toArgumentIndex: Int, toPath: SmallProjectionPath, _ context: FunctionPassContext) -> Bool {
   struct IsExclusiveArgumentEscapeVisitor : EscapeVisitor {
     let fromArgument: Argument
     let fromPath: SmallProjectionPath

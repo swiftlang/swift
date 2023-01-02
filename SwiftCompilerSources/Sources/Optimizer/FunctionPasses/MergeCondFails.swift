@@ -29,7 +29,7 @@ private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
 /// write in between them.
 /// This pass merges cond_fail instructions by building the disjunction of
 /// their operands.
-private func runMergeCondFails(function: Function, context: PassContext) {
+private func runMergeCondFails(function: Function, context: FunctionPassContext) {
 
   // Merge cond_fail instructions if there is no side-effect or read in
   // between them.
@@ -59,7 +59,7 @@ private func runMergeCondFails(function: Function, context: PassContext) {
 /// Try to merge the cond_fail instructions. Returns true if any could
 /// be merge.
 private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
-                            context: PassContext) {
+                            context: FunctionPassContext) {
   guard let lastCFI = condFailToMerge.last else {
     return
   }

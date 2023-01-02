@@ -32,7 +32,7 @@ import SIL
 /// continue_bb(%bridgedOptionalSwiftValue):
 /// ```
 let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   if !function.hasOwnership { return }
 
@@ -71,7 +71,7 @@ let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt", {
 /// The `block` is the continue-block of the second `switch_enum` diamond.
 /// Returns true if the pass should continue running.
 private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
-                                      _ context: PassContext) -> Bool {
+                                      _ context: FunctionPassContext) -> Bool {
   if block.arguments.count != 1 {
     // For simplicity only handle the common case: there is only one phi-argument which
     // is the result of the bridging operation.
@@ -120,7 +120,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
 /// The `apply` is the second (swift -> ObjC) bridging call.
 /// Returns true if the pass should continue running.
 private func optimizeNonOptionalBridging(_ apply: ApplyInst,
-                                         _ context: PassContext) -> Bool {
+                                         _ context: FunctionPassContext) -> Bool {
                                               
   guard let bridgeToObjcCall = isBridgeToObjcCall(apply) else {
     return true
@@ -229,7 +229,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 //===----------------------------------------------------------------------===//
 
 /// Removes `enum` instructions and bridging calls in all predecessors of `block`.
-private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: PassContext) {
+private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: FunctionPassContext) {
   for pred in block.predecessors {
     let branch = pred.terminator as! BranchInst
     let builder = Builder(after: branch, context)

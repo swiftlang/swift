@@ -39,7 +39,7 @@ import SIL
 /// reference count.
 /// Later optimizations can clean that up.
 let stackPromotion = FunctionPass(name: "stack-promotion") {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
   
   let deadEndBlocks = context.deadEndBlocks
 
@@ -64,14 +64,14 @@ let stackPromotion = FunctionPass(name: "stack-promotion") {
   }
   if needFixStackNesting {
     // Make sure that all stack allocating instructions are nested correctly.
-    context.fixStackNesting(function: function)
+    function.fixStackNesting(context)
   }
 }
 
 // Returns true if the allocation is promoted.
 private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
                              _ deadEndBlocks: DeadEndBlocksAnalysis,
-                             _ context: PassContext) -> Bool {
+                             _ context: FunctionPassContext) -> Bool {
   if allocRef.isObjC || allocRef.canAllocOnStack {
     return false
   }
@@ -191,7 +191,7 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   return true
 }
 
-private func getDominatingBlockOfAllUsePoints(context: PassContext,
+private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,
                                               _ value: SingleValueInstruction,
                                               domTree: DominatorTree) -> BasicBlock {
   struct FindDominatingBlock : EscapeVisitorWithResult {
@@ -213,7 +213,7 @@ private struct ComputeInnerLiferange : EscapeVisitorWithResult {
   var result: InstructionRange
   let domTree: DominatorTree
 
-  init(of instruction: Instruction, _ domTree: DominatorTree, _ context: PassContext) {
+  init(of instruction: Instruction, _ domTree: DominatorTree, _ context: FunctionPassContext) {
     result = InstructionRange(begin: instruction, context)
     self.domTree = domTree
   }
@@ -231,7 +231,7 @@ private struct ComputeInnerLiferange : EscapeVisitorWithResult {
 private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
   var result: BasicBlockRange
 
-  init(dominatedBy: BasicBlock, _ context: PassContext) {
+  init(dominatedBy: BasicBlock, _ context: FunctionPassContext) {
     result = BasicBlockRange(begin: dominatedBy, context)
   }
 

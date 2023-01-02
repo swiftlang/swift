@@ -75,7 +75,7 @@ extension ProjectedValue {
   /// the walk. See `EscapeVisitor` for details.
   ///
   func isEscaping(using visitor: some EscapeVisitor = DefaultVisitor(),
-                  _ context: PassContext) -> Bool {
+                  _ context: some Context) -> Bool {
     var walker = EscapeWalker(visitor: visitor, context)
     return walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk
   }
@@ -87,7 +87,7 @@ extension ProjectedValue {
   /// Technically, this means that the walk starts downwards instead of upwards.
   ///
   func isEscapingWhenWalkingDown(using visitor: some EscapeVisitor = DefaultVisitor(),
-                                 _ context: PassContext) -> Bool {
+                                 _ context: some Context) -> Bool {
     var walker = EscapeWalker(visitor: visitor, context)
     return walker.walkDown(addressOrValue: value, path: path.escapePath) == .abortWalk
   }
@@ -98,7 +98,7 @@ extension ProjectedValue {
   /// it returns the `result` of the `visitor`, if the projected value does not escape.
   /// Returns nil, if the projected value escapes.
   ///
-  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
+  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, context)
     if walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk {
       return nil
@@ -113,7 +113,7 @@ extension ProjectedValue {
   /// of returning a Bool, it returns the `result` of the `visitor`.
   ///
   func visitByWalkingDown<V: EscapeVisitorWithResult>(using visitor: V,
-                                                      _ context: PassContext) -> V.Result? {
+                                                      _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, context)
     if walker.walkDown(addressOrValue: value, path: path.escapePath) == .abortWalk {
       return nil
@@ -125,17 +125,17 @@ extension ProjectedValue {
 extension Value {
   /// The un-projected version of `ProjectedValue.isEscaping()`.
   func isEscaping(using visitor: some EscapeVisitor = DefaultVisitor(),
-                  _ context: PassContext) -> Bool {
+                  _ context: some Context) -> Bool {
     return self.at(SmallProjectionPath()).isEscaping(using: visitor, context)
   }
 
   func isEscapingWhenWalkingDown(using visitor: some EscapeVisitor = DefaultVisitor(),
-                                 _ context: PassContext) -> Bool {
+                                 _ context: some Context) -> Bool {
     return self.at(SmallProjectionPath()).isEscapingWhenWalkingDown(using: visitor, context)
   }
 
   /// The un-projected version of `ProjectedValue.visit()`.
-  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
+  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: some Context) -> V.Result? {
     return self.at(SmallProjectionPath()).visit(using: visitor, context)
   }
 }
@@ -287,7 +287,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                                                     AddressUseDefWalker {
   typealias Path = EscapeUtilityTypes.EscapePath
   
-  init(visitor: V, _ context: PassContext) {
+  init(visitor: V, _ context: some Context) {
     self.calleeAnalysis = context.calleeAnalysis
     self.visitor = visitor
   }

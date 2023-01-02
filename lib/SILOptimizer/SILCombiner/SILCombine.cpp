@@ -538,28 +538,28 @@ static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
-void SILCombine_registerInstructionPass(llvm::StringRef name,
+void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[name] = runFn;
+  swiftInstPasses[instClassName] = runFn;
   passesRegistered = true;
 }
 
-#define SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, LEGACY_RUN) \
+#define SWIFT_SILCOMBINE_PASS(INST) \
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
-  static bool runFunctionSet = false;                                      \
   static bool passDisabled = false;                                        \
-  if (!runFunctionSet) {                                                   \
-    runFunction = swiftInstPasses[TAG];                                    \
-    if (!runFunction && passesRegistered) {                                \
-      llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
-      abort();                                                             \
-    }                                                                      \
-    passDisabled = SILPassManager::isPassDisabled(TAG);                    \
-    runFunctionSet = true;                                                 \
-  }                                                                        \
   if (!runFunction) {                                                      \
-    LEGACY_RUN;                                                            \
+    runFunction = swiftInstPasses[#INST];                                  \
+    if (!runFunction) {                                                    \
+      if (passesRegistered) {                                              \
+        llvm::errs() << "Swift pass " << #INST << " is not registered\n";  \
+        abort();                                                           \
+      } else {                                                             \
+        return nullptr;                                                    \
+      }                                                                    \
+    }                                                                      \
+    passDisabled = SILPassManager::isPassDisabled(#INST) ||                \
+                   SILPassManager::isPassDisabled("sil-combine-" #INST);   \
   }                                                                        \
   if (passDisabled &&                                                      \
       SILPassManager::disablePassesForFunction(inst->getFunction())) {     \
@@ -571,12 +571,7 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
 
 #define PASS(ID, TAG, DESCRIPTION)
 
-#define SWIFT_INSTRUCTION_PASS(INST, TAG) \
-  SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return nullptr; })
-
 #include "swift/SILOptimizer/PassManager/Passes.def"
-
-#undef SWIFT_INSTRUCTION_PASS_COMMON
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points

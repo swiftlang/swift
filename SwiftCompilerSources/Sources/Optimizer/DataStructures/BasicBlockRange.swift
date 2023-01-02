@@ -66,7 +66,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
   
-  init(begin: BasicBlock, _ context: PassContext) {
+  init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
     self.inserted = Stack(context)

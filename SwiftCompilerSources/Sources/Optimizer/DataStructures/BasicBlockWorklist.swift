@@ -24,7 +24,7 @@ struct BasicBlockWorklist : CustomStringConvertible, NoReflectionChildren {
   private var worklist: Stack<BasicBlock>
   private var pushedBlocks: BasicBlockSet
 
-  init(_ context: PassContext) {
+  init(_ context: some Context) {
     self.worklist = Stack(context)
     self.pushedBlocks = BasicBlockSet(context)
   }

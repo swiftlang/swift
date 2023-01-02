@@ -54,7 +54,7 @@ let stackProtection = ModulePass(name: "stack-protection", {
 /// In contrast to the `stack-protection` pass, this pass doesn't do any inter-procedural
 /// analysis. It runs at Onone.
 let functionStackProtection = FunctionPass(name: "function-stack-protection", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   if !context.options.enableStackProtection {
     return
@@ -107,13 +107,13 @@ private struct StackProtectionOptimization {
   }
   
   /// The main entry point if running on function-level.
-  mutating func process(function: Function, _ context: PassContext) {
+  mutating func process(function: Function, _ context: FunctionPassContext) {
     var mustFixStackNesting = false
     for inst in function.instructions {
       process(instruction: inst, in: function, mustFixStackNesting: &mustFixStackNesting, context)
     }
     if mustFixStackNesting {
-      context.fixStackNesting(function: function)
+      function.fixStackNesting(context)
     }
   }
 
@@ -127,7 +127,7 @@ private struct StackProtectionOptimization {
   /// - if the origin is unknown, move the value into a temporary and set the function's
   ///   `needStackProtection` flag.
   private mutating func process(instruction: Instruction, in function: Function,
-                                mustFixStackNesting: inout Bool, _ context: PassContext) {
+                                mustFixStackNesting: inout Bool, _ context: FunctionPassContext) {
 
     // `withUnsafeTemporaryAllocation(of:capacity:_:)` is compiled to a `builtin "stackAlloc"`.
     if let bi = instruction as? BuiltinInst, bi.id == .StackAlloc {
@@ -322,7 +322,7 @@ private struct StackProtectionOptimization {
   }
 
   /// Moves the value of an indirect argument to a temporary stack location, if possible.
-  private func moveToTemporary(argument: FunctionArgument, _ context: PassContext) {
+  private func moveToTemporary(argument: FunctionArgument, _ context: FunctionPassContext) {
     if !argument.convention.isInout {
       // We cannot move from a read-only argument.
       // Also, read-only arguments shouldn't be subject to buffer overflows (because
@@ -354,7 +354,7 @@ private struct StackProtectionOptimization {
 
   /// Moves the value of a `beginAccess` to a temporary stack location, if possible.
   private func moveToTemporary(scope beginAccess: BeginAccessInst, mustFixStackNesting: inout Bool,
-                               _ context: PassContext) {
+                               _ context: FunctionPassContext) {
     if beginAccess.accessKind != .Modify {
       // We can only move from a `modify` access.
       // Also, read-only accesses shouldn't be subject to buffer overflows (because
@@ -401,7 +401,7 @@ private struct ArgumentWorklist : ValueUseDefWalker {
   // The actual worklist.
   private var list: Stack<FunctionArgument>
 
-  init(_ context: PassContext) {
+  init(_ context: FunctionPassContext) {
     self.list = Stack(context)
   }
 
@@ -510,7 +510,7 @@ private extension Instruction {
 }
 
 private extension Function {
-  func setNeedsStackProtection(_ context: PassContext) {
+  func setNeedsStackProtection(_ context: FunctionPassContext) {
     if !needsStackProtection {
       set(needStackProtection: true, context)
     }

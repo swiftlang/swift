@@ -48,7 +48,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   private var insertedInsts: InstructionSet
 
-  init(begin beginInst: Instruction, _ context: PassContext) {
+  init(begin beginInst: Instruction, _ context: some Context) {
     self.begin = beginInst
     self.blockRange = BasicBlockRange(begin: beginInst.parentBlock, context)
     self.insertedInsts = InstructionSet(context)
