@@ -141,6 +141,9 @@ jobs:
 
       - run: chmod -R 777 ./build-cache
         if: ${{ steps.build-cache.outputs.cache-hit }}
+      - name: Install Homebrew dependencies
+        if: ${{ startsWith(matrix.build_os, 'macos-') }}
+        run: brew bundle --file swift/Brewfile && brew install wasmer
       - name: Build ${{ matrix.target }} installable archive on Docker container
         if: ${{ matrix.container != null }}
         timeout-minutes: 300 # Exit before 6 hours limit to allow cache upload
