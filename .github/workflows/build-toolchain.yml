@@ -4,19 +4,11 @@ on:
   push:
     branches:
       - swiftwasm
-      - swiftwasm-release/5.3
-      - swiftwasm-release/5.4
-      - swiftwasm-release/5.5
-      - swiftwasm-release/5.6
-      - swiftwasm-release/5.7
+      - swiftwasm-release/**
   pull_request:
     branches:
       - swiftwasm
-      - swiftwasm-release/5.3
-      - swiftwasm-release/5.4
-      - swiftwasm-release/5.5
-      - swiftwasm-release/5.6
-      - swiftwasm-release/5.7
+      - swiftwasm-release/**
     types: [opened, synchronize, reopened]
 jobs:
   start-runner:
