@@ -258,9 +258,10 @@ extension String.UTF16View: BidirectionalCollection {
     return result
   }
 
+  @_effects(releasenone)
   public func distance(from start: Index, to end: Index) -> Int {
-    let start = _guts.ensureMatchingEncoding(start)
-    let end = _guts.ensureMatchingEncoding(end)
+    var start = _guts.ensureMatchingEncoding(start)
+    var end = _guts.ensureMatchingEncoding(end)
 
     // FIXME: This method used to not properly validate indices before 5.7;
     // temporarily allow older binaries to keep invoking undefined behavior as
@@ -293,6 +294,11 @@ extension String.UTF16View: BidirectionalCollection {
       // code unit will map to a single UTF-8 code unit, i.e., the worst
       // possible (a.k.a. most compact) case with all ASCII scalars.
       // FIXME: Figure out if a more optimistic threshold would work better.
+      start = _utf16AlignNativeIndex(start)
+      end = _utf16AlignNativeIndex(end)
+      guard start <= end else {
+        return -_utf16Distance(from: end, to: start)
+      }
       return _utf16Distance(from: start, to: end)
     }
 
@@ -737,8 +743,7 @@ extension String.UTF16View {
     return utf16Count
   }
 #endif
-  
-  @inline(__always)
+
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
         
