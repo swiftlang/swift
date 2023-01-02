@@ -35,13 +35,17 @@ case $(uname -s) in
   ;;
 esac
 
-BUILD_HOST_TOOLCHAIN=1
+OPTIONS_BUILD_HOST_TOOLCHAIN=1
+OPTIONS_DAILY_SNAPSHOT=0
 TOOLCHAIN_CHANNEL=${TOOLCHAIN_CHANNEL:-DEVELOPMENT}
 
 while [ $# -ne 0 ]; do
   case "$1" in
     --skip-build-host-toolchain)
-    BUILD_HOST_TOOLCHAIN=0
+    OPTIONS_BUILD_HOST_TOOLCHAIN=0
+  ;;
+    --daily-snapshot)
+    OPTIONS_DAILY_SNAPSHOT=1
   ;;
   *)
     echo "Unrecognised argument \"$1\""
@@ -54,7 +58,12 @@ done
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_NAME="swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
+
+if [ ${OPTIONS_DAILY_SNAPSHOT} -eq 1 ]; then
+  TOOLCHAIN_NAME="swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
+else
+  TOOLCHAIN_NAME="swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT"
+fi
 
 PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
@@ -181,11 +190,18 @@ create_darwin_info_plist() {
   echo "-- Create Info.plist --"
   PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
 
-  DARWIN_TOOLCHAIN_VERSION="$(swift_version).${YEAR}${MONTH}${DAY}"
   BUNDLE_PREFIX="org.swiftwasm"
-  DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
   DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT="Swift for WebAssembly Snapshot"
-  DARWIN_TOOLCHAIN_DISPLAY_NAME="${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
+
+  if [ ${OPTIONS_DAILY_SNAPSHOT} -eq 1 ]; then
+    DARWIN_TOOLCHAIN_VERSION="$(swift_version).${YEAR}${MONTH}${DAY}"
+    DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
+    DARWIN_TOOLCHAIN_DISPLAY_NAME="${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
+  else
+    DARWIN_TOOLCHAIN_VERSION="$(swift_version).9999"
+    DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.dev"
+    DARWIN_TOOLCHAIN_DISPLAY_NAME="${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT} Development"
+  fi
   DARWIN_TOOLCHAIN_ALIAS="swiftwasm"
 
   DARWIN_TOOLCHAIN_INFO_PLIST="${DIST_TOOLCHAIN_SDK}/Info.plist"
@@ -226,7 +242,7 @@ show_sccache_stats() {
   fi
 }
 
-if [ ${BUILD_HOST_TOOLCHAIN} -eq 1 ]; then
+if [ ${OPTIONS_BUILD_HOST_TOOLCHAIN} -eq 1 ]; then
   build_host_toolchain
   echo "=================================="
   echo "Host toolchain built successfully!"
