@@ -65,13 +65,15 @@ Types in C++ do not always fit cleanly into this model, and they cannot always b
 
 ### Reference types 
 
-**Review Note: this section ('Reference types') has pending changes.**
-
 Like Swift types, Objective-C types fall into two categories, which makes importing them easy: structs are imported as value types and Objective-C classes are imported as Swift class types. The same is not true for C++. As discussed above, there is no clear idiom for defining reference types in C++. All types in C++ are declared in the same way, but some types have reference semantics and others don’t. To be able to express reference types in Swift natively, users must annotate their reference types as such, which will tell the compiler to import them as Swift classes (which have the same semantics).
 
-There are several common patterns for reference types in C++. Swift's C++ interoperability should support at least these two:
-- **Immortal** reference types are not designed to be managed individually by the program. Objects of these types are allocated and then intentionally "leaked" without tracking their uses. Sometimes these objects are not truly immortal: for example, they may be arena-allocated, with an expectation that they will only be referenced from other objects within the arena. Nonetheless, they aren't expected to be individually managed.
-- **Automatically managed** reference types are reference-counted with custom retain and release operations that are provided by the C++ API.
+Without further information, foreign reference types can be used manually in an unsafe way. This default behavior allows types with reference semantics to be expressed with little effort at the cost of complete saftey. For some types this may be acceptable or even nessisary, but most types will benefit from additional information provided by the programmer. This additional information will further classify imported reference types into specific API patterns that feel native and ergonomic and are completely safe. While there are several common patterns for reference types in C++, Swift's C++ interoperability should support at least these three:
+  
+  - **Immortal** reference types are not designed to be managed individually by the program. Objects of these types are allocated and then intentionally "leaked" without tracking their uses. Sometimes these objects are not truly immortal: for example, they may be arena-allocated, with an expectation that they will only be referenced from other objects within the arena. Nonetheless, they aren't expected to be individually managed.
+  
+  - **Shared** reference types are reference-counted with custom retain and release operations that are provided by the C++ API. These reference types are similar to C++'s `shared_ptr` type as shared references are expected to potentially have many strong references. C++ interoperability should support both intrusive and non-intrusive reference counting; both types that inherit from an intrusive reference count (such as NSObject) and types which are meant to be passed around solely via a non-intrusive wrapper (such as `shared_ptr`) should be automatically managed and have reference semantics. 
+ 
+  - **Unique** reference types can take advantage of Swift's memory ownership features to safely manage an object without reference counting. These reference types are similar to C++'s `unique_ptr` type as unique references are expected to have exactly one strong reference. Unique reference types can be imported as move-only types in Swift where the object will be destroyed after the last use, unless it is moved into another context (transferring its ownership).
   
 [Examples of each of these are given below.](## Examples and Definitions)
 
