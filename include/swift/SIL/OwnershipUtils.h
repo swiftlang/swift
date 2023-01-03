@@ -50,6 +50,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/StackList.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -1299,6 +1300,18 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair);
 
+/// If \p value is a guaranteed non-phi value forwarded from it's instruction's
+/// operands, visit each forwarded operand.
+///
+/// Returns true if \p visitOperand was called (for convenience).
+///
+/// Precondition: \p value is not a phi. The client must handle phis first by
+/// checking if they are reborrows (using BorrowedValue). Reborrows have no
+/// forwarded operands. Guaranteed forwarding need to be handled by recursing
+/// through the phi operands.
+bool visitForwardedGuaranteedOperands(
+  SILValue value, function_ref<void(Operand *)> visitOperand);
+
 /// Visit the phis in the same block as \p phi which are reborrows of a borrow
 /// of one of the values reaching \p phi.
 ///
@@ -1306,6 +1319,24 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
 /// returns true.
 bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
                                  function_ref<bool(SILPhiArgument *)> visitor);
+
+/// Visit each definition of a scope that immediately encloses a guaranteed
+/// value. The guaranteed value effectively keeps these scopes alive.
+///
+/// This means something different depepending on whether \p value is itself a
+/// borrow introducer vs. a forwarded guaranteed value. If \p value is an
+/// introducer, then this discovers the enclosing borrow scope and visits all
+/// introducers of that scope. If \p value is a forwarded value, then this
+/// visits the introducers of the current borrow scope.
+bool visitEnclosingDefs(SILValue value, function_ref<bool(SILValue)> visitor);
+
+/// Visit the values that introduce the borrow scopes that includes \p
+/// value. If value is owned, or introduces a borrow scope, then this only
+/// visits \p value.
+///
+/// Returns false if the visitor returned false and exited early.
+bool visitBorrowIntroducers(SILValue value,
+                            function_ref<bool(SILValue)> visitor);
 
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.

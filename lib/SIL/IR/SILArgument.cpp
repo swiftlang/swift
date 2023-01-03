@@ -341,7 +341,7 @@ TermInst *SILPhiArgument::getTerminatorForResult() const {
   return nullptr;
 }
 
-const Operand *SILArgument::forwardedTerminatorResultOperand() const {
+Operand *SILArgument::forwardedTerminatorResultOperand() const {
   assert(isTerminatorResult() && "API is invalid for phis");
   return getSingleTerminator()->forwardedOperand();
 }

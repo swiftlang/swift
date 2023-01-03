@@ -205,7 +205,7 @@ public:
   /// Precondition: this->isTerminatorResult()
   ///
   /// TODO: Move this and other APIs into a TerminatorResult abstraction.
-  const Operand *forwardedTerminatorResultOperand() const;
+  Operand *forwardedTerminatorResultOperand() const;
 
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
