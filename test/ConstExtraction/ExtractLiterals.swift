@@ -96,7 +96,7 @@
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "\"Hello, World\""
+// CHECK-NEXT:        "value": "First \"string\"\nSecond \\ string"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "string2",
@@ -104,7 +104,7 @@
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "\"Hi\""
+// CHECK-NEXT:        "value": "Hi"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "string3",
@@ -112,7 +112,7 @@
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "\"Hey\""
+// CHECK-NEXT:        "value": "Hey"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
@@ -147,7 +147,7 @@
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "\"Hello\"",
+// CHECK-NEXT:        "value": "Hello",
 // CHECK-NEXT:        "attributes": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Buffered",
@@ -251,7 +251,12 @@ public struct Floats : MyProto {
 }
 
 public struct Strings : MyProto {
-    let string1: String = "Hello, World"
+    let string1: String =
+    """
+    First "string"
+    Second \\ string
+    """
+
     let string2: String = (("Hi"))
     var string3: String { ("Hey") }
 }
