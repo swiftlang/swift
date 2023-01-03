@@ -18,7 +18,6 @@
 #define SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/LocalContext.h"
 
 namespace swift {
 
@@ -54,9 +53,6 @@ public:
 class PersistentParserState {
   std::unique_ptr<IDEInspectionDelayedDeclState> IDEInspectionDelayedDeclStat;
 
-  /// The local context for all top-level code.
-  TopLevelContext TopLevelCode;
-
 public:
   PersistentParserState();
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
@@ -87,10 +83,6 @@ public:
   takeIDEInspectionDelayedDeclState() {
     assert(hasIDEInspectionDelayedDeclState());
     return std::move(IDEInspectionDelayedDeclStat);
-  }
-
-  TopLevelContext &getTopLevelContext() {
-    return TopLevelCode;
   }
 };
 

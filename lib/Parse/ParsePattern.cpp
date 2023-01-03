@@ -1034,13 +1034,6 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
           !SourceMgr.hasIDEInspectionTargetBuffer()) {
         CancellableBacktrackingScope backtrack(*this);
 
-        // Create a local context if needed so we can parse trailing closures.
-        LocalContext dummyContext;
-        Optional<ContextChange> contextChange;
-        if (!CurLocalContext) {
-          contextChange.emplace(*this, CurDeclContext, &dummyContext);
-        }
-        
         SmallVector<ExprListElt, 2> elts;
         auto argListResult = parseArgumentList(tok::l_paren, tok::r_paren,
                                                /*isExprBasic*/ false);
