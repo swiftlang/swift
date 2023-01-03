@@ -172,3 +172,43 @@ extension AttrWithInitsInExts {
 @AttrWithInitsInExts
 struct TestAttrWithExts { // Ok
 }
+
+@runtimeMetadata
+struct FlagForMutating {
+  init<T, Result>(attachedTo: (inout T) -> Result) {}
+  init<T, Result>(attachedTo: (inout T, String, inout Int, (String, [Int])) -> Result) {}
+}
+
+struct TestMutatingMethods {
+  @FlagForMutating mutating func noArgs() -> Int { 42 } // Ok
+  @FlagForMutating mutating func yesArgs(_: String, x: inout Int, _ data: (String, [Int])) -> (q: String, a: Int) {
+    (q: "", a: 42)
+  }
+}
+
+@runtimeMetadata
+struct FlagForAsyncFuncs {
+  init<Act>(attachedTo: (Act) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int, inout [Int]) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int) async -> Void) {}
+  init(attachedTo: () async -> [String]) {}
+}
+
+actor TestActor {
+  @FlagForAsyncFuncs func asyncExternally() throws {
+  }
+
+  @FlagForAsyncFuncs func doSomething() async throws {
+  }
+
+  @FlagForAsyncFuncs nonisolated func doSomething(_: Int) async {
+  }
+
+  @FlagForAsyncFuncs func doSomething(_: Int, x: inout [Int]) async {
+  }
+}
+
+@FlagForAsyncFuncs
+func globalAsyncFn() async -> [String] {
+  return []
+}
