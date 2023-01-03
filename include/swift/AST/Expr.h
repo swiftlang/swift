@@ -4350,6 +4350,10 @@ public:
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
+  static OpaqueValueExpr *
+  createImplicit(ASTContext &ctx, Type Ty, bool isPlaceholder = false,
+                 AllocationArena arena = AllocationArena::Permanent);
+
   /// Whether this opaque value expression represents a placeholder that
   /// is injected before type checking to act as a placeholder for some
   /// value to be specified later.
@@ -6012,17 +6016,20 @@ class TypeJoinExpr final : public Expr,
   static TypeJoinExpr *
   createImpl(ASTContext &ctx,
              llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
-             ArrayRef<Expr *> elements);
+             ArrayRef<Expr *> elements,
+             AllocationArena arena = AllocationArena::Permanent);
 
 public:
-  static TypeJoinExpr *create(ASTContext &ctx, DeclRefExpr *var,
-                              ArrayRef<Expr *> exprs) {
-    return createImpl(ctx, var, exprs);
+  static TypeJoinExpr *
+  create(ASTContext &ctx, DeclRefExpr *var, ArrayRef<Expr *> exprs,
+         AllocationArena arena = AllocationArena::Permanent) {
+    return createImpl(ctx, var, exprs, arena);
   }
 
-  static TypeJoinExpr *create(ASTContext &ctx, Type joinType,
-                              ArrayRef<Expr *> exprs) {
-    return createImpl(ctx, joinType.getPointer(), exprs);
+  static TypeJoinExpr *
+  create(ASTContext &ctx, Type joinType, ArrayRef<Expr *> exprs,
+         AllocationArena arena = AllocationArena::Permanent) {
+    return createImpl(ctx, joinType.getPointer(), exprs, arena);
   }
 
   SourceLoc getLoc() const { return SourceLoc(); }

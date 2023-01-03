@@ -1024,6 +1024,7 @@ private:
     }
 
     if (locator->directlyAt<ClosureExpr>()) {
+      auto &ctx = cs.getASTContext();
       auto *info = closureInfo.get();
 
       if (info->hasMultipleReturns()) {
@@ -1038,10 +1039,9 @@ private:
           // to inject its type into the join.
           if (info->solveReturnIndividually(R)) {
             auto target = *cs.getSolutionApplicationTarget(R);
-            resultExpr = new (ctx) OpaqueValueExpr(
-                /*Range=*/SourceRange(),
-                cs.simplifyType(cs.getType(target.getAsExpr())),
-                /*isPlaceholder=*/true);
+            resultExpr = OpaqueValueExpr::createImplicit(
+                ctx, cs.simplifyType(cs.getType(target.getAsExpr())),
+                /*isPlaceholder=*/true, AllocationArena::ConstraintSolver);
           } else {
             auto target = createTargetForReturn(R);
             resultExpr = target.getAsExpr();
@@ -1051,8 +1051,8 @@ private:
           resultExprs.push_back(resultExpr);
         }
 
-        ASTNode join = TypeJoinExpr::create(cs.getASTContext(),
-                                            context.getType(), resultExprs);
+        ASTNode join = TypeJoinExpr::create(ctx, context.getType(), resultExprs,
+                                            AllocationArena::ConstraintSolver);
 
         elements.push_back(makeElement(join, locator,
                                        /*contextualTypeInfo=*/{},
