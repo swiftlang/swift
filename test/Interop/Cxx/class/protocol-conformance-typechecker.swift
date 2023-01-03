@@ -35,3 +35,10 @@ protocol Invertable {
 extension HasOperatorExclaim: Invertable {}
 
 extension HasOperatorEqualEqual: Equatable {}
+
+
+protocol HasOperatorPlusEqualProtocol {
+  static func +=(lhs: inout Self, x: Int32)
+}
+
+extension HasOperatorPlusEqualInt : HasOperatorPlusEqualProtocol {}
