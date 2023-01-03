@@ -214,7 +214,8 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
           llvm_unreachable("Expected ProtocolDecl or ProtocolCompositionType");
         }
 
-        while (const auto *Comp = UnexpandedCompositions.pop_back_val()) {
+        while (!UnexpandedCompositions.empty()) {
+          const auto *Comp = UnexpandedCompositions.pop_back_val();
           for (const auto &Member : Comp->getMembers()) {
             if (const auto *Proto =
                     dyn_cast_or_null<ProtocolDecl>(Member->getAnyNominal())) {
