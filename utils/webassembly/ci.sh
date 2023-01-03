@@ -12,4 +12,4 @@ $UTILS_PATH/install-build-sdk.sh
 export SCCACHE_CACHE_SIZE="50G"
 export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
-$UTILS_PATH/build-toolchain.sh
+$UTILS_PATH/build-toolchain.sh --daily-snapshot
