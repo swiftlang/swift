@@ -357,8 +357,12 @@ static bool isStoreCopy(SILValue value) {
     findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
                                  roots);
     if (llvm::any_of(roots, [](SILValue root) {
-          return isa<BeginApplyInst>(root->getDefiningInstruction());
-        })) {
+      // Handle forwarding phis conservatively rather than recursing.
+      if (SILArgument::asPhi(root) && !BorrowedValue(root))
+        return true;
+
+      return isa<BeginApplyInst>(root->getDefiningInstruction());
+    })) {
       return false;
     }
   }
