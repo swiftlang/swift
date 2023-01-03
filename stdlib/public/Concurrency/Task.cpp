@@ -1533,8 +1533,8 @@ swift_task_addCancellationHandlerImpl(
 
   bool fireHandlerNow = false;
 
-  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
-    if (parentStatus.isCancelled()) {
+  addStatusRecord(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+    if (oldStatus.isCancelled()) {
       fireHandlerNow = true;
       // We don't fire the cancellation handler here since this function needs
       // to be idempotent

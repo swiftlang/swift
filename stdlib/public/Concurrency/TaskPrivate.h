@@ -51,6 +51,7 @@ namespace swift {
 
 class AsyncTask;
 class TaskGroup;
+class ActiveTaskStatus;
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
@@ -114,6 +115,63 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   return &wtable;
 }
 #endif
+
+/*************** Methods for Status records manipulation ******************/
+
+/// Remove the status record from input task which may not be the current task.
+/// This may be called asynchronously from the current task.  After this call
+/// returns, the record's memory can be freely modified or deallocated.  The
+/// record must be registered with the task. If it isn't, this function will
+/// crash.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task that we are removing the record from. It may
+/// modify the new ActiveTaskStatus that is to be set on the task. This function
+/// may be called multiple times inside a RMW loop and must be therefore be
+/// idempotent. The new status passed to `fn` is freshly derived from the
+/// current status and does not include modifications made by previous runs
+/// through the loop
+SWIFT_CC(swift)
+void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn);
+
+/// Remove a status record from the current task.  After this call returns,
+/// the record's memory can be freely modified or deallocated.
+///
+/// This must be called synchronously with the task.
+///
+/// The given record need not be the last record added to
+/// the task, but the operation may be less efficient if not.
+SWIFT_CC(swift)
+void removeStatusRecord(TaskStatusRecord *record);
+
+/// Add a status record to the current task. This must be called synchronously
+/// with the task.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task that we are adding the record to.
+///
+/// This can be used by the function to
+/// (1) to determine if the current status of the task permits adding the status
+/// record
+/// (2) modify the active task status that is to be set if needed
+///
+/// If the function_ref returns false, the status record is not added to the
+/// task. This function_ref may be called multiple times and must be idempotent.
+/// The new status passed to `fn` is freshly derived from the current status and
+/// does not include modifications made by previous runs through the loop
+SWIFT_CC(swift)
+bool addStatusRecord(TaskStatusRecord *record,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+/// A helper function for updating a new child task that is created with
+/// information from the parent or the group that it was going to be added to.
+SWIFT_CC(swift)
+void updateNewChildWithParentAndGroupState(AsyncTask *child,
+                                           ActiveTaskStatus parentStatus,
+                                           TaskGroup *group);
 
 // ==== ------------------------------------------------------------------------
 
@@ -850,39 +908,6 @@ inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
 inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
-
-/*************** Methods for Status records manipulation ******************/
-
-/// Remove a status record from a task.  After this call returns,
-/// the record's memory can be freely modified or deallocated.
-///
-/// This must be called synchronously with the task.  The record must
-/// be registered with the task or else this may crash.
-///
-/// The given record need not be the last record added to
-/// the task, but the operation may be less efficient if not.
-///
-/// Returns false if the task has been cancelled.
-SWIFT_CC(swift)
-bool removeStatusRecord(TaskStatusRecord *record);
-
-/// Add a status record to a task. This must be called synchronously with the
-/// task.
-///
-/// This function also takes in a function_ref which is given the task status of
-/// the task we're adding the record to, to determine if the current status of
-/// the task permits adding the status record. This function_ref may be called
-/// multiple times and must be idempotent.
-SWIFT_CC(swift)
-bool addStatusRecord(TaskStatusRecord *record,
-                     llvm::function_ref<bool(ActiveTaskStatus)> testAddRecord);
-
-/// A helper function for updating a new child task that is created with
-/// information from the parent or the group that it was going to be added to.
-SWIFT_CC(swift)
-void updateNewChildWithParentAndGroupState(AsyncTask *child,
-                                           ActiveTaskStatus parentStatus,
-                                           TaskGroup *group);
 
 } // end namespace swift
 

@@ -888,10 +888,10 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
   assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+  addStatusRecord(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     // If the task has already been cancelled, reflect that immediately in
     // the group's status.
-    if (parentStatus.isCancelled()) {
+    if (oldStatus.isCancelled()) {
       impl->statusCancel();
     }
     return true;

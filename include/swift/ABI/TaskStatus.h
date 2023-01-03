@@ -22,21 +22,26 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/Task.h"
+#include "swift/Runtime/HeapObject.h"
 
 namespace swift {
 
 /// The abstract base class for all status records.
 ///
-/// TaskStatusRecords are typically allocated on the stack (possibly
-/// in the task context), partially initialized, and then atomically
-/// added to the task with `swift_task_addTaskStatusRecord`.  While
-/// registered with the task, a status record should only be
-/// modified in ways that respect the possibility of asynchronous
-/// access by a cancelling thread.  In particular, the chain of
-/// status records must not be disturbed.  When the task leaves
-/// the scope that requires the status record, the record can
-/// be unregistered from the task with `removeStatusRecord`,
-/// at which point the memory can be returned to the system.
+/// TaskStatusRecords are typically allocated on the stack (possibly in the task
+/// context), partially initialized, and then atomically added to the task with
+/// `addStatusRecord`.
+///
+/// Status records currently are only added to a task by itself but they may be
+/// removed from the task by other threads, or accessed by other threads
+/// asynchronous to the task for other purposes.
+///
+/// As a result, while registered with the task, a status record should only be
+/// modified in ways that respect the possibility of asynchronous access by a
+/// different thread.  In particular, the chain of status records must not be
+/// disturbed. When the task leaves the scope that requires the status record,
+/// the record can be unregistered from the task with `removeStatusRecord`, at
+/// which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
   TaskStatusRecordFlags Flags;
