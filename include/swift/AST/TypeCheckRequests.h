@@ -3850,7 +3850,7 @@ public:
 /// Compute the local discriminators for the given declaration context.
 ///
 /// This is a state-changing operation for closures within the context, which
-/// produces the number of assigned discriminators.
+/// produces the discriminator value that any subsequent requests should use.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
                            unsigned(DeclContext *),

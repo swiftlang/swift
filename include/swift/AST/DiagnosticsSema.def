@@ -6781,6 +6781,9 @@ WARNING(macro_type_access_warn,none,
         (bool, AccessLevel, AccessLevel, bool))
 ERROR(macro_in_nested,none,
       "macro %0 can only be declared at file scope", (DeclName))
+ERROR(macro_without_context,none,
+      "macro %0 must declare its applicable contexts (e.g., '@expression')",
+       (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

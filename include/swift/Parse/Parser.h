@@ -27,7 +27,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserPosition.h"
@@ -176,8 +175,6 @@ public:
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
 
-  LocalContext *CurLocalContext = nullptr;
-
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -241,18 +238,15 @@ public:
   protected:
     Parser &P;
     DeclContext *OldContext; // null signals that this has been popped
-    LocalContext *OldLocal;
 
     ContextChange(const ContextChange &) = delete;
     ContextChange &operator=(const ContextChange &) = delete;
 
   public:
-    ContextChange(Parser &P, DeclContext *DC,
-                  LocalContext *newLocal = nullptr)
-      : P(P), OldContext(P.CurDeclContext), OldLocal(P.CurLocalContext) {
+    ContextChange(Parser &P, DeclContext *DC)
+      : P(P), OldContext(P.CurDeclContext) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
-      P.CurLocalContext = newLocal;
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
@@ -270,16 +264,15 @@ public:
   private:
     void popImpl() {
       P.CurDeclContext = OldContext;
-      P.CurLocalContext = OldLocal;
     }
   };
 
   /// A RAII object for parsing a new local context.
-  class ParseFunctionBody : public LocalContext {
+  class ParseFunctionBody {
   private:
     ContextChange CC;
   public:
-    ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC, this) {
+    ParseFunctionBody(Parser &P, DeclContext *DC) : CC(P, DC) {
       assert(!isa<TopLevelCodeDecl>(DC) &&
              "top-level code should be parsed using TopLevelCodeContext!");
     }
@@ -990,8 +983,7 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void setLocalDiscriminator(ValueDecl *D);
-  void setLocalDiscriminatorToParamList(ParameterList *PL);
+  void recordLocalType(TypeDecl *TD);
 
   /// Skip an `#if` configuration block containing only attributes.
   ///

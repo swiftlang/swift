@@ -2742,7 +2742,7 @@ class DeclDeserializer {
   DeclAttribute **AttrsNext = &DAttrs;
 
   Identifier privateDiscriminator;
-  unsigned localDiscriminator = 0;
+  unsigned localDiscriminator = ValueDecl::InvalidDiscriminator;
   StringRef filenameForPrivate;
 
   // Auxiliary map for deserializing `@differentiable` attributes.
@@ -2818,7 +2818,7 @@ public:
       if (!privateDiscriminator.empty())
         MF.PrivateDiscriminatorsByValue[value] = privateDiscriminator;
 
-      if (localDiscriminator != 0)
+      if (localDiscriminator != ValueDecl::InvalidDiscriminator)
         value->setLocalDiscriminator(localDiscriminator);
 
       if (!filenameForPrivate.empty())

@@ -2292,10 +2292,14 @@ private:
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
+public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+private:
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
-  unsigned LocalDiscriminator = 0;
+  unsigned LocalDiscriminator = InvalidDiscriminator;
 
   struct {
     /// Whether the "IsObjC" bit has been computed yet.
@@ -2581,6 +2585,12 @@ public:
   /// setters have discriminators.
   unsigned getLocalDiscriminator() const;
   void setLocalDiscriminator(unsigned index);
+
+  /// Whether this declaration has a local discriminator.
+  bool hasLocalDiscriminator() const;
+
+  /// Return the "raw" local discriminator, without computing it.
+  unsigned getRawLocalDiscriminator() const { return LocalDiscriminator; }
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
@@ -8297,6 +8307,17 @@ public:
   }
 };
 
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroContext: uint8_t {
+  /// An expression macro, referenced explicitly via "#stringify" or similar
+  /// in the source code.
+  Expression = 0x01,
+};
+
+/// The contexts in which a particular macro declaration can be used.
+using MacroContexts = OptionSet<MacroContext>;
+
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.
@@ -8347,6 +8368,9 @@ public:
 
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
+
+  /// Determine the contexts in which this macro can be applied.
+  MacroContexts getMacroContexts() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
