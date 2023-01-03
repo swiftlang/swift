@@ -197,7 +197,9 @@ option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
-if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
+elseif(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
 else()
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
@@ -205,7 +207,7 @@ endif()
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
-    "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
+    "Build the concurrency library to use the given global executor (options: none, dispatch, singlethreaded, hooked)")
 
 option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."
