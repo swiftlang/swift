@@ -184,7 +184,7 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
   Ty = Ty->getCanonicalType();
 
   // For opaque types like 'some View', consider them equivalent to 'View'.
-  if (auto OpaqueType = Ty->getAs<OpaqueTypeArchetypeType>()) {
+  if (auto OpaqueType = Ty->getAs<ArchetypeType>()) {
     if (auto Existential = OpaqueType->getExistentialType()) {
       Ty = Existential;
     }
