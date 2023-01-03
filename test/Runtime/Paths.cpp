@@ -63,7 +63,7 @@ int main(void) {
 
   // Runtime path must point to libswiftCore and must be a file.
 
-  // CHECK: runtime path: {{.*[\\/]}}libswiftCore.{{so|dylib|dll}}
+  // CHECK: runtime path: {{.*[\\/](lib)?}}swiftCore.{{so|dylib|dll}}
   // CHECK-NEXT: runtime is a file: yes
   printf("runtime path: %s\n", runtimePath ? runtimePath: "<NULL>");
   printf("runtime is a file: %s\n", isfile(runtimePath) ? "yes" : "no");
