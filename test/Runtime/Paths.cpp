@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %s -std=c++11 -I %swift_src_root/include -I %swift_src_root/stdlib/public/SwiftShims -I %clang-include-dir -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -lswiftCore -o %t/paths-test
+// RUN: %target-clang %s -std=c++11 -I %swift_src_root/include -I %swift_src_root/stdlib/public/SwiftShims -I %clang-include-dir -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name/%target-arch -lswiftCore -o %t/paths-test
 // RUN: %target-codesign %t/paths-test
 // RUN: %target-run %t/paths-test | %FileCheck %s
 
