@@ -178,6 +178,7 @@ import StrComplexWalk
 import StrToInt
 import StringBuilder
 import StringComparison
+import StringDistance
 import StringEdits
 import StringEnum
 import StringInterpolation
@@ -362,9 +363,10 @@ register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
 register(StringBuilder.benchmarks)
+register(StringComparison.benchmarks)
+register(StringDistance.benchmarks)
 register(StringEdits.benchmarks)
 register(StringEnum.benchmarks)
-register(StringComparison.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
