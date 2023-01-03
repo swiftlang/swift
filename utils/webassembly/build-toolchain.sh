@@ -174,12 +174,6 @@ build_target_toolchain() {
 embed_wasi_sysroot() {
   # Merge wasi-sdk and the toolchain
   cp -r "$WASI_SYSROOT_PATH" "$DIST_TOOLCHAIN_SDK/usr/share"
-
-  # Replace absolute sysroot path with relative path
-  sed -i.bak -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap"
-  rm "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap.bak"
-  sed -i.bak -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/wasi/wasm32/wasi.modulemap"
-  rm "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/wasi/wasm32/wasi.modulemap.bak"
 }
 
 swift_version() {
