@@ -412,7 +412,7 @@ struct SubscriptTest2 {
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2["foo"] // expected-error {{missing argument for parameter #2 in subscript}}
 
   let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 

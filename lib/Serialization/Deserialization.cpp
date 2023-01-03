@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -4586,6 +4587,7 @@ public:
     TypeID resultInterfaceTypeID;
     uint8_t rawAccessLevel;
     unsigned numArgNames;
+    unsigned builtinID;
     IdentifierID externalModuleNameID;
     IdentifierID externalMacroTypeNameID;
 
@@ -4598,6 +4600,7 @@ public:
                                          resultInterfaceTypeID,
                                          rawAccessLevel,
                                          numArgNames,
+                                         builtinID,
                                          externalModuleNameID,
                                          externalMacroTypeNameID,
                                          argNameAndDependencyIDs);
@@ -4647,10 +4650,7 @@ public:
                                       genericParams, nullptr,
                                       SourceLoc(),
                                       nullptr,
-                                      MF.getIdentifier(externalModuleNameID),
-                                      SourceLoc(),
-                                      MF.getIdentifier(externalMacroTypeNameID),
-                                      SourceLoc(),
+                                      nullptr,
                                       parent);
     declOrOffset = macro;
 
@@ -4667,6 +4667,34 @@ public:
 
     if (isImplicit)
       macro->setImplicit();
+
+    // Record definition
+    if (builtinID) {
+      Optional<BuiltinMacroKind> builtinKind;
+      switch (builtinID) {
+      case 1:
+        builtinKind = BuiltinMacroKind::ExternalMacro;
+        break;
+
+      default:
+        break;
+      }
+
+      if (builtinKind) {
+        ctx.evaluator.cacheOutput(
+            MacroDefinitionRequest{macro},
+            MacroDefinition::forBuiltin(*builtinKind)
+        );
+      }
+    } else if (externalModuleNameID > 0) {
+      ctx.evaluator.cacheOutput(
+          MacroDefinitionRequest{macro},
+          MacroDefinition::forExternal(
+            MF.getIdentifier(externalModuleNameID),
+            MF.getIdentifier(externalMacroTypeNameID)
+         )
+      );
+    }
 
     return macro;
   }

@@ -49,6 +49,10 @@ void swift::simple_display(
   simple_display(out, ext);
 }
 
+void swift::simple_display(llvm::raw_ostream &out, ASTContext *ctx) {
+  out << "(AST Context)";
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const TypeResolutionStage &value) {
   switch (value) {

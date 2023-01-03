@@ -4844,11 +4844,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
       consumeToken(tok::code_complete);
       DeclResult = makeParserCodeCompletionResult<Decl>();
       break;
-    } else if (Context.LangOpts.hasFeature(Feature::Macros)) {
-      DeclResult = parseDeclMacroExpansion(Flags, Attributes);
-      break;
     }
-    LLVM_FALLTHROUGH;
+
+    // Parse as a macro expansion.
+    DeclResult = parseDeclMacroExpansion(Flags, Attributes);
+    break;
 
   case tok::pound_if:
   case tok::pound_sourceLocation:
@@ -9080,44 +9080,20 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
     macroFullName = DeclName(Context, macroName, namePieces);
   }
 
-  // Parse '=' ModuleName . MacroTypeName
-  if (!consumeIf(tok::equal)) {
-    diagnose(Tok, diag::macro_decl_expected_equal);
-  }
+  // Parse '=' <expression>
+  Expr *definition = nullptr;
+  if (consumeIf(tok::equal)) {
+    ParserResult<Expr> parsedDefinition =
+        parseExpr(diag::macro_decl_expected_macro_definition);
+    status |= parsedDefinition;
 
-  // ModuleName
-  Identifier externalMacroModule;
-  SourceLoc externalMacroModuleLoc;
-  if (Tok.is(tok::identifier)) {
-    externalMacroModuleLoc = consumeIdentifier(externalMacroModule, true);
-  } else {
-    diagnose(Tok, diag::macro_decl_expected_macro_module);
-    status.setIsParseError();
-    externalMacroModuleLoc = Tok.getLoc();
-  }
-
-  // '.'
-  if (!consumeIf(tok::period)) {
-    diagnose(Tok, diag::macro_decl_expected_period);
-  }
-
-  // MacroTypeName
-  Identifier externalMacroTypeName;
-  SourceLoc externalMacroTypeNameLoc;
-  if (Tok.is(tok::identifier)) {
-    externalMacroTypeNameLoc = consumeIdentifier(
-        externalMacroTypeName, true);
-  } else {
-    diagnose(Tok, diag::macro_decl_expected_macro_type);
-    status.setIsParseError();
-    externalMacroTypeNameLoc = Tok.getLoc();
+    definition = parsedDefinition.getPtrOrNull();
   }
 
   // Create the macro declaration.
   auto *macro = new (Context) MacroDecl(
       macroLoc, macroFullName, macroNameLoc, genericParams, parameterList,
-      arrowOrColonLoc, resultType, externalMacroModule, externalMacroModuleLoc,
-      externalMacroTypeName, externalMacroTypeNameLoc, CurDeclContext);
+      arrowOrColonLoc, resultType, definition, CurDeclContext);
   macro->getAttrs() = attributes;
 
   // Parse a 'where' clause if present.

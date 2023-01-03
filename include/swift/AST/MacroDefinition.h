@@ -22,64 +22,97 @@
 
 namespace swift {
 
+/// A reference to an external macro definition that is understood by ASTGen.
+struct ExternalMacroDefinition {
+  /// ASTGen's notion of an macro definition, which is opaque to the C++ part
+  /// of the compiler.
+  void *opaqueHandle = nullptr;
+};
+
+/// A reference to an external macro.
+struct ExternalMacroReference {
+  Identifier moduleName;
+  Identifier macroTypeName;
+};
+
+/// Describes the known kinds of builtin macros.
+enum class BuiltinMacroKind: uint8_t {
+  /// #externalMacro, which references an external macro.
+  ExternalMacro,
+};
+
 /// Provides the definition of a macro.
 class MacroDefinition {
 public:
-  /// Describes a missing macro definition.
-  struct MissingDefinition {
-    Identifier externalModuleName;
-    Identifier externalMacroTypeName;
-  };
-
     /// Describes how the macro is implemented.
-  enum class ImplementationKind: uint8_t {
+  enum class Kind: uint8_t {
+    /// The macro has a definition, but it is invalid, so the macro cannot be
+    /// expanded.
+    Invalid,
+
     /// The macro has no definition.
     Undefined,
 
-    /// The macro has a definition, but it could not be found.
-    Missing,
+    /// An externally-provided macro definition.
+    External,
 
-    /// The macro is in the same process as the compiler, whether built-in or
-    /// loaded via a compiler plugin.
-    InProcess,
+    /// A builtin macro definition, which has a separate builtin kind.
+    Builtin,
   };
 
-  ImplementationKind implKind;
+  Kind kind;
 
 private:
-  void *opaqueHandle;
+  union Data {
+    ExternalMacroReference external;
+    BuiltinMacroKind builtin;
 
-  MacroDefinition(ImplementationKind implKind, void *opaqueHandle)
-    : implKind(implKind), opaqueHandle(opaqueHandle) { }
+    Data() : builtin(BuiltinMacroKind::ExternalMacro) { }
+  } data;
+
+  MacroDefinition(Kind kind) : kind(kind) { }
+
+  MacroDefinition(ExternalMacroReference external) : kind(Kind::External) {
+    data.external = external;
+  }
+
+  MacroDefinition(BuiltinMacroKind builtinKind) : kind(Kind::Builtin) {
+    data.builtin = builtinKind;
+  }
 
 public:
+  static MacroDefinition forInvalid() {
+    return MacroDefinition(Kind::Invalid);
+  }
+
   static MacroDefinition forUndefined() {
-    return MacroDefinition{
-      ImplementationKind::Undefined, nullptr
-    };
+    return MacroDefinition(Kind::Undefined);
   }
 
-  static MacroDefinition forMissing(
-      ASTContext &ctx,
-      Identifier externalModuleName,
-      Identifier externalMacroTypeName
-  );
-
-  static MacroDefinition forInProcess(void *opaqueHandle) {
-    return MacroDefinition{ImplementationKind::InProcess, opaqueHandle};
+  static MacroDefinition forExternal(
+      Identifier moduleName,
+      Identifier macroTypeName
+   ) {
+    return MacroDefinition(ExternalMacroReference{moduleName, macroTypeName});
   }
 
-  /// Return the opaque handle for an in-process macro definition.
-  void *getInProcessOpaqueHandle() const {
-    assert(implKind == ImplementationKind::InProcess);
-    return opaqueHandle;
+  static MacroDefinition forBuiltin(BuiltinMacroKind builtinKind) {
+    return MacroDefinition(builtinKind);
   }
 
-  /// Return more information about a missing macro definition.
-  MissingDefinition *getMissingDefinition() const {
-    assert(implKind == ImplementationKind::Missing);
-    return static_cast<MissingDefinition *>(opaqueHandle);
+  /// Retrieve the external macro being referenced.
+  ExternalMacroReference getExternalMacro() const {
+    assert(kind == Kind::External);
+    return data.external;
   }
+
+  /// Retrieve the builtin kind.
+  BuiltinMacroKind getBuiltinKind() const {
+    assert(kind == Kind::Builtin);
+    return data.builtin;
+  }
+
+  explicit operator bool() const { return kind != Kind::Invalid; }
 };
 
 }

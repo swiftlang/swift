@@ -103,7 +103,7 @@ precedencegroup $Precedence { // expected-error {{cannot declare entity named '$
   higherThan: $Precedence // expected-error {{cycle in 'higherThan' relation}}
 }
 infix operator **: $Precedence
-#$UnknownDirective() // expected-error {{use of unknown directive '#$UnknownDirective'}}
+#$UnknownDirective() // expected-error {{no macro named '$UnknownDirective'}}
 
 
 // https://github.com/apple/swift/issues/55672
