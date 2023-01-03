@@ -113,8 +113,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
         swift_ASTGen_destroyMacro(inProcess);
       });
 
-      return MacroDefinition::forInProcess(
-          MacroDefinition::Expression, inProcess);
+      return MacroDefinition::forInProcess(inProcess);
     }
   }
 #endif

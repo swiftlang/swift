@@ -2000,6 +2000,8 @@ public:
 
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
+    if (!MD->getMacroContexts())
+      MD->diagnose(diag::macro_without_context, MD->getName());
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
