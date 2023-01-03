@@ -50,20 +50,91 @@
 // CHECK: @"$s18runtime_attributes20attrIsHigherThanFuncyycvpfaAA13FlagWithAvailHF"
 // CHECK: @"$s18runtime_attributes9OuterTypeV5InnerV15innerInstFnTestyycvpfaAA07FlagForE7MethodsHF"
 // CHECK: @"$s18runtime_attributes9OuterTypeV5InnerV17innerStaticFnTestyycvpZfaAA07FlagForE7MethodsHF"
+// CHECK: @"$s18runtime_attributes9OuterTypeV5InnerV07mutableE6FnTest1x_ySS_SiztcvpfaAA07FlagForE7MethodsHF"
+// CHECK: @"$s18runtime_attributes9OuterTypeV15outerMutatingFnSiycvpfaAA19FlagForInnerMethodsHF"
 
-// CHECK: @"$s18runtime_attributes4FlagVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s18runtime_attributes4FlagVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes4FlagVHa", i32 0, i32 1) to i64)) to i32), i32 16, {{.*}} @"$s18runtime_attributes4FlagVHa", i32 0, i32 34) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s18runtime_attributes4FlagVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s18runtime_attributes4FlagVMn"
+// CHECK-SAME: i32 16
+// CHECK-SAME: @"$s18runtime_attributes8globalFnyycvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV2v1SSvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV4compSivpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5test1SiycvpZfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5test2yycvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV1xSaySiGSgvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC4testSaySiGSgvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerAcDCmvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AAaBVmvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC1BV03extC10StaticTestyycvpZfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC1BV03extC4TestyycvpZfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC1BV6storedSivpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC1BAeFVmvpfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC13extStaticTestyycvpZfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC7extTestyycvpZfaAA4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC11extComputedSivpfaAA4FlagHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s18runtime_attributes13OnlyPropsTestVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s18runtime_attributes13OnlyPropsTestVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes13OnlyPropsTestVHa", i32 0, i32 1) to i64)) to i32), i32 4, {{.*}} @"$s18runtime_attributes13OnlyPropsTestVHa", i32 0, i32 10) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s18runtime_attributes13OnlyPropsTestVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s18runtime_attributes13OnlyPropsTestVMn"
+// CHECK-SAME: i32 4
+// CHECK-SAME: @"$s18runtime_attributes1AV1xSaySiGSgvpfaAA13OnlyPropsTestHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC4testSaySiGSgvpfaAA13OnlyPropsTestHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC1BV6storedSivpfaAA13OnlyPropsTestHF"
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC11extComputedSivpfaAA13OnlyPropsTestHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s3RAD6IgnoreVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (%swift.type_descriptor* @"$s3RAD6IgnoreVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 1) to i64)) to i32), i32 5, i32 trunc (i64 sub (i64 ptrtoint (<{ [2 x i8], i8 }>* @"symbolic Si" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes1AV5InnerC11extComputedSivpfa3RAD6IgnoreHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 4) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ i8, i32, [1 x i8], i8 }>* @"symbolic _____m 18runtime_attributes16WithExternalAttrV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 5) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes16WithExternalAttrAaBVmvpfa3RAD6IgnoreHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 6) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ i8, i32, [1 x i8], i8 }>* @"symbolic _____m 18runtime_attributes14TestInference1V" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 7) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes14TestInference1AaBVmvpfa3RAD6IgnoreHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 8) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ i8, i32, [1 x i8], i8 }>* @"symbolic _____m 18runtime_attributes14TestInference2C" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 9) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes14TestInference2AaBCmvpfa3RAD6IgnoreHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 10) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ i8, i32, [1 x i8], i8 }>* @"symbolic _____m 18runtime_attributes14TestInference3O" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 11) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes14TestInference3AaBOmvpfa3RAD6IgnoreHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD6IgnoreVHa", i32 0, i32 12) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s3RAD6IgnoreVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s3RAD6IgnoreVMn"
+// CHECK-SAME: i32 5
+// CHECK-SAME: @"$s18runtime_attributes1AV5InnerC11extComputedSivpfa3RAD6IgnoreHF"
+// CHECK-SAME: @"$s18runtime_attributes16WithExternalAttrAaBVmvpfa3RAD6IgnoreHF"
+// CHECK-SAME: @"$s18runtime_attributes14TestInference1AaBVmvpfa3RAD6IgnoreHF"
+// CHECK-SAME: @"$s18runtime_attributes14TestInference2AaBCmvpfa3RAD6IgnoreHF"
+// CHECK-SAME: @"$s18runtime_attributes14TestInference3AaBOmvpfa3RAD6IgnoreHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s3RAD13TestAmbiguityVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (%swift.type_descriptor* @"$s3RAD13TestAmbiguityVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 1) to i64)) to i32), i32 6, i32 trunc (i64 sub (i64 ptrtoint (<{ [4 x i8], i8 }>* @"symbolic ySic" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes4testyySicvpfa3RAD13TestAmbiguityHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 4) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [4 x i8], i8 }>* @"symbolic ySSc" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 5) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes4testyySScvpfa3RAD13TestAmbiguityHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 6) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [4 x i8], i8, i32, [2 x i8], i8 }>* @"symbolic Siyc_____mc 18runtime_attributes15TestNoAmbiguityV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 7) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes15TestNoAmbiguityV10testStaticSiycvpZfa3RAD0cE0HF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 8) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8, i32, [2 x i8], i8 }>* @"symbolic yyc_____mc 18runtime_attributes15TestNoAmbiguityV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 9) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes15TestNoAmbiguityV10testStaticyycvpZfa3RAD0cE0HF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 10) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [8 x i8], i8, i32, [1 x i8], i8 }>* @"symbolic ySi_SStc_____c 18runtime_attributes15TestNoAmbiguityV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 11) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes15TestNoAmbiguityV8testInstyySi_SStcvpfa3RAD0cE0HF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 12) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [8 x i8], i8, i32, [1 x i8], i8 }>* @"symbolic ySi_Sitc_____c 18runtime_attributes15TestNoAmbiguityV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 13) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes15TestNoAmbiguityV8testInstyySi_Sitcvpfa3RAD0cE0HF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s3RAD13TestAmbiguityVHa", i32 0, i32 14) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s3RAD13TestAmbiguityVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s3RAD13TestAmbiguityVMn"
+// CHECK-SAME: i32 6
+// CHECK-SAME: @"$s18runtime_attributes4testyySicvpfa3RAD13TestAmbiguityHF"
+// CHECK-SAME: @"$s18runtime_attributes4testyySScvpfa3RAD13TestAmbiguityHF"
+// CHECK-SAME: @"$s18runtime_attributes15TestNoAmbiguityV10testStaticSiycvpZfa3RAD0cE0HF"
+// CHECK-SAME: @"$s18runtime_attributes15TestNoAmbiguityV10testStaticyycvpZfa3RAD0cE0HF"
+// CHECK-SAME: @"$s18runtime_attributes15TestNoAmbiguityV8testInstyySi_SStcvpfa3RAD0cE0HF"
+// CHECK-SAME: @"$s18runtime_attributes15TestNoAmbiguityV8testInstyySi_Sitcvpfa3RAD0cE0HF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s18runtime_attributes17AvailabilityTestsVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (<{ i32, i32, i32, i32, i32, i32, i32 }>* @"$s18runtime_attributes17AvailabilityTestsVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 1) to i64)) to i32), i32 5, i32 trunc (i64 sub (i64 ptrtoint (<{ [4 x i8], i8 }>* @"symbolic ySic" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes20testWithAvailabilityyySicvpfaAA0E5TestsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 4) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ i8, i32, [1 x i8], i8 }>* @"symbolic _____m 18runtime_attributes20TypeWithAvailabilityC" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 5) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes20TypeWithAvailabilityAaBCmvpfaAA0E5TestsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 6) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8, i32, [2 x i8], i8 }>* @"symbolic yyc_____mc 18runtime_attributes23MembersWithAvailabilityC" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 7) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes23MembersWithAvailabilityC8staticFnyycvpZfaAA0E5TestsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 8) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8, i32, [1 x i8], i8 }>* @"symbolic yyc_____c 18runtime_attributes23MembersWithAvailabilityC" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 9) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes23MembersWithAvailabilityC6instFnyycvpfaAA0E5TestsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 10) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [2 x i8], i8 }>* @"symbolic Si" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 11) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes23MembersWithAvailabilityC4propSivpfaAA0E5TestsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes17AvailabilityTestsVHa", i32 0, i32 12) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s18runtime_attributes17AvailabilityTestsVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s18runtime_attributes17AvailabilityTestsVMn"
+// CHECK-SAME: i32 5
+// CHECK-SAME: @"$s18runtime_attributes20testWithAvailabilityyySicvpfaAA0E5TestsHF
+// CHECK-SAME: @"$s18runtime_attributes20TypeWithAvailabilityAaBCmvpfaAA0E5TestsHF"
+// CHECK-SAME: @"$s18runtime_attributes23MembersWithAvailabilityC8staticFnyycvpZfaAA0E5TestsHF"
+// CHECK-SAME: @"$s18runtime_attributes23MembersWithAvailabilityC6instFnyycvpfaAA0E5TestsHF"
+// CHECK-SAME: @"$s18runtime_attributes23MembersWithAvailabilityC4propSivpfaAA0E5TestsHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s18runtime_attributes13FlagWithAvailVHa" = internal constant { i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (<{ i32, i32, i32, i32, i32, i32, i32 }>* @"$s18runtime_attributes13FlagWithAvailVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32 }* @"$s18runtime_attributes13FlagWithAvailVHa", i32 0, i32 1) to i64)) to i32), i32 1, i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8 }>* @"symbolic yyc" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32 }* @"$s18runtime_attributes13FlagWithAvailVHa", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes20attrIsHigherThanFuncyycvpfaAA13FlagWithAvailHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32 }* @"$s18runtime_attributes13FlagWithAvailVHa", i32 0, i32 4) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s18runtime_attributes13FlagWithAvailVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s18runtime_attributes13FlagWithAvailVMn"
+// CHECK-SAME: i32 1
+// CHECK-SAME: @"$s18runtime_attributes20attrIsHigherThanFuncyycvpfaAA13FlagWithAvailHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
-// CHECK: @"$s18runtime_attributes19FlagForInnerMethodsVHa" = internal constant { i32, i32, i32, i32, i32, i32, i32 } { i32 0, i32 trunc (i64 sub (i64 ptrtoint (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s18runtime_attributes19FlagForInnerMethodsVMn" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes19FlagForInnerMethodsVHa", i32 0, i32 1) to i64)) to i32), i32 2, i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8, i32, [1 x i8], i8 }>* @"symbolic yyc_____c 18runtime_attributes9OuterTypeV5InnerV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes19FlagForInnerMethodsVHa", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes9OuterTypeV5InnerV15innerInstFnTestyycvpfaAA07FlagForE7MethodsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes19FlagForInnerMethodsVHa", i32 0, i32 4) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (<{ [3 x i8], i8, i32, [2 x i8], i8 }>* @"symbolic yyc_____mc 18runtime_attributes9OuterTypeV5InnerV" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes19FlagForInnerMethodsVHa", i32 0, i32 5) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (%swift.accessible_function* @"$s18runtime_attributes9OuterTypeV5InnerV17innerStaticFnTestyycvpZfaAA07FlagForE7MethodsHF" to i64), i64 ptrtoint (i32* getelementptr inbounds ({ i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32 }* @"$s18runtime_attributes19FlagForInnerMethodsVHa", i32 0, i32 6) to i64)) to i32) }, section "__TEXT, __swift5_rattrs, regular", align 4
+// CHECK: @"$s18runtime_attributes19FlagForInnerMethodsVHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: @"$s18runtime_attributes19FlagForInnerMethodsVMn"
+// CHECK-SAME: i32 4
+// CHECK-SAME: @"$s18runtime_attributes9OuterTypeV5InnerV15innerInstFnTestyycvpfaAA07FlagForE7MethodsHF"
+// CHECK-SAME: @"$s18runtime_attributes9OuterTypeV5InnerV17innerStaticFnTestyycvpZfaAA07FlagForE7MethodsHF"
+// CHECK-SAME: @"$s18runtime_attributes9OuterTypeV5InnerV07mutableE6FnTest1x_ySS_SiztcvpfaAA07FlagForE7MethodsHF"
+// CHECK-SAME: @"$s18runtime_attributes9OuterTypeV15outerMutatingFnSiycvpfaAA19FlagForInnerMethodsHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
 import RAD
 
@@ -97,7 +168,7 @@ struct A {
   // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes1AV5test1SiycvpZfaAA4Flag"(%T18runtime_attributes4FlagVySiGSg* noalias nocapture sret(%T18runtime_attributes4FlagVySiGSg) %0)
   @Flag static func test1() -> Int { 42 }
 
-  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes1AV5test2yycvpfaAA4Flag"(%T18runtime_attributes4FlagVyyycGSg* noalias nocapture sret(%T18runtime_attributes4FlagVyyycGSg) %0)
+  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes1AV5test2yycvpfaAA4Flag"(%T18runtime_attributes4FlagVyytGSg* noalias nocapture sret(%T18runtime_attributes4FlagVyytGSg) %0)
   @Flag("test2") func test2() {} // Ok
 
   // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes1AV1xSaySiGSgvpfaAA4Flag"(%T18runtime_attributes4FlagVySaySiGSgGSg* noalias nocapture sret(%T18runtime_attributes4FlagVySaySiGSgGSg) %0)
@@ -223,8 +294,10 @@ func test_local_type_with_protocol_conformance() {
 
 @runtimeMetadata
 struct FlagForInnerMethods<Result> {
-  init<T>(attachedTo: (T) -> () -> Result) {}
   init(attachedTo: () -> Result) {}
+  init<T>(attachedTo: (T) -> Result) {}
+  init<T>(attachedTo: (inout T) -> Result) {}
+  init<T>(attachedTo: (inout T, String, inout Int) -> Result) {}
 }
 
 struct OuterType {
@@ -233,5 +306,13 @@ struct OuterType {
     @FlagForInnerMethods func innerInstFnTest() {}
     // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes9OuterTypeV5InnerV17innerStaticFnTestyycvpZfaAA07FlagForE7Methods"(%T18runtime_attributes19FlagForInnerMethodsVyytGSg* noalias nocapture sret(%T18runtime_attributes19FlagForInnerMethodsVyytGSg) %0)
     @FlagForInnerMethods static func innerStaticFnTest() {}
+
+    // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes9OuterTypeV5InnerV07mutableE6FnTest1x_ySS_SiztcvpfaAA07FlagForE7Methods"(%T18runtime_attributes19FlagForInnerMethodsVyytGSg* noalias nocapture sret(%T18runtime_attributes19FlagForInnerMethodsVyytGSg) %0)
+    @FlagForInnerMethods mutating func mutableInnerFnTest(x: String, _ y: inout Int) {}
   }
+}
+
+extension OuterType {
+  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes9OuterTypeV15outerMutatingFnSiycvpfaAA19FlagForInnerMethods"(%T18runtime_attributes19FlagForInnerMethodsVySiGSg* noalias nocapture sret(%T18runtime_attributes19FlagForInnerMethodsVySiGSg) %0)
+  @FlagForInnerMethods mutating func outerMutatingFn() -> Int { 42 }
 }
