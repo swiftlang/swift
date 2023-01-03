@@ -959,8 +959,8 @@ protected:
   VarDecl *captureExpr(Expr *expr, SmallVectorImpl<ASTNode> &container) {
     auto *var = builder.buildVar(expr->getStartLoc());
     Pattern *pattern = NamedPattern::createImplicit(ctx, var);
-    auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                  pattern, expr, dc);
+    auto *PB = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, expr, dc, var->getStartLoc());
     return recordVar(PB, container);
   }
 
@@ -972,7 +972,8 @@ protected:
         ctx, NamedPattern::createImplicit(ctx, var),
         type ? type : PlaceholderType::get(ctx, var));
     auto *PB = PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc);
+        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc,
+        var->getStartLoc());
     return recordVar(PB, container);
   }
 
@@ -1058,11 +1059,20 @@ protected:
                                {Identifier()});
     }
 
-    auto *capture = captureExpr(expr, newBody);
-    // A reference to the synthesized variable is passed as an argument
-    // to buildBlock.
-    buildBlockArguments.push_back(
-        builder.buildVarRef(capture, element.getStartLoc()));
+    if (isa<CodeCompletionExpr>(expr)) {
+      // Insert the CodeCompletionExpr directly into the buildBlock call. That
+      // way, we can extract the contextual type of the code completion token
+      // to rank code completion items that match the type expected by
+      // buildBlock higher.
+      buildBlockArguments.push_back(expr);
+    } else {
+      auto *capture = captureExpr(expr, newBody);
+      // A reference to the synthesized variable is passed as an argument
+      // to buildBlock.
+      buildBlockArguments.push_back(
+          builder.buildVarRef(capture, element.getStartLoc()));
+    }
+
     return None;
   }
 
@@ -2459,7 +2469,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return None;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
+  auto disableASTTransform = [&](NominalTypeDecl *builder) { return false; };
+
+  if (!disableASTTransform(builder)) {
     auto transformedBody = getBuilderTransformedBody(fn, builder);
     // If this builder transform has not yet been applied to this function,
     // let's do it and cache the result.
@@ -2517,7 +2529,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->getCurrentIndent() : 0;
       log.indent(indent) << "------- Transfomed Body -------\n";
-      transformedBody->second->dump(log);
+      transformedBody->second->dump(log, &getASTContext(), indent);
       log << '\n';
     }
 
