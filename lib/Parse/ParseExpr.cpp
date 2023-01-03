@@ -2012,15 +2012,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // whole InterpolatedStringLiteral.
   llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
-  // We're not in a place where an interpolation would be valid.
-  if (!CurLocalContext) {
-    // Return an error, but include an empty InterpolatedStringLiteralExpr
-    // so that parseDeclPoundDiagnostic() can figure out why this string
-    // literal was bad.
-    return makeParserErrorResult(new (Context) InterpolatedStringLiteralExpr(
-        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), 0, 0, nullptr));
-  }
-
   unsigned LiteralCapacity = 0;
   unsigned InterpolationCount = 0;
   TapExpr * AppendingExpr;
@@ -2036,7 +2027,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
 
@@ -2779,16 +2769,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
       throwsLoc, arrowLoc, explicitResultType, inLoc);
 
-  // If the closure was created in the context of an array type signature's
-  // size expression, there will not be a local context. A parse error will
-  // be reported at the signature's declaration site.
-  if (!CurLocalContext) {
-    skipUntil(tok::r_brace);
-    if (Tok.is(tok::r_brace))
-      consumeToken();
-    return makeParserError();
-  }
-  
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
       attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
@@ -2796,9 +2776,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
-  if (params) {
-    setLocalDiscriminatorToParamList(params);
-  } else {
+  if (!params) {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help

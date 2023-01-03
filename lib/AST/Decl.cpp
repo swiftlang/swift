@@ -2696,13 +2696,55 @@ bool ValueDecl::isInstanceMember() const {
   llvm_unreachable("bad DeclKind");
 }
 
+bool ValueDecl::hasLocalDiscriminator() const {
+  // Generic parameters and unnamed parameters never have local discriminators.
+  if (isa<GenericTypeParamDecl>(this) ||
+      (isa<ParamDecl>(this) && !hasName()))
+    return false;
+
+  // Opaque types never have local discriminators.
+  if (isa<OpaqueTypeDecl>(this))
+    return false;
+
+  // Accessors never have local discriminators.
+  if (isa<AccessorDecl>(this))
+    return false;
+
+  // Implicit and unnamed declarations never have local discriminators.
+  if (getBaseName().isSpecial())
+    return false;
+
+  // If we are not in a local context, there's nothing to do.
+  if (!getDeclContext()->isLocalContext())
+    return false;
+
+  return true;
+}
+
 unsigned ValueDecl::getLocalDiscriminator() const {
+  // If we have already assigned a local discriminator, we're done.
+  if (LocalDiscriminator != InvalidDiscriminator)
+    return LocalDiscriminator;
+
+  // If this declaration does not have a local discriminator, use 0 as a
+  // stand-in.
+  if (!hasLocalDiscriminator())
+    return 0;
+
+  // Assign local discriminators in this context.
+  evaluateOrDefault(
+      getASTContext().evaluator,
+      LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+
+  assert(LocalDiscriminator != InvalidDiscriminator);
+
   return LocalDiscriminator;
 }
 
 void ValueDecl::setLocalDiscriminator(unsigned index) {
-  assert(getDeclContext()->isLocalContext());
-  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  assert(hasLocalDiscriminator());
+  assert(LocalDiscriminator == InvalidDiscriminator &&
+         "LocalDiscriminator is set multiple times");
   LocalDiscriminator = index;
 }
 

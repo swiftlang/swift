@@ -242,9 +242,7 @@ Expr *swift::expandMacroExpr(
 
   // Set up a "local context" for parsing, so that we have a source of
   // closure and local-variable discriminators.
-  LocalContext tempContext{};
   parser.CurDeclContext = dc;
-  parser.CurLocalContext = &tempContext;
 
   auto parsedResult = parser.parseExpr(diag::expected_macro_expansion_expr);
   if (parsedResult.isParseError() || parsedResult.isNull()) {

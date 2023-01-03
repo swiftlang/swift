@@ -40,7 +40,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/LocalContext.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/DenseMap.h"
@@ -213,18 +212,37 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
 }
 
 namespace {
+  /// Visitor that assigns local discriminators through whatever it walks.
   class SetLocalDiscriminators : public ASTWalker {
-  public:
-    unsigned NextClosureDiscriminator = 0;
-    unsigned NextAutoclosureDiscriminator = 0;
+    /// The initial discriminator that everything starts with.
+    unsigned InitialDiscriminator;
 
+    // Next (explicit) closure discriminator.
+    unsigned NextClosureDiscriminator;
+
+    // Next autoclosure discriminator.
+    unsigned NextAutoclosureDiscriminator;
+
+    /// Local declaration discriminators.
+    llvm::SmallDenseMap<Identifier, unsigned> DeclDiscriminators;
+  public:
     SetLocalDiscriminators(
-        Optional<unsigned> nextClosureDiscriminator,
-        Optional<unsigned> nextAutoclosureDiscriminator
-    ) : NextClosureDiscriminator(
-            nextClosureDiscriminator.getValueOr(0)),
-        NextAutoclosureDiscriminator(
-            nextAutoclosureDiscriminator.getValueOr(0)) { }
+        unsigned initialDiscriminator = 0
+    ) : InitialDiscriminator(initialDiscriminator),
+        NextClosureDiscriminator(initialDiscriminator),
+        NextAutoclosureDiscriminator(initialDiscriminator) { }
+
+    /// Determine the maximum discriminator assigned to any local.
+    unsigned maxAssignedDiscriminator() const {
+      unsigned result = std::max(
+          NextClosureDiscriminator, NextAutoclosureDiscriminator);
+
+      for (const auto &decl : DeclDiscriminators) {
+        result = std::max(result, decl.second);
+      }
+
+      return result;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
@@ -256,7 +274,7 @@ namespace {
         // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked()) {
-          SetLocalDiscriminators innerVisitor(None, None);
+          SetLocalDiscriminators innerVisitor;
           CE->getBody()->walk(innerVisitor);
         }
 
@@ -268,14 +286,90 @@ namespace {
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
           DAE->getCallerSideDefaultExpr()->walk(*this);
 
+      // Tap expression bodies have an $interpolation variable that doesn't
+      // normally get visited. Visit it specifically.
+      if (auto tap = dyn_cast<TapExpr>(E)) {
+        if (auto body = tap->getBody()) {
+          if (!body->empty()) {
+            if (auto decl = body->getFirstElement().dyn_cast<Decl *>()) {
+              if (auto var = dyn_cast<VarDecl>(decl))
+                if (var->getName() ==
+                        var->getASTContext().Id_dollarInterpolation)
+                  setLocalDiscriminator(var);
+            }
+          }
+        }
+      }
+
       return Action::Continue(E);
     }
 
     /// We don't want to recurse into most local declarations.
     PreWalkAction walkToDeclPre(Decl *D) override {
+      // If we have a local declaration, assign a local discriminator to it.
+      if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
+        setLocalDiscriminator(valueDecl);
+      }
+
       // But we do want to walk into the initializers of local
       // variables.
       return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
+        for (auto var : caseStmt->getCaseBodyVariablesOrEmptyArray())
+          setLocalDiscriminator(var);
+      }
+      return Action::Continue(S);
+    }
+
+    /// Set the local discriminator for a named declaration.
+    void setLocalDiscriminator(ValueDecl *valueDecl) {
+      if (valueDecl->hasLocalDiscriminator() &&
+          valueDecl->getRawLocalDiscriminator() ==
+              ValueDecl::InvalidDiscriminator) {
+        // Assign the next discriminator.
+        Identifier name = valueDecl->getBaseIdentifier();
+        auto &discriminator = DeclDiscriminators[name];
+        if (discriminator < InitialDiscriminator)
+          discriminator = InitialDiscriminator;
+
+        valueDecl->setLocalDiscriminator(discriminator++);
+      }
+
+      // If this is a property wrapper, check for projected storage.
+      if (auto var = dyn_cast<VarDecl>(valueDecl)) {
+        if (auto auxVars = var->getPropertyWrapperAuxiliaryVariables()) {
+          if (auxVars.backingVar && auxVars.backingVar != var)
+            setLocalDiscriminator(auxVars.backingVar);
+
+          // If there is a projection variable, give it a local discriminator.
+          if (auxVars.projectionVar && auxVars.projectionVar != var) {
+            if (var->hasLocalDiscriminator() &&
+                var->getName() == auxVars.projectionVar->getName()) {
+              auxVars.projectionVar->setLocalDiscriminator(
+                  var->getRawLocalDiscriminator());
+            } else {
+              setLocalDiscriminator(auxVars.projectionVar);
+            }
+          }
+
+          // For the wrapped local variable, adopt the same discriminator as
+          // the parameter. For all intents and purposes, these are the same.
+          if (auxVars.localWrappedValueVar &&
+              auxVars.localWrappedValueVar != var) {
+            if (var->hasLocalDiscriminator() &&
+                var->getName() == auxVars.localWrappedValueVar->getName()) {
+              auxVars.localWrappedValueVar->setLocalDiscriminator(
+                  var->getRawLocalDiscriminator());
+            } else {
+              setLocalDiscriminator(
+                  auxVars.localWrappedValueVar);
+            }
+          }
+        }
+      }
     }
   };
 }
@@ -293,8 +387,12 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 
   Optional<unsigned> expectedNextAutoclosureDiscriminator = None;
   ASTNode node;
+  ParameterList *params = nullptr;
+  ParamDecl *selfParam = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
     node = func->getBody();
+    selfParam = func->getImplicitSelfDecl();
+    params = func->getParameters();
 
     // Accessors for lazy properties should be walked as part of the property's
     // pattern.
@@ -310,6 +408,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     }
   } else if (auto closure = dyn_cast<ClosureExpr>(dc)) {
     node = closure->getBody();
+    params = closure->getParameters();
   } else if (auto topLevel = dyn_cast<TopLevelCodeDecl>(dc)) {
     node = topLevel->getBody();
     expectedNextAutoclosureDiscriminator = ctx.NextAutoClosureDiscriminator;
@@ -344,26 +443,38 @@ unsigned LocalDiscriminatorsRequest::evaluate(
         runtimeAttrInit->getAttr());
     if (generator.second)
       node = generator.first;
+  } else {
+    params = getParameterList(dc);
   }
 
-  if (!node)
+  if (!node && !params && !selfParam)
     return 0;
 
-  SetLocalDiscriminators setLocalDiscriminators(
-      expectedNextAutoclosureDiscriminator,
-      expectedNextAutoclosureDiscriminator
+  SetLocalDiscriminators visitor(
+      expectedNextAutoclosureDiscriminator.value_or(0)
   );
-  node.walk(setLocalDiscriminators);
 
-  if (expectedNextAutoclosureDiscriminator) {
-    ctx.NextAutoClosureDiscriminator = std::max(
-        setLocalDiscriminators.NextClosureDiscriminator,
-        setLocalDiscriminators.NextAutoclosureDiscriminator
-    );
+  // Set local discriminator for the 'self' parameter.
+  if (selfParam)
+    visitor.setLocalDiscriminator(selfParam);
+
+  // Set local discriminators for the parameters, which might have property
+  // wrappers that need it.
+  if (params) {
+    for (auto *param : *params)
+      visitor.setLocalDiscriminator(param);
   }
 
-  // FIXME: Really need to provide multiple results here.
-  return 0;
+  if (node)
+    node.walk(visitor);
+
+  unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
+  if (expectedNextAutoclosureDiscriminator) {
+    ctx.NextAutoClosureDiscriminator = nextDiscriminator;
+  }
+
+  // Return the next discriminator.
+  return nextDiscriminator;
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a
