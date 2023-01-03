@@ -2055,25 +2055,10 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void)locator.getLocatorParts(path);
 
-  while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
-    path.pop_back();
-
-  if (!path.empty()) {
-    // Direct pattern matching between tuple pattern and tuple type.
-    if (path.back().is<LocatorPathElt::PatternMatch>()) {
-      return true;
-    } else if (path.size() > 1) {
-      // sub-pattern matching as part of the enum element matching
-      // where sub-element is a tuple pattern e.g.
-      // `case .foo((a: 42, _)) = question`
-      auto lastIdx = path.size() - 1;
-      if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
-          path[lastIdx].is<LocatorPathElt::FunctionArgument>())
-        return true;
-    }
-  }
-
-  return false;
+  auto pathElement = llvm::find_if(path, [](LocatorPathElt &elt) {
+    return elt.is<LocatorPathElt::PatternMatch>();
+  });
+  return pathElement != path.end();
 }
 
 namespace {
