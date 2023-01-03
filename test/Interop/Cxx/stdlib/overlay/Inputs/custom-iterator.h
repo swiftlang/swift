@@ -485,7 +485,7 @@ struct TemplatedIterator {
     return *this;
   }
   TemplatedIterator operator++(int) {
-    auto tmp = ConstIterator(value);
+    auto tmp = TemplatedIterator(value);
     value++;
     return tmp;
   }
