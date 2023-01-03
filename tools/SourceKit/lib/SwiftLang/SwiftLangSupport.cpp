@@ -672,6 +672,7 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   SIMPLE_CASE(Protocol)
   SIMPLE_CASE(Constructor)
   SIMPLE_CASE(Destructor)
+  SIMPLE_CASE(Macro)
 
   case SymbolKind::EnumConstant:
     return UID_FOR(EnumElement);

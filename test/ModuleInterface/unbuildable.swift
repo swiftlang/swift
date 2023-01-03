@@ -22,7 +22,7 @@
 // RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableCurrent.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,CURRENT-VERIFY %s
 // RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableFuture.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,FUTURE-VERIFY %s
 
-// ALL: Unbuildable{{[^.]+}}.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: use of unknown directive '#somethingYouveNeverHeardOf'
+// ALL: Unbuildable{{[^.]+}}.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: no macro named 'somethingYouveNeverHeardOf'
 
 #if CURRENT
 import UnbuildableCurrent

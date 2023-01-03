@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class DeclContext;
+
 /// Augments a buffer that was created specifically to hold generated source
 /// code with the reasons for it being generated.
 class GeneratedSourceInfo {
@@ -53,8 +55,11 @@ public:
   /// generated source, but it will never be from a different buffer.
   SourceRange generatedSourceRange;
 
-  /// The opaque pointer for an ASTNode.
+  /// The opaque pointer for an ASTNode for which this buffer was generated.
   void *astNode;
+
+  /// The declaration context in which this buffer logically resides.
+  DeclContext *declContext;
 };
 
 /// This class manages and owns source buffers.

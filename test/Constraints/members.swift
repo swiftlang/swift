@@ -645,7 +645,7 @@ func rdar_50467583_and_50909555() {
 
   func test(_ s: S) {
     s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
-    // expected-error@-1 {{missing argument for parameter #2 in call}} {{8-8=, <#Int#>}}
+    // expected-error@-1 {{missing argument for parameter #2 in subscript}} {{8-8=, <#Int#>}}
   }
 }
 

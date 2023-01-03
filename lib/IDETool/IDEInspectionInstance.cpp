@@ -349,7 +349,8 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           *AFD->getParentSourceFile()->getBufferID(),
           AFD->getOriginalBodySourceRange(),
           newBodyRange,
-          AFD
+          AFD,
+          nullptr
         }
     );
 

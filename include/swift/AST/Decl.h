@@ -60,6 +60,7 @@ namespace swift {
   struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
+  enum class BuiltinMacroKind: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -79,6 +80,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
   class EnumCaseDecl;
@@ -254,6 +256,9 @@ struct OverloadSignature {
 
   /// Whether this is a type alias.
   unsigned IsTypeAlias : 1;
+
+  /// Whether this is a macro.
+  unsigned IsMacro : 1;
 
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
@@ -8345,27 +8350,16 @@ public:
   /// The result type.
   TypeLoc resultType;
 
-  /// The module name for the external macro definition.
-  Identifier externalModuleName;
-
-  /// The location of the module name for the external macro definition.
-  SourceLoc externalModuleNameLoc;
-
-  /// The type name for the external macro definition.
-  Identifier externalMacroTypeName;
-
-  /// The location of the type name for the external macro definition.
-  SourceLoc externalMacroTypeNameLoc;
+  /// The macro definition, which should always be a
+  /// \c MacroExpansionExpr in well-formed code.
+  Expr *definition;
 
   MacroDecl(SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
             GenericParamList *genericParams,
             ParameterList *parameterList,
             SourceLoc arrowOrColonLoc,
             TypeRepr *resultType,
-            Identifier externalModuleName,
-            SourceLoc externalModuleNameLoc,
-            Identifier externalMacroTypeName,
-            SourceLoc externalMacroTypeNameLoc,
+            Expr *definition,
             DeclContext *parent);
 
   SourceRange getSourceRange() const;
@@ -8375,6 +8369,13 @@ public:
 
   /// Determine the contexts in which this macro can be applied.
   MacroContexts getMacroContexts() const;
+
+  /// Retrieve the definition of this macro.
+  MacroDefinition getDefinition() const;
+
+  /// Retrieve the builtin macro kind for this macro, or \c None if it is a
+  /// user-defined macro with no special semantics.
+  Optional<BuiltinMacroKind> getBuiltinKind() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
