@@ -146,6 +146,81 @@ _swift_initRootPath(void *)
   }
 }
 
+#if _WIN32
+/// Map an NT-style filename to a Win32 filename.
+///
+/// We can't use GetFinalPathNameByHandle() because there's no way to obtain
+/// a handle (at least, not without using the internal NtCreateFile() API, which
+/// we aren't supposed to be using).  Additionally, that function would resolve
+/// symlinks, which we don't want to do here.
+///
+/// As a result, we use the approach demonstrated here:
+///
+///  https://learn.microsoft.com/en-us/windows/win32/memory/obtaining-a-file-name-from-a-file-handle
+///
+/// @param pszFilename The NT-style filename to convert.
+///
+/// @result A string, allocated using std::malloc(), containing the Win32-style
+///         filename.
+LPWSTR
+_swift_win32NameFromNTName(LPWSTR pszFilename) {
+  DWORD dwLen = GetLogicalDriveStringsW(0, NULL);
+  if (!dwLen)
+    return NULL;
+
+  LPWSTR lpDriveStrings = (LPWSTR)std::malloc(dwLen * sizeof(WCHAR));
+  if (!lpDriveStrings)
+    return NULL;
+
+  DWORD dwRet = GetLogicalDriveStringsW(dwLen, lpDriveStrings);
+  if (!dwRet)
+    return NULL;
+
+  LPWSTR pszDrive = lpDriveStrings;
+  while (*pszDrive) {
+    size_t len = wcslen(pszDrive);
+    if (len && pszDrive[len - 1] == '\\')
+      pszDrive[len - 1] = 0;
+
+    WCHAR ntPath[4096];
+    dwRet = QueryDosDeviceW(pszDrive, ntPath, 4096);
+    if (dwRet) {
+      size_t ntLen = wcslen(ntPath);
+
+      if (_wcsnicmp(pszFilename, ntPath, ntLen) == 0
+          && pszFilename[ntLen] == '\\') {
+        size_t fnLen = wcslen(pszFilename);
+        size_t driveLen = wcslen(pszDrive);
+        size_t pathLen = fnLen - ntLen;
+        size_t newLen = driveLen + pathLen + 1;
+        LPWSTR pszWin32Name = (LPWSTR)std::malloc(newLen * sizeof(WCHAR));
+        if (!pszWin32Name) {
+          std::free(lpDriveStrings);
+          return NULL;
+        }
+
+        LPWSTR ptr = pszWin32Name;
+        memcpy(ptr, pszDrive, driveLen * sizeof(WCHAR));
+        ptr += driveLen;
+        memcpy(ptr, pszFilename + ntLen, pathLen * sizeof(WCHAR));
+        ptr += pathLen;
+        *ptr = 0;
+
+        std::free(lpDriveStrings);
+
+        return pszWin32Name;
+      }
+    }
+
+    pszDrive += len + 1;
+  }
+
+  std::free(lpDriveStrings);
+
+  return _wcsdup(pszFilename);
+}
+#endif
+
 }
 
 SWIFT_RUNTIME_EXPORT
@@ -241,7 +316,7 @@ _swift_initRuntimePath(void *) {
   LPWSTR lpFilename = (LPWSTR)std::malloc(dwBufSize * sizeof(WCHAR));
 
   DWORD dwRet = GetMappedFileNameW(GetCurrentProcess(),
-                                   _swift_initRuntimePath,
+                                   (void *)_swift_initRuntimePath,
                                    lpFilename,
                                    dwBufSize);
   if (!dwRet) {
@@ -249,14 +324,24 @@ _swift_initRuntimePath(void *) {
                       "Unable to obtain Swift runtime path\n");
   }
 
-  runtimePath = swift::win32::copyUTF8FromWide(lpFilename);
+  // GetMappedFileNameW() returns an NT-style path, not a Win32 path; that is,
+  // it starts with \Device\DeviceName rather than a drive letter.
+  LPWSTR lpWin32Filename = _swift_win32NameFromNTName(lpFilename);
+  if (!lpWin32Filename) {
+    swift::fatalError(/* flags = */ 0,
+                      "Unable to obtain Win32 path for Swift runtime\n");
+  }
+
+  std::free(lpFilename);
+
+  runtimePath = swift::win32::copyUTF8FromWide(lpWin32Filename);
   if (!runtimePath) {
     swift::fatalError(/* flags = */ 0,
                       "Unable to convert Swift runtime path to UTF-8: %lx, %d\n",
                       ::GetLastError(), errno);
   }
 
-  free(lpFilename);
+  std::free(lpWin32Filename);
 }
 #endif
 
