@@ -629,13 +629,12 @@ static void computeSwiftModuleTraceInfo(
     // filename available.
     if (isSwiftinterface) {
       // FIXME: Use PrettyStackTrace instead.
-      SmallVector<char, 0> errMsg;
-      llvm::raw_svector_ostream err(errMsg);
-      err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      err << "The module <-> path mapping we have is:\n";
+      llvm::errs() << "WARNING: unexpected path for swiftinterface file:\n"
+                   << depPath << "\n"
+                   << "The module <-> path mapping we have is:\n";
       for (auto &m : pathToModuleDecl)
-        err << m.second->getName() << " <-> " << m.first << '\n';
-      llvm::report_fatal_error(errMsg);
+        llvm::errs() << m.second->getName() << " <-> " << m.first << '\n';
+      continue;
     }
 
     // Skip cached modules in the prebuilt cache. We will add the corresponding
@@ -710,8 +709,11 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (const auto &module : ctxt.getLoadedModules()) {
     ModuleDecl *loadedDecl = module.second;
-    if (!loadedDecl)
-      llvm::report_fatal_error("Expected loaded modules to be non-null.");
+    if (!loadedDecl) {
+      llvm::errs() << "WARNING: Unable to load module '" << module.first
+                   << ".\n";
+      continue;
+    }
     if (loadedDecl == mainModule)
       continue;
     if (loadedDecl->getModuleFilename().empty()) {
