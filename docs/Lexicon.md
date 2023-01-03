@@ -542,7 +542,7 @@ A pattern that may not always match. These include patterns such as:
 2. Enum case check: e.g. `case .none:`.
 3. Expr pattern: e.g. `case foo():`.
 
-Contrast with [irefutable pattern](#irrefutable-pattern)
+Contrast with [irrefutable pattern](#irrefutable-pattern)
 
 ## resilient
 
