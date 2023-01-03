@@ -500,6 +500,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
+  if (auto A = Args.getLastArg(OPT_enable_deserialization_safety,
+                               OPT_disable_deserialization_safety)) {
+    Opts.EnableDeserializationSafety
+      = A->getOption().matches(OPT_enable_deserialization_safety);
+  }
+
   // Whether '/.../' regex literals are enabled. This implies experimental
   // string processing.
   if (Args.hasArg(OPT_enable_bare_slash_regex)) {
