@@ -1525,6 +1525,15 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   return nullptr;
 }
 
+OpaqueValueExpr *OpaqueValueExpr::createImplicit(ASTContext &ctx, Type Ty,
+                                                 bool isPlaceholder,
+                                                 AllocationArena arena) {
+  auto *mem =
+      ctx.Allocate(sizeof(OpaqueValueExpr), alignof(OpaqueValueExpr), arena);
+  return new (mem) OpaqueValueExpr(
+      /*Range=*/SourceRange(), Ty, isPlaceholder);
+}
+
 PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
                                             Type ty, Expr *wrappedValue,
@@ -2481,9 +2490,9 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
 
 TypeJoinExpr *TypeJoinExpr::createImpl(
     ASTContext &ctx, llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
-    ArrayRef<Expr *> elements) {
+    ArrayRef<Expr *> elements, AllocationArena arena) {
   size_t size = totalSizeToAlloc<Expr *>(elements.size());
-  void *mem = ctx.Allocate(size, alignof(TypeJoinExpr));
+  void *mem = ctx.Allocate(size, alignof(TypeJoinExpr), arena);
   return new (mem) TypeJoinExpr(varOrType, elements);
 }
 
