@@ -650,3 +650,42 @@ func test_that_closures_are_attempted_in_order() {
     return false
   }
 }
+
+func coule_of_result_join_tests() {
+  func fn<T>(_ f: () -> T) -> T { f() }
+  func genericRes<T>() -> T { fatalError() }
+
+  let resDouble = fn { // Joins to Double
+    if true {
+      return 42
+    }
+
+    return 0.0
+  }
+
+  let _: Double = resDouble // Ok
+
+  let resOptDouble = fn { // Joins to Double?
+    if true {
+      return 42
+    }
+
+    if false {
+      for x in 0..<2 {
+        if x == 0 {
+          return nil
+        } else if x == 1 {
+          return genericRes()
+        }
+        // Unfortunately this doesn't work because ExpressibleByNilLiteral doesn't get propagated out from the closure
+        // else {
+        //  return fn { nil }
+        // }
+      }
+    }
+
+    return 0.0
+  }
+
+  let _: Double = resOptDouble! // Ok
+}
