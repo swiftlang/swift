@@ -9,10 +9,10 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@expression macro customFileID: String = MacroDefinition.FileIDMacro
-@expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
-@expression macro fileID<T: _ExpressibleByStringLiteral>: T = MacroDefinition.FileIDMacro
-@expression macro recurse(_: Bool) = MacroDefinition.RecursiveMacro
+@expression macro customFileID: String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+@expression macro fileID<T: _ExpressibleByStringLiteral>: T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@expression macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
@@ -60,7 +60,7 @@ struct Outer {
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
 
-@expression macro addBlocker<T>(_ value: T) -> T = MacroDefinition.AddBlocker
+@expression macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 
 struct OnlyAdds {
   static func +(lhs: OnlyAdds, rhs: OnlyAdds) -> OnlyAdds { lhs }

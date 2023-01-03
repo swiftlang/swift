@@ -6801,6 +6801,18 @@ ERROR(macro_unsupported,none,
       "macros are not supported in this compiler", ())
 ERROR(macro_recursive,none,
       "recursive expansion of macro %0", (DeclName))
+WARNING(macro_definition_old_style,none,
+        "external macro definitions are now written using #externalMacro", ())
+WARNING(macro_definition_unknown_builtin,none,
+        "ignoring definition of unknown builtin macro %0", (Identifier))
+ERROR(macro_definition_not_expansion,none,
+      "macro must itself be defined by a macro expansion such as "
+      "'#externalMacro(...)'", ())
+ERROR(macro_definition_unsupported,none,
+      "macro definitions other than '#externalMacro(...)' are unsupported", ())
+ERROR(external_macro_arg_not_type_name,none,
+      "argument to `#externalMacro` must be a string literal naming "
+      "the external macro's %select{module|type}", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

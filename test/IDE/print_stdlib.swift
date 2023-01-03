@@ -18,6 +18,9 @@
 
 // CHECK-ARGC: static var argc: Int32 { get }
 
+// Builtin macro references
+// CHECK: Builtin.ExternalMacro
+
 // CHECK-NOT: @rethrows
 // CHECK-NOT: {{^}}import
 // CHECK-NOT: _Double

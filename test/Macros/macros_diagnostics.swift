@@ -1,8 +1,9 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
 
-@expression macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
+@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
 @expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
+// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{43-68=#externalMacro(module: "MissingModule", type: "MissingType")}}
 @expression macro missingMacro2(_: Any) = MissingModule.MissingType
 
 protocol P { }

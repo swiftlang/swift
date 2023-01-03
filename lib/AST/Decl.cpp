@@ -9681,20 +9681,14 @@ MacroDecl::MacroDecl(
     ParameterList *parameterList,
     SourceLoc arrowOrColonLoc,
     TypeRepr *resultType,
-    Identifier externalModuleName,
-    SourceLoc externalModuleNameLoc,
-    Identifier externalMacroTypeName,
-    SourceLoc externalMacroTypeNameLoc,
+    Expr *definition,
     DeclContext *parent
 ) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
     ValueDecl(DeclKind::Macro, parent, name, nameLoc),
     macroLoc(macroLoc), parameterList(parameterList),
     arrowOrColonLoc(arrowOrColonLoc),
     resultType(resultType),
-    externalModuleName(externalModuleName),
-    externalModuleNameLoc(externalModuleNameLoc),
-    externalMacroTypeName(externalMacroTypeName),
-    externalMacroTypeNameLoc(externalMacroTypeNameLoc) {
+    definition(definition) {
 
   if (parameterList)
     parameterList->setDeclContextOfParamDecls(this);
@@ -9711,7 +9705,11 @@ Type MacroDecl::getResultInterfaceType() const {
 }
 
 SourceRange MacroDecl::getSourceRange() const {
-  SourceLoc endLoc = externalMacroTypeNameLoc;
+  SourceLoc endLoc = getNameLoc();
+  if (parameterList)
+    endLoc = parameterList->getEndLoc();
+  if (definition)
+    endLoc = definition->getEndLoc();
   if (auto trailing = getTrailingWhereClause())
     endLoc = trailing->getSourceRange().End;
   return SourceRange(macroLoc, endLoc);
@@ -9724,6 +9722,20 @@ MacroContexts MacroDecl::getMacroContexts() const {
   return contexts;
 }
 
+MacroDefinition MacroDecl::getDefinition() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      MacroDefinitionRequest{const_cast<MacroDecl *>(this)},
+      MacroDefinition::forUndefined());
+}
+
+Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
+  auto def = getDefinition();
+  if (def.kind != MacroDefinition::Kind::Builtin)
+    return None;
+  return def.getBuiltinKind();
+}
+
 SourceRange MacroExpansionDecl::getSourceRange() const {
   SourceLoc endLoc;
   if (ArgList)
@@ -9734,16 +9746,6 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
     endLoc = MacroLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
-}
-
-MacroDefinition MacroDefinition::forMissing(
-    ASTContext &ctx, Identifier externalModuleName,
-    Identifier externalMacroTypeName
-) {
-  auto def = ctx.AllocateObjectCopy(
-    MissingDefinition{externalModuleName, externalMacroTypeName}
-  );
-  return MacroDefinition{ImplementationKind::Missing, def};
 }
 
 NominalTypeDecl *
