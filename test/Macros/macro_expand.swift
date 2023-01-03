@@ -45,6 +45,13 @@ func testStringify(a: Int, b: Int) {
   _ = (b, b2, s2, s3)
 }
 
+struct Outer {
+  var value: Int = 0
+  func test() {
+    _ = #stringify(1 + value)
+  }
+}
+
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
 

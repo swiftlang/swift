@@ -100,8 +100,7 @@ namespace {
     ModuleDecl &M;
     const ASTContext &Ctx;
     const SourceLoc Loc;
-    const SourceManager &SM;
-    
+
     /// Used to find the file-local names.
     DebuggerClient *const DebugClient;
     
@@ -151,8 +150,6 @@ namespace {
     void recordCompletionOfAScope();
 
 #pragma mark context-based lookup declarations
-
-    bool isInsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
     /// For diagnostic purposes, move aside the unavailables, and put
     /// them back as a last-ditch effort.
@@ -260,7 +257,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   M(*DC->getParentModule()),
   Ctx(M.getASTContext()),
   Loc(Loc),
-  SM(Ctx.SourceMgr),
   DebugClient(M.getDebugClient()),
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
@@ -327,13 +323,6 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 #pragma mark context-based lookup definitions
-
-bool UnqualifiedLookupFactory::isInsideBodyOfFunction(
-    const AbstractFunctionDecl *const AFD) const {
-  auto range = Lexer::getCharSourceRangeFromSourceRange(
-      SM, AFD->getBodySourceRange());
-  return range.contains(Loc);
-}
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
     const DeclNameRef &Name, NLOptions baseNLOptions,
@@ -794,12 +783,6 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
     const DeclContext *scopeDC) const {
-  if (candidateSelfDC) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
-      assert(factory.isInsideBodyOfFunction(afd) && "Should be inside");
-    }
-  }
-
   // We're looking for members of a type.
   //
   // If we started the looking from inside a scope where a 'self' parameter
