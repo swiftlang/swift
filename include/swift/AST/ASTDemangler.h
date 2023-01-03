@@ -193,6 +193,8 @@ public:
                                                     unsigned size,
                                                     unsigned alignment);
 
+  Type maybeWrapInExistential(Type type);
+
 private:
   bool validateParentType(TypeDecl *decl, Type parent);
   CanGenericSignature demangleGenericSignature(

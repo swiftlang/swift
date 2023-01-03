@@ -761,8 +761,7 @@ public:
 
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass, bool isClassBound,
-                                bool forRequirement = true) {
+                                BuiltType superclass, bool isClassBound) {
     std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
       if (!protocol)
@@ -857,6 +856,11 @@ public:
       const llvm::SmallVectorImpl<BuiltRequirement> &Requirements) {
     return SILBoxTypeWithLayoutTypeRef::create(*this, Fields, Substitutions,
                                                Requirements);
+  }
+
+  BuiltType maybeWrapInExistential(BuiltType type) {
+    // Nothing to do.
+    return type;
   }
 
   bool isExistential(const TypeRef *) {
