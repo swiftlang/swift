@@ -4721,6 +4721,11 @@ void PrintAST::visitMoveExpr(MoveExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitBorrowExpr(BorrowExpr *expr) {
+  Printer << "borrow ";
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitInOutExpr(InOutExpr *expr) {
   visit(expr->getSubExpr());
 }
