@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 730; // local discriminator change
+const uint16_t SWIFTMODULE_VERSION_MINOR = 731; // macro definition
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1683,8 +1683,9 @@ namespace decls_block {
     TypeIDField,  // result interface type
     AccessLevelField, // access level
     BCVBR<5>,    // number of parameter name components
-    IdentifierIDField, // external module name
-    IdentifierIDField,  // external type name
+    BCVBR<3>,    // builtin macro definition ID
+    IdentifierIDField, // external module name, for external macros
+    IdentifierIDField,  // external type name, for external macros
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

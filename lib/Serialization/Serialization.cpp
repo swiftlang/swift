@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -4324,6 +4325,32 @@ public:
 
     Type resultType = macro->getResultInterfaceType();
 
+    uint8_t builtinID = 0;
+    IdentifierID externalModuleNameID = 0;
+    IdentifierID externalMacroTypeNameID = 0;
+    auto def = macro->getDefinition();
+    switch (def.kind) {
+      case MacroDefinition::Kind::Invalid:
+      case MacroDefinition::Kind::Undefined:
+        break;
+
+      case MacroDefinition::Kind::External: {
+        auto external = def.getExternalMacro();
+        externalModuleNameID = S.addDeclBaseNameRef(external.moduleName);
+        externalMacroTypeNameID = S.addDeclBaseNameRef(external.macroTypeName);
+        break;
+      }
+
+      case MacroDefinition::Kind::Builtin: {
+        switch (def.getBuiltinKind()) {
+        case BuiltinMacroKind::ExternalMacro:
+          builtinID = 1;
+          break;
+        }
+        break;
+      }
+    }
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];
     MacroLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                             contextID.getOpaqueValue(),
@@ -4334,8 +4361,9 @@ public:
                             S.addTypeRef(resultType),
                             rawAccessLevel,
                             macro->getName().getArgumentNames().size(),
-                            S.addDeclBaseNameRef(macro->externalModuleName),
-                            S.addDeclBaseNameRef(macro->externalMacroTypeName),
+                            builtinID,
+                            externalModuleNameID,
+                            externalMacroTypeNameID,
                             nameComponentsAndDependencies);
 
     writeGenericParams(macro->getGenericParams());

@@ -45,6 +45,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
@@ -70,6 +71,8 @@ struct TypeWrapperInfo;
 void simple_display(
     llvm::raw_ostream &out,
     const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
+
+void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
 /// Request the type from the ith entry in the inheritance clause for the
 /// given declaration.
@@ -3792,6 +3795,30 @@ private:
 public:
   // Source location
   SourceLoc getNearestLoc() const;
+
+  bool isCached() const { return true; }
+};
+
+/// Resolve an external macro given its module and type name.
+class ExternalMacroDefinitionRequest
+    : public SimpleRequest<ExternalMacroDefinitionRequest,
+                           ExternalMacroDefinition(
+                               ASTContext *, Identifier, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ExternalMacroDefinition evaluate(
+      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName,
+      Identifier typeName
+  ) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 
   bool isCached() const { return true; }
 };

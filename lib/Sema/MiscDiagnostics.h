@@ -59,6 +59,14 @@ void fixItAccess(InFlightDiagnostic &diag,
                  bool isForSetter = false,
                  bool shouldUseDefaultAccess = false);
 
+/// Describes the context of a parameter, for use in diagnosing argument
+/// label problems.
+enum class ParameterContext: unsigned {
+  Call = 0,
+  Subscript = 1,
+  MacroExpansion = 2
+};
+
 /// Emit fix-its to correct the argument labels in \p argList.
 ///
 /// If \p existingDiag is null, the fix-its will be attached to an appropriate
@@ -68,7 +76,7 @@ void fixItAccess(InFlightDiagnostic &diag,
 bool diagnoseArgumentLabelError(ASTContext &ctx,
                                 const ArgumentList *argList,
                                 ArrayRef<Identifier> newNames,
-                                bool isSubscript,
+                                ParameterContext paramContext,
                                 InFlightDiagnostic *existingDiag = nullptr);
 
 /// If \p assignExpr has a destination expression that refers to a declaration

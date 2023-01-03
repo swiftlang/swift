@@ -164,6 +164,14 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state);
   PrettyStackTraceParser StackTrace(parser);
 
+  // If the buffer is generated source information that is conceptually within
+  // a particular declaration context, use that for the parser's declaration
+  // context instead of the source file.
+  if (auto generatedInfo = ctx.SourceMgr.getGeneratedSourceInfo(*bufferID)) {
+    if (generatedInfo->declContext)
+      parser.CurDeclContext = generatedInfo->declContext;
+  }
+
   SmallVector<ASTNode, 128> items;
   parser.parseTopLevelItems(items);
 

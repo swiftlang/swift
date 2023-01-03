@@ -674,6 +674,13 @@ public:
   void addAccessor(SDKNode* AC);
 };
 
+class SDKNodeDeclMacro : public SDKNodeDecl {
+public:
+  SDKNodeDeclMacro(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+  SDKNodeType *getType() const;
+};
+
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
   bool ReqNewWitnessTableEntry;
@@ -796,6 +803,7 @@ public:
   SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
   SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);
   SDKNode *constructTypeAliasNode(TypeAliasDecl *TAD);
+  SDKNode *constructMacroNode(MacroDecl *MAD);
   SDKNode *constructVarNode(ValueDecl *VD);
   SDKNode *constructExternalExtensionNode(NominalTypeDecl *NTD,
                                           ArrayRef<ExtensionDecl*> AllExts);
