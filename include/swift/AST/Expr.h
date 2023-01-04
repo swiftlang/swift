@@ -741,7 +741,7 @@ public:
   /// \p value The integer value.
   /// \return An implicit integer literal expression which evaluates to the value.
   static IntegerLiteralExpr *
-  createFromUnsigned(ASTContext &C, unsigned value);
+  createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc);
 
   /// Returns the value of the literal, appropriately constructed in the
   /// target type.

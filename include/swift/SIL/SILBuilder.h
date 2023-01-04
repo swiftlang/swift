@@ -263,7 +263,10 @@ public:
   bool hasValidInsertionPoint() const { return BB != nullptr; }
   SILBasicBlock *getInsertionBB() const { return BB; }
   SILBasicBlock::iterator getInsertionPoint() const { return InsertPt; }
-  SILLocation getInsertionPointLoc() const { return InsertPt->getLoc(); }
+  SILLocation getInsertionPointLoc() const {
+    assert(!insertingAtEndOfBlock());
+    return InsertPt->getLoc();
+  }
 
   /// insertingAtEndOfBlock - Return true if the insertion point is at the end
   /// of the current basic block.  False if we're inserting before an existing
