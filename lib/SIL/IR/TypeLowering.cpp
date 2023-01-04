@@ -3047,9 +3047,12 @@ const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
     AbstractionPattern origType, CanType loweredType,
     TypeExpansionContext forExpansion,
     IsTypeExpansionSensitive_t isTypeExpansionSensitive) {
-  assert(loweredType->isLegalSILType() && "type is not lowered!");
-  (void)loweredType;
-  
+
+  // For very large types (e.g. tuples with many elements), this assertion is
+  // very expensive to execute, because the `isLegalSILType` status is not cached.
+  // Therefore the assert is commented out and only here for documentation purposes.
+  // assert(loweredType->isLegalSILType() && "type is not lowered!");
+
   // Cache the lowered type record for a contextualized type independent of the
   // abstraction pattern. Lowered type parameters can't be cached or looked up
   // without context. (TODO: We could if they match the out-of-context
