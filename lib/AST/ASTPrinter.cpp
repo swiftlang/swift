@@ -3118,10 +3118,6 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureResultBuilderASTTransform(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }

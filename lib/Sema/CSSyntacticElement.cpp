@@ -1290,13 +1290,17 @@ public:
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
-  ASTNode visit(Stmt *S) {
+
+  ASTNode visit(Stmt *S, bool performSyntacticDiagnostics = true) {
     auto rewritten = ASTVisitor::visit(S);
     if (!rewritten)
       return {};
 
-    if (auto *stmt = getAsStmt(rewritten))
-      performStmtDiagnostics(stmt, context.getAsDeclContext());
+    if (performSyntacticDiagnostics) {
+      if (auto *stmt = getAsStmt(rewritten)) {
+        performStmtDiagnostics(stmt, context.getAsDeclContext());
+      }
+    }
 
     return rewritten;
   }
@@ -1819,8 +1823,9 @@ public:
 
 private:
   ASTNode visitDoStmt(DoStmt *doStmt) override {
-    if (auto transformed = transformDo(doStmt))
-      return visit(transformed.get());
+    if (auto transformed = transformDo(doStmt)) {
+      return visit(transformed.get(), /*performSyntacticDiagnostics=*/false);
+    }
 
     auto newBody = visit(doStmt->getBody());
     if (!newBody)
@@ -2111,11 +2116,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
     NullablePtr<BraceStmt> newBody;
 
-    if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
-      BraceStmt *transformedBody =
-          const_cast<BraceStmt *>(transform->transformedBody.get());
-
-      fn.setParsedBody(transformedBody, /*singleExpression=*/false);
+    if (auto transformedBody = transform->transformedBody) {
+      fn.setParsedBody(const_cast<BraceStmt *>(transformedBody.get()),
+                       /*singleExpression=*/false);
 
       ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
 
@@ -2201,6 +2204,21 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   fn.setTypecheckedBody(castToStmt<BraceStmt>(body),
                         fn.hasSingleExpressionBody());
   return false;
+}
+
+bool ConjunctionElement::mightContainCodeCompletionToken(
+    const ConstraintSystem &cs) const {
+  if (Element->getKind() == ConstraintKind::SyntacticElement) {
+    if (Element->getSyntacticElement().getSourceRange().isInvalid()) {
+      return true;
+    } else {
+      return cs.containsIDEInspectionTarget(Element->getSyntacticElement());
+    }
+  } else {
+    // All other constraint kinds are not handled yet. Assume that they might
+    // contain the code completion token.
+    return true;
+  }
 }
 
 void ConjunctionElement::findReferencedVariables(
