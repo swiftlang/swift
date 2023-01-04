@@ -683,7 +683,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // outlive the current function always.
   //
   // In the case of a yielded guaranteed value, we need to validate that all
-  // regular uses of the value are within the co
+  // regular uses of the value are within the coroutine.
   if (lifetimeEndingUsers.empty()) {
     if (checkValueWithoutLifetimeEndingUses(regularUsers))
       return false;
