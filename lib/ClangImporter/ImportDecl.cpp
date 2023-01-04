@@ -8442,6 +8442,9 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
+      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
