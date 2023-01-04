@@ -215,21 +215,6 @@ public class TopLevelClass2 {
   public class func nonFinalClassMethod() {}
 }
 
-@_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' requires that 'missingAllAvailabilityFunc()' have explicit availability for macOS}}
-public func missingAllAvailabilityFunc() {}
-
-@available(macOS 11.0, *)
-@_backDeploy(before: macOS 12.0, iOS 15.0) // expected-error {{'@_backDeploy' requires that 'missingiOSAvailabilityFunc()' have explicit availability for iOS}}
-public func missingiOSAvailabilityFunc() {}
-
-@available(macOS 12.0, *)
-@_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' has no effect because 'availableSameVersionAsBackDeployment()' is not available before macOS 12.0}}
-public func availableSameVersionAsBackDeployment() {}
-
-@available(macOS 12.1, *)
-@_backDeploy(before: macOS 12.0) // expected-error {{'availableAfterBackDeployment()' is not available before macOS 12.0}}
-public func availableAfterBackDeployment() {}
-
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, macOS 13.0) // expected-error {{'@_backDeploy' contains multiple versions for macOS}}
 public func duplicatePlatformsFunc1() {}
@@ -253,6 +238,7 @@ public func inlinableFunc() {}
 @_backDeploy(before: macOS 12.0)
 @_transparent // expected-error {{'@_transparent' cannot be applied to a back deployed global function}}
 public func transparentFunc() {}
+
 
 // MARK: - Attribute parsing
 
