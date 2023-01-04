@@ -267,8 +267,10 @@ void COWOptsPass::collectEscapePoints(SILValue v,
                             escapePoints, handled);
         break;
       case SILInstructionKind::CondBranchInst:
-        collectEscapePoints(cast<CondBranchInst>(user)->getArgForOperand(use),
-                            escapePoints, handled);
+        if (use->getOperandNumber() != CondBranchInst::ConditionIdx) {
+          collectEscapePoints(cast<CondBranchInst>(user)->getArgForOperand(use),
+                              escapePoints, handled);
+        }
         break;
       case SILInstructionKind::StructInst:
       case SILInstructionKind::StructExtractInst:
