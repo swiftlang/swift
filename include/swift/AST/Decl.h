@@ -613,13 +613,16 @@ protected:
     IsActor : 1
   );
 
-  SWIFT_INLINE_BITFIELD(
-      StructDecl, NominalTypeDecl, 1 + 1,
-      /// True if this struct has storage for fields that aren't accessible in
-      /// Swift.
-      HasUnreferenceableStorage : 1,
-      /// True if this struct is imported from C++ and does not have trivial value witness functions.
-      IsCxxNonTrivial : 1);
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1 + 1 + 1,
+                        /// True if this struct has storage for fields that
+                        /// aren't accessible in Swift.
+                        HasUnreferenceableStorage : 1,
+                        /// True if this struct is imported from C++ and does
+                        /// not have trivial value witness functions.
+                        IsCxxNonTrivial : 1,
+                        /// True if this struct is imported from C and has
+                        /// address diversified ptrauth qualified field.
+                        IsNonTrivialPtrAuth : 1);
 
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
     /// True if the enum has cases and at least one case has associated values.
@@ -4266,6 +4269,14 @@ public:
   bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
   void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
+
+  bool isNonTrivialPtrAuth() const {
+    return Bits.StructDecl.IsNonTrivialPtrAuth;
+  }
+
+  void setHasNonTrivialPtrAuth(bool v) {
+    Bits.StructDecl.IsNonTrivialPtrAuth = v;
+  }
 
   Type getTemplateInstantiationType() const { return TemplateInstantiationType; }
   void setTemplateInstantiationType(Type t) { TemplateInstantiationType = t; }

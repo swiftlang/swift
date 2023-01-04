@@ -1045,6 +1045,8 @@ public:
       return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
+    // TODO: New AddressOnlyPtrAuthTypeInfo to handle address diversified field
+    // function ptrs in C structs.
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);

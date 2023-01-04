@@ -854,7 +854,7 @@ namespace {
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
 
-      if (!Field->getPointerAuthQualifier() ||
+      if (!Field->getPointerAuthQualifier().isPresent() ||
           !SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
         return ManagedValue::forLValue(Res);
       }

@@ -2271,6 +2271,10 @@ namespace {
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
+        auto pointerAuthQual = field->getPointerAuthQualifier();
+        if (pointerAuthQual && pointerAuthQual.isAddressDiscriminated()) {
+          properties.setAddressOnly();
+        }
         auto substFieldType =
           field->getInterfaceType().subst(subMap)
                ->getCanonicalType();

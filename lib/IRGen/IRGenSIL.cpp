@@ -5811,7 +5811,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       auto *signedFptr = Builder.CreateLoad(pointerToIntPtr, Int64PtrTy,
                                             IGM.getPointerAlignment());
       auto *resignedFptr = emitPointerAuthResign(
-          *this, signedFptr, PointerAuthInfo::emit(IGM, pointerAuthQual),
+          *this, signedFptr,
+          PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr),
           PointerAuthInfo::emit(*this,
                                 IGM.getOptions().PointerAuth.FunctionPointers,
                                 pointerToSignedFptr, PointerAuthEntity()));
@@ -5926,6 +5927,8 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     auto pointerAuthQual = cast<StructElementAddrInst>(access->getOperand())
                                ->getField()
                                ->getPointerAuthQualifier();
+    auto *pointerToSignedFptr =
+        getLoweredAddress(access->getOperand()).getAddress();
     auto tempAddress = getLoweredAddress(access);
     auto *tempAddressToIntPtr =
         Builder.CreateBitCast(tempAddress.getAddress(), Int64PtrPtrTy);
@@ -5936,10 +5939,8 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
         PointerAuthInfo::emit(*this,
                               IGM.getOptions().PointerAuth.FunctionPointers,
                               tempAddress.getAddress(), PointerAuthEntity()),
-        PointerAuthInfo::emit(IGM, pointerAuthQual));
+        PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr));
 
-    auto *pointerToSignedFptr =
-        getLoweredAddress(access->getOperand()).getAddress();
     auto *pointerToIntPtr =
         Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
     Builder.CreateStore(signedFptr, pointerToIntPtr, IGM.getPointerAlignment());

@@ -239,12 +239,30 @@ PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
 }
 
 PointerAuthInfo
-PointerAuthInfo::emit(IRGenModule &IGM,
-                      clang::PointerAuthQualifier pointerAuthQual) {
-  return PointerAuthInfo(
-      pointerAuthQual.getKey(),
-      llvm::ConstantInt::get(IGM.Int64Ty,
-                             pointerAuthQual.getExtraDiscriminator()));
+PointerAuthInfo::emit(IRGenFunction &IGF,
+                      clang::PointerAuthQualifier pointerAuthQual,
+                      llvm::Value *storageAddress) {
+  unsigned key = pointerAuthQual.getKey();
+
+  // Produce the 'other' discriminator.
+  auto otherDiscriminator = pointerAuthQual.getExtraDiscriminator();
+  llvm::Value *discriminator =
+      llvm::ConstantInt::get(IGF.IGM.Int64Ty, otherDiscriminator);
+
+  // Factor in the address.
+  if (pointerAuthQual.isAddressDiscriminated()) {
+    assert(storageAddress &&
+           "no storage address for address-discriminated schema");
+
+    if (otherDiscriminator != 0) {
+      discriminator = emitPointerAuthBlend(IGF, storageAddress, discriminator);
+    } else {
+      discriminator =
+          IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.Int64Ty);
+    }
+  }
+
+  return PointerAuthInfo(key, discriminator);
 }
 
 llvm::ConstantInt *
