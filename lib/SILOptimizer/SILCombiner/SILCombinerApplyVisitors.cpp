@@ -344,6 +344,12 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
   KeyPathPattern *pattern = kp->getPattern();
   SubstitutionMap patternSubs = kp->getSubstitutions();
   CanType rootTy = pattern->getRootType().subst(patternSubs)->getCanonicalType();
+
+  // TODO: support lowering of the rootTy if it's not a legal SIL type in the
+  // first place, e.g. if it contains an AnyFunctionType.
+  if (!rootTy->isLegalSILType())
+    return false;
+
   CanType parentTy = rootTy;
   
   // First check if _storedInlineOffset would return an offset or nil. Basically
