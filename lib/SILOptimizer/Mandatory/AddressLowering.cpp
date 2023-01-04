@@ -377,6 +377,11 @@ static bool isStoreCopy(SILValue value) {
     SmallVector<SILValue, 4> roots;
     findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
                                  roots);
+    // TODO: Rather than checking whether the store is out of range of any
+    // guaranteed root's SSAPrunedLiveness, instead check whether it is out of
+    // range of ExtendedLiveness of the borrow introducers:
+    // - visit borrow introducers via visitBorrowIntroducers
+    // - call ExtendedLiveness.compute on each borrow introducer
     if (llvm::any_of(roots, [&](SILValue root) {
           // Handle forwarding phis conservatively rather than recursing.
           if (SILArgument::asPhi(root) && !BorrowedValue(root))
