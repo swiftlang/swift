@@ -437,13 +437,12 @@ internal struct _GraphemeBreakingState {
 }
 
 extension Unicode {
-  /// A state machine for recognizing `Character` (i.e., extended grapheme
+  /// A state machine for recognizing character (i.e., extended grapheme
   /// cluster) boundaries in an arbitrary series of Unicode scalars.
   ///
-  /// The recognizer needs to be initialized with the first scalar in the
-  /// series. Subsequent scalars must then be fed one by one to the
-  /// `hasCharacterBoundary(before:)` method, which returns a Boolean value
-  /// indicating whether the given scalar starts a new `Character`.
+  /// To detect grapheme breaks in a sequence of Unicode scalars, feed each of
+  /// them to the `hasBreak(before:)` method. The method returns true if the
+  /// sequence has a grapheme break preceding the given value.
   ///
   /// The results produced by this state machine are guaranteed to match the way
   /// `String` splits its contents into `Character` values.
@@ -454,9 +453,9 @@ extension Unicode {
     internal var _state: _GraphemeBreakingState
 
     /// Returns a non-nil value if it can be determined whether there is a
-    /// `Character` break between `scalar1` and `scalar2` without knowing
-    /// anything about the scalars that precede `scalar1`. This can be used as a
-    /// fast (but incomplete) test before spinning up a full state machine
+    /// grapheme break between `scalar1` and `scalar2` without knowing anything
+    /// about the scalars that precede `scalar1`. This can optionally be used as
+    /// a fast (but incomplete) test before spinning up a full state machine
     /// session.
     @_effects(releasenone)
     public static func quickBreak(
@@ -472,22 +471,32 @@ extension Unicode {
       return nil
     }
 
-    /// Initialize a new `Character` recognizer, feeding it the given value as
-    /// the first Unicode scalar in the series. The state machine assumes that
-    /// `first` is supposed to start a new extended grapheme cluster.
-    public init(first: Unicode.Scalar) {
+    /// Initialize a new character recognizer at the _start of text_ (sot)
+    /// position.
+    ///
+    /// The resulting state machine will report a grapheme break on the
+    /// first scalar that is fed to it.
+    public init() {
       _state = _GraphemeBreakingState()
-      _previous = first
+      // To avoid having to handle the empty case specially, we use NUL as the
+      // placeholder before the first scalar. NUL is a control character, so per
+      // rule GB5, it will induce an unconditional grapheme break before the
+      // first actual scalar, emulating GB1.
+      _previous = Unicode.Scalar(0 as UInt8)
     }
 
     /// Feeds the next scalar to the state machine, returning a Boolean value
-    /// indicating whether it starts a new `Character`.
+    /// indicating whether it starts a new extended grapheme cluster.
     ///
-    /// The state machine does not carry information across `Character`
+    /// This method will always report a break the first time it is called
+    /// on a newly initialized recognizer.
+    ///
+    /// The state machine does not carry information across character
     /// boundaries. I.e., if this method returns true, then `self` after the
-    /// call is equivalent to `_CharacterRecognizer(first: next)`.
+    /// call is equivalent to feeding the same scalar to a newly initialized
+    /// recognizer instance.
     @_effects(releasenone)
-    public mutating func hasCharacterBoundary(
+    public mutating func hasBreak(
       before next: Unicode.Scalar
     ) -> Bool {
       let r = _state.shouldBreak(between: _previous, and: next)

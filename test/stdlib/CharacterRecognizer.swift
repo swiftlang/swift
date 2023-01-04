@@ -13,19 +13,17 @@ var suite = TestSuite("CharacterRecognizer")
 defer { runAllTests() }
 
 if #available(SwiftStdlib 5.8, *) {
-  suite.test("Unicode test data") {
+  suite.test("Unicode test data/hasBreak") {
     for test in graphemeBreakTests {
-      var it = test.string.unicodeScalars.makeIterator()
-      guard let first = it.next() else { continue }
-      var recognizer = Unicode._CharacterRecognizer(first: first)
+      var recognizer = Unicode._CharacterRecognizer()
       var pieces: [[Unicode.Scalar]] = []
-      var piece: [Unicode.Scalar] = [first]
-      while let next = it.next() {
-        if recognizer.hasCharacterBoundary(before: next) {
-          pieces.append(piece)
-          piece = [next]
+      var piece: [Unicode.Scalar] = []
+      for scalar in test.string.unicodeScalars {
+        if recognizer.hasBreak(before: scalar) {
+          if !piece.isEmpty { pieces.append(piece) }
+          piece = [scalar]
         } else {
-          piece.append(next)
+          piece.append(scalar)
         }
       }
       if !piece.isEmpty { pieces.append(piece) }
@@ -57,15 +55,13 @@ if #available(SwiftStdlib 5.8, *) {
     let expectedBreaks = Array(sampleString.indices)
 
     let u = sampleString.unicodeScalars
-    var i = u.startIndex
-    var actualBreaks = [i]
-    var recognizer = Unicode._CharacterRecognizer(first: u[i])
-    u.formIndex(after: &i)
-    while i < u.endIndex {
-      if recognizer.hasCharacterBoundary(before: u[i]) {
+
+    var recognizer = Unicode._CharacterRecognizer()
+    var actualBreaks: [String.Index] = []
+    for i in u.indices {
+      if recognizer.hasBreak(before: u[i]) {
         actualBreaks.append(i)
       }
-      u.formIndex(after: &i)
     }
     expectEqual(actualBreaks, expectedBreaks,
       """
