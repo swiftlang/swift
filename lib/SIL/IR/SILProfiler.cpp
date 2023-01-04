@@ -213,8 +213,6 @@ shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
     // initializer instead.
     if (!Parent.isNull() || !Constant || !Constant.getAbstractClosureExpr())
       return Action::SkipChildren(E);
-
-    assert(CE->hasBody());
   }
   return Action::Continue(E);
 }

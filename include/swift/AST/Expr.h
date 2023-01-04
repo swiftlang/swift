@@ -3863,9 +3863,6 @@ public:
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
 
-  /// Whether this closure has a body
-  bool hasBody() const;
-
   /// Returns the body of closures that have a body
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
