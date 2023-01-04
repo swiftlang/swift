@@ -3,18 +3,18 @@
 
 // MARK: - Valid declarations
 
-// OK: top level functions
+// Ok, top level functions
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
 public func backDeployedTopLevelFunc() {}
 
-// OK: internal decls may be back deployed when @usableFromInline
+// Ok, internal decls may be back deployed when @usableFromInline
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
 @usableFromInline
 internal func backDeployedUsableFromInlineTopLevelFunc() {}
 
-// OK: function/property/subscript decls in a struct
+// Ok, function/property/subscript decls in a struct
 public struct TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
@@ -53,7 +53,7 @@ public struct TopLevelStruct {
   }
 }
 
-// OK: final function decls in a non-final class
+// Ok, final function decls in a non-final class
 public class TopLevelClass {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
@@ -72,7 +72,7 @@ public class TopLevelClass {
   public final class func backDeployedClassMethod() {}
 }
 
-// OK: function decls in a final class
+// Ok, function decls in a final class
 final public class FinalTopLevelClass {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
@@ -83,20 +83,20 @@ final public class FinalTopLevelClass {
   public var backDeployedComputedProperty: Int { 98 }
 }
 
-// OK: final function decls on an actor
+// Ok, final function decls on an actor
 @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public actor TopLevelActor {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   final public func finalActorMethod() {}
 
-  // OK: actor methods are effectively final
+  // Ok, actor methods are effectively final
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func actorMethod() {}
 }
 
-// OK: function decls in extension on public types
+// Ok, function decls in extension on public types
 extension TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
@@ -123,7 +123,8 @@ extension TopLevelProtocol {
   public func backDeployedExtensionMethod() {}
 }
 
-// MARK: - Unsupported declaration types
+
+// MARK: - Unsupported declaration kinds
 
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public class CannotBackDeployClass {}
@@ -166,6 +167,7 @@ protocol CannotBackDeployProtocol {}
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public actor CannotBackDeployActor {}
 
+
 // MARK: - Function body diagnostics
 
 public struct FunctionBodyDiagnostics {
@@ -187,6 +189,7 @@ public struct FunctionBodyDiagnostics {
     privateFunc() // expected-error {{instance method 'privateFunc()' is private and cannot be referenced from a '@_backDeploy' function}}
   }
 }
+
 
 // MARK: - Incompatible declarations
 
@@ -243,7 +246,7 @@ public func alwaysEmitIntoClientFunc() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
-@inlinable // OK
+@inlinable // Ok
 public func inlinableFunc() {}
 
 @available(macOS 11.0, *)
