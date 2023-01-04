@@ -203,6 +203,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(erasureExpr->getSubExpr());
     }
 
+    case ExprKind::Paren: {
+      auto parenExpr = cast<ParenExpr>(expr);
+      return extractCompileTimeValue(parenExpr->getSubExpr());
+    }
+
     default: {
       break;
     }
@@ -254,9 +259,10 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
 
   if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
     auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
-    if (node.is<Stmt *>()) {
-      if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
-        return {propertyDecl, extractCompileTimeValue(returnStmt->getResult())};
+    if (auto *stmt = node.dyn_cast<Stmt *>()) {
+      if (stmt->getKind() == StmtKind::Return) {
+        return {propertyDecl,
+                extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
       }
     }
   }
