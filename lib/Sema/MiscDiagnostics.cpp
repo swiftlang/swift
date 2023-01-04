@@ -3041,13 +3041,22 @@ public:
 
       SmallVector<AvailabilityCondition, 4> conditions;
 
-      llvm::transform(availabilityContext->getCond(),
-                      std::back_inserter(conditions),
-                      [&](const StmtConditionElement &elt) {
-                        auto condition = elt.getAvailability();
-                        return std::make_pair(condition->getAvailableRange(),
-                                              condition->isUnavailability());
-                      });
+      for (const auto &elt : availabilityContext->getCond()) {
+        auto condition = elt.getAvailability();
+
+        auto availabilityRange = condition->getAvailableRange();
+        // If there is no lower endpoint it means that the
+        // current platform is unrelated to this condition
+        // and we can ignore it.
+        if (!availabilityRange.hasLowerEndpoint())
+          continue;
+
+        conditions.push_back(
+            {availabilityRange, condition->isUnavailability()});
+      }
+
+      if (conditions.empty())
+        continue;
 
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
