@@ -1,3 +1,6 @@
+// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
+// REQUIRES: rdar103866776
+
 /// The fine-grained dependency graph has implicit dependencies from interfaces to implementations.
 /// These are not presently tested because depends nodes are marked as depending in the interface,
 /// as of 1/9/20. But this test will check fail if those links are not followed.
