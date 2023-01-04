@@ -294,6 +294,7 @@ func test_local_type_with_protocol_conformance() {
 struct FlagForInnerMethods<Result> {
   init(attachedTo: () -> Result) {}
   init<T>(attachedTo: (T) -> Result) {}
+  init<T>(attachedTo: (T.Type) -> Result) {}
   init<T>(attachedTo: (inout T) -> Result) {}
   init<T>(attachedTo: (inout T, String, inout Int) -> Result) {}
 }

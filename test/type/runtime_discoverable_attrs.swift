@@ -212,3 +212,16 @@ actor TestActor {
 func globalAsyncFn() async -> [String] {
   return []
 }
+
+@runtimeMetadata
+struct FlagForStaticFuncs {
+  init<T>(attachedTo: (T.Type) -> Void) {}
+  init<T>(attachedTo: (T.Type, Int.Type) -> Void) {}
+  init<T>(attachedTo: (T.Type, inout [String], Int) -> Void) {}
+}
+
+struct TestStaticFuncs {
+  @FlagForStaticFuncs static func test0() {}
+  @FlagForStaticFuncs static func test1(_: Int.Type) {}
+  @FlagForStaticFuncs static func test2(_: inout [String], x: Int) {}
+}
