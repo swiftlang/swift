@@ -33,9 +33,50 @@ if #available(SwiftStdlib 5.8, *) {
   }
 }
 
+func scalars(in buffer: some Sequence<UInt8>) -> [Unicode.Scalar] {
+  var result: [Unicode.Scalar] = []
+  var it = buffer.makeIterator()
+  var utf8Decoder = UTF8()
+  while true {
+    switch utf8Decoder.decode(&it) {
+    case .scalarValue(let v): result.append(v)
+    case .emptyInput: return result
+    case .error: expectTrue(false, "Invalid scalar")
+    }
+  }
+}
+
 if #available(SwiftStdlib 5.8, *) {
-  suite.test("Consistency with Swift String's behavior") {
-    let sampleString = #"""
+  suite.test("Unicode test data/_firstBreak") {
+    for test in graphemeBreakTests {
+      var recognizer = Unicode._CharacterRecognizer()
+      var pieces: [[Unicode.Scalar]] = []
+      var str = test.string
+      str.withUTF8 { buffer in
+        var i = buffer.startIndex
+        var last = i
+        while i < buffer.endIndex {
+          guard let scalar = recognizer._firstBreak(
+            inUncheckedUnsafeUTF8Buffer: buffer, startingAt: i)
+          else { break }
+
+          if scalar.lowerBound > last {
+            pieces.append(scalars(in: buffer[last..<scalar.lowerBound]))
+          }
+
+          last = scalar.lowerBound
+          i = scalar.upperBound
+        }
+
+        pieces.append(scalars(in: buffer[last...]))
+      }
+      expectEqual(pieces, test.pieces,
+        "string: \(String(reflecting: test.string))")
+    }
+  }
+}
+
+let sampleString = #"""
     The powerful programming language that is also easy to learn.
     손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
     🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
@@ -51,6 +92,9 @@ if #available(SwiftStdlib 5.8, *) {
     d̶̨̨̡̡͙̟͉̱̗̝͙͍̮͍̘̮͔͑\#
     e̶̢͕̦̜͔̘̘̝͈̪̖̺̥̺̹͉͎͈̫̯̯̻͑͑̿̽͂̀̽͋́̎̈́̈̿͆̿̒̈́̽̔̇͐͛̀̓͆̏̾̀̌̈́̆̽̕ͅ
     """#
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("Consistency with Swift String's behavior/hasBreak") {
 
     let expectedBreaks = Array(sampleString.indices)
 
