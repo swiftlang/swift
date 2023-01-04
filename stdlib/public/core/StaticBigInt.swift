@@ -43,14 +43,6 @@ public struct StaticBigInt:
   public init(_builtinIntegerLiteral value: Builtin.IntLiteral) {
     _value = value
   }
-
-  /// Returns the given value unchanged.
-  @_alwaysEmitIntoClient
-  @available(SwiftStdlib 5.8, *)
-  @inline(__always)
-  public static prefix func + (_ rhs: Self) -> Self {
-    rhs
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -117,7 +109,7 @@ extension StaticBigInt {
   ///     negative[1]        //-> 0xFFEEDDCCBBAA9988
   ///     negative[2]        //-> 0xFFFFFFFFFFFFFFFF
   ///
-  ///     let positive: StaticBigInt = +0x0011223344556677_8899AABBCCDDEEFF
+  ///     let positive: StaticBigInt =  0x0011223344556677_8899AABBCCDDEEFF
   ///     positive.signum()  //-> +1
   ///     positive.bitWidth  //-> 118
   ///     positive[0]        //-> 0x8899AABBCCDDEEFF
