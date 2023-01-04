@@ -32,6 +32,8 @@ final class StaticBigIntTests {
     let testSuite = TestSuite("StaticBigIntTests")
     testSuite.test("BinaryRepresentation",  testCase.testBinaryRepresentation)
     testSuite.test("TextualRepresentation", testCase.testTextualRepresentation)
+    testSuite.test("PrefixPlusTypeInference",  testCase.testPrefixPlusTypeInference)
+    testSuite.test("PrefixMinusTypeInference", testCase.testPrefixMinusTypeInference)
     testSuite.test("WrapperAssociatedType", testCase.testWrapperAssociatedType)
     runAllTests()
   }
@@ -57,14 +59,14 @@ extension StaticBigIntTests {
       -0x3:                                (-1,   3, [~2, ~0, ~0, ~0, ~0], [~2, ~0, ~0]),
       -0x2:                                (-1,   2, [~1, ~0, ~0, ~0, ~0], [~1, ~0, ~0]),
       -0x1:                                (-1,   1, [~0, ~0, ~0, ~0, ~0], [~0, ~0, ~0]),
-      +0x0:                                ( 0,   1, [ 0,  0,  0,  0,  0], [ 0,  0,  0]),
-      +0x1:                                (+1,   2, [ 1,  0,  0,  0,  0], [ 1,  0,  0]),
-      +0x2:                                (+1,   3, [ 2,  0,  0,  0,  0], [ 2,  0,  0]),
-      +0x3:                                (+1,   3, [ 3,  0,  0,  0,  0], [ 3,  0,  0]),
-      +0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE: (+1, 128, [~1, ~0, ~0, ~m,  0], [~1, ~m,  0]),
-      +0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF: (+1, 128, [~0, ~0, ~0, ~m,  0], [~0, ~m,  0]),
-      +0x80000000000000000000000000000000: (+1, 129, [ 0,  0,  0,  m,  0], [ 0,  m,  0]),
-      +0x80000000000000000000000000000001: (+1, 129, [ 1,  0,  0,  m,  0], [ 1,  m,  0]),
+       0x0:                                ( 0,   1, [ 0,  0,  0,  0,  0], [ 0,  0,  0]),
+       0x1:                                (+1,   2, [ 1,  0,  0,  0,  0], [ 1,  0,  0]),
+       0x2:                                (+1,   3, [ 2,  0,  0,  0,  0], [ 2,  0,  0]),
+       0x3:                                (+1,   3, [ 3,  0,  0,  0,  0], [ 3,  0,  0]),
+       0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE: (+1, 128, [~1, ~0, ~0, ~m,  0], [~1, ~m,  0]),
+       0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF: (+1, 128, [~0, ~0, ~0, ~m,  0], [~0, ~m,  0]),
+       0x80000000000000000000000000000000: (+1, 129, [ 0,  0,  0,  m,  0], [ 0,  m,  0]),
+       0x80000000000000000000000000000001: (+1, 129, [ 1,  0,  0,  m,  0], [ 1,  m,  0]),
     ]
     for (actual, expected) in keyValuePairs {
       expectEqual(expected.signum,   actual.signum())
@@ -108,20 +110,20 @@ extension StaticBigIntTests {
       -0x3:                                "-0x3",
       -0x2:                                "-0x2",
       -0x1:                                "-0x1",
-      +0x0:                                "+0x0",
-      +0x1:                                "+0x1",
-      +0x2:                                "+0x2",
-      +0x3:                                "+0x3",
-      +0x10:                               "+0x10",
-      +0x100:                              "+0x100",
-      +0x1000:                             "+0x1000",
-      +0x123456789ABC:                     "+0x123456789ABC",
-      +0x123456789ABCD:                    "+0x123456789ABCD",
-      +0x123456789ABCDE:                   "+0x123456789ABCDE",
-      +0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE: "+0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
-      +0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF: "+0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-      +0x80000000000000000000000000000000: "+0x80000000000000000000000000000000",
-      +0x80000000000000000000000000000001: "+0x80000000000000000000000000000001",
+       0x0:                                "+0x0",
+       0x1:                                "+0x1",
+       0x2:                                "+0x2",
+       0x3:                                "+0x3",
+       0x10:                               "+0x10",
+       0x100:                              "+0x100",
+       0x1000:                             "+0x1000",
+       0x123456789ABC:                     "+0x123456789ABC",
+       0x123456789ABCD:                    "+0x123456789ABCD",
+       0x123456789ABCDE:                   "+0x123456789ABCDE",
+       0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE: "+0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
+       0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF: "+0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+       0x80000000000000000000000000000000: "+0x80000000000000000000000000000000",
+       0x80000000000000000000000000000001: "+0x80000000000000000000000000000001",
     ]
     for (actual, expected) in keyValuePairs {
       expectEqual(expected, String(reflecting: actual))
@@ -146,6 +148,26 @@ extension StaticBigIntTests {
     init(integerLiteral actual: StaticBigInt) {
       self.actual = actual
     }
+  }
+  
+  func testPrefixPlusTypeInference() {
+    let a: Int = 7
+    // An earlier version of StaticBigInt contained a prefix + operation,
+    // which caused b to be inferred to have type StaticBigInt rather than
+    // Int:
+    let b = +1
+    // and then this would fail to typecheck, because there's no
+    // Int + StaticBigInt operation.
+    let c = a + b
+  }
+  
+  func testPrefixMinusTypeInference() {
+    // This example shouldn't suffer from the same problem as above, because
+    // -1 is a literal, not a prefix operator followed by a literal.
+    // Nonetheless, let's test it.
+    let a: Int = 7
+    let b = -1
+    let c = a + b
   }
 
   @available(SwiftStdlib 5.8, *)
