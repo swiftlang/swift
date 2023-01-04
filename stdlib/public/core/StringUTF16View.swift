@@ -197,21 +197,28 @@ extension String.UTF16View: BidirectionalCollection {
     return idx.encoded(offsetBy: -len)._scalarAligned._knownUTF8
   }
 
+  @_effects(releasenone)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    let i = _guts.ensureMatchingEncoding(i)
+    var i = _guts.ensureMatchingEncoding(i)
     _precondition(i <= endIndex, "String index is out of bounds")
+
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
 
-    if !_guts.isASCII { // We have ASCII fast paths below
-      let threshold = (
-        i == startIndex ? _breadcrumbStride / 2 : _breadcrumbStride)
-      if n.magnitude < threshold {
-        // Do not use breadcrumbs if directly computing the result is expected to
-        // be cheaper.
-        return _index(i, offsetBy: n)._knownUTF8
-      }
+    if _guts.isASCII {
+      return Index(
+        _encodedOffset: i._encodedOffset + n
+      )._scalarAligned._encodingIndependent
+    }
+
+    i = _utf16AlignNativeIndex(i)
+    let threshold = (
+      i == startIndex ? _breadcrumbStride / 2 : _breadcrumbStride)
+    if n.magnitude < threshold {
+      // Do not use breadcrumbs if directly computing the result is expected
+      // to be cheaper.
+      return _index(i, offsetBy: n)._knownUTF8
     }
 
     let lowerOffset = _nativeGetOffset(for: i)
@@ -219,13 +226,14 @@ extension String.UTF16View: BidirectionalCollection {
     return result
   }
 
+  @_effects(releasenone)
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    let limit = _guts.ensureMatchingEncoding(limit)
+    var limit = _guts.ensureMatchingEncoding(limit)
     guard _fastPath(limit <= endIndex) else { return index(i, offsetBy: n) }
 
-    let i = _guts.ensureMatchingEncoding(i)
+    var i = _guts.ensureMatchingEncoding(i)
     _precondition(i <= endIndex, "String index is out of bounds")
 
     if _slowPath(_guts.isForeign) {
@@ -233,11 +241,13 @@ extension String.UTF16View: BidirectionalCollection {
     }
 
     if !_guts.isASCII { // We have ASCII fast paths below
+      limit = _utf16AlignNativeIndex(limit)
+      i = _utf16AlignNativeIndex(i)
       let threshold = (
         _breadcrumbStride + (i == startIndex ? 0 : _breadcrumbStride / 2))
       if n.magnitude < threshold {
-        // Do not use breadcrumbs if directly computing the result is expected to
-        // be cheaper.
+        // Do not use breadcrumbs if directly computing the result is expected
+        // to be cheaper.
         return _index(i, offsetBy: n, limitedBy: limit)?._knownUTF8
       }
     }
@@ -351,8 +361,8 @@ extension String.UTF16View: BidirectionalCollection {
     for range: Range<Index>,
     from start: Index
   ) -> Range<Int> {
-    let lower = _guts.ensureMatchingEncoding(range.lowerBound)
-    let upper = _guts.ensureMatchingEncoding(range.upperBound)
+    var lower = _guts.ensureMatchingEncoding(range.lowerBound)
+    var upper = _guts.ensureMatchingEncoding(range.upperBound)
     _internalInvariant(_guts.hasMatchingEncoding(start))
 
     _precondition(
@@ -378,6 +388,8 @@ extension String.UTF16View: BidirectionalCollection {
     }
 
     if utf8Distance.magnitude <= _breadcrumbStride / 2 {
+      lower = _utf16AlignNativeIndex(lower)
+      upper = _utf16AlignNativeIndex(upper)
       let lowerOffset = distance(from: start, to: lower)
       let distance = _utf16Distance(from: lower, to: upper)
       return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
