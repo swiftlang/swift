@@ -392,8 +392,11 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsSemanticallyUnavailableRequest,
-              bool(const Decl *),
+SWIFT_REQUEST(TypeChecker, SemanticAvailableRangeAttrRequest,
+              Optional<AvailableAttrDeclPair>(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticUnavailableAttrRequest,
+              Optional<AvailableAttrDeclPair>(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),

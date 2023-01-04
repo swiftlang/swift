@@ -390,19 +390,12 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 
 Optional<llvm::VersionTuple>
 Decl::getBackDeployBeforeOSVersion(ASTContext &Ctx) const {
-  for (auto *attr : getAttrs()) {
-    if (auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr)) {
-      if (backDeployAttr->isActivePlatform(Ctx) && backDeployAttr->Version) {
-        return backDeployAttr->Version;
-      }
-    }
-  }
+  if (auto *attr = getAttrs().getBackDeploy(Ctx))
+    return attr->Version;
 
   // Accessors may inherit `@_backDeploy`.
-  if (getKind() == DeclKind::Accessor) {
-    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(
-        Ctx);
-  }
+  if (auto *AD = dyn_cast<AccessorDecl>(this))
+    return AD->getStorage()->getBackDeployBeforeOSVersion(Ctx);
 
   return None;
 }
