@@ -339,7 +339,6 @@ NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
 // Added in Swift 5.7
-NODE(OpaqueReturnTypeIndexed)
 NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
 NODE(ExtendedExistentialTypeShape)
@@ -353,6 +352,8 @@ NODE(MetatypeParamsRemoved)
 NODE(HasSymbolQuery)
 NODE(RuntimeDiscoverableAttributeRecord)
 CONTEXT_NODE(RuntimeAttributeGenerator)
+NODE(OpaqueReturnTypeIndex)
+NODE(OpaqueReturnTypeParent)
 
 #undef CONTEXT_NODE
 #undef NODE
