@@ -48,7 +48,8 @@ ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
   return std::make_pair(body, init->getType()->mapTypeOutOfContext());
 }
 
-static TypeRepr *buildTypeRepr(DeclContext *typeContext) {
+static TypeRepr *buildTypeRepr(DeclContext *typeContext,
+                               bool forMetatype = false) {
   assert(typeContext->isTypeContext());
 
   SmallVector<ComponentIdentTypeRepr *, 2> components;
@@ -77,10 +78,17 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext) {
   // Reverse the components to form a valid outer-to-inner name sequence.
   std::reverse(components.begin(), components.end());
 
-  if (components.size() == 1)
-    return components.front();
+  TypeRepr *typeRepr = nullptr;
+  if (components.size() == 1) {
+    typeRepr = components.front();
+  } else {
+    typeRepr = CompoundIdentTypeRepr::create(ctx, components);
+  }
 
-  return CompoundIdentTypeRepr::create(ctx, components);
+  if (forMetatype)
+    return new (ctx) MetatypeTypeRepr(typeRepr, /*MetaLoc=*/SourceLoc());
+
+  return typeRepr;
 }
 
 /// Synthesizes a closure thunk that forwards all of the arguments
@@ -98,22 +106,22 @@ static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
 
   SmallVector<ParamDecl *, 4> closureParams;
 
-  NullablePtr<ParamDecl> selfParam;
-  if (!method->isStatic()) {
-    auto *self = ParamDecl::createImplicit(
-        ctx,
-        /*argumentName=*/Identifier(),
-        /*parameterName=*/ctx.Id_self,
-        /*type=*/nominal->getDeclaredInterfaceType(), thunkDC,
-        method->isMutating() ? ParamSpecifier::InOut : ParamSpecifier::Default);
-
+  ParamDecl *selfParam = ParamDecl::createImplicit(
+      ctx,
+      /*argumentName=*/Identifier(),
+      /*parameterName=*/ctx.Id_self,
+      /*type=*/
+      method->isStatic() ? nominal->getInterfaceType()
+                         : nominal->getDeclaredInterfaceType(),
+      thunkDC,
+      method->isMutating() ? ParamSpecifier::InOut : ParamSpecifier::Default);
+  {
     // This is very important for the solver, without a type repr
     // it would create a type variable and attempt infer the type
     // from the body.
-    self->setTypeRepr(buildTypeRepr(nominal));
+    selfParam->setTypeRepr(buildTypeRepr(nominal, method->isStatic()));
 
-    closureParams.push_back(self);
-    selfParam = self;
+    closureParams.push_back(selfParam);
   }
 
   if (funcParams) {
@@ -139,14 +147,9 @@ static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
   // return self.<func>(<arguments>)
   SmallVector<ASTNode, 2> body;
   {
-    NullablePtr<Expr> baseExpr;
-    if (method->isStatic()) {
-      baseExpr =
-          TypeExpr::createImplicit(nominal->getDeclaredInterfaceType(), ctx);
-    } else {
-      baseExpr = new (ctx) DeclRefExpr({selfParam.get()}, /*Loc=*/DeclNameLoc(),
-                                       /*implicit=*/true);
-    }
+    NullablePtr<Expr> baseExpr =
+        new (ctx) DeclRefExpr({selfParam}, /*Loc=*/DeclNameLoc(),
+                              /*implicit=*/true);
 
     auto *memberRef = new (ctx) MemberRefExpr(
         baseExpr.get(), /*dotLoc=*/SourceLoc(), {method}, /*loc=*/DeclNameLoc(),
@@ -157,10 +160,9 @@ static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
       for (unsigned i = 0, n = funcParams->size(); i != n; ++i) {
         const auto *param = funcParams->get(i);
 
-        Expr *argExpr = new (ctx)
-            DeclRefExpr({closureParams[method->isStatic() ? i : i + 1]},
-                        /*Loc=*/DeclNameLoc(),
-                        /*implicit=*/true);
+        Expr *argExpr = new (ctx) DeclRefExpr({closureParams[i + 1]},
+                                              /*Loc=*/DeclNameLoc(),
+                                              /*implicit=*/true);
 
         if (param->isInOut()) {
           argExpr = new (ctx) InOutExpr(/*operLoc=*/SourceLoc(), argExpr,
