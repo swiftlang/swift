@@ -775,7 +775,7 @@ class r22240342 {
   lazy var xx: Int = {
     foo {  // expected-error {{cannot find 'foo' in scope}}
       let issueView = 42
-      issueView.delegate = 12
+      issueView.delegate = 12 // expected-error {{value of type 'Int' has no member 'delegate'}}
       
     }
     return 42
