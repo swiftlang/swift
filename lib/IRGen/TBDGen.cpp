@@ -633,10 +633,20 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  bool isSPI(const ValueDecl* VD) {
+  bool isSPI(const ValueDecl *VD) {
     assert(VD);
-    return VD->isSPI() || VD->isAvailableAsSPI();
+    return VD->isSPI() || VD->isAvailableAsSPI() ||
+           // Underscore-named symbols are considered SPIs before @_spi is
+           // available (rdar://95640793).
+           //
+           // FIXME: This does not cover children of an underscored container.
+           // For example, init/deinit of an underscored class have
+           // ConstructorDecl and DestructorDecl as the decl associated to the
+           // SymbolSource. They do not have underscored naming. Same with
+           // dispatch thunks and method descriptors for methods.
+           VD->hasUnderscoredNaming();
   }
+
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
@@ -661,6 +671,8 @@ public:
       }
     } else if (source.kind == SymbolSource::Kind::IR) {
       auto ref = source.getIRLinkEntity();
+      // FIXME: some ir link entities do not have a decl, for example
+      // type metadata and type metadata accessor.
       if (ref.hasDecl()) {
         if (isSPI(ref.getDecl()))
           access = apigen::APIAccess::Private;
@@ -690,15 +702,24 @@ public:
       if (method.getDecl()->getDescriptiveKind() ==
           DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
-      if (method.getDecl()->isSPI())
+
+      // Underscore-named symbols are considered SPIs before @_spi is available
+      // (rdar://95640793).
+      if (method.getDecl()->isSPI() || method.getDecl()->hasUnderscoredNaming())
         access = apigen::APIAccess::Private;
-    }
+    } else if (name.startswith("_"))
+      access = apigen::APIAccess::Private;
+
 
     apigen::ObjCContainerRecord *record = nullptr;
     if (auto *cls = dyn_cast<ClassDecl>(ctx))
       record = addOrGetObjCInterface(cls);
     else if (auto *ext = dyn_cast<ExtensionDecl>(ctx))
       record = addOrGetObjCCategory(ext);
+
+    // If the container has underscored naming, also make the method an SPI.
+    if (record->access == apigen::APIAccess::Private)
+      access = apigen::APIAccess::Private;
 
     if (record)
       api.addObjCMethod(record, name, moduleLoc, access, isInstanceMethod,
@@ -755,8 +776,11 @@ private:
     if (auto *super = decl->getSuperclassDecl())
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
-    apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    // Underscore-named symbols are considered SPIs before @_spi is available
+    // (rdar://95640793).
+    apigen::APIAccess access = decl->isSPI() || decl->hasUnderscoredNaming()
+                                   ? apigen::APIAccess::Private
+                                   : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
             ? apigen::APILinkage::Exported
@@ -788,8 +812,11 @@ private:
     auto interface = cls->getObjCRuntimeName(interfaceBuffer);
     buildCategoryName(decl, cls, nameBuffer);
     apigen::APIAvailability availability = getAvailability(decl);
-    apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    // Underscore-named symbols are considered SPIs before @_spi is available
+    // (rdar://95640793).
+    apigen::APIAccess access = decl->isSPI() || decl->hasUnderscoredNaming()
+                                   ? apigen::APIAccess::Private
+                                   : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getMaxAccessLevel() == AccessLevel::Public
             ? apigen::APILinkage::Exported
