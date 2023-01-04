@@ -352,6 +352,31 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
+void writeFileInformation(llvm::json::OStream &JSON, const VarDecl *VD) {
+  SourceRange sourceRange = VD->getSourceRange();
+  if (sourceRange.isInvalid())
+    return;
+
+  const ASTContext &ctx = VD->getDeclContext()->getASTContext();
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(sourceRange.Start));
+  JSON.attribute(
+      "line",
+      ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceRange.Start).first);
+}
+
+void writeFileInformation(llvm::json::OStream &JSON,
+                          const NominalTypeDecl *NTD) {
+  DeclContext *DC = NTD->getInnermostDeclContext();
+  SourceLoc loc = extractNearestSourceLoc(DC);
+  if (loc.isInvalid())
+    return;
+
+  const ASTContext &ctx = DC->getASTContext();
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(loc));
+  JSON.attribute("line",
+                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first);
+}
+
 void writeValue(llvm::json::OStream &JSON,
                 std::shared_ptr<CompileTimeValue> Value) {
   auto value = Value.get();
@@ -476,6 +501,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
                 .str());
+        writeFileInformation(JSON, TypeDecl);
         JSON.attributeArray("properties", [&] {
           for (const auto &PropertyInfo : TypeInfo.Properties) {
             JSON.object([&] {
@@ -486,6 +512,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
                              !decl->hasStorage() ? "true" : "false");
+              writeFileInformation(JSON, decl);
               writeValue(JSON, PropertyInfo.Value);
               writeAttributes(JSON, PropertyInfo.PropertyWrappers);
             });
