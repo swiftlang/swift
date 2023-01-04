@@ -1,5 +1,4 @@
-// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
-// REQUIRES: rdar103866776
+// REQUIRES: use_legacy_driver
 
 /// a ==> bad ==> c ==> d | b --> bad --> e ==> f
 
@@ -7,7 +6,7 @@
 // RUN: cp -r %S/Inputs/fail-chained-fine/* %t
 // RUN: touch -t 201401240005 %t/*
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v  2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v  2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps
 
 // CHECK-FIRST-NOT: warning
@@ -29,7 +28,7 @@
 
 
 // RUN: touch -t 201401240006 %t/a.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./bad.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v   > %t/a.txt 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./bad.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v   > %t/a.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A %s < %t/a.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-A %s < %t/a.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-A %s < %t/main~buildrecord.swiftdeps
@@ -50,7 +49,7 @@
 // CHECK-RECORD-A-DAG: "{{(./)?}}f.swift": [
 // CHECK-RECORD-A-DAG: "{{(./)?}}bad.swift": !private [
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a2.txt 2>&1
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A2 %s < %t/a2.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-A2 %s < %t/a2.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps
@@ -68,10 +67,10 @@
 // RUN: cp -r %S/Inputs/fail-chained-fine/* %t
 // RUN: touch -t 201401240005 %t/*
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // RUN: touch -t 201401240006 %t/b.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/b.txt 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/b.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-B %s < %t/b.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-B %s < %t/b.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-B %s < %t/main~buildrecord.swiftdeps
@@ -92,7 +91,7 @@
 // CHECK-RECORD-B-DAG: "{{(./)?}}f.swift": [
 // CHECK-RECORD-B-DAG: "{{(./)?}}bad.swift": !private [
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/b2.txt 2>&1
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/b2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-B2 %s < %t/b2.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-B2 %s < %t/b2.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps
@@ -110,10 +109,10 @@
 // RUN: cp -r %S/Inputs/fail-chained-fine/* %t
 // RUN: touch -t 201401240005 %t/*
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // RUN: touch -t 201401240006 %t/bad.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./bad.swift ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v > %t/bad.txt 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies-bad.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./bad.swift ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v > %t/bad.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-BAD %s < %t/bad.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-BAD %s < %t/bad.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-A %s < %t/main~buildrecord.swiftdeps
@@ -126,7 +125,7 @@
 // NEGATIVE-BAD-NOT: Handled e.swift
 // NEGATIVE-BAD-NOT: Handled f.swift
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/bad2.txt 2>&1
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/bad2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A2 %s < %t/bad2.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-A2 %s < %t/bad2.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps

@@ -1,6 +1,3 @@
-// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
-// REQUIRES: rdar103866776
-
 // REQUIRES: shell
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
@@ -15,7 +12,6 @@
 // MUST-EXEC-DAG: inputs: ["{{(\.\/)?}}main.swift"], output: {object: "{{(\.\/)?}}main.o", swift-dependencies: "{{(\.\/)?}}main.swiftdeps"}
 // MUST-EXEC-DAG: inputs: ["{{(\.\/)?}}other.swift"], output: {object: "{{(\.\/)?}}other.o", swift-dependencies: "{{(\.\/)?}}other.swiftdeps"}
 // MUST-EXEC-DAG: inputs: ["{{(\.\/)?}}yet-another.swift"], output: {object: "{{(\.\/)?}}yet-another.o", swift-dependencies: "{{(\.\/)?}}yet-another.swiftdeps"}
-// MUST-EXEC-DAG: Disabling incremental build: could not read build record
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0], "./yet-another.swift": [443865900, 0]}, build_time: [443865901, 0]}' > %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 -driver-show-incremental -driver-show-job-lifecycle | %FileCheck %s -check-prefix=NO-EXEC
