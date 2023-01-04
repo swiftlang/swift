@@ -4740,7 +4740,7 @@ using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
 /// that relates a type attribute is attached to a generator function.
 template <typename Runtime>
 struct TargetRuntimeDiscoverableAttributeEntry {
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> Type;
+  RelativeDirectPointer<const char, /*nullable*/ false> Type;
   RelativeDirectPointer<TargetAccessibleFunctionRecord<Runtime>> Generator;
 };
 
