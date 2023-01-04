@@ -50,7 +50,7 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     BS = FD->getBody(/*canSynthesize=*/false);
   } else if (auto *CD = FLoc.getAsASTNode<ConstructorDecl>()) {
     ResTy = CD->getResultInterfaceType();
-    BS = FD->getBody();
+    BS = CD->getBody();
   } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
     ResTy = CE->getResultType();
     BS = CE->getBody();
