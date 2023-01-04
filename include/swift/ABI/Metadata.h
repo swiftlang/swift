@@ -4759,7 +4759,10 @@ class RuntimeDiscoverableAttributeRecord
   uint32_t flags;
 
   /// The nominal type that describes the attribute.
-  TargetSignedContextPointer<Runtime, TargetTypeContextDescriptor> Attribute;
+  TargetRelativeIndirectablePointer<Runtime,
+                                    TargetTypeContextDescriptor<Runtime>,
+                                    /*nullable*/ false>
+      Attribute;
 
   /// The number of types this attribute is associated with.
   uint32_t numEntries;
