@@ -465,6 +465,7 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST "13.1")
 
 #
 # User-configurable debugging options.
@@ -589,6 +590,13 @@ option(SWIFT_THREADING_PACKAGE
    single package name, or a semicolon separated sequence of sdk:package pairs.
    Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
    or the empty string for the SDK default.")
+
+option(SWIFT_ENABLE_MACCATALYST
+  "Build the Standard Library and overlays with MacCatalyst support"
+  FALSE)
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
+  "Minimum deployment target version for macCatalyst")
 
 #
 # End of user-configurable options.
