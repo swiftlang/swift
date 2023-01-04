@@ -2485,8 +2485,9 @@ private:
   getIndentContextFrom(CaptureListExpr *CL,
                        SourceLoc ContextLoc = SourceLoc()) {
     AbstractClosureExpr *CE = CL->getClosureBody();
-    BraceStmt *BS = CE ? CE->getBody() : NULL;
-    if (!CE || !BS)
+    assert(CE);
+    BraceStmt *BS = CE->getBody();
+    if (!BS)
       return None;
 
     if (ContextLoc.isValid()) {
