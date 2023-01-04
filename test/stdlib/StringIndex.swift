@@ -1015,12 +1015,6 @@ suite.test("UTF-16 breadcrumbs") {
   let indices = Array(string.utf16.indices) + [string.utf16.endIndex]
   for i in 0 ..< indices.count {
     for j in 0 ..< indices.count {
-      // print(
-      //   """
-      //   i: \(i), indices[i]: \(indices[i]._description); \
-      //   j: \(j), indices[j]: \(indices[j]._description)
-      //   """)
-
       let distance = string.utf16.distance(from: indices[i], to: indices[j])
       expectEqual(distance, j - i,
         """
