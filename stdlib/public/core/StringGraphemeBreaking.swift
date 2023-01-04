@@ -506,6 +506,44 @@ extension Unicode {
       _previous = next
       return r
     }
+
+    /// Decode the scalars in the given UTF-8 buffer and feed them to the
+    /// recognizer up to and including the scalar following the first grapheme
+    /// break. If the buffer contains a grapheme break, then this function
+    /// returns the index range of the scalar that follows the first one;
+    /// otherwise it returns `nil`.
+    ///
+    /// On return, the state of the recognizer is updated to reflect the scalars
+    /// up to and including the returned one. You can detect additional grapheme
+    /// breaks by feeding the recognizer subsequent data.
+    ///
+    /// - Parameter buffer: A buffer containing valid UTF-8 data, starting and
+    ///    ending on Unicode scalar boundaries.
+    ///
+    /// - Parameter start: A valid index into `buffer`, addressing the first
+    ///    code unit of a UTF-8 scalar in the buffer, or the end.
+    ///
+    /// - Returns: The index range of the scalar that follows the first grapheme
+    ///    break in the buffer, if there is one. If the buffer contains no
+    ///    grapheme breaks, then this function returns `nil`.
+    ///
+    /// - Warning: This function does not validate that the buffer contains
+    ///    valid UTF-8 data; its behavior is undefined if given invalid input.
+    @_effects(releasenone)
+    public mutating func _firstBreak(
+      inUncheckedUnsafeUTF8Buffer buffer: UnsafeBufferPointer<UInt8>,
+      startingAt start: Int = 0
+    ) -> Range<Int>? {
+      var i = start
+      while i < buffer.endIndex {
+        let (next, n) = _decodeScalar(buffer, startingAt: i)
+        if hasBreak(before: next) {
+          return Range(_uncheckedBounds: (i, i &+ n))
+        }
+        i &+= n
+      }
+      return nil
+    }
   }
 }
 
