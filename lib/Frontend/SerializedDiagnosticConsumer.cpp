@@ -225,14 +225,15 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   // NOTE: Using Filename.data() here relies on SourceMgr using
   // const char* as buffer identifiers.  This is fast, but may
   // be brittle.  We can always switch over to using a StringMap.
-  unsigned &entry = State->Files[Filename.data()];
-  if (entry)
-    return entry;
+  unsigned &existingEntry = State->Files[Filename.data()];
+  if (existingEntry)
+    return existingEntry;
 
   // Lazily generate the record for the file.  Note that in
   // practice we only expect there to be one file, but this is
   // general and is what the diagnostic file expects.
-  entry = State->Files.size();
+  unsigned entry = State->Files.size();
+  existingEntry = entry;
   RecordData Record;
   Record.push_back(RECORD_FILENAME);
   Record.push_back(entry);
@@ -255,11 +256,16 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   // The source range that this buffer was generated from, expressed as
   // offsets into the original buffer.
   auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.Start);
-  addRangeToRecord(
-      Lexer::getCharSourceRangeFromSourceRange(
-          SM, generatedInfo->originalSourceRange),
-      SM, originalFilename, Record
-  );
+  if (generatedInfo->originalSourceRange.isValid()) {
+    addRangeToRecord(
+        Lexer::getCharSourceRangeFromSourceRange(
+            SM, generatedInfo->originalSourceRange),
+        SM, originalFilename, Record
+    );
+  } else {
+    addLocToRecord(SourceLoc(), SM, originalFilename, Record); // Start
+    addLocToRecord(SourceLoc(), SM, originalFilename, Record); // End
+  }
 
   // Contents of the buffer.
   auto sourceText = SM.getEntireTextForBuffer(bufferID);
