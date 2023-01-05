@@ -1011,6 +1011,10 @@ sil [ossa] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> () {
 [%1: escape => %0, noescape]
 }
 
+sil [ossa] @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y {
+[%1: escape c*.v** => %r.c*.v**]
+}
+
 // CHECK-LABEL: Escape information for callClosure1:
 // CHECK:  -    :   %0 = alloc_ref $Y
 // CHECK: global:   %1 = alloc_ref $Y
@@ -1319,3 +1323,23 @@ sil @test_debug_value : $@convention(thin) () -> () {
   %11 = tuple ()
   return %11 : $()
 }
+
+// CHECK-LABEL: Escape information for test_walk_up_partial_apply_argument:
+// CHECK: global:   %0 = alloc_ref $Y                               // users: %3, %2
+// CHECK: global:   %6 = alloc_ref $X                               // user: %7
+// CHECK: End function test_walk_up_partial_apply_argument
+sil @test_walk_up_partial_apply_argument : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %2 = function_ref @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
+  %8 = apply %3(%0) : $@callee_guaranteed (@guaranteed Y) -> @owned Y
+  %9 = ref_element_addr %8 : $Y, #Y.s
+  %10 = struct_element_addr %9 : $*Str, #Str.a
+
+  %11 = alloc_ref $X
+  store %11 to %10 : $*X
+  %13 = tuple ()
+  return %13 : $()
+}
+
