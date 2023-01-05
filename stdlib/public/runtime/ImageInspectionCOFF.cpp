@@ -23,6 +23,7 @@
 #include <DbgHelp.h>
 #endif
 
+#include "swift/Runtime/Win32.h"
 #include "swift/Threading/Mutex.h"
 
 using namespace swift;
@@ -31,7 +32,7 @@ using namespace swift;
 static LazyMutex mutex;
 static HANDLE dbgHelpHandle = nullptr;
 
-void swift::_swift_win32_withDbgHelpLibrary(
+void _swift_win32_withDbgHelpLibrary(
   void (* body)(HANDLE hProcess, void *context), void *context) {
   mutex.withLock([=] () {
     // If we have not previously created a handle to use with the library, do so
