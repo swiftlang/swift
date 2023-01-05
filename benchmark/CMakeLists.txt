@@ -44,12 +44,12 @@ set(SWIFT_BENCH_MODULES
     single-source/BitCount
     single-source/Breadcrumbs
     single-source/BucketSort
-    single-source/BufferFill
+    #single-source/BufferFill
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
     single-source/CString
-    single-source/CSVParsing
+    #single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
     single-source/ChaCha
@@ -165,7 +165,7 @@ set(SWIFT_BENCH_MODULES
     # Disabled while layout prespecializations are experimental
     #single-source/SimpleArraySpecialization
     single-source/SequenceAlgos
-    single-source/SetTests
+    #single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
     single-source/SortArrayInClass

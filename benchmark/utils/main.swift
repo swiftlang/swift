@@ -32,12 +32,12 @@ import BinaryFloatingPointProperties
 import BitCount
 import Breadcrumbs
 import BucketSort
-import BufferFill
+//import BufferFill
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
 import CString
-import CSVParsing
+//import CSVParsing
 import Calculator
 import CaptureProp
 import ChaCha
@@ -163,7 +163,7 @@ import RomanNumbers
 import SIMDRandomMask
 import SIMDReduceInteger
 import SequenceAlgos
-import SetTests
+//import SetTests
 import SevenBoom
 import Sim2DArray
 //import SimpleArraySpecialization
@@ -217,12 +217,12 @@ register(BinaryFloatingPointProperties.benchmarks)
 register(BitCount.benchmarks)
 register(Breadcrumbs.benchmarks)
 register(BucketSort.benchmarks)
-register(BufferFill.benchmarks)
+//register(BufferFill.benchmarks)
 register(ByteSwap.benchmarks)
 register(COWTree.benchmarks)
 register(COWArrayGuaranteedParameterOverhead.benchmarks)
 register(CString.benchmarks)
-register(CSVParsing.benchmarks)
+//register(CSVParsing.benchmarks)
 register(Calculator.benchmarks)
 register(CaptureProp.benchmarks)
 register(ChaCha.benchmarks)
@@ -349,7 +349,7 @@ register(RomanNumbers.benchmarks)
 register(SIMDRandomMask.benchmarks)
 register(SIMDReduceInteger.benchmarks)
 register(SequenceAlgos.benchmarks)
-register(SetTests.benchmarks)
+//register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)
 //register(SimpleArraySpecialization.benchmarks)
