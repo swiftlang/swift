@@ -85,7 +85,7 @@
 
 // CHECK: @"$s3RAD6IgnoreVHa" = internal constant
 // CHECK-SAME: i32 0
-// CHECK-SAME: @"$s3RAD6IgnoreVMn"
+// CHECK-SAME: %swift.type_descriptor** @"got.$s3RAD6IgnoreVMn"
 // CHECK-SAME: i32 5
 // CHECK-SAME: @"$s18runtime_attributes1AV5InnerC11extComputedSivpfa3RAD6IgnoreHF"
 // CHECK-SAME: @"$s18runtime_attributes16WithExternalAttrAaBVmvpfa3RAD6IgnoreHF"
@@ -96,7 +96,7 @@
 
 // CHECK: @"$s3RAD13TestAmbiguityVHa" = internal constant
 // CHECK-SAME: i32 0
-// CHECK-SAME: @"$s3RAD13TestAmbiguityVMn"
+// CHECK-SAME: %swift.type_descriptor** @"got.$s3RAD13TestAmbiguityVMn"
 // CHECK-SAME: i32 6
 // CHECK-SAME: @"$s18runtime_attributes4testyySicvpfa3RAD13TestAmbiguityHF"
 // CHECK-SAME: @"$s18runtime_attributes4testyySScvpfa3RAD13TestAmbiguityHF"
