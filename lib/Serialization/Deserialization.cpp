@@ -4750,6 +4750,14 @@ ModuleFile::getDeclChecked(
       IDC->setDeclID(DID);
     }
   }
+
+  LLVM_DEBUG(
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(declOrOffset.get())) {
+      llvm::dbgs() << "Deserialized: '";
+      llvm::dbgs() << VD->getName();
+      llvm::dbgs() << "'\n";
+    });
+
   return declOrOffset;
 }
 
