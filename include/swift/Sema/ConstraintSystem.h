@@ -6141,7 +6141,9 @@ public:
     // element.
     assert(elementEnv);
 
-    auto *elementType = cs.createTypeVariable(locator, TVO_CanBindToHole);
+    auto *elementType = cs.createTypeVariable(locator,
+                                              TVO_CanBindToHole |
+                                              TVO_CanBindToNoEscape);
     auto elementLoc = cs.getConstraintLocator(locator,
         LocatorPathElt::OpenedPackElement(elementEnv));
 
