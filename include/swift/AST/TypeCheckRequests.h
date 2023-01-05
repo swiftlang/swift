@@ -3546,23 +3546,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Return a type of the type wrapper (if any) associated with the given
-/// declaration.
-class GetTypeWrapperType
-    : public SimpleRequest<GetTypeWrapperType, Type(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Type evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Inject or get `$Storage` type which has all of the stored properties
 /// of the given type with a type wrapper.
 class GetTypeWrapperStorage
@@ -3757,23 +3740,6 @@ private:
   friend SimpleRequest;
 
   ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Check whether this is a protocol that has a type wrapper attribute
-/// or one of its dependencies does.
-class UsesTypeWrapperFeature
-    : public SimpleRequest<UsesTypeWrapperFeature, bool(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }

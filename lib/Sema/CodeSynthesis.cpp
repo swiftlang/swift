@@ -362,7 +362,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       params.push_back(arg);
     }
   } else if (ICK == ImplicitConstructorKind::TypeWrapperStorage) {
-    accessLevel = AccessLevel::Public;
+    accessLevel = decl->getTypeWrapperStorageDecl()->getFormalAccess();
 
     auto typeWrapperInfo = decl->getTypeWrapper();
     assert(typeWrapperInfo);
@@ -1657,6 +1657,22 @@ ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
+  auto &ctx = wrappedType->getASTContext();
+
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  {
+    auto parentSF = wrappedType->getDeclContext()->getParentSourceFile();
+    if (parentSF && parentSF->Kind == SourceFileKind::Interface) {
+      DeclName initName(ctx, DeclBaseName::createConstructor(),
+                        /*labels=*/{ctx.Id_storageWrapper});
+      auto results = wrappedType->lookupDirect(initName);
+      if (results.size() == 1)
+        return cast<ConstructorDecl>(results.front());
+    }
+  }
+
   // `@typeWrapperIgnored` properties suppress this initializer.
   if (llvm::any_of(wrappedType->getMembers(), [&](Decl *member) {
         return member->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>();
@@ -1664,7 +1680,6 @@ ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(
     return nullptr;
 
   // Create the implicit type wrapper storage constructor.
-  auto &ctx = wrappedType->getASTContext();
   auto ctor = createImplicitConstructor(
       wrappedType, ImplicitConstructorKind::TypeWrapperStorage, ctx);
   wrappedType->addMember(ctor);

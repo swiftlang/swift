@@ -2949,19 +2949,7 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
 }
 
 static bool usesFeatureTypeWrappers(Decl *decl) {
-  NullablePtr<NominalTypeDecl> typeDecl;
-
-  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-    typeDecl = extension->getExtendedNominal();
-  } else {
-    typeDecl = dyn_cast<NominalTypeDecl>(decl);
-  }
-
-  if (!typeDecl)
-    return false;
-
-  return evaluateOrDefault(decl->getASTContext().evaluator,
-                           UsesTypeWrapperFeature{typeDecl.get()}, false);
+  return false;
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
