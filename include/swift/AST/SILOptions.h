@@ -164,7 +164,7 @@ public:
   /// Do we always serialize SIL in OSSA form?
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = false;
+  bool EnableOSSAModules = true;
 
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
