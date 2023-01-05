@@ -197,10 +197,22 @@ private:
         return;
     }
 
+    // Don't walk into the opaque archetypes because they are not
+    // transparent in this context - `some P` could reference a
+    // type variables as substitutions which are visible only to
+    // the outer context.
+    if (type->is<OpaqueTypeArchetypeType>())
+      return;
+
     if (type->hasTypeVariable()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
       type->getTypeVariables(typeVars);
-      ReferencedVars.insert(typeVars.begin(), typeVars.end());
+
+      // Some of the type variables could be non-representative, so
+      // we need to recurse into `inferTypeVariables` to property
+      // handle them.
+      for (auto *typeVar : typeVars)
+        inferVariables(typeVar);
     }
   }
 };
