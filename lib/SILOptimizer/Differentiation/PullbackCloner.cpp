@@ -564,10 +564,15 @@ private:
         bufType, loc, /*zeroInitialize*/ true,
         debugInfo.transform(
           [&](AdjointValue::DebugInfo di) {
+            llvm::raw_svector_ostream adjNameStream(adjName);
             SILDebugVariable &dv = di.second;
             dv.ArgNo = 0;
-            llvm::raw_svector_ostream(adjName) << "adjoint of '" << dv.Name
-                                               << "' in bb" << origBB->getDebugID();
+            adjNameStream << "derivative of '" << dv.Name << "'";
+            if (SILDebugLocation origBBLoc = origBB->front().getDebugLocation()) {
+              adjNameStream << " in scope at ";
+              origBBLoc.getLocation().print(adjNameStream, getASTContext().SourceMgr);
+            }
+            adjNameStream << " (scope #" << origBB->getDebugID() << ")";
             dv.Name = adjName;
             return dv;
           }));
