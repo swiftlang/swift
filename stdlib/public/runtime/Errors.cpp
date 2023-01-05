@@ -36,6 +36,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
+#include "swift/Runtime/Win32.h"
 #include "swift/Threading/Errors.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/StringRef.h"
