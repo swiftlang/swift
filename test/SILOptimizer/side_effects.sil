@@ -1144,3 +1144,15 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @test_debug_value_address
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_debug_value_address : $@convention(thin) <T> (@in T, @inout T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  destroy_addr %0 : $*T
+  debug_value %1 : $*T
+  %4 = tuple ()
+  return %4 : $()
+}
+

@@ -442,7 +442,8 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
-    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst:
+    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
+         is DebugValueInst:
       return .continueWalk
 
     default:
