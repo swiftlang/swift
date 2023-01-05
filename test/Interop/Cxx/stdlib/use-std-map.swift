@@ -28,7 +28,6 @@ StdMapTestSuite.test("subscript") {
   expectEqual(m[3], 3)
 }
 
-extension Map.const_iterator : UnsafeCxxInputIterator { }
 extension Map : CxxSequence { }
 
 StdMapTestSuite.test("first(where:)") {
