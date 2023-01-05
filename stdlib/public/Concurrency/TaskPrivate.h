@@ -138,7 +138,8 @@ namespace {
 ///
 ///   @_silgen_name("swift_taskGroup_waitAll")
 ///   func _taskGroupWaitAll<T>(
-///     group: Builtin.RawPointer
+///     group: Builtin.RawPointer,
+///     bodyError: Swift.Error?
 ///   ) async throws -> T?
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {

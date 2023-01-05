@@ -154,7 +154,7 @@ public struct DiscardingTaskGroup {
   /// - Throws: The first error that was encountered by this group.
   @usableFromInline
   internal mutating func awaitAllRemainingTasks() async throws {
-    let _: Void? = try await _taskGroupWaitAll(group: _group)
+    let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: nil)
   }
 
   @_alwaysEmitIntoClient
@@ -393,12 +393,12 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
   } catch {
     group.cancelAll()
 
-    try await group.awaitAllRemainingTasks()
+    try await group.awaitAllRemainingTasks(bodyError: error)
 
     throw error
   }
 
-  try await group.awaitAllRemainingTasks()
+  try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
   #else
@@ -466,8 +466,8 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
   /// Await all the remaining tasks on this group.
   @usableFromInline
-  internal mutating func awaitAllRemainingTasks() async throws {
-    let _: Void? = try await _taskGroupWaitAll(group: _group)
+  internal mutating func awaitAllRemainingTasks(bodyError: Error?) async throws {
+    let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: bodyError)
   }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -549,7 +549,8 @@ extension ThrowingDiscardingTaskGroup: Sendable { }
 @discardableResult
 @_silgen_name("swift_taskGroup_waitAll")
 func _taskGroupWaitAll<T>(
-    group: Builtin.RawPointer
+    group: Builtin.RawPointer,
+    bodyError: Error?
 ) async throws -> T?
 
 @available(SwiftStdlib 5.8, *) // FIXME: remove

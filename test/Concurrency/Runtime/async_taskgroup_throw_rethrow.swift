@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -23,7 +23,7 @@ struct IgnoredBoom: Error {}
 func echo(_ i: Int) async -> Int { i }
 
 func test_taskGroup_throws_rethrows() async {
-  print("==== \(#function) ------") // CHECK_LABEL: test_taskGroup_throws_rethrows
+  print("==== \(#function) ------") // CHECK-LABEL: test_taskGroup_throws_rethrows
   do {
     let got = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
       group.addTask { await echo(1) }
@@ -52,7 +52,7 @@ func test_taskGroup_throws_rethrows() async {
 }
 
 func test_taskGroup_noThrow_ifNotAwaitedThrowingTask() async {
-  print("==== \(#function) ------") // CHECK_LABEL: test_taskGroup_noThrow_ifNotAwaitedThrowingTask
+  print("==== \(#function) ------") // CHECK-LABEL: test_taskGroup_noThrow_ifNotAwaitedThrowingTask
   let got = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     group.addTask { await echo(1) }
     guard let r = try! await group.next() else {
@@ -69,7 +69,7 @@ func test_taskGroup_noThrow_ifNotAwaitedThrowingTask() async {
 }
 
 func test_discardingTaskGroup_automaticallyRethrows() async {
-  print("==== \(#function) ------") // CHECK_LABEL: test_discardingTaskGroup_automaticallyRethrows
+  print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows
   do {
     let got = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
       group.addTask { await echo(1) }
@@ -121,6 +121,62 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
   }
 }
 
+func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst() async {
+  print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst
+  do {
+    try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
+      group.addTask {
+        await echo(1)
+      }
+      group.addTask {
+        try? await Task.sleep(until: .now + .seconds(10), clock: .continuous)
+        let error = Boom(id: "task, second, isCancelled:\(Task.isCancelled)")
+        print("Throwing: \(error)")
+        throw error
+      }
+
+      let bodyError = Boom(id: "body, first, isCancelled:\(group.isCancelled)")
+      print("Throwing: \(bodyError)")
+      throw bodyError
+    }
+
+    print("Expected error to be thrown")
+  } catch {
+    // CHECK: Throwing: Boom(id: "body, first, isCancelled:false
+    // CHECK: Throwing: Boom(id: "task, second, isCancelled:true
+    // and only then the re-throw happens:
+    // CHECK: rethrown: Boom(id: "body, first
+    print("rethrown: \(error)")
+  }
+}
+
+func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond() async {
+  print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
+  do {
+    try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
+      group.addTask {
+        let error = Boom(id: "task, first, isCancelled:\(Task.isCancelled)")
+        print("Throwing: \(error)")
+        throw error
+      }
+
+      try await Task.sleep(until: .now + .seconds(1), clock: .continuous)
+
+      let bodyError = Boom(id: "body, second, isCancelled:\(group.isCancelled)")
+      print("Throwing: \(bodyError)")
+      throw bodyError
+    }
+
+    print("Expected error to be thrown")
+  } catch {
+    // CHECK: Throwing: Boom(id: "task, first, isCancelled:false
+    // CHECK: Throwing: Boom(id: "body, second, isCancelled:true
+    // and only then the re-throw happens:
+    // CHECK: rethrown: Boom(id: "body, second
+    print("rethrown: \(error)")
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
@@ -128,5 +184,7 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
     await test_taskGroup_noThrow_ifNotAwaitedThrowingTask()
     await test_discardingTaskGroup_automaticallyRethrows()
     await test_discardingTaskGroup_automaticallyRethrowsOnlyFirst()
+    await test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst()
+    await test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond()
   }
 }

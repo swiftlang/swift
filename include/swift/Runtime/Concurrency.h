@@ -307,7 +307,8 @@ bool swift_taskGroup_isDiscardingResults(TaskGroup *group);
 /// \code
 /// func swift_taskGroup_waitAll(
 ///     waitingTask: Builtin.NativeObject, // current task
-///     group: Builtin.RawPointer
+///     group: Builtin.RawPointer,
+///     bodyError: Swift.Error?
 /// ) async throws
 /// \endcode
   SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -316,6 +317,7 @@ bool swift_taskGroup_isDiscardingResults(TaskGroup *group);
       OpaqueValue *resultPointer,
       SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
       TaskGroup *group,
+      SwiftError *bodyError,
       ThrowingTaskFutureWaitContinuationFunction *resumeFn,
       AsyncContext *callContext);
 
