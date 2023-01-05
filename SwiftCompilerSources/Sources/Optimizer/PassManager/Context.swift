@@ -151,13 +151,13 @@ struct SimplifyContext : MutatingContext {
 
 extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
-  init(at insPnt: Instruction, location: Location, _ context: some MutatingContext) {
+  init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     self.init(insertAt: .before(insPnt), location: location,
               context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts _before_ `insPnt`, using the location of `insPnt`.
-  init(at insPnt: Instruction, _ context: some MutatingContext) {
+  init(before insPnt: Instruction, _ context: some MutatingContext) {
     self.init(insertAt: .before(insPnt), location: insPnt.location,
               context.notifyInstructionChanged, context._bridged)
   }

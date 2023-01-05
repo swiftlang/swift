@@ -65,7 +65,7 @@ private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
   }
   var mergedCond: Value? = nil
   var didMerge = false
-  let builder = Builder(at: lastCFI.next!, location: lastCFI.location, context)
+  let builder = Builder(after: lastCFI, location: lastCFI.location, context)
 
   // Merge conditions and remove the merged cond_fail instructions.
   for cfi in condFailToMerge {

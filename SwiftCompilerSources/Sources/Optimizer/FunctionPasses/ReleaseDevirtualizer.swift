@@ -88,7 +88,7 @@ private func tryDevirtualizeReleaseOfObject(
     return
   }
 
-  let builder = Builder(at: release, location: release.location, context)
+  let builder = Builder(before: release, location: release.location, context)
 
   var object: Value = allocRefInstruction
   if object.type != type {

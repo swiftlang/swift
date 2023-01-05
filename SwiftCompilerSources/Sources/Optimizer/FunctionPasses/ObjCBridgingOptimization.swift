@@ -146,7 +146,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     let optionalReplacement = originalObjCValue.copy(at: originalObjCValueSwitch,
                                                      andMakeAvailableIn: bridgeToObjcCall.parentBlock,
                                                      context)
-    let builder = Builder(at: bridgeToObjcCall, context)
+    let builder = Builder(before: bridgeToObjcCall, context)
     
     // We know that it's the some-case.
     let replacement = builder.createUncheckedEnumData(enum: optionalReplacement,

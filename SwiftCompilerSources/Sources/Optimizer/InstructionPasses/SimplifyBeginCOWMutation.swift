@@ -64,7 +64,7 @@ private extension BeginCOWMutationInst {
       /// in an infinite loop in SILCombine.
       return
     }
-    let builder = Builder(at: self, location: location, context)
+    let builder = Builder(before: self, location: location, context)
     let zero = builder.createIntegerLiteral(0, type: uniquenessResult.type);
     uniquenessResult.uses.replaceAll(with: zero, context)
   }

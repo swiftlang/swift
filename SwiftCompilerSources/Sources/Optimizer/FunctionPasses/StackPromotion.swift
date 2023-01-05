@@ -176,7 +176,7 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   // Insert `dealloc_stack_ref` instructions at the exit- and end-points of the inner liferange.
   for exitInst in innerRange.exits {
     if !deadEndBlocks.isDeadEnd(exitInst.parentBlock) {
-      let builder = Builder(at: exitInst, context)
+      let builder = Builder(before: exitInst, context)
       builder.createDeallocStackRef(allocRef)
     }
   }

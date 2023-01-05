@@ -25,12 +25,12 @@ extension Builder {
       for succ in inst.parentBlock.successors {
         assert(succ.hasSinglePredecessor,
                "the terminator instruction must not have critical successors")
-        let builder = Builder(at: succ.instructions.first!, location: location,
+        let builder = Builder(before: succ.instructions.first!, location: location,
                               context)
         insertFunc(builder)
       }
     } else {
-      let builder = Builder(at: inst.next!, location: location, context)
+      let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
     }
   }
@@ -55,13 +55,13 @@ extension Value {
 
     // The value needs to be destroyed at every exit of the liferange.
     for exitBlock in useToDefRange.exits {
-      let builder = Builder(at: exitBlock.instructions.first!, context)
+      let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
     }
   
     if useToDefRange.contains(destBlock) {
       // The `destBlock` is within a loop, so we need to copy the value at each iteration.
-      let builder = Builder(at: destBlock.instructions.first!, context)
+      let builder = Builder(before: destBlock.instructions.first!, context)
       return builder.createCopyValue(operand: self)
     }
     return self
@@ -72,7 +72,7 @@ extension Value {
   /// For details see `makeAvailable`.
   func copy(at insertionPoint: Instruction, andMakeAvailableIn destBlock: BasicBlock,
             _ context: some MutatingContext) -> Value {
-    let builder = Builder(at: insertionPoint, context)
+    let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
   }
