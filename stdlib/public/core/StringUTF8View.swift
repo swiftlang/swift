@@ -191,7 +191,7 @@ extension String.UTF8View: BidirectionalCollection {
       }
       _precondition(result >= 0 && result <= _guts.count,
         "String index is out of bounds")
-      return Index(_encodedOffset: result)
+      return Index(_encodedOffset: result)._knownUTF8
     }
 
     return _foreignIndex(i, offsetBy: n, limitedBy: limit)
