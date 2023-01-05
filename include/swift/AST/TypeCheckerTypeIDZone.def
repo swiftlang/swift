@@ -404,9 +404,6 @@ SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
 SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
               Optional<TypeWrapperInfo>(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
-              Type(NominalTypeDecl *),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorage,
               TypeDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

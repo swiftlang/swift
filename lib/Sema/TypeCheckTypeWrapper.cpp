@@ -130,9 +130,19 @@ static void getTypeWrappers(NominalTypeDecl *decl,
       continue;
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
-    if (typeWrapper && typeWrapper->isValid())
+    if (typeWrapper && typeWrapper->isValid()) {
+      auto attrType = evaluateOrDefault(
+          ctx.evaluator,
+          CustomAttrTypeRequest{mutableAttr, decl,
+                                CustomAttrTypeKind::TypeWrapper},
+          Type());
+
+      if (!attrType || attrType->hasError())
+        continue;
+
       typeWrappers.push_back(
-          {mutableAttr, nominal, decl, /*isInferred=*/false});
+          {mutableAttr, attrType, nominal, decl, /*isInferred=*/false});
+    }
   }
 
   // Do not allow transitive protocol inference between protocols.
@@ -193,24 +203,6 @@ GetTypeWrapper::evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const {
   }
 
   return typeWrappers.front();
-}
-
-Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *decl) const {
-  auto typeWrapperInfo = decl->getTypeWrapper();
-  if (!typeWrapperInfo)
-    return Type();
-
-  auto type = evaluateOrDefault(
-      evaluator,
-      CustomAttrTypeRequest{typeWrapperInfo->Attr, decl->getDeclContext(),
-                            CustomAttrTypeKind::TypeWrapper},
-      Type());
-
-  if (!type || type->hasError()) {
-    return ErrorType::get(decl->getASTContext());
-  }
-  return type;
 }
 
 VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
@@ -352,10 +344,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   auto *storage = parent->getTypeWrapperStorageDecl();
   assert(storage);
 
-  auto *typeWrapperType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
-          ->castTo<AnyGenericType>();
-  assert(typeWrapperType);
+  auto *typeWrapperType = typeWrapper->AttrType->castTo<AnyGenericType>();
 
   // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(
