@@ -77,6 +77,24 @@ extension Clock {
   }
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.7, *)
+extension Clock {
+  /// Suspends for the given duration.
+  ///
+  /// Prefer to use the `sleep(until:tolerance:)` method on `Clock` if you have
+  /// access to an absolute instant.
+  @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  public func sleep(
+    for duration: Instant.Duration,
+    tolerance: Instant.Duration? = nil
+  ) async throws {
+    try await sleep(until: now.advanced(by: duration), tolerance: tolerance)
+  }
+}
+#endif
+
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
