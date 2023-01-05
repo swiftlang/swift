@@ -53,6 +53,18 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
 
+  /// Should we borrow our base when we perform this access?
+  bool MustBorrowBase = false;
+
+  LValueOptions forBorrowedBaseLValue() const {
+    auto copy = *this;
+
+    // We are going to borrow our base.
+    copy.MustBorrowBase = true;
+
+    return copy;
+  }
+
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
   LValueOptions forComputedBaseLValue() const {
@@ -1593,6 +1605,10 @@ public:
                                                         SILValue value);
   ManagedValue emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                         SILValue addr);
+
+  /// Create an end_access cleanup for \p addr and return it wrapped as a
+  /// ManagedValue::forLValue().
+  ManagedValue emitManagedLValueWithEndAccess(SILValue addr);
 
   void emitSemanticLoadInto(SILLocation loc, SILValue src,
                             const TypeLowering &srcLowering,

@@ -224,7 +224,14 @@ public:
 
   Expr *findStorageReferenceExprForBorrow() &&;
   Expr *findStorageReferenceExprForMoveOnlyBorrow(SILGenFunction &SGF) &&;
+
+  /// If this argument is of the form (load_expr (borrow_expr *))... consume the
+  /// argument source. The caller then is expected to emit a borrow parameter.
   Expr *findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) &&;
+
+  /// If this argument is a base of a storage expression that we load from,
+  /// return the expr.
+  Expr *findStorageBaseReferenceExprForBorrowExpr(SILGenFunction &SGF) &&;
 
   /// Given that this source is an expression, extract and clear
   /// that expression.

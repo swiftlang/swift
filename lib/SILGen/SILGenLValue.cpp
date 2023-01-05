@@ -2794,6 +2794,10 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
+  //if (options.MustBorrowBase) {
+  //  ctx = SGFContext::AllowGuaranteedPlusZero;
+  //}
+
   ManagedValue mv = SGF.emitRValueAsSingleValue(e, ctx);
   if (mv.isPlusZeroRValueOrTrivial())
     return mv;
@@ -4586,10 +4590,19 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
     if (component.isPhysical()) {
       auto projection = std::move(component).project(*this, loc, addr);
       if (projection.getType().isAddress()) {
-        auto actorIso = component.asPhysical().takeActorIsolation();
-
         // If the load must happen in the context of an actor, do a hop first.
+        auto actorIso = component.asPhysical().takeActorIsolation();
         prevExecutor = emitHopToTargetActor(loc, actorIso, addr);
+
+        // Then if we had a guaranteed base, we know that we did not enforce
+        // access when projecting... we need to handle this ourselves.
+        if (isBaseGuaranteed) {
+          projection = B.createBeginAccess(loc, projection, SILAccessKind::Read,
+                                           SILAccessEnforcement::Unknown,
+                                           /*hasNoNestedConflict*/ false,
+                                           /*fromBuiltin*/ false);
+        }
+
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);

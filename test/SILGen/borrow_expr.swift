@@ -11,11 +11,10 @@ func useKlass(_ k: Klass) {}
 
 struct Struct {
     var k = Klass()
+    var computedK : Klass { Klass() }
 
     func doSomething() {}
     func doSomething(_ k: Klass) {}
-
-    var computedK: Klass { Klass() }
 }
 
 func useStruct(_ s: Struct) {}
@@ -176,6 +175,49 @@ func simpleTestSelfField() {
     // With borrow.
     (_borrow s.k).doSomething()
     (_borrow s.k).doSomething(Klass())
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr27simpleTestSelfComputedFieldyyF : $@convention(thin) () -> () {
+// CHECK: [[ADDR:%.*]] = project_box
+//
+// Without borrow 1
+// XHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+// XHECK: [[VAL:%.*]] = load [copy] [[ACCESS]]
+// XHECK: end_access [[ACCESS]]
+// XHECK: [[BORROW_VAL:%.*]] = begin_borrow [[VAL]]
+// XHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr6StructV9computedKAA5KlassCvg : $@convention(method) (@guaranteed Struct) -> @owned Klass
+// XHECK: [[OWNED_VAL:%.*]] = apply [[FUNC]]([[BORROW_VAL]])
+// XHECK: end_borrow [[BORROW_VAL]]
+// XHECK: destroy_value [[VAL]]
+// XHECK: [[FUNC2:%.*]] = function_ref @$s11borrow_expr5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
+// XHECK: apply [[FUNC2]]([[OWNED_VAL]])
+// XHECK: destroy_value [[OWNED_VAL]]
+//
+// Without borrow 2
+// XHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+// XHECK: [[VAL:%.*]] = load [copy] [[ACCESS]]
+// XHECK: end_access [[ACCESS]]
+// XHECK: [[BORROW_VAL:%.*]] = begin_borrow [[VAL]]
+// XHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr6StructV9computedKAA5KlassCvg : $@convention(method) (@guaranteed Struct) -> @owned Klass
+// XHECK: [[OWNED_VAL:%.*]] = apply [[FUNC]]([[BORROW_VAL]])
+// XHECK: end_borrow [[BORROW_VAL]]
+// XHECK: destroy_value [[VAL]]
+// XHECK: [[FUNC2:%.*]] = function_ref @$s11borrow_expr5KlassC11doSomethingyyACF : $@convention(method) (@guaranteed Klass, @guaranteed Klass) -> ()
+// XHECK: apply [[FUNC2]]({{%.*}}, [[OWNED_VAL]])
+// XHECK: destroy_value [[OWNED_VAL]]
+//
+// CHECK: } // end sil function '$s11borrow_expr27simpleTestSelfComputedFieldyyF'
+func simpleTestSelfComputedField() {
+    var s = Struct()
+    s = Struct()
+
+    // Without borrow.
+    //s.computedK.doSomething()
+    //s.computedK.doSomething(Klass())
+
+    // With borrow.
+    (_borrow s).computedK.doSomething()
+    (_borrow s).computedK.doSomething(Klass())
 }
 
 ////////////////////////

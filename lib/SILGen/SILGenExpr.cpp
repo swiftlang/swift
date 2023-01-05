@@ -1038,13 +1038,30 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
+  // If our immediate sub expression is a borrow_expr, then we need to borrow
+  // our base even though our actual loaded value must be loaded at +1.
+  bool shouldBorrowBase = false;
+  LValueOptions options;
+  if (isa<BorrowExpr>(E->getSubExpr())) {
+    shouldBorrowBase = true;
+    // We are going to perform a load_borrow with a lexical cleanup of our
+    // base. So, we want the access scope to be a lexical borrow scope rather
+    // than a formal evaluation borrow scope.
+    options.IsNonAccessing = true;
+    C = C.withBorrowedBase();
+  }
+
   // Any writebacks here are tightly scoped.
   FormalEvaluationScope writeback(SGF);
-  LValue lv = SGF.emitLValue(E->getSubExpr(), SGFAccessKind::OwnedObjectRead);
+
+  LValue lv =
+      SGF.emitLValue(E->getSubExpr(), SGFAccessKind::OwnedObjectRead, options);
+
   // We can't load at immediate +0 from the lvalue without deeper analysis,
   // since the access will be immediately ended and might invalidate the value
   // we loaded.
-  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
+  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects(),
+                              shouldBorrowBase);
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
@@ -6126,4 +6143,31 @@ ManagedValue SILGenFunction::emitUndef(Type type) {
 ManagedValue SILGenFunction::emitUndef(SILType type) {
   SILValue undef = SILUndef::get(type, F);
   return ManagedValue::forUnmanaged(undef);
+}
+
+namespace {
+
+struct EndAccessCleanup final : Cleanup {
+  SILValue address;
+
+  EndAccessCleanup(SILValue address) : address(address) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createEndAccess(l, address, false /*aborted*/);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndAccessCleanup "
+                 << "Value:" << address << '\n';
+#endif
+  }
+};
+
+} // namespace
+
+ManagedValue SILGenFunction::emitManagedLValueWithEndAccess(SILValue addr) {
+  Cleanups.pushCleanup<EndAccessCleanup>(addr);
+  return ManagedValue::forLValue(addr);
 }

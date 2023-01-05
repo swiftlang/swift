@@ -964,3 +964,15 @@ ManagedValue SILGenBuilder::emitCopyValueOperation(SILLocation loc,
     return value;
   return SGF.emitManagedRValueWithCleanup(cvi);
 }
+
+ManagedValue SILGenBuilder::createBeginAccess(SILLocation loc,
+                                              ManagedValue addr,
+                                              SILAccessKind accessKind,
+                                              SILAccessEnforcement enforcement,
+                                              bool hasNoNestedConflict,
+                                              bool fromBuiltin) {
+  auto newAddr = SILBuilder::createBeginAccess(loc, addr.getValue(), accessKind,
+                                               enforcement, hasNoNestedConflict,
+                                               fromBuiltin);
+  return SGF.emitManagedLValueWithEndAccess(newAddr);
+}

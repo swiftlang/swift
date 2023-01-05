@@ -148,6 +148,17 @@ public:
     return copy;
   }
 
+  /// Get a context for a sub-expression that can assume that it has a borrowed
+  /// base value. It cannot assume that the base value is borrowed beyond the
+  /// time period in which the sub-expression is evaluated.
+  SGFContext withBorrowedBase() const {
+    SGFContext copy = *this;
+    if (copy.state.getInt() == ImmediatePlusZero)
+      return copy;
+    copy.state.setInt(GuaranteedPlusZero);
+    return copy;
+  }
+
   /// Get a context for a sub-expression where we plan to project out
   /// a value.  The Initialization is not okay to propagate down, but
   /// the +0/+1-ness is.
@@ -167,7 +178,7 @@ public:
 
     return SGFContext();
   }
-  
+
   /// Return the abstraction pattern of the context we're emitting into.
   Optional<AbstractionPattern> getAbstractionPattern() const {
     if (auto *init = getEmitInto()) {

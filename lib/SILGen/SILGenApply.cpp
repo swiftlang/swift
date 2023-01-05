@@ -2968,6 +2968,38 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
   return lvExpr;
 }
 
+Expr *ArgumentSource::findStorageBaseReferenceExprForBorrowExpr(
+    SILGenFunction &SGF) && {
+  if (!isExpr())
+    return nullptr;
+
+  // We pattern match the following:
+  //
+  // (borrow_expr (member_ref_expr* (load_expr ...)))
+  //
+  // NOTE: The * above means we allow for iterated member_ref_expr before we
+  // find the load_expr.
+  auto *argExpr = asKnownExpr();
+
+  auto *borrowExpr = dyn_cast<BorrowExpr>(argExpr);
+  if (!borrowExpr)
+    return nullptr;
+
+  Expr *expr = borrowExpr->getSubExpr();
+  while (auto *memberRef = dyn_cast<MemberRefExpr>(expr))
+    expr = memberRef->getBase();
+
+  auto *lvExpr = ::findStorageReferenceExprForBorrow(expr);
+
+  // Claim the value of this argument.
+  if (lvExpr) {
+    (void)std::move(*this).asKnownExpr();
+  }
+
+  // Then return our borrowExpr.
+  return borrowExpr;
+}
+
 Expr *
 ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!isExpr())
@@ -3349,20 +3381,29 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as a borrowed l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrowExpr(SGF);
-    if (!lvExpr)
-      return false;
+    if (auto *lvExpr =
+            std::move(arg).findStorageReferenceExprForBorrowExpr(SGF)) {
+      emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
+                   origParamType, paramsSlice);
+      return true;
+    }
 
-    emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
-                 origParamType, paramsSlice);
+    // If we have a borrow_expr that is a base of a load_expr.
+    if (auto *expr =
+            std::move(arg).findStorageBaseReferenceExprForBorrowExpr(SGF)) {
+      emitBorrowed(expr, loweredSubstArgType, loweredSubstParamType,
+                   origParamType, paramsSlice, true /*base is borrowed*/);
+      return true;
+    }
 
-    return true;
+    return false;
   }
 
   void emitBorrowed(Expr *arg, SILType loweredSubstArgType,
                     SILType loweredSubstParamType,
                     AbstractionPattern origParamType,
-                    ClaimedParamsRef claimedParams) {
+                    ClaimedParamsRef claimedParams,
+                    bool hasBorrowedBase = false) {
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
       assert(!param.isConsumed());
@@ -3372,7 +3413,12 @@ private:
       }
     }
 
-    LValue argLV = SGF.emitLValue(arg, emissionKind);
+    LValueOptions options;
+    // If we are supposed to borrow the base of our lvalue to emit this borrowed
+    // argument, do so.
+    if (hasBorrowedBase)
+      options = options.forBorrowedBaseLValue();
+    LValue argLV = SGF.emitLValue(arg, emissionKind, options);
 
     if (loweredSubstParamType.hasAbstractionDifference(Rep,
                                                        loweredSubstArgType)) {

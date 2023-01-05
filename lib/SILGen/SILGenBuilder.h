@@ -407,6 +407,16 @@ public:
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
                                  bool isLexical = false);
 
+  using SILBuilder::createBeginAccess;
+
+  // Take in a managed addr and return a new access scope enclosed address
+  // without forwarding addr's cleanup onto it. We create the lexical end_access
+  // cleanup.
+  ManagedValue createBeginAccess(SILLocation loc, ManagedValue addr,
+                                 SILAccessKind accessKind,
+                                 SILAccessEnforcement enforcement,
+                                 bool hasNoNestedConflict, bool fromBuiltin);
+
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value);
 
