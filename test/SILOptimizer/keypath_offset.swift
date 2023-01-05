@@ -159,7 +159,10 @@ func testTupleOffsets() {
   printOffset(TLayout.offset(of: \Tuple<Int, Int>.1))
 }
 
-// Just check that we don't crash.
+// CHECK-LABEL: sil {{.*}} @$s4test0A16TupleOfFunctionsyyF
+// CHECK-NOT:     _storedInlineOffset
+// CHECK-NOT:     class_method
+// CHECK:       } // end sil function '$s4test0A16TupleOfFunctionsyyF'
 @inline(never)
 func testTupleOfFunctions() {
   printOffset(MemoryLayout<TupleOfFunctions>.offset(of: \.b))
