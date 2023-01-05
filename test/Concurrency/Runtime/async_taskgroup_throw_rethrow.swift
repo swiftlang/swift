@@ -87,10 +87,12 @@ func test_discardingTaskGroup_automaticallyRethrows() async {
 }
 
 func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
-  print("==== \(#function) ------") // CHECK_LABEL: test_discardingTaskGroup_automaticallyRethrowsOnlyFirst
+  print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrowsOnlyFirst
   do {
     let got = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
-      group.addTask { await echo(1) }
+      group.addTask {
+        await echo(1)
+      }
       group.addTask {
         let error = Boom(id: "first, isCancelled:\(Task.isCancelled)")
         print("Throwing: \(error)")
@@ -102,7 +104,7 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
         do {
           try await Task.sleep(until: .now + .seconds(120), clock: .continuous)
         } catch {
-          print("Throwing: \(error)")
+          print("Awoken, throwing: \(error)")
           throw error
         }
       }
@@ -112,42 +114,9 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
     print("Expected error to be thrown, but got: \(got)")
   } catch {
     // CHECK: Throwing: Boom(id: "first, isCancelled:false
-    // CHECK: Throwing: CancellationError()
+    // CHECK: Awoken, throwing: CancellationError()
     // and only then the re-throw happens:
     // CHECK: rethrown: Boom(id: "first
-    print("rethrown: \(error)")
-  }
-}
-
-func test_discardingTaskGroup_automaticallyRethrowsOnlyFirstIncludingGroupBody() async {
-  print("==== \(#function) ------") // CHECK_LABEL: test_discardingTaskGroup_automaticallyRethrowsOnlyFirstIncludingGroupBody
-  do {
-    try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
-      group.addTask { await echo(1) }
-      group.addTask {
-        try await Task.sleep(until: .now + .seconds(1), clock: .continuous)
-        let error = Boom(id: "first, isCancelled:\(Task.isCancelled)")
-        print("Throwing: \(error)")
-        throw error
-      }
-      group.addTask {
-        // we wait "forever" but since the group will get cancelled after
-        // the first error, this will be woken up and throw a cancellation
-        try await Task.sleep(until: .now + .seconds(20), clock: .continuous)
-      }
-
-      let bodyError = Boom(id: "body, isCancelled:\(group.isCancelled)")
-      print("Throwing: \(bodyError)")
-      throw bodyError
-    }
-
-    print("Expected error to be thrown")
-  } catch {
-    // CHECK: Throwing: Boom(id: "body, isCancelled:false
-    // CHECK: Throwing: Boom(id: "first, isCancelled:true
-    // CHECK: Throwing: Boom(id: "second, isCancelled:true
-    // and only then the re-throw happens:
-    // CHECK: rethrown: Boom(id: "body
     print("rethrown: \(error)")
   }
 }

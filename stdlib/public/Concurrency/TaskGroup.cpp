@@ -577,7 +577,6 @@ TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
-  fprintf(stderr, "[%s:%d](%s) INITIALIZE...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   swift_taskGroup_initializeWithFlags(0, group, T);
 }
 
@@ -587,9 +586,6 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags, TaskGr
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
   TaskGroupFlags groupFlags(rawGroupFlags);
-
-  fprintf(stderr, "[%s:%d](%s) INITIALIZE FLAGS: flags.discardResults:%d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          groupFlags.isDiscardResults());
 
   TaskGroupImpl *impl = ::new(group)
     TaskGroupImpl(T, groupFlags.isDiscardResults());
@@ -809,23 +805,28 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
     // and we immediately discard the result.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "discard result, hadError:%d, was pending:%llu",
                                hadErrorResult, assumed.pendingTasks(this));
-    if (!lastPendingTaskAndWaitingTask) {
-      // we're not able to immediately complete a waitingTask with this task, so we may have to store it...
-      if (hadErrorResult && readyQueue.isEmpty()) {
-        // a discardResults throwing task group must retain the FIRST error it encounters.
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, completedTask:%p", completedTask);
-        enqueueCompletedTask(completedTask, /*hadErrorResult=*/hadErrorResult);
-      }
-    } // else, no need to store the task, as we'll immediately complete the waitingTask using it.
-
     // If this was the last pending task, and there is a waiting task (from waitAll),
     // we must resume the task; but not otherwise. There cannot be any waiters on next()
     // while we're discarding results.
     if (lastPendingTaskAndWaitingTask) {
+      ReadyQueueItem item;
+      bool dequeuedErrorItem = readyQueue.dequeue(item);
       SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, offered last pending task, resume waiting task:%p",
                                  waitQueue.load(std::memory_order_relaxed));
-      resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult);
+      if (dequeuedErrorItem) {
+        assert(item.getStatus() == ReadyStatus::Error && "only errors can be stored by a discarding task group, yet it wasn't an error!");
+        resumeWaitingTask(item.getTask(), assumed, /*hadErrorResult=*/true);
+      } else {
+        resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult);
+      }
     } else {
+      assert(!lastPendingTaskAndWaitingTask);
+      if (hadErrorResult && readyQueue.isEmpty()) {
+        // a discardResults throwing task group must retain the FIRST error it encounters.
+        SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, completedTask:%p", completedTask);
+        enqueueCompletedTask(completedTask, /*hadErrorResult=*/hadErrorResult);
+      } // else, we just are going to discard it.
+
       auto afterComplete = statusCompletePendingAssumeRelease();
       SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, either more pending tasks, or no waiting task, status:%s",
                                  afterComplete.to_string(this).c_str());
