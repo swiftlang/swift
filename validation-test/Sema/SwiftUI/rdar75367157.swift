@@ -22,7 +22,7 @@ struct S : View {
         EmptyView()
       }
 
-      if (check(self.test)) { // expected-error {{cannot convert value of type 'E' to expected argument type 'String'}} {{26-26=.rawValue}}
+      if (check(self.test)) {
         Spacer()
       }
     }

@@ -13,5 +13,5 @@ func test(a: Int, b: Int) {
   // expected-error@-1{{external macro implementation type 'SomeModule.StringifyMacro' could not be found for macro 'publicStringify'; the type must be public and provided via '-load-plugin-library'}}
 
   _ = #internalStringify(a + b)
-  // expected-error@-1{{macro 'internalStringify' is undefined}}
+  // expected-error@-1{{no macro named 'internalStringify'}}
 }

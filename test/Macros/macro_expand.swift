@@ -9,9 +9,10 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-macro customFileID: String = MacroDefinition.FileIDMacro
-macro stringify<T>(_ value: T) -> (T, String) = MacroDefinition.StringifyMacro
-macro fileID<T: _ExpressibleByStringLitera>: T = MacroDefinition.FileIDMacro
+@expression macro customFileID: String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+@expression macro fileID<T: _ExpressibleByStringLiteral>: T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@expression macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
@@ -45,10 +46,21 @@ func testStringify(a: Int, b: Int) {
   _ = (b, b2, s2, s3)
 }
 
+struct Outer {
+  var value: Int = 0
+  func test() {
+    _ = #stringify(1 + value)
+
+    _ = #stringify({ x in
+      x + 1
+    })
+  }
+}
+
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
 
-macro addBlocker<T>(_ value: T) -> T = MacroDefinition.AddBlocker
+@expression macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 
 struct OnlyAdds {
   static func +(lhs: OnlyAdds, rhs: OnlyAdds) -> OnlyAdds { lhs }
@@ -62,5 +74,9 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   _ = #addBlocker(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
+
+  // Check recursion.
+  #recurse(false) // okay
+  #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}
 #endif
 }

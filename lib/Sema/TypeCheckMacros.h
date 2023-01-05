@@ -24,8 +24,6 @@ namespace swift {
 class Expr;
 class TypeRepr;
 
-#if SWIFT_SWIFT_PARSER
-
 /// Expands the given macro expression and type-check the result with
 /// the given expanded type.
 ///
@@ -33,8 +31,6 @@ class TypeRepr;
 // macro could not be expanded.
 Expr *expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType);
-
-#endif // SWIFT_SWIFT_PARSER
 
 } // end namespace swift
 

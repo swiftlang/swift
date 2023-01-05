@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "InlinableText.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -3124,10 +3126,6 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureResultBuilderASTTransform(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }
@@ -4541,8 +4539,36 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
-  Printer << " = ";
-  Printer << decl->externalModuleName << "." << decl->externalMacroTypeName;
+  if (decl->definition) {
+    ASTContext &ctx = decl->getASTContext();
+    SmallString<64> scratch;
+    Printer << " = "
+            << extractInlinableText(ctx.SourceMgr, decl->definition, scratch);
+  } else {
+    auto def = decl->getDefinition();
+    switch (def.kind) {
+    case MacroDefinition::Kind::Invalid:
+    case MacroDefinition::Kind::Undefined:
+      // Nothing to do.
+      break;
+
+    case MacroDefinition::Kind::External: {
+      auto external = def.getExternalMacro();
+      Printer << " = #externalMacro(module: \"" << external.moduleName << "\", "
+              << "type: \"" << external.macroTypeName << "\")";
+      break;
+    }
+
+    case MacroDefinition::Kind::Builtin:
+      Printer << " = Builtin.";
+      switch (def.getBuiltinKind()) {
+      case BuiltinMacroKind::ExternalMacro:
+        Printer << "ExternalMacro";
+        break;
+      }
+      break;
+    }
+  }
 
   printDeclGenericRequirements(decl);
 }
@@ -4692,6 +4718,11 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
 
 void PrintAST::visitMoveExpr(MoveExpr *expr) {
   Printer << "move ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitBorrowExpr(BorrowExpr *expr) {
+  Printer << "borrow ";
   visit(expr->getSubExpr());
 }
 
@@ -7130,7 +7161,6 @@ swift::getInheritedForPrinting(
   }
 
   // Collect synthesized conformances.
-  auto &ctx = decl->getASTContext();
   llvm::SetVector<ProtocolDecl *> protocols;
   llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {

@@ -2550,8 +2550,10 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     if (originalArgs->isUnlabeledTrailingClosureIndex(i))
       continue;
     if (argumentLabelIDs[i] != originalArgs->getLabel(i)) {
+      auto paramContext = parsed.IsSubscript ? ParameterContext::Subscript
+                                             : ParameterContext::Call;
       diagnoseArgumentLabelError(ctx, originalArgs, argumentLabelIDs,
-                                 parsed.IsSubscript, &diag);
+                                 paramContext, &diag);
       return;
     }
   }

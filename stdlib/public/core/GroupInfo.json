@@ -213,6 +213,7 @@
     "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
+    "Macros.swift",
     "ManagedBuffer.swift",
     "Misc.swift",
     "OptionSet.swift",

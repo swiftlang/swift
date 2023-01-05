@@ -7,14 +7,14 @@
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Macros.swiftinterface -o %t/Macros.swiftmodule
 
 // CHECK: #if compiler(>=5.3) && $Macros
-// CHECK-NEXT: public macro publicStringify<T>(_ value: T) -> (T, Swift.String) = SomeModule.StringifyMacro
+// CHECK-NEXT: @expression public macro publicStringify<T>(_ value: T) -> (T, Swift.String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 // CHECK-NEXT: #endif
-public macro publicStringify<T>(_ value: T) -> (T, String) = SomeModule.StringifyMacro
+@expression public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 
 // CHECK: #if compiler(>=5.3) && $Macros
-// CHECK: public macro publicLine<T>: T = SomeModule.Line where T : Swift.ExpressibleByIntegerLiteral
+// CHECK: @expression public macro publicLine<T>: T = #externalMacro(module: "SomeModule", type: "Line") where T : Swift.ExpressibleByIntegerLiteral
 // CHECK-NEXT: #endif
-public macro publicLine<T: ExpressibleByIntegerLiteral>: T = SomeModule.Line
+@expression public macro publicLine<T: ExpressibleByIntegerLiteral>: T = #externalMacro(module: "SomeModule", type: "Line")
 
 // CHECK-NOT: internalStringify
-macro internalStringify<T>(_ value: T) -> (T, String) = SomeModule.StringifyMacro
+@expression macro internalStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")

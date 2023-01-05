@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -2740,9 +2741,10 @@ class DeclDeserializer {
 
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
+  SmallVector<serialization::BitOffset> customAttrOffsets;
 
   Identifier privateDiscriminator;
-  unsigned localDiscriminator = 0;
+  unsigned localDiscriminator = ValueDecl::InvalidDiscriminator;
   StringRef filenameForPrivate;
 
   // Auxiliary map for deserializing `@differentiable` attributes.
@@ -2818,7 +2820,7 @@ public:
       if (!privateDiscriminator.empty())
         MF.PrivateDiscriminatorsByValue[value] = privateDiscriminator;
 
-      if (localDiscriminator != 0)
+      if (localDiscriminator != ValueDecl::InvalidDiscriminator)
         value->setLocalDiscriminator(localDiscriminator);
 
       if (!filenameForPrivate.empty())
@@ -2828,7 +2830,14 @@ public:
 
   /// Deserializes records common to all decls from \c MF.DeclTypesCursor (ie.
   /// the invalid flag, attributes, and discriminators)
+  ///
+  /// Reads all attributes except for custom attributes that are skipped and
+  /// their offsets added to \c customAttrOffsets.
   llvm::Error deserializeDeclCommon();
+
+  /// Deserializes the custom attributes from \c MF.DeclTypesCursor, using the
+  /// offsets in \c customAttrOffsets.
+  llvm::Error deserializeCustomAttrs();
 
   Expected<Decl *> getDeclCheckedImpl(
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
@@ -4586,6 +4595,7 @@ public:
     TypeID resultInterfaceTypeID;
     uint8_t rawAccessLevel;
     unsigned numArgNames;
+    unsigned builtinID;
     IdentifierID externalModuleNameID;
     IdentifierID externalMacroTypeNameID;
 
@@ -4598,6 +4608,7 @@ public:
                                          resultInterfaceTypeID,
                                          rawAccessLevel,
                                          numArgNames,
+                                         builtinID,
                                          externalModuleNameID,
                                          externalMacroTypeNameID,
                                          argNameAndDependencyIDs);
@@ -4647,10 +4658,7 @@ public:
                                       genericParams, nullptr,
                                       SourceLoc(),
                                       nullptr,
-                                      MF.getIdentifier(externalModuleNameID),
-                                      SourceLoc(),
-                                      MF.getIdentifier(externalMacroTypeNameID),
-                                      SourceLoc(),
+                                      nullptr,
                                       parent);
     declOrOffset = macro;
 
@@ -4667,6 +4675,34 @@ public:
 
     if (isImplicit)
       macro->setImplicit();
+
+    // Record definition
+    if (builtinID) {
+      Optional<BuiltinMacroKind> builtinKind;
+      switch (builtinID) {
+      case 1:
+        builtinKind = BuiltinMacroKind::ExternalMacro;
+        break;
+
+      default:
+        break;
+      }
+
+      if (builtinKind) {
+        ctx.evaluator.cacheOutput(
+            MacroDefinitionRequest{macro},
+            MacroDefinition::forBuiltin(*builtinKind)
+        );
+      }
+    } else if (externalModuleNameID > 0) {
+      ctx.evaluator.cacheOutput(
+          MacroDefinitionRequest{macro},
+          MacroDefinition::forExternal(
+            MF.getIdentifier(externalModuleNameID),
+            MF.getIdentifier(externalMacroTypeNameID)
+         )
+      );
+    }
 
     return macro;
   }
@@ -4776,6 +4812,59 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   return attr;
 }
 
+llvm::Error DeclDeserializer::deserializeCustomAttrs() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  for (auto attrOffset : customAttrOffsets) {
+    if (auto error =
+          MF.diagnoseFatalIfNotSuccess(MF.DeclTypeCursor.JumpToBit(attrOffset)))
+      return error;
+
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      // We don't know how to serialize decls represented by sub-blocks.
+      return MF.diagnoseFatal();
+    }
+
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    assert(recordID == decls_block::Custom_DECL_ATTR &&
+        "expecting only custom attributes in deserializeCustomAttrs");
+
+    bool isImplicit;
+    bool isArgUnsafe;
+    TypeID typeID;
+    serialization::decls_block::CustomDeclAttrLayout::readRecord(
+      scratch, isImplicit, typeID, isArgUnsafe);
+
+    Expected<Type> deserialized = MF.getTypeChecked(typeID);
+    if (!deserialized) {
+      if (deserialized.errorIsA<XRefNonLoadedModuleError>() ||
+          MF.allowCompilerErrors()) {
+        // A custom attribute defined behind an implementation-only import
+        // is safe to drop when it can't be deserialized.
+        // rdar://problem/56599179. When allowing errors we're doing a best
+        // effort to create a module, so ignore in that case as well.
+        consumeError(deserialized.takeError());
+      } else
+        return deserialized.takeError();
+    } else if (!deserialized.get() && MF.allowCompilerErrors()) {
+      // Serialized an invalid attribute, just skip it when allowing errors
+    } else {
+      auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
+      auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+      custom->setArgIsUnsafe(isArgUnsafe);
+      AddAttribute(custom);
+    }
+    scratch.clear();
+  }
+
+  return llvm::Error::success();
+}
+
 llvm::Error DeclDeserializer::deserializeDeclCommon() {
   using namespace decls_block;
 
@@ -4783,6 +4872,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
   StringRef blobData;
   while (true) {
     BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+    serialization::BitOffset attrOffset = MF.DeclTypeCursor.GetCurrentBitNo();
     llvm::BitstreamEntry entry =
         MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -5074,33 +5164,10 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Custom_DECL_ATTR: {
-        bool isImplicit;
-        bool isArgUnsafe;
-        TypeID typeID;
-        serialization::decls_block::CustomDeclAttrLayout::readRecord(
-          scratch, isImplicit, typeID, isArgUnsafe);
-
-        Expected<Type> deserialized = MF.getTypeChecked(typeID);
-        if (!deserialized) {
-          if (deserialized.errorIsA<XRefNonLoadedModuleError>() ||
-              MF.allowCompilerErrors()) {
-            // A custom attribute defined behind an implementation-only import
-            // is safe to drop when it can't be deserialized.
-            // rdar://problem/56599179. When allowing errors we're doing a best
-            // effort to create a module, so ignore in that case as well.
-            consumeError(deserialized.takeError());
-            skipAttr = true;
-          } else
-            return deserialized.takeError();
-        } else if (!deserialized.get() && MF.allowCompilerErrors()) {
-          // Serialized an invalid attribute, just skip it when allowing errors
-          skipAttr = true;
-        } else {
-          auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
-          auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
-          custom->setArgIsUnsafe(isArgUnsafe);
-          Attr = custom;
-        }
+        // Deserialize the custom attributes after the attached decl,
+        // skip for now.
+        customAttrOffsets.push_back(attrOffset);
+        skipAttr = true;
         break;
       }
 
@@ -5389,16 +5456,19 @@ DeclDeserializer::getDeclCheckedImpl(
   switch (recordID) {
 #define CASE(RECORD_NAME) \
   case decls_block::RECORD_NAME##Layout::Code: {\
-    auto decl = deserialize##RECORD_NAME(scratch, blobData); \
-    if (decl) { \
+    auto declOrError = deserialize##RECORD_NAME(scratch, blobData); \
+    if (declOrError) { \
       /* \
       // Set original declaration and parameter indices in `@differentiable` \
       // attributes. \
       */ \
       setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
-          decl.get(), DAttrs, diffAttrParamIndicesMap); \
+          declOrError.get(), DAttrs, diffAttrParamIndicesMap); \
     } \
-    return decl; \
+    if (!declOrError) \
+      return declOrError; \
+    declOrOffset = declOrError.get(); \
+    break; \
   }
 
   CASE(TypeAlias)
@@ -5432,15 +5502,21 @@ DeclDeserializer::getDeclCheckedImpl(
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-    if (resolved)
-      declOrOffset = resolved.get();
-    return resolved;
+    if (!resolved)
+      return resolved;
+    declOrOffset = resolved.get();
+    break;
   }
   
   default:
     // We don't know how to deserialize this kind of decl.
     MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
+
+  auto attrError = deserializeCustomAttrs();
+  if (attrError)
+    return std::move(attrError);
+  return declOrOffset;
 }
 
 /// Translate from the Serialization function type repr enum values to the AST

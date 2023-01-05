@@ -448,6 +448,10 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   StringScratchSpace stringStorage;
   ContainerTracker Containers;
 
+  // Contains a mapping for captures of the form [x], from the declared "x"
+  // to the captured "x" in the enclosing scope.
+  llvm::DenseMap<VarDecl *, VarDecl *> sameNamedCaptures;
+
   bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
                      StringRef &name, StringRef &USR) {
     auto &result = nameAndUSRCache[ExtD ? (Decl*)ExtD : D];
@@ -701,6 +705,26 @@ private:
   bool walkToExprPre(Expr *E) override {
     if (Cancelled)
       return false;
+
+    // Record any captures of the form [x], herso we can treat
+    if (auto captureList = dyn_cast<CaptureListExpr>(E)) {
+      for (const auto &capture : captureList->getCaptureList()) {
+        auto declaredVar = capture.getVar();
+        if (capture.PBD->getEqualLoc(0).isValid())
+          continue;
+
+        VarDecl *capturedVar = nullptr;
+        if (auto init = capture.PBD->getInit(0)) {
+          if (auto declRef = dyn_cast<DeclRefExpr>(init))
+            capturedVar = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+        }
+
+        if (capturedVar) {
+          sameNamedCaptures[declaredVar] = capturedVar;
+        }
+      }
+    }
+
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
@@ -1611,6 +1635,15 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Always base the symbol information on the canonical VarDecl
     D = VD->getCanonicalVarDecl();
+
+    // Dig back to the original captured variable.
+    while (true) {
+      auto captured = sameNamedCaptures.find(cast<VarDecl>(D));
+      if (captured == sameNamedCaptures.end())
+        break;
+
+      D = captured->second;
+    }
   }
 
   Info.decl = D;

@@ -597,6 +597,10 @@ bool ConstraintLocator::isForResultBuilderBodyResult() const {
   return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
+bool ConstraintLocator::isForMacroExpansion() const {
+  return directlyAt<MacroExpansionExpr>();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?

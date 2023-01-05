@@ -67,7 +67,7 @@ Assumptions:
     + [Function templates: calls with generic type parameters](#function-templates-calls-with-generic-type-parameters)
     + [Function templates: importing as real generic functions](#function-templates-importing-as-real-generic-functions)
     + [Class templates](#class-templates)
-    + [Class templates: importing instantiation behind typedef](#class-templates-importing-instantiation-behind-typedef)
+    + [Class templates: importing full class template instantiations](#class-templates-importing-full-class-template-instantiations)
     + [Class templates: importing specific specializations](#class-templates-importing-specific-specializations)
     + [Class templates: using with generic type parameters](#class-templates-using-with-generic-type-parameters)
     + [Class templates: using in generic code through a synthesized protocol](#class-templates-using-in-generic-code-through-a-synthesized-protocol)
@@ -184,7 +184,7 @@ that pick different sides, forcing the user to choose.
 
 Swift/C++ interoperability builds on top of the Swift/C interoperability, so it
 helps to be familiar with [Swift's strategy for importing C
-modules](HowSwiftImportsCAPIs.md).
+modules](../HowSwiftImportsCAPIs.md).
 
 # Importing C++ APIs into Swift
 

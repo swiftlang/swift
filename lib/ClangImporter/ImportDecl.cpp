@@ -2118,15 +2118,7 @@ namespace {
           if (friendDecl->getFriendDecl()) {
             m = friendDecl->getFriendDecl();
 
-            // Find the owning module of the class template. Members of class
-            // template specializations don't have an owning module.
-            clang::Module *owningModule = nullptr;
-            if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
-              owningModule = spec->getSpecializedTemplate()->getOwningModule();
-            else
-              owningModule = decl->getOwningModule();
-
-            auto lookupTable = Impl.findLookupTable(owningModule);
+            auto lookupTable = Impl.findLookupTable(decl);
             addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
                                   Impl.getNameImporter());
           }
@@ -2243,6 +2235,9 @@ namespace {
 
               // Make sure the synthesized decl can be found by lookupDirect.
               result->addMemberToLookupTable(opFuncDecl);
+
+              addEntryToLookupTable(*Impl.findLookupTable(decl), cxxMethod,
+                                    Impl.getNameImporter());
             }
           }
           methods.push_back(MD);

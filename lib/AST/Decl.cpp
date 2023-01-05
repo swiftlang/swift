@@ -1529,6 +1529,7 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
                         Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
   Result->setInit(0, E);
+  Result->setOriginalInit(0, E);
   return Result;
 }
 
@@ -2696,13 +2697,55 @@ bool ValueDecl::isInstanceMember() const {
   llvm_unreachable("bad DeclKind");
 }
 
+bool ValueDecl::hasLocalDiscriminator() const {
+  // Generic parameters and unnamed parameters never have local discriminators.
+  if (isa<GenericTypeParamDecl>(this) ||
+      (isa<ParamDecl>(this) && !hasName()))
+    return false;
+
+  // Opaque types never have local discriminators.
+  if (isa<OpaqueTypeDecl>(this))
+    return false;
+
+  // Accessors never have local discriminators.
+  if (isa<AccessorDecl>(this))
+    return false;
+
+  // Implicit and unnamed declarations never have local discriminators.
+  if (getBaseName().isSpecial())
+    return false;
+
+  // If we are not in a local context, there's nothing to do.
+  if (!getDeclContext()->isLocalContext())
+    return false;
+
+  return true;
+}
+
 unsigned ValueDecl::getLocalDiscriminator() const {
+  // If we have already assigned a local discriminator, we're done.
+  if (LocalDiscriminator != InvalidDiscriminator)
+    return LocalDiscriminator;
+
+  // If this declaration does not have a local discriminator, use 0 as a
+  // stand-in.
+  if (!hasLocalDiscriminator())
+    return 0;
+
+  // Assign local discriminators in this context.
+  evaluateOrDefault(
+      getASTContext().evaluator,
+      LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+
+  assert(LocalDiscriminator != InvalidDiscriminator);
+
   return LocalDiscriminator;
 }
 
 void ValueDecl::setLocalDiscriminator(unsigned index) {
-  assert(getDeclContext()->isLocalContext());
-  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  assert(hasLocalDiscriminator());
+  assert(LocalDiscriminator == InvalidDiscriminator &&
+         "LocalDiscriminator is set multiple times");
   LocalDiscriminator = index;
 }
 
@@ -2741,6 +2784,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
 
   // If one is an async function and the other is not, they can't conflict.
   if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
+    return false;
+
+  // If one is a macro and the other is not, they can't conflict.
+  if (sig1.IsMacro != sig2.IsMacro)
     return false;
 
   // If one is a compound name and the other is not, they do not conflict
@@ -2974,6 +3021,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
+  signature.IsMacro = isa<MacroDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -9634,20 +9682,14 @@ MacroDecl::MacroDecl(
     ParameterList *parameterList,
     SourceLoc arrowOrColonLoc,
     TypeRepr *resultType,
-    Identifier externalModuleName,
-    SourceLoc externalModuleNameLoc,
-    Identifier externalMacroTypeName,
-    SourceLoc externalMacroTypeNameLoc,
+    Expr *definition,
     DeclContext *parent
 ) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
     ValueDecl(DeclKind::Macro, parent, name, nameLoc),
     macroLoc(macroLoc), parameterList(parameterList),
     arrowOrColonLoc(arrowOrColonLoc),
     resultType(resultType),
-    externalModuleName(externalModuleName),
-    externalModuleNameLoc(externalModuleNameLoc),
-    externalMacroTypeName(externalMacroTypeName),
-    externalMacroTypeNameLoc(externalMacroTypeNameLoc) {
+    definition(definition) {
 
   if (parameterList)
     parameterList->setDeclContextOfParamDecls(this);
@@ -9664,10 +9706,35 @@ Type MacroDecl::getResultInterfaceType() const {
 }
 
 SourceRange MacroDecl::getSourceRange() const {
-  SourceLoc endLoc = externalMacroTypeNameLoc;
+  SourceLoc endLoc = getNameLoc();
+  if (parameterList)
+    endLoc = parameterList->getEndLoc();
+  if (definition)
+    endLoc = definition->getEndLoc();
   if (auto trailing = getTrailingWhereClause())
     endLoc = trailing->getSourceRange().End;
   return SourceRange(macroLoc, endLoc);
+}
+
+MacroContexts MacroDecl::getMacroContexts() const {
+  MacroContexts contexts = None;
+  if (getAttrs().hasAttribute<ExpressionAttr>())
+    contexts |= MacroContext::Expression;
+  return contexts;
+}
+
+MacroDefinition MacroDecl::getDefinition() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      MacroDefinitionRequest{const_cast<MacroDecl *>(this)},
+      MacroDefinition::forUndefined());
+}
+
+Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
+  auto def = getDefinition();
+  if (def.kind != MacroDefinition::Kind::Builtin)
+    return None;
+  return def.getBuiltinKind();
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
@@ -9680,18 +9747,6 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
     endLoc = MacroLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
-}
-
-MacroDefinition MacroDefinition::forMissing(
-    ASTContext &ctx, Identifier externalModuleName,
-    Identifier externalMacroTypeName
-) {
-  auto def = ctx.AllocateObjectCopy(
-    MissingDefinition{externalModuleName, externalMacroTypeName}
-  );
-  return MacroDefinition{
-    Kind::Expression, ImplementationKind::Missing, def
-  };
 }
 
 NominalTypeDecl *

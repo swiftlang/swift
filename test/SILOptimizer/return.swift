@@ -220,7 +220,14 @@ func f_56150() {
 // https://github.com/apple/swift/issues/56857
 
 struct S_56857 {
-    let b = true
+    init(_ i: Int) {
+        if i > 0 {
+            b = false
+        }
+    } // expected-error {{return from initializer without initializing all stored properties}}
+
+    let b: Bool // expected-note {{'self.b' not initialized}}
+
     var x: Int {
         if b {
             return 0
@@ -238,8 +245,14 @@ struct S_56857 {
 }
 
 class C_56857 {
+  init(_ i: Int) {
+    if i > 0 {
+      b = false
+    }
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
   static let a = false
-  let b = true
+  let b: Bool // expected-note {{'self.b' not initialized}}
 
   func method() -> Int {
     if b {

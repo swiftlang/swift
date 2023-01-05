@@ -240,7 +240,7 @@ struct G<T> {
 func wump<T>(to: T, _ body: (G<T>) -> ()) {}
 
 wump(to: 0, { $0[] = 0 })
-// expected-error@-1 {{missing argument for parameter #1 in call}}
+// expected-error@-1 {{missing argument for parameter #1 in subscript}}
 
 // https://github.com/apple/swift/issues/56129
 

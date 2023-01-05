@@ -396,7 +396,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-      ContextChange CC(*this, TLCD, &State->getTopLevelContext());
+      ContextChange CC(*this, TLCD);
       SourceLoc StartLoc = Tok.getLoc();
 
       // Expressions can't begin with a closure literal at statement position.
@@ -903,7 +903,6 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       /*Throws=*/false,
       /*GenericParams*/ nullptr, params, TupleType::getEmpty(Context),
       CurDeclContext);
-  setLocalDiscriminator(tempDecl);
   ParserStatus Status;
   {
     // Change the DeclContext for any variables declared in the defer to be within
@@ -1077,7 +1076,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // represents tuples and var patterns as tupleexprs and
     // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
-      P.setLocalDiscriminator(VD);
       boundDecls.push_back(VD);
     });
 
@@ -1106,7 +1104,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         status.setIsParseError();
       }
       repeatedDecls.push_back(VD);
-      P.setLocalDiscriminator(VD);
     });
     
     for (auto previous : boundDecls) {
@@ -1653,12 +1650,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   result.push_back({IntroducerLoc, ThePattern.get(), Init.get()});
-  
-  // Add variable bindings from the pattern to our current scope and mark
-  // them as being having a non-pattern-binding initializer.
-  ThePattern.get()->forEachVariable([&](VarDecl *VD) {
-    setLocalDiscriminator(VD);
-  });
   return Status;
 }
 
@@ -2112,12 +2103,6 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
       Result[i] = vNew;
     }
     caseBodyDecls.emplace(Result);
-  }
-
-  if (caseBodyDecls) {
-    for (auto *v : *caseBodyDecls) {
-      setLocalDiscriminator(v);
-    }
   }
 
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
@@ -2609,12 +2594,6 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
-
-  if (CaseBodyDecls) {
-    for (auto *v : *CaseBodyDecls) {
-      setLocalDiscriminator(v);
-    }
-  }
 
   SmallVector<ASTNode, 8> BodyItems;
 

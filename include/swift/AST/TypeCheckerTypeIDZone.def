@@ -449,6 +449,9 @@ SWIFT_REQUEST(TypeChecker, UsesTypeWrapperFeature,
 SWIFT_REQUEST(TypeChecker, MacroDefinitionRequest,
               MacroDefinition(MacroDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExternalMacroDefinitionRequest,
+              ExternalMacroDefinition(ASTContext *, Identifier, Identifier),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
               Expr *(CustomAttr *, ValueDecl *),
               Cached, NoLocationInfo)
