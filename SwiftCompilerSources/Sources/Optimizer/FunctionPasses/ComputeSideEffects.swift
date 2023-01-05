@@ -98,6 +98,11 @@ private struct CollectedEffects {
       addDestroyEffects(of: inst.operands[0].value)
 
     case let da as DestroyAddrInst:
+      // A destroy_addr also involves a read from the address. It's equivalent to a `%x = load [take]` and `destroy_value %x`.
+      addEffects(.read, to: da.operand)
+      // Conceptually, it's also a write, because the stored value is not available anymore after the destroy
+      addEffects(.write, to: da.operand)
+
       addDestroyEffects(of: da.operand)
 
     case let copy as CopyAddrInst:
@@ -108,12 +113,16 @@ private struct CollectedEffects {
         addEffects(.copy, to: copy.source)
       }
       if !copy.isInitializationOfDest {
+        // Like for destroy_addr, the destroy also involves a read.
+        addEffects(.read, to: copy.destination)
         addDestroyEffects(of: copy.destination)
       }
 
     case let store as StoreInst:
       addEffects(.write, to: store.destination)
       if store.destinationOwnership == .assign {
+        // Like for destroy_addr, the destroy also involves a read.
+        addEffects(.read, to: store.destination)
         addDestroyEffects(of: store.destination)
       }
 
