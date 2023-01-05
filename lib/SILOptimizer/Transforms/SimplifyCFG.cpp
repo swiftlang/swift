@@ -2954,10 +2954,8 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
 bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   SmallVector<SILBasicBlock *, 16> ObjCBlocks;
 
-  // TODO: OSSA phi support. Even if all block arguments are trivial,
-  // jump-threading may require creation of guaranteed phis, which may require
-  // creation of nested borrow scopes.
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
+  if (Fn.hasOwnership()) {
+    // TODO: This needs additional support in ossa.
     return false;
   }
   // Collect blocks to tail duplicate.
