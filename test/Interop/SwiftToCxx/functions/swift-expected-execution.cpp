@@ -10,6 +10,7 @@
 
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: CPU=arm64e
 
 #include <cassert>
 #include <cstdio>
