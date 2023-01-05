@@ -123,6 +123,10 @@ public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
 }
 
 extension CxxSequence {
+  /// Returns an iterator over the elements of this C++ container.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the C++
+  ///   container.
   @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)
