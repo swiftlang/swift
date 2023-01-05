@@ -38,13 +38,13 @@ internal func forEachElement<C: CxxConvertibleToCollection>(
 }
 
 extension Array {
-  /// Creates an array containing the elements of a C++ collection.
+  /// Creates an array containing the elements of a C++ container.
   ///
-  /// This initializer copies each element of the C++ collection to a new Swift
+  /// This initializer copies each element of the C++ container to a new Swift
   /// array.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
-  ///   collection.
+  ///   container.
   public init<C: CxxConvertibleToCollection>(_ c: C)
     where C.RawIterator.Pointee == Element {
 
@@ -54,13 +54,13 @@ extension Array {
 }
 
 extension Set {
-  /// Creates an set containing the elements of a C++ collection.
+  /// Creates an set containing the elements of a C++ container.
   ///
-  /// This initializer copies each element of the C++ collection to a new Swift
+  /// This initializer copies each element of the C++ container to a new Swift
   /// set.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
-  ///   collection.
+  ///   container.
   public init<C: CxxConvertibleToCollection>(_ c: C)
     where C.RawIterator.Pointee == Element {
 
