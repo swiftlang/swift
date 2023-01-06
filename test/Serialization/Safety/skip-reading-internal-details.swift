@@ -19,8 +19,7 @@
 // RUN:   | %FileCheck --check-prefixes=NEEDED,UNSAFE %s
 
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -verify -Xllvm -debug-only=Serialization \
-// RUN:   -enable-deserialization-safety 2>&1 \
+// RUN:   -verify -Xllvm -debug-only=Serialization 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=NEEDED,CLEAN,SAFE %s
 
 /// Build against the swiftinterface.
