@@ -61,6 +61,8 @@ struct TupleProperties {
 
 typealias Tuple<T, U> = (S<T>, C<U>)
 
+typealias TupleOfFunctions = (a: @convention(c) () -> (), b: @convention(c) () -> ())
+
 func getIdentityKeyPathOfType<T>(_: T.Type) -> KeyPath<T, T> {
   return \.self
 }
@@ -157,6 +159,15 @@ func testTupleOffsets() {
   printOffset(TLayout.offset(of: \Tuple<Int, Int>.1))
 }
 
+// CHECK-LABEL: sil {{.*}} @$s4test0A16TupleOfFunctionsyyF
+// CHECK-NOT:     _storedInlineOffset
+// CHECK-NOT:     class_method
+// CHECK:       } // end sil function '$s4test0A16TupleOfFunctionsyyF'
+@inline(never)
+func testTupleOfFunctions() {
+  printOffset(MemoryLayout<TupleOfFunctions>.offset(of: \.b))
+}
+
 // CHECK-LABEL: sil {{.*}} @$s4test0A19GenericTupleOffsetsyyxmlF
 // CHECK-NOT:     _storedInlineOffset
 // CHECK-NOT:     class_method
@@ -194,4 +205,6 @@ print("### testGenericTupleOffsets")
 testGenericTupleOffsets(Int.self)
 print("### testResilientOffsets")
 testResilientOffsets()
+print("### testTupleOfFunctions")
+testTupleOfFunctions()
 
