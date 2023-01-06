@@ -34,7 +34,7 @@ using llvm::dyn_cast;
 
 enum class TypeRefKind {
 #define TYPEREF(Id, Parent) Id,
-#include "swift/Reflection/TypeRefs.def"
+#include "swift/RemoteInspection/TypeRefs.def"
 #undef TYPEREF
 };
 
@@ -1034,7 +1034,7 @@ public:
       return static_cast<ImplClass*>(this) \
         ->visit##Id##TypeRef(cast<Id##TypeRef>(typeRef), \
                            ::std::forward<Args>(args)...);
-#include "swift/Reflection/TypeRefs.def"
+#include "swift/RemoteInspection/TypeRefs.def"
     }
 
     // We shouldn't get an unknown kind, but bad data might result in an unknown
