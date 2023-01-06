@@ -155,6 +155,8 @@ const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
 const char InvalidRecordKindError::ID = '\0';
 void InvalidRecordKindError::anchor() {}
+const char UnsafeDeserializationError::ID = '\0';
+void UnsafeDeserializationError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -5414,6 +5416,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
     } else if (recordID == decls_block::DESERIALIZATION_SAFETY) {
       IdentifierID declID;
       decls_block::DeserializationSafetyLayout::readRecord(scratch, declID);
+
+      if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+          MF.getContext().LangOpts.EnableDeserializationSafety) {
+        auto name = MF.getIdentifier(declID);
+        LLVM_DEBUG(llvm::dbgs() << "Skipping unsafe deserialization: '"
+                                << name << "'\n");
+        return llvm::make_error<UnsafeDeserializationError>(name);
+      }
     } else {
       return llvm::Error::success();
     }
