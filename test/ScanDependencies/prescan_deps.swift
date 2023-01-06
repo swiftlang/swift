@@ -20,6 +20,7 @@ import SubE
 // CHECK-NEXT:  "SubE",
 // CHECK-NEXT:  "Swift",
 // CHECK-NEXT:  "SwiftOnoneSupport",
-// CHECK-NEXT:  "_Concurrency"
+// CHECK-NEXT:  "_Concurrency",
+// CHECK-NEXT:  "_SwiftConcurrencyShims",
 // CHECK-NEXT:  "_StringProcessing"
 // CHECK-NEXT: ]

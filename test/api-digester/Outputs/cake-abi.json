@@ -27,6 +27,13 @@
       },
       {
         "kind": "Import",
+        "name": "_SwiftConcurrencyShims",
+        "printedName": "_SwiftConcurrencyShims",
+        "declKind": "Import",
+        "moduleName": "cake"
+      },
+      {
+        "kind": "Import",
         "name": "cake",
         "printedName": "cake",
         "declKind": "Import",
