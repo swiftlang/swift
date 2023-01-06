@@ -243,8 +243,11 @@ public:
     auto Cases = getCases();
     return std::count_if(Cases.begin(), Cases.end(),
                          [](const FieldInfo &Case){
+                           // For our purposes here, assume any case
+                           // with invalid (missing) typeinfo is non-empty
                            return Case.TR != 0
-                             && Case.TI.getSize() != 0;
+                             && (Case.TI.getKind() == TypeInfoKind::Invalid
+                                 || Case.TI.getSize() > 0);
                          });
   }
   // Size of the payload area.
