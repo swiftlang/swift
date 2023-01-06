@@ -436,7 +436,7 @@ bb0(%0 : @owned $SP):
 }
 
 // CHECK-LABEL: sil [ossa] @store_destoys
-// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
@@ -448,7 +448,7 @@ bb0(%0 : $*X, %1 : @owned $X):
 }
 
 // CHECK-LABEL: sil [ossa] @unknown_destructor_effects
-// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
@@ -471,7 +471,7 @@ bb0(%0 : $*X, %1 : @owned $X):
 }
 
 // CHECK-LABEL: sil [ossa] @copy_destoys
-// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
@@ -518,7 +518,7 @@ bb0(%0 : @owned $SP):
 }
 
 // CHECK-LABEL: sil [ossa] @destroy_addr_effects
-// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @destroy_addr_effects : $@convention(thin) (@in X) -> () {
@@ -1142,5 +1142,17 @@ bb2:
 bb3:
   %r = tuple()
   return %r : $()
+}
+
+// CHECK-LABEL: sil @test_debug_value_address
+// CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_debug_value_address : $@convention(thin) <T> (@in T, @inout T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  destroy_addr %0 : $*T
+  debug_value %1 : $*T
+  %4 = tuple ()
+  return %4 : $()
 }
 
