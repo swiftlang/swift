@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
@@ -11,6 +11,12 @@ var CxxSequenceTestSuite = TestSuite("CxxConvertibleToCollection")
 
 CxxSequenceTestSuite.test("SimpleSequence to Swift.Array") {
   let seq = SimpleSequence()
+  let array = Array(seq)
+  expectEqual([1, 2, 3, 4] as [Int32], array)
+}
+
+CxxSequenceTestSuite.test("SimpleSequenceWithOutOfLineEqualEqual to Swift.Array") {
+  let seq = SimpleSequenceWithOutOfLineEqualEqual()
   let array = Array(seq)
   expectEqual([1, 2, 3, 4] as [Int32], array)
 }
