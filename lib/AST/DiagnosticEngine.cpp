@@ -1142,6 +1142,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
         SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
         llvm::SmallString<128> buffer;
         llvm::SmallString<128> bufferName;
+        const Decl *ppDecl = decl;
         {
           // The access level of the buffer we want to print. Declarations below
           // this access level will be omitted from the buffer; declarations
@@ -1152,7 +1153,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
           // Figure out which declaration to print. It's the top-most
           // declaration (not a module).
-          const Decl *ppDecl = decl;
           auto dc = decl->getDeclContext();
 
           // FIXME: Horrible, horrible hackaround. We're not getting a
@@ -1237,6 +1237,21 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
         auto bufferID = SourceMgr.addMemBufferCopy(buffer, bufferName);
         auto memBufferStartLoc = SourceMgr.getLocForBufferStart(bufferID);
 
+        SourceMgr.setGeneratedSourceInfo(
+            bufferID,
+            GeneratedSourceInfo{
+              GeneratedSourceInfo::PrettyPrinted,
+              bufferID,
+              SourceRange(),
+              SourceRange(
+                  memBufferStartLoc,
+                  memBufferStartLoc.getAdvancedLoc(buffer.size())
+              ),
+              ASTNode(const_cast<Decl *>(ppDecl)).getOpaqueValue(),
+              nullptr
+            }
+        );
+
         // Go through all of the pretty-printed entries and record their
         // locations.
         for (auto entry : entries) {
@@ -1318,12 +1333,18 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
       break;
     }
 
+    case GeneratedSourceInfo::PrettyPrinted:
+      break;
+
     case GeneratedSourceInfo::ReplacedFunctionBody:
       return childNotes;
     }
 
     // Walk up the stack.
     currentLoc = expansionNode.getStartLoc();
+    if (currentLoc.isInvalid())
+      return childNotes;
+
     currentBufferID = SourceMgr.findBufferContainingLoc(currentLoc);
   } while (true);
 }

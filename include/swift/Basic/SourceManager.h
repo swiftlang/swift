@@ -36,6 +36,9 @@ public:
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
+
+    /// Pretty-printed declarations that have no source location.
+    PrettyPrinted,
   } kind;
 
   /// The buffer ID for the enclosing buffer, in which originalSourceRange
