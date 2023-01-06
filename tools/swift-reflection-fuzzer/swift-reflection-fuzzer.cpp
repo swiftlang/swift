@@ -20,9 +20,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeRef.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeRef.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"

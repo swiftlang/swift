@@ -13,9 +13,9 @@
 #include "swift/StaticMirror/ObjectFileContext.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeLowering.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeLowering.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Remote/CMemoryReader.h"
 
 #include "llvm/ADT/StringSet.h"

@@ -39,6 +39,7 @@ endif()
 add_swift_target_library(swiftSwiftOnoneSupport
   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   ${swiftOnoneSupport_common_options}
+  MACCATALYST_BUILD_FLAVOR "zippered"
   INSTALL_IN_COMPONENT stdlib)
 
 if(WINDOWS IN_LIST SWIFT_SDKS)

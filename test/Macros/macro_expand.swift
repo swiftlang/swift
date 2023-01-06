@@ -1,7 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 // RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
+
+// Diagnostics testing
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
+
+// RUN: not %target-swift-frontend -typecheck -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s
+// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
+
+// Execution testing
 // RUN: %target-build-swift -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
@@ -75,6 +82,11 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
 
+  // CHECK-DIAGS: macro_expand.swift:81:7-81:27:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
+  // CHECK-DIAGS: CONTENTS OF FILE{{.*}}addBlocker
+  // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:81:7 - {{.*}}macro_expand.swift:81:27
+  // CHECK-DIAGS-NEXT: oa - oa
+  // CHECK-DIAGS-NEXT: END CONTENTS OF FILE
   // Check recursion.
   #recurse(false) // okay
   #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}

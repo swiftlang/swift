@@ -36,7 +36,7 @@ namespace reflection {
 
 enum class MetadataSourceKind {
 #define METADATA_SOURCE(Id, Parent) Id,
-#include "swift/Reflection/MetadataSources.def"
+#include "swift/RemoteInspection/MetadataSources.def"
 #undef METADATA_SOURCE
 };
 
@@ -344,7 +344,7 @@ public:
       return static_cast<ImplClass*>(this) \
         ->visit##Id##MetadataSource(cast<Id##MetadataSource>(MS), \
                            ::std::forward<Args>(args)...);
-#include "swift/Reflection/MetadataSources.def"
+#include "swift/RemoteInspection/MetadataSources.def"
     }
   }
 };

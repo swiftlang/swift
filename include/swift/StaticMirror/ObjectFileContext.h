@@ -13,7 +13,7 @@
 #ifndef SWIFT_OBJECT_FILE_CONTEXT_H
 #define SWIFT_OBJECT_FILE_CONTEXT_H
 
-#include "swift/Reflection/ReflectionContext.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
 
 namespace llvm {
 namespace object {
