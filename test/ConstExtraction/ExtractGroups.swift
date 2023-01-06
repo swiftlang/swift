@@ -50,7 +50,7 @@
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "valueKind": "RawLiteral",
-// CHECK-NEXT:            "value": "\"hi\""
+// CHECK-NEXT:            "value": "hi"
 // CHECK-NEXT:          }
 // CHECK-NEXT:        ]
 // CHECK-NEXT:      },
@@ -86,7 +86,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"One\""
+// CHECK-NEXT:              "value": "One"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
@@ -96,7 +96,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"Two\""
+// CHECK-NEXT:              "value": "Two"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
@@ -106,7 +106,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"Three\""
+// CHECK-NEXT:              "value": "Three"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
@@ -132,15 +132,15 @@
 // CHECK-NEXT:              "value": [
 // CHECK-NEXT:                {
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
-// CHECK-NEXT:                  "value": "\"a\""
+// CHECK-NEXT:                  "value": "a"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
-// CHECK-NEXT:                  "value": "\"b\""
+// CHECK-NEXT:                  "value": "b"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
-// CHECK-NEXT:                  "value": "\"c\""
+// CHECK-NEXT:                  "value": "c"
 // CHECK-NEXT:                }
 // CHECK-NEXT:              ]
 // CHECK-NEXT:            }
@@ -155,7 +155,7 @@
 // CHECK-NEXT:              "value": [
 // CHECK-NEXT:                {
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
-// CHECK-NEXT:                  "value": "\"z\""
+// CHECK-NEXT:                  "value": "z"
 // CHECK-NEXT:                }
 // CHECK-NEXT:              ]
 // CHECK-NEXT:            }
@@ -172,7 +172,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"Bar\""
+// CHECK-NEXT:              "value": "Bar"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "valueKind": "InitCall",
@@ -185,7 +185,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"Int\""
+// CHECK-NEXT:              "value": "Int"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "valueKind": "RawLiteral",
@@ -210,7 +210,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "Swift.String",
 // CHECK-NEXT:            "valueKind": "RawLiteral",
-// CHECK-NEXT:            "value": "\"foo\""
+// CHECK-NEXT:            "value": "foo"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractGroups.Bar",
