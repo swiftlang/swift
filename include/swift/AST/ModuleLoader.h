@@ -321,7 +321,7 @@ public:
 
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
-  virtual Optional<ModuleDependencyInfo> getModuleDependencies(
+  virtual Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) = 0;
