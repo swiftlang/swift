@@ -25,6 +25,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
@@ -1951,7 +1952,8 @@ swift_getTypeByMangledNameInEnvironment(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()) {
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
     swift::warning(0, "failed type lookup for %.*s: %s\n",
@@ -1982,7 +1984,8 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()) {
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
     swift::warning(0, "failed type lookup for %.*s: %s\n",
@@ -2012,7 +2015,8 @@ swift_getTypeByMangledNameInContext(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()) {
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
     swift::warning(0, "failed type lookup for %.*s: %s\n",
@@ -2043,7 +2047,8 @@ swift_getTypeByMangledNameInContextInMetadataState(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()) {
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
     swift::warning(0, "failed type lookup for %.*s: %s\n",
