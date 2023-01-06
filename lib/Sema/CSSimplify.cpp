@@ -13795,11 +13795,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto smaller = lhsLarger ? rhs : lhs;
     llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
 
-    // FIXME: For now, if either side contains pack expansion types, just fail.
+    // FIXME: For now, if either side contains pack expansion types, consider
+    // the fix constraint solved without trying to figure out which tuple
+    // elements were part of the pack.
     {
       if (lhs->containsPackExpansionType() ||
           rhs->containsPackExpansionType()) {
-        return SolutionKind::Error;
+        if (recordFix(fix))
+          return SolutionKind::Error;
+        return SolutionKind::Solved;
       }
     }
 

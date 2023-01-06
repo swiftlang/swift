@@ -3,20 +3,28 @@
 // REQUIRES: asserts
 
 func returnTuple1<T...>() -> (repeat each T) { fatalError() }
+// expected-note@-1 3 {{in call to function 'returnTuple1()'}}
 
 func returnTuple2<T...>() -> (Int, repeat each T) { fatalError() }
+// expected-note@-1 3 {{in call to function 'returnTuple2()'}}
 
 func returnTupleLabel1<T...>() -> (x: repeat each T) { fatalError() }
+// expected-note@-1 2 {{in call to function 'returnTupleLabel1()'}}
 
 func returnTupleLabel2<T...>() -> (Int, x: repeat each T) { fatalError() }
+// expected-note@-1 2 {{in call to function 'returnTupleLabel2()'}}
 
 func returnTupleLabel3<T...>() -> (Int, repeat each T, y: Float) { fatalError() }
+// expected-note@-1 3 {{in call to function 'returnTupleLabel3()'}}
 
-func returnTupleLabel4<T...>() -> (Int, x: repeat each T, y: Float) { fatalError() } // expected-note {{in call to function 'returnTupleLabel4()'}}
+func returnTupleLabel4<T...>() -> (Int, x: repeat each T, y: Float) { fatalError() }
+// expected-note@-1 2 {{in call to function 'returnTupleLabel4()'}}
 
 func returnTupleLabel5<T..., U...>() -> (Int, repeat each T, y: repeat each U) { fatalError() }
+// expected-note@-1 3 {{in call to function 'returnTupleLabel5()'}}
 
-func returnTupleLabel6<T..., U...>() -> (Int, x: repeat each T, y: repeat each U) { fatalError() } // expected-note {{in call to function 'returnTupleLabel6()'}}
+func returnTupleLabel6<T..., U...>() -> (Int, x: repeat each T, y: repeat each U) { fatalError() }
+// expected-note@-1 {{in call to function 'returnTupleLabel6()'}}
 
 func concreteReturnTupleValid() {
   let _: () = returnTuple1()
@@ -59,11 +67,26 @@ func concreteReturnTupleValid() {
 }
 
 func concreteReturnTypeInvalid() {
-  let _: (x: Int) = returnTuple1() // expected-error {{type of expression is ambiguous without more context}}
-  let _: () = returnTuple2() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (x: Int) = returnTupleLabel3() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (Int, Int, y: Float) = returnTupleLabel4() // expected-error {{type of expression is ambiguous without more context}}
-  let _: () = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}} 
+  let _: (x: Int) = returnTuple1()
+  // expected-error@-1 {{cannot convert value of type '(T...)' to specified type '(x: Int)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: () = returnTuple2()
+  // expected-error@-1 {{'(Int, T...)' is not convertible to '()', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (x: Int) = returnTupleLabel3()
+  // expected-error@-1 {{'(Int, T..., y: Float)' is not convertible to '(x: Int)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (Int, Int, y: Float) = returnTupleLabel4()
+  // expected-error@-1 {{cannot convert value of type '(Int, x: T..., y: Float)' to specified type '(Int, Int, y: Float)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: () = returnTupleLabel5()
+  // expected-error@-1 {{'(Int, T..., y: U...)' is not convertible to '()', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
 }
 
 func genericReturnTupleValid<T...>(_: repeat each T) {
@@ -93,30 +116,60 @@ func genericReturnTupleValid<T...>(_: repeat each T) {
 }
 
 func genericReturnTupleInvalid<T...>(_: repeat each T) {
-  let _: (x: repeat each T) = returnTuple1() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (x: Int, repeat each T) = returnTuple1() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (x: repeat each T) = returnTuple1()
+  // expected-error@-1 {{cannot convert value of type '(T...)' to specified type '(x: T...)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
-  let _: (Int, x: repeat each T) = returnTuple2() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (Int, x: String, repeat each T) = returnTuple2() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (x: Int, repeat each T) = returnTuple1()
+  // expected-error@-1 {{'(T...)' is not convertible to '(x: Int, T...)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
-  let _: (y: repeat each T) = returnTupleLabel1() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (y: Int, repeat each T) = returnTupleLabel1() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (Int, x: repeat each T) = returnTuple2()
+  // expected-error@-1 {{cannot convert value of type '(Int, T...)' to specified type '(Int, x: T...)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
-  let _: (x: repeat each T) = returnTupleLabel2() // expected-error {{type of expression is ambiguous without more context}}
-  let _: (Int, y: String, repeat each T) = returnTupleLabel2() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (Int, x: String, repeat each T) = returnTuple2()
+  // expected-error@-1 {{'(Int, T...)' is not convertible to '(Int, x: String, T...)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
-  let _: (repeat each T, y: Float) = returnTupleLabel3() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (y: repeat each T) = returnTupleLabel1()
+  // expected-error@-1 {{cannot convert value of type '(x: T...)' to specified type '(y: T...)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
-  let _: (Int, String, repeat each T, x: Float) = returnTupleLabel3() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (y: Int, repeat each T) = returnTupleLabel1()
+  // expected-error@-1 {{'(x: T...)' is not convertible to '(y: Int, T...)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (x: repeat each T) = returnTupleLabel2()
+  // expected-error@-1 {{'(Int, x: T...)' is not convertible to '(x: T...)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (Int, y: String, repeat each T) = returnTupleLabel2()
+  // expected-error@-1 {{'(Int, x: T...)' is not convertible to '(Int, y: String, T...)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (repeat each T, y: Float) = returnTupleLabel3()
+  // expected-error@-1 {{'(Int, T..., y: Float)' is not convertible to '(T..., y: Float)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+
+  let _: (Int, String, repeat each T, x: Float) = returnTupleLabel3()
+  // expected-error@-1 {{'(Int, T..., y: Float)' is not convertible to '(Int, String, T..., x: Float)', tuples have a different number of elements}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
   let _: (repeat each T, y: Float) = returnTupleLabel4() // expected-error {{'(Int, x: T..., y: Float)' is not convertible to '(T..., y: Float)', tuples have a different number of elements}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   let _: (Int, x: String, y: repeat each T) = returnTupleLabel4() // expected-error {{cannot convert value of type '(Int, x: String, y: Float)' to specified type '(Int, x: String, y: T...)'}}
 
-  let _: (Int, repeat each T, x: repeat each T) = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (Int, repeat each T, x: repeat each T) = returnTupleLabel5()
+  // expected-error@-1 {{cannot convert value of type '(Int, T..., y: U...)' to specified type '(Int, T..., x: T...)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
 
-  let _: (repeat each T, y: Float, repeat each T) = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (repeat each T, y: Float, repeat each T) = returnTupleLabel5()
+  // expected-error@-1 {{cannot convert value of type '(Int, T..., y: U...)' to specified type '(T..., y: Float, T...)'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
 
   let _: (repeat each T, y: Int) = returnTupleLabel6() // expected-error {{'(Int, x: T..., y: U...)' is not convertible to '(T..., y: Int)', tuples have a different number of elements}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
