@@ -283,37 +283,33 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::BeginBorrowInst: {
-        // Currently we only support borrows of owned values.
-        // Nested borrow handling can be complex in the presence of reborrows.
-        // So it is not handled currently.
         auto *borrowInst = cast<BeginBorrowInst>(&I);
+        // Populate guaranteedPhiDependencies for this borrowInst
+        findGuaranteedPhiDependencies(BorrowedValue(borrowInst));
+        auto disableBorrowDCE = [&](SILValue borrow) {
+          visitTransitiveEndBorrows(borrow, [&](EndBorrowInst *endBorrow) {
+            markInstructionLive(endBorrow);
+          });
+        };
+        // If we have a begin_borrow of a @guaranteed operand, disable DCE'ing
+        // of parent borrow scopes. Dead reborrows needs complex handling, whuch
+        // is why it is disabled for now.
         if (borrowInst->getOperand()->getOwnershipKind() ==
             OwnershipKind::Guaranteed) {
-          // Visit the end_borrows of all the borrow scopes that this
-          // begin_borrow could be borrowing.
           SmallVector<SILValue, 4> roots;
           findGuaranteedReferenceRoots(borrowInst->getOperand(),
                                        /*lookThroughNestedBorrows=*/false,
                                        roots);
+          // Visit the end_borrows of all the borrow scopes that this
+          // begin_borrow could be borrowing, and mark them live.
           for (auto root : roots) {
-            visitTransitiveEndBorrows(root,
-                                      [&](EndBorrowInst *endBorrow) {
-                                        markInstructionLive(endBorrow);
-                                      });
+            disableBorrowDCE(root);
           }
-          continue;
         }
-        // Populate guaranteedPhiDependencies for this borrow
-        findGuaranteedPhiDependencies(BorrowedValue(borrowInst));
-        // Don't optimize a borrow scope if it is lexical or has a pointer
-        // escape.
+        // If we have a lexical borrow scope or a pointer escape, disable DCE.
         if (borrowInst->isLexical() ||
             hasPointerEscape(BorrowedValue(borrowInst))) {
-          // Visit all end_borrows and mark them live
-          visitTransitiveEndBorrows(borrowInst, [&](EndBorrowInst *endBorrow) {
-            markInstructionLive(endBorrow);
-          });
-          continue;
+          disableBorrowDCE(borrowInst);
         }
         break;
       }
