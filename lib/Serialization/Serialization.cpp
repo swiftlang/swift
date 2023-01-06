@@ -70,6 +70,8 @@
 
 #include <vector>
 
+#define DEBUG_TYPE "Serialization"
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
@@ -3088,6 +3090,171 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
   }
 
+  /// Determine if \p decl is safe to deserialize when it's public
+  /// or otherwise needed by the client in normal builds, this should usually
+  /// correspond to logic in type-checking ensuring these safe decls don't
+  /// refer to implementation details. We have to be careful not to mark
+  /// anything needed by a client as unsafe as the client will reject reading
+  /// it, but at the same time keep the safety checks precise to avoid
+  /// XRef errors and such.
+  ///
+  /// \p decl should be either an \c ExtensionDecl or a \c ValueDecl.
+  static bool declIsDeserializationSafe(const Decl *decl) {
+    if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+      // Consider extensions as safe as their extended type.
+      auto nominalType = ext->getExtendedNominal();
+      if (!nominalType ||
+          !declIsDeserializationSafe(nominalType))
+        return false;
+
+      // We can mark the extension unsafe only if it has no public members.
+      auto members = ext->getMembers();
+      int membersCount = 0;
+      auto hasSafeMembers = std::any_of(members.begin(), members.end(),
+        [&membersCount](const Decl *D) -> bool {
+          membersCount ++;
+          if (auto VD = dyn_cast<ValueDecl>(D))
+            return declIsDeserializationSafe(VD);
+          return true;
+        });
+      if (hasSafeMembers)
+        return true;
+
+      // We can mark the extension unsafe only if it has no  public
+      // conformances.
+      auto protocols = ext->getLocalProtocols(
+                                        ConformanceLookupKind::OnlyExplicit);
+      bool hasSafeConformances = std::any_of(protocols.begin(),
+                                             protocols.end(),
+                                             declIsDeserializationSafe);
+      if (hasSafeConformances)
+        return true;
+
+      // Truly empty extensions are safe, it may happen in swiftinterfaces.
+      if (membersCount == 0 && protocols.size() == 0)
+        return true;
+
+      return false;
+    }
+
+    auto value = cast<ValueDecl>(decl);
+
+    // A decl is safe if formally accessible publicly.
+    auto accessScope = value->getFormalAccessScope(/*useDC=*/nullptr,
+                       /*treatUsableFromInlineAsPublic=*/true);
+    if (accessScope.isPublic())
+      return true;
+
+    // Testable allows access to internal details.
+    if (value->getDeclContext()->getParentModule()->isTestingEnabled() &&
+        accessScope.isInternal())
+      return true;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(value))
+      // Accessors are as safe as their storage.
+      if (declIsDeserializationSafe(accessor->getStorage()))
+        return true;
+
+    // Frozen fields are always safe.
+    if (auto var = dyn_cast<VarDecl>(value)) {
+      if (var->isLayoutExposedToClients())
+        return true;
+
+      // Consider all lazy var storage as "safe".
+      // FIXME: We should keep track of what lazy var is associated to the
+      //        storage for them to preserve the same safeness.
+      if (var->isLazyStorageProperty())
+        return true;
+
+      // Property wrappers storage is as safe as the wrapped property.
+      if (VarDecl *wrapped = var->getOriginalWrappedProperty())
+        if (declIsDeserializationSafe(wrapped))
+          return true;
+    }
+
+    return false;
+  }
+
+  /// Write a \c DeserializationSafetyLayout record only when \p decl is unsafe
+  /// to deserialize.
+  ///
+  /// \sa declIsDeserializationSafe
+  void writeDeserializationSafety(const Decl *decl) {
+    using namespace decls_block;
+
+    auto DC = decl->getDeclContext();
+    if (!DC->getParentModule()->isResilient())
+      return;
+
+    // Everything should be safe in a swiftinterface. So, don't emit any safety
+    // record when building a swiftinterface in release builds. Debug builds
+    // instead print inconsistencies.
+    auto parentSF = DC->getParentSourceFile();
+    bool fromModuleInterface = parentSF &&
+                               parentSF->Kind == SourceFileKind::Interface;
+#if NDEBUG
+    if (fromModuleInterface)
+      return;
+#endif
+
+    // Private imports allow safe access to everything.
+    if (DC->getParentModule()->arePrivateImportsEnabled())
+      return;
+
+    // Ignore things with no access level.
+    // Note: There's likely room to report some of these as unsafe to prevent
+    //       failures.
+    if (isa<GenericTypeParamDecl>(decl) ||
+        isa<OpaqueTypeDecl>(decl) ||
+        isa<ParamDecl>(decl) ||
+        isa<EnumCaseDecl>(decl) ||
+        isa<EnumElementDecl>(decl))
+      return;
+
+    if (!isa<ValueDecl>(decl) && !isa<ExtensionDecl>(decl))
+      return;
+
+    // Don't look at decls inside functions and
+    // check the ValueDecls themselves.
+    auto declIsSafe = DC->isLocalContext() ||
+                      declIsDeserializationSafe(decl);
+#ifdef NDEBUG
+    // In release builds, bail right away if the decl is safe.
+    // In debug builds, wait to bail after the debug prints and asserts.
+    if (declIsSafe)
+      return;
+#endif
+
+    // Write a human readable name to an identifier.
+    SmallString<64> out;
+    llvm::raw_svector_ostream outStream(out);
+    if (auto val = dyn_cast<ValueDecl>(decl)) {
+      outStream << val->getName();
+    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+      outStream << "extension ";
+      if (auto nominalType = ext->getExtendedNominal())
+        outStream << nominalType->getName();
+    }
+    auto name = S.getASTContext().getIdentifier(out);
+
+    LLVM_DEBUG(
+      llvm::dbgs() << "Serialization safety, "
+                   << (declIsSafe? "safe" : "unsafe")
+                   << ": '" << name << "'\n";
+      assert((declIsSafe || !fromModuleInterface) &&
+             "All swiftinterface decls should be deserialization safe");
+    );
+
+#ifndef NDEBUG
+    if (declIsSafe)
+      return;
+#endif
+
+    auto abbrCode = S.DeclTypeAbbrCodes[DeserializationSafetyLayout::Code];
+    DeserializationSafetyLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            S.addDeclBaseNameRef(name));
+  }
+
   void writeForeignErrorConvention(const ForeignErrorConvention &fec) {
     using namespace decls_block;
 
@@ -3404,6 +3571,8 @@ public:
   void visit(const Decl *D) {
     if (D->isInvalid())
       writeDeclErrorFlag();
+
+    writeDeserializationSafety(D);
 
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
