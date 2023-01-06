@@ -24,6 +24,7 @@
 
 namespace swift {
 class ASTContext;
+class AvailableAttr;
 class Decl;
 
 /// A lattice of version ranges of the form [x.y.z, +Inf).
@@ -343,6 +344,11 @@ public:
   /// Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
   static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
+
+  /// Returns the attribute that should be used to determine the availability
+  /// range of the given declaration, or nullptr if there is none.
+  static const AvailableAttr *attrForAnnotatedAvailableRange(const Decl *D,
+                                                             ASTContext &Ctx);
 
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration

@@ -1098,11 +1098,22 @@ public:
 
   bool isAvailableAsSPI() const;
 
-  /// Whether the declaration is considered unavailable through either being
-  /// explicitly marked as such, or has a parent decl that is semantically
-  /// unavailable. This is a broader notion of unavailability than is checked by
-  /// \c AvailableAttr::isUnavailable.
-  bool isSemanticallyUnavailable() const;
+  /// Retrieve the @available attribute that provides the OS version range that
+  /// this declaration is available in.
+  ///
+  /// The attribute may come from another declaration, since availability
+  /// could be inherited from a parent declaration.
+  Optional<std::pair<const AvailableAttr *, const Decl *>>
+  getSemanticAvailableRangeAttr() const;
+
+  /// Retrieve the @available attribute that makes this declaration unavailable,
+  /// if any.
+  ///
+  /// The attribute may come from another declaration, since unavailability
+  /// could be inherited from a parent declaration. This is a broader notion of
+  /// unavailability than is checked by \c AvailableAttr::isUnavailable.
+  Optional<std::pair<const AvailableAttr *, const Decl *>>
+  getSemanticUnavailableAttr() const;
 
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
