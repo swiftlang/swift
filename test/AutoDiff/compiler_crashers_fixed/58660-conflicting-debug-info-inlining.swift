@@ -1,6 +1,8 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // Issue #58660: Specifically-shaped differentiable functions yield "conflicting debug info for argument" assertion failure
 // Ensure that proper location is preserved after sil-mem2reg location-less stores (created during inlining)
 
