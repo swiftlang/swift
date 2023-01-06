@@ -2051,7 +2051,13 @@ public:
         auto *CaseTR = getCaseTypeRef(Case);
         assert(CaseTR != nullptr);
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
-        if (CaseTI->getSize() == 0) {
+	if (CaseTI == nullptr) {
+	  // We don't have typeinfo; assume it's not
+	  // zero-sized to match earlier behavior.
+	  // TODO: Maybe this should prompt us to fall
+	  // back to UnsupportedEnumTypeInfo??
+          PayloadCases.push_back(Case);
+	} else if (CaseTI->getSize() == 0) {
           // Zero-sized payloads get special treatment
           ++EmptyPayloadCases;
         } else {
