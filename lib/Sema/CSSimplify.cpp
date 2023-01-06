@@ -2491,9 +2491,9 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
       locator.withPathElement(ConstraintLocator::PackShape));
   auto *shapeTypeVar = createTypeVariable(shapeLoc, TVO_CanBindToPack);
   addConstraint(ConstraintKind::ShapeOf,
-                expansion1->getCountType(), shapeTypeVar, locator);
+                expansion1->getCountType(), shapeTypeVar, shapeLoc);
   addConstraint(ConstraintKind::ShapeOf,
-                expansion2->getCountType(), shapeTypeVar, locator);
+                expansion2->getCountType(), shapeTypeVar, shapeLoc);
 
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
@@ -6094,6 +6094,16 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::PackShape: {
     auto *shapeLocator = getConstraintLocator(locator);
+
+    // FIXME: If the anchor isn't a pack expansion, this shape requirement
+    // came from a same-shape generic requirement, which will fail separately
+    // with an applied requirement fix. Currently, pack shapes can themselves be
+    // pack types with pack expansions, so matching shape types can recursively
+    // add ShapeOf constraints. For now, skip fixing the nested ones to avoid
+    // cascading diagnostics.
+    if (!isExpr<PackExpansionExpr>(shapeLocator->getAnchor()))
+      return true;
+
     auto *fix = SkipSameShapeRequirement::create(*this, lhs, rhs, shapeLocator);
     conversionsOrFixes.push_back(fix);
     break;
