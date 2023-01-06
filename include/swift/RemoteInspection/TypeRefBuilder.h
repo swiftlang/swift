@@ -20,10 +20,10 @@
 
 #include "swift/Remote/ExternalTypeRefCache.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Reflection/MetadataSourceBuilder.h"
-#include "swift/Reflection/Records.h"
-#include "swift/Reflection/TypeLowering.h"
-#include "swift/Reflection/TypeRef.h"
+#include "swift/RemoteInspection/MetadataSourceBuilder.h"
+#include "swift/RemoteInspection/Records.h"
+#include "swift/RemoteInspection/TypeLowering.h"
+#include "swift/RemoteInspection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include <iomanip>
@@ -394,7 +394,7 @@ struct TypeRefDecl {
 /// it vends.
 class TypeRefBuilder {
 #define TYPEREF(Id, Parent) friend class Id##TypeRef;
-#include "swift/Reflection/TypeRefs.def"
+#include "swift/RemoteInspection/TypeRefs.def"
 
 public:
   using BuiltType = const TypeRef *;
@@ -437,7 +437,7 @@ private:
 #define TYPEREF(Id, Parent) \
   std::unordered_map<TypeRefID, const Id##TypeRef *, \
                      TypeRefID::Hash, TypeRefID::Equal> Id##TypeRefs;
-#include "swift/Reflection/TypeRefs.def"
+#include "swift/RemoteInspection/TypeRefs.def"
 
 public:
   template <typename TypeRefTy, typename... Args>

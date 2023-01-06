@@ -12,7 +12,7 @@
 
 #if SWIFT_ENABLE_REFLECTION
 
-#include "swift/Reflection/MetadataSource.h"
+#include "swift/RemoteInspection/MetadataSource.h"
 #include <iostream>
 
 using namespace swift;

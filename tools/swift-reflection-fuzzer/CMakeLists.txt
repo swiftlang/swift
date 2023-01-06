@@ -5,4 +5,4 @@ add_swift_fuzzer_host_tool(swift-reflection-fuzzer
   )
 target_link_libraries(swift-reflection-fuzzer
                       PRIVATE
-                        swiftReflection)
+                        swiftRemoteInspection)
