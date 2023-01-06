@@ -366,7 +366,7 @@ namespace swift {
 
     /// Enable early skipping deserialization of decls that are marked as
     /// unsafe to read.
-    bool EnableDeserializationSafety = true;
+    bool EnableDeserializationSafety = false;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
