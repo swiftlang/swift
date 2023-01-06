@@ -32,7 +32,6 @@ public struct Wrapper<W, S> {
 
 // CHECK: @TypeWrappers.Wrapper public class Test<T> where T : Swift.StringProtocol {
 // CHECK:   public init(a: Swift.Int, b: [T])
-// CHECK:   public init(storageWrapper: TypeWrappers.Wrapper<TypeWrappers.Test<T>, TypeWrappers.Test<T>.$Storage>)
 // CHECK: }
 
 @Wrapper

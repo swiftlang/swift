@@ -180,6 +180,12 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
+ERROR(error_bad_package_name,none,
+      "package name \"%0\" is not a valid identifier",
+      (StringRef))
+ERROR(error_stdlib_package_name,none,
+      "package name \"%0\" is reserved for the standard library",
+      (StringRef))
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_module_alias_invalid_format,none,

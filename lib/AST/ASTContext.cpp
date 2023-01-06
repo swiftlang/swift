@@ -1895,18 +1895,20 @@ static void findPath_dfs(ModuleDependencyID X,
     return;
   }
   visited.insert(X);
-  auto node = cache.findDependencies(X.first, X.second);
-  assert(node.has_value() && "Expected cache value for dependency.");
-  for (const auto &dep : node->getModuleDependencies()) {
+  auto optionalNode = cache.findDependency(X.first, X.second);
+  auto node = optionalNode.getValue();
+  assert(optionalNode.has_value() && "Expected cache value for dependency.");
+  for (const auto &dep : node->getModuleImports()) {
     Optional<ModuleDependencyKind> lookupKind = None;
     // Underlying Clang module needs an explicit lookup to avoid confusing it
     // with the parent Swift module.
     if ((dep == X.first && node->isSwiftModule()) || node->isClangModule())
       lookupKind = ModuleDependencyKind::Clang;
 
-    auto depNode = cache.findDependencies(dep, lookupKind);
-    if (!depNode.has_value())
+    auto optionalDepNode = cache.findDependency(dep, lookupKind);
+    if (!optionalDepNode.has_value())
       continue;
+    auto depNode = optionalDepNode.getValue();
     auto depID = std::make_pair(dep, depNode->getKind());
     if (!visited.count(depID)) {
       findPath_dfs(depID, Y, visited, stack, result, cache);
@@ -1918,7 +1920,7 @@ static void findPath_dfs(ModuleDependencyID X,
 static std::vector<ModuleDependencyID>
 findPathToDependency(ModuleDependencyID dependency,
                      const ModuleDependenciesCache &cache) {
-  auto mainModuleDep = cache.findDependencies(cache.getMainModuleName(),
+  auto mainModuleDep = cache.findDependency(cache.getMainModuleName(),
                                               ModuleDependencyKind::SwiftSource);
   // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
@@ -1948,8 +1950,9 @@ static void diagnoseScannerFailure(StringRef moduleName,
     
     for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
       const auto &entry = *it;
-      auto entryNode = cache.findDependencies(entry.first, entry.second);
-      assert(entryNode.has_value());
+      auto optionalEntryNode = cache.findDependency(entry.first, entry.second);
+      assert(optionalEntryNode.has_value());
+      auto entryNode = optionalEntryNode.getValue();
       std::string moduleFilePath = "";
       bool isClang = false;
       switch (entryNode->getKind()) {
@@ -1981,57 +1984,79 @@ static void diagnoseScannerFailure(StringRef moduleName,
   }
 }
 
-Optional<ModuleDependencyInfo> ASTContext::getModuleDependencies(
-    StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
-    bool cacheOnly, llvm::Optional<ModuleDependencyID> dependencyOf) {
-  auto searchPathSet = getAllModuleSearchPathsSet();
+Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
+    StringRef moduleName, ModuleDependenciesCache &cache,
+    InterfaceSubContextDelegate &delegate,
+    llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
-  if (cacheOnly) {
-    // Check whether we've cached this result.
-    if (!isUnderlyingClangModule) {
-      if (auto found = cache.findDependencies(
-              moduleName, ModuleDependencyKind::SwiftSource))
-        return found;
-      if (auto found = cache.findDependencies(
-              moduleName, ModuleDependencyKind::SwiftInterface))
-        return found;
-      if (auto found = cache.findDependencies(
-              moduleName, ModuleDependencyKind::SwiftBinary))
-        return found;
-      if (auto found = cache.findDependencies(
-              moduleName, ModuleDependencyKind::SwiftPlaceholder))
-        return found;
-    }
-    if (auto found = cache.findDependencies(
-            moduleName, ModuleDependencyKind::Clang))
-      return found;
-  } else {
-    for (auto &loader : getImpl().ModuleLoaders) {
-      if (isUnderlyingClangModule &&
-          loader.get() != getImpl().TheClangModuleLoader)
-        continue;
+  // Check whether we've cached this result.
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftSource))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftInterface))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::Clang))
+    return found;
 
-      if (auto dependencies =
-              loader->getModuleDependencies(moduleName, cache, delegate))
-        return dependencies;
-    }
-    
-    diagnoseScannerFailure(moduleName, Diags, cache,
-                           dependencyOf);
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (auto dependencies =
+        loader->getModuleDependencies(moduleName, cache, delegate))
+      return dependencies;
   }
 
+  diagnoseScannerFailure(moduleName, Diags, cache,
+                         dependencyOf);
   return None;
 }
 
-Optional<ModuleDependencyInfo>
+Optional<const ModuleDependencyInfo*>
 ASTContext::getSwiftModuleDependencies(StringRef moduleName,
                                        ModuleDependenciesCache &cache,
                                        InterfaceSubContextDelegate &delegate) {
+  // Check whether we've cached this result.
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftSource))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftInterface))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
+    return found;
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
+    return found;
+
   for (auto &loader : getImpl().ModuleLoaders) {
     if (loader.get() == getImpl().TheClangModuleLoader)
       continue;
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
+  return None;
+}
 
+Optional<const ModuleDependencyInfo*>
+ASTContext::getClangModuleDependencies(StringRef moduleName,
+                                       ModuleDependenciesCache &cache,
+                                       InterfaceSubContextDelegate &delegate) {
+  // Check whether we've cached this result.
+  if (auto found =
+      cache.findDependency(moduleName, ModuleDependencyKind::Clang))
+    return found;
+
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (loader.get() != getImpl().TheClangModuleLoader)
+      continue;
     if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
                                                           delegate))
       return dependencies;

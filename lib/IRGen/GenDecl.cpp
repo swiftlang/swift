@@ -4456,8 +4456,8 @@ void IRGenModule::emitRuntimeDiscoverableAttributes(
     B.addInt32(0);
 
     // Attribute metadata descriptor
-    B.addRelativeAddress(
-        getAddrOfTypeContextDescriptor(attrType, RequireMetadata));
+    B.addRelativeAddress(getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forNominalTypeDescriptor(attrType)));
 
     // Number of types it's attached to.
     B.addInt32(attachedTo.size());

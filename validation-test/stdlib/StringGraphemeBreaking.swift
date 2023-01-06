@@ -10,47 +10,59 @@ import StdlibUnicodeUnittest
 import Foundation
 
 let StringGraphemeBreaking = TestSuite("StringGraphemeBreaking")
+defer { runAllTests() }
 
 extension String {
-  var backwardsCount: Int {
-    var c = 0
-    var index = endIndex
-    while index != startIndex {
-      c += 1
-      formIndex(before: &index)
+  var forwardPieces: [[Unicode.Scalar]] {
+    var i = startIndex
+    var r: [[Unicode.Scalar]] = []
+    while i < endIndex {
+      let j = self.index(after: i)
+      r.append(Array(self[i..<j].unicodeScalars))
+      i = j
     }
-    return c
+    return r
+  }
+
+  var backwardPieces: [[Unicode.Scalar]] {
+    var j = endIndex
+    var r: [[Unicode.Scalar]] = []
+    while j > startIndex {
+      let i = self.index(before: j)
+      r.append(Array(self[i..<j].unicodeScalars))
+      j = i
+    }
+    r.reverse()
+    return r
   }
 }
 
 if #available(SwiftStdlib 5.6, *) {
   StringGraphemeBreaking.test("grapheme breaking") {
-    for graphemeBreakTest in graphemeBreakTests {
+    for test in graphemeBreakTests {
       expectEqual(
-        graphemeBreakTest.1,
-        graphemeBreakTest.0.count,
-        "string: \(String(reflecting: graphemeBreakTest.0))")
+        test.string.forwardPieces, test.pieces,
+        "string: \(String(reflecting: test.string)) (forward)")
       expectEqual(
-        graphemeBreakTest.1,
-        graphemeBreakTest.0.backwardsCount,
-        "string: \(String(reflecting: graphemeBreakTest.0))")
+        test.string.backwardPieces, test.pieces,
+        "string: \(String(reflecting: test.string)) (backward)")
     }
   }
 }
 
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
-class NonContiguousNSString : NSString {
+class NonContiguousNSString: NSString {
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
   }
   required init(itemProviderData data: Data, typeIdentifier: String) throws {
-    fatalError("don't call this initializer")    
+    fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
   init(_ value: [UInt16]) {
@@ -80,33 +92,19 @@ extension _StringGuts {
   func _isForeign() -> Bool
 }
 
-func getUTF16Array(from string: String) -> [UInt16] {
-  var result: [UInt16] = []
-
-  for cp in string.utf16 {
-    result.append(cp)
-  }
-
-  return result
-}
-
 if #available(SwiftStdlib 5.6, *) {
   StringGraphemeBreaking.test("grapheme breaking foreign") {
-    for graphemeBreakTest in graphemeBreakTests {
-      let foreignTest = NonContiguousNSString(
-        getUTF16Array(from: graphemeBreakTest.0)
-      )
-      let test = foreignTest as String
+    for test in graphemeBreakTests {
+      let foreign = NonContiguousNSString(Array(test.string.utf16))
+      let string = foreign as String
 
-      expectTrue(test._guts._isForeign())
+      expectTrue(string._guts._isForeign())
       expectEqual(
-        graphemeBreakTest.1, test.count,
-        "string: \(String(reflecting: graphemeBreakTest.0))")
+        string.forwardPieces, test.pieces,
+        "string: \(String(reflecting: test.string)) (forward)")
       expectEqual(
-        graphemeBreakTest.1, test.backwardsCount,
-        "string: \(String(reflecting: graphemeBreakTest.0))")
+        string.backwardPieces, test.pieces,
+        "string: \(String(reflecting: test.string)) (backward)")
     }
   }
 }
-
-runAllTests()

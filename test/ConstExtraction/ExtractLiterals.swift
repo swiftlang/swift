@@ -68,6 +68,21 @@
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "42.2"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "float2",
+// CHECK-NEXT:        "type": "Swift.Float",
+// CHECK-NEXT:        "isStatic": "true",
+// CHECK-NEXT:        "isComputed": "true",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": "6"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "float3",
+// CHECK-NEXT:        "type": "Swift.Float",
+// CHECK-NEXT:        "isStatic": "true",
+// CHECK-NEXT:        "isComputed": "true",
+// CHECK-NEXT:        "valueKind": "Runtime"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
@@ -82,6 +97,22 @@
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "\"Hello, World\""
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "string2",
+// CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": "\"Hi\""
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "string3",
+// CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "true",
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": "\"Hey\""
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
@@ -215,10 +246,14 @@ public struct Ints : MyProto {
 
 public struct Floats : MyProto {
     static let float1: Float = 42.2
+    static var float2: Float { return (6) }
+    static var float3: Float { return (1 + 2) }
 }
 
 public struct Strings : MyProto {
     let string1: String = "Hello, World"
+    let string2: String = (("Hi"))
+    var string3: String { ("Hey") }
 }
 
 public struct PropertyWrappers : MyProto {

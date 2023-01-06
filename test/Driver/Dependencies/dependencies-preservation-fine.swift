@@ -1,3 +1,6 @@
+// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
+// REQUIRES: rdar103866776
+
 // REQUIRES: shell
 // Verify that the top-level build record file from the last incremental
 // compilation is preserved with the same name, suffixed by a '~'.

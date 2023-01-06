@@ -4740,7 +4740,7 @@ using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
 /// that relates a type attribute is attached to a generator function.
 template <typename Runtime>
 struct TargetRuntimeDiscoverableAttributeEntry {
-  ConstTargetMetadataPointer<Runtime, TargetMetadata> Type;
+  RelativeDirectPointer<const char, /*nullable*/ false> Type;
   RelativeDirectPointer<TargetAccessibleFunctionRecord<Runtime>> Generator;
 };
 
@@ -4759,7 +4759,10 @@ class RuntimeDiscoverableAttributeRecord
   uint32_t flags;
 
   /// The nominal type that describes the attribute.
-  TargetSignedContextPointer<Runtime, TargetTypeContextDescriptor> Attribute;
+  TargetRelativeIndirectablePointer<Runtime,
+                                    TargetTypeContextDescriptor<Runtime>,
+                                    /*nullable*/ false>
+      Attribute;
 
   /// The number of types this attribute is associated with.
   uint32_t numEntries;

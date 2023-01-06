@@ -32,21 +32,10 @@ import SomeExternalModule
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "swift": "F"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swiftPlaceholder": "SomeExternalModule"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "SwiftOnoneSupport"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "_Concurrency"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "_StringProcessing"
-// CHECK-NEXT: }
-// CHECK-NEXT: ],
+// CHECK-DAG: "swift": "F"
+// CHECK-DAG: "swiftPlaceholder": "SomeExternalModule"
+// CHECK-DAG: "swift": "Swift"
+// CHECK-DAG: "swift": "SwiftOnoneSupport"
+// CHECK-DAG: "swift": "_Concurrency"
+// CHECK-DAG: "swift": "_StringProcessing"
+// CHECK: ],
