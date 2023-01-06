@@ -63,6 +63,7 @@ static bool validateModule(
     llvm::outs() << "error: loadFromSerializedAST() failed\n";
     return false;
   }
+  CI.getLangOptions().EnableDeserializationSafety = false;
 
   if (Verbose) {
     if (!info.shortVersion.empty())
