@@ -126,8 +126,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral:
-    case ExprKind::StringLiteral: {
+    case ExprKind::NilLiteral: {
       std::string literalOutput;
       llvm::raw_string_ostream OutputStream(literalOutput);
       expr->printConstExprValue(&OutputStream, nullptr);
@@ -135,6 +134,14 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         return std::make_shared<RawLiteralValue>(literalOutput);
       }
       break;
+    }
+
+    case ExprKind::StringLiteral: {
+      auto stringLiteralExpression = cast<StringLiteralExpr>(expr);
+      std::string literalOutput;
+      llvm::raw_string_ostream OutputStream(literalOutput);
+      OutputStream << stringLiteralExpression->getValue();
+      return std::make_shared<RawLiteralValue>(literalOutput);
     }
 
     case ExprKind::Array: {
