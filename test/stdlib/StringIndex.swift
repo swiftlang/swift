@@ -7,10 +7,8 @@
 // 5.7 so that we can test new behavior even if the SDK we're using predates it.
 
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // UNSUPPORTED: freestanding
-
-// Temporarily disabled due to extremely slow execution in the "UTF-16 breadcrumbs" test
-// REQUIRES: rdar103934958
 
 import StdlibUnittest
 #if _runtime(_ObjC)
