@@ -3579,9 +3579,6 @@ void UseRewriter::visitUncheckedEnumDataInst(
 
   assert(enumDataInst->getOwnershipKind() != OwnershipKind::Guaranteed);
 
-  // unchecked_enum_data could be a def-projection. It is handled as a
-  // separate allocation to make it clear that it can't be
-  // rematerialized. This means that
   auto srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
 
   auto loc = enumDataInst->getLoc();
