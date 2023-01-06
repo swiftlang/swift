@@ -9,6 +9,9 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
 
+// Temporarily disabled due to extremely slow execution in the "UTF-16 breadcrumbs" test
+// REQUIRES: rdar103934958
+
 import StdlibUnittest
 #if _runtime(_ObjC)
 import Foundation
