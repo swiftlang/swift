@@ -126,7 +126,9 @@ extension CxxSequence {
   /// Returns an iterator over the elements of this C++ container.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
-  ///   container.
+  ///   container when each element is copied in O(1). Note that this might not
+  ///   be true for certain C++ types, e.g. those with a custom copy
+  ///   constructor that performs additional logic.
   @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)
