@@ -5336,6 +5336,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
   registerDeclTypeAbbr<FilenameForPrivateLayout>();
+  registerDeclTypeAbbr<DeserializationSafetyLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 

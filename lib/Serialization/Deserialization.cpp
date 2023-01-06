@@ -5411,6 +5411,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       IdentifierID filenameID;
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
       filenameForPrivate = MF.getIdentifierText(filenameID);
+    } else if (recordID == decls_block::DESERIALIZATION_SAFETY) {
+      IdentifierID declID;
+      decls_block::DeserializationSafetyLayout::readRecord(scratch, declID);
     } else {
       return llvm::Error::success();
     }
