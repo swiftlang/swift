@@ -2941,6 +2941,14 @@ namespace {
 
           return Action::Continue(expr);
         }
+
+        PreWalkAction walkToDeclPre(Decl *D) override {
+          return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+        }
+
+        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+          return Action::SkipChildren(P);
+        }
       } collectVarRefs(CS);
 
       closure->walk(collectVarRefs);
