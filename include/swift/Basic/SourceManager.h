@@ -41,10 +41,6 @@ public:
     PrettyPrinted,
   } kind;
 
-  /// The buffer ID for the enclosing buffer, in which originalSourceRange
-  /// resides.
-  unsigned originalBufferID;
-
   /// The source range in the enclosing buffer where this source was generated.
   ///
   /// This could point at a macro expansion or at the implicit location at

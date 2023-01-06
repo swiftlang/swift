@@ -1241,7 +1241,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
             bufferID,
             GeneratedSourceInfo{
               GeneratedSourceInfo::PrettyPrinted,
-              bufferID,
               SourceRange(),
               SourceRange(
                   memBufferStartLoc,
