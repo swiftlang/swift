@@ -858,7 +858,7 @@ class MarkGlobalActorFunction final : public ContextualMismatch {
   }
 
 public:
-  std::string getName() const override { return "add @escaping"; }
+  std::string getName() const override { return "add global actor"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
