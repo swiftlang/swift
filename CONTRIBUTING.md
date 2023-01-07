@@ -9,3 +9,7 @@ Before submitting a pull request, please make sure you have [tested your
 changes](https://github.com/apple/swift/blob/main/docs/ContinuousIntegration.md)
 and that they follow the Swift project guidelines for [contributing
 code](https://swift.org/contributing/#contributing-code).
+
+---
+
+Thank you for taking your interest for contributing in Swift!
