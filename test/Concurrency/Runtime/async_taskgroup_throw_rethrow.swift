@@ -140,7 +140,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst(
       throw bodyError
     }
 
-    print("Expected error to be thrown")
+    fatalError("Expected error to be thrown")
   } catch {
     // CHECK: Throwing: Boom(id: "body, first, isCancelled:false
     // CHECK: Throwing: Boom(id: "task, second, isCancelled:true
@@ -167,7 +167,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
       throw bodyError
     }
 
-    print("Expected error to be thrown")
+    fatalError("Expected error to be thrown")
   } catch {
     // CHECK: Throwing: Boom(id: "task, first, isCancelled:false
     // CHECK: Throwing: Boom(id: "body, second, isCancelled:true

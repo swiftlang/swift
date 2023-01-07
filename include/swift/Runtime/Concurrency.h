@@ -289,16 +289,6 @@ void swift_taskGroup_cancelAll(TaskGroup *group);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isCancelled(TaskGroup *group);
 
-/// Check if the task group is discarding results or not.
-///
-/// This can be called from any thread. Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_isDiscardingResults(group: Builtin.RawPointer)
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_isDiscardingResults(TaskGroup *group);
-
 /// Wait until all pending tasks from the task group have completed.
 /// If this task group is accumulating results, this also discards all those results.
 ///

@@ -552,7 +552,3 @@ func _taskGroupWaitAll<T>(
     group: Builtin.RawPointer,
     bodyError: Error?
 ) async throws -> T?
-
-@available(SwiftStdlib 5.8, *) // FIXME: remove
-@_silgen_name("swift_taskGroup_isDiscardingResults")
-func _taskGroupIsDiscardingResults(group: Builtin.RawPointer) -> Bool
