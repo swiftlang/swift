@@ -1494,6 +1494,10 @@ public:
   llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
+  /// The pack expansion environment that can open pack elements for
+  /// a given locator.
+  llvm::DenseMap<ConstraintLocator *, UUID> PackExpansionEnvironments;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
@@ -3021,6 +3025,8 @@ private:
   llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
       OpenedExistentialTypes;
 
+  llvm::SmallMapVector<ConstraintLocator *, UUID, 4> PackExpansionEnvironments;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -3495,6 +3501,9 @@ public:
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
+
+    /// The length of \c PackExpansionEnvironments.
+    unsigned numPackExpansionEnvironments;
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
@@ -3973,6 +3982,12 @@ public:
   /// constraint system and returning both it and the root opened archetype.
   std::pair<Type, OpenedArchetypeType *> openExistentialType(
       Type type, ConstraintLocator *locator);
+
+  /// Add the given pack expansion as an opened pack element environment.
+  void addPackElementEnvironment(PackExpansionExpr *expr);
+
+  /// Get the opened element generic environment for the given locator.
+  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
@@ -6124,12 +6139,12 @@ public:
 class OpenPackElementType {
   ConstraintSystem &cs;
   ConstraintLocator *locator;
-  GenericEnvironment *elementEnv;
+  PackExpansionExpr *elementEnv;
 
 public:
   explicit OpenPackElementType(ConstraintSystem &cs,
                                const ConstraintLocatorBuilder &locator,
-                               GenericEnvironment *elementEnv)
+                               PackExpansionExpr *elementEnv)
       : cs(cs), elementEnv(elementEnv) {
     this->locator = cs.getConstraintLocator(locator);
   }
@@ -6141,9 +6156,9 @@ public:
     // element.
     assert(elementEnv);
 
-    auto *elementType = cs.createTypeVariable(locator, TVO_CanBindToHole);
-    auto elementLoc = cs.getConstraintLocator(locator,
-        LocatorPathElt::OpenedPackElement(elementEnv));
+    auto *elementType = cs.createTypeVariable(locator,
+                                              TVO_CanBindToHole |
+                                              TVO_CanBindToNoEscape);
 
     // If we're opening a pack element from an explicit type repr,
     // set the type repr types in the constraint system for generating
@@ -6154,7 +6169,7 @@ public:
     }
 
     cs.addConstraint(ConstraintKind::PackElementOf, elementType,
-                     packType, elementLoc);
+                     packType, cs.getConstraintLocator(elementEnv));
     return elementType;
   }
 };

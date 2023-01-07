@@ -2002,6 +2002,11 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
   return doIt(T->getBase());
 }
+
+bool Traversal::visitVarargTypeRepr(VarargTypeRepr *T) {
+  return doIt(T->getElementType());
+}
+
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
 }

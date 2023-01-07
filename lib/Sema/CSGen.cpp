@@ -845,8 +845,8 @@ namespace {
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
 
-    /// A stack of pack element generic environments.
-    llvm::SmallVector<GenericEnvironment *, 2> PackElementEnvironments;
+    /// A stack of pack expansions that can open pack elements.
+    llvm::SmallVector<PackExpansionExpr *, 2> PackElementEnvironments;
 
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
@@ -1088,8 +1088,9 @@ namespace {
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
-    void addPackElementEnvironment(GenericEnvironment *env) {
-      PackElementEnvironments.push_back(env);
+    void addPackElementEnvironment(PackExpansionExpr *expr) {
+      CS.addPackElementEnvironment(expr);
+      PackElementEnvironments.push_back(expr);
     }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
@@ -1424,7 +1425,7 @@ namespace {
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
 
       // Add a PackElementOf constraint for 'each T' type reprs.
-      GenericEnvironment *elementEnv = nullptr;
+      PackExpansionExpr *elementEnv = nullptr;
       if (!PackElementEnvironments.empty()) {
         options |= TypeResolutionFlags::AllowPackReferences;
         elementEnv = PackElementEnvironments.back();
@@ -1694,7 +1695,7 @@ namespace {
       auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
       for (auto specializationArg : specializationArgs) {
-        GenericEnvironment *elementEnv = nullptr;
+        PackExpansionExpr *elementEnv = nullptr;
         if (!PackElementEnvironments.empty()) {
           options |= TypeResolutionFlags::AllowPackReferences;
           elementEnv = PackElementEnvironments.back();
@@ -1764,7 +1765,7 @@ namespace {
           auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
           for (size_t i = 0, e = specializations.size(); i < e; ++i) {
-            GenericEnvironment *elementEnv = nullptr;
+            PackExpansionExpr *elementEnv = nullptr;
             if (!PackElementEnvironments.empty()) {
               options |= TypeResolutionFlags::AllowPackReferences;
               elementEnv = PackElementEnvironments.back();
@@ -3008,8 +3009,7 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
-      auto *elementEnv = expr->getGenericEnvironment();
-      assert(PackElementEnvironments.back() == elementEnv);
+      assert(PackElementEnvironments.back() == expr);
       PackElementEnvironments.pop_back();
 
       auto *patternLoc =
@@ -3018,10 +3018,8 @@ namespace {
                                              TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       auto elementResultType = CS.getType(expr->getPatternExpr());
-      auto *elementLoc = CS.getConstraintLocator(
-          expr, LocatorPathElt::OpenedPackElement(elementEnv));
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
-                       patternTy, elementLoc);
+                       patternTy, CS.getConstraintLocator(expr));
 
       auto *shapeLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::PackShape);
@@ -3052,6 +3050,9 @@ namespace {
 
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
+
+      if (PackElementEnvironments.empty())
+        return Type();
 
       // The type of a PackElementExpr is the opened pack element archetype
       // of the pack reference.
@@ -4060,7 +4061,7 @@ namespace {
       }
 
       if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
-        CG.addPackElementEnvironment(expansion->getGenericEnvironment());
+        CG.addPackElementEnvironment(expansion);
       }
 
       return Action::Continue(expr);

@@ -1250,16 +1250,11 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 }
 
 PackExpansionExpr *
-PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          ArrayRef<PackElementExpr *> packElements,
-                          SourceLoc dotsLoc, GenericEnvironment *environment,
+PackExpansionExpr::create(ASTContext &ctx, SourceLoc repeatLoc,
+                          Expr *patternExpr, GenericEnvironment *environment,
                           bool implicit, Type type) {
-  size_t size =
-      totalSizeToAlloc<PackElementExpr *>(packElements.size());
-  void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
-  return ::new (mem) PackExpansionExpr(patternExpr, packElements,
-                                       dotsLoc, environment,
-                                       implicit, type);
+  return new (ctx) PackExpansionExpr(repeatLoc, patternExpr, environment,
+                                     implicit, type);
 }
 
 void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
