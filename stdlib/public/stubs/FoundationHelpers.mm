@@ -80,6 +80,9 @@ _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
   return _CFStringHashCString(bytes, length);
 }
 
+extern IMP _Nonnull
+object_getMethodImplementation(id _Nullable obj, SEL _Nonnull name);
+
 SWIFT_RUNTIME_STDLIB_API
 _swift_shims_UInt16
 _swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
