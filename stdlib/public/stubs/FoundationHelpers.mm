@@ -92,12 +92,12 @@ _swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
   };
   static std::atomic<CharacterAtIndexCache> characterAtIndexCache;
   
-  auto cache = characterAtIndexCache.load(std::memory_order_relaxed)
+  auto cache = characterAtIndexCache.load(std::memory_order_relaxed);
   if cache.obj != obj {
     cache.obj = obj;
     cache.impl = object_getMethodImplementation(obj, @selector(characterAtIndex:));
     characterAtIndexCache.store(cache, std::memory_order_relaxed);
-    return cache.impl
+    return cache.impl;
   }
   return cache.impl(obj, @selector(characterAtIndex:), index);
 }
