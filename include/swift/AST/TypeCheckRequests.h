@@ -3473,9 +3473,11 @@ public:
   bool isCached() const { return true; }
 };
 
-class IsSemanticallyUnavailableRequest
-    : public SimpleRequest<IsSemanticallyUnavailableRequest,
-                           bool(const Decl *),
+using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;
+
+class SemanticAvailableRangeAttrRequest
+    : public SimpleRequest<SemanticAvailableRangeAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3483,7 +3485,25 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SemanticUnavailableAttrRequest
+    : public SimpleRequest<SemanticUnavailableAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

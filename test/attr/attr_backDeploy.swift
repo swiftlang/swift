@@ -3,39 +3,32 @@
 
 // MARK: - Valid declarations
 
-// OK: top level functions
-@available(macOS 11.0, *)
+// Ok, top level functions
 @_backDeploy(before: macOS 12.0)
 public func backDeployedTopLevelFunc() {}
 
-// OK: internal decls may be back deployed when @usableFromInline
-@available(macOS 11.0, *)
+// Ok, internal decls may be back deployed when @usableFromInline
 @_backDeploy(before: macOS 12.0)
 @usableFromInline
 internal func backDeployedUsableFromInlineTopLevelFunc() {}
 
-// OK: function/property/subscript decls in a struct
+// Ok, function/property/subscript decls in a struct
 public struct TopLevelStruct {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedMethod() {}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public var backDeployedComputedProperty: Int { 98 }
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public subscript(_ index: Int) -> Int { index }
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public var readWriteProperty: Int {
     get { 42 }
     set(newValue) {}
   }
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public subscript(at index: Int) -> Int {
     get { 42 }
@@ -43,74 +36,61 @@ public struct TopLevelStruct {
   }
 
   public var explicitReadAndModify: Int {
-    @available(macOS 11.0, *)
     @_backDeploy(before: macOS 12.0)
     _read { yield 42 }
 
-    @available(macOS 11.0, *)
     @_backDeploy(before: macOS 12.0)
     _modify {}
   }
 }
 
-// OK: final function decls in a non-final class
+// Ok, final function decls in a non-final class
 public class TopLevelClass {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   final public func backDeployedFinalMethod() {}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   final public var backDeployedFinalComputedProperty: Int { 98 }
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public static func backDeployedStaticMethod() {}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public final class func backDeployedClassMethod() {}
 }
 
-// OK: function decls in a final class
+// Ok, function decls in a final class
 final public class FinalTopLevelClass {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedMethod() {}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public var backDeployedComputedProperty: Int { 98 }
 }
 
-// OK: final function decls on an actor
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+// Ok, final function decls on an actor
+@available(SwiftStdlib 5.1, *)
 public actor TopLevelActor {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   final public func finalActorMethod() {}
 
-  // OK: actor methods are effectively final
-  @available(macOS 11.0, *)
+  // Ok, actor methods are effectively final
   @_backDeploy(before: macOS 12.0)
   public func actorMethod() {}
 }
 
-// OK: function decls in extension on public types
+// Ok, function decls in extension on public types
 extension TopLevelStruct {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedExtensionMethod() {}
 }
 
 extension TopLevelClass {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   final public func backDeployedExtensionMethod() {}
 }
 
 extension FinalTopLevelClass {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedExtensionMethod() {}
 }
@@ -118,22 +98,20 @@ extension FinalTopLevelClass {
 public protocol TopLevelProtocol {}
 
 extension TopLevelProtocol {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedExtensionMethod() {}
 }
 
-// MARK: - Unsupported declaration types
+
+// MARK: - Unsupported declaration kinds
 
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public class CannotBackDeployClass {}
 
 public final class CannotBackDeployClassInitDeinit {
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to initializer declarations}}
   public init() {}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to deinitializer declarations}}
   deinit {}
 }
@@ -162,9 +140,10 @@ extension TopLevelStruct {}
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 protocol CannotBackDeployProtocol {}
 
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.1, *)
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public actor CannotBackDeployActor {}
+
 
 // MARK: - Function body diagnostics
 
@@ -175,7 +154,6 @@ public struct FunctionBodyDiagnostics {
   fileprivate func fileprivateFunc() {} // expected-note {{instance method 'fileprivateFunc()' is not '@usableFromInline' or public}}
   private func privateFunc() {} // expected-note {{instance method 'privateFunc()' is not '@usableFromInline' or public}}
 
-  @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public func backDeployedMethod() {
     struct Nested {} // expected-error {{type 'Nested' cannot be nested inside a '@_backDeploy' function}}
@@ -187,6 +165,7 @@ public struct FunctionBodyDiagnostics {
     privateFunc() // expected-error {{instance method 'privateFunc()' is private and cannot be referenced from a '@_backDeploy' function}}
   }
 }
+
 
 // MARK: - Incompatible declarations
 
@@ -212,56 +191,34 @@ public class TopLevelClass2 {
   public class func nonFinalClassMethod() {}
 }
 
-@_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' requires that 'missingAllAvailabilityFunc()' have explicit availability for macOS}}
-public func missingAllAvailabilityFunc() {}
-
-@available(macOS 11.0, *)
-@_backDeploy(before: macOS 12.0, iOS 15.0) // expected-error {{'@_backDeploy' requires that 'missingiOSAvailabilityFunc()' have explicit availability for iOS}}
-public func missingiOSAvailabilityFunc() {}
-
-@available(macOS 12.0, *)
-@_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' has no effect because 'availableSameVersionAsBackDeployment()' is not available before macOS 12.0}}
-public func availableSameVersionAsBackDeployment() {}
-
-@available(macOS 12.1, *)
-@_backDeploy(before: macOS 12.0) // expected-error {{'availableAfterBackDeployment()' is not available before macOS 12.0}}
-public func availableAfterBackDeployment() {}
-
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, macOS 13.0) // expected-error {{'@_backDeploy' contains multiple versions for macOS}}
 public func duplicatePlatformsFunc1() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
 @_backDeploy(before: macOS 13.0) // expected-error {{'@_backDeploy' contains multiple versions for macOS}}
 public func duplicatePlatformsFunc2() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
 @_alwaysEmitIntoClient // expected-error {{'@_alwaysEmitIntoClient' cannot be applied to a back deployed global function}}
 public func alwaysEmitIntoClientFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
-@inlinable // OK
+@inlinable // Ok
 public func inlinableFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0)
 @_transparent // expected-error {{'@_transparent' cannot be applied to a back deployed global function}}
 public func transparentFunc() {}
 
+
 // MARK: - Attribute parsing
 
-@available(macOS 11.0, iOS 14.0, *)
 @_backDeploy(before: macos 12.0, iOS 15.0) // expected-warning {{unknown platform 'macos' for attribute '@_backDeploy'; did you mean 'macOS'?}} {{22-27=macOS}}
 public func incorrectPlatformCaseFunc() {}
 
-@available(macOS 11.0, iOS 14.0, *)
 @_backDeploy(before: mscos 12.0, iOS 15.0) // expected-warning {{unknown platform 'mscos' for attribute '@_backDeploy'; did you mean 'macOS'?}} {{22-27=macOS}}
 public func incorrectPlatformSimilarFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@_backDeploy'}}
 public func unknownOSFunc() {}
 
@@ -280,23 +237,18 @@ public func missingVersionFunc2() {}
 @_backDeploy(before: macOS, iOS) // expected-error 2{{expected version number in '@_backDeploy' attribute}}
 public func missingVersionFunc3() {}
 
-@available(macOS 11.0, iOS 14.0, *)
 @_backDeploy(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}}
 public func unexpectedSeparatorFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0.1) // expected-warning {{'@_backDeploy' only uses major and minor version number}}
 public func patchVersionFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, * 9.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func wildcardWithVersionFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, *) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func trailingWildcardFunc() {}
 
-@available(macOS 11.0, iOS 14.0, *)
 @_backDeploy(before: macOS 12.0, *, iOS 15.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func embeddedWildcardFunc() {}
 
@@ -315,7 +267,6 @@ public func unknownMacroMissingVersion() {}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
 public func unknownMacroVersioned() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
 public func knownAndUnknownMacroVersioned() {}
 
@@ -323,7 +274,6 @@ public func knownAndUnknownMacroVersioned() {}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
 public func emptyAttributeFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{expected 'before:' in '@_backDeploy' attribute}} {{14-14=before:}}
 public func missingBeforeFunc() {}
 
@@ -331,15 +281,12 @@ public func missingBeforeFunc() {}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
 public func missingColonAfterBeforeFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before macOS 12.0) // expected-error {{expected ':' after 'before' in '@_backDeploy' attribute}} {{20-20=:}}
 public func missingColonBetweenBeforeAndPlatformFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0,) // expected-error {{unexpected ',' separator}} {{32-33=}}
 public func unexpectedTrailingCommaFunc() {}
 
-@available(macOS 11.0, iOS 14.0, *)
 @_backDeploy(before: macOS 12.0,, iOS 15.0) // expected-error {{unexpected ',' separator}} {{33-34=}}
 public func extraCommaFunc() {}
 
