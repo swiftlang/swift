@@ -155,6 +155,8 @@ const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
 const char InvalidRecordKindError::ID = '\0';
 void InvalidRecordKindError::anchor() {}
+const char UnsafeDeserializationError::ID = '\0';
+void UnsafeDeserializationError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -4750,6 +4752,14 @@ ModuleFile::getDeclChecked(
       IDC->setDeclID(DID);
     }
   }
+
+  LLVM_DEBUG(
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(declOrOffset.get())) {
+      llvm::dbgs() << "Deserialized: '";
+      llvm::dbgs() << VD->getName();
+      llvm::dbgs() << "'\n";
+    });
+
   return declOrOffset;
 }
 
@@ -5403,6 +5413,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       IdentifierID filenameID;
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
       filenameForPrivate = MF.getIdentifierText(filenameID);
+    } else if (recordID == decls_block::DESERIALIZATION_SAFETY) {
+      IdentifierID declID;
+      decls_block::DeserializationSafetyLayout::readRecord(scratch, declID);
+
+      if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+          MF.getContext().LangOpts.EnableDeserializationSafety) {
+        auto name = MF.getIdentifier(declID);
+        LLVM_DEBUG(llvm::dbgs() << "Skipping unsafe deserialization: '"
+                                << name << "'\n");
+        return llvm::make_error<UnsafeDeserializationError>(name);
+      }
     } else {
       return llvm::Error::success();
     }
