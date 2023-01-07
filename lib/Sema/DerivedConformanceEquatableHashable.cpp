@@ -716,7 +716,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     {
       // Generate: hasher.combine(<ordinal>)
-      auto ordinalExpr = IntegerLiteralExpr::createFromUnsigned(C, index++);
+      auto ordinalExpr = IntegerLiteralExpr::createFromUnsigned(C, index++, SourceLoc());
       auto combineExpr = createHasherCombineCall(C, hasherParam, ordinalExpr);
       statements.emplace_back(ASTNode(combineExpr));
     }

@@ -485,7 +485,7 @@ struct TemplatedIterator {
     return *this;
   }
   TemplatedIterator operator++(int) {
-    auto tmp = ConstIterator(value);
+    auto tmp = TemplatedIterator(value);
     value++;
     return tmp;
   }
@@ -495,5 +495,102 @@ struct TemplatedIterator {
 };
 
 using TemplatedIteratorInt = TemplatedIterator<int>;
+
+template <typename T>
+struct TemplatedIteratorOutOfLineEq {
+  T value;
+
+  using iterator_category = std::input_iterator_tag;
+  using value_type = T;
+  using pointer = T *;
+  using reference = const T &;
+  using difference_type = int;
+
+  TemplatedIteratorOutOfLineEq(int value) : value(value) {}
+  TemplatedIteratorOutOfLineEq(const TemplatedIteratorOutOfLineEq &other) =
+      default;
+
+  const int &operator*() const { return value; }
+
+  TemplatedIteratorOutOfLineEq &operator++() {
+    value++;
+    return *this;
+  }
+  TemplatedIteratorOutOfLineEq operator++(int) {
+    auto tmp = TemplatedIteratorOutOfLineEq(value);
+    value++;
+    return tmp;
+  }
+};
+
+template <typename T>
+bool operator==(const TemplatedIteratorOutOfLineEq<T> &lhs,
+                const TemplatedIteratorOutOfLineEq<T> &rhs) {
+  return lhs.value == rhs.value;
+}
+
+using TemplatedIteratorOutOfLineEqInt = TemplatedIteratorOutOfLineEq<int>;
+
+template <typename T>
+struct TemplatedRACIteratorOutOfLineEq {
+  T value;
+  
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = T;
+  using pointer = T *;
+  using reference = const T &;
+  using difference_type = int;
+
+  TemplatedRACIteratorOutOfLineEq(int value) : value(value) {}
+  TemplatedRACIteratorOutOfLineEq(const TemplatedRACIteratorOutOfLineEq &other) =
+      default;
+
+  const int &operator*() const { return value; }
+
+  TemplatedRACIteratorOutOfLineEq &operator++() {
+    value++;
+    return *this;
+  }
+  TemplatedRACIteratorOutOfLineEq &operator--() {
+    value--;
+    return *this;
+  }
+  TemplatedRACIteratorOutOfLineEq operator++(int) {
+    auto tmp = TemplatedRACIteratorOutOfLineEq(value);
+    value++;
+    return tmp;
+  }
+
+  TemplatedRACIteratorOutOfLineEq &operator+=(difference_type v) {
+    value += v;
+    return *this;
+  }
+  TemplatedRACIteratorOutOfLineEq &operator-=(difference_type v) {
+    value -= v;
+    return *this;
+  }
+
+  TemplatedRACIteratorOutOfLineEq operator+(difference_type v) const {
+    return TemplatedRACIteratorOutOfLineEq(value + v);
+  }
+  TemplatedRACIteratorOutOfLineEq operator-(difference_type v) const {
+    return TemplatedRACIteratorOutOfLineEq(value - v);
+  }
+};
+
+template <typename T>
+bool operator==(const TemplatedRACIteratorOutOfLineEq<T> &lhs,
+                const TemplatedRACIteratorOutOfLineEq<T> &rhs) {
+  return lhs.value == rhs.value;
+}
+
+template <typename T>
+typename TemplatedRACIteratorOutOfLineEq<T>::difference_type
+operator-(const TemplatedRACIteratorOutOfLineEq<T> &lhs,
+          const TemplatedRACIteratorOutOfLineEq<T> &rhs) {
+  return lhs.value - rhs.value;
+}
+
+using TemplatedRACIteratorOutOfLineEqInt = TemplatedRACIteratorOutOfLineEq<int>;
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

@@ -674,6 +674,8 @@ case let (jeb):
 struct Foo19605164 {
 func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
 }}} // expected-error {{expected ']' in array type}}
+// expected-error@-2{{consecutive statements on a line must be separated by ';'}}
+// expected-error@-3{{expected expression}}
 #endif
   
 // rdar://19605567

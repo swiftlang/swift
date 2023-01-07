@@ -54,6 +54,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_OSX Darwin SwiftPrivateThreadExtras
   SWIFT_MODULE_DEPENDS_TVOS Darwin SwiftPrivateThreadExtras
   SWIFT_MODULE_DEPENDS_WATCHOS Darwin SwiftPrivateThreadExtras
+  SWIFT_MODULE_DEPENDS_MACCATALYST Darwin SwiftPrivateThreadExtras
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}" SwiftPrivateThreadExtras
   SWIFT_MODULE_DEPENDS_LINUX Glibc SwiftPrivateThreadExtras
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc SwiftPrivateThreadExtras
@@ -66,6 +67,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
-  LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries})
+  LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries}
+  MACCATALYST_BUILD_FLAVOR "zippered")
 set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++14)
 

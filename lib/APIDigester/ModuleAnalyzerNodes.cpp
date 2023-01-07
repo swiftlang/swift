@@ -172,6 +172,9 @@ SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
   HasStorage(Info.HasStorage) {}
 
+SDKNodeDeclMacro::SDKNodeDeclMacro(SDKNodeInitInfo Info):
+  SDKNodeDecl(Info, SDKNodeKind::DeclMacro) {}
+
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
                      ReqNewWitnessTableEntry(Info.ReqNewWitnessTableEntry),
@@ -223,6 +226,10 @@ SDKNodeDeclAccessor *SDKNodeDeclSubscript::getAccessor(AccessorKind Kind) const 
 }
 
 SDKNodeType *SDKNodeDeclVar::getType() const {
+  return cast<SDKNodeType>(childAt(0));
+}
+
+SDKNodeType *SDKNodeDeclMacro::getType() const {
   return cast<SDKNodeType>(childAt(0));
 }
 
@@ -409,6 +416,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
     return SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx,
       P->getChildIndex(this));
   case SDKNodeKind::DeclVar:
+  case SDKNodeKind::DeclMacro:
     return "declared";
   case SDKNodeKind::DeclTypeAlias:
     return "underlying";
@@ -993,6 +1001,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::DeclMacro:
     case SDKNodeKind::Conformance:
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclImport:
@@ -1834,6 +1843,13 @@ SwiftDeclCollector::constructTypeAliasNode(TypeAliasDecl *TAD) {
 }
 
 SDKNode *swift::ide::api::
+SwiftDeclCollector::constructMacroNode(MacroDecl *MD) {
+  auto Macro = SDKNodeInitInfo(Ctx, MD).createSDKNode(SDKNodeKind::DeclMacro);
+  Macro->addChild(constructTypeNode(MD->getInterfaceType(), TypeInitInfo()));
+  return Macro;
+}
+
+SDKNode *swift::ide::api::
 SwiftDeclCollector::constructAssociatedTypeNode(AssociatedTypeDecl *ATD) {
   auto Asso = SDKNodeInitInfo(Ctx, ATD).
     createSDKNode(SDKNodeKind::DeclAssociatedType);
@@ -2028,6 +2044,8 @@ void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
     RootNode->addChild(constructVarNode(VAD));
   } else if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
     RootNode->addChild(constructTypeAliasNode(TAD));
+  } else if (auto MD = dyn_cast<MacroDecl>(VD)) {
+    RootNode->addChild(constructMacroNode(MD));
   } else {
     llvm_unreachable("unhandled value decl");
   }

@@ -59,7 +59,7 @@ As you can see, sequence does nothing more than deliver an iterator.
 To understand the need for iterators, it's important to distinguish
 the two kinds of sequences.
 
-* **Volatile** sequences like "stream of network packets," carry
+* **Volatile** sequences, like "stream of network packets", carry
   their own traversal state, and are expected to be "consumed" as they
   are traversed.
 

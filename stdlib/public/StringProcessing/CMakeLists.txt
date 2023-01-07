@@ -53,4 +53,5 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
 
   SWIFT_MODULE_DEPENDS _RegexParser
   INSTALL_IN_COMPONENT stdlib
+  MACCATALYST_BUILD_FLAVOR "zippered"
 )

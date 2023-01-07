@@ -1998,8 +1998,12 @@ public:
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
 
+    if (!Ctx.LangOpts.hasFeature(Feature::Macros))
+      MD->diagnose(diag::macro_experimental);
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
+    if (!MD->getMacroContexts())
+      MD->diagnose(diag::macro_without_context, MD->getName());
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
@@ -3185,21 +3189,31 @@ public:
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
       if (!extType->hasError() && extType->getAnyNominal()) {
+        auto canExtType = extType->getCanonicalType();
+        if (auto existential = canExtType->getAs<ExistentialType>()) {
+          ED->diagnose(diag::unsupported_existential_extension, extType)
+              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+          ED->diagnose(diag::invalid_extension_rewrite,
+                       existential->getConstraintType())
+              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                            existential->getConstraintType()->getString());
+          return;
+        }
+
         // If we've got here, then we have some kind of extension of a prima
-        // fascie non-nominal type.  This can come up when we're projecting
+        // facie non-nominal type.  This can come up when we're projecting
         // typealiases out of bound generic types.
         //
         // struct Array<T> { typealias Indices = Range<Int> }
         // extension Array.Indices.Bound {}
         //
         // Offer to rewrite it to the underlying nominal type.
-        auto canExtType = extType->getCanonicalType();
         if (canExtType.getPointer() != extType.getPointer()) {
           ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
-            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
-            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                          canExtType->getString());
+              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+          ED->diagnose(diag::invalid_extension_rewrite, canExtType)
+              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                            canExtType->getString());
           return;
         }
       }

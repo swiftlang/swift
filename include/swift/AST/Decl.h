@@ -60,6 +60,7 @@ namespace swift {
   struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
+  enum class BuiltinMacroKind: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -79,6 +80,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
   class EnumCaseDecl;
@@ -254,6 +256,9 @@ struct OverloadSignature {
 
   /// Whether this is a type alias.
   unsigned IsTypeAlias : 1;
+
+  /// Whether this is a macro.
+  unsigned IsMacro : 1;
 
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
@@ -1969,6 +1974,10 @@ public:
     getMutablePatternList()[i].setInit(E);
   }
 
+  void setOriginalInit(unsigned i, Expr *E) {
+    getMutablePatternList()[i].setOriginalInit(E);
+  }
+
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }
@@ -2292,10 +2301,14 @@ private:
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
+public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+private:
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
-  unsigned LocalDiscriminator = 0;
+  unsigned LocalDiscriminator = InvalidDiscriminator;
 
   struct {
     /// Whether the "IsObjC" bit has been computed yet.
@@ -2581,6 +2594,12 @@ public:
   /// setters have discriminators.
   unsigned getLocalDiscriminator() const;
   void setLocalDiscriminator(unsigned index);
+
+  /// Whether this declaration has a local discriminator.
+  bool hasLocalDiscriminator() const;
+
+  /// Return the "raw" local discriminator, without computing it.
+  unsigned getRawLocalDiscriminator() const { return LocalDiscriminator; }
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
@@ -8297,6 +8316,17 @@ public:
   }
 };
 
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroContext: uint8_t {
+  /// An expression macro, referenced explicitly via "#stringify" or similar
+  /// in the source code.
+  Expression = 0x01,
+};
+
+/// The contexts in which a particular macro declaration can be used.
+using MacroContexts = OptionSet<MacroContext>;
+
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.
@@ -8320,33 +8350,32 @@ public:
   /// The result type.
   TypeLoc resultType;
 
-  /// The module name for the external macro definition.
-  Identifier externalModuleName;
-
-  /// The location of the module name for the external macro definition.
-  SourceLoc externalModuleNameLoc;
-
-  /// The type name for the external macro definition.
-  Identifier externalMacroTypeName;
-
-  /// The location of the type name for the external macro definition.
-  SourceLoc externalMacroTypeNameLoc;
+  /// The macro definition, which should always be a
+  /// \c MacroExpansionExpr in well-formed code.
+  Expr *definition;
 
   MacroDecl(SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
             GenericParamList *genericParams,
             ParameterList *parameterList,
             SourceLoc arrowOrColonLoc,
             TypeRepr *resultType,
-            Identifier externalModuleName,
-            SourceLoc externalModuleNameLoc,
-            Identifier externalMacroTypeName,
-            SourceLoc externalMacroTypeNameLoc,
+            Expr *definition,
             DeclContext *parent);
 
   SourceRange getSourceRange() const;
 
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
+
+  /// Determine the contexts in which this macro can be applied.
+  MacroContexts getMacroContexts() const;
+
+  /// Retrieve the definition of this macro.
+  MacroDefinition getDefinition() const;
+
+  /// Retrieve the builtin macro kind for this macro, or \c None if it is a
+  /// user-defined macro with no special semantics.
+  Optional<BuiltinMacroKind> getBuiltinKind() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())

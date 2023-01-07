@@ -450,6 +450,7 @@ cmake --build %BuildRoot%\9 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\10 ^
 
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /DYAML_DECLARE_EXPORT /DWIN32" ^

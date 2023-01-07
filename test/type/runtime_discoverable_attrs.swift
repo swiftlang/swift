@@ -172,3 +172,56 @@ extension AttrWithInitsInExts {
 @AttrWithInitsInExts
 struct TestAttrWithExts { // Ok
 }
+
+@runtimeMetadata
+struct FlagForMutating {
+  init<T, Result>(attachedTo: (inout T) -> Result) {}
+  init<T, Result>(attachedTo: (inout T, String, inout Int, (String, [Int])) -> Result) {}
+}
+
+struct TestMutatingMethods {
+  @FlagForMutating mutating func noArgs() -> Int { 42 } // Ok
+  @FlagForMutating mutating func yesArgs(_: String, x: inout Int, _ data: (String, [Int])) -> (q: String, a: Int) {
+    (q: "", a: 42)
+  }
+}
+
+@runtimeMetadata
+struct FlagForAsyncFuncs {
+  init<Act>(attachedTo: (Act) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int, inout [Int]) async throws -> Void) {}
+  init<Act>(attachedTo: (Act, Int) async -> Void) {}
+  init(attachedTo: () async -> [String]) {}
+}
+
+actor TestActor {
+  @FlagForAsyncFuncs func asyncExternally() throws {
+  }
+
+  @FlagForAsyncFuncs func doSomething() async throws {
+  }
+
+  @FlagForAsyncFuncs nonisolated func doSomething(_: Int) async {
+  }
+
+  @FlagForAsyncFuncs func doSomething(_: Int, x: inout [Int]) async {
+  }
+}
+
+@FlagForAsyncFuncs
+func globalAsyncFn() async -> [String] {
+  return []
+}
+
+@runtimeMetadata
+struct FlagForStaticFuncs {
+  init<T>(attachedTo: (T.Type) -> Void) {}
+  init<T>(attachedTo: (T.Type, Int.Type) -> Void) {}
+  init<T>(attachedTo: (T.Type, inout [String], Int) -> Void) {}
+}
+
+struct TestStaticFuncs {
+  @FlagForStaticFuncs static func test0() {}
+  @FlagForStaticFuncs static func test1(_: Int.Type) {}
+  @FlagForStaticFuncs static func test2(_: inout [String], x: Int) {}
+}

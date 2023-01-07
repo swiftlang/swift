@@ -1329,9 +1329,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(legacy_object_literal,none,
-      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
-      (bool, StringRef, StringRef))
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
@@ -1348,6 +1345,10 @@ ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_move, none,
+      "expected expression after '_move'", ())
+ERROR(expected_expr_after_borrow, none,
+      "expected expression after '_borrow'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1999,18 +2000,12 @@ ERROR(expected_lparen_macro,PointsToFirstBadToken,
       "expected '(' for macro parameters or ':' for a value-like macro", ())
 ERROR(expected_type_macro_result,PointsToFirstBadToken,
       "expected macro result type", ())
-ERROR(macro_decl_expected_equal,PointsToFirstBadToken,
-      "expected '=' to introduce external macro name", ())
-ERROR(macro_decl_expected_macro_module,PointsToFirstBadToken,
-      "expected external macro name", ())
-ERROR(macro_decl_expected_period,PointsToFirstBadToken,
-      "expected '.' between external macro module and type name", ())
-ERROR(macro_decl_expected_macro_type,PointsToFirstBadToken,
-      "expected external macro type name", ())
+ERROR(macro_decl_expected_macro_definition,PointsToFirstBadToken,
+      "expected macro definition following '=''", ())
 
-ERROR(macro_expansion_expr_expected_macro_identifier,none,
+ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal expression", ())
-ERROR(macro_expansion_decl_expected_macro_identifier,none,
+ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal declaration", ())
 
 ERROR(parser_round_trip_error,none,

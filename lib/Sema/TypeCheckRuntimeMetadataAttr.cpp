@@ -14,9 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
@@ -44,6 +46,186 @@ ValueDecl::getRuntimeDiscoverableAttributeGenerator(CustomAttr *attr) const {
   assert(init);
 
   return std::make_pair(body, init->getType()->mapTypeOutOfContext());
+}
+
+static TypeRepr *buildTypeRepr(DeclContext *typeContext,
+                               bool forMetatype = false) {
+  assert(typeContext->isTypeContext());
+
+  SmallVector<ComponentIdentTypeRepr *, 2> components;
+
+  auto &ctx = typeContext->getASTContext();
+  DeclContext *DC = typeContext;
+  while (!DC->isModuleContext()) {
+    auto *NTD = DC->getSelfNominalTypeDecl();
+    // Only contiguous chains of nominals and extensions thereof.
+    if (!NTD)
+      break;
+
+    auto *component = new (ctx) SimpleIdentTypeRepr(
+        /*Loc=*/DeclNameLoc(), NTD->createNameRef());
+
+    // Resolve the component right away, instead of
+    // involving name lookup. This plays well with
+    // the fact that initializer is anchored on a
+    // source file.
+    component->setValue(NTD, NTD->getDeclContext());
+
+    components.push_back(component);
+    DC = NTD->getDeclContext();
+  }
+
+  // Reverse the components to form a valid outer-to-inner name sequence.
+  std::reverse(components.begin(), components.end());
+
+  TypeRepr *typeRepr = nullptr;
+  if (components.size() == 1) {
+    typeRepr = components.front();
+  } else {
+    typeRepr = CompoundIdentTypeRepr::create(ctx, components);
+  }
+
+  if (forMetatype)
+    return new (ctx) MetatypeTypeRepr(typeRepr, /*MetaLoc=*/SourceLoc());
+
+  return typeRepr;
+}
+
+/// Synthesizes a closure thunk that forwards all of the arguments
+/// to the underlying method. This is required to support mutating
+/// methods and create uniform signatures where for instance methods
+/// first parameter is always `self` (with or without `inout`).
+static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
+                                          NominalTypeDecl *nominal,
+                                          FuncDecl *method) {
+  auto &ctx = method->getASTContext();
+
+  // If this is a method, let's form a thunk so that attribute initializer
+  // gets `([inout] T, Argument, ...) -> Result` signature.
+  auto *funcParams = method->getParameters();
+
+  SmallVector<ParamDecl *, 4> closureParams;
+
+  ParamDecl *selfParam = ParamDecl::createImplicit(
+      ctx,
+      /*argumentName=*/Identifier(),
+      /*parameterName=*/ctx.Id_self,
+      /*type=*/
+      method->isStatic() ? nominal->getInterfaceType()
+                         : nominal->getDeclaredInterfaceType(),
+      thunkDC,
+      method->isMutating() ? ParamSpecifier::InOut : ParamSpecifier::Default);
+  {
+    // This is very important for the solver, without a type repr
+    // it would create a type variable and attempt infer the type
+    // from the body.
+    selfParam->setTypeRepr(buildTypeRepr(nominal, method->isStatic()));
+
+    closureParams.push_back(selfParam);
+  }
+
+  if (funcParams) {
+    unsigned anonIdx = 0;
+    for (auto *param : *funcParams) {
+      auto name = param->getParameterName();
+      // Cannot leave parameter anonymous because it would be
+      // referenced in the body.
+      if (name.empty())
+        name = ctx.getIdentifier((Twine("$anon") + Twine(anonIdx++)).str());
+
+      auto *closureParam = ParamDecl::createImplicit(
+          ctx,
+          /*argumentName=*/Identifier(),
+          /*parameterName=*/name, param->getInterfaceType(), thunkDC,
+          param->getSpecifier());
+      closureParam->setTypeRepr(param->getTypeRepr());
+
+      closureParams.push_back(closureParam);
+    }
+  }
+
+  // return self.<func>(<arguments>)
+  SmallVector<ASTNode, 2> body;
+  {
+    NullablePtr<Expr> baseExpr =
+        new (ctx) DeclRefExpr({selfParam}, /*Loc=*/DeclNameLoc(),
+                              /*implicit=*/true);
+
+    auto *memberRef = new (ctx) MemberRefExpr(
+        baseExpr.get(), /*dotLoc=*/SourceLoc(), {method}, /*loc=*/DeclNameLoc(),
+        /*Implicit=*/true);
+
+    SmallVector<Argument, 4> arguments;
+    if (funcParams) {
+      for (unsigned i = 0, n = funcParams->size(); i != n; ++i) {
+        const auto *param = funcParams->get(i);
+
+        Expr *argExpr = new (ctx) DeclRefExpr({closureParams[i + 1]},
+                                              /*Loc=*/DeclNameLoc(),
+                                              /*implicit=*/true);
+
+        if (param->isInOut()) {
+          argExpr = new (ctx) InOutExpr(/*operLoc=*/SourceLoc(), argExpr,
+                                        Type(), /*implicit=*/true);
+        }
+
+        arguments.push_back(
+            {/*labelLoc=*/SourceLoc(), param->getArgumentName(), argExpr});
+      }
+    }
+
+    Expr *call = CallExpr::createImplicit(
+        ctx, memberRef, ArgumentList::createImplicit(ctx, arguments));
+
+    bool isAsync = false;
+    bool isThrows = method->hasThrows();
+
+    switch (getActorIsolation(method)) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent: {
+      isAsync = method->hasAsync();
+      break;
+    }
+
+    case ActorIsolation::ActorInstance: {
+      isAsync = true;
+      isThrows |= nominal->isDistributedActor();
+      break;
+    }
+
+    case ActorIsolation::GlobalActor:
+      isAsync = true;
+      LLVM_FALLTHROUGH;
+    case ActorIsolation::GlobalActorUnsafe: {
+      break;
+    }
+    }
+
+    if (isAsync)
+      call = AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), call);
+
+    if (isThrows)
+      call = TryExpr::createImplicit(ctx, /*tryLoc=*/SourceLoc(), call);
+
+    body.push_back(new (ctx) ReturnStmt(/*ReturnLoc=*/SourceLoc(), call,
+                                        /*implicit=*/true));
+  }
+
+  DeclAttributes attrs;
+  auto *closure = new (ctx) ClosureExpr(
+      attrs, /*bracketRange=*/SourceRange(),
+      /*capturedSelf=*/nullptr, ParameterList::create(ctx, closureParams),
+      /*asyncLoc=*/SourceLoc(),
+      /*throwsLoc=*/SourceLoc(),
+      /*arrowLoc=*/SourceLoc(),
+      /*inLoc=*/SourceLoc(),
+      /*explicitResultType=*/nullptr, thunkDC);
+
+  closure->setBody(BraceStmt::createImplicit(ctx, body),
+                   /*isSingleExpr=*/true);
+  closure->setImplicit();
+
+  return closure;
 }
 
 Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
@@ -77,13 +259,7 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
         DotSelfExpr(metatype, /*dot=*/SourceLoc(), /*self=*/SourceLoc());
   } else if (auto *func = dyn_cast<FuncDecl>(attachedTo)) {
     if (auto *nominal = func->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto *baseExpr =
-          TypeExpr::createImplicit(nominal->getDeclaredInterfaceType(), ctx);
-
-      // Form an initializer call passing in the function reference
-      initArgument = new (ctx) MemberRefExpr(baseExpr, /*dotLoc=*/SourceLoc(),
-                                             {func}, /*loc=*/DeclNameLoc(),
-                                             /*Implicit=*/true);
+      initArgument = synthesizeMethodThunk(initContext, nominal, func);
     } else {
       initArgument = new (ctx)
           DeclRefExpr({func}, /*Loc=*/DeclNameLoc(), /*implicit=*/true);
@@ -102,44 +278,7 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     // Build a type repr for base of the key path, since attribute
     // could be attached to an inner type, we need to go up decl
     // contexts and add every parent type.
-    {
-      SmallVector<ComponentIdentTypeRepr *, 2> baseNameComponents;
-
-      auto *DC = var->getDeclContext();
-      while (!DC->isModuleContext()) {
-        auto *NTD = DC->getSelfNominalTypeDecl();
-        // Only contiguous chains of nominals and extensions thereof.
-        if (!NTD)
-          break;
-
-        auto *component = new (ctx) SimpleIdentTypeRepr(
-            /*Loc=*/DeclNameLoc(), NTD->createNameRef());
-
-        // Resolve the component right away, instead of
-        // involving name lookup. This plays well with
-        // the fact that initializer is anchored on a
-        // source file.
-        component->setValue(NTD, NTD->getDeclContext());
-
-        baseNameComponents.push_back(component);
-        DC = NTD->getDeclContext();
-      }
-
-      // Reverse the components to form a valid outer-to-inner name sequence.
-      std::reverse(baseNameComponents.begin(), baseNameComponents.end());
-
-      // Set the 'root' of the key path to the newly build base name.
-      // We cannot do this via `parsedRoot` because it has strict
-      // rules about leading-dot.
-      TypeRepr *rootName = nullptr;
-      if (baseNameComponents.size() == 1) {
-        rootName = baseNameComponents.front();
-      } else {
-        rootName = CompoundIdentTypeRepr::create(ctx, baseNameComponents);
-      }
-
-      keyPath->setRootType(rootName);
-    }
+    keyPath->setRootType(buildTypeRepr(var->getDeclContext()));
 
     initArgument = keyPath;
   }
@@ -177,6 +316,7 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     return nullptr;
 
   TypeChecker::contextualizeInitializer(initContext, result);
+  checkInitializerActorIsolation(initContext, result);
   TypeChecker::checkInitializerEffects(initContext, result);
 
   return result;

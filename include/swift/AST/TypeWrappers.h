@@ -21,17 +21,18 @@ namespace swift {
 
 struct TypeWrapperInfo {
   CustomAttr *Attr;
+  Type AttrType;
   NominalTypeDecl *Wrapper;
   NominalTypeDecl *AttachedTo;
   bool IsInferred;
 
-  TypeWrapperInfo(CustomAttr *attr, NominalTypeDecl *wrapperDecl,
+  TypeWrapperInfo(CustomAttr *attr, Type attrType, NominalTypeDecl *wrapperDecl,
                   NominalTypeDecl *attachedTo, bool isInferred)
-      : Attr(attr), Wrapper(wrapperDecl), AttachedTo(attachedTo),
-        IsInferred(isInferred) {}
+      : Attr(attr), AttrType(attrType), Wrapper(wrapperDecl),
+        AttachedTo(attachedTo), IsInferred(isInferred) {}
 
   TypeWrapperInfo asInferred() const {
-    return {Attr, Wrapper, AttachedTo, true};
+    return {Attr, AttrType, Wrapper, AttachedTo, true};
   }
 };
 

@@ -828,7 +828,8 @@ public:
     case SDKNodeKind::DeclImport:
     case SDKNodeKind::TypeFunc:
     case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeAlias: {
+    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::DeclMacro: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),

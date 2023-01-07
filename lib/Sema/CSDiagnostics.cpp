@@ -907,13 +907,25 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   return true;
 }
 
+/// Determine the parameter context to use for diagnostics purposes.
+static ParameterContext getParameterContextForDiag(ASTNode anchor) {
+  if (isExpr<SubscriptExpr>(anchor))
+    return ParameterContext::Subscript;
+
+  if (isExpr<MacroExpansionExpr>(anchor))
+    return ParameterContext::MacroExpansion;
+
+  return ParameterContext::Call;
+}
+
 bool LabelingFailure::diagnoseAsError() {
   auto *args = getArgumentListFor(getLocator());
   if (!args)
     return false;
 
+  auto paramContext = getParameterContextForDiag(getRawAnchor());
   return diagnoseArgumentLabelError(getASTContext(), args, CorrectLabels,
-                                    isExpr<SubscriptExpr>(getRawAnchor()));
+                                    paramContext);
 }
 
 bool LabelingFailure::diagnoseAsNote() {
@@ -4699,7 +4711,10 @@ bool MissingArgumentsFailure::diagnoseAsError() {
       },
       [&] { arguments << ", "; });
 
-  auto diag = emitDiagnostic(diag::missing_arguments_in_call, arguments.str());
+  auto paramContext = getParameterContextForDiag(getRawAnchor());
+  auto diag = emitDiagnostic(
+      diag::missing_arguments_in_call, arguments.str(),
+      static_cast<unsigned>(paramContext));
 
   auto callInfo = getCallInfo(anchor);
   auto *args = callInfo ? callInfo->second : nullptr;
@@ -4753,11 +4768,14 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto anchor = getRawAnchor();
   if (!(isExpr<CallExpr>(anchor) || isExpr<SubscriptExpr>(anchor) ||
         isExpr<UnresolvedMemberExpr>(anchor) ||
-        isExpr<ObjectLiteralExpr>(anchor)))
+        isExpr<ObjectLiteralExpr>(anchor) ||
+        isExpr<MacroExpansionExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
     return false;
+
+  auto paramContext = getParameterContextForDiag(anchor);
 
   const auto &argument = SynthesizedArgs.front();
   auto position = argument.paramIdx;
@@ -4869,7 +4887,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
 
   if (label.empty()) {
     auto diag = emitDiagnosticAt(
-        insertLoc, diag::missing_argument_positional, position + 1);
+        insertLoc, diag::missing_argument_positional, position + 1,
+        static_cast<unsigned>(paramContext));
     if (shouldEmitFixIt)
       diag.fixItInsert(insertLoc, insertText.str());
   } else if (isPropertyWrapperInitialization()) {
@@ -4878,7 +4897,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
                      label, resolveType(TE->getInstanceType())->getString());
   } else {
     auto diag = emitDiagnosticAt(
-        insertLoc, diag::missing_argument_named, label);
+        insertLoc, diag::missing_argument_named, label,
+        static_cast<unsigned>(paramContext));
     if (shouldEmitFixIt)
       diag.fixItInsert(insertLoc, insertText.str());
   }
@@ -5112,6 +5132,8 @@ MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
     return std::make_pair((Expr *)SE, SE->getArgs());
   } else if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
     return std::make_pair((Expr *)OLE, OLE->getArgs());
+  } else if (auto *ME = getAsExpr<MacroExpansionExpr>(anchor)) {
+    return std::make_pair((Expr *)ME, ME->getArgs());
   }
   return None;
 }
@@ -5478,7 +5500,9 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 
   if (ContextualType->getNumParams() == 0) {
     if (auto *args = getArgumentListFor(getLocator())) {
-      emitDiagnostic(diag::extra_argument_to_nullary_call)
+      auto paramContext = getParameterContextForDiag(getRawAnchor());
+      emitDiagnostic(diag::extra_argument_to_nullary_call,
+                     static_cast<unsigned>(paramContext))
           .highlight(args->getSourceRange())
           .fixItRemove(args->getSourceRange());
       return true;
@@ -5531,6 +5555,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 
 bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
   auto *locator = getLocator();
+  auto paramContext = getParameterContextForDiag(getRawAnchor());
 
   // This specifically handles a case of `Void(...)` which generates
   // constraints differently from other constructor invocations and
@@ -5538,7 +5563,8 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
   if (auto *call = getAsExpr<CallExpr>(getRawAnchor())) {
     auto *TE = dyn_cast<TypeExpr>(call->getFn());
     if (TE && getType(TE)->getMetatypeInstanceType()->isVoid()) {
-      emitDiagnosticAt(call->getLoc(), diag::extra_argument_to_nullary_call)
+      emitDiagnosticAt(call->getLoc(), diag::extra_argument_to_nullary_call,
+                       static_cast<unsigned>(paramContext))
           .highlight(call->getArgs()->getSourceRange());
       return true;
     }
@@ -5551,26 +5577,31 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
   const auto &e = ExtraArgs.front();
   auto index = e.first;
   auto argument = e.second;
-
   auto *argExpr = arguments->getExpr(index);
   auto loc = argExpr->getLoc();
   if (arguments->isTrailingClosureIndex(index)) {
-    emitDiagnosticAt(loc, diag::extra_trailing_closure_in_call)
-        .highlight(argExpr->getSourceRange());
+    emitDiagnosticAt(
+        loc, diag::extra_trailing_closure_in_call,
+        static_cast<unsigned>(paramContext)
+    ).highlight(argExpr->getSourceRange());
   } else if (ContextualType->getNumParams() == 0) {
     auto *subExpr = arguments->getUnlabeledUnaryExpr();
     if (subExpr && argument.getPlainType()->isVoid()) {
-      emitDiagnosticAt(loc, diag::extra_argument_to_nullary_call)
+      emitDiagnosticAt(loc, diag::extra_argument_to_nullary_call,
+                       static_cast<unsigned>(paramContext))
           .fixItRemove(subExpr->getSourceRange());
     } else {
-      emitDiagnosticAt(loc, diag::extra_argument_to_nullary_call)
+      emitDiagnosticAt(loc, diag::extra_argument_to_nullary_call,
+                       static_cast<unsigned>(paramContext))
           .highlight(arguments->getSourceRange());
     }
   } else if (argument.hasLabel()) {
-    emitDiagnosticAt(loc, diag::extra_argument_named, argument.getLabel())
+    emitDiagnosticAt(loc, diag::extra_argument_named, argument.getLabel(),
+                     static_cast<unsigned>(paramContext))
         .highlight(arguments->getSourceRange());
   } else {
-    emitDiagnosticAt(loc, diag::extra_argument_positional)
+    emitDiagnosticAt(loc, diag::extra_argument_positional,
+                     static_cast<unsigned>(paramContext))
         .highlight(arguments->getSourceRange());
   }
   return true;
@@ -8463,5 +8494,40 @@ bool ConflictingPatternVariables::diagnoseAsError() {
                      diag::type_mismatch_multiple_pattern_list, getType(var),
                      ExpectedType);
   }
+  return true;
+}
+
+bool AddMissingMacroPound::diagnoseAsError() {
+  emitDiagnostic(diag::macro_expansion_missing_pound, macro->getName())
+    .fixItInsert(getLoc(), "#");
+  return true;
+}
+
+bool AddMissingMacroArguments::diagnoseAsError() {
+  std::string argumentString;
+  {
+    llvm::raw_string_ostream out(argumentString);
+    out << "(";
+    llvm::interleave(
+        macro->parameterList->begin(), macro->parameterList->end(),
+        [&](ParamDecl *param) {
+          if (!param->getArgumentName().empty()) {
+            out << param->getArgumentName() << ": ";
+          }
+
+          out << "<#" << param->getInterfaceType().getString() << "#" << ">";
+        },
+        [&] {
+          out << ", ";
+        });
+    out << ")";
+  }
+
+  auto insertLoc = getRawAnchor().getEndLoc();
+  emitDiagnostic(diag::macro_expansion_missing_arguments, macro->getName())
+    .fixItInsertAfter(insertLoc, argumentString);
+  macro->diagnose(
+      diag::kind_declname_declared_here, macro->getDescriptiveKind(),
+      macro->getName());
   return true;
 }

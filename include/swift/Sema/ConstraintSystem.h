@@ -1676,7 +1676,11 @@ public:
   Type getContextualType(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
       if (entry.first == anchor) {
-        return simplifyType(entry.second.getType());
+        // The contextual information record could contain the purpose
+        // without a type i.e. when the context is an optional-some or
+        // an invalid pattern binding.
+        if (auto contextualTy = entry.second.getType())
+          return simplifyType(contextualTy);
       }
     }
     return Type();
@@ -6506,6 +6510,10 @@ public:
     Out << "conjunction element ";
     Element->print(Out, SM, indent);
   }
+
+  /// Returns \c false if this conjunction element is known not to contain the
+  /// code compleiton token.
+  bool mightContainCodeCompletionToken(const ConstraintSystem &cs) const;
 
 private:
   /// Find type variables referenced by this conjunction element.

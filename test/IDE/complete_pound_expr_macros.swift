@@ -22,7 +22,7 @@ func test1() {
   let _ = useInt(#^BARE_EXPR_1^#)
 }
 
-// POUND_EXPR_INTCONTEXT: Begin completions, 11 items
+// POUND_EXPR_INTCONTEXT: Begin completions, 12 items
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#function]/None:            function[#String#]; name=function
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#file]/None:                file[#String#]; name=file
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#fileID]/None: fileID[#String#]; name=fileID
@@ -34,10 +34,10 @@ func test1() {
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/CurrModule/TypeRelation[Convertible]: myLine[#Int#]; name=myLine
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/CurrModule:             myStringify({#T#})[#(T, String)#]; name=myStringify()
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/CurrModule:             myColorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})[#Color#]; name=myColorLiteral(red:green:blue:alpha:)
-
+// POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
 // POUND_EXPR_INTCONTEXT: End completions
 
-// POUND_EXPR_STRINGCONTEXT: Begin completions, 12 items
+// POUND_EXPR_STRINGCONTEXT: Begin completions, 13 items
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#function]/None/TypeRelation[Convertible]: function[#String#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#file]/None/TypeRelation[Convertible]: file[#String#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#fileID]/None/TypeRelation[Convertible]: fileID[#String#];
@@ -50,6 +50,7 @@ func test1() {
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/CurrModule:             myFilename[#T#]; name=myFilename
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/CurrModule:             myLine[#Int#]; name=myLine
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/CurrModule:             myStringify({#T#})[#(T, String)#]; name=myStringify()
+// POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
 // POUND_EXPR_STRINGCONTEXT: End completions
 
 // BARE_EXPR_INTCONTEXT: Begin completions,

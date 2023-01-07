@@ -3,7 +3,7 @@
 let _ = "foo\(#"bar"##)baz"
 // expected-error@-1{{too many '#' characters in closing delimiter}}
 // expected-error@-2{{expected ',' separator}}
-// expected-error@-3{{expected expression in list of expressions}}
+// expected-error@-3{{expected a macro identifier}}
 
 let _ = #"\##("invalid")"#
 // expected-error@-1{{too many '#' characters in delimited escape}}
@@ -12,7 +12,7 @@ let _ = #"\##("invalid")"#
 let _ = ###"""invalid"######
 // expected-error@-1{{too many '#' characters in closing delimiter}}{{26-29=}}
 // expected-error@-2{{consecutive statements on a line must be separated by ';'}}
-// expected-error@-3{{expected expression}}
+// expected-error@-3{{expected a macro identifier}}
 
 let _ = ####"invalid"###
 // expected-error@-1{{unterminated string literal}}
@@ -20,7 +20,7 @@ let _ = ####"invalid"###
 let _ = ###"invalid"######
 // expected-error@-1{{too many '#' characters in closing delimiter}}{{24-27=}}
 // expected-error@-2{{consecutive statements on a line must be separated by ';'}}
-// expected-error@-3{{expected expression}}
+// expected-error@-3{{expected a macro identifier}}
 
 let _ = ##"""aa
   foobar

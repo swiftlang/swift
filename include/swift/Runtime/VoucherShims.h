@@ -40,6 +40,10 @@
 
 #if SWIFT_HAS_VOUCHERS
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+#error Cannot use task-to-thread model with vouchers
+#endif
+
 #if SWIFT_HAS_VOUCHER_HEADER
 
 #else

@@ -2601,3 +2601,27 @@ RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
   return new (mem)
       RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
 }
+
+bool MacroMissingPound::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  AddMissingMacroPound failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingPound *
+MacroMissingPound::create(ConstraintSystem &cs, MacroDecl *macro,
+                          ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingPound(cs, macro, locator);
+}
+
+bool MacroMissingArguments::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  AddMissingMacroArguments failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingArguments *
+MacroMissingArguments::create(ConstraintSystem &cs, MacroDecl *macro,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingArguments(cs, macro, locator);
+}

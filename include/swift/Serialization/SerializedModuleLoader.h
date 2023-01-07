@@ -205,7 +205,7 @@ public:
 
   virtual void verifyAllModules() override;
 
-  virtual Optional<ModuleDependencyInfo> getModuleDependencies(
+  virtual Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 };

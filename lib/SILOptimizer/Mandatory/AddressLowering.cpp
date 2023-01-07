@@ -347,6 +347,27 @@ static bool isStoreCopy(SILValue value) {
   if (!copyInst->hasOneUse())
     return false;
 
+  auto *user = value->getSingleUse()->getUser();
+  auto *storeInst = dyn_cast<StoreInst>(user);
+  if (!storeInst)
+    return false;
+
+  SSAPrunedLiveness liveness;
+  auto isStoreOutOfRange = [&liveness, storeInst](SILValue root) {
+    liveness.initializeDef(root);
+    auto summary = liveness.computeSimple();
+    if (summary.addressUseKind != AddressUseKind::NonEscaping) {
+      return true;
+    }
+    if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
+      return true;
+    }
+    if (!liveness.isWithinBoundary(storeInst)) {
+      return true;
+    }
+    return false;
+  };
+
   auto source = copyInst->getOperand();
   if (source->getOwnershipKind() == OwnershipKind::Guaranteed) {
     // [in_guaranteed_begin_apply_results] If any root of the source is a
@@ -356,15 +377,30 @@ static bool isStoreCopy(SILValue value) {
     SmallVector<SILValue, 4> roots;
     findGuaranteedReferenceRoots(source, /*lookThroughNestedBorrows=*/true,
                                  roots);
-    if (llvm::any_of(roots, [](SILValue root) {
-          return isa<BeginApplyInst>(root->getDefiningInstruction());
+    // TODO: Rather than checking whether the store is out of range of any
+    // guaranteed root's SSAPrunedLiveness, instead check whether it is out of
+    // range of ExtendedLiveness of the borrow introducers:
+    // - visit borrow introducers via visitBorrowIntroducers
+    // - call ExtendedLiveness.compute on each borrow introducer
+    if (llvm::any_of(roots, [&](SILValue root) {
+          // Handle forwarding phis conservatively rather than recursing.
+          if (SILArgument::asPhi(root) && !BorrowedValue(root))
+            return true;
+
+          if (isa<BeginApplyInst>(root->getDefiningInstruction())) {
+            return true;
+          }
+          return isStoreOutOfRange(root);
         })) {
+      return false;
+    }
+  } else if (source->getOwnershipKind() == OwnershipKind::Owned) {
+    if (isStoreOutOfRange(source)) {
       return false;
     }
   }
 
-  auto *user = value->getSingleUse()->getUser();
-  return isa<StoreInst>(user);
+  return true;
 }
 
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
@@ -2276,9 +2312,9 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
                                      info.isConsumed() ? IsTake : IsNotTake,
                                      IsInitialization);
       } else {
-        // [in_guaranteed_begin_apply_results] Because OSSA ensure that all uses
-        // of a guaranteed value produced by a begin_apply are used within the
-        // coroutine's range, AddressLowering will not introduce uses of
+        // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
+        // uses of a guaranteed value produced by a begin_apply are used within
+        // the coroutine's range, AddressLowering will not introduce uses of
         // invalid memory by rewriting the uses of a yielded guaranteed opaque
         // value as uses of yielded guaranteed storage.  However, it must
         // allocate storage for copies of [projections of] such values.
@@ -2990,12 +3026,12 @@ protected:
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(1, opAddr);
+      bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
     case BuiltinValueKind::ResumeThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(1, opAddr);
+      bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
     case BuiltinValueKind::Copy: {
@@ -3764,7 +3800,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
       originalUses.insert(oper);
       UseRewriter::rewriteUse(oper, pass);
     }
-    // Rewrite every new uses that was added.
+    // Rewrite every new use that was added.
     uses.clear();
     for (auto *use : valueDef->getUses()) {
       if (originalUses.contains(use))

@@ -741,7 +741,7 @@ public:
   /// \p value The integer value.
   /// \return An implicit integer literal expression which evaluates to the value.
   static IntegerLiteralExpr *
-  createFromUnsigned(ASTContext &C, unsigned value);
+  createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc);
 
   /// Returns the value of the literal, appropriately constructed in the
   /// target type.
@@ -2076,6 +2076,37 @@ public:
   static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
 };
 
+/// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
+/// apply site marking the lvalue/accessor as being borrowed when passed to the
+/// callee.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'borrow' was written.
+class BorrowExpr final : public IdentityExpr {
+  SourceLoc BorrowLoc;
+
+public:
+  BorrowExpr(SourceLoc borrowLoc, Expr *sub, Type type = Type(),
+             bool implicit = false)
+      : IdentityExpr(ExprKind::Borrow, sub, type, implicit),
+        BorrowLoc(borrowLoc) {}
+
+  static BorrowExpr *createImplicit(ASTContext &ctx, SourceLoc borrowLoc,
+                                    Expr *sub, Type type = Type()) {
+    return new (ctx) BorrowExpr(borrowLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return BorrowLoc; }
+
+  SourceLoc getStartLoc() const { return BorrowLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Borrow;
+  }
+};
+
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'. Note
 /// that expressions like '(4)' are represented with a ParenExpr.
 class TupleExpr final : public Expr,
@@ -3308,7 +3339,7 @@ public:
   /// this array will be empty
   ArrayRef<ConversionPair> getArgumentConversions() const {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   /// Retrieve the conversion expressions mapping requirements from any
@@ -3318,7 +3349,7 @@ public:
   /// this array will be empty
   MutableArrayRef<ConversionPair> getArgumentConversions() {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   void setArgumentConversion(unsigned i, const ConversionPair &p) {

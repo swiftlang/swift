@@ -197,10 +197,22 @@ private:
         return;
     }
 
+    // Don't walk into the opaque archetypes because they are not
+    // transparent in this context - `some P` could reference a
+    // type variables as substitutions which are visible only to
+    // the outer context.
+    if (type->is<OpaqueTypeArchetypeType>())
+      return;
+
     if (type->hasTypeVariable()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
       type->getTypeVariables(typeVars);
-      ReferencedVars.insert(typeVars.begin(), typeVars.end());
+
+      // Some of the type variables could be non-representative, so
+      // we need to recurse into `inferTypeVariables` to property
+      // handle them.
+      for (auto *typeVar : typeVars)
+        inferVariables(typeVar);
     }
   }
 };
@@ -1290,13 +1302,17 @@ public:
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
-  ASTNode visit(Stmt *S) {
+
+  ASTNode visit(Stmt *S, bool performSyntacticDiagnostics = true) {
     auto rewritten = ASTVisitor::visit(S);
     if (!rewritten)
       return {};
 
-    if (auto *stmt = getAsStmt(rewritten))
-      performStmtDiagnostics(stmt, context.getAsDeclContext());
+    if (performSyntacticDiagnostics) {
+      if (auto *stmt = getAsStmt(rewritten)) {
+        performStmtDiagnostics(stmt, context.getAsDeclContext());
+      }
+    }
 
     return rewritten;
   }
@@ -1819,8 +1835,9 @@ public:
 
 private:
   ASTNode visitDoStmt(DoStmt *doStmt) override {
-    if (auto transformed = transformDo(doStmt))
-      return visit(transformed.get());
+    if (auto transformed = transformDo(doStmt)) {
+      return visit(transformed.get(), /*performSyntacticDiagnostics=*/false);
+    }
 
     auto newBody = visit(doStmt->getBody());
     if (!newBody)
@@ -2199,6 +2216,21 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   fn.setTypecheckedBody(castToStmt<BraceStmt>(body),
                         fn.hasSingleExpressionBody());
   return false;
+}
+
+bool ConjunctionElement::mightContainCodeCompletionToken(
+    const ConstraintSystem &cs) const {
+  if (Element->getKind() == ConstraintKind::SyntacticElement) {
+    if (Element->getSyntacticElement().getSourceRange().isInvalid()) {
+      return true;
+    } else {
+      return cs.containsIDEInspectionTarget(Element->getSyntacticElement());
+    }
+  } else {
+    // All other constraint kinds are not handled yet. Assume that they might
+    // contain the code completion token.
+    return true;
+  }
 }
 
 void ConjunctionElement::findReferencedVariables(

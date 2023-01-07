@@ -5,13 +5,15 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: single_threaded_concurrency
+// UNSUPPORTED: freestanding
 
 // for sleep
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
     import Glibc
+#elseif os(WASI)
+    import WASILibc
 #elseif os(Windows)
     import WinSDK
 #endif

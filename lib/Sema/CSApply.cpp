@@ -2939,7 +2939,7 @@ namespace {
 
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
-        LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
+        LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value, loc);
         cs.setType(expr, ctx.getIntType());
         return handleIntegerLiteralExpr(expr);
       };
@@ -5387,27 +5387,21 @@ namespace {
     }
 
     Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-#if SWIFT_SWIFT_PARSER
-      auto &ctx = cs.getASTContext();
-      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
-        auto expandedType = solution.simplifyType(solution.getType(E));
-        cs.setType(E, expandedType);
+      auto expandedType = solution.simplifyType(solution.getType(E));
+      cs.setType(E, expandedType);
 
-        auto locator = cs.getConstraintLocator(E);
-        auto overload = solution.getOverloadChoice(locator);
+      auto locator = cs.getConstraintLocator(E);
+      auto overload = solution.getOverloadChoice(locator);
 
-        auto macro = cast<MacroDecl>(overload.choice.getDecl());
-        ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
-        E->setMacroRef(macroRef);
+      auto macro = cast<MacroDecl>(overload.choice.getDecl());
+      ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
+      E->setMacroRef(macroRef);
 
-        if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
-          E->setRewritten(newExpr);
-          cs.cacheExprTypes(E);
-          return E;
-        }
-        // Fall through to use old implementation.
+      if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
+        E->setRewritten(newExpr);
+        cs.cacheExprTypes(E);
       }
-#endif
+
       return E;
     }
 
