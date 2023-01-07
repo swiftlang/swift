@@ -1597,6 +1597,20 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
+SmallVector<MacroDecl *, 1>
+TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
+                          SourceLoc loc, MacroContexts contexts) {
+  auto result = lookupUnqualified(dc, DeclNameRef(macroName), loc,
+                                  (defaultUnqualifiedLookupOptions |
+                                      NameLookupFlags::IncludeOuterResults));
+  SmallVector<MacroDecl *, 1> choices;
+  for (const auto &found : result.allResults())
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
+      if (contexts.contains(macro->getMacroContexts()))
+        choices.push_back(macro);
+  return choices;
+}
+
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's

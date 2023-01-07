@@ -1773,9 +1773,8 @@ namespace {
     }
 
     void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-      auto *rewritten = med->getRewritten();
-      assert(rewritten && "Macro should have already been expanded by IRGen");
-      visit(rewritten);
+      for (auto *rewritten : med->getRewritten())
+        visit(rewritten);
     }
 
     void addIVarInitializer() {

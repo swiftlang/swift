@@ -2639,6 +2639,39 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   }
 }
 
+static Optional<swift::MacroContext>
+getActualMacroContext(uint8_t context) {
+  switch (context) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::MacroContext::THE_DK: \
+    return swift::MacroContext::THE_DK;
+  CASE(Expression)
+  CASE(FreestandingDeclaration)
+  CASE(AttachedDeclaration)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
+static Optional<swift::MacroIntroducedDeclNameKind>
+getActualMacroIntroducedDeclNameKind(uint8_t context) {
+  switch (context) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::MacroIntroducedDeclNameKind::THE_DK: \
+    return swift::MacroIntroducedDeclNameKind::THE_DK;
+  CASE(Named)
+  CASE(Overloaded)
+  CASE(Accessors)
+  CASE(Prefixed)
+  CASE(Suffixed)
+  CASE(Arbitrary)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
@@ -5365,6 +5398,34 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
                                                 SourceRange(), isImplicit,
                                                 isCategoryNameInvalid);
+        break;
+      }
+
+      case decls_block::Declaration_DECL_ATTR: {
+        bool isImplicit;
+        uint8_t rawMacroContext;
+        uint64_t numPeers, numMembers;
+        ArrayRef<uint64_t> introducedDeclNames;
+        serialization::decls_block::DeclarationDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroContext, numPeers,
+                       numMembers, introducedDeclNames);
+        auto macroContext = *getActualMacroContext(rawMacroContext);
+        if (introducedDeclNames.size() != (numPeers + numMembers) * 2)
+          return MF.diagnoseFatal();
+        SmallVector<MacroIntroducedDeclName, 1> peersAndMembers;
+        ArrayRef<MacroIntroducedDeclName> peersAndMembersRef;
+        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
+          auto kind = getActualMacroIntroducedDeclNameKind(
+              (uint8_t)introducedDeclNames[i]);
+          auto identifier =
+              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
+          peersAndMembers.push_back(MacroIntroducedDeclName(*kind, identifier));
+        }
+        Attr = DeclarationAttr::create(
+            ctx, SourceLoc(), SourceRange(), macroContext,
+            peersAndMembersRef.take_front(numPeers),
+            peersAndMembersRef.take_back(numMembers),
+            isImplicit);
         break;
       }
 
