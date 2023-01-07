@@ -1423,9 +1423,10 @@ void PotentialBindings::infer(Constraint *constraint) {
     if (elementVar == TypeVar && !packVar) {
       // Produce a potential binding to the opened element archetype corresponding
       // to the pack type.
+      auto shapeClass = packType->getReducedShape();
       packType = packType->mapTypeOutOfContext();
       auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
-                                                      packType->getReducedShape());
+                                                      shapeClass);
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 
@@ -1433,9 +1434,14 @@ void PotentialBindings::infer(Constraint *constraint) {
     } else if (packVar == TypeVar && !elementVar) {
       // Produce a potential binding to the pack archetype corresponding to
       // the opened element type.
+      Type patternType;
       auto *packEnv = CS.DC->getGenericEnvironmentOfContext();
-      elementType = elementType->mapTypeOutOfContext();
-      auto patternType = packEnv->mapElementTypeIntoPackContext(elementType);
+      if (!elementType->hasElementArchetype()) {
+        patternType = elementType;
+      } else {
+        patternType = packEnv->mapElementTypeIntoPackContext(elementType);
+      }
+
       addPotentialBinding({patternType, AllowedBindingKind::Exact, constraint});
 
       break;

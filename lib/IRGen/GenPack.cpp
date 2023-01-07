@@ -177,7 +177,7 @@ static void emitPackExpansionType(IRGenFunction &IGF,
   auto elementSig = IGF.IGM.Context.getOpenedElementSignature(
       genericSig, expansionTy.getCountType());
   auto *elementEnv = GenericEnvironment::forOpenedElement(
-      elementSig, UUID::fromTime(), subMap);
+      elementSig, UUID::fromTime(), expansionTy.getCountType(), subMap);
 
   // Open each pack archetype.
   for (auto patternPackType : patternPacks) {

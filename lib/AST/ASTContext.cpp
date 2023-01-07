@@ -5037,7 +5037,8 @@ GenericEnvironment::forOpenedExistential(
 
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
+GenericEnvironment::forOpenedElement(GenericSignature signature,
+                                     UUID uuid, CanType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
@@ -5060,7 +5061,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
                                   OpenedElementEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid,
+  auto *genericEnv = new (mem) GenericEnvironment(signature,
+                                                  uuid, shapeClass,
                                                   outerSubs);
 
   openedElementEnvironments[uuid] = genericEnv;
@@ -5663,6 +5665,11 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
     if (!paramType->isParameterPack())
       continue;
 
+    // Only include opened element parameters for packs in the given
+    // shape equivalence class.
+    if (!baseGenericSig->haveSameShape(paramType, shapeClass->mapTypeOutOfContext()))
+      continue;
+
     auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
                                                    packElementDepth,
                                                    packElementParams.size(),
@@ -5674,7 +5681,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   auto eraseParameterPackRec = [&](Type type) -> Type {
     return type.transformRec([&](Type t) -> Optional<Type> {
       if (auto *paramType = t->getAs<GenericTypeParamType>()) {
-        if (paramType->isParameterPack()) {
+        if (packElementParams.find(paramType) != packElementParams.end()) {
           return Type(packElementParams[paramType]);
         }
 

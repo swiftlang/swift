@@ -655,7 +655,8 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
       DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeClass);
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  return GenericEnvironment::forOpenedElement(elementSig, uuid, contextSubs);
+  return GenericEnvironment::forOpenedElement(elementSig, uuid, shapeClass,
+                                              contextSubs);
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions

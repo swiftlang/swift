@@ -7124,8 +7124,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
     auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
-    auto patternType = packEnv->mapElementTypeIntoPackContext(
-        toElementType->mapTypeOutOfContext());
+    auto patternType = packEnv->mapElementTypeIntoPackContext(toElementType);
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 
