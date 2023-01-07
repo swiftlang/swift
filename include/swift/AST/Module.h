@@ -173,6 +173,8 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
+  /// The name of the package this module belongs to
+  mutable Identifier PackageName;
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -398,6 +400,14 @@ public:
   /// Set the ABI name of the module;
   void setABIName(Identifier name) {
     ModuleABIName = name;
+  }
+
+  /// Get the package name of the module
+  Identifier getPackageName() const { return PackageName; }
+
+  /// Set the name of the package this module belongs to
+  void setPackageName(Identifier name) {
+    PackageName = name;
   }
 
   /// Retrieve the actual module name of an alias used for this module (if any).
