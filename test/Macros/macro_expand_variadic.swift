@@ -9,7 +9,7 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@expression macro print<Value...>(_ value: Value...) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
+@expression macro print<Value...>(_ value: repeat each Value) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 
 func testIt() {
   // CHECK: hello

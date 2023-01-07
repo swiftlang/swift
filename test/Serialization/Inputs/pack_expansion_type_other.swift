@@ -1,11 +1,11 @@
-public func variadicFunction<T..., U...>(t: T..., u: U...) -> ((T, U)...) {
-  // FIXME: return ((t, u)...)
+public func variadicFunction<T..., U...>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {
+  // FIXME: return (repeat (each t, each u))
   fatalError()
 }
 
 public struct VariadicType<T...> {
-  public func variadicMethod<U...>(t: T..., u: U...) -> ((T, U)...) {
-    // FIXME: return ((t, u)...)
+  public func variadicMethod<U...>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {
+    // FIXME: return (repeat (each t, each u))
     fatalError()
   }
 }

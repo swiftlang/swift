@@ -163,7 +163,8 @@ bool Parser::startsParameterName(bool isClosure) {
     if (!Tok.isContextualKeyword("isolated") &&
         !Tok.isContextualKeyword("some") &&
         !Tok.isContextualKeyword("any") &&
-        !Tok.isContextualKeyword("each"))
+        !Tok.isContextualKeyword("each") &&
+        !Tok.is(tok::kw_repeat))
       return true;
 
     // "isolated" can be an argument label, but it's also a contextual keyword,

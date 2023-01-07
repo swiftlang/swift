@@ -350,11 +350,6 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(PackExpansionExpr, Expr, 32,
-    : NumPadBits,
-    NumBindings : 32
-  );
-
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
     : NumPadBits,
     NumElements : 32
@@ -3599,39 +3594,23 @@ public:
 /// that naturally accept a comma-separated list of values, including
 /// call argument lists, the elements of a tuple value, and the source
 /// of a for-in loop.
-class PackExpansionExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpansionExpr, PackElementExpr *> {
-  friend TrailingObjects;
-
+class PackExpansionExpr final : public Expr {
+  SourceLoc RepeatLoc;
   Expr *PatternExpr;
-  SourceLoc DotsLoc;
   GenericEnvironment *Environment;
 
-  PackExpansionExpr(Expr *patternExpr,
-                    ArrayRef<PackElementExpr *> packElements,
-                    SourceLoc dotsLoc,
+  PackExpansionExpr(SourceLoc repeatLoc,
+                    Expr *patternExpr,
                     GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
-      PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
-    Bits.PackExpansionExpr.NumBindings = packElements.size();
-    std::uninitialized_copy(packElements.begin(), packElements.end(),
-                            getTrailingObjects<PackElementExpr *>());
-  }
-
-  size_t numTrailingObjects(OverloadToken<PackElementExpr *>) const {
-    return getNumBindings();
-  }
-
-  MutableArrayRef<PackElementExpr *> getMutableBindings() {
-    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
-  }
+      RepeatLoc(repeatLoc), PatternExpr(patternExpr),
+      Environment(environment) {}
 
 public:
   static PackExpansionExpr *create(ASTContext &ctx,
+                                   SourceLoc repeatLoc,
                                    Expr *patternExpr,
-                                   ArrayRef<PackElementExpr *> packElements,
-                                   SourceLoc dotsLoc,
                                    GenericEnvironment *environment,
                                    bool implicit = false,
                                    Type type = Type());
@@ -3642,26 +3621,22 @@ public:
     PatternExpr = patternExpr;
   }
 
-  unsigned getNumBindings() const {
-    return Bits.PackExpansionExpr.NumBindings;
-  }
-
-  ArrayRef<PackElementExpr *> getPackElements() {
-    return {getTrailingObjects<PackElementExpr *>(), getNumBindings()};
-  }
-
   void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
 
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
   }
 
+  void setGenericEnvironment(GenericEnvironment *env) {
+    Environment = env;
+  }
+
   SourceLoc getStartLoc() const {
-    return PatternExpr->getStartLoc();
+    return RepeatLoc;
   }
 
   SourceLoc getEndLoc() const {
-    return DotsLoc;
+    return PatternExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {

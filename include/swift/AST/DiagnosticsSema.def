@@ -5163,6 +5163,9 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
+ERROR(vararg_not_allowed,none,
+      "variadic parameter cannot appear outside of a function parameter list",
+      ())
 ERROR(expansion_not_allowed,none,
       "variadic expansion %0 cannot appear outside of a function parameter list, "
       "function result, tuple element or generic argument list", (Type))

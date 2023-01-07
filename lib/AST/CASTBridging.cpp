@@ -466,10 +466,10 @@ void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc) {
   return new (Context) ProtocolTypeRepr((TypeRepr *)baseType, protocolLoc);
 }
 
-void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc) {
+void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) PackExpansionTypeRepr(
-      (TypeRepr *)base, getSourceLocFromPointer(ellipsisLoc));
+      getSourceLocFromPointer(repeatLoc), (TypeRepr *)base);
 }
 
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,

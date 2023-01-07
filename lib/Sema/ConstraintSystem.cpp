@@ -637,6 +637,26 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
   return {result, opened};
 }
 
+void ConstraintSystem::addPackElementEnvironment(PackExpansionExpr *expr) {
+  auto *locator = getConstraintLocator(expr);
+  PackExpansionEnvironments[locator] = UUID::fromTime();
+}
+
+GenericEnvironment *
+ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator) {
+  auto result = PackExpansionEnvironments.find(locator);
+  if (result == PackExpansionEnvironments.end())
+    return nullptr;
+
+  auto uuid = result->second;
+  auto &ctx = getASTContext();
+  auto elementSig = ctx.getOpenedElementSignature(
+      DC->getGenericSignatureOfContext().getCanonicalSignature());
+  auto *contextEnv = DC->getGenericEnvironmentOfContext();
+  auto contextSubs = contextEnv->getForwardingSubstitutionMap();
+  return GenericEnvironment::forOpenedElement(elementSig, uuid, contextSubs);
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -5378,7 +5398,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
 
     case ConstraintLocator::PackElement:
-    case ConstraintLocator::OpenedPackElement:
     case ConstraintLocator::PackShape:
       break;
 

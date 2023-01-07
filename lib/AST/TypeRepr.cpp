@@ -428,10 +428,16 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
+void VarargTypeRepr::printImpl(ASTPrinter &Printer,
+                               const PrintOptions &Opts) const {
+  printTypeRepr(Element, Printer, Opts);
+  Printer << "...";
+}
+
 void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
+  Printer.printKeyword("repeat", Opts, /*Suffix=*/" ");
   printTypeRepr(Pattern, Printer, Opts);
-  Printer << "...";
 }
 
 void PackReferenceTypeRepr::printImpl(ASTPrinter &Printer,
