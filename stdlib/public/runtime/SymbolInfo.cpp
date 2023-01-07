@@ -60,7 +60,8 @@ const char *SymbolInfo::getImagePath() const {
     // doesn't require the use of the global DbgHelp lock and doesn't fetch
     // other information we don't need.
     std::array<wchar_t, MAX_PATH> filename;
-    if (GetMappedFileNameW(GetCurrentProcess(), _address, filename.data(), filename.size())) {
+    if (GetMappedFileNameW(GetCurrentProcess(), const_cast<void *>(_address),
+                           filename.data(), filename.size())) {
       _imagePath = _swift_win32_copyUTF8FromWide(filename.data());
     }
   }
