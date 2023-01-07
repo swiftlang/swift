@@ -26,7 +26,7 @@ namespace swift {
 
 class ASTContext;
 class TypeRepr;
-class ComponentIdentTypeRepr;
+class IdentTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 
@@ -602,7 +602,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  ComponentIdentTypeRepr *ref) const;
+                                  IdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

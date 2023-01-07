@@ -242,7 +242,7 @@ void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
 void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc);
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc);
-void *IdentTypeRepr_create(void *ctx, BridgedArrayRef components);
+void *DeclRefTypeRepr_create(void *ctx, BridgedArrayRef bridgedComponents);
 void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name,
                                   void *nameLoc, BridgedArrayRef genericArgs,
                                   void *lAngle, void *rAngle);

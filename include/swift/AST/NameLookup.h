@@ -43,7 +43,8 @@ class ASTScopeImpl;
 } // namespace ast_scope
 
 /// Walk the type representation recursively, collecting any
-/// `OpaqueReturnTypeRepr`s, `CompositionTypeRepr`s  or `IdentTypeRepr`s.
+/// \c OpaqueReturnTypeRepr, \c CompositionTypeRepr  or \c DeclRefTypeRepr
+/// nodes.
 CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.

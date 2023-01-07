@@ -497,10 +497,14 @@ void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                                SourceRange{lParen, rParen});
 }
 
-void *IdentTypeRepr_create(void *ctx, BridgedArrayRef components) {
+void *DeclRefTypeRepr_create(void *ctx, BridgedArrayRef bridgedComponents) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return IdentTypeRepr::create(
-      Context, getArrayRef<ComponentIdentTypeRepr *>(components));
+  auto components = getArrayRef<IdentTypeRepr *>(bridgedComponents);
+  if (components.size() == 1) {
+    return components.front();
+  }
+
+  return MemberTypeRepr::create(Context, components);
 }
 
 void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,

@@ -148,23 +148,23 @@ lookupEnumMemberElement(DeclContext *DC, Type ty,
 }
 
 namespace {
-// Build up an IdentTypeRepr and see what it resolves to.
-struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
-{
-  SmallVectorImpl<ComponentIdentTypeRepr *> &components;
+/// Build up an \c DeclRefTypeRepr and see what it resolves to.
+/// FIXME: Support DeclRefTypeRepr nodes with non-identifier base components.
+struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
+  SmallVectorImpl<IdentTypeRepr *> &components;
   ASTContext &C;
 
-  ExprToIdentTypeRepr(decltype(components) &components, ASTContext &C)
-    : components(components), C(C) {}
-  
+  ExprToDeclRefTypeRepr(decltype(components) &components, ASTContext &C)
+      : components(components), C(C) {}
+
   bool visitExpr(Expr *e) {
     return false;
   }
   
   bool visitTypeExpr(TypeExpr *te) {
     if (auto *TR = te->getTypeRepr())
-      if (auto *CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
-        components.push_back(CITR);
+      if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
+        components.push_back(ITR);
         return true;
       }
     return false;
@@ -475,14 +475,19 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, Context).visit(ude->getBase()))
+    SmallVector<IdentTypeRepr *, 2> components;
+    if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
-    auto *repr = IdentTypeRepr::create(Context, components);
+    DeclRefTypeRepr *repr = nullptr;
+    if (components.size() == 1) {
+      repr = components.front();
+    } else {
+      repr = MemberTypeRepr::create(Context, components);
+    }
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
@@ -576,8 +581,8 @@ public:
       return P;
     }
 
-    SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, Context).visit(ce->getFn()))
+    SmallVector<IdentTypeRepr *, 2> components;
+    if (!ExprToDeclRefTypeRepr(components, Context).visit(ce->getFn()))
       return nullptr;
     
     if (components.empty())
@@ -604,7 +609,12 @@ public:
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      auto *prefixRepr = IdentTypeRepr::create(Context, components);
+      DeclRefTypeRepr *prefixRepr = nullptr;
+      if (components.size() == 1) {
+        prefixRepr = components.front();
+      } else {
+        prefixRepr = MemberTypeRepr::create(Context, components);
+      }
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(

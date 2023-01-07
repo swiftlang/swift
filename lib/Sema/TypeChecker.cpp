@@ -474,12 +474,14 @@ namespace {
         : dc(dc), params(params) {}
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
-        auto firstComponent = ident->getComponentRange().front();
-        auto name = firstComponent->getNameRef().getBaseIdentifier();
+    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
+      if (auto *identBase =
+              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
+        auto name = identBase->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name))
-          firstComponent->setValue(paramDecl, dc);
+          identBase->setValue(paramDecl, dc);
       }
+    }
 
       return Action::Continue();
     }
