@@ -1454,7 +1454,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   }
 
   // Fold 'T.U' into a nested type.
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
+  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
     const auto BaseTy = TypeResolution::resolveContextualType(
         InnerTypeRepr, DC, TypeResolverContext::InExpression,
@@ -1478,7 +1478,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(ITR, UDE->getNameLoc(),
+        return TypeExpr::createForMemberDecl(DeclRefTR, UDE->getNameLoc(),
                                              Result.front().Member);
       }
     }
@@ -1492,12 +1492,11 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
-    if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(ITR,
-                                                us->getUnresolvedParams(),
-                                                SourceRange(us->getLAngleLoc(),
-                                                            us->getRAngleLoc()),
-                                                getASTContext());
+    if (auto *declRefTR =
+            dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
+      return TypeExpr::createForSpecializedDecl(
+          declRefTR, us->getUnresolvedParams(),
+          SourceRange(us->getLAngleLoc(), us->getRAngleLoc()), getASTContext());
     }
   }
 

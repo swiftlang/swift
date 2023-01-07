@@ -72,7 +72,7 @@ extension ASTGenVisitor {
 
     return .type(
       elements.withBridgedArrayRef { elements in
-        return IdentTypeRepr_create(self.ctx, elements)
+        return DeclRefTypeRepr_create(self.ctx, elements)
       })
   }
 

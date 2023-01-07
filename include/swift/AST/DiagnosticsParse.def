@@ -196,11 +196,12 @@ ERROR(lex_conflict_marker_in_file,none,
 // MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
+NOTE(note_in_decl_of,none,
+     "in declaration of %0", (DeclNameRef))
+NOTE(note_in_extension_of,none,
+     "in extension of %0", (TypeRepr *))
 ERROR(line_directive_style_deprecated,none,
-        "#line directive was renamed to #sourceLocation",
-        ())
+      "#line directive was renamed to #sourceLocation", ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())

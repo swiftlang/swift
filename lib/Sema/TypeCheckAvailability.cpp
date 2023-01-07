@@ -3956,7 +3956,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   const ExportContext &where;
   DeclAvailabilityFlags flags;
 
-  bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
+  bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
@@ -3986,31 +3986,36 @@ public:
       : where(where), flags(flags) {}
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
-      if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(ITR)) {
-        for (auto *comp : CTR->getComponents()) {
-          // If a parent type is unavailable, don't go on to diagnose
-          // the member since that will just produce a redundant
-          // diagnostic.
-          if (checkComponentIdentTypeRepr(comp)) {
-            foundAnyIssues = true;
-            break;
-          }
-        }
-      } else if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(T)) {
-        if (checkComponentIdentTypeRepr(GTR))
-          foundAnyIssues = true;
-      } else if (auto *STR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-        if (checkComponentIdentTypeRepr(STR))
-          foundAnyIssues = true;
-      }
+    auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
+    if (!declRefTR)
+      return Action::Continue();
 
-      // We've already visited all the children above, so we don't
-      // need to recurse.
+    auto *baseComp = declRefTR->getBaseComponent();
+    if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+      if (checkIdentTypeRepr(identBase)) {
+        foundAnyIssues = true;
+        return Action::SkipChildren();
+      }
+    } else if (diagnoseTypeReprAvailability(baseComp, where, flags)) {
+      foundAnyIssues = true;
       return Action::SkipChildren();
     }
 
-    return Action::Continue();
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      for (auto *comp : memberTR->getMemberComponents()) {
+        // If a parent type is unavailable, don't go on to diagnose
+        // the member since that will just produce a redundant
+        // diagnostic.
+        if (checkIdentTypeRepr(comp)) {
+          foundAnyIssues = true;
+          break;
+        }
+      }
+    }
+
+    // We've already visited all the children above, so we don't
+    // need to recurse.
+    return Action::SkipChildren();
   }
 };
 

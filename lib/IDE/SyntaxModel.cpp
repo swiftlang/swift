@@ -1178,7 +1178,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
     if (!handleAttrs(AttrT->getAttrs()))
       return Action::SkipChildren();
 
-  } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
+  } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
     if (!passTokenNodesUntil(IdT->getStartLoc(),
                              ExcludeNodeAtLocation).shouldContinue)
       return Action::SkipChildren();
