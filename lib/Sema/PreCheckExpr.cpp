@@ -399,21 +399,6 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
   return nullptr;
 }
 
-static void
-setPackElementEnvironment(DeclContext *dc, PackExpansionExpr *expansion) {
-  // FIXME: The generic environment should be created lazily when solving
-  // PackElementOf constraints.
-  auto &ctx = dc->getASTContext();
-  auto sig = ctx.getOpenedElementSignature(
-      dc->getGenericSignatureOfContext().getCanonicalSignature());
-  auto *contextEnv = dc->getGenericEnvironmentOfContext();
-  auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  auto *environment =
-      GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
-                                           contextSubs);
-  expansion->setGenericEnvironment(environment);
-}
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -1158,12 +1143,6 @@ namespace {
           return Action::Stop();
 
         return Action::Continue(result);
-      }
-
-      // Set the generic environment of a PackExpansionExpr.
-      if (auto *expansion = dyn_cast<PackExpansionExpr>(expr)) {
-        setPackElementEnvironment(DC, expansion);
-        return Action::Continue(expansion);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.

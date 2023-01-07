@@ -1414,10 +1414,6 @@ void PotentialBindings::infer(Constraint *constraint) {
     auto elementType = CS.simplifyType(constraint->getFirstType());
     auto packType = CS.simplifyType(constraint->getSecondType());
 
-    auto *loc = constraint->getLocator();
-    auto openedElement  =
-        loc->getLastElementAs<LocatorPathElt::OpenedPackElement>();
-
     if (elementType->isTypeVariableOrMember() && packType->isTypeVariableOrMember())
       break;
 
@@ -1428,7 +1424,7 @@ void PotentialBindings::infer(Constraint *constraint) {
       // Produce a potential binding to the opened element archetype corresponding
       // to the pack type.
       packType = packType->mapTypeOutOfContext();
-      auto *elementEnv = openedElement->getGenericEnvironment();
+      auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator());
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 
