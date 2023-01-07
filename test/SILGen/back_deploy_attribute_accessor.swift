@@ -5,7 +5,6 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS 10.50, *)
 public struct TopLevelStruct {
   // -- Fallback definition for TopLevelStruct.property.getter
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwB : $@convention(method) (TopLevelStruct) -> TopLevelStruct
@@ -37,14 +36,12 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.property.getter
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
-  @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public var property: TopLevelStruct { self }
 }
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
 // CHECK: bb0([[STRUCT_ARG:%.*]] : $TopLevelStruct):
-@available(macOS 10.51, *)
 func caller(_ s: TopLevelStruct) {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct

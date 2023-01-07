@@ -2367,6 +2367,10 @@ public:
   /// otherwise.
   const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
+  /// Returns the \c @_backDeploy attribute that is active for the current
+  /// platform.
+  const BackDeployAttr *getBackDeploy(const ASTContext &ctx) const;
+
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;

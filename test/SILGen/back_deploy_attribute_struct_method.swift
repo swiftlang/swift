@@ -5,7 +5,6 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS 10.50, *)
 public struct TopLevelStruct {
   // -- Fallback definition for TopLevelStruct.trivialMethod()
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwB : $@convention(method) (TopLevelStruct) -> ()
@@ -39,14 +38,12 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.trivialMethod()
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyF : $@convention(method) (TopLevelStruct) -> ()
-  @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public func trivialMethod() {}
 }
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
 // CHECK: bb0([[STRUCT_ARG:%.*]] : $TopLevelStruct):
-@available(macOS 10.51, *)
 func caller(_ s: TopLevelStruct) {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()

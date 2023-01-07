@@ -5,7 +5,6 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS 10.50, *)
 public struct TopLevelStruct {
   // -- Fallback definition for TopLevelStruct.property.read
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvrTwB : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
@@ -64,16 +63,14 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.property.read
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvr : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
-  @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public var property: TopLevelStruct {
     _read { yield self }
   }
 }
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s11back_deploy6calleryyAA14TopLevelStructVF : $@convention(thin) (TopLevelStruct) -> ()
 // CHECK: bb0([[STRUCT_ARG:%.*]] : $TopLevelStruct):
-@available(macOS 10.51, *)
 func caller(_ s: TopLevelStruct) {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV8propertyACvrTwb : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
