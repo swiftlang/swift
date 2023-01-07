@@ -637,8 +637,18 @@ public:
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(DeclName Name, NLKind LookupKind,
+  void lookupValue(DeclName Name, NLKind LookupKind, NLOptions Options,
                    SmallVectorImpl<ValueDecl*> &Result) const;
+
+  /// Look up a (possibly overloaded) value set at top-level scope
+  /// (but with the specified access path, which may come from an import decl)
+  /// within the current module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupValue(DeclName Name, NLKind LookupKind,
+                   SmallVectorImpl<ValueDecl*> &Result) const {
+    lookupValue(Name, LookupKind, getDefaultNLOptions(LookupKind), Result);
+  }
 
   /// Look up a local type declaration by its mangled name.
   ///

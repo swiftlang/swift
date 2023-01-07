@@ -46,7 +46,7 @@ static Type getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   auto &ctx = stdlib->getASTContext();
   SmallVector<ValueDecl*, 1> results;
   stdlib->lookupValue(ctx.getIdentifier(name), NLKind::QualifiedLookup,
-                      results);
+                      NL_QualifiedDefault, results);
 
   // If we have one single type decl, and that decl has been
   // type-checked, return its declared type.

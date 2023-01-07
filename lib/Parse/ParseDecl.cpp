@@ -4659,6 +4659,7 @@ bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_subscript:
   case tok::kw_typealias:
   case tok::kw_var:
+  case tok::pound:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -4770,10 +4771,14 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     return isStartOfSwiftDecl(allowPoundIfAttributes);
   }
 
+  // Macro expansion starts with a pound and a custom identifier.
+  if (Tok.is(tok::pound) && peekToken().is(tok::identifier))
+    return true;
+
   // Skip a #if that contains only attributes in all branches. These will be
   // parsed as attributes of a declaration, not as separate declarations.
   if (Tok.is(tok::pound_if) && allowPoundIfAttributes) {
-    BacktrackingScope backtrack(*this);
+      BacktrackingScope backtrack(*this);
     bool sawAnyAttributes = false;
     return skipIfConfigOfAttributes(sawAnyAttributes) &&
         (Tok.is(tok::eof) || (sawAnyAttributes && isStartOfSwiftDecl()));

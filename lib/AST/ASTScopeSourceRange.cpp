@@ -366,6 +366,11 @@ SourceRange GuardStmtBodyScope::getSourceRangeOfThisASTNode(
   return body->getSourceRange();
 }
 
+SourceRange MacroExpansionDeclScope::
+getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return decl->getSourceRange();
+}
+
 #pragma mark source range caching
 
 CharSourceRange

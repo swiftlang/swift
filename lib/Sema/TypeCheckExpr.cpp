@@ -615,9 +615,12 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
   DeclNameRef nameRef(ctx.getIdentifier(name));
-  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               nameRef, SourceLoc(),
-                                               defaultUnqualifiedLookupOptions);
+
+  // Note: Don't look into macro expansions as it would be a circular dependency
+  // to have macro arguments' default literal types depend on macro expansions.
+  auto lookup = TypeChecker::lookupUnqualified(
+      dc->getModuleScopeContext(), nameRef, SourceLoc(),
+      NameLookupFlags::DisableMacroExpansions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -682,7 +685,8 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
     type = lookupDefaultLiteralType(dc, name);
 
   if (!type)
-    type = lookupDefaultLiteralType(TypeChecker::getStdlibModule(dc), name);
+    type = lookupDefaultLiteralType(
+        TypeChecker::getStdlibModule(dc), name);
 
   // Strip off one level of sugar; we don't actually want to print
   // the name of the typealias itself anywhere.

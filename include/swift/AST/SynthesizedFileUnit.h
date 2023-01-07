@@ -43,7 +43,7 @@ public:
   /// Add a synthesized top-level declaration.
   void addTopLevelDecl(Decl *D) { TopLevelDecls.push_back(D); }
 
-  virtual void lookupValue(DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind, NLOptions options,
                            SmallVectorImpl<ValueDecl *> &result) const override;
 
   void lookupObjCMethods(

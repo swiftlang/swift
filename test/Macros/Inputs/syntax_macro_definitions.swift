@@ -196,7 +196,7 @@ public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
   public static func expansion(
     of node: MacroExpansionDeclSyntax,
     in context: inout MacroExpansionContext
-  ) throws -> [DeclSyntax] {
+  ) throws -> CodeBlockItemListSyntax {
     guard let firstElement = node.argumentList.first,
           let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
           stringLiteral.segments.count == 1,
@@ -204,7 +204,7 @@ public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
       throw CustomError.message("#bitwidthNumberedStructs macro requires a string literal")
     }
 
-    return [8, 16, 32, 64].map { bitwidth in
+    let decls: [Decl] = [8, 16, 32, 64].map { bitwidth in
       """
 
       struct \(raw: prefix)\(raw: String(bitwidth)) { }
@@ -373,5 +373,23 @@ public struct AddMembers: MemberDeclarationMacro {
       DeclSyntax(storageVariable),
       DeclSyntax(instanceMethod),
     ]
+    return CodeBlockItemList(decls.map { CodeBlockItemSyntax(item: .init($0)) })
+  }
+}
+
+public struct DefineStructWithUnqualifiedLookupMacro: FreestandingDeclarationMacro {
+  public static func expansion(
+    of node: MacroExpansionDeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> CodeBlockItemListSyntax {
+    return CodeBlockItemList([.init(item: .decl("""
+    struct StructWithUnqualifiedLookup {
+      let hello = 1
+
+      func foo() -> Int {
+        hello + world // looks up "world" in the parent scope
+      }
+    }
+    """))])
   }
 }

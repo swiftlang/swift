@@ -430,11 +430,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
-    if (MED->getArgs() && doIt(MED->getArgs()))
+    if (auto *rewritten = MED->getRewritten()) {
+      for (auto node : rewritten->getElements())
+        if (doIt(node))
+          return true;
+    } else if (MED->getArgs() && doIt(MED->getArgs())) {
       return true;
-    for (auto *decl : MED->getRewritten())
-      if (doIt(decl))
-        return true;
+    }
     return false;
   }
 
@@ -1446,6 +1448,19 @@ public:
         Walker.walkToPatternPre(P),
         [&](Pattern *P) { return visit(P); },
         [&](Pattern *P) { return Walker.walkToPatternPost(P); });
+  }
+
+  LLVM_NODISCARD
+  bool doIt(ASTNode N) {
+    if (auto *stmt = N.dyn_cast<Stmt *>())
+      return doIt(stmt);
+    if (auto *expr = N.dyn_cast<Expr *>())
+      return doIt(expr);
+    if (auto *decl = N.dyn_cast<Decl *>())
+      return doIt(decl);
+    if (auto *pattern = N.dyn_cast<Pattern *>())
+      return doIt(pattern);
+    llvm_unreachable("all cases handled");
   }
 
   LLVM_NODISCARD

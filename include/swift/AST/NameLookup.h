@@ -239,6 +239,10 @@ enum class UnqualifiedLookupFlags {
   // This lookup should include results that are @inlinable or
   // @usableFromInline.
   IncludeUsableFromInline = 1 << 5,
+  // This lookup should not expand macros.
+  DisableMacroExpansions  = 1 << 6,
+  // This lookup should only return macros.
+  MacroLookup             = 1 << 7,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -793,6 +797,11 @@ public:
   /// well-formed 'fallthrough' statement has both a source and destination.
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
+
+  /// Returns true if the given location is within a \c MacroDecl or a top-level
+  /// \c MacroExpansionDecl.
+  static bool isLocWithinMacroDeclOrTopLevelMacroExpansionDeclScope(
+      SourceFile *sf, SourceLoc loc);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;

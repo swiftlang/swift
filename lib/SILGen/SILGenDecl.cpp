@@ -1489,6 +1489,10 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   });
 }
 
+void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
+  llvm_unreachable("already handled by BraceStmt");
+}
+
 /// Emit literals for the major, minor, and subminor components of the version
 /// and return a tuple of SILValues for them.
 static std::tuple<SILValue, SILValue, SILValue>

@@ -81,8 +81,10 @@ public:
 
   /// Visit expanded macros.
   void visitMacroExpansionDecl(MacroExpansionDecl *D) {
-    for (auto *decl : D->getRewritten())
-      asImpl().visit(decl);
+    if (auto *rewritten = D->getRewritten())
+      for (auto node : rewritten->getElements())
+        if (auto *decl = node.dyn_cast<Decl *>())
+          asImpl().visit(decl);
   }
 };
 

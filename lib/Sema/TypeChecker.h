@@ -139,7 +139,7 @@ enum class TypeCheckExprFlags {
   /// Don't type check expressions for correct availability.
   DisableExprAvailabilityChecking = 0x08,
 
-  /// Don't expansino macros.
+  /// Don't expand macros.
   DisableMacroExpansions = 0x10,
 };
 
@@ -158,8 +158,12 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 1 << 1,
-  // Whether to include results that are marked @inlinable or @usableFromInline.
+  /// Whether to include results that are marked @inlinable or @usableFromInline.
   IncludeUsableFromInline = 1 << 2,
+  /// Disable macro expansions.
+  DisableMacroExpansions = 1 << 3,
+  /// Only look up macros.
+  MacroLookup = 1 << 4,
 };
 
 /// A set of options that control name lookup.
@@ -917,9 +921,9 @@ lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
-SmallVector<MacroDecl *, 1>
+MacroRoles
 lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
-             MacroRoles contexts);
+             MacroRoles roles, SmallVectorImpl<MacroDecl *> &results);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,
@@ -1151,6 +1155,10 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
+void checkMacroExpansionEffects(DeclContext *DC, MacroExpansionExpr *E);
+
+/// Do post type checking analyses on an expanded macro expansion.
+void postTypeCheckMacroExpansion(Expr *, DeclContext *DC);
 
 /// Whether the given expression can throw.
 bool canThrow(Expr *expr);

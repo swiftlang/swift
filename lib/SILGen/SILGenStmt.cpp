@@ -301,15 +301,22 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   }
 
   bool didDiagnoseUnreachableElements = false;
-  for (auto &ESD : S->getElements()) {
-    
+
+  llvm::function_ref<void(ASTNode ESD)> emitNode;
+  emitNode = [&](ASTNode ESD) {
     if (auto D = ESD.dyn_cast<Decl*>()) {
       if (isa<IfConfigDecl>(D))
-        continue;
+        return;
+
+      if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
+        for (auto node : MED->getRewritten()->getElements())
+          emitNode(node);
+        return;
+      }
 
       // Hoisted declarations are emitted at the top level by emitSourceFile().
       if (D->isHoisted())
-        continue;
+        return;
 
       // PatternBindingBecls represent local variable bindings that execute
       // as part of the function's execution.
@@ -318,7 +325,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
         SGF.visit(D);
-        continue;
+        return;
       }
     }
     
@@ -336,14 +343,14 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         if (S->isImplicit() && isa<ReturnStmt>(S)) {
           auto returnStmt = cast<ReturnStmt>(S);
           if (!returnStmt->hasResult()) {
-            continue;
+            return;
           }
           if (returnStmt->getResult()->isImplicit()) {
-            continue;
+            return;
           }
         }
         if (S->isImplicit() && !isa<ReturnStmt>(S)) {
-          continue;
+          return;
         }
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         // Optional chaining expressions are wrapped in a structure like.
@@ -355,23 +362,23 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         // Walk through it to find out if the statement is actually implicit.
         if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
           if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-            if (IIO->getSubExpr()->isImplicit()) continue;
+            if (IIO->getSubExpr()->isImplicit()) return;
           if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
-            if (C->isImplicit()) continue;
+            if (C->isImplicit()) return;
         } else if (E->isImplicit()) {
           // Ignore all other implicit expressions.
-          continue;
+          return;
         }
       } else if (auto D = ESD.dyn_cast<Decl*>()) {
         // Local declarations aren't unreachable - only their usages can be. To
         // that end, we only care about pattern bindings since their
         // initializer expressions can be unreachable.
         if (!isa<PatternBindingDecl>(D))
-          continue;
+          return;
       }
       
       if (didDiagnoseUnreachableElements)
-        continue;
+        return;
       didDiagnoseUnreachableElements = true;
       
       if (StmtType != UnknownStmtType) {
@@ -400,7 +407,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           }
         }
       }
-      continue;
+      return;
     }
 
     // Process children.
@@ -425,7 +432,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
 
       SGF.visit(PBD);
     }
-  }
+  };
+
+  for (auto &ESD : S->getElements())
+    emitNode(ESD);
 }
 
 namespace {

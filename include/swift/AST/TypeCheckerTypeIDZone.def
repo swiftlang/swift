@@ -65,8 +65,8 @@ SWIFT_REQUEST(TypeChecker, DefaultArgumentInitContextRequest,
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
-              Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
-              NoLocationInfo)
+              Type(KnownProtocolKind, const DeclContext *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
@@ -453,7 +453,7 @@ SWIFT_REQUEST(TypeChecker, ExternalMacroDefinitionRequest,
               ExternalMacroDefinition(ASTContext *, Identifier, Identifier),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionDeclRequest,
-              ArrayRef<Decl *>(MacroExpansionDecl *),
+              BraceStmt *(MacroExpansionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandMemberAttributeMacros,
               bool(Decl *),

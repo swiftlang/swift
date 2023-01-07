@@ -165,11 +165,15 @@ class swift::SourceLookupCache {
   using OperatorMap = llvm::DenseMap<Identifier, TinyPtrVector<T *>>;
   OperatorMap<OperatorDecl> Operators;
   OperatorMap<PrecedenceGroupDecl> PrecedenceGroups;
+  SmallVector<MacroExpansionDecl *, 4> DelayedMacroExpansions;
 
   template<typename Range>
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
   template<typename Range>
   void addToMemberCache(Range decls);
+
+  void addDelayedMacroExpansions();
+
 public:
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
@@ -177,7 +181,7 @@ public:
   /// Throw away as much memory as possible.
   void invalidate();
 
-  void lookupValue(DeclName Name, NLKind LookupKind,
+  void lookupValue(DeclName Name, NLKind LookupKind, NLOptions Options,
                    SmallVectorImpl<ValueDecl*> &Result);
 
   /// Retrieves all the operator decls. The order of the results is not
@@ -229,6 +233,7 @@ SourceLookupCache &SourceFile::getCache() const {
 template<typename Range>
 void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
                                                     bool onlyOperators) {
+  SmallVector<MacroExpansionDecl *, 4> delayedMacroExpansions;
   for (Decl *D : decls) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
@@ -237,11 +242,12 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       }
     }
 
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
+    else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(NTD->getMembers(), true);
+    }
 
-    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       // Avoid populating the cache with the members of invalid extension
       // declarations.  These members can be used to point validation inside of
       // a malformed context.
@@ -251,11 +257,14 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
 
-    if (auto *OD = dyn_cast<OperatorDecl>(D))
+    else if (auto *OD = dyn_cast<OperatorDecl>(D))
       Operators[OD->getName()].push_back(OD);
 
-    if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
+    else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
+
+    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
+      DelayedMacroExpansions.push_back(MED);
   }
 }
 
@@ -331,8 +340,25 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
   }
 }
 
+void SourceLookupCache::addDelayedMacroExpansions() {
+  for (auto *MED : DelayedMacroExpansions) {
+    auto *rewritten = evaluateOrDefault(MED->getASTContext().evaluator,
+                                        ExpandMacroExpansionDeclRequest{MED},
+                                        nullptr);
+    if (rewritten)
+      for (auto node : rewritten->getElements())
+        if (auto *decl = node.dyn_cast<Decl *>())
+          addToUnqualifiedLookupCache(TinyPtrVector<Decl *>{decl}, false);
+  }
+  DelayedMacroExpansions.clear();
+}
+
 void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
+                                    NLOptions Options,
                                     SmallVectorImpl<ValueDecl*> &Result) {
+  if (!(Options & NL_DisableMacroExpansions))
+    addDelayedMacroExpansions();
+
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
 
@@ -724,17 +750,18 @@ static bool isParsedModule(const ModuleDecl *mod) {
 }
 
 void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
+                             NLOptions Options,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
     ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
-    getSourceLookupCache().lookupValue(Name, LookupKind, Result);
+    getSourceLookupCache().lookupValue(Name, LookupKind, Options, Result);
     return;
   }
 
-  FORWARD(lookupValue, (Name, LookupKind, Result));
+  FORWARD(lookupValue, (Name, LookupKind, Options, Result));
 }
 
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
@@ -781,7 +808,8 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
       alreadyInPrivateContext = true;
   } else if (isa<ModuleDecl>(containerDecl)) {
     assert(container == this);
-    this->lookupValue(name, NLKind::QualifiedLookup, results);
+    this->lookupValue(name, NLKind::QualifiedLookup, NL_QualifiedDefault,
+                      results);
   } else if (!isa<GenericTypeDecl>(containerDecl)) {
     // If ExtensionDecl, then use ExtensionDecl::lookupDirect instead.
     llvm_unreachable("This context does not support lookup.");
@@ -828,6 +856,7 @@ void ModuleDecl::lookupImportedSPIGroups(
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
+                              NLOptions options,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
@@ -839,8 +868,9 @@ void BuiltinUnit::lookupObjCMethods(
 }
 
 void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
+                             NLOptions options,
                              SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name, lookupKind, result);
+  getCache().lookupValue(name, lookupKind, options, result);
 }
 
 void ModuleDecl::lookupVisibleDecls(ImportPath::Access AccessPath,
@@ -3672,7 +3702,7 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 }
 
 void SynthesizedFileUnit::lookupValue(
-    DeclName name, NLKind lookupKind,
+    DeclName name, NLKind lookupKind, NLOptions options,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
     if (auto VD = dyn_cast<ValueDecl>(decl)) {

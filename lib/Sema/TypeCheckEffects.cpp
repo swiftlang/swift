@@ -1393,7 +1393,7 @@ public:
     /// A defer body
     DeferBody,
 
-    // A runtime discoverable attribute initialization expression.
+    /// A runtime discoverable attribute initialization expression.
     RuntimeAttribute,
   };
 
@@ -1564,6 +1564,10 @@ public:
     }
 
     return Context(closureTypeThrows, closureTypeIsAsync, AnyFunctionRef(E));
+  }
+
+  static Context forMacroExpansion(MacroExpansionExpr *E) {
+    return Context(/*handlesErrors*/ true, /*handlesAsync*/ true, None);
   }
 
   static Context forCatchPattern(CaseStmt *S) {
@@ -2962,8 +2966,7 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
       superInit->walk(checker);
 }
 
-void TypeChecker::checkInitializerEffects(Initializer *initCtx,
-                                                Expr *init) {
+void TypeChecker::checkInitializerEffects(Initializer *initCtx, Expr *init) {
   auto &ctx = initCtx->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
@@ -2991,6 +2994,19 @@ void TypeChecker::checkPropertyWrapperEffects(
   CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
   expr->walk(LocalFunctionEffectsChecker());
+}
+
+void TypeChecker::checkMacroExpansionEffects(DeclContext *DC,
+                                             MacroExpansionExpr *E) {
+  auto &ctx = DC->getASTContext();
+  CheckEffectsCoverage checker(ctx, Context::forMacroExpansion(E));
+  if (auto *rewritten = E->getRewritten()) {
+    rewritten->walk(checker);
+    rewritten->walk(LocalFunctionEffectsChecker());
+  }
+  // In some language modes, we allow top-level code to omit 'try' marking.
+  if (ctx.LangOpts.EnableThrowWithoutTry && isa<TopLevelCodeDecl>(DC))
+    checker.setTopLevelThrowWithoutTry();
 }
 
 bool TypeChecker::canThrow(Expr *expr) {

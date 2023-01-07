@@ -3767,11 +3767,14 @@ namespace {
     SmallVector<OverloadChoice, 1>
     lookupMacros(Identifier macroName, SourceLoc loc,
                  FunctionRefKind functionRefKind) {
+      SmallVector<MacroDecl *, 1> foundMacros;
+      TypeChecker::lookupMacros(
+          CurDC, DeclNameRef(macroName), loc, MacroRole::Expression,
+          foundMacros);
       SmallVector<OverloadChoice, 1> choices;
-      auto results = TypeChecker::lookupMacros(
-          CurDC, DeclNameRef(macroName), loc, MacroRole::Expression);
-      for (const auto &result : results) {
-        OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
+      choices.reserve(foundMacros.size());
+      for (const auto &macro : foundMacros) {
+        OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
         choices.push_back(choice);
       }
 

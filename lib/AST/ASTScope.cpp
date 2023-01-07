@@ -76,6 +76,34 @@ void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {
   impl->dumpOneScopeMapLocation(lineCol);
 }
 
+bool ASTScope::isLocWithinMacroDeclOrTopLevelMacroExpansionDeclScope(
+    SourceFile *sf, SourceLoc loc) {
+  // The innermost scope containing the loc.
+  auto *innermostScope = sf->getScope().impl->findInnermostEnclosingScope(
+      loc, nullptr);
+  auto isMDOrTopLevelMED = [&](const ASTScopeImpl *scope) -> bool {
+    if (auto *decl = scope->getDeclIfAny().getPtrOrNull()) {
+      if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
+        if (med->getDeclContext()->getContextKind() ==
+            DeclContextKind::FileUnit)
+          return true;
+      } else if (auto *md = dyn_cast<MacroDecl>(decl)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  // Climb up the tree until we find a matching scope.
+  const ASTScopeImpl *scope = innermostScope;
+  while (!isMDOrTopLevelMED(scope)) {
+    auto *parentScope = scope->getLookupParent().getPtrOrNull();
+    if (!parentScope || parentScope == scope)
+      return false;
+    scope = parentScope;
+  }
+  return true;
+}
+
 #pragma mark ASTScopeImpl
 
 
@@ -151,6 +179,7 @@ DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(EnumElementScope)
 DEFINE_GET_CLASS_NAME(MacroDeclScope)
+DEFINE_GET_CLASS_NAME(MacroExpansionDeclScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
 DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)

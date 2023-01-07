@@ -53,6 +53,9 @@ enum NLOptions : unsigned {
   // Include @usableFromInline and @inlinable
   NL_IncludeUsableFromInline = 1 << 6,
 
+  /// Don't expand macros.
+  NL_DisableMacroExpansions = 1 << 7,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the
@@ -77,6 +80,13 @@ static inline NLOptions &operator&=(NLOptions &lhs, NLOptions rhs) {
 }
 static inline NLOptions operator~(NLOptions value) {
   return NLOptions(~(unsigned)value);
+}
+
+static inline NLOptions getDefaultNLOptions(NLKind kind) {
+  switch (kind) {
+  case NLKind::QualifiedLookup: return NL_QualifiedDefault;
+  case NLKind::UnqualifiedLookup: return NL_UnqualifiedDefault;
+  }
 }
 
 void simple_display(llvm::raw_ostream &out, NLOptions options);

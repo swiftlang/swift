@@ -110,6 +110,7 @@ namespace swift {
   class VarDecl;
   class OpaqueReturnTypeRepr;
   class Witness;
+  class MacroExpansionExpr;
 
   namespace ast_scope {
   class AbstractPatternEntryScope;
@@ -8446,7 +8447,8 @@ class MacroExpansionDecl : public Decl {
   SourceLoc LeftAngleLoc, RightAngleLoc;
   ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
-  ArrayRef<Decl *> Rewritten;
+  // An implicit brace statement serving as the container for the expansion.
+  BraceStmt *Rewritten = nullptr;
 
   /// The referenced macro.
   ConcreteDeclRef macroRef;
@@ -8461,7 +8463,7 @@ public:
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
         Macro(macro), MacroLoc(macroLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(args), Rewritten({}) {}
+        GenericArgs(genericArgs), ArgList(args) {}
 
   ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
 
@@ -8475,10 +8477,12 @@ public:
   DeclNameLoc getMacroLoc() const { return MacroLoc; }
   DeclNameRef getMacro() const { return Macro; }
   ArgumentList *getArgs() const { return ArgList; }
-  ArrayRef<Decl *> getRewritten() const { return Rewritten; }
-  void setRewritten(ArrayRef<Decl *> rewritten) { Rewritten = rewritten; }
+  void setArgs(ArgumentList *args) { ArgList = args; }
+  BraceStmt *getRewritten() const { return Rewritten; }
+  void setRewritten(BraceStmt *rewritten) { Rewritten = rewritten; }
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+  MacroExpansionExpr *createExpr() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;

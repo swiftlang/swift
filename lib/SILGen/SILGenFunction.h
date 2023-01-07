@@ -2199,6 +2199,8 @@ public:
 
   void visitVarDecl(VarDecl *D);
 
+  void visitMacroExpansionDecl(MacroExpansionDecl *D);
+
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd,
                                                                bool immutable);

@@ -2432,7 +2432,6 @@ ArrayRef<MacroIntroducedDeclName> AttachedAttr::getNames() const {
   };
 }
 
-
 const DeclAttribute *
 DeclAttributes::getEffectiveSendableAttr() const {
   const NonSendableAttr *assumedAttr = nullptr;

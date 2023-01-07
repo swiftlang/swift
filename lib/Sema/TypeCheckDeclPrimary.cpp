@@ -2050,7 +2050,7 @@ public:
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     (void)evaluateOrDefault(
-        Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
+        Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, nullptr);
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3667,22 +3667,55 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
-ArrayRef<Decl *>
+BraceStmt *
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
-  auto foundMacros = TypeChecker::lookupMacros(
-      MED->getDeclContext(), MED->getMacro(),
-      MED->getLoc(), MacroRole::FreestandingDeclaration);
+  // Non-call declaration macros cannot be overloaded.
+  MacroRoles viableRoles(MacroRole::FreestandingDeclaration);
+  // In a code block context, a macro expansion decl can also represent a
+  // macro expansion expression.
+  if (dc->isLocalContext() || dc->getContextKind() == DeclContextKind::FileUnit)
+    viableRoles |= MacroRole::Expression;
+  SmallVector<MacroDecl *, 4> foundMacros;
+  auto foundRoles = TypeChecker::lookupMacros(
+      MED->getDeclContext(), MED->getMacro(), MED->getLoc(), viableRoles,
+      foundMacros);
   if (foundMacros.empty()) {
     MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
         .highlight(MED->getMacroLoc().getSourceRange());
-    return {};
+    return nullptr;
   }
+
+  auto expandAsMacroExpansionExpr = [&]() -> BraceStmt * {
+    Expr *mee = MED->createExpr();
+    TypeChecker::typeCheckExpression(mee, dc, {},
+                                     TypeCheckExprFlags::IsExprStmt |
+                                         TypeCheckExprFlags::IsDiscarded);
+    ASTNode expansion = mee;
+    // If top-level, wrap it in a `TopLevelCodeDecl(BraceStmt(...))`.
+    auto innermostDC = dc;
+    if (dc->getContextKind() == DeclContextKind::FileUnit) {
+      auto *tlcd = new (ctx) TopLevelCodeDecl(
+          dc, BraceStmt::createImplicit(ctx, {expansion}));
+      tlcd->setDeclContext(dc);
+      expansion = tlcd;
+      innermostDC = tlcd;
+    }
+    auto codeBlockItemList = BraceStmt::createImplicit(ctx, {expansion});
+    MED->setRewritten(codeBlockItemList);
+    TypeChecker::postTypeCheckMacroExpansion(mee, innermostDC);
+    return codeBlockItemList;
+  };
+
+  // If we've only found expression macros, expand to a macro expansion expr.
+  if (foundRoles.containsOnly(MacroRole::Expression))
+    return expandAsMacroExpansionExpr();
+
   // Resolve macro candidates.
   MacroDecl *macro;
-  // Non-call declaration macros cannot be overloaded.
+  // Non-call macros cannot be overloaded.
   auto *args = MED->getArgs();
   if (!args) {
     if (foundMacros.size() > 1) {
@@ -3690,7 +3723,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
           .highlight(MED->getMacroLoc().getSourceRange());
       for (auto *candidate : foundMacros)
         candidate->diagnose(diag::found_candidate);
-      return {};
+      return nullptr;
     }
     macro = foundMacros.front();
   }
@@ -3698,9 +3731,19 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   else {
     using namespace constraints;
     ConstraintSystem cs(dc, ConstraintSystemOptions());
-    // Type-check macro arguments.
-    for (auto *arg : args->getArgExprs())
-      cs.setType(arg, TypeChecker::typeCheckExpression(arg, dc));
+    SmallVector<Argument, 2> newArgs;
+    newArgs.reserve(args->size());
+    for (auto arg : *args) {
+      auto *expr = arg.getExpr();
+      auto type = TypeChecker::typeCheckExpression(expr, dc);
+      arg.setExpr(expr);
+      cs.setType(expr, type);
+      newArgs.push_back(arg);
+    }
+    args = ArgumentList::create(
+        ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
+        args->getFirstTrailingClosureIndex(), args->isImplicit());
+    MED->setArgs(args);
     auto choices = map<SmallVector<OverloadChoice, 1>>(
         foundMacros,
         [](MacroDecl *md) {
@@ -3732,37 +3775,42 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<AnyFunctionType::Param, 8> params;
     getMatchingParams(args, params);
     cs.associateArgumentList(locator, args);
+    auto resultType = cs.createTypeVariable(
+        cs.getConstraintLocator(MED, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
     cs.addConstraint(
         ConstraintKind::ApplicableFunction,
-        FunctionType::get(params, ctx.getVoidType()),
+        FunctionType::get(params, resultType),
         macroRefType,
         cs.getConstraintLocator(MED, ConstraintLocator::ApplyFunction));
     // Solve.
     auto solution = cs.solveSingle();
     if (!solution) {
+      if (viableRoles.contains(MacroRole::Expression))
+        return nullptr;
       MED->diagnose(diag::no_overloads_match_exactly_in_call,
                     /*reference|call*/false, DescriptiveDeclKind::Macro,
                     false, MED->getMacro().getBaseName())
           .highlight(MED->getMacroLoc().getSourceRange());
       for (auto *candidate : foundMacros)
         candidate->diagnose(diag::found_candidate);
-      return {};
+      return nullptr;
     }
     auto choice = solution->getOverloadChoice(locator).choice;
     macro = cast<MacroDecl>(choice.getDecl());
   }
   MED->setMacroRef(macro);
 
-  // Expand the macro.
-  SmallVector<Decl *, 2> expandedTemporary;
-  if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
-    return {};
-  auto expanded = ctx.AllocateCopy(expandedTemporary);
-  // FIXME: Handle this in name lookup instead of `addMember`.
-  // MED->setRewritten(expanded);
-  if (auto *parentDecl = MED->getDeclContext()->getAsDecl())
-    if (auto *idc = dyn_cast<IterableDeclContext>(parentDecl))
-      for (auto *decl : expanded)
-        idc->addMember(decl);
-  return expanded;
+  auto roles = macro->getMacroRoles();
+
+  // If the resolved macro is an expression-only macro, expand to a macro
+  // expansion expr.
+  if (roles.containsOnly(MacroRole::Expression))
+    return expandAsMacroExpansionExpr();
+
+  // Otherwise, we treat it as a freestanding declaration macro.
+  assert(roles.contains(MacroRole::FreestandingDeclaration));
+  auto *expansion = expandFreestandingDeclarationMacro(MED);
+  MED->setRewritten(expansion);
+  return expansion;
 }

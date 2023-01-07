@@ -2548,8 +2548,10 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::MacroExpansion:
-    for (auto *rewritten : cast<MacroExpansionDecl>(D)->getRewritten())
-      emitGlobalDecl(rewritten);
+    if (auto *rewritten = cast<MacroExpansionDecl>(D)->getRewritten())
+      for (auto node : rewritten->getElements())
+        if (auto *decl = node.dyn_cast<Decl *>())
+          emitGlobalDecl(decl);
     return;
   }
 
@@ -5503,8 +5505,10 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::MacroExpansion:
-      for (auto *decl : cast<MacroExpansionDecl>(member)->getRewritten())
-        emitNestedTypeDecls({decl, nullptr});
+      if (auto *rewritten = cast<MacroExpansionDecl>(member)->getRewritten())
+        for (auto node : rewritten->getElements())
+          if (auto *decl = node.dyn_cast<Decl *>())
+            emitNestedTypeDecls({decl, nullptr});
       continue;
     }
   }

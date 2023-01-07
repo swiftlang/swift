@@ -107,6 +107,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
     Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
+                                      NL_QualifiedDefault,
                                       decls);
     
     if (decls.size() == 1 && isa<TypeDecl>(decls[0]))

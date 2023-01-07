@@ -1422,6 +1422,7 @@ bool SerializedASTFile::isSystemModule() const {
 }
 
 void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
+                                    NLOptions options,
                                     SmallVectorImpl<ValueDecl*> &results) const{
   File.lookupValue(name, results);
 }

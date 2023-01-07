@@ -126,8 +126,14 @@ func testNestedDeclInExpr() {
 // Test overload
 @declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 
-// FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//#bitwidthNumberedStructs("MyIntGlobal")
+#bitwidthNumberedStructs("MyIntGlobal")
+
+#bitwidthNumberedStructs("MyIntGlobalTwo", blah: false)
+
+let blah = false
+#bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
+
+@declaration(freestanding) macro structWithUnqualifiedLookup: Void = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
@@ -155,14 +161,27 @@ func testFreestandingMacroExpansion() {
   // CHECK: MyIntTwo64
   print(Foo2.MyIntTwo64.self)
 
-  // FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//  HECK: MyIntGlobal8
-//  print(MyIntGlobal8.self)
-//  HECK: MyIntGlobal16
-//  print(MyIntGlobal16.self)
-//  HECK: MyIntGlobal32
-//  print(MyIntGlobal32.self)
-//  HECK: MyIntGlobal64
-//  print(MyIntGlobal64.self)
+  // FIXME: Locals don't work yet.
+  // #bitwidthNumberedStructs("MyIntLocal")
+  // // HECK: MyIntLocal8
+  // print(MyIntLocal8.self)
+  // // HECK: MyIntLocal16
+  // print(MyIntLocal16.self)
+  // // HECK: MyIntLocal32
+  // print(MyIntLocal32.self)
+  // // HECK: MyIntLocal64
+  // print(MyIntLocal64.self)
+
+  // CHECK: MyIntGlobal8
+  print(MyIntGlobal8.self)
+  // CHECK: MyIntGlobal16
+  print(MyIntGlobal16.self)
+  // CHECK: MyIntGlobal32
+  print(MyIntGlobal32.self)
+  // CHECK: MyIntGlobal64
+  print(MyIntGlobal64.self)
+
+//  #structWithUnqualifiedLookup
+//  print(StructWithUnqualifiedLookup().foo())
 }
 testFreestandingMacroExpansion()

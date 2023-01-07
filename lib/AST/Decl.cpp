@@ -510,8 +510,15 @@ bool Decl::isInvalid() const {
   case DeclKind::Destructor:
   case DeclKind::Func:
   case DeclKind::EnumElement:
-  case DeclKind::Macro:
     return cast<ValueDecl>(this)->getInterfaceType()->hasError();
+
+  case DeclKind::Macro: {
+    auto *MD = cast<ValueDecl>(this);
+    // Avoid eagerly computing the macro interface type to avoid a cycle.
+    if (MD->hasInterfaceType())
+      return MD->getInterfaceType()->hasError();
+    return false;
+  }
 
   case DeclKind::Accessor: {
     auto *AD = cast<AccessorDecl>(this);
@@ -9858,6 +9865,12 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
     endLoc = MacroLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
+}
+
+MacroExpansionExpr *MacroExpansionDecl::createExpr() const {
+  return new (getASTContext()) MacroExpansionExpr(
+      PoundLoc, Macro, MacroLoc, LeftAngleLoc, GenericArgs, RightAngleLoc,
+      ArgList);
 }
 
 NominalTypeDecl *

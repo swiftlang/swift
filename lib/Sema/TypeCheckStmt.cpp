@@ -267,7 +267,7 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if(CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator)
+        if (CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator)
           CE->setDiscriminator(NextClosureDiscriminator++);
 
         // If the closure was type checked within its enclosing context,
@@ -311,9 +311,15 @@ namespace {
         setLocalDiscriminator(valueDecl);
       }
 
+      if (auto *med = dyn_cast<MacroExpansionDecl>(D)) {
+        (void)evaluateOrDefault(med->getASTContext().evaluator,
+                                ExpandMacroExpansionDeclRequest{med}, nullptr);
+      }
+
       // But we do want to walk into the initializers of local
       // variables.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitChildrenIf(
+          isa<PatternBindingDecl>(D) || isa<MacroExpansionDecl>(D));
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -475,6 +481,25 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 
   // Return the next discriminator.
   return nextDiscriminator;
+}
+
+// Find nested functions and perform effects checking on them.
+struct SetLocalMacroExpansionAccess : ASTWalker {
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (auto vd = dyn_cast<ValueDecl>(D))
+      if (vd->getDeclContext()->isLocalContext())
+        vd->setAccess(AccessLevel::Private);
+    return Action::Continue();
+  }
+};
+
+void TypeChecker::postTypeCheckMacroExpansion(Expr *E, DeclContext *DC) {
+  E->walk(ContextualizeClosures(DC));
+  E->walk(SetLocalMacroExpansionAccess());
+  if (auto *tlcd = dyn_cast<TopLevelCodeDecl>(DC))
+    checkTopLevelEffects(tlcd);
+  else
+    checkMacroExpansionEffects(DC, cast<MacroExpansionExpr>(E));
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a

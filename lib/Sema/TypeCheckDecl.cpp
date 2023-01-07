@@ -1600,18 +1600,26 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
-SmallVector<MacroDecl *, 1>
+MacroRoles
 TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroRoles contexts) {
+                          SourceLoc loc, MacroRoles contexts,
+                          SmallVectorImpl<MacroDecl *> &results) {
   auto result = lookupUnqualified(dc, DeclNameRef(macroName), loc,
                                   (defaultUnqualifiedLookupOptions |
-                                      NameLookupFlags::IncludeOuterResults));
-  SmallVector<MacroDecl *, 1> choices;
-  for (const auto &found : result.allResults())
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
-      if (contexts.contains(macro->getMacroRoles()))
-        choices.push_back(macro);
-  return choices;
+                                      NameLookupFlags::IncludeOuterResults |
+                                      NameLookupFlags::DisableMacroExpansions |
+                                      NameLookupFlags::MacroLookup));
+  MacroRoles foundRoles;
+  for (const auto &found : result.allResults()) {
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+      auto candidateRoles = macro->getMacroRoles();
+      if (contexts.contains(candidateRoles)) {
+        foundRoles |= candidateRoles;
+        results.push_back(macro);
+      }
+    }
+  }
+  return foundRoles;
 }
 
 /// Validate the given operator declaration.

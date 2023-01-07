@@ -30,6 +30,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -311,7 +312,6 @@ public:
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
   // are visited separately.
@@ -347,6 +347,7 @@ public:
   VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
   VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
   VISIT_AND_CREATE(MacroDecl, MacroDeclScope)
+  VISIT_AND_CREATE(MacroExpansionDecl, MacroExpansionDeclScope)
 
 #undef VISIT_AND_CREATE
 
@@ -431,7 +432,23 @@ public:
     // statement into nested scopes.
     for (auto braceElement : bs->getElements()) {
       if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
+        // The decl could be one value decl or multiple value decls from a macro
+        // expansion. Treat those from a macro expansion as part of the same
+        // parent scope.
+        SmallVector<ValueDecl *, 4> valueDecls;
         if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
+          valueDecls.push_back(vd);
+        } else if (auto *med = dyn_cast<MacroExpansionDecl>(localBinding)) {
+          if (auto *expanded = evaluateOrDefault(
+                  med->getASTContext().evaluator,
+                  ExpandMacroExpansionDeclRequest{med}, nullptr))
+            for (auto node : expanded->getElements())
+              if (auto *d = node.dyn_cast<Decl *>())
+                if (auto *vd = dyn_cast<ValueDecl>(d))
+                  valueDecls.push_back(vd);
+        }
+
+        for (auto *vd : valueDecls) {
           if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
             localFuncsAndTypes.push_back(vd);
           } else if (auto *var = dyn_cast<VarDecl>(localBinding)) {
@@ -705,6 +722,7 @@ NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(MacroDeclScope)
+NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
@@ -1126,10 +1144,17 @@ void DefaultArgumentInitializerScope::
 void AttachedPropertyWrapperScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
-  if (auto *args = attr->getArgs()) {
+  if (auto *args = attr->getArgs())
     for (auto arg : *args)
       scopeCreator.addToScopeTree(arg.getExpr(), this);
-  }
+}
+
+void MacroExpansionDeclScope::
+    expandAScopeThatDoesNotCreateANewInsertionPoint(
+        ScopeCreator &scopeCreator) {
+  if (auto *args = decl->getArgs())
+    for (auto arg : *args)
+      scopeCreator.addToScopeTree(arg.getExpr(), this);
 }
 
 #pragma mark expandScope

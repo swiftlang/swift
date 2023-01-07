@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
@@ -217,6 +218,10 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::DisableMacroExpansions))
+    newOptions |= UnqualifiedLookupFlags::DisableMacroExpansions;
+  if (options.contains(NameLookupFlags::MacroLookup))
+    newOptions |= UnqualifiedLookupFlags::MacroLookup;
 
   return newOptions;
 }

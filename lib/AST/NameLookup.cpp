@@ -107,10 +107,13 @@ void swift::simple_display(llvm::raw_ostream &out,
                            UnqualifiedLookupOptions options) {
   using Flag = std::pair<UnqualifiedLookupFlags, StringRef>;
   Flag possibleFlags[] = {
+      {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::AllowProtocolMembers, "AllowProtocolMembers"},
       {UnqualifiedLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
       {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
-      {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
+      {UnqualifiedLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
+      {UnqualifiedLookupFlags::DisableMacroExpansions, "DisableMacroExpansions"},
+      {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -1312,7 +1315,18 @@ MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
 }
 
 void MemberLookupTable::addMember(Decl *member) {
-  // Only value declarations matter.
+  // Peer through macro expansions.
+  if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
+    auto expanded = evaluateOrDefault(med->getASTContext().evaluator,
+                                      ExpandMacroExpansionDeclRequest{med},
+                                      nullptr);
+    if (expanded)
+      for (auto node : expanded->getElements())
+        if (auto *decl = node.dyn_cast<Decl *>())
+          addMember(decl);
+    return;
+  }
+
   auto vd = dyn_cast<ValueDecl>(member);
   if (!vd)
     return;
@@ -1987,7 +2001,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   };
 
   // Add all of the nominal types to the stack.
-  for (auto nominal : typeDecls) {
+  for (auto nominal: typeDecls) {
     addNominalType(nominal);
   }
 

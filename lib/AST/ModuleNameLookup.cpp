@@ -81,12 +81,13 @@ private:
   }
 
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
+                     NLOptions options,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
     // If this import is specific to some named decl ("import Swift.Int")
     // then filter out any lookups that don't match.
     if (!path.matches(name))
       return;
-    module->lookupValue(name, lookupKind, localDecls);
+    module->lookupValue(name, lookupKind, options, localDecls);
   }
 };
 
@@ -112,6 +113,7 @@ private:
   }
 
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
+                     NLOptions options,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
     VectorDeclConsumer consumer(localDecls);
     module->lookupVisibleDecls(path, consumer, lookupKind);
@@ -169,7 +171,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
   // Do the lookup into the current module.
   auto *module = moduleOrFile->getParentModule();
-  getDerived()->doLocalLookup(module, accessPath, decls);
+  getDerived()->doLocalLookup(module, accessPath, options, decls);
   updateNewDecls(moduleScopeContext);
 
   bool canReturnEarly = (initialCount != decls.size() &&
@@ -198,7 +200,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         return;
 
       getDerived()->doLocalLookup(import.importedModule, import.accessPath,
-                                  decls);
+                                  options, decls);
       updateNewDecls(moduleScopeContext);
     };
 

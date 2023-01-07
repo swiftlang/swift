@@ -1898,8 +1898,8 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   evaluateOrDefault(
       getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
 
-  // Ill-formed code might not be able to assign discriminators, so assign
-  // a new one now.
+  // Ill-formed code or macro expansions might not be able to assign
+  // discriminators, so assign a new one now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       getASTContext().Diags.hadAnyError()) {
     const_cast<AbstractClosureExpr *>(this)->

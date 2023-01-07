@@ -272,13 +272,15 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   auto localCounter = lookupCounter;
   (void)localCounter; // for debugging
 #endif
+  auto *sf = DC->getParentSourceFile();
   FrontendStatsTracer StatsTracer(Ctx.Stats,
                                   "performUnqualifiedLookup",
-                                  DC->getParentSourceFile());
+                                  sf);
 
-  if (Loc.isValid() && DC->getParentSourceFile()) {
-    // Operator lookup is always global, for the time being.
-    if (!Name.isOperator())
+  if (Loc.isValid() && sf) {
+    // Operator and macro lookups are always global, for the time being.
+    if (!Name.isOperator() &&
+        !options.contains(UnqualifiedLookupFlags::MacroLookup))
       lookInASTScopes();
   } else {
     assert((DC->isModuleScopeContext() || !DC->getParentSourceFile()) &&
@@ -520,6 +522,13 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(Flags::DisableMacroExpansions) ||
+      // Macro expansions will be disabled if we are performing the lookup from
+      // within a `MacroDecl` and `MacroExpansionDecl`.
+      (dc->getParentSourceFile() &&
+       ASTScope::isLocWithinMacroDeclOrTopLevelMacroExpansionDeclScope(
+           dc->getParentSourceFile(), Loc)))
+    nlOptions |= NL_DisableMacroExpansions;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 

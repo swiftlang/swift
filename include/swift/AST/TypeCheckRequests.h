@@ -3823,7 +3823,7 @@ public:
 /// Find the definition of a given macro.
 class ExpandMacroExpansionDeclRequest
     : public SimpleRequest<ExpandMacroExpansionDeclRequest,
-                           ArrayRef<Decl *>(MacroExpansionDecl *),
+                           BraceStmt *(MacroExpansionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3831,8 +3831,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
-                            MacroExpansionDecl *med) const;
+  BraceStmt *evaluate(Evaluator &evaluator, MacroExpansionDecl *med) const;
 
 public:
   bool isCached() const { return true; }

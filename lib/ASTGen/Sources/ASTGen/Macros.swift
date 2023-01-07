@@ -169,23 +169,26 @@ func evaluateMacro(
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      guard let parentExpansion = parentSyntax.as(MacroExpansionExprSyntax.self) else {
-        print("not on a macro expansion node: \(token.recursiveDescription)")
+      if let expr = parentSyntax.as(MacroExpansionExprSyntax.self) {
+        macroName = expr.macro.withoutTrivia().description
+        evaluatedSyntax = Syntax(try exprMacro.expansion(of: expr, in: &context))
+      } else if let decl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
+        macroName = decl.macro.withoutTrivia().description
+        evaluatedSyntax = Syntax(
+            try exprMacro.expansion(of: decl.asMacroExpansionExpr(), in: &context))
+      } else {
+        print("not a macro expansion expr; found \(parentSyntax.kind)")
         return -1
       }
-      macroName = parentExpansion.macro.withoutTrivia().description
-      evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
     case let declMacro as FreestandingDeclarationMacro.Type:
       guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
-        print("not on a macro expansion node: \(token.recursiveDescription)")
+        print("not a macro expansion decl; found \(parentSyntax.kind)")
         return -1
       }
-      let decls = try declMacro.expansion(of: parentExpansion, in: &context)
+      evaluatedSyntax = Syntax(try declMacro.expansion(of: parentExpansion, in: &context))
       macroName = parentExpansion.macro.withoutTrivia().description
-      evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
-        decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
 
     default:
       print("not an expression macro or a freestanding declaration macro")

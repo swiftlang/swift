@@ -352,7 +352,7 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind, NLOptions options,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual StringRef

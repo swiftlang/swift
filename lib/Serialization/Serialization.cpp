@@ -2231,7 +2231,7 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");
-  }
+}
 
 static uint8_t getRawStableMacroIntroducedDeclNameKind(
     swift::MacroIntroducedDeclNameKind kind) {

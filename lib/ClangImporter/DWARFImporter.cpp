@@ -32,7 +32,7 @@ public:
   /// Forwards the request to the ClangImporter, which forwards it to the
   /// DWARFimporterDelegate.
   virtual void
-  lookupValue(DeclName name, NLKind lookupKind,
+  lookupValue(DeclName name, NLKind lookupKind, NLOptions options,
               SmallVectorImpl<ValueDecl *> &results) const override {
     Owner.lookupValueDWARF(name, lookupKind,
                            getParentModule()->getName(), results);

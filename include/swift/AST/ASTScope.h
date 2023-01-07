@@ -278,10 +278,12 @@ private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
                                                         const SourceLoc where);
 
-protected:
+public:
   /// Not const because may reexpand some scopes.
   ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
                                             NullablePtr<raw_ostream>);
+
+protected:
   ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
                                                 NullablePtr<raw_ostream>,
                                                 SourceManager &,
@@ -1214,6 +1216,29 @@ public:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
+};
+
+class MacroExpansionDeclScope final : public ASTScopeImpl {
+public:
+  MacroExpansionDecl *const decl;
+
+  MacroExpansionDeclScope(MacroExpansionDecl *d) : decl(d) {}
+  virtual ~MacroExpansionDeclScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+
+public:
+  virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
+  Decl *getDecl() const { return decl; }
 };
 
 class AbstractStmtScope : public ASTScopeImpl {
