@@ -22,14 +22,11 @@
 using namespace swift;
 
 void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
-                                                     unsigned startBitNo) {
-  unsigned endBitNo = startBitNo + 1;
-
+                                                     unsigned bitNo) {
   // If, we are visiting this block, then it is not already LiveOut. Mark it
   // LiveWithin to indicate a liveness boundary within the block.
-  markBlockLive(userBB, startBitNo, endBitNo, LiveWithin);
+  markBlockLive(userBB, bitNo, LiveWithin);
 
-  // Specialize the given code for scalar code.
   BasicBlockWorklist worklist(userBB->getFunction());
   worklist.push(userBB);
 
@@ -39,12 +36,12 @@ void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
     // Traversal terminates at any previously visited block, including the
     // blocks initialized as definition blocks.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      switch (getBlockLiveness(predBlock, startBitNo)) {
+      switch (getBlockLiveness(predBlock, bitNo)) {
       case Dead:
         worklist.pushIfNotVisited(predBlock);
         LLVM_FALLTHROUGH;
       case LiveWithin:
-        markBlockLive(predBlock, startBitNo, endBitNo, LiveOut);
+        markBlockLive(predBlock, bitNo, LiveOut);
         break;
       case LiveOut:
         break;
