@@ -174,7 +174,8 @@ static void emitPackExpansionType(IRGenFunction &IGF,
   auto genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
 
   // Create an opened element signature and environment.
-  auto elementSig = IGF.IGM.Context.getOpenedElementSignature(genericSig);
+  auto elementSig = IGF.IGM.Context.getOpenedElementSignature(
+      genericSig, expansionTy.getCountType());
   auto *elementEnv = GenericEnvironment::forOpenedElement(
       elementSig, UUID::fromTime(), subMap);
 

@@ -1424,7 +1424,8 @@ void PotentialBindings::infer(Constraint *constraint) {
       // Produce a potential binding to the opened element archetype corresponding
       // to the pack type.
       packType = packType->mapTypeOutOfContext();
-      auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator());
+      auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
+                                                      packType->getReducedShape());
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 

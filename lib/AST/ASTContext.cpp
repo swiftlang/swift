@@ -356,9 +356,10 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
       ExistentialSignatures;
 
-  /// The element signature for a generic signature, constructed by dropping
-  /// the parameter pack bit from generic parameters.
-  llvm::DenseMap<const GenericSignatureImpl *,
+  /// The element signature for a generic signature, which contains a clone
+  /// of the context generic signature with new type parameters and requirements
+  /// for opened pack elements in the given shape equivalence class.
+  llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>,
                  CanGenericSignature> ElementSignatures;
 
   /// Overridden declarations.
@@ -5624,9 +5625,11 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
 }
 
 CanGenericSignature
-ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
+ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
+                                      CanType shapeClass) {
   auto &sigs = getImpl().ElementSignatures;
-  auto found = sigs.find(baseGenericSig.getPointer());
+  auto key = std::make_pair(shapeClass, baseGenericSig.getPointer());
+  auto found = sigs.find(key);
   if (found != sigs.end())
     return found->second;
 
@@ -5718,7 +5721,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
   auto elementSig = buildGenericSignature(
       *this, GenericSignature(), genericParams, requirements)
           .getCanonicalSignature();
-  sigs[baseGenericSig.getPointer()] = elementSig;
+  sigs[key] = elementSig;
   return elementSig;
 }
 
