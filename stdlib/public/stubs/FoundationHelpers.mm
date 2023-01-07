@@ -80,6 +80,28 @@ _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
   return _CFStringHashCString(bytes, length);
 }
 
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_UInt16
+_swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
+                                          _swift_shims_CFIndex index) {
+  typedef _swift_shims_UInt16 (*CharacterAtIndexImplPtr)(id, SEL, _swift_shims_CFIndex);
+  struct CharacterAtIndexCache {
+    id _Nonnull obj;
+    CharacterAtIndexImplPtr impl;
+    //I would love to put a length + characters ptr pair here, but I don't want std::atomic to have to use a lock
+  };
+  static std::atomic<CharacterAtIndexCache> characterAtIndexCache;
+  
+  auto cache = characterAtIndexCache.load(std::memory_order_relaxed)
+  if cache.obj != obj {
+    cache.obj = obj;
+    cache.impl = object_getMethodImplementation(obj, @selector(characterAtIndex:));
+    characterAtIndexCache.store(cache, std::memory_order_relaxed);
+    return cache.impl
+  }
+  return cache.impl(obj, @selector(characterAtIndex:), index);
+}
+
 const __swift_uint8_t *
 _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
                                                   unsigned long encoding) {

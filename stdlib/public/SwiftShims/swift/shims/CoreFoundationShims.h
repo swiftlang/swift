@@ -38,6 +38,7 @@ typedef signed long _swift_shims_CFIndex;
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint8_t _swift_shims_UInt8;
+typedef __swift_uint16_t _swift_shims_UInt16;
 typedef __swift_uint32_t _swift_shims_CFStringEncoding;
 
 /* This is layout-compatible with constant CFStringRefs on Darwin */
@@ -58,6 +59,11 @@ SWIFT_RUNTIME_STDLIB_API
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length);
+
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_UInt16
+_swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
+                                          _swift_shims_CFIndex index);
 
 SWIFT_RUNTIME_STDLIB_API
 const __swift_uint8_t * _Nullable

@@ -153,17 +153,10 @@ internal func _cocoaStringCopyCharacters(
 }
 
 @_effects(readonly)
-private func _NSStringGetCharacter(
-  _ target: _StringSelectorHolder, _ position: Int
-) -> UTF16.CodeUnit {
-  return target.character(at: position)
-}
-
-@_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
-  return _NSStringGetCharacter(_objc(target), position)
+  return _swift_stdlib_CFStringGetCharacterAtIndex(target, position)
 }
 
 @_effects(releasenone)
