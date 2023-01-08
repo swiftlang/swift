@@ -321,7 +321,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
     replaceBranchTarget(TI, CCBBlock, TargetFailureBB,
     /*PreserveArgs=*/true);
   }
-  Cloner.updateOSSAAfterCloning();
+  Cloner.updateSSAAfterCloning();
 }
 
 /// Create a copy of the BB or reuse BB as a landing basic block for all
@@ -383,7 +383,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
     SILBuilderWithScope Builder(clonedCCBI);
     Builder.createBranch(clonedCCBI->getLoc(), successBB, {SuccessArg});
     clonedCCBI->eraseFromParent();
-    Cloner.updateOSSAAfterCloning();
+    Cloner.updateSSAAfterCloning();
     return;
   }
   // Remove all uses from the failure path so RAUW can erase the
@@ -395,7 +395,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
   // Create nested borrow scopes for new phis either created for the
   // checked_cast's results or during SSA update. This puts the SIL in
   // valid OSSA form before calling OwnershipRAUWHelper.
-  Cloner.updateOSSAAfterCloning();
+  Cloner.updateSSAAfterCloning();
 
   auto *clonedSuccessArg = successBB->getArgument(0);
   OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg);
@@ -789,7 +789,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     edit->modifyCFGForSuccessPreds(Cloner, rauwContext);
 
     if (Cloner.wasCloned()) {
-      Cloner.updateOSSAAfterCloning();
+      Cloner.updateSSAAfterCloning();
 
       if (!Cloner.getNewBB()->pred_empty())
         BlocksForWorklist.push_back(Cloner.getNewBB());

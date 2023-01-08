@@ -273,18 +273,8 @@ public:
     bi->eraseFromParent();
   }
 
-  /// Create phis and maintain OSSA invariants.
-  ///
-  /// Note: This must be called after calling cloneBlock or cloneBranchTarget,
-  /// before using any OSSA utilities.
-  ///
-  /// The client may perform arbitrary branch fixups and dead block removal
-  /// after cloning and before calling this.
-  ///
-  /// WARNING: If client converts terminator results to phis (e.g. replaces a
-  /// switch_enum with a branch), then it must call this before performing that
-  /// transformation, or fix the OSSA representation of that value itself.
-  void updateOSSAAfterCloning();
+  /// Helper function to perform SSA updates
+  void updateSSAAfterCloning();
 
   /// Get the newly cloned block corresponding to `origBB`.
   SILBasicBlock *getNewBB() {
@@ -294,13 +284,6 @@ public:
   bool wasCloned() { return isBlockCloned(origBB); }
 
 protected:
-  /// Helper function to perform SSA updates used by updateOSSAAfterCloning.
-  void updateSSAAfterCloning(SmallVectorImpl<SILPhiArgument *> &newPhis);
-
-  /// Given a terminator result, either from the original or the cloned block,
-  /// update OSSA for any phis created for the result during edge splitting.
-  void updateOSSATerminatorResult(SILPhiArgument *termResult);
-
   // MARK: CRTP overrides.
 
   /// Override getMappedValue to allow values defined outside the block to be
