@@ -175,7 +175,6 @@ bool SILPhiArgument::getIncomingPhiOperands(
     return false;
 
   const auto *parentBlock = getParent();
-  assert(!parentBlock->pred_empty());
 
   unsigned argIndex = getIndex();
   for (auto *predBlock : getParent()->getPredecessorBlocks()) {
