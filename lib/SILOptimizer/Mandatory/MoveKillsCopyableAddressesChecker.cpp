@@ -141,6 +141,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/GraphNodeWorklist.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Consumption.h"
@@ -182,15 +183,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
-
-namespace llvm {
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SmallBitVector &bv) {
-  for (unsigned index : range(bv.size())) {
-    os << (bv[index] ? 1 : 0);
-  }
-  return os;
-}
-} // namespace llvm
 
 static SourceLoc getSourceLocFromValue(SILValue value) {
   if (auto *defInst = value->getDefiningInstruction())
