@@ -213,14 +213,19 @@ struct TypeTreeLeafTypeRange {
   SubElementNumber startEltOffset;
   SubElementNumber endEltOffset;
 
-private:
+public:
+  TypeTreeLeafTypeRange() : startEltOffset(0), endEltOffset(0) {}
+
   TypeTreeLeafTypeRange(SubElementNumber start, SubElementNumber end)
       : startEltOffset(start), endEltOffset(end) {}
 
-public:
   /// The leaf type range for the entire type tree.
   TypeTreeLeafTypeRange(SILValue rootAddress)
       : startEltOffset(0), endEltOffset(TypeSubElementCount(rootAddress)) {}
+
+  /// The leaf type range for the entire type tree.
+  TypeTreeLeafTypeRange(SILType rootType, SILFunction *fn)
+      : startEltOffset(0), endEltOffset(TypeSubElementCount(rootType, fn)) {}
 
   /// The leaf type sub-range of the type tree of \p rootAddress, consisting of
   /// \p projectedAddress and all of \p projectedAddress's descendent fields in
