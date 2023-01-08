@@ -274,6 +274,11 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   registerIRGenSILTransforms(*Context);
 
+  if (Invocation.getFrontendOptions().RequestedAction ==
+        FrontendOptions::ActionType::MergeModules ||
+      Invocation.getLangOptions().DebuggerSupport)
+    Invocation.getLangOptions().EnableDeserializationSafety = false;
+
   if (setUpModuleLoaders())
     return true;
 

@@ -1201,8 +1201,8 @@ else()
     add_subdirectory(stdlib/public/BackDeployConcurrency)
   endif()
 
-  # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
-  # ensure we build that when building tools.
+  # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
+  # so ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()

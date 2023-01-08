@@ -33,7 +33,7 @@
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.String",
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"\""
+// CHECK-NEXT:              "value": ""
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
@@ -57,7 +57,7 @@
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.String",
 // CHECK-NEXT:              "valueKind": "RawLiteral",
-// CHECK-NEXT:              "value": "\"hello\""
+// CHECK-NEXT:              "value": "hello"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",

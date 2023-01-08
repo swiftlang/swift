@@ -19,8 +19,8 @@
 
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Reflection/TypeRef.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeRef.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include <iostream>
 
 using namespace swift;

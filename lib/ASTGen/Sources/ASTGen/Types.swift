@@ -72,7 +72,7 @@ extension ASTGenVisitor {
 
     return .type(
       elements.withBridgedArrayRef { elements in
-        return IdentTypeRepr_create(self.ctx, elements)
+        return DeclRefTypeRepr_create(self.ctx, elements)
       })
   }
 
@@ -118,8 +118,8 @@ extension ASTGenVisitor {
 
   public func visit(_ node: PackExpansionTypeSyntax) -> ASTNode {
     let base = visit(node.patternType).rawValue
-    let ellipsisLoc = self.base.advanced(by: node.ellipsis.position.utf8Offset).raw
-    return .type(PackExpansionTypeRepr_create(self.ctx, base, ellipsisLoc))
+    let repeatLoc = self.base.advanced(by: node.repeatKeyword.position.utf8Offset).raw
+    return .type(PackExpansionTypeRepr_create(self.ctx, base, repeatLoc))
   }
 
   public func visit(_ node: TupleTypeSyntax) -> ASTNode {

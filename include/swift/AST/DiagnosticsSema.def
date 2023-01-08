@@ -3290,8 +3290,14 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
       (DeclAttribute, AccessLevel))
 
 ERROR(attr_has_no_effect_decl_not_available_before,none,
-      "'%0' has no effect because %1 is not available before %2 %3",
-      (DeclAttribute, DeclName, StringRef, llvm::VersionTuple))
+      "'%0' has no effect because %select{getter for |setter for |}1%2 is not "
+      "available before %3 %4",
+      (DeclAttribute, unsigned, DeclName, StringRef, llvm::VersionTuple))
+
+ERROR(attr_has_no_effect_on_unavailable_decl,none,
+      "'%0' has no effect because %select{getter for |setter for |}1%2 is "
+      "unavailable on %3",
+      (DeclAttribute, unsigned, DeclName, StringRef))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
@@ -5157,6 +5163,9 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
+ERROR(vararg_not_allowed,none,
+      "variadic parameter cannot appear outside of a function parameter list",
+      ())
 ERROR(expansion_not_allowed,none,
       "variadic expansion %0 cannot appear outside of a function parameter list, "
       "function result, tuple element or generic argument list", (Type))

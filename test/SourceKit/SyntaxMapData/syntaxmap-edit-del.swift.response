@@ -83,7 +83,7 @@
           key.column: 8,
           key.filepath: syntaxmap-edit-del.swift,
           key.severity: source.diagnostic.severity.note,
-          key.id: "note_in_decl_extension",
+          key.id: "note_in_decl_of",
           key.description: "in declaration of 'Foo'"
         }
       ]

@@ -36,11 +36,10 @@ public:
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
-  } kind;
 
-  /// The buffer ID for the enclosing buffer, in which originalSourceRange
-  /// resides.
-  unsigned originalBufferID;
+    /// Pretty-printed declarations that have no source location.
+    PrettyPrinted,
+  } kind;
 
   /// The source range in the enclosing buffer where this source was generated.
   ///

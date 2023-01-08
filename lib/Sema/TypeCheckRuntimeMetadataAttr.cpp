@@ -52,7 +52,7 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
                                bool forMetatype = false) {
   assert(typeContext->isTypeContext());
 
-  SmallVector<ComponentIdentTypeRepr *, 2> components;
+  SmallVector<IdentTypeRepr *, 2> components;
 
   auto &ctx = typeContext->getASTContext();
   DeclContext *DC = typeContext;
@@ -82,7 +82,7 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
   if (components.size() == 1) {
     typeRepr = components.front();
   } else {
-    typeRepr = CompoundIdentTypeRepr::create(ctx, components);
+    typeRepr = MemberTypeRepr::create(ctx, components);
   }
 
   if (forMetatype)

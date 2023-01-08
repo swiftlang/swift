@@ -298,7 +298,8 @@ func blender(_ peeler : () -> Void) {
   // expected-warning@-1 3{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   blender((peelBanana))
-  // expected-warning@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  // expected-warning@-1 2{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+
   await wisk(peelBanana)
   // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 

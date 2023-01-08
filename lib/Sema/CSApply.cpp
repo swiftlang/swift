@@ -3818,6 +3818,10 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
+      auto *locator = cs.getConstraintLocator(expr);
+      auto *environment = cs.getPackElementEnvironment(locator);
+      expr->setGenericEnvironment(environment);
+
       return simplifyExprType(expr);
     }
 

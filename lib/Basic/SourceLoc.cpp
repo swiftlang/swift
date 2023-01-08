@@ -260,6 +260,7 @@ void SourceManager::setGeneratedSourceInfo(
 
   switch (info.kind) {
   case GeneratedSourceInfo::MacroExpansion:
+  case GeneratedSourceInfo::PrettyPrinted:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:

@@ -5,7 +5,7 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
                            SHARED DONT_EMBED_BITCODE NOSWIFTRT
                            SwiftRemoteMirror.cpp
                            LINK_LIBRARIES
-                             swiftReflection
+                             swiftRemoteInspection
                            C_COMPILE_FLAGS
                              ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftRemoteMirror_EXPORTS -I${LLVM_MAIN_INCLUDE_DIR}
                            LINK_FLAGS

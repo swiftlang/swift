@@ -7,7 +7,7 @@
 
 struct G<T...> {
   func makeTuple() {
-    print(((Array<T>)...).self)
+    print((repeat (Array<T>)).self)
   }
 }
 

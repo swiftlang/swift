@@ -288,7 +288,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
   // ActiveTaskStatusWithoutEscalation in
-  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // include/swift/RemoteInspection/RuntimeInternals.h. Any changes to the layout here
   // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
