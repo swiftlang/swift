@@ -620,6 +620,10 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
 bool SILValueOwnershipChecker::
     hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
         SILPhiArgument *phi) const {
+  // For a phi in a trivially dead block, return true.
+  if (phi->getParentBlock()->pred_empty()) {
+    return true;
+  }
   bool foundGuaranteedForwardingPhiOperand = false;
   bool foundNonGuaranteedForwardingPhiOperand = false;
   phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *operand) -> bool {

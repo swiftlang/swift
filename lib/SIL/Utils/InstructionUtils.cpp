@@ -279,8 +279,9 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   switch (user->getKind()) {
   default:
     return false;
-  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::StrongReleaseInst:

@@ -292,7 +292,7 @@ void DCE::markLive() {
           });
         };
         // If we have a begin_borrow of a @guaranteed operand, disable DCE'ing
-        // of parent borrow scopes. Dead reborrows needs complex handling, whuch
+        // of parent borrow scopes. Dead reborrows needs complex handling, which
         // is why it is disabled for now.
         if (borrowInst->getOperand()->getOwnershipKind() ==
             OwnershipKind::Guaranteed) {
