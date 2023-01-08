@@ -21,8 +21,9 @@
 # TODO: /*test/stdlib/
 # TODO: /unittests/stdlib/
 
-# Owners of ASTGen
-lib/ASTGen @zoecarver @CodaFi
+# ASTGen
+/lib/ASTGen/  @zoecarver @CodaFi
+/test/ASTGen/ @zoecarver @CodaFi
 
 # Dependency scanning
 include/swift/DependencyScan                 @artemcm
