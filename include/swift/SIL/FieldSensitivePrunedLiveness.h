@@ -196,6 +196,10 @@ struct TypeSubElementCount {
   TypeSubElementCount(SILType type, SILModule &mod,
                       TypeExpansionContext context);
 
+  /// Helper method that invokes the SILModule &mod entry point.
+  TypeSubElementCount(SILType type, SILFunction *fn)
+      : TypeSubElementCount(type, fn->getModule(), TypeExpansionContext(*fn)) {}
+
   TypeSubElementCount(SILValue value)
       : TypeSubElementCount(value->getType(), *value->getModule(),
                             TypeExpansionContext(*value->getFunction())) {}
