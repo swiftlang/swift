@@ -2029,15 +2029,19 @@ swift::_getRef__AbstractClosureExpr_getActorIsolation() {
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
   SourceRange CLASS::getSourceRange() const {     \
+    if (!NODE) { return SourceRange(); }          \
     return (NODE)->getSourceRange();              \
   }                                               \
   SourceLoc CLASS::getStartLoc() const {          \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getStartLoc();                 \
   }                                               \
   SourceLoc CLASS::getEndLoc() const {            \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getEndLoc();                   \
   }                                               \
   SourceLoc CLASS::getLoc() const {               \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getStartLoc();                 \
   }
 

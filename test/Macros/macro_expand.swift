@@ -92,3 +92,10 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}
 #endif
 }
+
+// Make sure we don't crash with declarations produced by expansions.
+@expression macro nestedDeclInExpr: () -> Void = #externalMacro(module: "MacroDefinition", type: "NestedDeclInExprMacro")
+
+func testNestedDeclInExpr() {
+  let _: () -> Void = #nestedDeclInExpr
+}
