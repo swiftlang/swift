@@ -1794,6 +1794,9 @@ enum class ConstraintSystemFlags {
 
   /// When set, ignore async/sync mismatches
   IgnoreAsyncSyncMismatch = 0x80,
+
+  /// Disable macro expansions.
+  DisableMacroExpansions = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.

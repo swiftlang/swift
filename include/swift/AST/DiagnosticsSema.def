@@ -6779,6 +6779,8 @@ ERROR(external_macro_not_found,none,
       "'-load-plugin-library'", (StringRef, StringRef, DeclName))
 ERROR(macro_must_be_defined,none,
       "macro %0 requires a definition", (DeclName))
+ERROR(external_macro_outside_macro_definition,none,
+      "macro 'externalMacro' can only be used to define another macro", ())
 NOTE(macro_note, none,
      "%1 (in macro %0)", (DeclName, StringRef))
 WARNING(macro_warning, none,

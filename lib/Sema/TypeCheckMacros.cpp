@@ -234,7 +234,8 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   PrettyStackTraceDecl debugStack("type checking macro definition", macro);
   Type typeCheckedType = TypeChecker::typeCheckExpression(
-      definition, macro, contextualType);
+      definition, macro, contextualType,
+      TypeCheckExprFlags::DisableMacroExpansions);
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
 
@@ -352,7 +353,8 @@ Expr *swift::expandMacroExpr(
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
-      // FIXME: Error here.
+        ctx.Diags.diagnose(
+            expr->getLoc(), diag::external_macro_outside_macro_definition);
       return nullptr;
     }
   }

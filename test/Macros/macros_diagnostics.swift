@@ -102,3 +102,7 @@ func testMissing() {
 
 @expression macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
 
+func testExternalMacroOutOfPlace() {
+  let _: Int = #externalMacro(module: "A", type: "B")
+  // expected-error@-1{{macro 'externalMacro' can only be used to define another macro}}
+}
