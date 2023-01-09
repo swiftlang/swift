@@ -93,14 +93,13 @@ _swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
     CharacterAtIndexImplPtr impl;
     //I would love to put a length + characters ptr pair here, but I don't want std::atomic to have to use a lock
   };
-  static std::atomic<CharacterAtIndexCache> characterAtIndexCache;
+  static CharacterAtIndexCache characterAtIndexCache;
   
-  auto cache = characterAtIndexCache.load(std::memory_order_relaxed);
+  auto cache = characterAtIndexCache;
   if (cache.obj != obj) {
     cache.obj = obj;
     cache.impl = (CharacterAtIndexImplPtr)object_getMethodImplementation(obj, @selector(characterAtIndex:));
-    characterAtIndexCache.store(cache, std::memory_order_relaxed);
-    return cache.impl(obj, @selector(characterAtIndex:), index);
+    characterAtIndexCache = cache;
   }
   return cache.impl(obj, @selector(characterAtIndex:), index);
 }
