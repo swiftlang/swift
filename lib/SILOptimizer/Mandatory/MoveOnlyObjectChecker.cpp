@@ -92,7 +92,7 @@ bool MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
       auto *cvi = dyn_cast<CopyValueInst>(&*ii);
       ++ii;
 
-      if (!cvi || !cvi->getOperand()->getType().isMoveOnlyWrapped())
+      if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
         continue;
 
       SILBuilderWithScope b(cvi);
@@ -326,6 +326,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   // First search for candidates to process and emit diagnostics on any
   // mark_must_check [noimplicitcopy] we didn't recognize.
   bool emittedDiagnostic = searchForCandidateMarkMustChecks(diagnosticEmitter);
+  LLVM_DEBUG(llvm::dbgs()
+             << "Emitting diagnostic when checking for mark must check inst: "
+             << (emittedDiagnostic ? "yes" : "no") << '\n');
 
   // If we didn't find any introducers to check, just return if we emitted an
   // error (which is the only way we emitted a change to the instruction
@@ -354,6 +357,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     // First canonicalize ownership.
     if (!canonicalizer.canonicalize(markedValue)) {
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "Emitted checker doesnt understand diagnostic! Exiting early!\n");
       continue;
     } else {
       // Always set changed to true if we succeeded in canonicalizing since we
@@ -382,6 +388,8 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   }
 
   emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
+  LLVM_DEBUG(llvm::dbgs() << "Emitting checker based diagnostic: "
+                          << (emittedDiagnostic ? "yes" : "no") << '\n');
 
   // Ok, we have success. All of our marker instructions were proven as safe or
   // we emitted a diagnostic. Now we need to clean up the IR by eliminating our
@@ -472,6 +480,17 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (MoveOnlyChecker(getFunction(), deAnalysis)
             .check(accessBlockAnalysis, domTree)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
+
+    if (getOptions().VerifyAll) {
+      for (auto &block : *getFunction()) {
+        for (auto &inst : block) {
+          if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
+            assert(!cvi->getOperand()->getType().isMoveOnly() &&
+                   "Shouldn't copy move only types at this point");
+          }
+        }
+      }
     }
   }
 };

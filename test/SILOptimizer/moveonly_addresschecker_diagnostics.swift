@@ -126,11 +126,11 @@ public func classMultipleNonConsumingUseArgTest(_ x2: inout Klass) { // expected
     print(x2) // expected-note {{consuming use}}
 }
 
-public func classMultipleNonConsumingUseArgTest2(_ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func classMultipleNonConsumingUseArgTest2(_ x2: inout Klass) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     classUseMoveOnlyWithoutEscaping(x2)
     classUseMoveOnlyWithoutEscaping(x2)
     print(x2) // expected-note {{consuming use}}
-    classUseMoveOnlyWithoutEscaping(x2)
+    classUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
 }
 
 public func classMultipleNonConsumingUseArgTest3(_ x2: inout Klass) {  // expected-error {{'x2' consumed but not reinitialized before end of function}}
@@ -349,12 +349,11 @@ public func classAssignToVar5() {
     print(x3)
 }
 
-public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
-                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) {
+    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    classUseMoveOnlyWithoutEscaping(x2)
+    classUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
     x3 = x // expected-note {{consuming use}}
     print(x3)
 }
@@ -658,9 +657,17 @@ public func finalClassAssignToVar5() {
     print(x3)
 }
 
-public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) {
+    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     var x3 = x2 // expected-note {{consuming use}}
-    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
+    x3 = FinalKlass()
+    print(x3)
+}
+
+public func finalClassAssignToVar5Arg2(_ x2: inout FinalKlass) {
+    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    var x3 = x2 // expected-note {{consuming use}}
     x3 = FinalKlass()
     print(x3)
 }
@@ -1691,13 +1698,21 @@ public func enumAssignToVar5() {
     print(x3)
 }
 
-public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
-                                                            
+public func enumAssignToVar5Arg(_ x2: inout EnumTy) {
+    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     var x3 = x2 // expected-note {{consuming use}}
-    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
     x3 = EnumTy.klass(Klass())
     print(x3)
 }
+
+public func enumAssignToVar5Arg2(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                            
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = EnumTy.klass(Klass())
+    print(x3)
+}
+
 
 public func enumPatternMatchIfLet1() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' consumed more than once}}
@@ -1880,12 +1895,15 @@ public func closureClassUseAfterConsumeArg(_ argX: inout Klass) {
 }
 
 // We do not support captures of vars by closures today.
+//
+// TODO: Why are we erroring for the same variable twice?
 public func closureCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1896,6 +1914,22 @@ public func closureCaptureClassUseAfterConsume() {
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
+        // expected-note @-4 {{consuming use}}
+    }
+    f()
+}
+
+public func closureCaptureClassUseAfterConsume2() {
+    var x2 = Klass()
+    // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    x2 = Klass()
+    let f = {
+        classUseMoveOnlyWithoutEscaping(x2)
+        classConsume(x2)
+        // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
     }
     f()
 }
@@ -1906,6 +1940,7 @@ public func closureCaptureClassUseAfterConsumeError() {
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1916,6 +1951,7 @@ public func closureCaptureClassUseAfterConsumeError() {
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
+        // expected-note @-4 {{consuming use}}
     }
     f()
     let x3 = x2
@@ -1939,34 +1975,35 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
     f()
 }
 
-// TODO: Improve error msg here to make it clear the use is due to the defer.
 public func deferCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
-    defer {
+    defer { // expected-note {{non-consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        print(x2)
         // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
     }
-    print(x2)
+    print(x2) // expected-note {{consuming use}}
 }
 
 public func deferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = Klass()
-    defer {
+    defer { // expected-note {{non-consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
         print(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
-    // Shouldn't we get a use after free error on the defer?
-    let x3 = x2
+    let x3 = x2 // expected-note {{consuming use}}
     let _ = x3
 }
 
@@ -2007,10 +2044,16 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = Klass()
     let f = {
         classConsume(x2)
+        // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
         defer {
+            // expected-note @-1 {{non-consuming use}}
+            // expected-note @-2 {{non-consuming use}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
             print(x2)
@@ -2027,10 +2070,16 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = Klass()
     let f = {
         classConsume(x2)
+        // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
         defer {
+            // expected-note @-1 {{non-consuming use}}
+            // expected-note @-2 {{non-consuming use}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
             print(x2)
@@ -2071,6 +2120,7 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-5 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-6 {{'x2' consumed more than once}}
+    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2082,6 +2132,7 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
+            // expected-note @-4 {{consuming use}}
         }
         g()
     }
@@ -2096,6 +2147,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
     // expected-error @-6 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2107,6 +2159,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
+            // expected-note @-4 {{consuming use}}
         }
         g()
     }
@@ -2156,12 +2209,14 @@ func moveOperatorTest(_ k: __owned Klass) {
     // expected-error @-3 {{'k2' consumed more than once}}
     k2 = Klass()
     let k3 = _move k2 // expected-note {{consuming use}}
-    let _ = _move k2 // expected-note {{consuming use}}
-    _ = k2 // expected-note {{consuming use}}
-    let _ = k2
+    let _ = _move k2
     // expected-note @-1 {{consuming use}}
     // expected-note @-2 {{consuming use}}
-    // expected-note @-3 {{consuming use}}
+    _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
+    let _ = k2
+    // expected-note @-1 {{consuming use}}
     let _ = k3
 }
 
@@ -2180,13 +2235,17 @@ func blackHoleKlassTestCase(_ k: __owned Klass) {
 
     k2 = Klass()
     var _ = k2 // expected-note {{consuming use}}
-    var _ = k2 // expected-note {{consuming use}}
+    var _ = k2
+    // expected-note @-1 {{consuming use}}
+    // expected-note @-2 {{consuming use}}
 
-    _ = k2 // expected-note {{consuming use}}
     _ = k2
     // expected-note @-1 {{consuming use}}
     // expected-note @-2 {{consuming use}}
-    // expected-note @-3 {{consuming use}}
+
+    // TODO: Why do we not also get 2 errors here?
+    _ = k2
+    // expected-note @-1 {{consuming use}}
 }
 
 ///////////////////////////////////////
@@ -2216,14 +2275,14 @@ func copyableKlassInAMoveOnlyStruct3() {
     copyableClassUseMoveOnlyWithoutEscaping(a.copyableK) // expected-note {{non-consuming use}}
 }
 
-// FIXME: We want to transition to a field sensitive model which should cause
-// this to no longer error.
+// This used to error, but no longer errors since we are using a true field
+// sensitive model.
 func copyableKlassInAMoveOnlyStruct4() {
-    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    var a = NonTrivialStruct()
     a = NonTrivialStruct()
     copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
-    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
-    nonConsumingUseNonTrivialStruct2(a.nonTrivialStruct2) // expected-note {{non-consuming use}}
+    copyableClassConsume(a.copyableK)
+    nonConsumingUseNonTrivialStruct2(a.nonTrivialStruct2)
 }
 
 func copyableStructsInMoveOnlyStructNonConsuming() {
@@ -2235,3 +2294,72 @@ func copyableStructsInMoveOnlyStructNonConsuming() {
     nonConsumingUseNonTrivialCopyableStruct2(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2)
     copyableClassUseMoveOnlyWithoutEscaping(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass)
 }
+
+///////////////////////////
+// Field Sensitive Tests //
+///////////////////////////
+
+func fieldSensitiveTestReinitField () {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    classConsume(a.k)
+    a.k = Klass()
+    classUseMoveOnlyWithoutEscaping(a.k)
+}
+
+#if false
+func fieldSensitiveTestReinitFieldMultiBlock1 () {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    classConsume(a.k)
+
+    if boolValue {
+        a.k = Klass()
+        classUseMoveOnlyWithoutEscaping(a.k)
+    }
+}
+#endif
+
+func fieldSensitiveTestReinitFieldMultiBlock2 () {
+    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    a = NonTrivialStruct()
+    classConsume(a.k) // expected-note {{consuming use}}
+
+    if boolValue {
+        a.k = Klass()
+    }
+
+    classUseMoveOnlyWithoutEscaping(a.k) // expected-note {{non-consuming use}}
+}
+
+#if false
+func fieldSensitiveTestReinitFieldMultiBlock3 () {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    classConsume(a.k)
+
+    if boolValue {
+        a.k = Klass()
+    } else {
+        a.k = Klass()
+    }
+
+    classUseMoveOnlyWithoutEscaping(a.k)
+}
+#endif
+
+#if false
+func fieldSensitiveTestReinitFieldMultiBlock4 () {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    classConsume(a.k)
+
+    if boolValue {
+        a.k = Klass()
+    } else {
+        a = NonTrivialStruct()
+    }
+
+    classUseMoveOnlyWithoutEscaping(a.k)
+}
+#endif

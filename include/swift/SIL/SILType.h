@@ -495,6 +495,8 @@ public:
   SILType getFieldType(VarDecl *field, SILModule &M,
                        TypeExpansionContext context) const;
 
+  SILType getFieldType(VarDecl *field, SILFunction *fn) const;
+
   /// Given that this is an enum type, return the lowered type of the
   /// data for the given element.  Applies substitutions as necessary.
   /// The result will have the same value category as the base type.
