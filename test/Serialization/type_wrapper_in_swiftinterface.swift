@@ -31,6 +31,8 @@
 // RUN:   -module-name Client -I %t \
 // RUN:   -enable-experimental-feature TypeWrappers
 
+// REQUIRES: asserts
+
 //--- PublicModule.swift
 @typeWrapper
 public struct Wrapper<W : Wrapped, S> {
