@@ -1882,51 +1882,48 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   Optional<AvailabilityContext> EnclosingAnnotatedRange;
-  bool EnclosingDeclIsUnavailable = false;
-  Decl *EnclosingDecl = getEnclosingDeclForDecl(D);
-
-  while (EnclosingDecl) {
-    if (EnclosingDecl->getAttrs().getUnavailable(Ctx)) {
-      EnclosingDeclIsUnavailable = true;
-      break;
-    }
-
-    EnclosingAnnotatedRange =
-        AvailabilityInference::annotatedAvailableRange(EnclosingDecl, Ctx);
-
-    if (EnclosingAnnotatedRange.has_value())
-      break;
-
-    EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
-  }
-
   AvailabilityContext AttrRange{
       VersionRange::allGTE(attr->Introduced.value())};
 
-  if (EnclosingDecl) {
-    if (EnclosingDeclIsUnavailable) {
+  if (auto *parent = getEnclosingDeclForDecl(D)) {
+    if (auto enclosingUnavailable = parent->getSemanticUnavailableAttr()) {
       if (!AttrRange.isKnownUnreachable()) {
-        diagnose(D->isImplicit() ? EnclosingDecl->getLoc()
+        const Decl *enclosingDecl = enclosingUnavailable.value().second;
+        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : attr->getLocation(),
                  diag::availability_decl_more_than_unavailable_enclosing,
                  D->getDescriptiveKind());
-        diagnose(EnclosingDecl->getLoc(),
+        diagnose(parent->getLoc(),
                  diag::availability_decl_more_than_unavailable_enclosing_here);
       }
-    } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.value())) {
-      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
-               diag::availability_decl_more_than_enclosing,
-               D->getDescriptiveKind());
-      if (D->isImplicit())
-        diagnose(EnclosingDecl->getLoc(),
-                 diag::availability_implicit_decl_here,
-                 D->getDescriptiveKind(),
+    } else if (auto enclosingAvailable =
+                   parent->getSemanticAvailableRangeAttr()) {
+      const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
+      const Decl *enclosingDecl = enclosingAvailable.value().second;
+      EnclosingAnnotatedRange.emplace(
+          VersionRange::allGTE(enclosingAttr->Introduced.value()));
+      if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
+        // Members of extensions of nominal types with available ranges were
+        // not diagnosed previously, so only emit a warning in that case.
+        auto limit = (enclosingDecl != parent && isa<ExtensionDecl>(parent))
+                         ? DiagnosticBehavior::Warning
+                         : DiagnosticBehavior::Unspecified;
+        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
+                                 : attr->getLocation(),
+                 diag::availability_decl_more_than_enclosing,
+                 D->getDescriptiveKind())
+            .limitBehavior(limit);
+        if (D->isImplicit())
+          diagnose(enclosingDecl->getLoc(),
+                   diag::availability_implicit_decl_here,
+                   D->getDescriptiveKind(),
+                   prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+                   AttrRange.getOSVersion().getLowerEndpoint());
+        diagnose(enclosingDecl->getLoc(),
+                 diag::availability_decl_more_than_enclosing_here,
                  prettyPlatformString(targetPlatform(Ctx.LangOpts)),
-                 AttrRange.getOSVersion().getLowerEndpoint());
-      diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_enclosing_here,
-               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
-               EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
+                 EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
+      }
     }
   }
 
