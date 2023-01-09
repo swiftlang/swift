@@ -13,7 +13,12 @@
 #ifndef SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
 #define SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
 
+#include "swift/AST/TypeExpansionContext.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/PrunedLiveness.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -57,23 +62,30 @@ namespace swift {
 /// Linearized Representation of Enums
 /// ----------------------------------
 ///
-/// Since enums are sum types, an enum can require different numbers of bits in
-/// its linearized representation depending on the payload of the case that the
-/// enum is initialized to. To work around this problem in our representation,
-/// we always store enough bits for the max sized payload of all cases of the
-/// enum and add an additional last bit for the discriminator. Any extra bits
-/// that may be needed (e.x.: we are processing a enum case with a smaller
-/// payload) are always assumed to be set to the same value that the
-/// discriminator bit is set to. This representation allows us to track liveness
-/// trading off the ability to determine information about the actual case that
-/// we are tracking. Since we just care about liveness, this is a trade off that
-/// we are willing to make since our goal (computing liveness) is still solved.
+/// Since enums are sum types, our representation of enums must deal with the
+/// following problems:
+///
+/// 1. An enum can require different numbers of bits in its linearized
+/// representation depending on the payload of the case that the enum is
+/// initialized to.
+///
+/// 2. It is important that we be able to construct the exact enum case that our
+/// sub-element corresponds to. This implies we must in our representation store
+/// in some manner the actual case information. To do so, our representation
+/// uses 1 + log2(num enum cases) bits. The first bit shows
+///
+/// To work around this problem in our representation, we always
+/// store enough bits for the max sized payload of all cases of the enum and add
+/// an additional set of last bits for the discriminator. Any extra bits that
+/// may be needed (e.x.: we are processing a enum case with a smaller payload)
+/// are always assumed to be set to the same value that the initial
+/// discriminator bit is set to.
 ///
 /// With the above paragraph in mind, an example of the bit layout of an enum
 /// looks as follows:
 ///
 /// ```
-/// [ PAYLOAD BITS | EXTRA_TOP_LEVEL_BITS | DISCRIMINATOR_BIT ]
+/// [ PAYLOAD BITS | EXTRA_TOP_LEVEL_BITS | DISCRIMINATOR_BITS ]
 /// ```
 ///
 /// Notice how placing the discriminator bit last ensures that separately the
@@ -149,7 +161,10 @@ namespace swift {
 /// the original enum and its payload since that would be a verifier caught
 /// leak.
 struct SubElementNumber {
-  unsigned number;
+  /// Our internal sub element representation number. We force 32 bits so that
+  /// our type tree span is always pointer width. This is convenient for storing
+  /// it in other data structures.
+  uint32_t number;
 
   SubElementNumber(unsigned number) : number(number) {}
 
@@ -168,9 +183,22 @@ struct SubElementNumber {
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
   static Optional<SubElementNumber> compute(SILValue projectionFromRoot,
-                                            SILValue root);
+                                            SILValue root) {
+    assert(projectionFromRoot->getType().getCategory() ==
+               root->getType().getCategory() &&
+           "projectionFromRoot and root must both be objects or address.");
+    if (root->getType().isObject())
+      return computeForValue(projectionFromRoot, root);
+    return computeForAddress(projectionFromRoot, root);
+  }
 
   operator unsigned() const { return number; }
+
+private:
+  static Optional<SubElementNumber>
+  computeForAddress(SILValue projectionFromRoot, SILValue rootAddress);
+  static Optional<SubElementNumber> computeForValue(SILValue projectionFromRoot,
+                                                    SILValue rootValue);
 };
 
 /// Given a type T, this is the number of leaf field types in T's type tree. A
@@ -207,9 +235,12 @@ struct TypeSubElementCount {
   operator unsigned() const { return number; }
 };
 
+class FieldSensitivePrunedLiveness;
+
 /// A span of leaf elements in the sub-element break down of the linearization
 /// of the type tree of a type T.
 struct TypeTreeLeafTypeRange {
+  friend FieldSensitivePrunedLiveness;
   SubElementNumber startEltOffset;
   SubElementNumber endEltOffset;
 
@@ -243,6 +274,48 @@ public:
              *startEltOffset + TypeSubElementCount(projectedAddress)}};
   }
 
+  /// Given a type \p rootType and a set of needed elements specified by the bit
+  /// vector \p neededElements, place into \p foundContiguousTypeRanges a set of
+  /// TypeTreeLeafTypeRanges that are associated with the bit vectors
+  /// elements. As a constraint, we ensure that if \p neededElements has bits
+  /// set that are part of subsequent fields of a type that is only partially
+  /// needed, the two fields are represented as separate ranges. This ensures
+  /// that it is easy to use this API to correspond to independent operations
+  /// for the fields.
+  static void convertNeededElementsToContiguousTypeRanges(
+      SILFunction *fn, SILType rootType, SmallBitVector &neededElements,
+      SmallVectorImpl<TypeTreeLeafTypeRange> &foundContiguousTypeRanges);
+
+  static void constructProjectionsForNeededElements(
+      SILValue rootValue, SILInstruction *insertPt,
+      SmallBitVector &neededElements,
+      SmallVectorImpl<std::pair<SILValue, TypeTreeLeafTypeRange>>
+          &resultingProjections);
+
+  bool operator==(const TypeTreeLeafTypeRange &other) const {
+    return startEltOffset == other.startEltOffset &&
+           endEltOffset == other.endEltOffset;
+  }
+
+  bool operator!=(const TypeTreeLeafTypeRange &other) const {
+    return !(*this == other);
+  }
+
+  /// Return the type tree leaf type range that is the intersection of \p this
+  /// and \p other.
+  Optional<TypeTreeLeafTypeRange>
+  setIntersection(const TypeTreeLeafTypeRange &other) const {
+    unsigned start = startEltOffset;
+    if (startEltOffset < other.startEltOffset)
+      start = other.startEltOffset;
+    unsigned end = endEltOffset;
+    if (endEltOffset >= other.endEltOffset)
+      end = other.endEltOffset;
+    if (start >= end)
+      return None;
+    return TypeTreeLeafTypeRange(start, end);
+  }
+
   /// Is the given leaf type specified by \p singleLeafElementNumber apart of
   /// our \p range of leaf type values in the our larger type.
   bool contains(SubElementNumber singleLeafElementNumber) const {
@@ -250,21 +323,31 @@ public:
            singleLeafElementNumber < endEltOffset;
   }
 
-  /// Returns true if either of this overlaps at all with the given range.
+  /// Returns true if \p range is completely within this range.
   bool contains(TypeTreeLeafTypeRange range) const {
-    if (startEltOffset <= range.startEltOffset &&
-        range.startEltOffset < endEltOffset)
-      return true;
-
-    // If our start and end offsets, our extent is only 1 and we know that our
-    // value
-    unsigned rangeLastElt = range.endEltOffset - 1;
-    if (range.startEltOffset == rangeLastElt)
-      return false;
-
-    // Othrwise, see if endEltOffset - 1 is within the range.
-    return startEltOffset <= rangeLastElt && rangeLastElt < endEltOffset;
+    return startEltOffset <= range.startEltOffset &&
+           endEltOffset >= range.endEltOffset;
   }
+
+  IntRange<unsigned> getRange() const {
+    return range(startEltOffset, endEltOffset);
+  }
+
+  bool empty() const { return startEltOffset == endEltOffset; }
+
+  unsigned size() const { return endEltOffset - startEltOffset; }
+
+  /// Construct per field projections if the projection range has any bits in
+  /// common with filterBitVector.
+  void constructFilteredProjections(
+      SILValue value, SILInstruction *insertPt, SmallBitVector &filterBitVector,
+      llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange)> callback);
+
+  void print(llvm::raw_ostream &os) const {
+    os << "TypeTreeLeafTypeRange: (start: " << startEltOffset
+       << ", end: " << endEltOffset << ")";
+  }
+  void dump() const { print(llvm::dbgs()); }
 };
 
 /// This is exactly like pruned liveness except that instead of tracking a
@@ -274,7 +357,7 @@ public:
 /// DISCUSSION: One can view a type T as a tree with recursively each field F of
 /// the type T being a child of T in the tree. We say recursively since the tree
 /// unfolds for F and its children as well.
-class FieldSensitiveAddressPrunedLiveness {
+class FieldSensitivePrunedLiveness {
   PrunedLiveBlocks liveBlocks;
 
   struct InterestingUser {
@@ -304,14 +387,14 @@ class FieldSensitiveAddressPrunedLiveness {
   llvm::SmallMapVector<SILInstruction *, InterestingUser, 8> users;
 
   /// The root address of our type tree.
-  SILValue rootAddress;
+  SILValue rootValue;
 
 public:
-  FieldSensitiveAddressPrunedLiveness(
+  FieldSensitivePrunedLiveness(
       SILFunction *fn, SILValue rootValue,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : liveBlocks(TypeSubElementCount(rootValue), discoveredBlocks),
-        rootAddress(rootValue) {}
+        rootValue(rootValue) {}
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
@@ -323,9 +406,14 @@ public:
     users.clear();
   }
 
-  SILValue getRootAddress() const { return rootAddress; }
+  SILValue getRootValue() const { return rootValue; }
+  SILType getRootType() const { return rootValue->getType(); }
 
   unsigned numLiveBlocks() const { return liveBlocks.numLiveBlocks(); }
+
+  TypeTreeLeafTypeRange getTopLevelSpan() const {
+    return TypeTreeLeafTypeRange(0, getNumSubElements());
+  }
 
   /// If the constructor was provided with a vector to populate, then this
   /// returns the list of all live blocks with no duplicates.
@@ -377,10 +465,7 @@ public:
   /// Return the liveness for this specific sub-element of our root value.
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb,
                                             unsigned subElementNumber) const {
-    SmallVector<PrunedLiveBlocks::IsLive, 1> isLive;
-    liveBlocks.getBlockLiveness(bb, subElementNumber, subElementNumber + 1,
-                                isLive);
-    return isLive[0];
+    return liveBlocks.getBlockLiveness(bb, subElementNumber);
   }
 
   void getBlockLiveness(
@@ -389,6 +474,10 @@ public:
     liveBlocks.getBlockLiveness(bb, 0, liveBlocks.getNumBitsToTrack(),
                                 foundLiveness);
   }
+
+  void getBlockLiveness(SILBasicBlock *bb, SmallBitVector &liveWithinBits,
+                        SmallBitVector &liveOutBits,
+                        SmallBitVector &deadBits) const;
 
   enum IsInterestingUser { NonUser, NonLifetimeEndingUse, LifetimeEndingUse };
 
@@ -406,31 +495,143 @@ public:
 
   unsigned getNumSubElements() const { return liveBlocks.getNumBitsToTrack(); }
 
-  /// Return true if \p inst occurs before the liveness boundary. Used when the
-  /// client already knows that inst occurs after the start of liveness.
-  void isWithinBoundary(SILInstruction *inst, SmallBitVector &outVector) const;
+  void print(llvm::raw_ostream &os) const { liveBlocks.print(os); }
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+protected:
+  /// Helper function used in FieldSensitivePrunedLiveness::updateForUse and
+  /// FieldSensitivePrunedLiveRange::updateForUse. Please do not use directly!
+  /// This is an implementation detail.
+  ///
+  /// Note that a user may use the current value from multiple operands. If any
+  /// of the uses are non-lifetime-ending, then we must consider the user
+  /// itself non-lifetime-ending; it cannot be a final destroy point because
+  /// the value of the non-lifetime-ending operand must be kept alive until the
+  /// end of the user. Consider a call that takes the same value using
+  /// different conventions:
+  ///
+  ///   apply %f(%val, %val) : $(@guaranteed, @owned) -> ()
+  ///
+  /// This call is not considered the end of %val's lifetime. The @owned
+  /// argument must be copied.
+  void addInterestingUser(SILInstruction *user, TypeTreeLeafTypeRange range,
+                          bool lifetimeEnding) {
+    auto iterAndSuccess =
+        users.insert({user, InterestingUser(range, lifetimeEnding)});
+    if (!iterAndSuccess.second)
+      iterAndSuccess.first->second &= lifetimeEnding;
+  }
 };
 
 /// Record the last use points and CFG edges that form the boundary of
-/// FieldSensitiveAddressPrunedLiveness. It does this on a per type tree leaf
-/// node basis.
-struct FieldSensitiveAddressPrunedLivenessBoundary {
-  /// The list of last users and an associated SILValue that is the address that
-  /// is being used. The address can be used to determine the start sub element
-  /// number of the user in the type tree and the end sub element number.
-  ///
-  /// TODO (MG): If we don't eventually need to store the SILValue here (I am
-  /// not sure yet...), just store a tuple with the start/end sub element
-  /// number.
-  SmallVector<std::tuple<SILInstruction *, TypeTreeLeafTypeRange>, 8> lastUsers;
+/// PrunedLiveness.
+///
+/// Dead defs may occur even when the liveness result has uses for every
+/// definition because those uses may occur in unreachable blocks. A dead def
+/// must either be a SILInstruction or SILArgument. This supports memory
+/// location liveness, so there isn't necessary a defining SILValue.
+///
+/// Each boundary edge is identified by its target block. The source of the edge
+/// is the target block's single predecessor which must have at least one other
+/// non-boundary successor.
+class FieldSensitivePrunedLivenessBoundary {
+  llvm::SmallMapVector<SILInstruction *, SmallBitVector, 8> lastUsers;
+  llvm::SmallMapVector<SILBasicBlock *, SmallBitVector, 8> boundaryEdges;
+  llvm::SmallMapVector<SILNode *, SmallBitVector, 1> deadDefs;
+  unsigned numBits;
 
-  /// Blocks where the value was live out but had a successor that was dead.
-  SmallVector<SILBasicBlock *, 8> boundaryEdges;
+public:
+  FieldSensitivePrunedLivenessBoundary(unsigned numBits) : numBits(numBits) {}
+
+  /// Sanity check meant for NDEBUG mode.
+  unsigned getNumLastUsersAndDeadDefs(unsigned bitNo) const {
+#ifdef NDEBUG
+    llvm_unreachable("Only call in asserts build!\n");
+#else
+    unsigned count = 0;
+    for (auto &pair : lastUsers) {
+      count += unsigned(pair.second[bitNo]);
+    }
+    for (auto &pair : deadDefs) {
+      count += unsigned(pair.second[bitNo]);
+    }
+    return count;
+#endif
+  }
+
+  using LastUserRange = iterator_range<decltype(lastUsers)::iterator>;
+  LastUserRange getLastUsers() {
+    return make_range(lastUsers.begin(), lastUsers.end());
+  }
+
+  using BoundaryEdgeRange = iterator_range<decltype(boundaryEdges)::iterator>;
+  BoundaryEdgeRange getBoundaryEdges() {
+    return make_range(boundaryEdges.begin(), boundaryEdges.end());
+  }
+
+  using DeadDefRange = iterator_range<decltype(deadDefs)::iterator>;
+  DeadDefRange getDeadDefs() {
+    return make_range(deadDefs.begin(), deadDefs.end());
+  }
+
+  /// Helper entry point to get the last user that creates the correct size
+  /// small bit vector if we haven't seen this last user yet.
+  SmallBitVector &getLastUserBits(SILInstruction *inst) {
+    auto iter = lastUsers.insert({inst, SmallBitVector()});
+    if (iter.second) {
+      iter.first->second.resize(numBits);
+    }
+    return iter.first->second;
+  }
+
+  SmallBitVector &getBoundaryEdgeBits(SILBasicBlock *block) {
+    auto iter = boundaryEdges.insert({block, SmallBitVector()});
+    if (iter.second) {
+      iter.first->second.resize(numBits);
+    }
+    return iter.first->second;
+  }
+
+  SmallBitVector &getDeadDefsBits(SILNode *def) {
+    auto iter = deadDefs.insert({def, SmallBitVector()});
+    if (iter.second) {
+      iter.first->second.resize(numBits);
+    }
+    return iter.first->second;
+  }
 
   void clear() {
     lastUsers.clear();
     boundaryEdges.clear();
+    deadDefs.clear();
   }
+
+  void print(llvm::raw_ostream &os) const;
+  void dump() const;
+};
+
+template <typename LivenessWithDefs>
+class FieldSensitivePrunedLiveRange : public FieldSensitivePrunedLiveness {
+  const LivenessWithDefs &asImpl() const {
+    return reinterpret_cast<const LivenessWithDefs &>(*this);
+  }
+
+public:
+  FieldSensitivePrunedLiveRange(
+      SILFunction *fn, SILValue rootValue,
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : FieldSensitivePrunedLiveness(fn, rootValue, discoveredBlocks) {}
+
+  /// Check if \p inst occurs in between the definition of a def and the
+  /// liveness boundary for bits in \p span.
+  ///
+  /// NOTE: It is assumed that \p inst is correctly described by span.
+  bool isWithinBoundary(SILInstruction *inst, TypeTreeLeafTypeRange span) const;
+
+  /// Customize updateForUse for FieldSensitivePrunedLiveness such that we check
+  /// that we consider defs as stopping liveness from being propagated up.
+  void updateForUse(SILInstruction *user, TypeTreeLeafTypeRange span,
+                    bool lifetimeEnding);
 
   /// Compute the boundary from the blocks discovered during liveness analysis.
   ///
@@ -440,14 +641,177 @@ struct FieldSensitiveAddressPrunedLivenessBoundary {
   /// The computed boundary will completely post-dominate, including dead end
   /// paths. The client should query DeadEndBlocks to ignore those dead end
   /// paths.
-  void compute(const FieldSensitiveAddressPrunedLiveness &liveness);
+  void computeBoundary(FieldSensitivePrunedLivenessBoundary &boundary) const;
+};
 
-private:
+/// Single defined liveness.
+///
+// An SSA def results in pruned liveness with a contiguous liverange.
+///
+/// An unreachable self-loop might result in a "gap" between the last use above
+/// the def in the same block.
+///
+/// For SSA live ranges, a single "def" block dominates all uses. If no def
+/// block is provided, liveness is computed as if defined by a function
+/// argument. If the client does not provide a single, dominating def block,
+/// then the client must at least ensure that no uses precede the first
+/// definition in a def block. Since this analysis does not remember the
+/// positions of defs, it assumes that, within a block, uses follow
+/// defs. Breaking this assumption will result in a "hole" in the live range in
+/// which the def block's predecessors incorrectly remain dead. This situation
+/// could be handled by adding an updateForUseBeforeFirstDef() API.
+class FieldSensitiveSSAPrunedLiveRange
+    : public FieldSensitivePrunedLiveRange<FieldSensitiveSSAPrunedLiveRange> {
+  std::pair<SILValue, Optional<TypeTreeLeafTypeRange>> def = {{}, {}};
+
+  /// None for arguments.
+  std::pair<SILInstruction *, Optional<TypeTreeLeafTypeRange>> defInst = {
+      nullptr, None};
+
+public:
+  FieldSensitiveSSAPrunedLiveRange(
+      SILFunction *fn, SILValue rootValue,
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : FieldSensitivePrunedLiveRange(fn, rootValue, discoveredBlocks) {}
+
+  std::pair<SILValue, Optional<TypeTreeLeafTypeRange>> getDef() const {
+    return def;
+  }
+
+  void clear() {
+    def = {{}, {}};
+    defInst = {{}, {}};
+    FieldSensitivePrunedLiveRange::clear();
+  }
+
+  void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+    assert(!this->def.first && !this->def.second && "reinitialization");
+
+    this->def = {def, span};
+    defInst = {def->getDefiningInstruction(), span};
+    initializeDefBlock(def->getParentBlock(), span);
+  }
+
+  bool isInitialized() const { return bool(def.first) && bool(def.second); }
+
+  bool isDef(SILInstruction *inst, unsigned bit) const {
+    return inst == defInst.first && defInst.second->contains(bit);
+  }
+
+  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    return inst == defInst.first &&
+           defInst.second->setIntersection(span).hasValue();
+  }
+
+  bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
+    return def.first->getParentBlock() == block && def.second->contains(bit);
+  }
+
   void
-  findLastUserInBlock(SILBasicBlock *bb,
-                      FieldSensitiveAddressPrunedLivenessBoundary &boundary,
-                      const FieldSensitiveAddressPrunedLiveness &liveness,
-                      unsigned subElementNumber);
+  findBoundariesInBlock(SILBasicBlock *block, unsigned bitNo, bool isLiveOut,
+                        FieldSensitivePrunedLivenessBoundary &boundary) const;
+};
+
+/// MultiDefPrunedLiveness is computed incrementally by calling updateForUse.
+///
+/// Defs should be initialized before calling updatingForUse on any def
+/// that reaches the use.
+class FieldSensitiveMultiDefPrunedLiveRange
+    : public FieldSensitivePrunedLiveRange<
+          FieldSensitiveMultiDefPrunedLiveRange> {
+  // TODO: See if we can make this more efficient.
+  SmallFrozenMultiMap<SILNode *, TypeTreeLeafTypeRange, 8> defs;
+  SmallFrozenMultiMap<SILBasicBlock *, TypeTreeLeafTypeRange, 8> defBlocks;
+
+public:
+  FieldSensitiveMultiDefPrunedLiveRange(
+      SILFunction *fn, SILValue rootValue,
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : FieldSensitivePrunedLiveRange(fn, rootValue, discoveredBlocks) {}
+
+  void clear() { llvm_unreachable("multi-def liveness cannot be reused"); }
+
+  /// Call this when we have finished initializing defs and can begin to add
+  /// liveness use information.
+  ///
+  /// Internally this freezes our def/defblocks arrays so we can use them as
+  /// maps.
+  void finishedInitializationOfDefs() {
+    defs.setFrozen();
+    defBlocks.setFrozen();
+  }
+
+  void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+    defs.insert(def, span);
+    auto *block = def->getParentBlock();
+    defBlocks.insert(block, span);
+    initializeDefBlock(block, span);
+  }
+
+  void initializeDef(SILInstruction *def, TypeTreeLeafTypeRange span) {
+    defs.insert(cast<SILNode>(def), span);
+    auto *block = def->getParent();
+    defBlocks.insert(block, span);
+    initializeDefBlock(block, span);
+  }
+
+  bool isInitialized() const { return !defs.empty(); }
+
+  /// Return true if this block is a def block for this specific bit.
+  bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
+    auto iter = defBlocks.find(block);
+    if (!iter)
+      return false;
+    return llvm::any_of(
+        *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+  }
+
+  bool isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span) const {
+    auto iter = defBlocks.find(block);
+    if (!iter)
+      return false;
+    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
+      return span.setIntersection(storedSpan).hasValue();
+    });
+  }
+
+  bool isDef(SILInstruction *inst, unsigned bit) const {
+    auto iter = defs.find(cast<SILNode>(inst));
+    if (!iter)
+      return false;
+    return llvm::any_of(
+        *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+  }
+
+  bool isDef(SILValue value, unsigned bit) const {
+    auto iter = defs.find(cast<SILNode>(value));
+    if (!iter)
+      return false;
+    return llvm::any_of(
+        *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+  }
+
+  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    auto iter = defs.find(cast<SILNode>(inst));
+    if (!iter)
+      return false;
+    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
+      return span.setIntersection(storedSpan).hasValue();
+    });
+  }
+
+  bool isDef(SILValue value, TypeTreeLeafTypeRange span) const {
+    auto iter = defs.find(cast<SILNode>(value));
+    if (!iter)
+      return false;
+    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
+      return span.setIntersection(storedSpan).hasValue();
+    });
+  }
+
+  void
+  findBoundariesInBlock(SILBasicBlock *block, unsigned bitNo, bool isLiveOut,
+                        FieldSensitivePrunedLivenessBoundary &boundary) const;
 };
 
 } // namespace swift

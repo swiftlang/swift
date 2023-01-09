@@ -294,6 +294,21 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
   }
 
   if (isInOutEndOfFunction) {
+    if (auto *pbi = dyn_cast<ProjectBoxInst>(markedValue->getOperand())) {
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+        if (fArg->isClosureCapture()) {
+          diagnose(
+              astContext,
+              markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+              diag::
+                  sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
+              varName);
+          diagnose(astContext, violatingUse->getLoc().getSourceLoc(),
+                   diag::sil_moveonlychecker_consuming_use_here);
+          return;
+        }
+      }
+    }
     if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
       if (fArg->isClosureCapture()) {
         diagnose(
