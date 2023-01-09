@@ -283,11 +283,16 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     initArgument = keyPath;
   }
 
-  auto reprRange = SourceRange();
-  if (auto *repr = attr->getTypeRepr())
-    reprRange = repr->getSourceRange();
+  SourceRange sourceRange;
+  if (auto *repr = attr->getTypeRepr()) {
+    sourceRange = repr->getSourceRange();
+  } else {
+    sourceRange = SourceRange(
+        attachedTo->getAttributeInsertionLoc(/*forModifier=*/false));
+  }
 
-  auto typeExpr = TypeExpr::createImplicitHack(reprRange.Start, attrType, ctx);
+  auto typeExpr =
+      TypeExpr::createImplicitHack(sourceRange.Start, attrType, ctx);
 
   // Add the initializer argument at the front of the argument list
   SmallVector<Argument, 4> newArgs;
@@ -295,8 +300,8 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
   if (auto *attrArgs = attr->getArgs())
     newArgs.append(attrArgs->begin(), attrArgs->end());
 
-  ArgumentList *argList = ArgumentList::createImplicit(ctx, reprRange.Start,
-                                                       newArgs, reprRange.End);
+  ArgumentList *argList = ArgumentList::createImplicit(
+      ctx, sourceRange.Start, newArgs, sourceRange.End);
   Expr *init = CallExpr::createImplicit(ctx, typeExpr, argList);
 
   // result of generator is an optional always.
