@@ -339,7 +339,6 @@ NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
 // Added in Swift 5.7
-NODE(OpaqueReturnTypeIndexed)
 NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
 NODE(ExtendedExistentialTypeShape)
@@ -351,6 +350,8 @@ NODE(SymbolicExtendedExistentialType)
 // Added in Swift 5.8
 NODE(MetatypeParamsRemoved)
 NODE(HasSymbolQuery)
+NODE(OpaqueReturnTypeIndex)
+NODE(OpaqueReturnTypeParent)
 
 #undef CONTEXT_NODE
 #undef NODE
