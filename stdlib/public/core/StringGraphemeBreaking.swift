@@ -407,7 +407,7 @@ extension Unicode.Scalar {
   }
 }
 
-internal struct _GraphemeBreakingState {
+internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
   // that there is at LEAST 1 Virama present between two linking consonants.
   // This value helps ensure that when we ultimately need to decide whether or
@@ -436,6 +436,18 @@ internal struct _GraphemeBreakingState {
   var shouldBreakRI = false
 }
 
+extension _GraphemeBreakingState: CustomStringConvertible {
+  var description: String {
+    var r = "["
+    if hasSeenVirama { r += "V" }
+    if isInEmojiSequence { r += "E" }
+    if isInIndicSequence { r += "I" }
+    if shouldBreakRI { r += "R" }
+    r += "]"
+    return r
+  }
+}
+
 extension Unicode {
   /// A state machine for recognizing character (i.e., extended grapheme
   /// cluster) boundaries in an arbitrary series of Unicode scalars.
@@ -448,7 +460,7 @@ extension Unicode {
   /// `String` splits its contents into `Character` values.
   @available(SwiftStdlib 5.8, *)
   public // SPI(Foundation) FIXME: We need API for this
-  struct _CharacterRecognizer {
+  struct _CharacterRecognizer: Sendable {
     internal var _previous: Unicode.Scalar
     internal var _state: _GraphemeBreakingState
 
@@ -546,6 +558,21 @@ extension Unicode {
     }
   }
 }
+
+@available(SwiftStdlib 5.8, *)
+extension Unicode._CharacterRecognizer: Equatable {
+  public static func ==(left: Self, right: Self) -> Bool {
+    left._previous == right._previous && left._state == right._state
+  }
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Unicode._CharacterRecognizer: CustomStringConvertible {
+  public var description: String {
+    return "\(_state)U+\(String(_previous.value, radix: 16, uppercase: true))"
+  }
+}
+
 
 extension _StringGuts {
   // Returns the stride of the grapheme cluster starting at offset `index`,
