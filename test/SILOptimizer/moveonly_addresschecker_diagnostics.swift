@@ -2307,7 +2307,6 @@ func fieldSensitiveTestReinitField () {
     classUseMoveOnlyWithoutEscaping(a.k)
 }
 
-#if false
 func fieldSensitiveTestReinitFieldMultiBlock1 () {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
@@ -2318,7 +2317,6 @@ func fieldSensitiveTestReinitFieldMultiBlock1 () {
         classUseMoveOnlyWithoutEscaping(a.k)
     }
 }
-#endif
 
 func fieldSensitiveTestReinitFieldMultiBlock2 () {
     var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
@@ -2332,7 +2330,6 @@ func fieldSensitiveTestReinitFieldMultiBlock2 () {
     classUseMoveOnlyWithoutEscaping(a.k) // expected-note {{non-consuming use}}
 }
 
-#if false
 func fieldSensitiveTestReinitFieldMultiBlock3 () {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
@@ -2346,9 +2343,7 @@ func fieldSensitiveTestReinitFieldMultiBlock3 () {
 
     classUseMoveOnlyWithoutEscaping(a.k)
 }
-#endif
 
-#if false
 func fieldSensitiveTestReinitFieldMultiBlock4 () {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
@@ -2362,4 +2357,3 @@ func fieldSensitiveTestReinitFieldMultiBlock4 () {
 
     classUseMoveOnlyWithoutEscaping(a.k)
 }
-#endif
