@@ -2027,11 +2027,11 @@ SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
-  return Body->getStartLoc();
+  return Body ? Body->getStartLoc() : SourceLoc();
 }
 
 SourceRange TopLevelCodeDecl::getSourceRange() const {
-  return Body->getSourceRange();
+  return Body? Body->getSourceRange() : SourceRange();
 }
 
 SourceRange IfConfigDecl::getSourceRange() const {
