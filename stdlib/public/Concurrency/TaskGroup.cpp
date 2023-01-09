@@ -104,10 +104,13 @@ protected:
   /// to that task or null.
   std::atomic<AsyncTask *> waitQueue;
 
-  explicit TaskGroupBase(uint64_t initialStatus)
+  const Metadata *successType;
+
+  explicit TaskGroupBase(const Metadata* T, uint64_t initialStatus)
     : TaskGroupTaskStatusRecord(),
       status(initialStatus),
-      waitQueue(nullptr) {}
+      waitQueue(nullptr),
+      successType(T) {}
 
 public:
   virtual ~TaskGroupBase() {}
@@ -282,7 +285,7 @@ public:
   /// There can be only at-most-one waiting task on a group at any given time,
   /// and the waiting task is expected to be the parent task in which the group
   /// body is running.
-  virtual PollResult tryEnqueueWaitingTask(AsyncTask *waitingTask) = 0;
+  PollResult tryEnqueueWaitingTask(AsyncTask *waitingTask);
 
   // Enqueue the completed task onto ready queue if there are no waiting tasks yet
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
@@ -568,16 +571,13 @@ private:
   /// AsyncTask.
   NaiveTaskGroupQueue<ReadyQueueItem> readyQueue;
 
-  const Metadata *successType;
-
   friend class ::swift::AsyncTask;
 
 public:
 
   explicit AccumulatingTaskGroup(const Metadata *T)
-    : TaskGroupBase(TaskGroupStatus::initial().status),
-      readyQueue(),
-      successType(T) {}
+    : TaskGroupBase(T, TaskGroupStatus::initial().status),
+      readyQueue() {}
 
   virtual void destroy() override;
 
@@ -653,9 +653,6 @@ public:
   /// and the waitingTask eventually be woken up by a completion.
   PollResult poll(AsyncTask *waitingTask);
 
-  /// Attempt to store the waiting task, though if there is no pending tasks to wait for,
-  /// or we're ready to complete the waiting task immediately, the PollResult will inform about that.
-  virtual PollResult tryEnqueueWaitingTask(AsyncTask *waitingTask) override;
 };
 
 /******************************************************************************/
@@ -688,16 +685,13 @@ private:
   /// however we use this queue to store errors from child tasks (currently at most one).
   NaiveTaskGroupQueue<ReadyQueueItem> readyQueue;
 
-  const Metadata *successType;
-
   friend class ::swift::AsyncTask;
 
 public:
 
   explicit DiscardingTaskGroup(const Metadata *T)
-    : TaskGroupBase(TaskGroupStatus::initial().status),
-      readyQueue(),
-      successType(T) {}
+    : TaskGroupBase(T, TaskGroupStatus::initial().status),
+      readyQueue() {}
 
   virtual void destroy() override;
 
@@ -798,8 +792,6 @@ public:
   /// or a `PollStatus::MustWait` result if there are tasks in flight
   /// and the waitingTask eventually be woken up by a completion.
   PollResult poll(AsyncTask *waitingTask);
-
-  virtual PollResult tryEnqueueWaitingTask(AsyncTask *waitingTask) override;
 
   bool offerBodyError(SwiftError* _Nonnull bodyError);
 
@@ -1713,7 +1705,7 @@ bool DiscardingTaskGroup::offerBodyError(SwiftError* _Nonnull bodyError) {
   return true;
 }
 
-PollResult DiscardingTaskGroup::tryEnqueueWaitingTask(AsyncTask *waitingTask) {
+PollResult TaskGroupBase::tryEnqueueWaitingTask(AsyncTask *waitingTask) {
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "tryEnqueueWaitingTask, status = %s", statusString().c_str());
   PollResult result = PollResult::getEmpty(this->successType);
   result.storage = nullptr;
@@ -1772,75 +1764,6 @@ PollResult DiscardingTaskGroup::tryEnqueueWaitingTask(AsyncTask *waitingTask) {
       // task, we should reevaluate parent task
       _swift_task_setCurrent(oldTask);
       goto reevaluate_if_TaskGroup_has_results;
-#endif
-      // no ready tasks, so we must wait.
-      result.status = PollStatus::MustWait;
-      _swift_task_clearCurrent();
-      return result;
-    } // else, try again
-  }
-}
-
-// FIXME: duplicated!!!!!!!!
-PollResult AccumulatingTaskGroup::tryEnqueueWaitingTask(AsyncTask *waitingTask) {
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "tryEnqueueWaitingTask, status = %s", statusString().c_str());
-  PollResult result = PollResult::getEmpty(this->successType);
-  result.storage = nullptr;
-  result.retainedTask = nullptr;
-
-  // Have we suspended the task?
-  bool hasSuspended = false;
-  bool haveRunOneChildTaskInline = false;
-
-  reevaluate_if_TaskGroup_has_results:;
-  auto assumed = statusMarkWaitingAssumeAcquire();
-  // ==== 1) bail out early if no tasks are pending ----------------------------
-  if (assumed.isEmpty(this)) {
-    SWIFT_TASK_DEBUG_LOG("group(%p) waitAll, is empty, no pending tasks", this);
-    // No tasks in flight, we know no tasks were submitted before this poll
-    // was issued, and if we parked here we'd potentially never be woken up.
-    // Bail out and return `nil` from `group.next()`.
-    statusRemoveWaitingRelease();
-    return result;
-  }
-
-  lock(); // TODO: remove pool lock, and use status for synchronization
-  auto waitHead = waitQueue.load(std::memory_order_acquire);
-
-  // ==== 2) Add to wait queue -------------------------------------------------
-  _swift_tsan_release(static_cast<Job *>(waitingTask));
-  while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspended();
-    }
-    // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_strong(
-        waitHead, waitingTask,
-        /*success*/ std::memory_order_release,
-        /*failure*/ std::memory_order_acquire)) {
-      unlock(); // TODO: remove fragment lock, and use status for synchronization
-#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-      // The logic here is paired with the logic in TaskGroupBase::offer. Once
-       // we run the
-       auto oldTask = _swift_task_clearCurrent();
-       assert(oldTask == waitingTask);
-
-       auto childTask = getTaskRecord()->getFirstChild();
-       assert(childTask != NULL);
-
-       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching away from running %p to now running %p", oldTask, childTask);
-       // Run the new task on the same thread now - this should run the new task to
-       // completion. All swift tasks in task-to-thread model run on generic
-       // executor
-       swift_job_run(childTask, ExecutorRef::generic());
-       haveRunOneChildTaskInline = true;
-
-       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", childTask, oldTask);
-       // We are back to being the parent task and now that we've run the child
-       // task, we should reevaluate parent task
-       _swift_task_setCurrent(oldTask);
-       goto reevaluate_if_TaskGroup_has_results;
 #endif
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
