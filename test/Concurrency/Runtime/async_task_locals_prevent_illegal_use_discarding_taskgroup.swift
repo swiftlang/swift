@@ -19,14 +19,13 @@ enum TL {
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.1, *)
-func bindAroundGroupSpawn() async {
+func bindAroundGroupAddTask() async {
   await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
       // CHECK: error: task-local: detected illegal task-local value binding at {{.*}}illegal_use.swift:[[# @LINE + 1]]
       TL.$number.withValue(2222) { // bad!
         print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
-        group.spawn {
+        group.addTask {
           0 // don't actually perform the read, it would be unsafe.
         }
       }
@@ -36,9 +35,28 @@ func bindAroundGroupSpawn() async {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+func bindAroundDiscardingGroupAddTask() async {
+  await TL.$number.withValue(1111) { // ok
+    await withDiscardingTaskGroup(of: Int.self) { group in
+      // CHECK: error: task-local: detected illegal task-local value binding at {{.*}}illegal_use.swift:[[# @LINE + 1]]
+      TL.$number.withValue(2222) { // bad!
+        print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
+        group.addTask {
+          0 // don't actually perform the read, it would be unsafe.
+        }
+      }
+
+      print("Survived the illegal call!") // CHECK-NOT: Survived the illegal call!
+    }
+  }
+}
+
 @main struct Main {
   static func main() async {
-    await bindAroundGroupSpawn()
+    if CommandLine.arguments.contains("discarding-task-group") {
+      await bindAroundGroupAddTask()
+    } else {
+      await bindAroundDiscardingGroupAddTask()
+    }
   }
 }
