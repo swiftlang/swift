@@ -3826,7 +3826,16 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 }
 
 void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::TypeWrappers)) {
+  auto isEnabled = [&]() {
+    if (Ctx.LangOpts.hasFeature(Feature::TypeWrappers))
+      return true;
+
+    // Accept attributes that come from swiftinterface files.
+    auto *parentSF = D->getDeclContext()->getParentSourceFile();
+    return parentSF && parentSF->Kind == SourceFileKind::Interface;
+  };
+
+  if (!isEnabled()) {
     diagnose(attr->getLocation(), diag::type_wrappers_are_experimental);
     attr->setInvalid();
     return;
@@ -4511,6 +4520,8 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
+  auto *ActiveAttr = D->getAttrs().getBackDeploy(Ctx);
+
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
@@ -4550,18 +4561,47 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
       continue;
     }
 
-    // Require explicit availability for back deployed decls.
-    if (diagnoseMissingAvailability(Attr, Platform))
+    if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
+
+    // Availability conflicts can only be diagnosed for attributes that apply
+    // to the active platform.
+    if (Attr != ActiveAttr)
+      continue;
+
+    // Unavailable decls cannot be back deployed.
+    if (auto unavailableAttrPair = VD->getSemanticUnavailableAttr()) {
+      auto unavailableAttr = unavailableAttrPair.value().first;
+      DeclName name;
+      unsigned accessorKind;
+      std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
+      diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
+               accessorKind, name, prettyPlatformString(Platform));
+      diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
+               accessorKind, name)
+          .highlight(unavailableAttr->getRange());
+      continue;
+    }
 
     // Verify that the decl is available before the back deployment boundary.
     // If it's not, the attribute doesn't make sense since the back deployment
     // fallback could never be executed at runtime.
-    auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (Attr->Version <= IntroVer.value()) {
-      diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before, Attr,
-               VD->getName(), prettyPlatformString(Platform), Attr->Version);
-      continue;
+    if (auto availableRangeAttrPair = VD->getSemanticAvailableRangeAttr()) {
+      auto availableAttr = availableRangeAttrPair.value().first;
+      if (Attr->Version <= availableAttr->Introduced.value()) {
+        DeclName name;
+        unsigned accessorKind;
+        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
+        diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
+                 Attr, accessorKind, name, prettyPlatformString(Platform),
+                 Attr->Version);
+        diagnose(availableAttr->AtLoc, diag::availability_introduced_in_version,
+                 accessorKind, name,
+                 prettyPlatformString(availableAttr->Platform),
+                 *availableAttr->Introduced)
+            .highlight(availableAttr->getRange());
+        continue;
+      }
     }
   }
 }

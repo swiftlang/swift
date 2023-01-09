@@ -937,14 +937,20 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     }
   }
 
-  for (auto *AI : ReadOnlyApplies) {
-    if (!mayWriteTo(AA, BCA, sideEffects, AI)) {
-      HoistUp.insert(AI);
+  // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+  if (ReadOnlyApplies.size() * sideEffects.size() < 8000) {
+    for (auto *AI : ReadOnlyApplies) {
+      if (!mayWriteTo(AA, BCA, sideEffects, AI)) {
+        HoistUp.insert(AI);
+      }
     }
   }
-  for (auto *LI : Loads) {
-    if (!mayWriteTo(AA, sideEffects, LI)) {
-      HoistUp.insert(LI);
+  // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+  if (Loads.size() * sideEffects.size() < 8000) {
+    for (auto *LI : Loads) {
+      if (!mayWriteTo(AA, sideEffects, LI)) {
+        HoistUp.insert(LI);
+      }
     }
   }
 

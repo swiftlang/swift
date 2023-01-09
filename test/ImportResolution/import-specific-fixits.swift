@@ -55,6 +55,9 @@ import struct ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' 
 // CHECK-NEXT: Number FIXITs = 0
 // CHECK-NEXT: note: found this candidate
 // CHECK-NEXT: Number FIXITs = 0
+// CHECK-NEXT: CONTENTS OF FILE ambiguous_right.funcOrVar:
+// CHECK: public var funcOrVar: Int
+// CHECK: END CONTENTS OF FILE
 // CHECK-NEXT: note: found this candidate
 
 import func ambiguous.someVar // expected-error{{ambiguous name 'someVar' in module 'ambiguous'}}

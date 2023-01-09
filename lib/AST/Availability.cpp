@@ -145,6 +145,25 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 }
 
+/// Returns the decl that should be considered the parent decl of the given decl
+/// when looking for inherited availability annotations.
+static Decl *parentDeclForAvailability(const Decl *D) {
+  if (auto *AD = dyn_cast<AccessorDecl>(D))
+    return AD->getStorage();
+
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *NTD = ED->getExtendedNominal())
+      return NTD;
+  }
+
+  // Clang decls may be inaccurately parented rdar://53956555
+  if (D->hasClangNode())
+    return nullptr;
+
+  // Availability is inherited from the enclosing context.
+  return D->getDeclContext()->getInnermostDeclarationDeclContext();
+}
+
 /// Returns true if the introduced version in \p newAttr should be used instead
 /// of the introduced version in \p prevAttr when both are attached to the same
 /// declaration and refer to the active platform.
@@ -165,8 +184,9 @@ static bool isBetterThan(const AvailableAttr *newAttr,
                                           prevAttr->Platform);
 }
 
-Optional<AvailabilityContext>
-AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+const AvailableAttr *
+AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
+                                                      ASTContext &Ctx) {
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto Attr : D->getAttrs()) {
@@ -182,6 +202,30 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
       bestAvailAttr = AvailAttr;
   }
 
+  return bestAvailAttr;
+}
+
+Optional<AvailableAttrDeclPair>
+SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
+                                            const Decl *decl) const {
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(
+          decl, decl->getASTContext()))
+    return std::make_pair(attr, decl);
+
+  if (auto *parent = parentDeclForAvailability(decl))
+    return parent->getSemanticAvailableRangeAttr();
+
+  return None;
+}
+
+Optional<AvailableAttrDeclPair> Decl::getSemanticAvailableRangeAttr() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this}, None);
+}
+
+Optional<AvailabilityContext>
+AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+  auto bestAvailAttr = attrForAnnotatedAvailableRange(D, Ctx);
   if (!bestAvailAttr)
     return None;
 
@@ -195,39 +239,22 @@ bool Decl::isAvailableAsSPI() const {
     .isAvailableAsSPI();
 }
 
-bool IsSemanticallyUnavailableRequest::evaluate(Evaluator &evaluator,
-                                                const Decl *decl) const {
+Optional<AvailableAttrDeclPair>
+SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
+                                         const Decl *decl) const {
   // Directly marked unavailable.
-  if (AvailableAttr::isUnavailable(decl))
-    return true;
+  if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext()))
+    return std::make_pair(attr, decl);
 
-  // If this is an extension, it's semantically unavailable if its nominal is,
-  // as there is no way to reference or construct the type.
-  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto *nom = ext->getExtendedNominal()) {
-      if (nom->isSemanticallyUnavailable())
-        return true;
-    }
-  }
+  if (auto *parent = parentDeclForAvailability(decl))
+    return parent->getSemanticUnavailableAttr();
 
-  // If the parent decl is semantically unavailable, then this decl is too.
-  // For local contexts, this means it's a local decl in e.g an unavailable
-  // function, which cannot be accessed. For non-local contexts, this is a
-  // nested type or a member with an unavailable parent, which cannot be
-  // referenced.
-  // Similar to `AvailableAttr::isUnavailable`, don't apply this logic to
-  // Clang decls, as they may be inaccurately parented.
-  if (!decl->hasClangNode()) {
-    auto *DC = decl->getDeclContext();
-    if (auto *parentDecl = DC->getInnermostDeclarationDeclContext())
-      return parentDecl->isSemanticallyUnavailable();
-  }
-  return false;
+  return None;
 }
 
-bool Decl::isSemanticallyUnavailable() const {
+Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
   auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, IsSemanticallyUnavailableRequest{this}, false);
+  return evaluateOrDefault(eval, SemanticUnavailableAttrRequest{this}, None);
 }
 
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(

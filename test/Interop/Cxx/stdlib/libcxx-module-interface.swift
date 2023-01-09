@@ -10,10 +10,10 @@
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
-// CHECK-IOSFWD:     struct __CxxTemplateInstNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE {
+// CHECK-IOSFWD:     struct __CxxTemplateInstNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE : CxxRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     struct __CxxTemplateInstNSt3__112basic_stringIwNS_11char_traitsIwEENS_9allocatorIwEEEE {
+// CHECK-IOSFWD:     struct __CxxTemplateInstNSt3__112basic_stringIwNS_11char_traitsIwEENS_9allocatorIwEEEE : CxxRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CWideChar
 // CHECK-IOSFWD:     }
 // CHECK-IOSFWD:     typealias string = std.__1.__CxxTemplateInstNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE

@@ -529,6 +529,48 @@ bb1(%newborrowi : @guaranteed $Klass, %newborrowo : @guaranteed $Klass):
   return %res : $()
 }
 
+
+sil [ossa] @dce_nestedborrowlifetime4 : $@convention(thin) (@guaranteed Wrapper1, @guaranteed Wrapper1) -> () {
+bb0(%0 : @guaranteed $Wrapper1, %1 : @guaranteed $Wrapper1):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %outer1 = begin_borrow %0 : $Wrapper1
+  %ex1 = struct_extract %outer1 : $Wrapper1, #Wrapper1.val1
+  %ex11 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex11 : $Klass, %outer1 : $Wrapper1)
+
+bb2:
+  %outer2 = begin_borrow %1 : $Wrapper1
+  %ex2 = struct_extract %outer2 : $Wrapper1, #Wrapper1.val1
+  %ex21 = struct_extract %ex2 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex21 : $Klass, %outer2 : $Wrapper1)
+
+bb3(%phi1 : @guaranteed $Klass, %phi2 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi2 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @dce_nestedborrowlifetime5 : $@convention(thin) (@guaranteed Wrapper1) -> () {
+bb0(%0 : @guaranteed $Wrapper1):
+  %outer1 = begin_borrow %0 : $Wrapper1
+  %inner1 = begin_borrow %outer1 : $Wrapper1
+  %ex1 = struct_extract %inner1 : $Wrapper1, #Wrapper1.val1
+  %ex11 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  br bb2(%ex11 : $Klass, %inner1 : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Klass, %phi2 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi2 : $Wrapper1
+  end_borrow %outer1 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @infinite_loop :
 // CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'infinite_loop'

@@ -2973,7 +2973,19 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!isExpr())
     return nullptr;
 
-  auto argExpr = asKnownExpr();
+  // We support two patterns:
+  //
+  // (load_expr (borrow_expr))
+  //   *or*
+  // (paren_expr (load_expr (borrow_expr)))
+  //
+  // The first happens if a borrow is used on a non-self argument. The second
+  // happens if we pass self as a borrow.
+  auto *argExpr = asKnownExpr();
+
+  if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr))
+    argExpr = parenExpr->getSubExpr();
+
   auto *li = dyn_cast<LoadExpr>(argExpr);
   if (!li)
     return nullptr;

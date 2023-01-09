@@ -50,7 +50,7 @@
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "valueKind": "RawLiteral",
-// CHECK-NEXT:            "value": "\"hi\""
+// CHECK-NEXT:            "value": "hi"
 // CHECK-NEXT:          }
 // CHECK-NEXT:        ]
 // CHECK-NEXT:      },
@@ -81,8 +81,118 @@
 // CHECK-NEXT:        "type": "[Swift.String : Swift.Int]",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "[(\"One\", 1), (\"Two\", 2), (\"Three\", 3)]"
+// CHECK-NEXT:        "valueKind": "Dictionary",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "One"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "1"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Two"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "2"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Three"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "3"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "dict2",
+// CHECK-NEXT:        "type": "[Swift.Int : [Swift.String]]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Dictionary",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "1"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "Array",
+// CHECK-NEXT:              "value": [
+// CHECK-NEXT:                {
+// CHECK-NEXT:                  "valueKind": "RawLiteral",
+// CHECK-NEXT:                  "value": "a"
+// CHECK-NEXT:                },
+// CHECK-NEXT:                {
+// CHECK-NEXT:                  "valueKind": "RawLiteral",
+// CHECK-NEXT:                  "value": "b"
+// CHECK-NEXT:                },
+// CHECK-NEXT:                {
+// CHECK-NEXT:                  "valueKind": "RawLiteral",
+// CHECK-NEXT:                  "value": "c"
+// CHECK-NEXT:                }
+// CHECK-NEXT:              ]
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "2"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "Array",
+// CHECK-NEXT:              "value": [
+// CHECK-NEXT:                {
+// CHECK-NEXT:                  "valueKind": "RawLiteral",
+// CHECK-NEXT:                  "value": "z"
+// CHECK-NEXT:                }
+// CHECK-NEXT:              ]
+// CHECK-NEXT:            }
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "dict3",
+// CHECK-NEXT:        "type": "[Swift.String : ExtractGroups.Foo]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "valueKind": "Dictionary",
+// CHECK-NEXT:        "value": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Bar"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "InitCall",
+// CHECK-NEXT:              "value": {
+// CHECK-NEXT:                "type": "ExtractGroups.Bar",
+// CHECK-NEXT:                "arguments": []
+// CHECK-NEXT:              }
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Int"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "42"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
@@ -100,7 +210,7 @@
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "Swift.String",
 // CHECK-NEXT:            "valueKind": "RawLiteral",
-// CHECK-NEXT:            "value": "\"foo\""
+// CHECK-NEXT:            "value": "foo"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractGroups.Bar",
@@ -155,6 +265,14 @@ public struct Arrays : MyProto {
 
 public struct Dictionaries : MyProto {
     let dict1: [String: Int] = ["One": 1, "Two": 2, "Three": 3]
+    let dict2: [Int: [String]] = [
+        1: ["a", "b", "c"],
+        2: ["z"]
+    ]
+    let dict3: [String: Foo] = [
+        "Bar": Bar(),
+        "Int": 42
+    ]
 }
 
 public struct Tuples : MyProto {

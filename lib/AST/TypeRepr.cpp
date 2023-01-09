@@ -127,7 +127,31 @@ SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   return SourceLoc();
 }
 
-DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
+TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
+  return const_cast<DeclRefTypeRepr *>(this)
+      ->getLastComponent()
+      ->getBoundDecl();
+}
+
+DeclNameRef DeclRefTypeRepr::getNameRef() const {
+  return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameRef();
+}
+
+TypeRepr *DeclRefTypeRepr::getBaseComponent() {
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
+
+  return cast<MemberTypeRepr>(this)->getBaseComponent();
+}
+
+IdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
+
+  return cast<MemberTypeRepr>(this)->getLastComponent();
+}
+
+DeclNameRef IdentTypeRepr::getNameRef() const {
   if (IdOrDecl.is<DeclNameRef>())
     return IdOrDecl.get<DeclNameRef>();
 
@@ -245,15 +269,6 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
-IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
-                                ArrayRef<ComponentIdentTypeRepr *> Components) {
-  assert(!Components.empty());
-  if (Components.size() == 1)
-    return Components.front();
-
-  return CompoundIdentTypeRepr::create(C, Components);
-}
-
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
                              ArrayRef<TypeRepr *> Args) {
   if (Args.empty())
@@ -265,8 +280,8 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
   Printer << ">";
 }
 
-void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
-                                       const PrintOptions &Opts) const {
+void IdentTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
@@ -280,10 +295,10 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
     printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());
 }
 
-void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
-                                      const PrintOptions &Opts) const {
-  printTypeRepr(getComponents().front(), Printer, Opts);
-  for (auto C : getComponents().slice(1)) {
+void MemberTypeRepr::printImpl(ASTPrinter &Printer,
+                               const PrintOptions &Opts) const {
+  printTypeRepr(getBaseComponent(), Printer, Opts);
+  for (auto C : getMemberComponents()) {
     Printer << ".";
     printTypeRepr(C, Printer, Opts);
   }
@@ -369,11 +384,17 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
-CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(const ASTContext &C,
-                                 ArrayRef<ComponentIdentTypeRepr*> Components) {
-  auto size = totalSizeToAlloc<ComponentIdentTypeRepr*>(Components.size());
-  auto mem = C.Allocate(size, alignof(CompoundIdentTypeRepr));
-  return new (mem) CompoundIdentTypeRepr(Components);
+MemberTypeRepr *
+MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                       ArrayRef<IdentTypeRepr *> MemberComponents) {
+  auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
+  auto mem = C.Allocate(size, alignof(MemberTypeRepr));
+  return new (mem) MemberTypeRepr(Base, MemberComponents);
+}
+
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
+                                       ArrayRef<IdentTypeRepr *> Components) {
+  return create(Ctx, Components.front(), Components.drop_front());
 }
 
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
@@ -407,10 +428,16 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
+void VarargTypeRepr::printImpl(ASTPrinter &Printer,
+                               const PrintOptions &Opts) const {
+  printTypeRepr(Element, Printer, Opts);
+  Printer << "...";
+}
+
 void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
+  Printer.printKeyword("repeat", Opts, /*Suffix=*/" ");
   printTypeRepr(Pattern, Printer, Opts);
-  Printer << "...";
 }
 
 void PackReferenceTypeRepr::printImpl(ASTPrinter &Printer,

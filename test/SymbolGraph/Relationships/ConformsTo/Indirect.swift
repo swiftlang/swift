@@ -35,6 +35,12 @@ extension ES: EQ {
 // EQ : EP
 // EXTERNAL-DAG: "kind": "conformsTo",{{[[:space:]]*}}"source": "s:16ExternalIndirect2EQP",{{[[:space:]]*}}"target": "s:16ExternalIndirect2EPP"
 
+// extension ES : EA (originating from EP : EAB and typealias EAB = EA & EB)
+// EXTENSION-DAG: "kind": "conformsTo",{{[[:space:]]*}}"source": "s:e:s:16ExternalIndirect2ESV0B0E3fooyyF",{{[[:space:]]*}}"target": "s:16ExternalIndirect2EAP"
+
+// extension ES : EB (originating from EP : EAB and typealias EAB = EA & EB)
+// EXTENSION-DAG: "kind": "conformsTo",{{[[:space:]]*}}"source": "s:e:s:16ExternalIndirect2ESV0B0E3fooyyF",{{[[:space:]]*}}"target": "s:16ExternalIndirect2EBP"
+
 // extension ES : EP
 // EXTENSION-DAG: "kind": "conformsTo",{{[[:space:]]*}}"source": "s:e:s:16ExternalIndirect2ESV0B0E3fooyyF",{{[[:space:]]*}}"target": "s:16ExternalIndirect2EPP"
 

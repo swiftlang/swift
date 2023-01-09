@@ -238,6 +238,26 @@ bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
 /// Determines whether this function's body uses flow-sensitive isolation.
 bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
 
+/// Check if it is safe for the \c globalActor qualifier to be removed from
+/// \c ty, when the function value of that type is isolated to that actor.
+///
+/// In general this is safe in a narrow but common case: a global actor
+/// qualifier can be dropped from a function type while in a DeclContext
+/// isolated to that same actor, as long as the value is not Sendable.
+///
+/// \param dc the innermost context in which the cast to remove the global actor
+///           is happening.
+/// \param globalActor global actor that was dropped from \c ty.
+/// \param ty a function type where \c globalActor was removed from it.
+/// \param getClosureActorIsolation function that knows how to produce accurate
+///        information about the isolation of a closure.
+/// \return true if it is safe to drop the global-actor qualifier.
+bool safeToDropGlobalActor(
+                DeclContext *dc, Type globalActor, Type ty,
+                llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+                    getClosureActorIsolation =
+                        _getRef__AbstractClosureExpr_getActorIsolation());
+
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
 } // end namespace swift

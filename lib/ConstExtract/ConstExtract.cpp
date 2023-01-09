@@ -123,13 +123,10 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
-    case ExprKind::Dictionary:
-
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral:
-    case ExprKind::StringLiteral: {
+    case ExprKind::NilLiteral: {
       std::string literalOutput;
       llvm::raw_string_ostream OutputStream(literalOutput);
       expr->printConstExprValue(&OutputStream, nullptr);
@@ -139,6 +136,14 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       break;
     }
 
+    case ExprKind::StringLiteral: {
+      auto stringLiteralExpression = cast<StringLiteralExpr>(expr);
+      std::string literalOutput;
+      llvm::raw_string_ostream OutputStream(literalOutput);
+      OutputStream << stringLiteralExpression->getValue();
+      return std::make_shared<RawLiteralValue>(literalOutput);
+    }
+
     case ExprKind::Array: {
       auto arrayExpr = cast<ArrayExpr>(expr);
       std::vector<std::shared_ptr<CompileTimeValue>> elementValues;
@@ -146,6 +151,18 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         elementValues.push_back(extractCompileTimeValue(elementExpr));
       }
       return std::make_shared<ArrayValue>(elementValues);
+    }
+
+    case ExprKind::Dictionary: {
+      auto dictionaryExpr = cast<DictionaryExpr>(expr);
+      std::vector<std::shared_ptr<TupleValue>> tuples;
+      for (auto elementExpr : dictionaryExpr->getElements()) {
+        auto elementValue = extractCompileTimeValue(elementExpr);
+        if (isa<TupleValue>(elementValue.get())) {
+          tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
+        }
+      }
+      return std::make_shared<DictionaryValue>(tuples);
     }
 
     case ExprKind::Tuple: {
@@ -203,6 +220,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(erasureExpr->getSubExpr());
     }
 
+    case ExprKind::Paren: {
+      auto parenExpr = cast<ParenExpr>(expr);
+      return extractCompileTimeValue(parenExpr->getSubExpr());
+    }
+
     default: {
       break;
     }
@@ -254,9 +276,10 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
 
   if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
     auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
-    if (node.is<Stmt *>()) {
-      if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
-        return {propertyDecl, extractCompileTimeValue(returnStmt->getResult())};
+    if (auto *stmt = node.dyn_cast<Stmt *>()) {
+      if (stmt->getKind() == StmtKind::Return) {
+        return {propertyDecl,
+                extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
       }
     }
   }
@@ -383,6 +406,17 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Dictionary: {
     JSON.attribute("valueKind", "Dictionary");
+    JSON.attributeArray("value", [&] {
+      for (auto tupleValue : cast<DictionaryValue>(value)->getElements()) {
+        auto tupleElements = tupleValue.get()->getElements();
+        JSON.object([&] {
+          JSON.attributeObject(
+              "key", [&] { writeValue(JSON, tupleElements[0].Value); });
+          JSON.attributeObject(
+              "value", [&] { writeValue(JSON, tupleElements[1].Value); });
+        });
+      }
+    });
     break;
   }
 

@@ -85,13 +85,17 @@ ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
   return dyn_cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
 }
 
-void ModuleDependencyInfo::addModuleDependency(
-    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
-  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
-    storage->moduleDependencies.push_back(module.str());
+void ModuleDependencyInfo::addModuleDependency(ModuleDependencyID dependencyID) {
+  storage->resolvedModuleDependencies.push_back(dependencyID);
 }
 
-void ModuleDependencyInfo::addModuleDependencies(
+void ModuleDependencyInfo::addModuleImport(
+    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
+    storage->moduleImports.push_back(module.str());
+}
+
+void ModuleDependencyInfo::addModuleImport(
     const SourceFile &sf, llvm::StringSet<> &alreadyAddedModules) {
   // Add all of the module dependencies.
   SmallVector<Decl *, 32> decls;
@@ -103,7 +107,7 @@ void ModuleDependencyInfo::addModuleDependencies(
 
     ImportPath::Builder scratch;
     auto realPath = importDecl->getRealModulePath(scratch);
-    addModuleDependency(realPath, &alreadyAddedModules);
+    addModuleImport(realPath, &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();
@@ -303,12 +307,12 @@ void SwiftDependencyScanningService::configureForContextHash(std::string scannin
   }
 }
 
-Optional<ModuleDependencyInfo> SwiftDependencyScanningService::findDependencies(
+Optional<const ModuleDependencyInfo*> SwiftDependencyScanningService::findDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
   if (!kind) {
     for (auto kind = ModuleDependencyKind::FirstKind;
          kind != ModuleDependencyKind::LastKind; ++kind) {
-      auto dep = findDependencies(moduleName, kind);
+      auto dep = findDependency(moduleName, kind);
       if (dep.has_value())
         return dep.value();
     }
@@ -323,62 +327,29 @@ Optional<ModuleDependencyInfo> SwiftDependencyScanningService::findDependencies(
   const auto &map = getDependenciesMap(kind.value());
   auto known = map.find(moduleName);
   if (known != map.end())
-    return known->second;
+    return &(known->second);
 
   return None;
 }
 
-Optional<ModuleDependencyInfo>
+Optional<const ModuleDependencyInfo*>
 SwiftDependencyScanningService::findSourceModuleDependency(
     StringRef moduleName) const {
   auto known = SwiftSourceModuleDependenciesMap.find(moduleName);
   if (known != SwiftSourceModuleDependenciesMap.end())
-    return known->second;
+    return &(known->second);
   else
     return None;
 }
 
-bool SwiftDependencyScanningService::hasDependencies(
+bool SwiftDependencyScanningService::hasDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  assert(kind != ModuleDependencyKind::Clang &&
-         "Attempting to query Clang dependency in persistent Dependency "
-         "Scanner Cache.");
-  return findDependencies(moduleName, kind).has_value();
+  return findDependency(moduleName, kind).has_value();
 }
 
-static std::string modulePathForVerification(const ModuleDependencyInfo &module) {
-  std::string existingModulePath = "";
-  switch (module.getKind()) {
-  case swift::ModuleDependencyKind::SwiftInterface: {
-    auto *swiftDep = module.getAsSwiftInterfaceModule();
-    existingModulePath = swiftDep->swiftInterfaceFile;
-    break;
-  }
-  case swift::ModuleDependencyKind::SwiftBinary: {
-    auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
-    existingModulePath = swiftBinaryDep->compiledModulePath;
-    break;
-  }
-  case swift::ModuleDependencyKind::Clang: {
-    auto *clangDep = module.getAsClangModule();
-    existingModulePath = clangDep->moduleMapFile;
-    break;
-  }
-  case swift::ModuleDependencyKind::SwiftSource:
-  case swift::ModuleDependencyKind::SwiftPlaceholder:
-  case swift::ModuleDependencyKind::LastKind:
-    llvm_unreachable("Unhandled dependency kind.");
-  }
-  return existingModulePath;
-}
-
-const ModuleDependencyInfo *SwiftDependencyScanningService::recordDependencies(
+const ModuleDependencyInfo *SwiftDependencyScanningService::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependencies) {
   auto kind = dependencies.getKind();
-  assert(kind != ModuleDependencyKind::Clang &&
-         "Attempting to cache Clang dependency in persistent Dependency "
-         "Scanner Cache.");
-
   // Source-based dependencies are recorded independently of the invocation's
   // target triple.
   if (kind == swift::ModuleDependencyKind::SwiftSource) {
@@ -397,13 +368,9 @@ const ModuleDependencyInfo *SwiftDependencyScanningService::recordDependencies(
   return &(map[moduleName]);
 }
 
-const ModuleDependencyInfo *SwiftDependencyScanningService::updateDependencies(
+const ModuleDependencyInfo *SwiftDependencyScanningService::updateDependency(
     ModuleDependencyID moduleID, ModuleDependencyInfo dependencies) {
   auto kind = dependencies.getKind();
-  assert(kind != ModuleDependencyKind::Clang &&
-         "Attempting to update Clang dependency in persistent Dependency "
-         "Scanner Cache.");
-
   // Source-based dependencies
   if (kind == swift::ModuleDependencyKind::SwiftSource) {
     assert(SwiftSourceModuleDependenciesMap.count(moduleID.first) == 1 &&
@@ -439,9 +406,10 @@ ModuleDependenciesCache::getDependencyReferencesMap(
 ModuleDependenciesCache::ModuleDependenciesCache(
     SwiftDependencyScanningService &globalScanningService,
     std::string mainScanModuleName,
-    std::string scanningContextHash)
+    std::string scannerContextHash)
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
+      scannerContextHash(scannerContextHash),
       clangScanningTool(globalScanningService.ClangScanningService) {
   globalScanningService.configureForContextHash(scannerContextHash);
   for (auto kind = ModuleDependencyKind::FirstKind;
@@ -451,90 +419,44 @@ ModuleDependenciesCache::ModuleDependenciesCache(
   }
 }
 
-Optional<const ModuleDependencyInfo *> ModuleDependenciesCache::findDependenciesLocalOnly(
+Optional<const ModuleDependencyInfo*>
+ModuleDependenciesCache::findDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  if (!kind) {
-    for (auto kind = ModuleDependencyKind::FirstKind;
-         kind != ModuleDependencyKind::LastKind; ++kind) {
-      auto dep = findDependenciesLocalOnly(moduleName, kind);
-      if (dep.has_value())
-        return dep.value();
-    }
-    return None;
-  }
-
-  const auto &map = getDependencyReferencesMap(*kind);
-  auto known = map.find(moduleName);
-  if (known != map.end())
-    return known->second;
-
-  return None;
+  return globalScanningService.findDependency(moduleName, kind);
 }
 
-Optional<ModuleDependencyInfo>
-ModuleDependenciesCache::findDependencies(
+bool ModuleDependenciesCache::hasDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  // 1. Query the local scan results
-  // 2. If no module found, query the global cache
-  auto localResult = findDependenciesLocalOnly(moduleName, kind);
-  if (localResult.has_value())
-    return *(localResult.value());
-  else
-    return globalScanningService.findDependencies(moduleName, kind);
+  return findDependency(moduleName, kind).has_value();
 }
 
-bool ModuleDependenciesCache::hasDependenciesLocalOnly(StringRef moduleName,
-                                                       Optional<ModuleDependencyKind> kind) const {
-  return findDependenciesLocalOnly(moduleName, kind).has_value();
-}
-
-bool ModuleDependenciesCache::hasDependencies(
-    StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  return findDependencies(moduleName, kind).has_value();
-}
-
-void ModuleDependenciesCache::recordDependencies(
+void ModuleDependenciesCache::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependencies) {
   auto dependenciesKind = dependencies.getKind();
-
-  // The underlying Clang module needs to be cached in this invocation,
-  // but should not make it to the global cache since it will look slightly
-  // differently for clients of this module than it does for the module itself.
-  const ModuleDependencyInfo *recordedDependencies;
-  if (dependencies.getKind() == ModuleDependencyKind::Clang) {
-    auto *clangDep = dependencies.getAsClangModule();
-    assert(clangDep && "Unexpected NULL Clang dependency.");
-    // Cache may already have a dependency for this module
-    if (clangModuleDependencies.count(moduleName) != 0) {
-      // Do not record duplicate dependencies.
-      auto newModulePath = clangDep->moduleMapFile;
-      for (auto &existingDeps : clangModuleDependencies[moduleName]) {
-        if (modulePathForVerification(existingDeps) == newModulePath)
-          return;
-      }
-      clangModuleDependencies[moduleName].emplace_back(std::move(dependencies));
-      recordedDependencies = clangModuleDependencies[moduleName].end() - 1;
-    } else {
-      clangModuleDependencies.insert(
-          {moduleName, ModuleDependenciesVector{std::move(dependencies)}});
-      recordedDependencies = &(clangModuleDependencies[moduleName].front());
-    }
-
-  } else
-    recordedDependencies =
-        globalScanningService.recordDependencies(moduleName, dependencies);
+  const ModuleDependencyInfo *recordedDependencies =
+        globalScanningService.recordDependency(moduleName, dependencies);
 
   auto &map = getDependencyReferencesMap(dependenciesKind);
   assert(map.count(moduleName) == 0 && "Already added to map");
   map.insert({moduleName, recordedDependencies});
 }
 
-void ModuleDependenciesCache::updateDependencies(
-    ModuleDependencyID moduleID, ModuleDependencyInfo dependencies) {
-  auto globalDepRef = globalScanningService.updateDependencies(moduleID, dependencies);
+void ModuleDependenciesCache::updateDependency(
+    ModuleDependencyID moduleID, ModuleDependencyInfo dependencyInfo) {
+  const ModuleDependencyInfo *updatedDependencies = globalScanningService.updateDependency(moduleID, dependencyInfo);
   auto &map = getDependencyReferencesMap(moduleID.second);
   auto known = map.find(moduleID.first);
   if (known != map.end())
     map.erase(known);
-  map.insert({moduleID.first, globalDepRef});
+  map.insert({moduleID.first, updatedDependencies});
+}
+
+void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID moduleID,
+                                                       const std::vector<ModuleDependencyID> &dependencyIDs) {
+  auto optionalDependencyInfo = findDependency(moduleID.first, moduleID.second);
+  assert(optionalDependencyInfo.hasValue() && "Resolving unknown dependency");
+  // Copy the existing info to a mutable one we can then replace it with, after resolving its dependencies.
+  auto dependencyInfo = *(optionalDependencyInfo.getValue());
+  dependencyInfo.resolveDependencies(dependencyIDs);
+  updateDependency(moduleID, dependencyInfo);
 }

@@ -270,6 +270,30 @@ struct ShrinkBorrowScopeTest : UnitTest {
   }
 };
 
+struct SimplifyCFGSimplifyArgument : UnitTest {
+  SimplifyCFGSimplifyArgument(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifyArgument(arguments.takeBlock(), arguments.takeUInt());
+  }
+};
+
+struct SimplifyCFGSimplifyBlockArgs : UnitTest {
+  SimplifyCFGSimplifyBlockArgs(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifyBlockArgs();
+  }
+};
+
 struct SimplifyCFGCanonicalizeSwitchEnum : UnitTest {
   SimplifyCFGCanonicalizeSwitchEnum(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
@@ -282,6 +306,71 @@ struct SimplifyCFGCanonicalizeSwitchEnum : UnitTest {
   }
 };
 
+struct SimplifyCFGSimplifySwitchEnumBlock : UnitTest {
+  SimplifyCFGSimplifySwitchEnumBlock(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifySwitchEnumBlock(
+            cast<SwitchEnumInst>(arguments.takeInstruction()));
+  }
+};
+
+struct SimplifyCFGSwitchEnumOnObjcClassOptional : UnitTest {
+  SimplifyCFGSwitchEnumOnObjcClassOptional(UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifySwitchEnumOnObjcClassOptional(
+            cast<SwitchEnumInst>(arguments.takeInstruction()));
+  }
+};
+
+struct SimplifyCFGSimplifySwitchEnumUnreachableBlocks : UnitTest {
+  SimplifyCFGSimplifySwitchEnumUnreachableBlocks(UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifySwitchEnumUnreachableBlocks(
+            cast<SwitchEnumInst>(arguments.takeInstruction()));
+  }
+};
+
+struct SimplifyCFGSimplifyTermWithIdenticalDestBlocks : UnitTest {
+  SimplifyCFGSimplifyTermWithIdenticalDestBlocks(UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifyTermWithIdenticalDestBlocks(arguments.takeBlock());
+  }
+};
+
+struct SimplifyCFGTryJumpThreading : UnitTest {
+  SimplifyCFGTryJumpThreading(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .tryJumpThreading(cast<BranchInst>(arguments.takeInstruction()));
+  }
+};
 
 // Arguments:
 // - string: list of characters, each of which specifies subsequent arguments
@@ -437,7 +526,28 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
-    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum", SimplifyCFGCanonicalizeSwitchEnum)
+
+    // SimplifyCFG unit tests
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-argument",
+                           SimplifyCFGSimplifyArgument)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-block-args",
+                           SimplifyCFGSimplifyBlockArgs)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum",
+                           SimplifyCFGCanonicalizeSwitchEnum)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-switch-enum-block",
+                           SimplifyCFGSimplifySwitchEnumBlock)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+        SimplifyCFGSimplifySwitchEnumUnreachableBlocks)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+        SimplifyCFGSwitchEnumOnObjcClassOptional)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-simplify-term-with-identical-dest-blocks",
+        SimplifyCFGSimplifyTermWithIdenticalDestBlocks)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-try-jump-threading",
+                           SimplifyCFGTryJumpThreading)
+
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)

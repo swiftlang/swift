@@ -196,26 +196,19 @@ public:
 
     unsigned size() const { return bits.size() / 2; }
 
-    // FIXME: specialize this for scalar liveness, which is the critical path
-    // for all OSSA utilities.
     IsLive getLiveness(unsigned bitNo) const {
-      SmallVector<IsLive, 1> foundLiveness;
-      getLiveness(bitNo, bitNo + 1, foundLiveness);
-      return foundLiveness[0];
+      if (!bits[bitNo * 2])
+        return IsLive::Dead;
+      return bits[bitNo * 2 + 1] ? LiveOut : LiveWithin;
     }
 
+    /// Returns the liveness in \p resultingFoundLiveness. We only return the
+    /// bits for endBitNo - startBitNo.
     void getLiveness(unsigned startBitNo, unsigned endBitNo,
                      SmallVectorImpl<IsLive> &resultingFoundLiveness) const {
       unsigned actualStartBitNo = startBitNo * 2;
       unsigned actualEndBitNo = endBitNo * 2;
 
-      // NOTE: We pad both before/after with Dead to ensure that we are
-      // returning an array that acts as a bit mask and thus can be directly
-      // compared against other such bitmasks. This invariant is used when
-      // computing boundaries.
-      for (unsigned i = 0; i != startBitNo; ++i) {
-        resultingFoundLiveness.push_back(Dead);
-      }
       for (unsigned i = actualStartBitNo, e = actualEndBitNo; i != e; i += 2) {
         if (!bits[i]) {
           resultingFoundLiveness.push_back(Dead);
@@ -223,9 +216,6 @@ public:
         }
 
         resultingFoundLiveness.push_back(bits[i + 1] ? LiveOut : LiveWithin);
-      }
-      for (unsigned i = endBitNo, e = size(); i != e; ++i) {
-        resultingFoundLiveness.push_back(Dead);
       }
     }
 
@@ -291,9 +281,12 @@ public:
 
   /// Update this liveness result for a single use.
   IsLive updateForUse(SILInstruction *user, unsigned bitNo) {
-    SmallVector<IsLive, 1> resultingLiveness;
-    updateForUse(user, bitNo, bitNo + 1, resultingLiveness);
-    return resultingLiveness[0];
+    auto *block = user->getParent();
+    auto liveness = getBlockLiveness(block, bitNo);
+    if (liveness != Dead)
+      return liveness;
+    computeScalarUseBlockLiveness(block, bitNo);
+    return getBlockLiveness(block, bitNo);
   }
 
   /// Update this range of liveness results for a single use.
@@ -302,19 +295,22 @@ public:
                     SmallVectorImpl<IsLive> &resultingLiveness);
 
   IsLive getBlockLiveness(SILBasicBlock *bb, unsigned bitNo) const {
-    SmallVector<IsLive, 1> isLive;
-    getBlockLiveness(bb, bitNo, bitNo + 1, isLive);
-    return isLive[0];
+    auto liveBlockIter = liveBlocks.find(bb);
+    if (liveBlockIter == liveBlocks.end()) {
+      return Dead;
+    }
+
+    return liveBlockIter->second.getLiveness(bitNo);
   }
 
-  // FIXME: This API should directly return the live bitset. The live bitset
-  // type should have an api for querying and iterating over the live fields.
+  /// FIXME: This API should directly return the live bitset. The live bitset
+  /// type should have an api for querying and iterating over the live fields.
   void getBlockLiveness(SILBasicBlock *bb, unsigned startBitNo,
                         unsigned endBitNo,
                         SmallVectorImpl<IsLive> &foundLivenessInfo) const {
     auto liveBlockIter = liveBlocks.find(bb);
     if (liveBlockIter == liveBlocks.end()) {
-      for (unsigned i : range(numBitsToTrack)) {
+      for (unsigned i : range(endBitNo - startBitNo)) {
         (void)i;
         foundLivenessInfo.push_back(Dead);
       }
@@ -330,11 +326,6 @@ public:
 
 protected:
   void markBlockLive(SILBasicBlock *bb, unsigned bitNo, IsLive isLive) {
-    markBlockLive(bb, bitNo, bitNo + 1, isLive);
-  }
-
-  void markBlockLive(SILBasicBlock *bb, unsigned startBitNo, unsigned endBitNo,
-                     IsLive isLive) {
     assert(isLive != Dead && "erasing live blocks isn't implemented.");
     auto iterAndInserted =
         liveBlocks.insert(std::make_pair(bb, LivenessSmallBitVector()));
@@ -344,18 +335,44 @@ protected:
       // we have more than SmallBitVector's small size number of bits.
       auto &insertedBV = iterAndInserted.first->getSecond();
       insertedBV.init(numBitsToTrack);
-      insertedBV.setLiveness(startBitNo, endBitNo, isLive);
+      insertedBV.setLiveness(bitNo, bitNo + 1, isLive);
       if (discoveredBlocks)
         discoveredBlocks->push_back(bb);
-    } else if (isLive == LiveOut) {
-      // Update the existing entry to be live-out.
-      iterAndInserted.first->getSecond().setLiveness(startBitNo, endBitNo,
-                                                     LiveOut);
+    } else {
+      // If we are dead, always update to the new liveness.
+      switch (iterAndInserted.first->getSecond().getLiveness(bitNo)) {
+      case Dead:
+        iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                       isLive);
+        break;
+      case LiveWithin:
+        if (isLive == LiveOut) {
+          // Update the existing entry to be live-out.
+          iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                         LiveOut);
+        }
+        break;
+      case LiveOut:
+        break;
+      }
     }
   }
 
-  void computeUseBlockLiveness(SILBasicBlock *userBB, unsigned startBitNo,
-                               unsigned endBitNo);
+  void markBlockLive(SILBasicBlock *bb, unsigned startBitNo, unsigned endBitNo,
+                     IsLive isLive) {
+    for (unsigned index : range(startBitNo, endBitNo)) {
+      markBlockLive(bb, index, isLive);
+    }
+  }
+
+private:
+  /// A helper routine that as a fast path handles the scalar case. We do not
+  /// handle the mult-bit case today since the way the code is written today
+  /// assumes we process a bit at a time.
+  ///
+  /// TODO: Make a multi-bit query for efficiency reasons.
+  void computeScalarUseBlockLiveness(SILBasicBlock *userBB,
+                                     unsigned startBitNo);
 };
 
 /// If inner borrows are 'Contained', then liveness is fully described by the

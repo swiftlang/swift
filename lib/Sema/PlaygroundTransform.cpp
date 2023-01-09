@@ -750,7 +750,7 @@ public:
 
     std::uniform_int_distribution<unsigned> Distribution(0, 0x7fffffffu);
     const unsigned id_num = Distribution(RNG);
-    Expr *IDExpr = IntegerLiteralExpr::createFromUnsigned(Context, id_num);
+    Expr *IDExpr = IntegerLiteralExpr::createFromUnsigned(Context, id_num, SourceLoc());
 
     return buildLoggerCallWithArgs(LogWithIDName, { *E, NameExpr, IDExpr }, SR);
   }
@@ -779,10 +779,10 @@ public:
         Context.SourceMgr.getPresumedLineAndColumnForLoc(
             Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
-    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
-    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
-    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first, SR.Start);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first, SR.End);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second, SR.Start);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second, SR.End);
 
     Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
     Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);

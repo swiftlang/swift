@@ -620,6 +620,10 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
 bool SILValueOwnershipChecker::
     hasGuaranteedForwardingIncomingPhiOperandsOnZeroOrAllPaths(
         SILPhiArgument *phi) const {
+  // For a phi in a trivially dead block, return true.
+  if (phi->getParentBlock()->pred_empty()) {
+    return true;
+  }
   bool foundGuaranteedForwardingPhiOperand = false;
   bool foundNonGuaranteedForwardingPhiOperand = false;
   phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *operand) -> bool {
@@ -683,7 +687,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // outlive the current function always.
   //
   // In the case of a yielded guaranteed value, we need to validate that all
-  // regular uses of the value are within the co
+  // regular uses of the value are within the coroutine.
   if (lifetimeEndingUsers.empty()) {
     if (checkValueWithoutLifetimeEndingUses(regularUsers))
       return false;

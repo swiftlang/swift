@@ -458,7 +458,7 @@ When emitting code to call to a generic function, the compiler looks at the subs
 \item Conformance lookup: Section~\ref{conformance lookup}
 \end{MoreDetails}
 
-\index{identifier type representation}
+\index{declaration reference type representation}
 \index{associated type}
 \paragraph{Associated types} Perhaps the simplest example of a protocol with an associated type is the \texttt{Iterator} protocol in the standard library. This protocol abstracts over an iterator which produces elements of a type that depends on the conformance:
 \begin{Verbatim}
@@ -473,7 +473,7 @@ func firstElement<I: IteratorProtocol>(_ iter: inout I) -> I.Element {
   return iter.next()!
 }
 \end{Verbatim}
-The return type of our function is the \emph{identifier type representation} \texttt{I.Element} with two components, ``\texttt{I}'' and ``\texttt{Element}''. Type resolution resolves this type representation to a type by performing a qualified lookup of \texttt{Element} on the base type \texttt{I}. The generic parameter type \texttt{I} is subject to a conformance requirement, and qualified lookup finds the associated type declaration \texttt{Element}.
+The return type of our function is the \emph{declaration reference type representation} \texttt{I.Element} with two components, ``\texttt{I}'' and ``\texttt{Element}''. Type resolution resolves this type representation to a type by performing a qualified lookup of \texttt{Element} on the base type \texttt{I}. The generic parameter type \texttt{I} is subject to a conformance requirement, and qualified lookup finds the associated type declaration \texttt{Element}.
 
 \index{dependent member type}
 The resolved type is a \emph{dependent member type} composed from the generic parameter type \texttt{I} and associated type declaration \texttt{Element}. We will denote this dependent member type as \verb|I.[IteratorProtocol]Element| to make explicit the fact that a name lookup has resolved the identifier \texttt{Element} to an associated type.
@@ -487,7 +487,7 @@ The interface type of \verb|firstElement(_:)| is therefore this generic function
 \end{quote}
 
 \begin{MoreDetails}
-\item Identifier type representations: Section \ref{identtyperepr}
+\item Declaration reference type representations: Section \ref{declreftyperepr}
 \end{MoreDetails}
 
 \index{type parameter}
@@ -1393,7 +1393,7 @@ First, we have the string ``\texttt{Array<Int>}'' written somewhere in a source 
 
 A type representation has a tree structure, so when we talk about the type representation \texttt{Array<Int>}, we really mean this:
 \begin{quote}
-``An identifier type representation with a single component, storing the identifier \texttt{Array} together with a single generic argument. The generic argument is another identifier type representation, again with a single component, storing the identifier \texttt{Int}.''
+``A declaration reference type representation with a single component, storing the identifier \texttt{Array} together with a single generic argument. The generic argument is another declaration reference type representation, again with a single component, storing the identifier \texttt{Int}.''
 \end{quote}
 Types also have a tree structure, so when we talk about the type \texttt{Array<Int>}, what we really mean is:
 \begin{quote}
@@ -1671,7 +1671,7 @@ The dynamic Self type appears when a class method declares a return type of \tex
 This concept comes from Objective-C, where it is called \texttt{instancetype}. The dynamic Self type in many ways behaves like a generic parameter, but it is not represented as one; the type checker and SILGen implement support for it directly.
 \begin{example} Listing~\ref{dynamic self example} demonstrates some of the behaviors of the dynamic Self type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \texttt{Self} appears in contravariant position.
 
-Note that \texttt{Self} has a different interpretation inside a non-class type declaration. In a protocol declaration, \texttt{Self} is the implicit generic parameter (Section~\ref{protocols}). In a struct or enum declaration, \texttt{Self} is the declared interface type (Section~\ref{identtyperepr}).
+Note that \texttt{Self} has a different interpretation inside a non-class type declaration. In a protocol declaration, \texttt{Self} is the implicit generic parameter (Section~\ref{protocols}). In a struct or enum declaration, \texttt{Self} is the declared interface type (Section~\ref{declreftyperepr}).
 \end{example}
 
 \section{Sugared Types}\label{sugared types}
@@ -1682,7 +1682,7 @@ Sugared generic parameter types were already described in the previous section. 
 \index{type alias type}
 \paragraph{Type alias types} A type alias type represents a reference to a type alias declaration. It contains an optional parent type, a substitution map, and the substituted underlying type. The canonical type of a type alias type is the substituted underlying type.
 
-The type alias type's substitution map is formed in type resolution, from any generic arguments applied to the type alias type declaration itself, together with the generic arguments of the base type (Section~\ref{identtyperepr}). Type resolution applies this substitution map to the underlying type of the type alias declaration to compute the substituted underlying type. The type alias type also preserves this substitution map for printing, and for requirement inference (Section~\ref{requirementinference}).
+The type alias type's substitution map is formed in type resolution, from any generic arguments applied to the type alias type declaration itself, together with the generic arguments of the base type (Section~\ref{declreftyperepr}). Type resolution applies this substitution map to the underlying type of the type alias declaration to compute the substituted underlying type. The type alias type also preserves this substitution map for printing, and for requirement inference (Section~\ref{requirementinference}).
 
 \index{optional sugared type}
 \paragraph{Optional types} The optional type is written as \texttt{T?} for some object type \texttt{T}; its canonical type is \texttt{Optional<T>}.
@@ -4073,7 +4073,7 @@ Applying the substitution map to the underlying type of each type alias declarat
 \end{quote}
 The first two original types are generic parameters, and substitution directly projects the corresponding replacement type from the substitution map; the second two original types are substituted by recursively replacing generic parameters they contain.
 
-References to generic type alias declarations are more complex because in addition to the generic parameters of the base type, the generic type alias will have generic parameters of its own. Section~\ref{identtyperepr} describes how the substitution map is computed in this case.
+References to generic type alias declarations are more complex because in addition to the generic parameters of the base type, the generic type alias will have generic parameters of its own. Section~\ref{declreftyperepr} describes how the substitution map is computed in this case.
 \end{example}
 
 \index{substitution failure}
@@ -4257,7 +4257,7 @@ Applying this substitution map to the declared interface type of the type alias 
 }
 \]
 \end{example}
-In fact, the type alias \texttt{A} cannot be referenced as a member of this base type at all, because name lookup checks whether the generic requirements of a type declaration are satisfied. Checking generic requirements will be first introduced as part of type resolution (Section~\ref{identtyperepr}), and will come up elsewhere as well.
+In fact, the type alias \texttt{A} cannot be referenced as a member of this base type at all, because name lookup checks whether the generic requirements of a type declaration are satisfied. Checking generic requirements will be first introduced as part of type resolution (Section~\ref{declreftyperepr}), and will come up elsewhere as well.
 \index{protocol substitution map}
 \index{protocol Self type}
 \paragraph{Protocol substitution map}
@@ -5864,20 +5864,20 @@ TODO:
 \end{itemize}
 \fi
 
-\section{Identifier Type Representations}\label{identtyperepr}
+\section{Declaration Reference Type Representations}\label{declreftyperepr}
 
 \ifWIP
 
-\index{identifier type representation}
-Structural types, such as function types and tuples, have their own type representations parsed from special syntax, and type resolution constructs the corresponding semantic types directly. On the other hand, references to type declarations---nominal types, type aliases, generic parameters and associated types---are resolved via name lookup from a very general kind of type representation called an \emph{identifier type representation}.
+\index{declaration reference type representation}
+Structural types, such as function types and tuples, have their own type representations parsed from special syntax, and type resolution constructs the corresponding semantic types directly. On the other hand, references to type declarations---nominal types, type aliases, generic parameters and associated types---are resolved via name lookup from a very general kind of type representation called an \emph{declaration reference type representation}.
 
-This kind of type representation consists of one or more \emph{components}, separated by dot in written syntax. Each component stores an identifier, together with an optional list of one or more generic arguments, where each generic argument is again recursively a type representation. The following identifier type representation has three components, two of which have generic arguments:
+This kind of type representation consists of one or more \emph{components}, separated by dot in written syntax. The first, base component is an arbitrary type representation. Each subsequent component stores an identifier, together with an optional list of one or more generic arguments, where each generic argument is again recursively a type representation. The following declaration reference type representation has three components, two of which have generic arguments:
 \begin{quote}
 \begin{verbatim}
 Foo.Bar<(Int) -> ()>.Baz<Float, String>
 \end{verbatim}
 \end{quote}
-\paragraph{Unqualified lookup} The first component is special. An unqualified name lookup is performed to find a type declaration with the given name, starting from the innermost lexical scope, finally reaching the top level, after which all imported modules are searched.
+\paragraph{Unqualified lookup} The first component is special. If it stores an identifier, an unqualified name lookup is performed to find a type declaration with the given name, starting from the innermost lexical scope, finally reaching the top level, after which all imported modules are searched.
 
 The first component can be a module name, in which case there must be at least two components; modules can only be used as the base of a lookup, and are not first-class values which stand on their own.
 
@@ -5963,7 +5963,7 @@ struct Outer<T> {
 }
 \end{Verbatim}
 \end{listing}
-\begin{example} The return type of \texttt{f1()} in Listing~\ref{applying generic arguments} is an identifier type representation with two components:
+\begin{example} The return type of \texttt{f1()} in Listing~\ref{applying generic arguments} is a declaration reference type representation with two components:
 \begin{enumerate}
 \item The first component is resolved by applying the substitution map $\texttt{T}:=\texttt{Int}$ to the declared interface type of \texttt{Outer}, which outputs \texttt{Outer<Int>}.
 \item The second component is resolved by first building a substitution map for the generic signature of \texttt{Inner}, which is \texttt{<T,~U>}. The base type \texttt{Outer<Int>} provides the replacement $\texttt{T}:=\texttt{Int}$, and the component's single generic argument \texttt{String} provides the replacement $\texttt{U}:=\texttt{String}$. The declared interface type of the named type declaration \texttt{Inner} is \texttt{Outer<T>.Inner<U>}. Applying the combined substitution map to this type gives \texttt{Outer<Int>.Inner<String>}.
@@ -5971,7 +5971,7 @@ struct Outer<T> {
 
 \end{example}
 
-The type resolution process for an identifier type representation might seem unnecessarily convoluted. When resolving a type representation like \texttt{Outer<Int>.Inner<String>}, we build the type of the first component by applying a substitution map to the declared interface type of the type declaration, \texttt{Outer<T>}. In the next step, we turn this type back into a substitution map, extend the substitution map with a replacement type for \texttt{U}, then apply it to the declared interface type of \texttt{Outer<T>.Inner<U>}. It seems like we might be able to get away with performing a chain of name lookups to find the final type declaration, then collect all of the generic arguments and apply them in one shot. Unfortunately, the next example shows why this appealing simplification does not handle the full generality of type resolution.
+The type resolution process for a declaration reference type representation might seem unnecessarily convoluted. When resolving a type representation like \texttt{Outer<Int>.Inner<String>}, we build the type of the first component by applying a substitution map to the declared interface type of the type declaration, \texttt{Outer<T>}. In the next step, we turn this type back into a substitution map, extend the substitution map with a replacement type for \texttt{U}, then apply it to the declared interface type of \texttt{Outer<T>.Inner<U>}. It seems like we might be able to get away with performing a chain of name lookups to find the final type declaration, then collect all of the generic arguments and apply them in one shot. Unfortunately, the next example shows why this appealing simplification does not handle the full generality of type resolution.
 
 \begin{listing}\captionabove{The named type declaration of a component can depend on generic arguments previously applied}\label{type resolution with dependent base}
 \begin{Verbatim}
@@ -6013,7 +6013,7 @@ Clearly, \texttt{Paul.Pony} and \texttt{Maureen.Pony} are two unrelated nominal 
 
 \end{example}
 
-\paragraph{Bound components} A minor optimization worth understanding, because it slightly complicates the implementation. After type resolution of a component succeeds, the bound (or found, perhaps) type declaration is stored inside the component. If the identifier type representation is resolved again, any bound components will skip the name lookup and proceed to compute the final type from the bound declaration. The optimization was more profitable in the past, when type resolution actually had \emph{three} stages, with a third stage resolving interface types to archetypes. The third stage was subsumed by the \texttt{mapTypeIntoContext()} operation on generic environments. Parsing textual SIL also ``manually'' binds components to type declarations which name lookup would otherwise not find, in order to parse some of the more esoteric SIL syntax that we're not going to discuss here.
+\paragraph{Bound components} A minor optimization worth understanding, because it slightly complicates the implementation. After type resolution of a component succeeds, the bound (or found, perhaps) type declaration is stored inside the component. If the declaration reference type representation is resolved again, any bound components will skip the name lookup and proceed to compute the final type from the bound declaration. The optimization was more profitable in the past, when type resolution actually had \emph{three} stages, with a third stage resolving interface types to archetypes. The third stage was subsumed by the \texttt{mapTypeIntoContext()} operation on generic environments. Parsing textual SIL also ``manually'' binds components to type declarations which name lookup would otherwise not find, in order to parse some of the more esoteric SIL syntax that we're not going to discuss here.
 \fi
 
 \section{Checking Generic Arguments}\label{checking generic arguments}

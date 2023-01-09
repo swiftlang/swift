@@ -214,16 +214,15 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
     ParsedTypeLoc.setType(ty);
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
-    if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
-      const auto &componentRange = ITR->getComponentRange();
+    if (auto *declRefTR =
+            dyn_cast<DeclRefTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       // If it has more than one component, it can't be a module name.
-      if (std::distance(componentRange.begin(), componentRange.end()) != 1)
+      if (isa<MemberTypeRepr>(declRefTR))
         return false;
 
-      const auto &component = componentRange.front();
+      const auto *identTR = cast<IdentTypeRepr>(declRefTR);
       ImportPath::Module::Builder builder(
-          component->getNameRef().getBaseIdentifier(),
-          component->getLoc());
+          identTR->getNameRef().getBaseIdentifier(), identTR->getLoc());
 
       if (auto Module = Context.getLoadedModule(builder.get()))
         ParsedTypeLoc.setType(ModuleType::get(Module));
@@ -267,8 +266,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithDot(DeclRefTypeRepr *TR) override;
+  void completeTypeIdentifierWithoutDot(DeclRefTypeRepr *TR) override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -496,21 +495,21 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
 }
 
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
-    IdentTypeRepr *ITR) {
-  if (!ITR) {
+    DeclRefTypeRepr *TR) {
+  if (!TR) {
     completeTypeSimpleBeginning();
     return;
   }
   Kind = CompletionKind::TypeIdentifierWithDot;
-  ParsedTypeLoc = TypeLoc(ITR);
+  ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
-    IdentTypeRepr *ITR) {
-  assert(ITR);
+    DeclRefTypeRepr *TR) {
+  assert(TR);
   Kind = CompletionKind::TypeIdentifierWithoutDot;
-  ParsedTypeLoc = TypeLoc(ITR);
+  ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
 

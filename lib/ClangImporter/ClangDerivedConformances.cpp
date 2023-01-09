@@ -15,6 +15,8 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Overload.h"
 
 using namespace swift;
 using namespace swift::importer;
@@ -202,6 +204,45 @@ static ValueDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
                         isValid);
 }
 
+static void instantiateTemplatedOperator(
+    ClangImporter::Implementation &impl,
+    const clang::ClassTemplateSpecializationDecl *classDecl,
+    clang::BinaryOperatorKind operatorKind) {
+
+  clang::ASTContext &clangCtx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
+
+  clang::UnresolvedSet<1> ops;
+  auto qualType = clang::QualType(classDecl->getTypeForDecl(), 0);
+  auto arg = new (clangCtx)
+      clang::CXXThisExpr(clang::SourceLocation(), qualType, false);
+  arg->setType(clang::QualType(classDecl->getTypeForDecl(), 0));
+
+  clang::OverloadedOperatorKind opKind =
+      clang::BinaryOperator::getOverloadedOperator(operatorKind);
+  clang::OverloadCandidateSet candidateSet(
+      classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
+      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
+                                              clang::SourceLocation(), false));
+  clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, {arg, arg}, true);
+
+  clang::OverloadCandidateSet::iterator best;
+  switch (candidateSet.BestViableFunction(clangSema, clang::SourceLocation(),
+                                          best)) {
+  case clang::OR_Success: {
+    if (auto clangCallee = best->Function) {
+      auto lookupTable = impl.findLookupTable(classDecl);
+      addEntryToLookupTable(*lookupTable, clangCallee, impl.getNameImporter());
+    }
+    break;
+  }
+  case clang::OR_No_Viable_Function:
+  case clang::OR_Ambiguous:
+  case clang::OR_Deleted:
+    break;
+  }
+}
+
 bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
   return getIteratorCategoryDecl(clangDecl);
 }
@@ -294,6 +335,13 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!successorTy || successorTy->getAnyNominal() != decl)
     return;
 
+  // If this is a templated class, `operator==` might be templated as well.
+  // Try to instantiate it.
+  if (auto templateSpec =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
+    instantiateTemplatedOperator(impl, templateSpec,
+                                 clang::BinaryOperatorKind::BO_EQ);
+  }
   // Check if present: `func ==`
   auto equalEqual = getEqualEqualOperator(decl);
   if (!equalEqual)
@@ -309,6 +357,11 @@ void swift::conformToCxxIteratorIfNeeded(
 
   // Try to conform to UnsafeCxxRandomAccessIterator if possible.
 
+  if (auto templateSpec =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
+    instantiateTemplatedOperator(impl, templateSpec,
+                                 clang::BinaryOperatorKind::BO_Sub);
+  }
   auto minus = dyn_cast_or_null<FuncDecl>(getMinusOperator(decl));
   if (!minus)
     return;

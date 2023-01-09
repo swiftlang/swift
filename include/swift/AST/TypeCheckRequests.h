@@ -3480,9 +3480,11 @@ public:
   bool isCached() const { return true; }
 };
 
-class IsSemanticallyUnavailableRequest
-    : public SimpleRequest<IsSemanticallyUnavailableRequest,
-                           bool(const Decl *),
+using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;
+
+class SemanticAvailableRangeAttrRequest
+    : public SimpleRequest<SemanticAvailableRangeAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3490,7 +3492,25 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SemanticUnavailableAttrRequest
+    : public SimpleRequest<SemanticUnavailableAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3541,23 +3561,6 @@ private:
 
   Optional<TypeWrapperInfo> evaluate(Evaluator &evaluator,
                                      NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Return a type of the type wrapper (if any) associated with the given
-/// declaration.
-class GetTypeWrapperType
-    : public SimpleRequest<GetTypeWrapperType, Type(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Type evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
@@ -3757,23 +3760,6 @@ private:
   friend SimpleRequest;
 
   ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Check whether this is a protocol that has a type wrapper attribute
-/// or one of its dependencies does.
-class UsesTypeWrapperFeature
-    : public SimpleRequest<UsesTypeWrapperFeature, bool(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }

@@ -114,6 +114,7 @@ void Mangler::beginManglingWithoutPrefix() {
   Storage.clear();
   Substitutions.clear();
   StringSubstitutions.clear();
+  NextSubstitutionIndex = 0;
   Words.clear();
   SubstMerging.clear();
 }

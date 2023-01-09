@@ -3002,6 +3002,10 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool SynthesizeExtensions) {
   CompilerInvocation Invocation(InitInvok);
 
+  // Read everything from loaded modules, including internal details to
+  // test the behavior around non-public access levels.
+  Invocation.getLangOptions().EnableDeserializationSafety = false;
+
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;

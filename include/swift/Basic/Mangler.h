@@ -54,6 +54,12 @@ protected:
 
   /// Identifier substitutions.
   llvm::StringMap<unsigned> StringSubstitutions;
+  
+  /// Index to use for the next added substitution.
+  /// Note that this is not simply the sum of the size of the \c Substitutions
+  /// and \c StringSubstitutions maps above, since in some circumstances the
+  /// same entity may be registered for multiple substitution indexes.
+  unsigned NextSubstitutionIndex = 0;
 
   /// Word substitutions in mangled identifiers.
   llvm::SmallVector<SubstitutionWord, 26> Words;
@@ -102,7 +108,6 @@ protected:
   }
 
 protected:
-
   Mangler() : Buffer(Storage) { }
 
   /// Begins a new mangling but does not add the mangling prefix.
@@ -134,15 +139,15 @@ protected:
   void addSubstitution(const void *ptr) {
     if (!UseSubstitutions)
       return;
-
-    auto value = Substitutions.size() + StringSubstitutions.size();
+    
+    auto value = NextSubstitutionIndex++;
     Substitutions[ptr] = value;
   }
   void addSubstitution(StringRef Str) {
     if (!UseSubstitutions)
       return;
 
-    auto value = Substitutions.size() + StringSubstitutions.size();
+    auto value = NextSubstitutionIndex++;
     StringSubstitutions[Str] = value;
   }
 

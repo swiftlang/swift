@@ -392,8 +392,11 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsSemanticallyUnavailableRequest,
-              bool(const Decl *),
+SWIFT_REQUEST(TypeChecker, SemanticAvailableRangeAttrRequest,
+              Optional<AvailableAttrDeclPair>(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticUnavailableAttrRequest,
+              Optional<AvailableAttrDeclPair>(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
@@ -403,9 +406,6 @@ SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
               Optional<TypeWrapperInfo>(NominalTypeDecl *),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
-              Type(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorage,
               TypeDecl *(NominalTypeDecl *),
@@ -442,9 +442,6 @@ SWIFT_REQUEST(TypeChecker, ContinueTargetRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
               ConstructorDecl *(NominalTypeDecl *),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, UsesTypeWrapperFeature,
-              bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MacroDefinitionRequest,
               MacroDefinition(MacroDecl *),

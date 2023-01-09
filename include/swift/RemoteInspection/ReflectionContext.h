@@ -30,11 +30,11 @@
 #include "swift/Concurrency/Actor.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Reflection/Records.h"
-#include "swift/Reflection/RuntimeInternals.h"
-#include "swift/Reflection/TypeLowering.h"
-#include "swift/Reflection/TypeRef.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/Records.h"
+#include "swift/RemoteInspection/RuntimeInternals.h"
+#include "swift/RemoteInspection/TypeLowering.h"
+#include "swift/RemoteInspection/TypeRef.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 
 #include <set>

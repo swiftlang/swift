@@ -17,7 +17,7 @@
 #ifndef SWIFT_REFLECTION_METADATASOURCEBUILDER_H
 #define SWIFT_REFLECTION_METADATASOURCEBUILDER_H
 
-#include "swift/Reflection/MetadataSource.h"
+#include "swift/RemoteInspection/MetadataSource.h"
 
 namespace swift {
 namespace reflection {

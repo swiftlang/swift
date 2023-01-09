@@ -32,6 +32,3 @@ inline uint32_t testVector32Sum(size_t vectorSize, size_t iters) {
     }
     return sum;
 }
-
-// FIXME: remove when the templated operator == is correctly bridged.
-inline bool operator ==(const VectorOfU32::const_iterator &lhs, const VectorOfU32::const_iterator &rhs) { return lhs.base() == rhs.base(); }

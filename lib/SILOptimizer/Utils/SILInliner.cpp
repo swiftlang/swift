@@ -285,7 +285,7 @@ class SILInlineCloner
   /// This location wraps the call site AST node that is being inlined.
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
-  Optional<SILLocation> Loc;
+  SILLocation Loc;
   const SILDebugScope *CallSiteScope = nullptr;
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
@@ -338,9 +338,7 @@ protected:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.has_value()
-               ? Loc.value()
-               : MandatoryInlinedLocation();
+    return Loc;
   }
 
   const SILDebugScope *remapScope(const SILDebugScope *DS) {
@@ -387,6 +385,16 @@ SILInliner::inlineFullApply(FullApplySite apply,
                                 appliedArgs);
 }
 
+static SILLocation selectLoc(bool mandatory, SILLocation orig) {
+  // Compute the SILLocation which should be used by all the inlined
+  // instructions.
+  if (mandatory)
+    return MandatoryInlinedLocation(orig);
+  else {
+    return InlinedLocation(orig);
+  }
+}
+
 SILInlineCloner::SILInlineCloner(
     SILFunction *calleeFunction, FullApplySite apply,
     SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
@@ -395,7 +403,8 @@ SILInlineCloner::SILInlineCloner(
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
               /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
-      deleter(deleter) {
+      deleter(deleter),
+      Loc(selectLoc(inlineKind == InlineKind::MandatoryInline, apply.getLoc())) {
 
   SILFunction &F = getBuilder().getFunction();
   assert(apply.getFunction() && apply.getFunction() == &F
@@ -407,15 +416,6 @@ SILInlineCloner::SILInlineCloner(
           || IKind == InlineKind::PerformanceInline)
          && "Cannot inline Objective-C methods or C functions in mandatory "
             "inlining");
-
-  // Compute the SILLocation which should be used by all the inlined
-  // instructions.
-  if (IKind == InlineKind::PerformanceInline)
-    Loc = InlinedLocation(apply.getLoc());
-  else {
-    assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
-    Loc = MandatoryInlinedLocation(apply.getLoc());
-  }
 
   auto applyScope = apply.getDebugScope();
   // FIXME: Turn this into an assertion instead.
@@ -436,7 +436,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.value(), &getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc, &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.

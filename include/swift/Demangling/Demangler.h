@@ -475,8 +475,9 @@ protected:
   friend DemangleInitRAII;
   
   void addSubstitution(NodePointer Nd) {
-    if (Nd)
+    if (Nd) {
       Substitutions.push_back(Nd, *this);
+    }
   }
 
   NodePointer addChild(NodePointer Parent, NodePointer Child);

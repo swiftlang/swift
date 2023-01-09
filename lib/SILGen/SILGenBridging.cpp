@@ -1364,6 +1364,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   // Emit the other arguments, taking ownership of arguments if necessary.
   auto inputs = objcFnTy->getParameters();
   auto nativeInputs = swiftFnTy->getParameters();
+  auto fnConv = SGF.silConv.getFunctionConventions(swiftFnTy);
   assert(nativeInputs.size() == bridgedFormalTypes.size());
   assert(nativeInputs.size() == nativeFormalTypes.size());
   assert(inputs.size() ==
@@ -1434,7 +1435,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (nativeInputs[i].isFormalIndirect() &&
+    if (fnConv.isSILIndirect(nativeInputs[i]) &&
         !native.getType().isAddress()) {
       auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
       native.forwardInto(SGF, loc, buf);
