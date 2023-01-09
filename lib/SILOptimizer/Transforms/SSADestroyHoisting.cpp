@@ -441,6 +441,7 @@ protected:
                            SmallVectorImpl<LoadInst *> &loads,
                            SmallVectorImpl<CopyAddrInst *> &copies,
                            SmallPtrSetImpl<AccessPath::PathNode> &leaves,
+                           SmallPtrSetImpl<AccessPath::PathNode> &trivialLeaves,
                            const AccessStorage &storage,
                            const DeinitBarriers &deinitBarriers);
 
@@ -568,6 +569,25 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
   // destroy_addr in order for folding to occur.
   llvm::SmallPtrSet<AccessPath::PathNode, 16> leaves;
 
+  // The trivial storage leaves of the root storage.  They needn't be destroyed
+  // in the sequence prior to the destroy_addr, but their uses may obstruct
+  // folding.  For example,  given an %object and %triv a trivial subobject
+  //
+  //     load [copy] %object
+  //     load [trivial] %triv
+  //     destroy_addr %object
+  //
+  // it isn't legal to fold the destroy_addr into the load of %object like
+  //
+  //     load [take] %object
+  //     load [trivial] %triv
+  //
+  // because the memory location %triv is no longer valid.  In general, it would
+  // be fine to support folding over accesses of trivial subobjects so long as
+  // they occur prior to the access to some nontrivial subobject that contains
+  // it.
+  SmallPtrSet<AccessPath::PathNode, 16> trivialLeaves;
+
   visitProductLeafAccessPathNodes(storageRoot, typeExpansionContext, module,
                                   [&](AccessPath::PathNode node, SILType ty) {
                                     if (ty.isTrivial(*function))
@@ -577,8 +597,8 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
 
   for (auto *instruction = barrier; instruction != nullptr;
        instruction = instruction->getPreviousInstruction()) {
-    if (checkFoldingBarrier(instruction, loads, copies, leaves, storage,
-                            deinitBarriers))
+    if (checkFoldingBarrier(instruction, loads, copies, leaves, trivialLeaves,
+                            storage, deinitBarriers))
       return false;
 
     // If we have load [copy]s or copy_addrs of projections out of the root
@@ -672,8 +692,9 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
 bool HoistDestroys::checkFoldingBarrier(
     SILInstruction *instruction, SmallVectorImpl<LoadInst *> &loads,
     SmallVectorImpl<CopyAddrInst *> &copies,
-    SmallPtrSetImpl<AccessPath::PathNode> &leaves, const AccessStorage &storage,
-    const DeinitBarriers &deinitBarriers) {
+    SmallPtrSetImpl<AccessPath::PathNode> &leaves,
+    SmallPtrSetImpl<AccessPath::PathNode> &trivialLeaves,
+    const AccessStorage &storage, const DeinitBarriers &deinitBarriers) {
   // The address of a projection out of the root storage which would be
   // folded if folding is possible.
   //
@@ -720,20 +741,29 @@ bool HoistDestroys::checkFoldingBarrier(
     // Find its nontrivial product leaves and remove them from the set of
     // leaves of the root storage which we're wating to see.
     bool alreadySawLeaf = false;
-    visitProductLeafAccessPathNodes(address, typeExpansionContext, module,
-                                    [&](AccessPath::PathNode node, SILType ty) {
-                                      if (ty.isTrivial(*function))
-                                        return;
-                                      bool erased = leaves.erase(node);
-                                      alreadySawLeaf =
-                                          alreadySawLeaf || !erased;
-                                    });
+    bool alreadySawTrivialSubleaf = false;
+    visitProductLeafAccessPathNodes(
+        address, typeExpansionContext, module,
+        [&](AccessPath::PathNode node, SILType ty) {
+          if (ty.isTrivial(*function)) {
+            bool inserted = !trivialLeaves.insert(node).second;
+            alreadySawTrivialSubleaf = alreadySawTrivialSubleaf || inserted;
+            return;
+          }
+          bool erased = leaves.erase(node);
+          alreadySawLeaf = alreadySawLeaf || !erased;
+        });
     if (alreadySawLeaf) {
       // We saw this non-trivial product leaf already.  That means there are
       // multiple load [copy]s or copy_addrs of at least one product leaf
       // before (walking backwards from the hoisting point) there are
       // instructions that load or copy from all the non-trivial leaves.
       // Give up on folding.
+      return true;
+    }
+    if (alreadySawTrivialSubleaf) {
+      // We saw this trivial leaf already.  That means there was some later
+      // load [copy] or copy_addr of it.  Give up on folding.
       return true;
     }
   } else if (deinitBarriers.isBarrier(instruction)) {

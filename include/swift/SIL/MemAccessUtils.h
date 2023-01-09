@@ -1132,6 +1132,8 @@ public:
     // Precondition: this != subNode
     PathNode findPrefix(PathNode subNode) const;
 
+    bool isPrefixOf(PathNode other) { return node->isPrefixOf(other.node); }
+
     bool operator==(PathNode other) const { return node == other.node; }
     bool operator!=(PathNode other) const { return node != other.node; }
   };
