@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -132,23 +132,11 @@ extension StaticBigIntTests {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: - Wrapper Associated Type
+// MARK: - Type Inference
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.8, *)
 extension StaticBigIntTests {
-
-  @available(SwiftStdlib 5.8, *)
-  struct Wrapper: ExpressibleByIntegerLiteral {
-
-    @available(SwiftStdlib 5.8, *)
-    let actual: StaticBigInt
-
-    @available(SwiftStdlib 5.8, *)
-    init(integerLiteral actual: StaticBigInt) {
-      self.actual = actual
-    }
-  }
   
   func testPrefixPlusTypeInference() {
     let a: Int = 7
@@ -168,6 +156,26 @@ extension StaticBigIntTests {
     let a: Int = 7
     let b = -1
     let c = a + b
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Wrapper Associated Type
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.8, *)
+extension StaticBigIntTests {
+
+  @available(SwiftStdlib 5.8, *)
+  struct Wrapper: ExpressibleByIntegerLiteral {
+
+    @available(SwiftStdlib 5.8, *)
+    let actual: StaticBigInt
+
+    @available(SwiftStdlib 5.8, *)
+    init(integerLiteral actual: StaticBigInt) {
+      self.actual = actual
+    }
   }
 
   @available(SwiftStdlib 5.8, *)
