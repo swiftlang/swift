@@ -846,7 +846,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
   }
 
   // ==== 3) Add to wait queue -------------------------------------------------
-  assert(assumed.readyTasks() == 0);
+  assert(assumed.readyTasks(this) == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
     if (!hasSuspended) {
