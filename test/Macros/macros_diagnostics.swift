@@ -2,9 +2,12 @@
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
+// expected-warning@-2{{external macro implementation type}}
 @expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 // expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{43-68=#externalMacro(module: "MissingModule", type: "MissingType")}}
+// expected-warning@-2{{external macro implementation type}}
 @expression macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
+// expected-warning@-1{{external macro implementation type}}
 
 protocol P { }
 
@@ -16,36 +19,52 @@ internal struct X { } // expected-note{{type declared here}}
 
 @expression public macro createAnX: X = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{macro cannot be declared public because its result type uses an internal type}}
+// expected-warning@-2{{external macro implementation type}}
 
 @expression macro m1: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+// expected-warning@-1{{external macro implementation type}}
 @expression macro m1: Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
+// expected-warning@-1{{external macro implementation type}}
 
 @expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2' previously declared here}}
+// expected-warning@-1{{external macro implementation type}}
 @expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2'}}
+// expected-warning@-1{{external macro implementation type}}
 
 @expression macro m3(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+// expected-warning@-1{{external macro implementation type}}
 @expression macro m3(_: Int) -> Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
+// expected-warning@-1{{external macro implementation type}}
 
 @expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m4' previously declared here}}
+// expected-warning@-1{{external macro implementation type}}
 @expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm4'}}
+// expected-warning@-1{{external macro implementation type}}
 
 struct ZZZ {
   macro m5: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
   // expected-error@-1{{macro 'm5' can only be declared at file scope}}
   // expected-error@-2{{macro 'm5' must declare its applicable contexts (e.g., '@expression')}}
+  // expected-warning@-3{{external macro implementation type}}
 }
 
 @expression macro multiArgMacro(_: Any, second: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{'multiArgMacro(_:second:)' declared here}}
+// expected-warning@-2{{external macro implementation type}}
 
 @expression macro overloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType")
+// expected-warning@-1{{external macro implementation type}}
+
 func overloaded1(_ p: Any) { }
 
 @expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType") // expected-note{{'notOverloaded1' previously declared here}}
+// expected-warning@-1{{external macro implementation type}}
 @expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
+// expected-warning@-1{{external macro implementation type}}
 
 @expression macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
+// expected-warning@-2{{external macro implementation type}}
 
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
@@ -80,3 +99,6 @@ func shadow(a: Int, b: Int, stringify: Int) {
 func testMissing() {
   #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; the type must be public and provided via '-load-plugin-library'}}
 }
+
+@expression macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
+

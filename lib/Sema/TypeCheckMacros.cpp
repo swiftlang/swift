@@ -358,7 +358,7 @@ Expr *swift::expandMacroExpr(
   }
 
   case MacroDefinition::Kind::External: {
-    // Retrieve the extternal definition of the macro.
+    // Retrieve the external definition of the macro.
     auto external = macroDef.getExternalMacro();
     ExternalMacroDefinitionRequest request{
       &ctx, external.moduleName, external.macroTypeName

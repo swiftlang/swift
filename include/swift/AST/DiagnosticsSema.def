@@ -6777,6 +6777,8 @@ ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
       "macro %2; the type must be public and provided via "
       "'-load-plugin-library'", (StringRef, StringRef, DeclName))
+ERROR(macro_must_be_defined,none,
+      "macro %0 requires a definition", (DeclName))
 NOTE(macro_note, none,
      "%1 (in macro %0)", (DeclName, StringRef))
 WARNING(macro_warning, none,
