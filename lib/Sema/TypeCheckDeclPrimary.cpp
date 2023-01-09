@@ -39,6 +39,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -2004,6 +2005,39 @@ public:
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroContexts())
       MD->diagnose(diag::macro_without_context, MD->getName());
+
+    // Check the macro definition.
+    switch (auto macroDef = MD->getDefinition()) {
+    case MacroDefinition::Kind::Undefined:
+      MD->diagnose(diag::macro_must_be_defined, MD->getName());
+      break;
+
+    case MacroDefinition::Kind::Invalid:
+    case MacroDefinition::Kind::Builtin:
+      // Nothing else to check here.
+      break;
+
+    case MacroDefinition::Kind::External: {
+        // Retrieve the external definition of the macro.
+      auto external = macroDef.getExternalMacro();
+      ExternalMacroDefinitionRequest request{
+        &Ctx, external.moduleName, external.macroTypeName
+      };
+      auto externalDef = evaluateOrDefault(
+          Ctx.evaluator, request, ExternalMacroDefinition()
+                                           );
+      if (!externalDef.opaqueHandle) {
+        MD->diagnose(
+            diag::external_macro_not_found,
+            external.moduleName.str(),
+            external.macroTypeName.str(),
+            MD->getName()
+        ).limitBehavior(DiagnosticBehavior::Warning);
+      }
+
+      break;
+    }
+    }
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {

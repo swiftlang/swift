@@ -5406,11 +5406,13 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
-        E->setRewritten(newExpr);
-        cs.cacheExprTypes(E);
+      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
+        if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
+          E->setRewritten(newExpr);
+        }
       }
 
+      cs.cacheExprTypes(E);
       return E;
     }
 
