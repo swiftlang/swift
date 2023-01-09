@@ -167,3 +167,16 @@ public class RecursiveMacro: ExpressionMacro {
     return "()"
   }
 }
+
+public class NestedDeclInExprMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+  ) -> ExprSyntax {
+    return """
+    { () -> Void in
+      struct Foo { }
+      return ()
+    }
+    """
+  }
+}

@@ -573,7 +573,8 @@ void ModuleDecl::updateSourceFileLocationMap() {
   }
 
   // If we are up-to-date, there's nothing to do.
-  if (sourceFileLocationMap->numFiles == getFiles().size() &&
+  ArrayRef<FileUnit *> files = Files;
+  if (sourceFileLocationMap->numFiles == files.size() &&
       sourceFileLocationMap->numAuxiliaryFiles ==
           AuxiliaryFiles.size())
     return;
@@ -582,7 +583,7 @@ void ModuleDecl::updateSourceFileLocationMap() {
   sourceFileLocationMap->allSourceFiles.clear();
 
   // First, add all of the source files with a backing buffer.
-  for (auto *fileUnit : getFiles()) {
+  for (auto *fileUnit : files) {
     if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
       if (sourceFile->getBufferID())
         sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
