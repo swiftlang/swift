@@ -579,7 +579,9 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
       }
     }
   }
-  assert(prevCount < boundary.deadDefs.size() + boundary.lastUsers.size()
+  // All live-within blocks must contain a boundary.
+  assert(isLiveOut
+         || (prevCount < boundary.deadDefs.size() + boundary.lastUsers.size())
          && "findBoundariesInBlock must be called on a live block");
 }
 

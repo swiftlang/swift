@@ -175,3 +175,46 @@ bb0(%0 : @guaranteed $D):
   %99 = tuple()
   return %99 : $()
 }
+
+// CHECK-LABEL: @testMultiDef
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def: %{{.*}} = copy_value %0 : $C
+// CHECK:   def: %{{.*}} = move_value [[CP0]] : $C
+// CHECK:   def: %{{.*}} = argument of bb4 : $C
+// CHECK: bb0: LiveOut,
+// CHECK: bb2: LiveWithin,
+// CHECK: bb3: LiveWithin,
+// CHECK: bb4: LiveWithin,
+// CHECK: bb1: LiveWithin,
+// CHECK: lifetime-ending user:   %{{.*}} = move_value [[CP0]] : $C
+// CHECK: lifetime-ending user:   destroy_value [[CP0]] : $C
+// CHECK: lifetime-ending user:   br bb4(%5 : $C)
+// CHECK: lifetime-ending user:   br bb4(%7 : $C)
+// CHECK: lifetime-ending user:   destroy_value %9 : $C
+sil [ossa] @testMultiDef : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %copy0 = copy_value %0 : $C
+  debug_value [trace] %copy0 : $C
+  cond_br undef, bb1, bb3
+
+bb1:
+  destroy_value %copy0 : $C
+  br bb2
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  debug_value [trace] %copy2 : $C
+  br bb4(%copy2 : $C)
+
+bb3:
+  %copy3 = move_value %copy0 : $C
+  debug_value [trace] %copy3 : $C
+  br bb4(%copy3 : $C)
+
+bb4(%phi : @owned $C):
+  debug_value [trace] %phi : $C
+  destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
