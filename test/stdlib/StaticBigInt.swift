@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,11 +28,13 @@ final class StaticBigIntTests {
   static func main() {
     let testCase = StaticBigIntTests()
     let testSuite = TestSuite("StaticBigIntTests")
-    testSuite.test("BinaryRepresentation",  testCase.testBinaryRepresentation)
-    testSuite.test("TextualRepresentation", testCase.testTextualRepresentation)
+    testSuite.test("BinaryRepresentation",     testCase.testBinaryRepresentation)
+    testSuite.test("TextualRepresentation",    testCase.testTextualRepresentation)
     testSuite.test("PrefixPlusTypeInference",  testCase.testPrefixPlusTypeInference)
     testSuite.test("PrefixMinusTypeInference", testCase.testPrefixMinusTypeInference)
-    testSuite.test("WrapperAssociatedType", testCase.testWrapperAssociatedType)
+    testSuite.test("WrapperNegativeValue",     testCase.testWrapperNegativeValue)
+    testSuite.test("WrapperPositiveValue",     testCase.testWrapperPositiveValue)
+    testSuite.test("WrapperFibonacciSequence", testCase.testWrapperFibonacciSequence)
     runAllTests()
   }
 }
@@ -132,23 +134,11 @@ extension StaticBigIntTests {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: - Wrapper Associated Type
+// MARK: - Type Inference
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.8, *)
 extension StaticBigIntTests {
-
-  @available(SwiftStdlib 5.8, *)
-  struct Wrapper: ExpressibleByIntegerLiteral {
-
-    @available(SwiftStdlib 5.8, *)
-    let actual: StaticBigInt
-
-    @available(SwiftStdlib 5.8, *)
-    init(integerLiteral actual: StaticBigInt) {
-      self.actual = actual
-    }
-  }
   
   func testPrefixPlusTypeInference() {
     let a: Int = 7
@@ -169,70 +159,96 @@ extension StaticBigIntTests {
     let b = -1
     let c = a + b
   }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Wrapper Associated Type
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.8, *)
+extension StaticBigIntTests {
 
   @available(SwiftStdlib 5.8, *)
-  func testWrapperAssociatedType() {
-    do {
-      let negative = Wrapper(-0x00112233_44556677_8899AABB_CCDDEEFF)
-      expectEqual( -1, negative.actual.signum())
-      expectEqual(118, negative.actual.bitWidth)
+  struct Wrapper: ExpressibleByIntegerLiteral {
+
+    @available(SwiftStdlib 5.8, *)
+    let actual: StaticBigInt
+
+    @available(SwiftStdlib 5.8, *)
+    init(integerLiteral actual: StaticBigInt) {
+      self.actual = actual
+    }
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testWrapperNegativeValue() {
+    let negative = Wrapper(-0x00112233_44556677_8899AABB_CCDDEEFF)
+    expectEqual( -1, negative.actual.signum())
+    expectEqual(118, negative.actual.bitWidth)
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
-      expectEqual(0x33221101, negative.actual[0])
-      expectEqual(0x77665544, negative.actual[1])
-      expectEqual(0xBBAA9988, negative.actual[2])
-      expectEqual(0xFFEEDDCC, negative.actual[3])
-      expectEqual(0xFFFFFFFF, negative.actual[4])
-      expectEqual(0xFFFFFFFF, negative.actual[.max])
+    expectEqual(0x33221101, negative.actual[0])
+    expectEqual(0x77665544, negative.actual[1])
+    expectEqual(0xBBAA9988, negative.actual[2])
+    expectEqual(0xFFEEDDCC, negative.actual[3])
+    expectEqual(0xFFFFFFFF, negative.actual[4])
+    expectEqual(0xFFFFFFFF, negative.actual[.max])
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
-      expectEqual(0x77665544_33221101, negative.actual[0])
-      expectEqual(0xFFEEDDCC_BBAA9988, negative.actual[1])
-      expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[2])
-      expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[.max])
+    expectEqual(0x77665544_33221101, negative.actual[0])
+    expectEqual(0xFFEEDDCC_BBAA9988, negative.actual[1])
+    expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[2])
+    expectEqual(0xFFFFFFFF_FFFFFFFF, negative.actual[.max])
 #else
 #error("Unimplemented")
 #endif
-    }
-    do {
-      let positive = Wrapper(0x00112233_44556677_8899AABB_CCDDEEFF)
-      expectEqual( +1, positive.actual.signum())
-      expectEqual(118, positive.actual.bitWidth)
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testWrapperPositiveValue() {
+    let positive = Wrapper(0x00112233_44556677_8899AABB_CCDDEEFF)
+    expectEqual( +1, positive.actual.signum())
+    expectEqual(118, positive.actual.bitWidth)
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
-      expectEqual(0xCCDDEEFF, positive.actual[0])
-      expectEqual(0x8899AABB, positive.actual[1])
-      expectEqual(0x44556677, positive.actual[2])
-      expectEqual(0x00112233, positive.actual[3])
-      expectEqual(0x00000000, positive.actual[4])
-      expectEqual(0x00000000, positive.actual[.max])
+    expectEqual(0xCCDDEEFF, positive.actual[0])
+    expectEqual(0x8899AABB, positive.actual[1])
+    expectEqual(0x44556677, positive.actual[2])
+    expectEqual(0x00112233, positive.actual[3])
+    expectEqual(0x00000000, positive.actual[4])
+    expectEqual(0x00000000, positive.actual[.max])
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
-      expectEqual(0x8899AABB_CCDDEEFF, positive.actual[0])
-      expectEqual(0x00112233_44556677, positive.actual[1])
-      expectEqual(0x00000000_00000000, positive.actual[2])
-      expectEqual(0x00000000_00000000, positive.actual[.max])
+    expectEqual(0x8899AABB_CCDDEEFF, positive.actual[0])
+    expectEqual(0x00112233_44556677, positive.actual[1])
+    expectEqual(0x00000000_00000000, positive.actual[2])
+    expectEqual(0x00000000_00000000, positive.actual[.max])
 #else
 #error("Unimplemented")
 #endif
-    }
-    do {
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testWrapperFibonacciSequence() {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
-      // Unimplemented.
+    let wordCount = 48
+    let fibonacciSequence = Wrapper(
+      0xB11924E1_6D73E55F_43A53F82_29CEA5DD_19D699A5_0FF80C38_09DE8D6D_06197ECB_03C50EA2_02547029_01709E79_00E3D1B0_008CCCC9_005704E7_0035C7E2_00213D05_00148ADD_000CB228_0007D8B5_0004D973_0002FF42_0001DA31_00012511_0000B520_00006FF1_0000452F_00002AC2_00001A6D_00001055_00000A18_0000063D_000003DB_00000262_00000179_000000E9_00000090_00000059_00000037_00000022_00000015_0000000D_00000008_00000005_00000003_00000002_00000001_00000001_00000000
+    )
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
-      let fibonacciSequence = Wrapper(
-        0xA94FAD42221F2702_68A3DD8E61ECCFBD_40ABCFB3C0325745_27F80DDAA1BA7878_18B3C1D91E77DECD_0F444C01834299AB_096F75D79B354522_05D4D629E80D5489_039A9FADB327F099_023A367C34E563F0_016069317E428CA9_00D9CD4AB6A2D747_00869BE6C79FB562_00533163EF0321E5_00336A82D89C937D_001FC6E116668E68_0013A3A1C2360515_000C233F54308953_000780626E057BC2_0004A2DCE62B0D91_0002DD8587DA6E31_0001C5575E509F60_0001182E2989CED1_0000AD2934C6D08F_00006B04F4C2FE42_000042244003D24D_000028E0B4BF2BF5_000019438B44A658_00000F9D297A859D_000009A661CA20BB_000005F6C7B064E2_000003AF9A19BBD9_000002472D96A909_000001686C8312D0_000000DEC1139639_00000089AB6F7C97_0000005515A419A2_0000003495CB62F5_000000207FD8B6AD_0000001415F2AC48_0000000C69E60A65_00000007AC0CA1E3_00000004BDD96882_00000002EE333961_00000001CFA62F21_000000011E8D0A40_00000000B11924E1_000000006D73E55F_0000000043A53F82_0000000029CEA5DD_0000000019D699A5_000000000FF80C38_0000000009DE8D6D_0000000006197ECB_0000000003C50EA2_0000000002547029_0000000001709E79_0000000000E3D1B0_00000000008CCCC9_00000000005704E7_000000000035C7E2_0000000000213D05_0000000000148ADD_00000000000CB228_000000000007D8B5_000000000004D973_000000000002FF42_000000000001DA31_0000000000012511_000000000000B520_0000000000006FF1_000000000000452F_0000000000002AC2_0000000000001A6D_0000000000001055_0000000000000A18_000000000000063D_00000000000003DB_0000000000000262_0000000000000179_00000000000000E9_0000000000000090_0000000000000059_0000000000000037_0000000000000022_0000000000000015_000000000000000D_0000000000000008_0000000000000005_0000000000000003_0000000000000002_0000000000000001_0000000000000001_0000000000000000
-      )
+    let wordCount = 94
+    let fibonacciSequence = Wrapper(
+      0xA94FAD42221F2702_68A3DD8E61ECCFBD_40ABCFB3C0325745_27F80DDAA1BA7878_18B3C1D91E77DECD_0F444C01834299AB_096F75D79B354522_05D4D629E80D5489_039A9FADB327F099_023A367C34E563F0_016069317E428CA9_00D9CD4AB6A2D747_00869BE6C79FB562_00533163EF0321E5_00336A82D89C937D_001FC6E116668E68_0013A3A1C2360515_000C233F54308953_000780626E057BC2_0004A2DCE62B0D91_0002DD8587DA6E31_0001C5575E509F60_0001182E2989CED1_0000AD2934C6D08F_00006B04F4C2FE42_000042244003D24D_000028E0B4BF2BF5_000019438B44A658_00000F9D297A859D_000009A661CA20BB_000005F6C7B064E2_000003AF9A19BBD9_000002472D96A909_000001686C8312D0_000000DEC1139639_00000089AB6F7C97_0000005515A419A2_0000003495CB62F5_000000207FD8B6AD_0000001415F2AC48_0000000C69E60A65_00000007AC0CA1E3_00000004BDD96882_00000002EE333961_00000001CFA62F21_000000011E8D0A40_00000000B11924E1_000000006D73E55F_0000000043A53F82_0000000029CEA5DD_0000000019D699A5_000000000FF80C38_0000000009DE8D6D_0000000006197ECB_0000000003C50EA2_0000000002547029_0000000001709E79_0000000000E3D1B0_00000000008CCCC9_00000000005704E7_000000000035C7E2_0000000000213D05_0000000000148ADD_00000000000CB228_000000000007D8B5_000000000004D973_000000000002FF42_000000000001DA31_0000000000012511_000000000000B520_0000000000006FF1_000000000000452F_0000000000002AC2_0000000000001A6D_0000000000001055_0000000000000A18_000000000000063D_00000000000003DB_0000000000000262_0000000000000179_00000000000000E9_0000000000000090_0000000000000059_0000000000000037_0000000000000022_0000000000000015_000000000000000D_0000000000000008_0000000000000005_0000000000000003_0000000000000002_0000000000000001_0000000000000001_0000000000000000
+    )
+#else
+#error("Unimplemented")
+#endif
+    expectEqual(
+      1 + (wordCount * UInt.bitWidth),
+      fibonacciSequence.actual.bitWidth
+    )
+    for wordIndex in 2..<wordCount {
       expectEqual(
-        1 + (94 * UInt.bitWidth), //-> 6017 bits.
-        fibonacciSequence.actual.bitWidth
+        fibonacciSequence.actual[wordIndex],
+        fibonacciSequence.actual[wordIndex - 1] +
+        fibonacciSequence.actual[wordIndex - 2]
       )
-      for wordIndex in 2..<94 {
-        expectEqual(
-          fibonacciSequence.actual[wordIndex],
-          fibonacciSequence.actual[wordIndex - 1] +
-          fibonacciSequence.actual[wordIndex - 2]
-        )
-      }
-#else
-#error("Unimplemented")
-#endif
     }
   }
 }
