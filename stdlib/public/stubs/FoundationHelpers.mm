@@ -100,7 +100,7 @@ _swift_stdlib_CFStringGetCharacterAtIndex(id _Nonnull obj,
     cache.obj = obj;
     cache.impl = (CharacterAtIndexImplPtr)object_getMethodImplementation(obj, @selector(characterAtIndex:));
     characterAtIndexCache.store(cache, std::memory_order_relaxed);
-    return cache.impl;
+    return cache.impl(obj, @selector(characterAtIndex:), index);
   }
   return cache.impl(obj, @selector(characterAtIndex:), index);
 }
