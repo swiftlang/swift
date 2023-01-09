@@ -2299,7 +2299,7 @@ func copyableStructsInMoveOnlyStructNonConsuming() {
 // Field Sensitive Tests //
 ///////////////////////////
 
-func fieldSensitiveTestReinitField () {
+func fieldSensitiveTestReinitField() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     classConsume(a.k)
@@ -2307,7 +2307,7 @@ func fieldSensitiveTestReinitField () {
     classUseMoveOnlyWithoutEscaping(a.k)
 }
 
-func fieldSensitiveTestReinitFieldMultiBlock1 () {
+func fieldSensitiveTestReinitFieldMultiBlock1() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     classConsume(a.k)
@@ -2318,7 +2318,7 @@ func fieldSensitiveTestReinitFieldMultiBlock1 () {
     }
 }
 
-func fieldSensitiveTestReinitFieldMultiBlock2 () {
+func fieldSensitiveTestReinitFieldMultiBlock2() {
     var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
     a = NonTrivialStruct()
     classConsume(a.k) // expected-note {{consuming use}}
@@ -2330,7 +2330,7 @@ func fieldSensitiveTestReinitFieldMultiBlock2 () {
     classUseMoveOnlyWithoutEscaping(a.k) // expected-note {{non-consuming use}}
 }
 
-func fieldSensitiveTestReinitFieldMultiBlock3 () {
+func fieldSensitiveTestReinitFieldMultiBlock3() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     classConsume(a.k)
@@ -2344,7 +2344,9 @@ func fieldSensitiveTestReinitFieldMultiBlock3 () {
     classUseMoveOnlyWithoutEscaping(a.k)
 }
 
-func fieldSensitiveTestReinitFieldMultiBlock4 () {
+// This test sees what happens if we partially reinit along one path and do a
+// full reinit along another path.
+func fieldSensitiveTestReinitFieldMultiBlock4() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     classConsume(a.k)
@@ -2356,4 +2358,44 @@ func fieldSensitiveTestReinitFieldMultiBlock4 () {
     }
 
     classUseMoveOnlyWithoutEscaping(a.k)
+}
+
+func fieldSensitiveTestReinitEnumMultiBlock() {
+    var e = NonTrivialEnum.first // expected-error {{'e' used after consume. Lifetime extension of variable requires a copy}}
+    e = NonTrivialEnum.second(Klass())
+    switch e { // expected-note {{consuming use}}
+    case .second:
+        e = NonTrivialEnum.third(NonTrivialStruct())
+    default:
+        break
+    }
+    nonConsumingUseNonTrivialEnum(e) // expected-note {{non-consuming use}}
+}
+
+func fieldSensitiveTestReinitEnumMultiBlock1() {
+    var e = NonTrivialEnum.first
+    e = NonTrivialEnum.second(Klass())
+    switch e {
+    case .second:
+        e = NonTrivialEnum.third(NonTrivialStruct())
+    default:
+        e = NonTrivialEnum.fourth(CopyableKlass())
+    }
+    nonConsumingUseNonTrivialEnum(e)
+}
+
+func fieldSensitiveTestReinitEnumMultiBlock2() {
+    var e = NonTrivialEnum.first
+    e = NonTrivialEnum.second(Klass())
+    if boolValue {
+        switch e {
+        case .second:
+            e = NonTrivialEnum.third(NonTrivialStruct())
+        default:
+            e = NonTrivialEnum.fourth(CopyableKlass())
+        }
+    } else {
+        e = NonTrivialEnum.third(NonTrivialStruct())
+    }
+    nonConsumingUseNonTrivialEnum(e)
 }
