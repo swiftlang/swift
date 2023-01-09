@@ -356,9 +356,10 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
       ExistentialSignatures;
 
-  /// The element signature for a generic signature, constructed by dropping
-  /// the parameter pack bit from generic parameters.
-  llvm::DenseMap<const GenericSignatureImpl *,
+  /// The element signature for a generic signature, which contains a clone
+  /// of the context generic signature with new type parameters and requirements
+  /// for opened pack elements in the given shape equivalence class.
+  llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>,
                  CanGenericSignature> ElementSignatures;
 
   /// Overridden declarations.
@@ -5036,7 +5037,8 @@ GenericEnvironment::forOpenedExistential(
 
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
+GenericEnvironment::forOpenedElement(GenericSignature signature,
+                                     UUID uuid, CanType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
@@ -5059,7 +5061,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid,
                                   OpenedElementEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid,
+  auto *genericEnv = new (mem) GenericEnvironment(signature,
+                                                  uuid, shapeClass,
                                                   outerSubs);
 
   openedElementEnvironments[uuid] = genericEnv;
@@ -5624,9 +5627,11 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
 }
 
 CanGenericSignature
-ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
+ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
+                                      CanType shapeClass) {
   auto &sigs = getImpl().ElementSignatures;
-  auto found = sigs.find(baseGenericSig.getPointer());
+  auto key = std::make_pair(shapeClass, baseGenericSig.getPointer());
+  auto found = sigs.find(key);
   if (found != sigs.end())
     return found->second;
 
@@ -5660,6 +5665,11 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
     if (!paramType->isParameterPack())
       continue;
 
+    // Only include opened element parameters for packs in the given
+    // shape equivalence class.
+    if (!baseGenericSig->haveSameShape(paramType, shapeClass->mapTypeOutOfContext()))
+      continue;
+
     auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
                                                    packElementDepth,
                                                    packElementParams.size(),
@@ -5671,7 +5681,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
   auto eraseParameterPackRec = [&](Type type) -> Type {
     return type.transformRec([&](Type t) -> Optional<Type> {
       if (auto *paramType = t->getAs<GenericTypeParamType>()) {
-        if (paramType->isParameterPack()) {
+        if (packElementParams.find(paramType) != packElementParams.end()) {
           return Type(packElementParams[paramType]);
         }
 
@@ -5718,7 +5728,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
   auto elementSig = buildGenericSignature(
       *this, GenericSignature(), genericParams, requirements)
           .getCanonicalSignature();
-  sigs[baseGenericSig.getPointer()] = elementSig;
+  sigs[key] = elementSig;
   return elementSig;
 }
 

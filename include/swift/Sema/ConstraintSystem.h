@@ -3987,7 +3987,8 @@ public:
   void addPackElementEnvironment(PackExpansionExpr *expr);
 
   /// Get the opened element generic environment for the given locator.
-  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator);
+  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
+                                                CanType shapeClass);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags

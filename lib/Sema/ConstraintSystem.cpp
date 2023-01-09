@@ -643,7 +643,8 @@ void ConstraintSystem::addPackElementEnvironment(PackExpansionExpr *expr) {
 }
 
 GenericEnvironment *
-ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator) {
+ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
+                                            CanType shapeClass) {
   auto result = PackExpansionEnvironments.find(locator);
   if (result == PackExpansionEnvironments.end())
     return nullptr;
@@ -651,10 +652,11 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator) {
   auto uuid = result->second;
   auto &ctx = getASTContext();
   auto elementSig = ctx.getOpenedElementSignature(
-      DC->getGenericSignatureOfContext().getCanonicalSignature());
+      DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeClass);
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  return GenericEnvironment::forOpenedElement(elementSig, uuid, contextSubs);
+  return GenericEnvironment::forOpenedElement(elementSig, uuid, shapeClass,
+                                              contextSubs);
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
