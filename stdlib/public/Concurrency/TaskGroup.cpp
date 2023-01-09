@@ -50,7 +50,7 @@
 
 using namespace swift;
 
-#if 1
+#if 0
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...) \
 fprintf(stderr, "[%#lx] [%s:%d](%s) group(%p%s) " fmt "\n",             \
       (unsigned long)Thread::current().platformThreadId(),              \
@@ -67,8 +67,8 @@ namespace {
 class TaskStatusRecord;
 struct TaskGroupStatus;
 
-struct AccumulatingTaskGroup;
-struct DiscardingTaskGroup;
+class AccumulatingTaskGroup;
+class DiscardingTaskGroup;
 
 /******************************************************************************/
 /*************************** TASK GROUP BASE **********************************/
@@ -112,8 +112,14 @@ protected:
       waitQueue(nullptr),
       successType(T) {}
 
+  TaskGroupBase(const TaskGroupBase &) = delete;
+
 public:
   virtual ~TaskGroupBase() {}
+
+  TaskStatusRecordKind getKind() const {
+    return Flags.getKind();
+  }
 
   /// Describes the status of the group.
   enum class ReadyStatus : uintptr_t {
@@ -259,7 +265,7 @@ public:
   /// Any TaskGroup always IS its own TaskRecord.
   /// This allows us to easily get the group while cancellation is propagated throughout the task tree.
   TaskGroupTaskStatusRecord *getTaskRecord() {
-    return reinterpret_cast<TaskGroupTaskStatusRecord *>(this);
+    return static_cast<TaskGroupTaskStatusRecord *>(this);
   }
 
   // ==== Queue operations ----------------------------------------------------
@@ -824,11 +830,11 @@ static TaskGroupBase *asBaseImpl(TaskGroup *group) {
 }
 static AccumulatingTaskGroup *asAccumulatingImpl(TaskGroup *group) {
   assert(group->isAccumulatingResults());
-  return reinterpret_cast<AccumulatingTaskGroup*>(group);
+  return static_cast<AccumulatingTaskGroup*>(reinterpret_cast<TaskGroupBase*>(group));
 }
 static DiscardingTaskGroup *asDiscardingImpl(TaskGroup *group) {
   assert(group->isDiscardingResults());
-  return reinterpret_cast<DiscardingTaskGroup*>(group);
+  return static_cast<DiscardingTaskGroup*>(reinterpret_cast<TaskGroupBase*>(group));
 }
 
 static TaskGroup *asAbstract(TaskGroupBase *group) {
@@ -849,6 +855,10 @@ bool TaskGroup::isDiscardingResults() {
   return asBaseImpl(this)->isDiscardingResults();
 }
 
+TaskGroup* TaskGroupTaskStatusRecord::getGroup() {
+  return reinterpret_cast<TaskGroup *>(static_cast<TaskGroupBase*>(this));
+}
+
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
@@ -864,7 +874,7 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
 
   TaskGroupFlags groupFlags(rawGroupFlags);
-  SWIFT_TASK_DEBUG_LOG("(group(%p) create; flags: isDiscardingResults=%d",
+  SWIFT_TASK_DEBUG_LOG("group(%p) create; flags: isDiscardingResults=%d",
                        group, groupFlags.isDiscardResults());
 
   TaskGroupBase *impl;
@@ -875,6 +885,8 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
   }
 
   TaskGroupTaskStatusRecord *record = impl->getTaskRecord();
+  assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
+
   // ok, now that the group actually is initialized: attach it to the task
   addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
     // If the task has already been cancelled, reflect that immediately in
@@ -902,7 +914,8 @@ void TaskGroup::addChildTask(AsyncTask *child) {
   // prevents us from racing with cancellation or escalation.  We don't
   // need to acquire the task group lock because the child list is only
   // accessed under the task status record lock.
-  auto record = asBaseImpl(this)->getTaskRecord();
+  auto base = asBaseImpl(this);
+  auto record = base->getTaskRecord();
   record->attachChild(child);
 }
 
