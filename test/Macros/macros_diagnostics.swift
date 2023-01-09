@@ -4,46 +4,47 @@
 // expected-note@-1 2{{'stringify' declared here}}
 @expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 // expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{43-68=#externalMacro(module: "MissingModule", type: "MissingType")}}
-@expression macro missingMacro2(_: Any) = MissingModule.MissingType
+@expression macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 
 protocol P { }
 
-@expression macro tryToHide<T: P>(_: P) -> some P = BuiltinMacros.Blah
+@expression macro tryToHide<T: P>(_: T) -> some P = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{some' types are only permitted in properties, subscripts, and functions}}
+// expected-error@-2{{generic parameter 'T' could not be inferred}}
 
 internal struct X { } // expected-note{{type declared here}}
 
-@expression public macro createAnX: X = BuiltinMacros.Blah
+@expression public macro createAnX: X = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{macro cannot be declared public because its result type uses an internal type}}
 
-@expression macro m1: Int = A.B
-@expression macro m1: Float = A.B
+@expression macro m1: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@expression macro m1: Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
 
-@expression macro m2: Int = A.B // expected-note{{'m2' previously declared here}}
-@expression macro m2: Int = A.B // expected-error{{invalid redeclaration of 'm2'}}
+@expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2' previously declared here}}
+@expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2'}}
 
-@expression macro m3(_: Int) -> Int = A.B
-@expression macro m3(_: Int) -> Float = A.B
+@expression macro m3(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@expression macro m3(_: Int) -> Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
 
-@expression macro m4(_: Int) -> Int = A.B // expected-note{{'m4' previously declared here}}
-@expression macro m4(_: Int) -> Int = A.B // expected-error{{invalid redeclaration of 'm4'}}
+@expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m4' previously declared here}}
+@expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm4'}}
 
 struct ZZZ {
-  macro m5: Int = A.B
+  macro m5: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
   // expected-error@-1{{macro 'm5' can only be declared at file scope}}
   // expected-error@-2{{macro 'm5' must declare its applicable contexts (e.g., '@expression')}}
 }
 
-@expression macro multiArgMacro(_: Any, second: Any) = MissingModule.MissingType
+@expression macro multiArgMacro(_: Any, second: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{'multiArgMacro(_:second:)' declared here}}
 
-@expression macro overloaded1(_ p: P) = MissingModule.MissingType
+@expression macro overloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType")
 func overloaded1(_ p: Any) { }
 
-@expression macro notOverloaded1(_ p: P) = MissingModule.MissingType // expected-note{{'notOverloaded1' previously declared here}}
-@expression macro notOverloaded1(_ p: P) = MissingModule.MissingOtherType // expected-error{{invalid redeclaration of 'notOverloaded1'}}
+@expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType") // expected-note{{'notOverloaded1' previously declared here}}
+@expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
 
-@expression macro intIdentity(value: Int, _: Float) -> Int = MissingModule.MissingType
+@expression macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
 
 func testDiags(a: Int, b: Int) {

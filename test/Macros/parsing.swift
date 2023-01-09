@@ -9,3 +9,4 @@ protocol Q { associatedtype Assoc }
 @expression macro m5<T: P>(_: T) = #externalMacro(module: "A", type: "M4")
 
 @expression macro m6 = A // expected-error{{expected '(' for macro parameters or ':' for a value-like macro}}
+// expected-error@-1{{macro must itself be defined by a macro expansion such as '#externalMacro(...)'}}

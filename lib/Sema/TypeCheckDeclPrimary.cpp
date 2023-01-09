@@ -39,6 +39,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -2004,6 +2005,8 @@ public:
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroContexts())
       MD->diagnose(diag::macro_without_context, MD->getName());
+
+    (void)MD->getDefinition();
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
