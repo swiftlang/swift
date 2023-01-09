@@ -1582,6 +1582,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // If building an application extension, make sure API use
   // is restricted accordingly in downstream dependnecies.
   if (langOpts.EnableAppExtensionRestrictions) {
+    genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions = true;
     GenericArgs.push_back("-application-extension");
   }
   // Save the parent invocation's Target Triple
