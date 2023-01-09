@@ -135,7 +135,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
-  @inlinable
   @discardableResult
   @_unsafeInheritExecutor
   @available(SwiftStdlib 5.1, *) // back deploy requires we declare the availability explicitly on this method
