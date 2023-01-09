@@ -1791,8 +1791,10 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  if (getActiveAvailableAttribute(D, Context)) {
-    // For QoI, in future should emit a fixit to update the existing attribute.
+  if (auto *attr = getActiveAvailableAttribute(D, Context)) {
+    D->diagnose(diag::availability_update_attribute)
+        .fixItReplace(attr->IntroducedRange,
+                      RequiredRange.getLowerEndpoint().getAsString());
     return;
   }
 

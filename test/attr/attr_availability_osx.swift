@@ -100,17 +100,27 @@ extension TestStruct { // expected-note {{enclosing scope requires availability 
   @available(swift 1)
   func doFourthThing() {}
 
+  @available(macOS 10.12, iOS 13, tvOS 13, *)
+  func doFifthThing() {}
+
   @available(*, deprecated)
   func doDeprecatedThing() {}
 }
 
-@available(macOS 10.11, *)
-func testMemberAvailability() {
+@available(macOS 10.11, *) func testMemberAvailability() { // expected-note {{update existing @available attribute}} {{18-23=10.12}}
   TestStruct().doTheThing() // expected-error {{'doTheThing()' is unavailable}}
   TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
   TestStruct().doThirdThing() // expected-error {{'doThirdThing()' is unavailable}}
   TestStruct().doFourthThing() // expected-error {{'doFourthThing()' is only available in macOS 10.12 or newer}} expected-note {{'if #available'}}
   TestStruct().doDeprecatedThing() // expected-warning {{'doDeprecatedThing()' is deprecated}}
+}
+
+@available(iOS 11, macOS 10.11, *) func testUpdateAvailabilityAttribute() { // expected-note {{update existing @available attribute}} {{26-31=10.12}}
+  TestStruct().doFifthThing() // expected-error {{'doFifthThing()' is only available in macOS 10.12 or newer}} expected-note {{'if #available'}}
+}
+
+@available(macOS, introduced: 10.11) func testUpdateAvailabilityAttribute2() { // expected-note {{update existing @available attribute}} {{31-36=10.12}}
+  TestStruct().doFifthThing() // expected-error {{'doFifthThing()' is only available in macOS 10.12 or newer}} expected-note {{'if #available'}}
 }
 
 extension TestStruct {
