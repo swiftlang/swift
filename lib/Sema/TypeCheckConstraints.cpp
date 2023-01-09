@@ -422,6 +422,9 @@ TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
   if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
     csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
+  if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
+    csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
+
   ConstraintSystem cs(dc, csOptions);
 
   if (auto *expr = target.getAsExpr()) {
