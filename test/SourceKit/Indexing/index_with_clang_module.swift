@@ -14,6 +14,9 @@ func foo(a: FooClassDerived) {
 }
 
 // CHECK:      key.kind: source.lang.swift.import.module.clang
+// CHECK-NEXT: key.name: "_SwiftConcurrencyShims"
+
+// CHECK:      key.kind: source.lang.swift.import.module.clang
 // CHECK-NEXT: key.name: "Foo"
 // CHECK-NEXT: key.filepath: "{{.*[/\\]}}Foo{{.*}}.pcm"
 
