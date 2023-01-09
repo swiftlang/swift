@@ -259,6 +259,26 @@ public:
       return !pair.second.hasValue();
     });
   }
+
+  typename VectorStorage::iterator vector_begin() {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.begin();
+  }
+
+  typename VectorStorage::iterator vector_end() {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.end();
+  }
+
+  typename VectorStorage::const_iterator vector_begin() const {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.begin();
+  }
+
+  typename VectorStorage::const_iterator vector_end() const {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.end();
+  }
 };
 
 template <typename Key, typename Value, typename Storage>

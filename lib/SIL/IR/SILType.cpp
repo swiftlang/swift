@@ -320,6 +320,10 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M,
   return getFieldType(field, M.Types, context);
 }
 
+SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
+  return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
+}
+
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
