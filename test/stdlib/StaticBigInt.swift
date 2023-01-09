@@ -28,11 +28,13 @@ final class StaticBigIntTests {
   static func main() {
     let testCase = StaticBigIntTests()
     let testSuite = TestSuite("StaticBigIntTests")
-    testSuite.test("BinaryRepresentation",  testCase.testBinaryRepresentation)
-    testSuite.test("TextualRepresentation", testCase.testTextualRepresentation)
+    testSuite.test("BinaryRepresentation",     testCase.testBinaryRepresentation)
+    testSuite.test("TextualRepresentation",    testCase.testTextualRepresentation)
     testSuite.test("PrefixPlusTypeInference",  testCase.testPrefixPlusTypeInference)
     testSuite.test("PrefixMinusTypeInference", testCase.testPrefixMinusTypeInference)
-    testSuite.test("WrapperAssociatedType", testCase.testWrapperAssociatedType)
+    testSuite.test("WrapperNegativeValue",     testCase.testWrapperNegativeValue)
+    testSuite.test("WrapperPositiveValue",     testCase.testWrapperPositiveValue)
+    testSuite.test("WrapperFibonacciSequence", testCase.testWrapperFibonacciSequence)
     runAllTests()
   }
 }
@@ -179,7 +181,7 @@ extension StaticBigIntTests {
   }
 
   @available(SwiftStdlib 5.8, *)
-  func testWrapperAssociatedType() {
+  func testWrapperNegativeValue() {
     do {
       let negative = Wrapper(-0x00112233_44556677_8899AABB_CCDDEEFF)
       expectEqual( -1, negative.actual.signum())
@@ -200,6 +202,10 @@ extension StaticBigIntTests {
 #error("Unimplemented")
 #endif
     }
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testWrapperPositiveValue() {
     do {
       let positive = Wrapper(0x00112233_44556677_8899AABB_CCDDEEFF)
       expectEqual( +1, positive.actual.signum())
@@ -220,6 +226,10 @@ extension StaticBigIntTests {
 #error("Unimplemented")
 #endif
     }
+  }
+
+  @available(SwiftStdlib 5.8, *)
+  func testWrapperFibonacciSequence() {
     do {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
       // Unimplemented.
