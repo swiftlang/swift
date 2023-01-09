@@ -494,6 +494,27 @@ public:
   }
 };
 
+// Decl was not deserialized because it's an internal detail maked as unsafe
+// at serialization.
+class UnsafeDeserializationError : public llvm::ErrorInfo<UnsafeDeserializationError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  UnsafeDeserializationError(Identifier name) {
+    this->name = name;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "Decl '" << name << "' is unsafe to deserialize";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 [[nodiscard]]
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {

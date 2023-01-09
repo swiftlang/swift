@@ -398,6 +398,29 @@ const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
   return bestAttr;
 }
 
+const BackDeployAttr *
+DeclAttributes::getBackDeploy(const ASTContext &ctx) const {
+  const BackDeployAttr *bestAttr = nullptr;
+
+  for (auto attr : *this) {
+    auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr);
+    if (!backDeployAttr)
+      continue;
+
+    if (backDeployAttr->isInvalid() || !backDeployAttr->isActivePlatform(ctx))
+      continue;
+
+    // We have an attribute that is active for the platform, but
+    // is it more specific than our current best?
+    if (!bestAttr || inheritsAvailabilityFromPlatform(backDeployAttr->Platform,
+                                                      bestAttr->Platform)) {
+      bestAttr = backDeployAttr;
+    }
+  }
+
+  return bestAttr;
+}
+
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printDeclarations();

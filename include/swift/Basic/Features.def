@@ -150,7 +150,7 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
 /// Enable the experimental macros feature.
-EXPERIMENTAL_FEATURE(Macros, false)
+EXPERIMENTAL_FEATURE(Macros, true)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.

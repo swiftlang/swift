@@ -448,7 +448,6 @@ Expr *swift::expandMacroExpr(
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
     GeneratedSourceInfo::MacroExpansion,
-    *sourceFile->getBufferID(),
     expr->getSourceRange(),
     SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
     ASTNode(expr).getOpaqueValue(),

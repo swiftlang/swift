@@ -504,7 +504,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     class EraseTypeParamWalker : public ASTWalker {
     public:
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
               ident->overwriteNameRef(genericParam->createNameRef());
@@ -535,16 +535,28 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 ///
 ParserResult<TypeRepr> Parser::parseType(
     Diag<> MessageID, ParseTypeReason reason) {
+  // Parse pack expansion 'repeat T'
+  if (Tok.is(tok::kw_repeat)) {
+    SourceLoc repeatLoc = consumeToken(tok::kw_repeat);
+
+    auto ty = parseTypeScalar(MessageID, reason);
+    if (ty.isNull())
+      return ty;
+
+    return makeParserResult(ty,
+        new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
+  }
+
   auto ty = parseTypeScalar(MessageID, reason);
   if (ty.isNull())
     return ty;
 
-  // Parse pack expansion 'T...'.
+  // Parse vararg type 'T...'.
   if (Tok.isEllipsis()) {
     Tok.setKind(tok::ellipsis);
     SourceLoc ellipsisLoc = consumeToken();
     ty = makeParserResult(ty,
-        new (Context) PackExpansionTypeRepr(ty.get(), ellipsisLoc));
+        new (Context) VarargTypeRepr(ty.get(), ellipsisLoc));
   }
 
   return ty;
@@ -676,7 +688,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
         IDECallbacks->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+      return makeParserCodeCompletionResult<DeclRefTypeRepr>();
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -689,7 +701,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     return nullptr;
   }
   ParserStatus Status;
-  SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
+  SmallVector<IdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
     DeclNameLoc Loc;
@@ -710,7 +722,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       }
       EndLoc = Loc.getEndLoc();
 
-      ComponentIdentTypeRepr *CompT;
+      IdentTypeRepr *CompT;
       if (HasGenericArgs) {
         CompT = GenericIdentTypeRepr::create(Context, Loc, Name, GenericArgs,
                                              SourceRange(LAngle, RAngle));
@@ -750,9 +762,13 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     break;
   }
 
-  IdentTypeRepr *ITR = nullptr;
+  DeclRefTypeRepr *DeclRefTR = nullptr;
   if (!ComponentsR.empty()) {
-    ITR = IdentTypeRepr::create(Context, ComponentsR);
+    if (ComponentsR.size() == 1) {
+      DeclRefTR = ComponentsR.front();
+    } else {
+      DeclRefTR = MemberTypeRepr::create(Context, ComponentsR);
+    }
   }
 
   if (Status.hasCodeCompletion()) {
@@ -760,16 +776,16 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       // We have a dot.
       consumeToken();
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithDot(ITR);
+        IDECallbacks->completeTypeIdentifierWithDot(DeclRefTR);
     } else {
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithoutDot(ITR);
+        IDECallbacks->completeTypeIdentifierWithoutDot(DeclRefTR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
   }
 
-  return makeParserResult(Status, ITR);
+  return makeParserResult(Status, DeclRefTR);
 }
 
 /// parseTypeSimpleOrComposition
@@ -916,9 +932,9 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       // Parse the type-identifier.
       ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
       Status |= Protocol;
-      if (auto *ident =
-            dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
-        Protocols.push_back(ident);
+      if (auto *DeclRefTR =
+              dyn_cast_or_null<DeclRefTypeRepr>(Protocol.getPtrOrNull()))
+        Protocols.push_back(DeclRefTR);
     } while (consumeIf(tok::comma));
   }
 
@@ -1396,6 +1412,9 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
+  // 'repeat' starts a pack expansion type.
+  consumeIf(tok::kw_repeat);
+
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 

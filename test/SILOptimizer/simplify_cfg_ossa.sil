@@ -248,36 +248,36 @@ enum BoolLike { case true_, false_ }
 // CHECK: } // end sil function 'testThread'
 sil [ossa] @testThread : $@convention(thin) (@in BoolLike) -> Int64 {
 bb0(%0 : $*BoolLike):
-  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
+  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3
 
-bb1:                                              // Preds: bb0
-  %4 = integer_literal $Builtin.Int1, -1          // user: %5
-  br bb2(%4 : $Builtin.Int1)                      // id: %5
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  br bb2(%4 : $Builtin.Int1)
 
-bb2(%6 : $Builtin.Int1):                          // Preds: bb3 bb1
-  br bb4                                          // id: %7
+bb2(%6 : $Builtin.Int1):
+  br bb4
 
-bb3:                                              // Preds: bb0
-  %8 = integer_literal $Builtin.Int1, 0           // user: %9
-  br bb2(%8 : $Builtin.Int1)                      // id: %9
+bb3:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb2(%8 : $Builtin.Int1)
 
-bb4:                                              // Preds: bb2
-  cond_br %6, bb5, bb6                            // id: %10
+bb4:
+  cond_br %6, bb5, bb6
 
-bb5:                                              // Preds: bb4
+bb5:
   %11 = metatype $@thin Int64.Type
-  %12 = integer_literal $Builtin.Int64, 42        // user: %13
-  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  br bb7(%13 : $Int64)                            // id: %14
+  %12 = integer_literal $Builtin.Int64, 42
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  br bb7(%13 : $Int64)
 
-bb6:                                              // Preds: bb4
+bb6:
   %15 = metatype $@thin Int64.Type
-  %16 = integer_literal $Builtin.Int64, 17        // user: %17
-  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
-  br bb7(%17 : $Int64)                            // id: %18
+  %16 = integer_literal $Builtin.Int64, 17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
+  br bb7(%17 : $Int64)
 
-bb7(%19 : $Int64):                                // Preds: bb6 bb5
-  return %19 : $Int64                             // id: %21
+bb7(%19 : $Int64):
+  return %19 : $Int64
 }
 
 /// CHECK-LABEL: sil [ossa] @testCondBrFold
@@ -572,27 +572,27 @@ bb1:
 // CHECK-NOT: br bb
 sil [ossa] @dead_loop : $@convention(thin) () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4
-  %2 = integer_literal $Builtin.Int1, -1          // user: %11
-  cond_br %0, bb1, bb3                            // id: %4
+  %0 = integer_literal $Builtin.Int1, 0
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb1, bb3
 
-bb1:                                              // Preds: bb0
-  %5 = integer_literal $Builtin.Int32, 0           // users: %6, %7
+bb1:
+  %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
-  br bb2(%5 : $Builtin.Int32)                      // id: %7
+  br bb2(%5 : $Builtin.Int32)
 
-bb2(%8 : $Builtin.Int32):                          // Preds: bb1 bb2
-  %9 = integer_literal $Builtin.Int32, 1           // user: %11
-  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %12, %13
-  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0 // users: %15, %16
-  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
-  cond_fail %13 : $Builtin.Int1                   // id: %14
+bb2(%8 : $Builtin.Int32):
+  %9 = integer_literal $Builtin.Int32, 1
+  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %13 : $Builtin.Int1
   %15 = struct $Int32 (%12 : $Builtin.Int32)
-  br bb2(%12 : $Builtin.Int32)                     // id: %16
+  br bb2(%12 : $Builtin.Int32)
 
-bb3:                                              // Preds: bb0
-  %17 = tuple ()                                  // user: %18
-  return %17 : $()                                // id: %18
+bb3:
+  %17 = tuple ()
+  return %17 : $()
 }
 
 class C {

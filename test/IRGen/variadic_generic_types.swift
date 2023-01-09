@@ -17,12 +17,12 @@ struct G<T...> {
     callee()
   }
 
-  func makeTuple1() -> (T...).Type {
-    return (T...).self
+  func makeTuple1() -> (repeat each T).Type {
+    return (repeat T).self
   }
 
-  func makeTuple2() -> ((Array<T>)...).Type {
-    return ((Array<T>)...).self
+  func makeTuple2() -> (repeat Array<each T>).Type {
+    return (repeat Array<T>).self
   }
 }
 

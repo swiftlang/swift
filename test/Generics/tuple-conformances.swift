@@ -12,7 +12,7 @@ protocol P {
 }
 
 extension Builtin.TheTupleType: P where Elements: P {
-  typealias A = (Elements.A...)
+  typealias A = (repeat each Elements.A)
   typealias B = Float
   func f() {}
 }

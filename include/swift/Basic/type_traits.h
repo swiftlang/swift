@@ -45,6 +45,8 @@ struct IsTriviallyConstructible {
 #if defined(_LIBCPP_VERSION) || SWIFT_COMPILER_IS_MSVC
   // libc++ and MSVC implement is_trivially_constructible.
   static const bool value = std::is_trivially_constructible<T>::value;
+#elif __has_feature(is_trivially_constructible)
+  static const bool value = __is_trivially_constructible(T);
 #elif __has_feature(has_trivial_constructor) || __GNUC__ >= 5
   static const bool value = __has_trivial_constructor(T);
 #else
@@ -57,6 +59,8 @@ struct IsTriviallyDestructible {
 #if defined(_LIBCPP_VERSION) || SWIFT_COMPILER_IS_MSVC
   // libc++ and MSVC implement is_trivially_destructible.
   static const bool value = std::is_trivially_destructible<T>::value;
+#elif __has_feature(is_trivially_destructible)
+  static const bool value = __is_trivially_destructible(T);
 #elif __has_feature(has_trivial_destructor) || __GNUC__ >= 5
   static const bool value = __has_trivial_destructor(T);
 #else

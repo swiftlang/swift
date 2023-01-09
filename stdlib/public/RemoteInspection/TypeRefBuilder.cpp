@@ -17,11 +17,11 @@
 
 #if SWIFT_ENABLE_REFLECTION
 
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Reflection/Records.h"
-#include "swift/Reflection/TypeLowering.h"
-#include "swift/Reflection/TypeRef.h"
+#include "swift/RemoteInspection/Records.h"
+#include "swift/RemoteInspection/TypeLowering.h"
+#include "swift/RemoteInspection/TypeRef.h"
 #include "swift/Remote/MetadataReader.h"
 #include <iomanip>
 #include <iostream>

@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_METADATAPATH_H
 
 #include "swift/Basic/EncodedSequence.h"
-#include "swift/Reflection/MetadataSource.h"
+#include "swift/RemoteInspection/MetadataSource.h"
 #include "WitnessIndex.h"
 #include "IRGen.h"
 

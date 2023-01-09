@@ -991,18 +991,20 @@ public:
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
-  /// \param isUnderlyingClangModule When true, only look for a Clang module
-  /// with the given name, ignoring any Swift modules.
-  Optional<ModuleDependencyInfo> getModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
-      bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool cacheOnly = false,
       llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
+  /// Retrieve the module dependencies for the Clang module with the given name.
+  Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate);
+
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<ModuleDependencyInfo> getSwiftModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
@@ -1367,7 +1369,8 @@ public:
   ///
   /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
-  CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig);
+  CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig,
+                                                CanType shapeClass);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

@@ -376,5 +376,7 @@ add_swift_target_library(swiftCore
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
                   INSTALL_IN_COMPONENT
-                    stdlib)
-
+                    stdlib
+                  MACCATALYST_BUILD_FLAVOR
+                    zippered
+                 )

@@ -187,7 +187,7 @@ struct SILDeclRef {
   /// The AST node represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
-  Kind kind : 4;
+  Kind kind : 5;
   /// True if this references a foreign entry point for the referenced decl.
   unsigned isForeign : 1;
   /// True if this references a distributed function.

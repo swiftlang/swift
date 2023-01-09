@@ -874,3 +874,10 @@ func testSkipToFindOpenBrace1() {
 func testSkipToFindOpenBrace2() {
   do { if true {} else false } // expected-error {{expected '{' or 'if' after 'else'}}
 }
+
+struct Outer {
+  struct Inner<T> {}
+}
+extension Outer.Inner<Never> { // expected-note {{in extension of 'Outer.Inner<Never>'}}
+  @someAttr
+} // expected-error {{expected declaration}}

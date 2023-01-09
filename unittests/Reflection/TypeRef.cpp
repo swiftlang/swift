@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Remote/MetadataReader.h"
 #include "gtest/gtest.h"
 

@@ -562,6 +562,7 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  Invocation.getLangOptions().EnableDeserializationSafety = false;
   if (auto overrideKind = getASTOverrideKind()) {
     Invocation.getLangOptions().ASTVerifierOverride = *overrideKind;
   }

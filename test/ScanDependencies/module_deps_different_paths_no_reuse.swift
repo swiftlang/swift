@@ -21,15 +21,10 @@ import A
 // CHECK-INITIAL-SCAN-NEXT:      ],
 // CHECK-INITIAL-SCAN-NEXT:      "directDependencies": [
 // CHECK-INITIAL-SCAN-NEXT:        {
-// CHECK-INITIAL-SCAN-NEXT:          "clang": "A"
-// CHECK-INITIAL-SCAN-NEXT:        },
-// CHECK-INITIAL-SCAN-NEXT:        {
-// CHECK-INITIAL-SCAN-NEXT:          "swift": "Swift"
-// CHECK-INITIAL-SCAN-NEXT:        },
-// CHECK-INITIAL-SCAN-NEXT:        {
-// CHECK-INITIAL-SCAN-NEXT:          "swift": "SwiftOnoneSupport"
-// CHECK-INITIAL-SCAN-NEXT:        }
-// CHECK-INITIAL-SCAN-NEXT:      ],
+// CHECK-INITIAL-SCAN-DAG:          "clang": "A"
+// CHECK-INITIAL-SCAN-DAG:          "swift": "Swift"
+// CHECK-INITIAL-SCAN-DAG:          "swift": "SwiftOnoneSupport"
+// CHECK-INITIAL-SCAN:      ],
 // CHECK-INITIAL-SCAN-NEXT:      "details": {
 // CHECK-INITIAL-SCAN-NEXT:        "swift": {
 // CHECK-INITIAL-SCAN-NEXT:          "moduleInterfacePath": "{{.*}}/Swift/A.swiftinterface",
@@ -39,12 +34,9 @@ import A
 // CHECK-DIFFERENT-NEXT:      ],
 // CHECK-DIFFERENT-NEXT:      "directDependencies": [
 // CHECK-DIFFERENT-NEXT:        {
-// CHECK-DIFFERENT-NEXT:          "swift": "Swift"
-// CHECK-DIFFERENT-NEXT:        },
-// CHECK-DIFFERENT-NEXT:        {
-// CHECK-DIFFERENT-NEXT:          "swift": "SwiftOnoneSupport"
-// CHECK-DIFFERENT-NEXT:        }
-// CHECK-DIFFERENT-NEXT:      ],
+// CHECK-DIFFERENT-DAG:          "swift": "Swift"
+// CHECK-DIFFERENT-DAG:          "swift": "SwiftOnoneSupport"
+// CHECK-DIFFERENT:      ],
 // CHECK-DIFFERENT-NEXT:      "details": {
 // CHECK-DIFFERENT-NEXT:        "swift": {
 // CHECK-DIFFERENT-NEXT:          "moduleInterfacePath": "{{.*}}/SwiftDifferent/A.swiftinterface",

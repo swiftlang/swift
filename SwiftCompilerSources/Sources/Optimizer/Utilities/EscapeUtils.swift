@@ -810,7 +810,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         switch effect.kind {
         case .escapingToReturn(let toPath, let exclusive):
           if exclusive && path.projectionPath.matches(pattern: toPath) {
-            let arg = apply.arguments[effect.argumentIndex]
+            guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
+              return .abortWalk
+            }
+            let arg = apply.arguments[callerArgIdx]
             
             let p = Path(projectionPath: effect.pathPattern, followStores: path.followStores, knownType: nil)
             if walkUp(addressOrValue: arg, path: p) == .abortWalk {

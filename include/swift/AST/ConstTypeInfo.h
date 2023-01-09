@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -102,16 +102,6 @@ private:
   std::vector<CompileTimeValue> Members;
 };
 
-/// A dictionary literal value representation
-class DictionaryValue : public CompileTimeValue {
-public:
-  DictionaryValue() : CompileTimeValue(ValueKind::Dictionary) {}
-
-  static bool classof(const CompileTimeValue *T) {
-    return T->getKind() == ValueKind::Dictionary;
-  }
-};
-
 struct TupleElement {
   Optional<std::string> Label;
   swift::Type Type;
@@ -149,6 +139,24 @@ public:
 
 private:
   std::vector<std::shared_ptr<CompileTimeValue>> Elements;
+};
+
+/// A dictionary literal value representation
+class DictionaryValue : public CompileTimeValue {
+public:
+  DictionaryValue(std::vector<std::shared_ptr<TupleValue>> elements)
+      : CompileTimeValue(ValueKind::Dictionary), Elements(elements) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Dictionary;
+  }
+
+  std::vector<std::shared_ptr<TupleValue>> getElements() const {
+    return Elements;
+  }
+
+private:
+  std::vector<std::shared_ptr<TupleValue>> Elements;
 };
 
 /// A representation of an arbitrary value that does not fall under

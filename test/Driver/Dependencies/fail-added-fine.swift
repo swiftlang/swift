@@ -1,3 +1,6 @@
+// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
+// REQUIRES: rdar103866776
+
 /// bad ==> main | bad --> other
 
 // RUN: %empty-directory(%t)
