@@ -62,30 +62,23 @@ namespace swift {
 /// Linearized Representation of Enums
 /// ----------------------------------
 ///
-/// Since enums are sum types, our representation of enums must deal with the
-/// following problems:
-///
-/// 1. An enum can require different numbers of bits in its linearized
-/// representation depending on the payload of the case that the enum is
-/// initialized to.
-///
-/// 2. It is important that we be able to construct the exact enum case that our
-/// sub-element corresponds to. This implies we must in our representation store
-/// in some manner the actual case information. To do so, our representation
-/// uses 1 + log2(num enum cases) bits. The first bit shows
-///
-/// To work around this problem in our representation, we always
-/// store enough bits for the max sized payload of all cases of the enum and add
-/// an additional set of last bits for the discriminator. Any extra bits that
-/// may be needed (e.x.: we are processing a enum case with a smaller payload)
-/// are always assumed to be set to the same value that the initial
-/// discriminator bit is set to.
+/// Since enums are sum types, an enum can require different numbers of bits in
+/// its linearized representation depending on the payload of the case that the
+/// enum is initialized to. To work around this problem in our representation,
+/// we always store enough bits for the max sized payload of all cases of the
+/// enum and add an additional last bit for the discriminator. Any extra bits
+/// that may be needed (e.x.: we are processing a enum case with a smaller
+/// payload) are always assumed to be set to the same value that the
+/// discriminator bit is set to. This representation allows us to track liveness
+/// trading off the ability to determine information about the actual case that
+/// we are tracking. Since we just care about liveness, this is a trade off that
+/// we are willing to make since our goal (computing liveness) is still solved.
 ///
 /// With the above paragraph in mind, an example of the bit layout of an enum
 /// looks as follows:
 ///
 /// ```
-/// [ PAYLOAD BITS | EXTRA_TOP_LEVEL_BITS | DISCRIMINATOR_BITS ]
+/// [ PAYLOAD BITS | EXTRA_TOP_LEVEL_BITS | DISCRIMINATOR_BIT ]
 /// ```
 ///
 /// Notice how placing the discriminator bit last ensures that separately the
