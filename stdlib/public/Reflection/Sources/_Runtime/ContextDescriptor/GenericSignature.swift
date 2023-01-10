@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct GenericSignature {
   public let header: Header
@@ -29,6 +30,7 @@ public struct GenericSignature {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericSignature {
   @frozen
   public struct Header {
@@ -54,6 +56,7 @@ extension GenericSignature {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericSignature {
   @frozen
   public struct RequirementDescriptor: PublicLayout {
@@ -78,6 +81,7 @@ extension GenericSignature {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inlinable
 func getGenericSignature(at address: UnsafeRawPointer) -> GenericSignature {
   var address = address

@@ -142,6 +142,7 @@ extension PtrAuth {
 
 extension PtrAuth {
 #if _ptrauth(_arm64e)
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signDescriptor<T: PublicLayout>(_ descriptor: T) -> T {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
@@ -153,6 +154,7 @@ extension PtrAuth {
     return T(signedBitPattern.rawPointer)
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signNonUniqueExtendedExistentialShape(
     _ shape: ExtendedExistentialShape
@@ -166,6 +168,7 @@ extension PtrAuth {
     return ExtendedExistentialShape(signedBitPattern.rawPointer)
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signObjcISA(_ isa: Metadata) -> Metadata {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
@@ -177,6 +180,7 @@ extension PtrAuth {
     return Metadata(signedBitPattern.rawPointer)
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signSuperclass(_ superclass: Metadata) -> Metadata {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
@@ -188,11 +192,13 @@ extension PtrAuth {
     return Metadata(signedBitPattern.rawPointer)
   }
 #else
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signDescriptor<T: PublicLayout>(_ descriptor: T) -> T {
     descriptor
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signNonUniqueExtendedExistentialShape(
     _ shape: ExtendedExistentialShape
@@ -200,11 +206,13 @@ extension PtrAuth {
     shape
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signObjcISA(_ isa: Metadata) -> Metadata {
     isa
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   static func signSuperclass(_ superclass: Metadata) -> Metadata {
     superclass
@@ -237,6 +245,7 @@ extension UnsafeRawPointer {
     return resigned.rawPointer
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeBufferWithCopyOfBuffer: ValueWitnessTable.InitializeBufferWithCopyOfBuffer {
     unsafeBitCast(signedVWTFunc(
@@ -247,6 +256,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTDestroy: ValueWitnessTable.Destroy {
     unsafeBitCast(signedVWTFunc(
@@ -257,6 +267,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeWithCopy: ValueWitnessTable.InitializeWithCopy {
     unsafeBitCast(signedVWTFunc(
@@ -267,6 +278,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTAssignWithCopy: ValueWitnessTable.AssignWithCopy {
     unsafeBitCast(signedVWTFunc(
@@ -277,6 +289,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeWithTake: ValueWitnessTable.InitializeWithTake {
     unsafeBitCast(signedVWTFunc(
@@ -287,6 +300,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTAssignWithTake: ValueWitnessTable.AssignWithTake {
     unsafeBitCast(signedVWTFunc(
@@ -297,6 +311,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTGetEnumTagSinglePayload: ValueWitnessTable.GetEnumTagSinglePayload {
     unsafeBitCast(signedVWTFunc(
@@ -307,6 +322,7 @@ extension UnsafeRawPointer {
     ))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTStoreEnumTagSinglePayload: ValueWitnessTable.StoreEnumTagSinglePayload {
     unsafeBitCast(signedVWTFunc(
@@ -317,41 +333,49 @@ extension UnsafeRawPointer {
     ))
   }
 #else
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeBufferWithCopyOfBuffer: ValueWitnessTable.InitializeBufferWithCopyOfBuffer {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTDestroy: ValueWitnessTable.Destroy {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeWithCopy: ValueWitnessTable.InitializeWithCopy {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTAssignWithCopy: ValueWitnessTable.AssignWithCopy {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTInitializeWithTake: ValueWitnessTable.InitializeWithTake {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTAssignWithTake: ValueWitnessTable.AssignWithTake {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTGetEnumTagSinglePayload: ValueWitnessTable.GetEnumTagSinglePayload {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
   }
   
+  @available(SwiftStdlib 9999, *)
   @inlinable
   var signedVWTStoreEnumTagSinglePayload: ValueWitnessTable.StoreEnumTagSinglePayload {
     unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))

@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct EnumDescriptor: PublicLayout {
   public typealias Layout = (
@@ -27,6 +28,7 @@ public struct EnumDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension EnumDescriptor {
   @inlinable
   public var numberOfPayloadCases: Int {
@@ -45,6 +47,7 @@ extension EnumDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension EnumDescriptor {
   @inlinable
   public var type: TypeDescriptor {
@@ -65,6 +68,7 @@ extension EnumDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension EnumDescriptor: Equatable {
   @inlinable
   public static func ==(lhs: EnumDescriptor, rhs: EnumDescriptor) -> Bool {
@@ -72,6 +76,7 @@ extension EnumDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension EnumDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

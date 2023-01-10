@@ -12,6 +12,7 @@
 import Swift
 import _Runtime
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct GenericArguments {
   @usableFromInline
@@ -27,6 +28,7 @@ public struct GenericArguments {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericArguments: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {
@@ -53,6 +55,7 @@ extension GenericArguments: RandomAccessCollection {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericArguments: BidirectionalCollection {
   @inlinable
   public func index(before i: Int) -> Int {

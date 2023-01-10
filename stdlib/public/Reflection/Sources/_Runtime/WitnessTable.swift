@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct WitnessTable: PublicLayout {
   public typealias Layout = ConformanceDescriptor

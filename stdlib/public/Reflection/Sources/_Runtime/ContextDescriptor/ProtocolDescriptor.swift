@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct ProtocolDescriptor: PublicLayout {
   public typealias Layout = (
@@ -29,6 +30,7 @@ public struct ProtocolDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor {
   @inlinable
   public var name: String {
@@ -61,6 +63,7 @@ extension ProtocolDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct ProtocolRequirement: PublicLayout {
   public typealias Layout = (
@@ -80,6 +83,7 @@ public struct ProtocolRequirement: PublicLayout {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor: Equatable {
   @inlinable
   public static func ==(
@@ -90,7 +94,27 @@ extension ProtocolDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor: Hashable {
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ptr)
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension ProtocolRequirement: Equatable {
+  @inlinable
+  public static func ==(
+    lhs: ProtocolRequirement,
+    rhs: ProtocolRequirement
+  ) -> Bool {
+    lhs.ptr == rhs.ptr
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension ProtocolRequirement: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct HeapObject: PublicLayout {
   public typealias Layout = (
@@ -26,6 +27,7 @@ public struct HeapObject: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension HeapObject {
   @inlinable
   public var type: Metadata {

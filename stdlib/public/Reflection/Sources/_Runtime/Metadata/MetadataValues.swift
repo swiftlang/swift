@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 extension Metadata {
   @frozen
   public struct Kind {
@@ -130,6 +131,7 @@ extension Metadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata.Kind: Equatable {
   @inlinable
   public static func ==(_ lhs: Metadata.Kind, _ rhs: Metadata.Kind) -> Bool {
@@ -148,6 +150,7 @@ extension Metadata.Kind: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata {
   @frozen
   public struct Request {
@@ -222,6 +225,7 @@ extension Metadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExistentialMetadata {
   internal struct Flags {
     let value: UInt32
@@ -277,6 +281,7 @@ extension ExistentialMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   @frozen
   public struct Convention {
@@ -304,6 +309,7 @@ extension FunctionMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata.Convention: Equatable {
   public static func ==(
     lhs: FunctionMetadata.Convention,
@@ -313,6 +319,7 @@ extension FunctionMetadata.Convention: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   @frozen
   public struct DifferentiableKind {
@@ -344,6 +351,7 @@ extension FunctionMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata.DifferentiableKind: Equatable {
   public static func ==(
     lhs: FunctionMetadata.DifferentiableKind,
@@ -353,6 +361,7 @@ extension FunctionMetadata.DifferentiableKind: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   struct Flags {
     let value: Int
@@ -447,6 +456,7 @@ extension FunctionMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   struct ParameterFlags {
     let value: UInt32
@@ -491,6 +501,7 @@ enum ValueOwnership: UInt8 {
   case owned = 3
 }
 
+@available(SwiftStdlib 9999, *)
 extension ValueWitnessTable {
   @frozen
   public struct Flags {

@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct TypeMetadata: PublicLayout {
   public typealias Layout = Int
@@ -23,6 +24,7 @@ public struct TypeMetadata: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeMetadata {
   @inlinable
   public var descriptor: TypeDescriptor {
@@ -60,6 +62,7 @@ extension TypeMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeMetadata {
   @inlinable
   public var metadata: Metadata {
@@ -82,6 +85,7 @@ extension TypeMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeMetadata {
   @inlinable
   public func resolve(_ typeRef: MangledTypeReference) -> Any.Type? {
@@ -106,6 +110,7 @@ extension TypeMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension TypeMetadata: Equatable {
   @inlinable
   public static func ==(lhs: TypeMetadata, rhs: TypeMetadata) -> Bool {
@@ -113,6 +118,7 @@ extension TypeMetadata: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeMetadata: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

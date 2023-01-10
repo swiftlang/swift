@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct OpaqueDescriptor: PublicLayout {
   public typealias Layout = ContextDescriptor.Layout
@@ -23,6 +24,7 @@ public struct OpaqueDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension OpaqueDescriptor {
   @inlinable
   public var numberOfUnderlyingTypes: Int {
@@ -34,6 +36,7 @@ extension OpaqueDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension OpaqueDescriptor: Equatable {
   @inlinable
   public static func ==(lhs: OpaqueDescriptor, rhs: OpaqueDescriptor) -> Bool {
@@ -41,6 +44,7 @@ extension OpaqueDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension OpaqueDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

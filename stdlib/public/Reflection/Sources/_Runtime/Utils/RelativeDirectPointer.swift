@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct RelativeDirectPointer<Pointee>: RelativePointer {
   public let offset: Int32
@@ -27,6 +28,7 @@ public struct RelativeDirectPointer<Pointee>: RelativePointer {
 }
 
 extension UnsafeRawPointer {
+  @available(SwiftStdlib 9999, *)
   @inlinable
   public func relativeDirectAddress<T>(as type: T.Type) -> UnsafeRawPointer {
     let relativePointer = RelativeDirectPointer<T>(

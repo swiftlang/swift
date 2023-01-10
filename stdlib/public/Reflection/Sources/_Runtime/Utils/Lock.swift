@@ -20,6 +20,7 @@ import ucrt
 import WinSDK
 #endif
 
+@available(SwiftStdlib 9999, *)
 @usableFromInline
 struct Lock<T> {
 #if canImport(os)
@@ -32,6 +33,7 @@ struct Lock<T> {
 #endif
 }
 
+@available(SwiftStdlib 9999, *)
 extension Lock {
   @inlinable
   func withLock<U>(_ body: @Sendable (inout T) throws -> U) rethrows -> U {
@@ -61,6 +63,7 @@ extension Lock {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Lock where T: Sendable {
   @usableFromInline
   init(initialState state: T) {
@@ -89,4 +92,5 @@ extension Lock where T: Sendable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Lock: @unchecked Sendable {}

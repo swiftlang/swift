@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct RelativeIndirectablePointer<Pointee>: RelativePointer {
   public let offset: Int32

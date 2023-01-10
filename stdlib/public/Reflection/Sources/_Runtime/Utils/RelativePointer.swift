@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 public protocol RelativePointer {
   associatedtype Pointee
   
@@ -20,6 +21,7 @@ public protocol RelativePointer {
   func pointee(from ptr: UnsafeRawPointer) -> Pointee?
 }
 
+@available(SwiftStdlib 9999, *)
 extension RelativePointer {
   @inlinable
   public var isNull: Bool {

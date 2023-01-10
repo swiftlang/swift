@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct ExtensionDescriptor: PublicLayout {
   public typealias Layout = (
@@ -26,6 +27,7 @@ public struct ExtensionDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtensionDescriptor {
   @inlinable
   public var extendedContext: MangledTypeReference {
@@ -33,6 +35,7 @@ extension ExtensionDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtensionDescriptor {
   @inlinable
   public var genericSignature: GenericSignature? {
@@ -44,6 +47,7 @@ extension ExtensionDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension ExtensionDescriptor: Equatable {
   public static func ==(
     lhs: ExtensionDescriptor,
@@ -53,6 +57,7 @@ extension ExtensionDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtensionDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

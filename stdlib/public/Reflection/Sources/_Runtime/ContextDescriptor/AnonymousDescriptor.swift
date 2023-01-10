@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct AnonymousDescriptor: PublicLayout {
   public typealias Layout = ContextDescriptor.Layout
@@ -23,6 +24,7 @@ public struct AnonymousDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension AnonymousDescriptor {
   @inlinable
   public var base: ContextDescriptor {
@@ -35,6 +37,7 @@ extension AnonymousDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension AnonymousDescriptor {
   @inlinable
   public var genericSignature: GenericSignature? {
@@ -50,6 +53,7 @@ extension AnonymousDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension AnonymousDescriptor: Equatable {
   @inlinable
   public static func ==(
@@ -60,6 +64,7 @@ extension AnonymousDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension AnonymousDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

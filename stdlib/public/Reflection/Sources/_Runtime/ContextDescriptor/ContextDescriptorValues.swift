@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 extension AnonymousDescriptor {
   @frozen
   public struct Flags {
@@ -35,6 +36,7 @@ extension AnonymousDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ConformanceDescriptor {
   @frozen
   public struct Flags {
@@ -127,6 +129,7 @@ extension ConformanceDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor {
   @frozen
   public struct Kind {
@@ -188,6 +191,7 @@ extension ContextDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor.Kind: Equatable {
   @inlinable
   public static func ==(
@@ -198,6 +202,7 @@ extension ContextDescriptor.Kind: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor {
   @frozen
   public struct Flags {
@@ -279,6 +284,7 @@ extension ContextDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtendedExistentialShape {
   @frozen
   public struct SpecialKind {
@@ -316,6 +322,7 @@ extension ExtendedExistentialShape {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtendedExistentialShape.SpecialKind: Equatable {
   @inlinable
   public static func ==(
@@ -326,6 +333,7 @@ extension ExtendedExistentialShape.SpecialKind: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ExtendedExistentialShape {
   @frozen
   public struct Flags {
@@ -402,6 +410,7 @@ extension ExtendedExistentialShape {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FieldDescriptor.Element {
   @frozen
   public struct Flags {
@@ -432,6 +441,7 @@ extension FieldDescriptor.Element {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericSignature {
   @frozen
   public struct ParameterDescriptor {
@@ -490,6 +500,7 @@ extension GenericSignature {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension GenericSignature.RequirementDescriptor {
   @frozen
   public struct Kind {
@@ -572,6 +583,7 @@ extension GenericSignature.RequirementDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor {
   @frozen
   public struct DispatchStrategy {
@@ -597,6 +609,7 @@ extension ProtocolDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor.DispatchStrategy: Equatable {
   @inlinable
   public static func ==(
@@ -607,6 +620,7 @@ extension ProtocolDescriptor.DispatchStrategy: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolDescriptor {
   @frozen
   public struct Flags {
@@ -681,6 +695,7 @@ extension ProtocolDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolRequirement {
   @frozen
   public struct Kind {
@@ -748,6 +763,7 @@ extension ProtocolRequirement {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolRequirement.Kind: Equatable {
   @inlinable
   public static func ==(
@@ -758,6 +774,7 @@ extension ProtocolRequirement.Kind: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ProtocolRequirement {
   @frozen
   public struct Flags {
@@ -839,6 +856,7 @@ public struct MetadataInitializationKind {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeDescriptor {
   @frozen
   public struct Flags {
@@ -972,6 +990,7 @@ extension TypeDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeReference {
   @frozen
   public struct Kind {
@@ -1009,6 +1028,7 @@ extension TypeReference {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeReference.Kind: Equatable {
   @inlinable
   public static func ==(

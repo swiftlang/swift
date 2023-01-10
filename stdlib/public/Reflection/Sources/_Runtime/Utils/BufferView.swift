@@ -12,6 +12,7 @@
 import Swift
 
 // TODO: Replace this with Guillaume's actual BufferView
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct BufferView<Element/* : BitwiseCopyable */> {
   public let start: UnsafeRawPointer
@@ -29,6 +30,7 @@ public struct BufferView<Element/* : BitwiseCopyable */> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension BufferView: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {
@@ -59,6 +61,7 @@ extension BufferView: RandomAccessCollection {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct IndirectBufferView<Element: PublicLayout> {
   public let start: UnsafeRawPointer
@@ -71,6 +74,7 @@ public struct IndirectBufferView<Element: PublicLayout> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension IndirectBufferView: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {

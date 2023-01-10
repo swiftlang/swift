@@ -12,6 +12,7 @@
 import Swift
 import CRuntime
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct BoxPair {
   public typealias Storage = (
@@ -33,9 +34,11 @@ public struct BoxPair {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @_silgen_name("swift_allocBox")
 public func swift_allocBox(_: Metadata) -> BoxPair
 
+@available(SwiftStdlib 9999, *)
 @inlinable
 public func swift_conformsToProtocol(
   _ type: Metadata,
@@ -48,6 +51,7 @@ public func swift_conformsToProtocol(
   return WitnessTable(wt)
 }
 
+@available(SwiftStdlib 9999, *)
 @inlinable
 public func swift_projectBox(
   _ obj: HeapObject

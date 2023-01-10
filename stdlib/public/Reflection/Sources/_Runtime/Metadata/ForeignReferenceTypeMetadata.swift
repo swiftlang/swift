@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct ForeignReferenceTypeMetadata: PublicLayout {
   public typealias Layout = (
@@ -26,6 +27,7 @@ public struct ForeignReferenceTypeMetadata: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ForeignReferenceTypeMetadata {
   @inlinable
   public var descriptor: ClassDescriptor {
@@ -37,6 +39,7 @@ extension ForeignReferenceTypeMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension ForeignReferenceTypeMetadata: Equatable {
   @inlinable
   public static func ==(
@@ -47,6 +50,7 @@ extension ForeignReferenceTypeMetadata: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ForeignReferenceTypeMetadata: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

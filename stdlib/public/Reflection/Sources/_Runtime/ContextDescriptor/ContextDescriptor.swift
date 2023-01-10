@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct ContextDescriptor: PublicLayout {
   public typealias Layout = (
@@ -28,6 +29,7 @@ public struct ContextDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor {
   @inlinable
   public var flags: Flags {
@@ -92,6 +94,7 @@ extension ContextDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor: Equatable {
   @inlinable
   public static func ==(
@@ -102,6 +105,7 @@ extension ContextDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension ContextDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

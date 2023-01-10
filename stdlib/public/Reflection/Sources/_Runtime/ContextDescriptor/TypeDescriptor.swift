@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct TypeDescriptor: PublicLayout {
   public typealias Layout = (
@@ -28,6 +29,7 @@ public struct TypeDescriptor: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeDescriptor {
   @inlinable
   public var base: ContextDescriptor {
@@ -55,6 +57,7 @@ extension TypeDescriptor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeDescriptor {
   @inlinable
   var sizeOfSelf: Int {
@@ -85,6 +88,7 @@ extension TypeDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension TypeDescriptor: Equatable {
   @inlinable
   public static func ==(_ lhs: TypeDescriptor, _ rhs: TypeDescriptor) -> Bool {
@@ -92,6 +96,7 @@ extension TypeDescriptor: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension TypeDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

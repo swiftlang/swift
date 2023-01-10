@@ -15,6 +15,7 @@ import Swift
 import Darwin
 #endif
 
+@available(SwiftStdlib 9999, *)
 @inlinable
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
   Swift.unsafeBitCast(x, to: type)
@@ -80,6 +81,7 @@ extension UnsafeRawPointer {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inlinable
 public func getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
   var end = base

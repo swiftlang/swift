@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct FunctionMetadata: PrivateLayout {
   typealias Layout = (
@@ -27,6 +28,7 @@ public struct FunctionMetadata: PrivateLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   public var convention: Convention {
     layout.flags.convention
@@ -61,6 +63,7 @@ extension FunctionMetadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata {
   public var differentiableKind: DifferentiableKind {
     guard isDifferential else {
@@ -99,12 +102,14 @@ extension FunctionMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata: Equatable {
   public static func ==(lhs: FunctionMetadata, rhs: FunctionMetadata) -> Bool {
     lhs.ptr == rhs.ptr
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FunctionMetadata: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

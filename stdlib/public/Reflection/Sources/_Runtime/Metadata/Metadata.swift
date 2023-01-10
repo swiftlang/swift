@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct Metadata: PublicLayout {
   public typealias Layout = Int
@@ -28,6 +29,7 @@ public struct Metadata: PublicLayout {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata {
   @inlinable
   public var vwt: ValueWitnessTable {
@@ -40,6 +42,7 @@ extension Metadata {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata {
   @inlinable
   public var `class`: ClassMetadata {
@@ -86,6 +89,7 @@ extension Metadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension Metadata: Equatable {
   @inlinable
   public static func ==(_ lhs: Metadata, _ rhs: Metadata) -> Bool {
@@ -93,6 +97,7 @@ extension Metadata: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
@@ -100,6 +105,7 @@ extension Metadata: Hashable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Metadata: CustomStringConvertible {
   @inlinable
   public var description: String {

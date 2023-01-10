@@ -11,6 +11,7 @@
 
 import Swift
 
+@available(SwiftStdlib 9999, *)
 extension Metadata {
   @frozen
   public struct AccessFunction {
