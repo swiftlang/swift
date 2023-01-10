@@ -1086,7 +1086,7 @@
 // CHECK-64-NEXT:       (case name=C index=2)
 // CHECK-64-NEXT:       (case name=D index=3)))
 // CHECK-64-NEXT:   (field name=sillyNoPayload offset=1
-// CHECK-64-NEXT:    (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECK-64-NEXT:    (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:      (case name=A index=0 offset=0
 // CHECK-64-NEXT:        (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
 // CHECK-64-NEXT:      (case name=B index=1 offset=0

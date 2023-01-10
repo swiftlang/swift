@@ -1101,17 +1101,21 @@ public:
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
   ///
-  /// The attribute may come from another declaration, since availability
-  /// could be inherited from a parent declaration.
+  /// This attribute may come from an enclosing decl since availability is
+  /// inherited. The second member of the returned pair is the decl that owns
+  /// the attribute.
   Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticAvailableRangeAttr() const;
 
   /// Retrieve the @available attribute that makes this declaration unavailable,
   /// if any.
   ///
-  /// The attribute may come from another declaration, since unavailability
-  /// could be inherited from a parent declaration. This is a broader notion of
-  /// unavailability than is checked by \c AvailableAttr::isUnavailable.
+  /// This attribute may come from an enclosing decl since availability is
+  /// inherited. The second member of the returned pair is the decl that owns
+  /// the attribute.
+  ///
+  /// Note that this notion of unavailability is broader than that which is
+  /// checked by \c AvailableAttr::isUnavailable.
   Optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr() const;
 

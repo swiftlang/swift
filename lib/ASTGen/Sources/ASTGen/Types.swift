@@ -28,16 +28,6 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: MemberTypeIdentifierSyntax) -> ASTNode {
-    // Handle metatypes.
-    // FIXME: We might want to do this in the parser instead?
-    if node.name.tokenKind == .identifier("Type") &&
-        node.genericArgumentClause == nil {
-      let baseType = visit(node.baseType).rawValue
-      let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
-      return .type(
-        MetatypeTypeRepr_create(self.ctx, baseType, nameLoc))
-    }
-
     var path = [(TokenSyntax, GenericArgumentClauseSyntax?)]()
     var memberRef: Syntax? = Syntax(node)
     while let nestedMember = memberRef?.as(MemberTypeIdentifierSyntax.self) {
