@@ -8,6 +8,16 @@
 // RUN: %target-codesign %t/swift-enums-execution
 // RUN: %target-run %t/swift-enums-execution
 
+// RUN: %empty-directory(%t-evo)
+
+// RUN: %target-swift-frontend %S/enum-associated-value-class-type-cxx.swift -typecheck -module-name Enums -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo/enums.h
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-enums-execution.o
+// RUN: %target-interop-build-swift %S/enum-associated-value-class-type-cxx.swift -o %t-evo/swift-enums-execution -Xlinker %t-evo/swift-enums-execution.o -module-name Enums -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+
+// RUN: %target-codesign %t-evo/swift-enums-execution
+// RUN: %target-run %t-evo/swift-enums-execution
+
 // REQUIRES: executable_test
 
 #include <cassert>
@@ -15,16 +25,33 @@
 
 using namespace Enums;
 
+extern "C" size_t swift_retainCount(void * _Nonnull obj);
+
+size_t getRetainCount(const C & obj) {
+  void *p = swift::_impl::_impl_RefCountedClass::getOpaquePointer(obj);
+  return swift_retainCount(p);
+}
+
 int main() {
     auto c = C::init(1234);
     assert(c.getX() == 1234);
+    assert(getRetainCount(c) == 1);
 
-    auto e1 = E::c(c);
-    assert(e1.isC());
-    assert(e1.getC().getX() == 1234);
+    {
+        auto e = E::c(c);
+        assert(e.isC());
+        assert(getRetainCount(c) == 2);
 
-    auto e2 = E::i(5678);
-    assert(e2.isI());
-    assert(e2.getI() == 5678);
+        auto extracted = e.getC();
+        assert(getRetainCount(c) == 3);
+        assert(getRetainCount(extracted) == 3);
+        assert(extracted.getX() == 1234);
+
+        extracted.setX(5678);
+        assert(extracted.getX() == 5678);
+        assert(c.getX() == 5678);
+    }
+
+    assert(getRetainCount(c) == 1);
     return 0;
 }
