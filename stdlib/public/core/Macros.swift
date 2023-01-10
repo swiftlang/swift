@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasAttribute(expression)
 /// Specifies the module and type name for an externally-defined macro, which
 /// must conform to the appropriate set of `Macro` protocols.
 ///
@@ -23,3 +24,4 @@
 public macro externalMacro<T>(module: String, type: String) -> T =
     Builtin.ExternalMacro
 
+#endif
