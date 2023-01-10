@@ -145,9 +145,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
     _taskLocalValuePush(key: key, value: valueDuringOperation)
-    defer { _taskLocalValuePop() }
-
-    return try await operation()
+    do {
+      let result = try await operation()
+      _taskLocalValuePop()
+      return result
+    } catch {
+      _taskLocalValuePop()
+      throw error
+    }
   }
 
   /// Binds the task-local to the specific value for the duration of the
