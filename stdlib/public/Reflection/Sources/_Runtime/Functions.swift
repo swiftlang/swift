@@ -52,5 +52,5 @@ public func swift_conformsToProtocol(
 public func swift_projectBox(
   _ obj: HeapObject
 ) -> UnsafeMutableRawPointer {
-  CRuntime.swift_projectBox(obj.ptr.mutable)
+  swift_projectBox(obj.ptr.mutable)
 }

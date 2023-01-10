@@ -9,9 +9,9 @@ let package = Package(
   ],
   products: [
     .library(
-      name: "Runtime",
+      name: "_Runtime",
       type: .dynamic,
-      targets: ["Runtime"]
+      targets: ["_Runtime"]
     ),
     .library(
       name: "Reflection",
@@ -21,13 +21,10 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "CRuntime"
-    ),
-    .target(
-      name: "Runtime",
-      dependencies: ["CRuntime"],
+      name: "_Runtime",
       swiftSettings: [
         .unsafeFlags([
+          "-I", "\(Context.packageDirectory)/Sources/CRuntime",
           "-parse-stdlib",
           "-enable-library-evolution",
           "-Xfrontend", "-disable-implicit-concurrency-module-import",
@@ -38,7 +35,7 @@ let package = Package(
     ),
     .target(
       name: "Reflection",
-      dependencies: ["Runtime"],
+      dependencies: ["_Runtime"],
       swiftSettings: [
         .unsafeFlags([
           "-parse-stdlib",
@@ -52,11 +49,11 @@ let package = Package(
     
     .testTarget(
       name: "RuntimeTests",
-      dependencies: ["Runtime"]
+      dependencies: ["_Runtime"]
     ),
     .testTarget(
       name: "ReflectionTests",
-      dependencies: ["Runtime", "Reflection"]
+      dependencies: ["_Runtime", "Reflection"]
     ),
   ]
 )

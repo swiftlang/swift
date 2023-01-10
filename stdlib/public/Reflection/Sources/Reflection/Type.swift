@@ -10,7 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import Runtime
+import _Runtime
 
 @frozen
 public struct Type {
