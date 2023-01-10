@@ -42,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     # Required to stop the runner even if the error happened in the previous jobs
     if: ${{ always() && needs.start-runner.result == 'success' }}
+    # The runner can be already stopped when re-running a part of failed jobs
+    continue-on-error: true
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
