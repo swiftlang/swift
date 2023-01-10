@@ -114,3 +114,36 @@ if #available(SwiftStdlib 5.8, *) {
       """)
   }
 }
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("Equatable") {
+    var r1 = Unicode._CharacterRecognizer()
+    var r2 = Unicode._CharacterRecognizer()
+    expectEqual(r1, r2)
+    expectTrue(r1.hasBreak(before: "a"))
+    expectNotEqual(r1, r2)
+    expectTrue(r2.hasBreak(before: "a"))
+    expectEqual(r1, r2)
+    expectTrue(r2.hasBreak(before: "\u{1f44f}")) // CLAPPING HANDS SIGN
+    expectNotEqual(r1, r2)
+    expectTrue(r1.hasBreak(before: "b"))
+    expectNotEqual(r1, r2)
+    expectFalse(r2.hasBreak(before: "\u{1f3fc}")) // EMOJI MODIFIER FITZPATRICK TYPE-3
+    expectNotEqual(r1, r2)
+    expectTrue(r2.hasBreak(before: "b"))
+    expectEqual(r1, r2) // breaks should reset state
+  }
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("CustomStringConvertible") {
+    var r = Unicode._CharacterRecognizer()
+    expectEqual("\(r)", "[]U+0")
+    expectTrue(r.hasBreak(before: "\u{1F1FA}")) // REGIONAL INDICATOR SYMBOL LETTER U
+    expectEqual("\(r)", "[]U+1F1FA")
+    expectFalse(r.hasBreak(before: "\u{1F1F8}")) // REGIONAL INDICATOR SYMBOL LETTER S
+    expectEqual("\(r)", "[R]U+1F1F8")
+    expectTrue(r.hasBreak(before: "$"))
+    expectEqual("\(r)", "[]U+24")
+  }
+}
