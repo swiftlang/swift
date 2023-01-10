@@ -522,18 +522,24 @@ private:
                   elementDecl->getParentEnum()->getModuleContext());
               outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
-              outOfLineOS << "::returnNewValue([&](char * _Nonnull result) {\n";
-              outOfLineOS << "      swift::"
-                          << cxx_synthesis::getCxxImplNamespaceName();
-              outOfLineOS << "::implClassFor<";
-              outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                  objectTypeDecl->getModuleContext(),
-                  elementDecl->getParentEnum()->getModuleContext());
-              outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-              outOfLineOS << ">::type";
-              outOfLineOS
-                  << "::initializeWithTake(result, payloadFromDestruction);\n";
-              outOfLineOS << "    });\n  ";
+              if (isa<ClassDecl>(objectTypeDecl)) {
+                outOfLineOS << "::makeRetained(*reinterpret_cast<void "
+                               "**>(payloadFromDestruction));\n  ";
+              } else {
+                outOfLineOS
+                    << "::returnNewValue([&](char * _Nonnull result) {\n";
+                outOfLineOS << "      swift::"
+                            << cxx_synthesis::getCxxImplNamespaceName();
+                outOfLineOS << "::implClassFor<";
+                outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
+                    objectTypeDecl->getModuleContext(),
+                    elementDecl->getParentEnum()->getModuleContext());
+                outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                outOfLineOS << ">::type";
+                outOfLineOS << "::initializeWithTake(result, "
+                               "payloadFromDestruction);\n";
+                outOfLineOS << "    });\n  ";
+              }
             }
           },
           ED, ED->getModuleContext(), outOfLineOS);
@@ -666,6 +672,13 @@ private:
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
+                  } else if (isa<ClassDecl>(objectTypeDecl)) {
+                    outOfLineOS
+                        << "    auto op = swift::"
+                        << cxx_synthesis::getCxxImplNamespaceName()
+                        << "::_impl_RefCountedClass::copyOpaquePointer(val);\n";
+                    outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                   "&op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
