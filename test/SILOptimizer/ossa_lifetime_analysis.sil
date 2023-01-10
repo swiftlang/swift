@@ -176,7 +176,9 @@ bb0(%0 : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: @testMultiDef
+// A LiveOut block with a non-SSA def, bb0, has no liveness boundary.
+//
+// CHECK-LABEL: @testMultiDefLiveOutNoBoundary
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
 // CHECK:   def: %{{.*}} = copy_value %0 : $C
@@ -187,12 +189,12 @@ bb0(%0 : @guaranteed $D):
 // CHECK: bb3: LiveWithin,
 // CHECK: bb4: LiveWithin,
 // CHECK: bb1: LiveWithin,
-// CHECK: lifetime-ending user:   %{{.*}} = move_value [[CP0]] : $C
-// CHECK: lifetime-ending user:   destroy_value [[CP0]] : $C
-// CHECK: lifetime-ending user:   br bb4(%5 : $C)
-// CHECK: lifetime-ending user:   br bb4(%7 : $C)
-// CHECK: lifetime-ending user:   destroy_value %9 : $C
-sil [ossa] @testMultiDef : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: last user:   br bb4
+// CHECK-NEXT: last user:   br bb4
+// CHECK-NEXT: last user:   %{{.*}} = move_value [[CP0]] : $C
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $C
+// CHECK-NEXT: last user:   destroy_value [[CP0]] : $C
+sil [ossa] @testMultiDefLiveOutNoBoundary : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0 = copy_value %0 : $C
   debug_value [trace] %copy0 : $C
@@ -215,6 +217,36 @@ bb3:
 bb4(%phi : @owned $C):
   debug_value [trace] %phi : $C
   destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// A dead-end block with a def can still be a boundary edge. This can
+// only happen in OSSA with incomplete lifetimes.
+//
+// CHECK-LABEL: @testMultiDefDeadDefBoundaryEdge
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def: [[CP3:%.*]] = copy_value %0 : $C
+// CHECK: bb0: LiveOut,
+// CHECK: bb1: LiveWithin,
+// CHECK: bb2: LiveWithin,
+// CHECK: last user:   destroy_value [[CP0]] : $C
+// CHECK-NEXT: boundary edge: bb1
+// CHECK-NEXT: dead def: [[CP3]] = copy_value %0 : $C
+sil [ossa] @testMultiDefDeadDefBoundaryEdge : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %copy0 = copy_value %0 : $C
+  debug_value [trace] %copy0 : $C
+  cond_br undef, bb1, bb3
+
+bb1:
+  %dead = copy_value %0 : $C
+  debug_value [trace] %dead : $C
+  unreachable
+
+bb3:
+  destroy_value %copy0 : $C
   %99 = tuple()
   return %99 : $()
 }
