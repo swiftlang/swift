@@ -1494,10 +1494,12 @@ tryCastToClassExistential(
 #if SWIFT_OBJC_INTEROP
     id srcObject;
     memcpy(&srcObject, srcValue, sizeof(id));
-    if (getAsSwiftValue(srcObject) != nullptr) {
-      // Do not directly cast a `__SwiftValue` box
-      // Return failure so our caller will unwrap and try again
-      return DynamicCastResult::Failure;
+    if (!runtime::bincompat::useLegacySwiftValueUnboxingInCasting()) {
+      if (getAsSwiftValue(srcObject) != nullptr) {
+	// Do not directly cast a `__SwiftValue` box
+	// Return failure so our caller will unwrap and try again
+	return DynamicCastResult::Failure;
+      }
     }
 #endif
     SWIFT_FALLTHROUGH;
