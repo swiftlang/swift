@@ -1275,7 +1275,7 @@ protected:
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
         if (isOptional && isTopLevel(anchor)) {
-          builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
+          builderCall = buildCallIfWanted(ifStmt->getThenStmt()->getStartLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
         }
@@ -1304,7 +1304,7 @@ protected:
             /*argLabels=*/{}));
       }
 
-      auto *ifVarRef = builder.buildVarRef(ifVar.get(), ifStmt->getEndLoc());
+      auto *ifVarRef = builder.buildVarRef(ifVar.get(), ifStmt->getStartLoc());
       doBody.push_back(TypeJoinExpr::create(ctx, ifVarRef, buildEitherCalls));
     }
 
