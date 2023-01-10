@@ -6,10 +6,11 @@
 
 // REQUIRES: OS=watchos
 // REQUIRES: CPU=armv7k || CPU=arm64_32
-// REQUIRES: rdar97790231
 
-public func someAsyncFunction() async {
-}
+@_silgen_name("forward_function")
+func forwardFunction()
+
+public func someAsyncFunction() async { forwardFunction() }
 
 // AUTO: swift_async_extendedFramePointerFlags
 
