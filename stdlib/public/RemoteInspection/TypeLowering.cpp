@@ -418,13 +418,13 @@ public:
 // Enum with a single non-payload case
 class TrivialEnumTypeInfo: public EnumTypeInfo {
 public:
-  TrivialEnumTypeInfo(const std::vector<FieldInfo> &Cases)
+  TrivialEnumTypeInfo(EnumKind Kind, const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(/*Size*/ 0,
                    /* Alignment*/ 1,
                    /*Stride*/ 1,
                    /*NumExtraInhabitants*/ 0,
                    /*BitwiseTakable*/ true,
-                   EnumKind::NoPayloadEnum, Cases) {}
+                   Kind, Cases) {}
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
@@ -446,12 +446,13 @@ class NoPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
   NoPayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                         unsigned Stride, unsigned NumExtraInhabitants,
+                        EnumKind Kind,
                         const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    /*BitwiseTakable*/ true,
-                   EnumKind::NoPayloadEnum, Cases) {
+                   Kind, Cases) {
     assert(Cases.size() >= 2);
-    assert(getNumPayloadCases() == 0);
+    assert(getNumNonEmptyPayloadCases() == 0);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -491,11 +492,12 @@ public:
   SinglePayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                             unsigned Stride, unsigned NumExtraInhabitants,
                             bool BitwiseTakable,
+                            EnumKind Kind,
                             const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   BitwiseTakable, EnumKind::SinglePayloadEnum, Cases) {
+                   BitwiseTakable, Kind, Cases) {
     assert(Cases[0].TR != 0);
-    assert(getNumPayloadCases() == 1);
+    assert(getNumNonEmptyPayloadCases() == 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -611,7 +613,7 @@ public:
                    BitwiseTakable, EnumKind::MultiPayloadEnum, Cases) {
     assert(Cases[0].TR != 0);
     assert(Cases[1].TR != 0);
-    assert(getNumPayloadCases() > 1);
+    assert(getNumNonEmptyPayloadCases() > 1);
     assert(getSize() > getPayloadSize());
     assert(getCases().size() > 1);
   }
@@ -986,7 +988,7 @@ public:
       spareBitsMask(spareBitsMask) {
     assert(Cases[0].TR != 0);
     assert(Cases[1].TR != 0);
-    assert(getNumPayloadCases() > 1);
+    assert(getNumNonEmptyPayloadCases() > 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -1043,7 +1045,7 @@ public:
 
     // Check whether this tag is used for valid content
     auto payloadCases = getNumPayloadCases();
-    auto nonPayloadCases = getNumCases() - getNumPayloadCases();
+    auto nonPayloadCases = getNumCases() - payloadCases;
     uint32_t inhabitedTags;
     if (nonPayloadCases == 0) {
       inhabitedTags = payloadCases;
@@ -2031,7 +2033,8 @@ public:
   const TypeInfo *build(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
     // Sort enum into payload and no-payload cases.
-    unsigned NoPayloadCases = 0;
+    unsigned TrueNoPayloadCases = 0;
+    unsigned EmptyPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
 
     std::vector<FieldTypeInfo> Fields;
@@ -2042,41 +2045,77 @@ public:
 
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
-        ++NoPayloadCases;
+        ++TrueNoPayloadCases;
         addCase(Case.Name);
       } else {
-        PayloadCases.push_back(Case);
         auto *CaseTR = getCaseTypeRef(Case);
         assert(CaseTR != nullptr);
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
+	if (CaseTI == nullptr) {
+	  // We don't have typeinfo; assume it's not
+	  // zero-sized to match earlier behavior.
+	  // TODO: Maybe this should prompt us to fall
+	  // back to UnsupportedEnumTypeInfo??
+          PayloadCases.push_back(Case);
+	} else if (CaseTI->getSize() == 0) {
+          // Zero-sized payloads get special treatment
+          ++EmptyPayloadCases;
+        } else {
+          PayloadCases.push_back(Case);
+        }
         addCase(Case.Name, CaseTR, CaseTI);
       }
     }
+    // For layout purposes, cases w/ empty payload are
+    // treated the same as cases with no payload.
+    unsigned EffectiveNoPayloadCases = TrueNoPayloadCases + EmptyPayloadCases;
 
     if (Cases.empty()) {
       return TC.makeTypeInfo<EmptyEnumTypeInfo>(Cases);
     }
 
+    // `Kind` is used when dumping data, so it reflects how the enum was
+    // declared in source; the various *TypeInfo classes mentioned below reflect
+    // the in-memory layout, which may be different because cases whose
+    // payload is zero-sized get treated (for layout purposes) as non-payload
+    // cases.
+    EnumKind Kind;
+    switch (PayloadCases.size() + EmptyPayloadCases) {
+    case 0: Kind = EnumKind::NoPayloadEnum; break;
+    case 1: Kind = EnumKind::SinglePayloadEnum; break;
+    default: Kind = EnumKind::MultiPayloadEnum; break;
+    }
+
     if (PayloadCases.empty()) {
       // NoPayloadEnumImplStrategy
-      if (NoPayloadCases == 1) {
-        return TC.makeTypeInfo<TrivialEnumTypeInfo>(Cases);
-      } else if (NoPayloadCases < 256) {
-        return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
-          /* Size */ 1, /* Alignment */ 1, /* Stride */ 1,
-          /* NumExtraInhabitants */ 256 - NoPayloadCases, Cases);
-      } else if (NoPayloadCases < 65536) {
-        return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
-          /* Size */ 2, /* Alignment */ 2, /* Stride */ 2,
-          /* NumExtraInhabitants */ 65536 - NoPayloadCases, Cases);
+      if (EffectiveNoPayloadCases == 1) {
+        return TC.makeTypeInfo<TrivialEnumTypeInfo>(Kind, Cases);
       } else {
-        auto extraInhabitants = std::numeric_limits<uint32_t>::max() - NoPayloadCases + 1;
-        if (extraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
-          extraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+        unsigned Size, NumExtraInhabitants;
+        if (EffectiveNoPayloadCases < 256) {
+          Size = 1;
+          NumExtraInhabitants = 256 - EffectiveNoPayloadCases;
+        } else if (EffectiveNoPayloadCases < 65536) {
+          Size = 2;
+          NumExtraInhabitants = 65536 - EffectiveNoPayloadCases;
+        } else {
+          Size = 4;
+          NumExtraInhabitants = std::numeric_limits<uint32_t>::max() - EffectiveNoPayloadCases + 1;
+        }
+        if (EmptyPayloadCases > 0) {
+          // This enum uses no-payload layout, but the source actually does
+          // have payloads (they're just all zero-sized).
+          // If this is really a single-payload enum, we take extra inhabitants
+          // from the first payload, which is zero sized in this case.
+          // If this is really a multi-payload enum, ...
+          NumExtraInhabitants = 0;
+        }
+        if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+          NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
         }
         return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
-          /* Size */ 4, /* Alignment */ 4, /* Stride */ 4,
-          /* NumExtraInhabitants */ extraInhabitants, Cases);
+          /* Size */ Size, /* Alignment */ Size, /* Stride */ Size,
+          NumExtraInhabitants, Kind, Cases);
       }
     } else if (PayloadCases.size() == 1) {
       // SinglePayloadEnumImplStrategy
@@ -2087,26 +2126,26 @@ public:
       }
       // An enum consisting of a single payload case and nothing else
       // is lowered as the payload type.
-      if (NoPayloadCases == 0)
+      if (EffectiveNoPayloadCases == 0)
         return CaseTI;
       // Below logic should match the runtime function
       // swift_initEnumMetadataSinglePayload().
       auto PayloadExtraInhabitants = CaseTI->getNumExtraInhabitants();
-      if (PayloadExtraInhabitants >= NoPayloadCases) {
+      if (PayloadExtraInhabitants >= EffectiveNoPayloadCases) {
         // Extra inhabitants can encode all no-payload cases.
-        NumExtraInhabitants = PayloadExtraInhabitants - NoPayloadCases;
+        NumExtraInhabitants = PayloadExtraInhabitants - EffectiveNoPayloadCases;
       } else {
         // Not enough extra inhabitants for all cases. We have to add an
         // extra tag field.
         NumExtraInhabitants = 0;
-        auto tagCounts = getEnumTagCounts(Size, NoPayloadCases,
+        auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
                                           /*payloadCases=*/1);
         Size += tagCounts.numTagBytes;
         Alignment = std::max(Alignment, tagCounts.numTagBytes);
       }
       unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
       return TC.makeTypeInfo<SinglePayloadEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Cases);
+        Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
     } else {
       // MultiPayloadEnumImplStrategy
 
@@ -2207,7 +2246,7 @@ public:
       } else {
         // Dynamic multi-payload enums cannot use spare bits, so they
         // always use a separate tag value:
-        auto tagCounts = getEnumTagCounts(Size, NoPayloadCases,
+        auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
                                           PayloadCases.size());
         Size += tagCounts.numTagBytes;
         // Dynamic multi-payload enums use the tag representations not assigned
