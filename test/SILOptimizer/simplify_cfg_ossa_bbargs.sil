@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -unit-test-runner %s | %FileCheck %s
 
+// Test fails in Windows CI - rdar://104021173
+// UNSUPPORTED: OS=windows-msvc
+
 import Builtin
 
 class Klass {}

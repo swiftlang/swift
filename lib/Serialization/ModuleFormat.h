@@ -1759,7 +1759,7 @@ namespace decls_block {
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
     BCFixed<1>,                  // GenericEnvironmentKind
-    TypeIDField,                 // existential type
+    TypeIDField,                 // existential type or shape class
     GenericSignatureIDField,     // parent signature
     SubstitutionMapIDField       // substitution map
   >;

@@ -18,7 +18,7 @@
 
 @expression macro customFileID: String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
-@expression macro fileID<T: _ExpressibleByStringLiteral>: T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@expression macro fileID<T: ExpressibleByStringLiteral>: T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @expression macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
 
 func testFileID(a: Int, b: Int) {

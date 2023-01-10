@@ -80,8 +80,8 @@ func doSomethingDeprecatedOniOS() { }
 
 doSomethingDeprecatedOniOS() // okay
 
-
-struct TestStruct {}
+@available(macOS 10.10, *)
+struct TestStruct {} // expected-note {{enclosing scope requires availability of macOS 10.10 or newer}}
 
 @available(macOS 10.10, *)
 extension TestStruct { // expected-note {{enclosing scope requires availability of macOS 10.10 or newer}}
@@ -102,6 +102,11 @@ extension TestStruct { // expected-note {{enclosing scope requires availability 
 
   @available(*, deprecated)
   func doDeprecatedThing() {}
+}
+
+extension TestStruct {
+  @available(macOS 10.9, *) // expected-warning {{instance method cannot be more available than enclosing scope}}
+  func doFifthThing() {}
 }
 
 @available(macOS 10.11, *)

@@ -1027,10 +1027,10 @@ public func enumAssignToVar5() {
     print(x3)
 }
 
-public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
                                                             
     var x3 = x2 // expected-note {{consuming use}}
-    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
     print(x3)
 }
@@ -1222,6 +1222,7 @@ public func closureCaptureClassUseAfterConsume() {
     // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1232,6 +1233,7 @@ public func closureCaptureClassUseAfterConsume() {
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
+        // expected-note @-4 {{consuming use}}
     }
     f()
 }
@@ -1242,6 +1244,7 @@ public func closureCaptureClassUseAfterConsumeError() {
     // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1252,6 +1255,7 @@ public func closureCaptureClassUseAfterConsumeError() {
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
+        // expected-note @-4 {{consuming use}}
     }
     f()
     let x3 = x2
@@ -1280,29 +1284,30 @@ public func deferCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
-    defer {
+    defer { // expected-note {{non-consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
         print(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
-    print(x2)
+    print(x2) // expected-note {{consuming use}}
 }
 
 public func deferCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
-    defer {
+    defer { //  expected-note {{non-consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
         print(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
-    // Shouldn't we get a use after free error on the defer?
-    let x3 = x2
+    let x3 = x2 // expected-note {{consuming use}}
     let _ = x3
 }
 
@@ -1343,10 +1348,16 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     let f = {
         classConsume(x2)
+        // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
         defer {
+            // expected-note @-1 {{non-consuming use}}
+            // expected-note @-2 {{non-consuming use}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
             print(x2)
@@ -1363,10 +1374,16 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     let f = {
         classConsume(x2)
+        // expected-note @-1 {{consuming use}}
+        // expected-note @-2 {{consuming use}}
         defer {
+            // expected-note @-1 {{non-consuming use}}
+            // expected-note @-2 {{non-consuming use}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
             print(x2)
@@ -1407,6 +1424,7 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-5 {{'x2' consumed more than once}}
     // expected-error @-6 {{'x2' consumed more than once}}
+    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {
@@ -1418,6 +1436,7 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
+            // expected-note @-4 {{consuming use}}
         }
         g()
     }
@@ -1432,6 +1451,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-5 {{'x2' consumed more than once}}
     // expected-error @-6 {{'x2' consumed more than once}}
+    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {
@@ -1443,6 +1463,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
+            // expected-note @-4 {{consuming use}}
         }
         g()
     }

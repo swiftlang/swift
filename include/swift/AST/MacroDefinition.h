@@ -112,7 +112,7 @@ public:
     return data.builtin;
   }
 
-  explicit operator bool() const { return kind != Kind::Invalid; }
+  operator Kind() const { return kind; }
 };
 
 }

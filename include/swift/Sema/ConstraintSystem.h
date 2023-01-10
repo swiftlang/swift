@@ -1798,6 +1798,9 @@ enum class ConstraintSystemFlags {
 
   /// When set, ignore async/sync mismatches
   IgnoreAsyncSyncMismatch = 0x80,
+
+  /// Disable macro expansions.
+  DisableMacroExpansions = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3987,7 +3990,8 @@ public:
   void addPackElementEnvironment(PackExpansionExpr *expr);
 
   /// Get the opened element generic environment for the given locator.
-  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator);
+  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
+                                                CanType shapeClass);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags

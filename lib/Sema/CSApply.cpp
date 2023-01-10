@@ -3818,11 +3818,16 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
+      simplifyExprType(expr);
+
+      // Set the opened pack element environment for this pack expansion.
+      auto expansionTy = cs.getType(expr)->castTo<PackExpansionType>();
       auto *locator = cs.getConstraintLocator(expr);
-      auto *environment = cs.getPackElementEnvironment(locator);
+      auto *environment = cs.getPackElementEnvironment(locator,
+          expansionTy->getCountType()->getCanonicalType());
       expr->setGenericEnvironment(environment);
 
-      return simplifyExprType(expr);
+      return expr;
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
@@ -5401,11 +5406,13 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
-        E->setRewritten(newExpr);
-        cs.cacheExprTypes(E);
+      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
+        if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
+          E->setRewritten(newExpr);
+        }
       }
 
+      cs.cacheExprTypes(E);
       return E;
     }
 
@@ -7119,8 +7126,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
     auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
-    auto patternType = packEnv->mapElementTypeIntoPackContext(
-        toElementType->mapTypeOutOfContext());
+    auto patternType = packEnv->mapElementTypeIntoPackContext(toElementType);
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 

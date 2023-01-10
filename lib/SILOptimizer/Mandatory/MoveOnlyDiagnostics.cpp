@@ -22,6 +22,13 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
+static llvm::cl::opt<bool> SilentlyEmitDiagnostics(
+    "move-only-diagnostics-silently-emit-diagnostics",
+    llvm::cl::desc(
+        "For testing purposes, emit the diagnostic silently so we can "
+        "filecheck the result of emitting an error from the move checkers"),
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -29,6 +36,10 @@ using namespace swift::siloptimizer;
 template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
+  // If for testing reasons we want to return that we emitted an error but not
+  // emit the actual error itself, return early.
+  if (SilentlyEmitDiagnostics)
+    return;
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -283,6 +294,21 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
   }
 
   if (isInOutEndOfFunction) {
+    if (auto *pbi = dyn_cast<ProjectBoxInst>(markedValue->getOperand())) {
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+        if (fArg->isClosureCapture()) {
+          diagnose(
+              astContext,
+              markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+              diag::
+                  sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
+              varName);
+          diagnose(astContext, violatingUse->getLoc().getSourceLoc(),
+                   diag::sil_moveonlychecker_consuming_use_here);
+          return;
+        }
+      }
+    }
     if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
       if (fArg->isClosureCapture()) {
         diagnose(

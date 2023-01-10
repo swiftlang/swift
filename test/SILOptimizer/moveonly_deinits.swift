@@ -36,7 +36,8 @@ enum MoveOnlyEnum {
         y = self // expected-note {{consuming use}}
         // We get an infinite recursion since we are going to call our own
         // deinit here. We are just testing diagnostics here though.
-        _ = y // expected-warning {{function call causes an infinite recursion}}
+        // expected-warning @-3 {{function call causes an infinite recursion}}
+        _ = y 
         globalMoveOnlyEnum = self // expected-note {{consuming use}}
     } // expected-note {{consuming use}}
 }
