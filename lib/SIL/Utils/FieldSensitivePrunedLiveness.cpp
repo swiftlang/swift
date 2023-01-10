@@ -781,7 +781,7 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
   LLVM_DEBUG(llvm::dbgs() << "Has multiple defs!\n");
 
   // Handle a live-out or live-within block with potentially multiple defs
-  // unsigned prevCount = boundary.getNumLastUsersAndDeadDefs(bitNo);
+  unsigned prevCount = boundary.getNumLastUsersAndDeadDefs(bitNo);
   bool isLive = isLiveOut;
   for (auto &inst : llvm::reverse(*block)) {
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << inst);
@@ -861,6 +861,7 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
                << "    Live at beginning of block! No dead args!\n");
   }
 
-  // assert(prevCount < boundary.getNumLastUsersAndDeadDefs(bitNo) &&
-  //        "findBoundariesInBlock must be called on a live block");
+  assert((isLiveOut ||
+          prevCount < boundary.getNumLastUsersAndDeadDefs(bitNo)) &&
+         "findBoundariesInBlock must be called on a live block");
 }
