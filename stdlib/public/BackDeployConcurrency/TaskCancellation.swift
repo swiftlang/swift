@@ -46,9 +46,14 @@ public func withTaskCancellationHandler<T>(
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
-
-  return try await operation()
+  do {
+    let result = try await operation()
+    _taskRemoveCancellationHandler(record: record)
+    return result
+  } catch {
+    _taskRemoveCancellationHandler(record: record)
+    throw error
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
