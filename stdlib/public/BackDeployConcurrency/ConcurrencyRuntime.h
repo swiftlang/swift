@@ -173,9 +173,6 @@ void swift_taskGroup_wait_next_throwing(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_initializeWithFlags(size_t flags, TaskGroup *group, const Metadata *T);
-
 /// Attach a child task to the parent task's task group record.
 ///
 /// This function MUST be called from the AsyncTask running the task group.
