@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 extension std.string {
+  /// Creates a C++ string having the same content as the given Swift string.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of UTF-8 code units in the
+  ///   Swift string.
   public init(_ string: String) {
     self.init()
     for char in string.utf8 {
@@ -26,6 +30,13 @@ extension std.string: ExpressibleByStringLiteral {
 }
 
 extension String {
+  /// Creates a String having the same content as the given C++ string.
+  ///
+  /// If `cxxString` contains ill-formed UTF-8 code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string.
   public init(cxxString: std.string) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxString.__c_strUnsafe(),
