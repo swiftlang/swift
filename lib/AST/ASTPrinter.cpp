@@ -2938,6 +2938,10 @@ static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
 
 static bool usesFeatureBuiltinUnprotectedAddressOf(Decl *) { return false; }
 
+static bool usesFeatureBuiltinCreateTaskGroupWithFlags(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
