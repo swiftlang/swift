@@ -40,6 +40,7 @@ extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
 
+  @inlinable
   public var pointee: Pointee {
     if let value = self {
       return value.pointee
@@ -47,6 +48,7 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
     fatalError("Could not dereference nullptr")
   }
 
+  @inlinable
   public func successor() -> Self {
     if let value = self {
       return value.successor()
