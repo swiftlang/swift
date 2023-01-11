@@ -189,7 +189,7 @@ bool useLegacyOptionalNilInjectionInCasting() {
 // by that protocol.
 bool useLegacyObjCBoxingInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
-  return true; // For now, continue using the legacy behavior on Apple OSes
+  return false; // For now, always use the new behavior on Apple OSes
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif
@@ -209,7 +209,7 @@ bool useLegacyObjCBoxingInCasting() {
 
 bool useLegacySwiftValueUnboxingInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
-  return true; // For now, continue using the legacy behavior on Apple OSes
+  return false; // For now, always use the new behavior on Apple OSes
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif
