@@ -585,10 +585,6 @@ public:
     : TaskGroupBase(T, TaskGroupStatus::initial().status),
       readyQueue() {}
 
-  AccumulatingTaskGroup(const AccumulatingTaskGroup &) = delete;
-
-  virtual ~AccumulatingTaskGroup() {}
-
   virtual void destroy() override;
 
   virtual bool isDiscardingResults() const override {
@@ -702,9 +698,6 @@ public:
   explicit DiscardingTaskGroup(const Metadata *T)
     : TaskGroupBase(T, TaskGroupStatus::initial().status),
       readyQueue() {}
-
-  DiscardingTaskGroup(const DiscardingTaskGroup &) = delete;
-  virtual ~DiscardingTaskGroup() {}
 
   virtual void destroy() override;
 
