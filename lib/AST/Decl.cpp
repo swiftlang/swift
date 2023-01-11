@@ -9713,6 +9713,8 @@ MacroContexts MacroDecl::getMacroContexts() const {
   MacroContexts contexts = None;
   if (getAttrs().hasAttribute<ExpressionAttr>())
     contexts |= MacroContext::Expression;
+  for (auto attr : getAttrs().getAttributes<DeclarationAttr>())
+    contexts |= attr->getMacroContext();
   return contexts;
 }
 

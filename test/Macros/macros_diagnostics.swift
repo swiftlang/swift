@@ -66,6 +66,11 @@ func overloaded1(_ p: Any) { }
 // expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
+@declaration(freestanding) macro unaryDeclMacro(_ x: String) // expected-note {{found this candidate}}
+// expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
+@declaration(freestanding) macro unaryDeclMacro(_ x: String, blah: Bool) // expected-note {{found this candidate}}
+// expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
+
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
   let s = #stringify<Int, Int>(a + b) // expected-error{{type of expression is ambiguous without more context}}
@@ -89,6 +94,15 @@ func testDiags(a: Int, b: Int) {
 
   overloaded1(a) // okay, calls the function
   #overloaded1(a) // expected-error{{argument type 'Int' does not conform to expected type 'P'}}
+
+//  #unaryDeclMacro("abc") // okay, declaration macro where both exprs and decls are allowed
+//  _ = #unaryDeclMacro("abc") // xpected-error {{no macro named 'unaryDeclMacro'}}
+//  (#unaryDeclMacro("abc"), 3) // xpected-error {{no macro named 'unaryDeclMacro'}}
+
+  struct Foo {
+    #unaryDeclMacro("abc", blah: false) // okay
+    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{no exact matches in reference to macro 'unaryDeclMacro'}}
+  }
 }
 
 func shadow(a: Int, b: Int, stringify: Int) {

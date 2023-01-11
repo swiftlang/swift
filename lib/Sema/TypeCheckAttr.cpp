@@ -160,6 +160,7 @@ public:
   IGNORED_ATTR(BackDeploy)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(Expression)
+  IGNORED_ATTR(Declaration)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

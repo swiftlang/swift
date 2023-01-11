@@ -428,8 +428,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     if (MED->getArgs() && doIt(MED->getArgs()))
       return true;
-    if (MED->getRewritten() && doIt(MED->getRewritten()))
-      return true;
+    for (auto *decl : MED->getRewritten())
+      if (doIt(decl))
+        return true;
     return false;
   }
 

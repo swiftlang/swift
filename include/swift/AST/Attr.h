@@ -33,6 +33,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
@@ -2299,6 +2300,40 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjCImplementation;
+  }
+};
+
+class DeclarationAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DeclarationAttr, MacroIntroducedDeclName> {
+  friend TrailingObjects;
+
+  MacroContext macroContext;
+  unsigned numPeerNames, numMemberNames;
+
+  DeclarationAttr(SourceLoc atLoc, SourceRange range, MacroContext macroContext,
+                  ArrayRef<MacroIntroducedDeclName> peerNames,
+                  ArrayRef<MacroIntroducedDeclName> memberNames,
+                  bool implicit);
+
+public:
+  static DeclarationAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                                 SourceRange range, MacroContext macroContext,
+                                 ArrayRef<MacroIntroducedDeclName> peerNames,
+                                 ArrayRef<MacroIntroducedDeclName> memberNames,
+                                 bool implicit);
+
+  size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
+    return numPeerNames + numMemberNames;
+  }
+
+  MacroContext getMacroContext() const { return macroContext; }
+  ArrayRef<MacroIntroducedDeclName> getPeerAndMemberNames() const;
+  ArrayRef<MacroIntroducedDeclName> getPeerNames() const;
+  ArrayRef<MacroIntroducedDeclName> getMemberNames() const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Declaration;
   }
 };
 

@@ -6780,6 +6780,8 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
+ERROR(expected_macro_expansion_decls,PointsToFirstBadToken,
+      "expected macro expansion to produce declarations", ())
 ERROR(macro_undefined,PointsToFirstBadToken,
       "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
@@ -6836,6 +6838,8 @@ ERROR(macro_definition_unsupported,none,
 ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
       "the external macro's %select{module|type}", (unsigned))
+ERROR(attached_declaration_macro_not_supported,none,
+      "attached declaration macros are not yet supported", ())
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

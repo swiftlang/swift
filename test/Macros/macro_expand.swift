@@ -99,3 +99,48 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
 func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
 }
+
+@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+// Test overload
+@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+// FIXME: Declaration macro expansions in BraceStmt don't work yet.
+//#bitwidthNumberedStructs("MyIntGlobal")
+
+func testFreestandingMacroExpansion() {
+  // Explicit structs to force macros to be parsed as decl.
+  struct Foo {
+    #bitwidthNumberedStructs("MyIntOne")
+  }
+  // CHECK: MyIntOne8
+  print(Foo.MyIntOne8.self)
+  // CHECK: MyIntOne16
+  print(Foo.MyIntOne16.self)
+  // CHECK: MyIntOne32
+  print(Foo.MyIntOne32.self)
+  // CHECK: MyIntOne64
+  print(Foo.MyIntOne64.self)
+
+  struct Foo2 {
+    #bitwidthNumberedStructs("MyIntTwo", blah: false)
+  }
+  // CHECK: MyIntTwo8
+  print(Foo2.MyIntTwo8.self)
+  // CHECK: MyIntTwo16
+  print(Foo2.MyIntTwo16.self)
+  // CHECK: MyIntTwo32
+  print(Foo2.MyIntTwo32.self)
+  // CHECK: MyIntTwo64
+  print(Foo2.MyIntTwo64.self)
+
+  // FIXME: Declaration macro expansions in BraceStmt don't work yet.
+//  HECK: MyIntGlobal8
+//  print(MyIntGlobal8.self)
+//  HECK: MyIntGlobal16
+//  print(MyIntGlobal16.self)
+//  HECK: MyIntGlobal32
+//  print(MyIntGlobal32.self)
+//  HECK: MyIntGlobal64
+//  print(MyIntGlobal64.self)
+}
+testFreestandingMacroExpansion()
