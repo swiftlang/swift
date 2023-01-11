@@ -1,5 +1,8 @@
 // RUN: %target-swift-emit-sil -verify -enable-experimental-move-only %s
 
+// rdar://104107922
+// REQUIRES: rdar104107922
+
 //////////////////
 // Declarations //
 //////////////////
