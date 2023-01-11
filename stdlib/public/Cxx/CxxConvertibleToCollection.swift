@@ -37,10 +37,11 @@ internal func forEachElement<C: CxxConvertibleToCollection>(
   }
 }
 
-extension Array {
-  /// Creates an array containing the elements of a C++ container.
+extension RangeReplaceableCollection {
+  /// Creates a collection containing the elements of a C++ container.
   ///
-  /// This initializes the array by copying every element of the C++ container.
+  /// This initializes the collection by copying every element of the C++
+  /// container.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
   ///   container when each element is copied in O(1). Note that this might not
