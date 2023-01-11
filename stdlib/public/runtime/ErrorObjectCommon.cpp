@@ -24,6 +24,7 @@
 
 using namespace swift;
 
+SWIFT_RUNTIME_EXPORT
 std::atomic<void (*)(SwiftError *error)> swift::_swift_willThrow;
 
 void swift::_swift_setWillThrowHandler(void (* handler)(SwiftError *error)) {
