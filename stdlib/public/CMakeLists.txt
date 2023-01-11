@@ -146,6 +146,10 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(StringProcessing)
     add_subdirectory(RegexBuilder)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+    add_subdirectory(Reflection)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

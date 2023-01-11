@@ -1,4 +1,0 @@
-module CRuntime {
-  header "Functions.h"
-  export *
-}

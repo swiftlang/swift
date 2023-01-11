@@ -10,7 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import CRuntime
+import _SwiftRuntimeShims
 
 @available(SwiftStdlib 9999, *)
 @frozen
