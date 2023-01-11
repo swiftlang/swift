@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 732; // deserialization safety
+const uint16_t SWIFTMODULE_VERSION_MINOR = 734; // @declaration
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -604,6 +604,27 @@ enum class GenericEnvironmentKind : uint8_t {
   OpenedExistential,
   OpenedElement
 };
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class MacroContext : uint8_t {
+  Expression,
+  FreestandingDeclaration,
+  AttachedDeclaration,
+};
+using MacroContextField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class MacroIntroducedDeclNameKind : uint8_t {
+  Named = 0,
+  Overloaded,
+  Accessors,
+  Prefixed,
+  Suffixed,
+  Arbitrary,
+};
+using MacroIntroducedDeclNameKindField = BCFixed<4>;
 
 // Encodes a VersionTuple:
 //
@@ -2191,6 +2212,15 @@ namespace decls_block {
     IdentifierIDField,  // metadata text
     BCFixed<1>,         // has visibility
     AccessLevelField    // visibility
+  >;
+
+  using DeclarationDeclAttrLayout = BCRecordLayout<
+    Declaration_DECL_ATTR,
+    BCFixed<1>,                // implicit flag
+    MacroContextField,         // macro context
+    BCVBR<5>,                  // number of peer names
+    BCVBR<5>,                  // number of member names
+    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

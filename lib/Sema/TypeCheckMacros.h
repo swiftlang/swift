@@ -22,6 +22,7 @@
 namespace swift {
 
 class Expr;
+class MacroExpansionDecl;
 class TypeRepr;
 
 /// Expands the given macro expression and type-check the result with
@@ -31,6 +32,13 @@ class TypeRepr;
 // macro could not be expanded.
 Expr *expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType);
+
+/// Expands the given macro expansion declaration, type-checks the replacement
+/// declarations, and adds them to \p results.
+///
+/// \returns true if expansion succeeded, false if failed.
+bool expandFreestandingDeclarationMacro(
+    MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results);
 
 } // end namespace swift
 

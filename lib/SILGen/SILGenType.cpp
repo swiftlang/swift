@@ -1235,9 +1235,8 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 
@@ -1410,9 +1409,8 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 

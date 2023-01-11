@@ -907,6 +907,11 @@ DECL_MODIFIER_KINDS = [
                         OnMacro,
                         ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
                         code=140),
+
+    DeclAttribute('declaration', 'Declaration',
+                  OnMacro, AllowMultipleAttributes,
+                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
+                  code=141),
 ]
 
 DEPRECATED_MODIFIER_KINDS = [

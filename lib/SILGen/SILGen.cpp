@@ -1806,9 +1806,8 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 }
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
-  auto *rewritten = d->getRewritten();
-  assert(rewritten && "Macro must have been rewritten in SILGen");
-  visit(rewritten);
+  // Expanded declaration macros were already added to the parent decl context
+  // for name lookup to work. Nothing to be done here.
 }
 
 bool

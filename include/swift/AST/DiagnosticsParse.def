@@ -2009,6 +2009,9 @@ ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
 ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal declaration", ())
 
+ERROR(declaration_attr_expected_kind,PointsToFirstBadToken,
+      "expected a declaration macro kind ('freestanding' or 'attached')", ())
+
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())
 ERROR(parser_new_parser_errors,none,

@@ -110,8 +110,8 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
 @usableFromInline
 func evaluateMacro(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
-  macroPtr: UnsafeMutablePointer<UInt8>,
-  sourceFilePtr: UnsafePointer<UInt8>,
+  macroPtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
   expandedSourceLength: UnsafeMutablePointer<Int>
@@ -125,79 +125,93 @@ func evaluateMacro(
     return -1
   }
 
-  return sourceFilePtr.withMemoryRebound(
-    to: ExportedSourceFile.self, capacity: 1
-  ) { (sourceFile: UnsafePointer<ExportedSourceFile>) -> Int in
-    // Find the offset.
-    let buffer = sourceFile.pointee.buffer
-    let offset = sourceLocationPtr - buffer.baseAddress!
-    if offset < 0 || offset >= buffer.count {
-      print("source location isn't inside this buffer")
-      return -1
-    }
-
-    let sf = sourceFile.pointee.syntax
-    guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
-      print("couldn't find token at offset \(offset)")
-      return -1
-    }
-
-    guard let parentSyntax = token.parent,
-          let parentExpansion = parentSyntax.as(MacroExpansionExprSyntax.self)
-    else {
-      print("not on a macro expansion node: \(token.recursiveDescription)")
-      return -1
-    }
-
-    var context = MacroExpansionContext(
-      moduleName: sourceFile.pointee.moduleName,
-      fileName: sourceFile.pointee.fileName.withoutPath()
-    )
-
-    let evaluatedSyntax: ExprSyntax = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
-      guard let exprMacro = macro.pointee.macro as? ExpressionMacro.Type else {
-        print("not an expression macro")
-        return ExprSyntax(parentExpansion)
-      }
-
-      do {
-        return try exprMacro.expansion(of: parentExpansion, in: &context)
-      } catch {
-        // Record the error
-        context.diagnose(
-          Diagnostic(
-            node: Syntax(parentExpansion),
-            message: ThrownErrorDiagnostic(message: String(describing: error))
-          )
-        )
-
-        return ExprSyntax(parentExpansion)
-      }
-    }
-
-    // Emit diagnostics accumulated in the context.
-    let macroName = parentExpansion.macro.withoutTrivia().description
-    for diag in context.diagnostics {
-      emitDiagnostic(
-        diagEnginePtr: diagEnginePtr,
-        sourceFileBuffer: .init(mutating: sourceFile.pointee.buffer),
-        diagnostic: diag,
-        messageSuffix: " (from macro '\(macroName)')"
-      )
-    }
-
-    var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
-    evaluatedSyntaxStr.withUTF8 { utf8 in
-      let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
-      if let baseAddress = utf8.baseAddress {
-        evaluatedResultPtr.initialize(from: baseAddress, count: utf8.count)
-      }
-      evaluatedResultPtr[utf8.count] = 0
-
-      expandedSourcePointer.pointee = UnsafePointer(evaluatedResultPtr)
-      expandedSourceLength.pointee = utf8.count
-    }
-
-    return 0
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+  // Find the offset.
+  let buffer = sourceFilePtr.pointee.buffer
+  let offset = sourceLocationPtr - buffer.baseAddress!
+  if offset < 0 || offset >= buffer.count {
+    print("source location isn't inside this buffer")
+    return -1
   }
+
+  let sf = sourceFilePtr.pointee.syntax
+  guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
+    print("couldn't find token at offset \(offset)")
+    return -1
+  }
+
+  var context = MacroExpansionContext(
+    moduleName: sourceFilePtr.pointee.moduleName,
+    fileName: sourceFilePtr.pointee.fileName.withoutPath()
+  )
+
+  guard let parentSyntax = token.parent else {
+    print("not on a macro expansion node: \(token.recursiveDescription)")
+    return -1
+  }
+
+  let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
+
+  let macroName: String
+  let evaluatedSyntax: Syntax
+  do {
+    switch macroPtr.pointee.macro {
+    // Handle expression macro.
+    case let exprMacro as ExpressionMacro.Type:
+      guard let parentExpansion = parentSyntax.as(MacroExpansionExprSyntax.self) else {
+        print("not on a macro expansion node: \(token.recursiveDescription)")
+        return -1
+      }
+      macroName = parentExpansion.macro.withoutTrivia().description
+      evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
+
+    // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
+    case let declMacro as FreestandingDeclarationMacro.Type:
+      guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
+        print("not on a macro expansion node: \(token.recursiveDescription)")
+        return -1
+      }
+      let decls = try declMacro.expansion(of: parentExpansion, in: &context)
+      macroName = parentExpansion.macro.withoutTrivia().description
+      evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
+        decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
+
+    default:
+      print("not an expression macro or a freestanding declaration macro")
+      return -1
+    }
+  } catch {
+    // Record the error
+    context.diagnose(
+      Diagnostic(
+        node: parentSyntax,
+        message: ThrownErrorDiagnostic(message: String(describing: error))
+      )
+    )
+    return -1
+  }
+
+  // Emit diagnostics accumulated in the context.
+  for diag in context.diagnostics {
+    emitDiagnostic(
+      diagEnginePtr: diagEnginePtr,
+      sourceFileBuffer: .init(mutating: sourceFilePtr.pointee.buffer),
+      diagnostic: diag,
+      messageSuffix: " (from macro '\(macroName)')"
+    )
+  }
+
+  var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
+  evaluatedSyntaxStr.withUTF8 { utf8 in
+    let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
+    if let baseAddress = utf8.baseAddress {
+      evaluatedResultPtr.initialize(from: baseAddress, count: utf8.count)
+    }
+    evaluatedResultPtr[utf8.count] = 0
+
+    expandedSourcePointer.pointee = UnsafePointer(evaluatedResultPtr)
+    expandedSourceLength.pointee = utf8.count
+  }
+
+  return 0
 }
