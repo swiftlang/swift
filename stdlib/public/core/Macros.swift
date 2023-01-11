@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if hasAttribute(expression)
+#if compiler(>=5.8) && hasAttribute(expression)
 /// Specifies the module and type name for an externally-defined macro, which
 /// must conform to the appropriate set of `Macro` protocols.
 ///
