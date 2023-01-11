@@ -177,7 +177,7 @@ public:
       Value = TypeLookupError("unknown error");
   }
 
-  TypeLookupErrorOr(const TypeLookupError &te) : Value(te) {}
+  TypeLookupErrorOr(TypeLookupError &te) : Value(te) {}
 
   T getType() {
     if (auto *ptr = Value.template dyn_cast<T>())
