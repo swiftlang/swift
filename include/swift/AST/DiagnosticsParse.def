@@ -890,6 +890,10 @@ ERROR(deprecated_protocol_composition_single,none,
 ERROR(deprecated_any_composition,none,
       "'protocol<>' syntax has been removed; use 'Any' instead", ())
 
+// Pack Types
+ERROR(expected_rbrace_pack_type_list,none,
+      "expected '}' at end of pack type list", ())
+
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,
       "expected 'var' or 'let' to introduce SIL box field type", ())

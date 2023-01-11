@@ -2008,6 +2008,13 @@ bool Traversal::visitVarargTypeRepr(VarargTypeRepr *T) {
   return doIt(T->getElementType());
 }
 
+bool Traversal::visitPackTypeRepr(PackTypeRepr *T) {
+  for (auto &elem : T->getMutableElements())
+    if (doIt(elem))
+      return true;
+  return false;
+}
+
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
 }
