@@ -578,8 +578,15 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
         boundary.deadDefs.push_back(deadArg);
       }
     }
+    if (auto *predBB = block->getSinglePredecessorBlock()) {
+      if (getBlockLiveness(predBB) == PrunedLiveBlocks::LiveOut) {
+        boundary.boundaryEdges.push_back(block);
+      }
+    }
   }
-  assert(prevCount < boundary.deadDefs.size() + boundary.lastUsers.size()
+  // All live-within blocks must contain a boundary.
+  assert(isLiveOut
+         || (prevCount < boundary.deadDefs.size() + boundary.lastUsers.size())
          && "findBoundariesInBlock must be called on a live block");
 }
 
