@@ -113,6 +113,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskStatus.cpp
   TaskGroup.cpp
   TaskGroup.swift
+  DiscardingTaskGroup.swift
   TaskLocal.cpp
   TaskLocal.swift
   TaskSleep.swift

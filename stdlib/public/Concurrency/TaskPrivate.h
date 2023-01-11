@@ -39,11 +39,13 @@ namespace swift {
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 1
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                              \
           (unsigned long)Thread::current().platformThreadId(), __FILE__,       \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
 
@@ -133,6 +135,12 @@ namespace {
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
+///   @_silgen_name("swift_taskGroup_waitAll")
+///   func _taskGroupWaitAll<T>(
+///     group: Builtin.RawPointer,
+///     bodyError: Swift.Error?
+///   ) async throws -> T?
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:

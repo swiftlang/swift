@@ -2655,6 +2655,9 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
 
+    if (name.equals("swift_taskGroup_waitAll"))
+      return SpecialKind::TaskGroupWaitAll;
+
     if (name.equals("swift_distributed_execute_target"))
       return SpecialKind::DistributedExecuteTarget;
   }
