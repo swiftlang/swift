@@ -2212,6 +2212,36 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
+static uint8_t getRawStableMacroContext(swift::MacroContext context) {
+  switch (context) {
+#define CASE(NAME) \
+  case swift::MacroContext::NAME: \
+    return static_cast<uint8_t>(serialization::MacroContext::NAME);
+  CASE(Expression)
+  CASE(FreestandingDeclaration)
+  CASE(AttachedDeclaration)
+  }
+#undef CASE
+  llvm_unreachable("bad result declaration macro kind");
+  }
+
+static uint8_t getRawStableMacroIntroducedDeclNameKind(
+    swift::MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(NAME) \
+  case swift::MacroIntroducedDeclNameKind::NAME: \
+    return static_cast<uint8_t>(serialization::MacroIntroducedDeclNameKind::NAME);
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Accessors)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+  }
+#undef CASE
+  llvm_unreachable("bad result macro-introduced decl name kind");
+}
+
 #ifndef NDEBUG
 // This is done with a macro so that we get a slightly more useful assertion.
 # define DECL(KIND, PARENT)\
@@ -2944,6 +2974,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
+
+    case DAK_Declaration: {
+      auto *theAttr = cast<DeclarationAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[DeclarationDeclAttrLayout::Code];
+      auto rawMacroContext =
+          getRawStableMacroContext(theAttr->getMacroContext());
+      SmallVector<IdentifierID, 4> introducedDeclNames;
+      for (auto name : theAttr->getPeerAndMemberNames()) {
+        introducedDeclNames.push_back(IdentifierID(
+            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
+        introducedDeclNames.push_back(
+            S.addDeclBaseNameRef(name.getIdentifier()));
+      }
+
+      DeclarationDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          rawMacroContext, theAttr->getPeerNames().size(),
+          theAttr->getMemberNames().size(), introducedDeclNames);
       return;
     }
     }
