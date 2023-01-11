@@ -162,6 +162,7 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
   case SpecialKind::AsyncLetGetThrowing:
   case SpecialKind::AsyncLetFinish:
   case SpecialKind::TaskGroupWaitNext:
+  case SpecialKind::TaskGroupWaitAll:
   case SpecialKind::DistributedExecuteTarget:
     // The current guarantee for all of these functions is the same.
     // See TaskFutureWaitAsyncContext.
