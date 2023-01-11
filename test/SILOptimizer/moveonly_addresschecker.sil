@@ -1,5 +1,9 @@
 // RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-sil-verify-all %s | %FileCheck %s
 
+// rdar://104107922
+// REQUIRES: rdar104107922
+
+
 sil_stage raw
 
 import Swift
