@@ -585,7 +585,7 @@ bool swift::expandFreestandingDeclarationMacro(
     break;
 #else
     med->diagnose(diag::macro_unsupported);
-    return nullptr;
+    return false;
 #endif
   }
   }
