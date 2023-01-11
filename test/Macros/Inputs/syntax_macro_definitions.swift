@@ -36,7 +36,7 @@ public struct FileIDMacro: ExpressionMacro {
   public static func expansion(
     of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
-    let fileLiteral: ExprSyntax = #""\#(context.moduleName)/\#(context.fileName)""#
+    let fileLiteral: ExprSyntax = #""\#(raw: context.moduleName)/\#(raw: context.fileName)""#
     if let leadingTrivia = macro.leadingTrivia {
       return fileLiteral.withLeadingTrivia(leadingTrivia)
     }
@@ -82,9 +82,9 @@ public enum AddBlocker: ExpressionMacro {
     }
 
     // Link the folded argument back into the tree.
-    var node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
+    let node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
 
-   class AddVisitor: SyntaxRewriter {
+    class AddVisitor: SyntaxRewriter {
       var diagnostics: [Diagnostic] = []
 
       override func visit(
@@ -117,7 +117,7 @@ public enum AddBlocker: ExpressionMacro {
                         oldNode: Syntax(binOp.operatorToken.withoutTrivia()),
                         newNode: Syntax(
                           TokenSyntax(
-                            .spacedBinaryOperator("-"),
+                            .binaryOperator("-"),
                             presence: .present
                           )
                         )
@@ -132,7 +132,7 @@ public enum AddBlocker: ExpressionMacro {
               node.withOperatorOperand(
                 ExprSyntax(
                   binOp.withOperatorToken(
-                    binOp.operatorToken.withKind(.spacedBinaryOperator("-"))
+                    binOp.operatorToken.withKind(.binaryOperator("-"))
                   )
                 )
               )
