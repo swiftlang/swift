@@ -301,13 +301,16 @@ namespace swift {
     /// @{ Type parsing.
     bool parseASTType(CanType &result,
                       GenericSignature genericSig=GenericSignature(),
-                      GenericParamList *genericParams=nullptr);
+                      GenericParamList *genericParams=nullptr,
+                      bool forceContextualType = false);
     bool parseASTType(CanType &result,
                       SourceLoc &TypeLoc,
                       GenericSignature genericSig=GenericSignature(),
-                      GenericParamList *genericParams=nullptr) {
+                      GenericParamList *genericParams=nullptr,
+                      bool forceContextualType = false) {
       TypeLoc = P.Tok.getLoc();
-      return parseASTType(result, genericSig, genericParams);
+      return parseASTType(result, genericSig, genericParams,
+                          forceContextualType);
     }
 
     Optional<StringRef> parseOptionalAttribute(ArrayRef<StringRef> expected) {
@@ -1295,11 +1298,16 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
 
 bool SILParser::parseASTType(CanType &result,
                              GenericSignature genericSig,
-                             GenericParamList *genericParams) {
+                             GenericParamList *genericParams,
+                             bool forceContextualType) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
 
-  bool wantContextualType = false;
+  // If we weren't given a specific generic context to resolve the type
+  // within, use the contextual generic parameters and always produce
+  // a contextual type.  Otherwise, produce a contextual type only if
+  // we were asked for one.
+  bool wantContextualType = forceContextualType;
   if (!genericSig) {
     genericSig = ContextGenericSig;
     wantContextualType = true;
@@ -3278,6 +3286,77 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     ResultVal =
         B.createOpenExistentialValue(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+  case SILInstructionKind::OpenPackElementInst: {
+    if (parseValueRef(Val, SILType::getPackIndexType(P.Context), InstLoc, B) ||
+        parseVerbatim("of"))
+      return true;
+
+    // Parse the generic parameters for the environment being opened.
+    // This does not include the opened generic parameters.
+    GenericParamList *openedGenerics; {
+      if (!P.startsWithLess(P.Tok)) {
+        P.diagnose(P.Tok, diag::expected_generic_signature);
+        return true;
+      }
+      openedGenerics = P.maybeParseGenericParams().getPtrOrNull();
+      if (!openedGenerics)
+        return true;
+    }
+
+    // Resolve a generic signature from those parameters.
+    auto openedGenericsSig = handleSILGenericParams(openedGenerics, &P.SF);
+    if (!openedGenericsSig) return true;
+
+    // Parse the substitutions for the environment being opened.
+    SubstitutionMap openedSubMap; {
+      if (parseVerbatim("at"))
+        return true;
+
+      // The substitutions are not contextual within the signature
+      // we just parsed.
+      SmallVector<ParsedSubstitution> parsedOpenedSubs;
+      if (parseSubstitutions(parsedOpenedSubs))
+        return true;
+
+      // We do need those substitutions to resolve a SubstitutionMap,
+      // though.
+      openedSubMap =
+        getApplySubstitutionsFromParsed(*this, openedGenericsSig,
+                                        parsedOpenedSubs);
+      if (!openedSubMap)
+        return true;
+    }
+
+    // Parse the shape class that should be opened.  This is a contextual
+    // type within the signature we just parsed.
+    CanType shapeClass;
+    if (!P.consumeIf(tok::comma) ||
+        parseVerbatim("shape") ||
+        P.parseToken(tok::sil_dollar,
+                     diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(shapeClass, openedGenericsSig, openedGenerics,
+                     /*wantContextualType*/ true))
+      return true;
+
+    // Parse the UUID for the opening.
+    UUID uuid;
+    if (!P.consumeIf(tok::comma) ||
+        parseVerbatim("uuid") ||
+        P.parseUUIDString(uuid, diag::sil_expected_uuid))
+      return true;
+
+    // Build the opened-element signature, which adds the parameters for
+    // the opened elements to the signature we parsed above.
+    auto openedElementSig =
+      P.Context.getOpenedElementSignature(
+        openedGenericsSig.getCanonicalSignature(), shapeClass);
+
+    auto openedEnv = GenericEnvironment::forOpenedElement(openedElementSig,
+                         uuid, shapeClass, openedSubMap);
+
+    ResultVal = B.createOpenPackElement(InstLoc, Val, openedEnv);
     break;
   }
 

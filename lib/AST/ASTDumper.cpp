@@ -3174,6 +3174,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPackTypeRepr(PackTypeRepr *T) {
+    printCommon("pack") << '\n';
+    for (auto elt : T->getElements())
+      printRec(elt);
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
     printCommon("pack_expansion") << '\n';
     printRec(T->getPatternType());

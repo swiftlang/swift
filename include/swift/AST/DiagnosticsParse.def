@@ -673,6 +673,10 @@ ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
       "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
+ERROR(expected_generic_signature,none,
+      "expected a generic signature", ())
+ERROR(sil_expected_uuid,none,
+      "expected a UUID string literal", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -889,6 +893,10 @@ ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,
       "'protocol<>' syntax has been removed; use 'Any' instead", ())
+
+// Pack Types
+ERROR(expected_rbrace_pack_type_list,none,
+      "expected '}' at end of pack type list", ())
 
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,

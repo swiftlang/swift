@@ -645,6 +645,8 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
   SIMPLE_PRINTER(ValueOwnershipKind)
+  SIMPLE_PRINTER(UUID)
+  SIMPLE_PRINTER(GenericSignature)
 #undef SIMPLE_PRINTER
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
@@ -2276,6 +2278,16 @@ public:
   }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
+  }
+  void visitOpenPackElementInst(OpenPackElementInst *OPEI) {
+    auto env = OPEI->getOpenedGenericEnvironment();
+    auto subs = env->getPackElementContextSubstitutions();
+    *this << Ctx.getID(OPEI->getIndexOperand())
+          << " of " << subs.getGenericSignature()
+          << " at ";
+    printSubstitutions(subs);
+    *this << ", shape $" << env->getOpenedElementShapeClass()
+          << ", uuid \"" << env->getOpenedElementUUID() << "\"";
   }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     *this << getIDAndType(PBSI->getOperand());
