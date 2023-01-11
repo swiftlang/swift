@@ -74,7 +74,7 @@ public func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
     discardResults: true
   )
@@ -378,7 +378,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
       discardResults: true
   )
