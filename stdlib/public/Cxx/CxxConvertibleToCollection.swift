@@ -21,19 +21,17 @@ public protocol CxxConvertibleToCollection {
   mutating func __endUnsafe() -> RawIterator
 }
 
-@inlinable @inline(__always)
-internal func forEachElement<C: CxxConvertibleToCollection>(
-  of c: C,
-  body: (C.RawIterator.Pointee) -> Void
-) {
-  var mutableC = c
-  withExtendedLifetime(mutableC) {
-    var rawIterator = mutableC.__beginUnsafe()
-    let endIterator = mutableC.__endUnsafe()
+extension CxxConvertibleToCollection {
+  @inlinable
+  internal func forEach(_ body: (RawIterator.Pointee) -> Void) {
+    var mutableSelf = self
+    var rawIterator = mutableSelf.__beginUnsafe()
+    let endIterator = mutableSelf.__endUnsafe()
     while rawIterator != endIterator {
       body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
     }
+    withExtendedLifetime(mutableSelf) {}
   }
 }
 
@@ -51,7 +49,7 @@ extension RangeReplaceableCollection {
     where C.RawIterator.Pointee == Element {
 
     self.init()
-    forEachElement(of: c) { self.append($0) }
+    c.forEach { self.append($0) }
   }
 }
 
@@ -68,6 +66,6 @@ extension Set {
     where C.RawIterator.Pointee == Element {
 
     self.init()
-    forEachElement(of: c) { self.insert($0) }
+    c.forEach { self.insert($0) }
   }
 }
