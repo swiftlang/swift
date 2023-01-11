@@ -86,6 +86,7 @@ public:
     bool isStatic = false;
     bool isInline = false;
     bool isConst = false;
+    bool isNoexcept = false;
 
     FunctionSignatureModifiers() {}
   };

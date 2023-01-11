@@ -903,6 +903,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   os << ')';
   if (modifiers.isConst)
     os << " const";
+  if (modifiers.isNoexcept)
+    os << " noexcept";
   return resultingRepresentation;
 }
 
