@@ -275,10 +275,6 @@ OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, const Metadata *T), (group, T))
 
-OVERRIDE_TASK_GROUP(taskGroup_initializeWithFlags, void,
-                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, (size_t flags, TaskGroup *group, const Metadata *T), (flags, group, T))
-
 OVERRIDE_TASK_STATUS(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, AsyncTask *child),
@@ -316,17 +312,6 @@ OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     swift::, (TaskGroup *group, bool unconditionally),
                     (group, unconditionally))
 
-OVERRIDE_TASK_GROUP(taskGroup_waitAll, void,
-                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
-                    swift::,
-                    (OpaqueValue *resultPointer,
-                        SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-                        TaskGroup *_group,
-                        SwiftError *bodyError,
-                        ThrowingTaskFutureWaitContinuationFunction *resumeFn,
-                        AsyncContext *callContext),
-                    (resultPointer, callerContext, _group, bodyError,
-                        resumeFn, callContext))
 
 OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,

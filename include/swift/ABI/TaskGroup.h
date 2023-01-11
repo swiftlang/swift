@@ -54,14 +54,6 @@ public:
 
   // Provide accessor for task group's status record
   TaskGroupTaskStatusRecord *getTaskRecord();
-
-  /// The group is a `TaskGroup` that accumulates results.
-  bool isAccumulatingResults() {
-    return !isDiscardingResults();
-  }
-
-  /// The group is a `DiscardingTaskGroup` that discards results.
-  bool isDiscardingResults();
 };
 
 } // end namespace swift

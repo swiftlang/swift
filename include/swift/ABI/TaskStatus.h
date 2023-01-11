@@ -45,16 +45,13 @@ public:
   TaskStatusRecord(TaskStatusRecordKind kind,
                    TaskStatusRecord *parent = nullptr)
       : Flags(kind) {
-    getKind();
     resetParent(parent);
   }
 
   TaskStatusRecord(const TaskStatusRecord &) = delete;
   TaskStatusRecord &operator=(const TaskStatusRecord &) = delete;
 
-  TaskStatusRecordKind getKind() const {
-    return Flags.getKind();
-  }
+  TaskStatusRecordKind getKind() const { return Flags.getKind(); }
 
   TaskStatusRecord *getParent() const { return Parent; }
 
@@ -175,14 +172,15 @@ public:
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
-public:
   AsyncTask *FirstChild;
   AsyncTask *LastChild;
 
+public:
   TaskGroupTaskStatusRecord()
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(nullptr),
-        LastChild(nullptr) {}
+        LastChild(nullptr) {
+  }
 
   TaskGroupTaskStatusRecord(AsyncTask *child)
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
@@ -191,8 +189,7 @@ public:
     assert(!LastChild || !LastChild->childFragment()->getNextChild());
   }
 
-  /// Get the task group this record is associated with.
-  TaskGroup *getGroup();
+  TaskGroup *getGroup() { return reinterpret_cast<TaskGroup *>(this); }
 
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy

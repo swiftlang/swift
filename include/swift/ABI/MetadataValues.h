@@ -2383,24 +2383,6 @@ enum class TaskOptionRecordKind : uint8_t {
   RunInline = UINT8_MAX,
 };
 
-/// Flags for TaskGroup.
-class TaskGroupFlags : public FlagSet<uint32_t> {
-public:
-  enum {
-    // 8 bits are reserved for future use
-    /// Request the TaskGroup to immediately release completed tasks,
-    /// and not store their results. This also effectively disables `next()`.
-    TaskGroup_DiscardResults = 8,
-  };
-
-  explicit TaskGroupFlags(uint32_t bits) : FlagSet(bits) {}
-  constexpr TaskGroupFlags() {}
-
-  FLAGSET_DEFINE_FLAG_ACCESSORS(TaskGroup_DiscardResults,
-                                isDiscardResults,
-                                setIsDiscardResults)
-};
-
 /// Flags for cancellation records.
 class TaskStatusRecordFlags : public FlagSet<size_t> {
 public:

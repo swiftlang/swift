@@ -451,8 +451,8 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
   return reinterpret_cast<TaskGroup*>(group);
 }
 
-TaskGroupTaskStatusRecord *TaskGroup::getTaskRecord() {
-  return asImpl(this)->getTaskRecord();
+TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
+    return asImpl(this)->getTaskRecord();
 }
 
 // =============================================================================
@@ -561,6 +561,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
+  SWIFT_TASK_DEBUG_LOG("offer task %p to group %p", completedTask, this);
 
   mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
@@ -714,12 +715,12 @@ static void swift_taskGroup_wait_next_throwingImpl(
     SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
                          group, waitingTask, polled.retainedTask);
     fillGroupNextResult(context, polled);
-
     if (auto completedTask = polled.retainedTask) {
       // it would be null for PollStatus::Empty, then we don't need to release
       group->detachChild(polled.retainedTask);
       swift_release(polled.retainedTask);
     }
+
     return waitingTask->runInFullyEstablishedContext();
   }
 }
@@ -840,7 +841,6 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
 // =============================================================================
 // ==== isEmpty ----------------------------------------------------------------
-
 SWIFT_CC(swift)
 static bool swift_taskGroup_isEmptyImpl(TaskGroup *group) {
   return asImpl(group)->isEmpty();

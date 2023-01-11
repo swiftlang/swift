@@ -271,8 +271,7 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
-                                        SubstitutionMap subs,
-                                        llvm::Value *groupFlags) {
+                                        SubstitutionMap subs) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
   auto group = IGF.Builder.CreateBitCast(address.getAddress(),
@@ -283,14 +282,9 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
-  llvm::CallInst *call;
-  if (groupFlags) {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
-                                  {groupFlags, group, resultTypeMetadata});
-  } else {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                                  {group, resultTypeMetadata});
-  }
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                             {group, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
