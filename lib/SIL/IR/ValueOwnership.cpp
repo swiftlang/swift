@@ -154,6 +154,7 @@ CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
+CONSTANT_OWNERSHIP_INST(None, OpenPackElement)
 
 #undef CONSTANT_OWNERSHIP_INST
 

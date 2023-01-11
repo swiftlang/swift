@@ -1427,6 +1427,9 @@ public:
     if (auto *baResult = isaResultOf<BeginApplyInst>(value))
       return baResult->isBeginApplyToken();
 
+    if (isa<OpenPackElementInst>(value))
+      return true;
+
     // Add more token cases here as they arise.
 
     return false;

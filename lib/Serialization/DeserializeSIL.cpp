@@ -1363,6 +1363,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
+  case SILInstructionKind::OpenPackElementInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
+    auto index = getLocalValue(ValID,
+        getSILType(MF->getType(TyID), (SILValueCategory) TyCategory, Fn));
+    auto env = MF->getGenericEnvironmentChecked(Attr);
+    if (!env) MF->fatal(env.takeError());
+    ResultInst = Builder.createOpenPackElement(Loc, index, *env);
+    break;
+  }
 
 #define ONEOPERAND_ONETYPE_INST(ID)                                            \
   case SILInstructionKind::ID##Inst:                                           \
