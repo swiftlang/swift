@@ -131,8 +131,18 @@ UUID GenericEnvironment::getOpenedElementUUID() const {
   return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
 }
 
-void GenericEnvironment::getPackElementBindings(
-    SmallVectorImpl<PackElementBinding> &bindings) const {
+void GenericEnvironment::forEachPackElementArchetype(
+          llvm::function_ref<void(ElementArchetypeType *)> function) const {
+  auto packElements = getGenericSignature().getInnermostGenericParams();
+  for (auto eltInterfaceType: packElements) {
+    auto *elementArchetype =
+      mapTypeIntoContext(eltInterfaceType)->castTo<ElementArchetypeType>();
+    function(elementArchetype);
+  }
+}
+
+void GenericEnvironment::forEachPackElementBinding(
+    PackElementBindingCallback function) const {
   auto sig = getGenericSignature();
   auto shapeClass = getOpenedElementShapeClass();
   auto packElements = sig.getInnermostGenericParams();
@@ -156,13 +166,13 @@ void GenericEnvironment::getPackElementBindings(
 
     assert(elementIt != packElements.end());
     auto *elementArchetype =
-        mapTypeIntoContext(*elementIt++)->getAs<ElementArchetypeType>();
-    auto *packArchetype =
-        mapTypeIntoContext(genericParam)->getAs<PackArchetypeType>();
-
-    assert(elementArchetype && packArchetype);
-    bindings.emplace_back(elementArchetype, packArchetype);
+        mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
+    auto *packSubstitution =
+        maybeApplyOuterContextSubstitutions(genericParam)->castTo<PackType>();
+    function(elementArchetype, packSubstitution);
   }
+
+  assert(elementIt == packElements.end());
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature)

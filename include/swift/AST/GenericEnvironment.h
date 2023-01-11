@@ -195,15 +195,19 @@ public:
   /// Retrieve the UUID for an opened element environment.
   UUID getOpenedElementUUID() const;
 
-  using PackElementBinding =
-      std::pair<ElementArchetypeType *, PackArchetypeType *>;
+  void forEachPackElementArchetype(
+          llvm::function_ref<void(ElementArchetypeType*)> function) const;
 
-  /// Retrieve the bindings for the opened pack element archetypes in this
-  /// generic environment to the pack archetypes that contain them.
-  ///
-  /// \param bindings The vector to populate with the pack element bindings.
-  void getPackElementBindings(
-      SmallVectorImpl<PackElementBinding> &bindings) const;
+  using PackElementBindingCallback =
+    llvm::function_ref<void(ElementArchetypeType *elementType,
+                            PackType *packSubstitution)>;
+
+  /// Given that this is an opened element environment, iterate the
+  /// opened pack element bindings: the pack archetype that's been opened
+  /// (which may not be meaningful in the surrounding context), the element
+  /// archetype that it has been opened as, and the pack type whose elements
+  /// are opened.
+  void forEachPackElementBinding(PackElementBindingCallback function) const;
 
   /// Create a new, primary generic environment.
   static GenericEnvironment *forPrimary(GenericSignature signature);

@@ -1760,6 +1760,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                  open.getOperand());
     break;
   }
+  case SILInstructionKind::OpenPackElementInst: {
+    auto &opei = cast<OpenPackElementInst>(SI);
+    auto envRef =
+      S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
+    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
+    break;
+  }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
     auto &gaca = cast<GetAsyncContinuationAddrInst>(SI);
     writeOneTypeOneOperandLayout(gaca.getKind(), gaca.throws(),

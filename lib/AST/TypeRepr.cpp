@@ -397,6 +397,24 @@ MemberTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
   return create(Ctx, Components.front(), Components.drop_front());
 }
 
+PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
+                           ArrayRef<TypeRepr*> elements)
+  : TypeRepr(TypeReprKind::Pack),
+    KeywordLoc(keywordLoc), BraceLocs(braceLocs) {
+  Bits.PackTypeRepr.NumElements = elements.size();
+  memcpy(getTrailingObjects<TypeRepr*>(), elements.data(),
+         elements.size() * sizeof(TypeRepr*));
+}
+
+PackTypeRepr *PackTypeRepr::create(const ASTContext &ctx,
+                                   SourceLoc keywordLoc,
+                                   SourceRange braceLocs,
+                                   ArrayRef<TypeRepr*> elements) {
+  auto size = totalSizeToAlloc<TypeRepr*>(elements.size());
+  auto mem = ctx.Allocate(size, alignof(PackTypeRepr));
+  return new (mem) PackTypeRepr(keywordLoc, braceLocs, elements);
+}
+
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
                       GenericParamList *GenericParams,
                       SourceLoc LBraceLoc, ArrayRef<Field> Fields,
@@ -432,6 +450,18 @@ void VarargTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   printTypeRepr(Element, Printer, Opts);
   Printer << "...";
+}
+
+void PackTypeRepr::printImpl(ASTPrinter &Printer,
+                             const PrintOptions &Opts) const {
+  Printer.printKeyword("Pack", Opts);
+  Printer << "{";
+  auto elts = getElements();
+  for (size_t i = 0, e = elts.size(); i != e; ++i) {
+    if (i) Printer << ", ";
+    printTypeRepr(elts[i], Printer, Opts);
+  }
+  Printer << "}";
 }
 
 void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,

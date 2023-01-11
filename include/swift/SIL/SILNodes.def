@@ -597,6 +597,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
                             SingleValueInstruction, MayRead, DoesNotRelease)
 
+  // Variadic generics
+  SINGLE_VALUE_INST(OpenPackElementInst, open_pack_element,
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // Blocks
   SINGLE_VALUE_INST(ProjectBlockStorageInst, project_block_storage,
                     SingleValueInstruction, None, DoesNotRelease)

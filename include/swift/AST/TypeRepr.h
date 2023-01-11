@@ -100,6 +100,11 @@ protected:
     NumFields : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackTypeRepr, TypeRepr, 32,
+    /// The number of elements contained.
+    NumElements : 32
+  );
+
   } Bits;
 
   TypeRepr(TypeReprKind K) {
@@ -758,6 +763,54 @@ private:
   friend class TypeRepr;
 };
 
+/// An explicit pack grouping, `Pack{...}`.
+///
+/// This allows packs to be explicitly grouped.  It is currently only
+/// allowed in SIL files.
+class PackTypeRepr final
+    : public TypeRepr,
+      private llvm::TrailingObjects<PackTypeRepr, TypeRepr *> {
+  friend TrailingObjects;
+  SourceLoc KeywordLoc;
+  SourceRange BraceLocs;
+
+  size_t numTrailingObjects(OverloadToken<TypeRepr*>) const {
+    return Bits.PackTypeRepr.NumElements;
+  }
+
+  PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
+               ArrayRef<TypeRepr*> elements);
+public:
+  static PackTypeRepr *create(const ASTContext &ctx,
+                              SourceLoc keywordLoc,
+                              SourceRange braceLocs,
+                              ArrayRef<TypeRepr*> elements);
+
+  SourceLoc getKeywordLoc() const { return KeywordLoc; }
+  SourceRange getBracesRange() const { return BraceLocs; }
+
+  MutableArrayRef<TypeRepr*> getMutableElements() {
+    return llvm::makeMutableArrayRef(getTrailingObjects<TypeRepr*>(),
+                                     Bits.PackTypeRepr.NumElements);
+  }
+  ArrayRef<TypeRepr*> getElements() const {
+    return llvm::makeArrayRef(getTrailingObjects<TypeRepr*>(),
+                              Bits.PackTypeRepr.NumElements);
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Pack;
+  }
+  static bool classof(const PackTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return KeywordLoc; }
+  SourceLoc getEndLocImpl() const { return BraceLocs.End; }
+  SourceLoc getLocImpl() const { return KeywordLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A pack reference spelled with the \c each keyword.
 ///
 /// Pack references can only appear inside pack expansions and in
@@ -1398,6 +1451,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ImplicitlyUnwrappedOptional:
   case TypeReprKind::Vararg:
   case TypeReprKind::PackExpansion:
+  case TypeReprKind::Pack:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
