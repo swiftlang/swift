@@ -601,9 +601,14 @@ protected:
   PrunedLiveRange(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : PrunedLiveness(discoveredBlocks) {}
 
+  SimpleLiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
+                                                 SILValue value);
+
 public:
   /// Update liveness for all direct uses of \p def.
-  SimpleLiveRangeSummary updateForDef(SILValue def);
+  SimpleLiveRangeSummary updateForDef(SILValue def) {
+    return recursivelyUpdateForDef(def, def);
+  }
 
   /// Check if \p inst occurs in between the definition this def and the
   /// liveness boundary.
