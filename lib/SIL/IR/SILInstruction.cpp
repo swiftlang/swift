@@ -1557,9 +1557,20 @@ void SILInstruction::forEachDefinedLocalArchetype(
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialValueInst)
 #undef SINGLE_VALUE_SINGLE_OPEN
+  case SILInstructionKind::OpenPackElementInst:
+    return cast<OpenPackElementInst>(this)->forEachDefinedLocalArchetype(fn);
   default:
     return;
   }
+}
+
+void OpenPackElementInst::forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const {
+  getOpenedGenericEnvironment()->forEachPackElementBinding(
+                                  [&](ElementArchetypeType *elementType,
+                                      PackType *packSubstitution) {
+    fn(CanElementArchetypeType(elementType), this);
+  });
 }
 
 //===----------------------------------------------------------------------===//

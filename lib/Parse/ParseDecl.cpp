@@ -3693,6 +3693,25 @@ bool Parser::parseConventionAttributeInternal(
   return false;
 }
 
+bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic) {
+  if (!Tok.is(tok::string_literal)) {
+    diagnose(Tok, diagnostic);
+    return true;
+  }
+
+  bool failed = true;
+  auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
+  llvm::SmallString<UUID::StringBufferSize> text(literalText);
+  if (auto id = UUID::fromString(text.c_str())) {
+    uuid = *id;
+    failed = false;
+  } else {
+    diagnose(Tok, diagnostic);
+  }
+  consumeToken(tok::string_literal);
+  return failed;
+}
+
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -3882,24 +3901,12 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
     // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (Tok.is(tok::string_literal)) {
-        UUID openedID;
-        idLoc = Tok.getLoc();
-        auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
-        llvm::SmallString<UUID::StringBufferSize> text(literalText);
-        if (auto openedID = UUID::fromString(text.c_str())) {
-          Attributes.OpenedID = openedID;
-        } else {
-          diagnose(Tok, diag::opened_attribute_id_value);
-        }
-        consumeToken();
-      } else {
-        diagnose(Tok, diag::opened_attribute_id_value);
-      }
+      idLoc = Tok.getLoc();
+      UUID id;
+      if (!parseUUIDString(id, diag::opened_attribute_id_value))
+        Attributes.OpenedID = id;
 
-      if (Tok.is(tok::comma)) {
-        consumeToken(tok::comma);
-
+      if (consumeIf(tok::comma)) {
         auto constraintType = parseType(diag::expected_type);
         if (constraintType.isNonNull())
           Attributes.ConstraintType = constraintType.getPtrOrNull();

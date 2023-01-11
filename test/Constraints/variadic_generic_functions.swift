@@ -38,7 +38,7 @@ func call() {
 
   func multipleSequences<T..., U...>(xs: repeat each T, ys: repeat each U) -> (repeat each T) {
     return (repeat each ys)
-    // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
+    // expected-error@-1 {{cannot convert return expression of type '(repeat each U)' to return type '(repeat each T)'}}
   }
 
   multipleSequences()

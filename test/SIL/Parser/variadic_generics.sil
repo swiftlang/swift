@@ -1,0 +1,13 @@
+// RUN: %target-sil-opt -enable-experimental-feature VariadicGenerics -enable-sil-verify-all=true %s | %target-sil-opt -enable-experimental-feature VariadicGenerics -enable-sil-verify-all=true | %FileCheck %s
+
+import Builtin
+
+// CHECK-LABEL: sil @test1 :
+// CHECK: {{%.*}} = open_pack_element {{%.*}} of <U...> at <Pack{repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000000"
+sil @test1 : $<T...> () -> () {
+bb0:
+  %index = integer_literal $Builtin.Word, 0
+  %0 = open_pack_element %index of <U...> at <Pack{repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000000"
+  %ret = tuple ()
+  return %ret : $()
+}

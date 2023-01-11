@@ -7403,6 +7403,94 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// Bind archetypes to the given element of one or more type packs.
+///
+/// The result of this instruction is just for use in recording type
+/// dependencies on the bound archetypes.
+///
+///   %0 = open_pack_element %index
+///          of <t_1_0... as $@opened t_10101 from {T...}>
+///          where t_1_0: Equatable
+///
+/// %index is always a $Builtin.Word.
+///
+/// In the printed representation, only the relevant portions of the
+/// opened generic environment are given: the pack type parameters,
+/// the opened element archetypes, the contextual substitutions of
+/// the pack type parameters, and the requirements on the pack type
+/// parameters.
+class OpenPackElementInst final
+    : public InstructionBaseWithTrailingOperands<
+                                        SILInstructionKind::OpenPackElementInst,
+                                        OpenPackElementInst,
+                                        SingleValueInstruction> {
+  friend SILBuilder;
+
+  /// The opened-element generic environment for this operation.
+  ///
+  /// In the AST, the opened element generic environment of a
+  /// PackExpansionExpr extends the contextual generic environment with
+  /// a new, innermost level of parameters representing the opened
+  /// elements.  These parameters are not pack parameters, but they are
+  /// 1-1 with the expanded pack parameters, and the requirements laid
+  /// on them are copied from the requirements on those parameters.
+  /// The substitutions in the environment map the contextual generic
+  /// parameters to their current archetypes, and only the new element
+  /// parameters acquire new archetypes within the environment.
+  ///
+  /// Parts of this correspondence break down for open_pack_element.
+  /// In particular, SIL instructions can be cloned into new contexts,
+  /// applying a substitution that can change or even erase the pack
+  /// parameters in the contextual environment.  Rather than require
+  /// the opened element environment to continue to be an extension
+  /// of the contextual environment, SIL allows the two to diverge:
+  /// there is no presumed relationship between the generic signature
+  /// of the opened environment and that of the contextual environment.
+  /// The generic environment should be treated as a source of
+  /// information about the expanded packs, the contextual pack
+  /// substitutions, and the opened archetype for each pack.
+  ///
+  /// An alternative representation would be to remove the non-pack
+  /// parameters from the opened generic environment, replacing them
+  /// in the requirements with references to the contextual archetypes.
+  /// However, this would require various algorithms working with
+  /// generic signatures and environments to work with a mixture of
+  /// archetypes and type parameters, which can introduce problems
+  /// when reasoning about certain kinds of generic signatures.
+  GenericEnvironment *Env;
+
+  OpenPackElementInst(SILDebugLocation debugLoc,
+                      ArrayRef<SILValue> allOperands,
+                      SILType type,
+                      GenericEnvironment *env);
+
+  static OpenPackElementInst *
+  create(SILFunction &F, SILDebugLocation debugLoc, SILValue index,
+         GenericEnvironment *env);
+
+public:
+  /// Call the given function for each element archetype that this
+  /// instruction opens.
+  void forEachDefinedLocalArchetype(
+      llvm::function_ref<void(CanLocalArchetypeType, SILValue)> fn) const;
+
+  GenericEnvironment *getOpenedGenericEnvironment() const {
+    return Env;
+  }
+
+  SILValue getIndexOperand() const {
+    return getAllOperands()[0].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(1);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(1);
+  }
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<SILInstructionKind::ProjectBlockStorageInst,

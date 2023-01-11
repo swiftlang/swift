@@ -92,6 +92,9 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking a tuple element type.
   TupleElement,
 
+  /// Whether we are checking a pack element type.
+  PackElement,
+
   /// Whether we are checking the parameter list of a function.
   AbstractFunctionDecl,
 
@@ -253,6 +256,7 @@ public:
     case Context::GenericArgument:
     case Context::ProtocolGenericArgument:
     case Context::TupleElement:
+    case Context::PackElement:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
@@ -297,6 +301,7 @@ public:
     case Context::None:
     case Context::GenericArgument:
     case Context::ProtocolGenericArgument:
+    case Context::PackElement:
     case Context::TupleElement:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
@@ -326,6 +331,7 @@ public:
     switch (context) {
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
+    case Context::PackElement:
     case Context::TupleElement:
     case Context::GenericArgument:
       return true;
@@ -379,6 +385,7 @@ public:
     case Context::None:
     case Context::Inherited:
     case Context::FunctionInput:
+    case Context::PackElement:
     case Context::TupleElement:
     case Context::GenericArgument:
     case Context::ProtocolGenericArgument:

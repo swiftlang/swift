@@ -160,6 +160,7 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 ///     '_'
+///     'Pack' '{' (type (',' type)*)? '}'    (only in SIL files)a
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
@@ -700,6 +701,34 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
     return nullptr;
   }
+
+  // In SIL files (not just when parsing SIL types), accept the
+  // Pack{} syntax for spelling variadic type packs.
+  if (SIL && Tok.isContextualKeyword("Pack") &&
+      peekToken().is(tok::l_brace)) {
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
+    SourceLoc keywordLoc = consumeToken(tok::identifier);
+    SourceLoc lbLoc = consumeToken(tok::l_brace);
+    SourceLoc rbLoc;
+    SmallVector<TypeRepr*, 8> elements;
+    auto status = parseList(tok::r_brace, lbLoc, rbLoc,
+                            /*AllowSepAfterLast=*/false,
+                            diag::expected_rbrace_pack_type_list,
+                            [&] () -> ParserStatus {
+      auto element = parseType(diag::expected_type);
+      if (element.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      if (element.isNull())
+        return makeParserError();
+      elements.push_back(element.get());
+      return makeParserSuccess();
+    });
+
+    return makeParserResult(status,
+        PackTypeRepr::create(Context, keywordLoc, SourceRange(lbLoc, rbLoc),
+                             elements));
+  }
+
   ParserStatus Status;
   SmallVector<IdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;

@@ -348,6 +348,21 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
     // Handle by operand and result check.
     break;
 
+  case SILInstructionKind::OpenPackElementInst: {
+    auto open = cast<OpenPackElementInst>(&inst);
+    bool wouldChange = false;
+    open->getOpenedGenericEnvironment()
+        ->forEachPackElementBinding([&](ElementArchetypeType *elementType,
+                                        PackType *packSubstitution) {
+      if (!wouldChange) {
+        if (opaqueArchetypeWouldChange(context,
+                                       packSubstitution->getCanonicalType()))
+          wouldChange = true;
+      }
+    });
+    return wouldChange;
+  }
+
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::TryApplyInst:
