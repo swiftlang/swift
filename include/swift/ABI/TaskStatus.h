@@ -45,7 +45,6 @@ public:
   TaskStatusRecord(TaskStatusRecordKind kind,
                    TaskStatusRecord *parent = nullptr)
       : Flags(kind) {
-    getKind();
     resetParent(parent);
   }
 
@@ -175,10 +174,10 @@ public:
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
-public:
   AsyncTask *FirstChild;
   AsyncTask *LastChild;
 
+public:
   TaskGroupTaskStatusRecord()
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(nullptr),
