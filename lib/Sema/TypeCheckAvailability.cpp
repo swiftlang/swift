@@ -3586,6 +3586,34 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
 static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
+  // FIXME: I don't think this is right, but I don't understand the issue well
+  //        enough to fix it properly. If the decl context is an abstract
+  //        closure, we need it to have a type assigned to it before we can
+  //        determine whether it is an asynchronous context. It will crash
+  //        when we go to check without one. In TypeChecker::typeCheckExpression
+  //        (TypeCheckConstraints.cpp:403), we apply a solution before calling
+  //        `performSyntacticDiagnosticsForTarget`, which eventually calls
+  //        down to this function. Under most circumstances, the context that
+  //        we're in is typechecked at that point and has a type assigned.
+  //        When working with specific result builders, the solution applied
+  //        results in an expression with an unset type. In these cases, the
+  //        application makes its way into `ConstraintSystem::applySolution` for
+  //        closures (CSClosure.cpp:1356). The type is computed, but is
+  //        squirreled away in the constrain system to be applied once the
+  //        checks (including this one) approve of the decls within the decl
+  //        context before applying the type to the expression. It might be
+  //        possible to drive the constraint solver through the availability
+  //        checker and into us so that we can ask for it, but that feels wrong
+  //        too.
+  //        This behavior is demonstrated by the first use of the `tuplify`
+  //        function in `testExistingPatternsInCaseStatements` in
+  //        `test/Constraints/result_builder.swift`.
+  const AbstractClosureExpr *declCtxAsExpr =
+      dyn_cast<AbstractClosureExpr>(Where.getDeclContext());
+  if (declCtxAsExpr && !declCtxAsExpr->getType()) {
+    return false;
+  }
+
   // If we are in a synchronous context, don't check it
   if (!Where.getDeclContext()->isAsyncContext())
     return false;
