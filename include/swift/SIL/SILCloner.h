@@ -49,7 +49,7 @@ protected:
 
   SILBuilder Builder;
   DominanceInfo *DomTree = nullptr;
-  TypeSubstitutionMap OpenedExistentialSubs;
+  TypeSubstitutionMap LocalArchetypeSubs;
 
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
@@ -164,10 +164,10 @@ public:
     asImpl().mapValue(origValue, mappedValue);
   }
 
-  /// Register a re-mapping for opened existentials.
-  void registerOpenedExistentialRemapping(ArchetypeType *From,
-                                          ArchetypeType *To) {
-    auto result = OpenedExistentialSubs.insert(
+  /// Register a re-mapping for local archetypes such as opened existentials.
+  void registerLocalArchetypeRemapping(ArchetypeType *From,
+                                       ArchetypeType *To) {
+    auto result = LocalArchetypeSubs.insert(
         std::make_pair(CanArchetypeType(From), CanType(To)));
     assert(result.second);
     (void)result;
@@ -189,15 +189,15 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    // If we have open existentials to substitute, check whether that's
+    // If we have local archetypes to substitute, check whether that's
     // relevant to this particular substitution.
-    if (!OpenedExistentialSubs.empty()) {
+    if (!LocalArchetypeSubs.empty()) {
       for (auto ty : Subs.getReplacementTypes()) {
-        // If we found a type containing an opened existential, substitute
+        // If we found a type containing a local archetype, substitute
         // open existentials throughout the substitution map.
-        if (ty->hasOpenedExistential()) {
+        if (ty->hasLocalArchetype()) {
           Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
-                              OpenedExistentialSubs},
+                              LocalArchetypeSubs},
                             MakeAbstractConformanceForGenericType());
           break;
         }
@@ -209,19 +209,19 @@ public:
 
   SILType getTypeInClonedContext(SILType Ty) {
     auto objectTy = Ty.getASTType();
-    // Do not substitute opened existential types, if we do not have any.
-    if (!objectTy->hasOpenedExistential())
+    // Do not substitute local archetypes, if we do not have any.
+    if (!objectTy->hasLocalArchetype())
       return Ty;
-    // Do not substitute opened existential types, if it is not required.
+    // Do not substitute local archetypes, if it is not required.
     // This is often the case when cloning basic blocks inside the same
     // function.
-    if (OpenedExistentialSubs.empty())
+    if (LocalArchetypeSubs.empty())
       return Ty;
 
-    // Substitute opened existential types, if we have any.
+    // Substitute local archetypes, if we have any.
     return Ty.subst(
       Builder.getModule(),
-      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
       MakeAbstractConformanceForGenericType());
   }
   SILType getOpType(SILType Ty) {
@@ -230,17 +230,17 @@ public:
   }
 
   CanType getASTTypeInClonedContext(Type ty) {
-    // Do not substitute opened existential types, if we do not have any.
-    if (!ty->hasOpenedExistential())
+    // Do not substitute local archetypes, if we do not have any.
+    if (!ty->hasLocalArchetype())
       return ty->getCanonicalType();
-    // Do not substitute opened existential types, if it is not required.
+    // Do not substitute local archetypes, if it is not required.
     // This is often the case when cloning basic blocks inside the same
     // function.
-    if (OpenedExistentialSubs.empty())
+    if (LocalArchetypeSubs.empty())
       return ty->getCanonicalType();
 
     return ty.subst(
-      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
       MakeAbstractConformanceForGenericType()
     )->getCanonicalType();
   }
@@ -258,7 +258,7 @@ public:
         ->getCanonicalType();
     auto substExistentialTy = getOpASTType(origExistentialTy);
     auto replacementTy = OpenedArchetypeType::get(substExistentialTy, sig);
-    registerOpenedExistentialRemapping(archetypeTy, replacementTy);
+    registerLocalArchetypeRemapping(archetypeTy, replacementTy);
   }
 
   // SILCloner will take care of debug scope on the instruction
@@ -273,12 +273,12 @@ public:
 
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
-    // If we have open existentials to substitute, do so now.
-    if (ty->hasOpenedExistential() && !OpenedExistentialSubs.empty()) {
+    // If we have local archetypes to substitute, do so now.
+    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
       conformance =
         conformance.subst(ty,
                           QueryTypeSubstitutionMapOrIdentity{
-                                                        OpenedExistentialSubs},
+                                                        LocalArchetypeSubs},
                           MakeAbstractConformanceForGenericType());
     }
 
