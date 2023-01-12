@@ -746,9 +746,7 @@ void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
   // This is similar to recordUnknownConflict, but only class and global
   // accesses can be affected by a deinitializer.
   auto isHeapAccess = [](AccessStorage::Kind accessKind) {
-    return accessKind == AccessStorage::Class
-           || accessKind == AccessStorage::Class
-           || accessKind == AccessStorage::Global;
+    return accessKind == AccessStorage::Class || accessKind == AccessStorage::Global;
   };
   // Mark the in-scope accesses as having a nested conflict
   llvm::for_each(state.inScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
