@@ -4,8 +4,8 @@
 // RUN: %target-swift-frontend -disable-availability-checking -target arm64_32-apple-watchos7  -swift-async-frame-pointer=never %s -S | %FileCheck  -check-prefix=NEVER %s
 // RUN: %target-swift-frontend -disable-availability-checking -target arm64_32-apple-watchos7  -swift-async-frame-pointer=auto %s -S | %FileCheck  -check-prefix=AUTO %s
 
-// REQUIRES: OS=watchos
-// REQUIRES: CPU=armv7k || CPU=arm64_32
+// REQUIRES: OS=watchos || OS=watchossimulator
+// REQUIRES: CODEGENERATOR=AArch64
 
 @_silgen_name("forward_function")
 func forwardFunction()
