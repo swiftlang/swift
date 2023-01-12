@@ -907,3 +907,34 @@ func test_associated_values_dont_block_solver_when_unresolved() {
     }
   }
 }
+
+func test_dependent_member_with_unresolved_base_type() {
+  struct Wrapper<A, T: P> : P {
+  }
+
+  @resultBuilder
+  struct Builder<A> {
+    static func buildBlock(_ value: some P) -> some P {
+      value
+    }
+  }
+
+  func test<A, U: P>(data: KeyPath<A, [(Int, U.T)]>, // expected-note {{in call to function 'test(data:_:)'}}
+                     @Builder<U.T> _: () -> U) -> Wrapper<A, U> { fatalError() }
+
+  struct Value : P {
+    typealias T = (Int, String)
+  }
+
+  struct Test : P {
+    struct T {
+      var values: [(Int, Value.T)]
+    }
+
+    var v: some P {
+      test(data: \T.values) { // expected-error {{generic parameter 'U' could not be inferred}}
+        Value()
+      }
+    }
+  }
+}
