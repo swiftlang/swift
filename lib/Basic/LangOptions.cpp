@@ -235,6 +235,9 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
 }
 
 bool LangOptions::hasFeature(Feature feature) const {
+  if (feature == Feature::StatementExpressions)
+    return true;
+
   if (Features.contains(feature))
     return true;
 
