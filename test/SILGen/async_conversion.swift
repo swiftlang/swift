@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --implicit-check-not hop_to_executor %s
 // REQUIRES: concurrency
 
 func f(_: Int, _: String) -> String? { nil }
@@ -33,3 +33,56 @@ actor A: P2 {
   // CHECK-NEXT: apply
   // CHECK: return
 }
+
+// It's important that async thunks generated for conversions
+// from a nonisolated, non-async function to an async function
+// do _not_ contain hops to any executor, including the generic executor (!!),
+// because these specific async functions derived from non-async ones
+// must inherit their executor to make conversion sequences such as these, safe:
+
+@MainActor func mainActorFn() {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test7caller1yyYaF : $@convention(thin) @async () -> () {
+@MainActor func caller1() async {
+  // CHECK: hop_to_executor {{.*}} : $MainActor
+  // CHECK: [[F:%.*]] = function_ref @$s4test11mainActorFnyyF : $@convention(thin) () -> ()
+  // CHECK: [[THICK_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  // CHECK: [[THUNK:%.*]] = function_ref @$sIeg_IegH_TR : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()
+  // CHECK:  = partial_apply [callee_guaranteed] [[THUNK]]([[THICK_F]]) : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()
+  // ... after applying ...
+  // CHECK: hop_to_executor {{.*}} : $MainActor
+  let f: () -> () = mainActorFn
+  let g: () async -> () = f
+  await g()  // g cannot be hopping to a different executor, it must inherit!
+}
+// CHECK: end sil function '$s4test7caller1yyYaF'
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-NOT: hop_to_executor
+// CHECK: end sil function '$sIeg_IegH_TR'
+
+
+actor AnActor {
+  func isolatedMethod(_ i: Int) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@guaranteed AnActor) -> () {
+  func caller() async {
+    // CHECK: hop_to_executor {{..*}} : $AnActor
+    //  [[F:%.*]] = function_ref @$s4test7AnActorC6calleryyYaFySicACYicfu_ : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()
+    //  [[APPLIED_F:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()
+    //  [[BORROWED_F:%.*]] = begin_borrow [lexical] [[APPLIED_F]] : $@callee_guaranteed (Int) -> ()
+    //  [[COPIED_F:%.*]] = copy_value [[BORROWED_F]] : $@callee_guaranteed (Int) -> ()
+    //  [[THUNK:%.*]] = function_ref @$sSiIegy_SiIegHy_TR : $@convention(thin) @async (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
+    //  = partial_apply [callee_guaranteed] [[THUNK]]([[COPIED_F]]) : $@convention(thin) @async (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
+    // ... after applying ...
+    // CHECK: hop_to_executor {{.*}} : $AnActor
+    let f: (Int) -> () = self.isolatedMethod
+    let g: (Int) async -> () = f
+    await g(0)
+  }
+} // CHECK: end sil function '$s4test7AnActorC6calleryyYaF'
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIegy_SiIegHy_TR : $@convention(thin) @async (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> () {
+// CHECK-NOT: hop_to_executor
+// CHECK: end sil function '$sSiIegy_SiIegHy_TR'
+
