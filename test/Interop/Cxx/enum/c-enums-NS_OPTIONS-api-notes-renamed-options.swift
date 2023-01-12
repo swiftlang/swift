@@ -3,8 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar102858524
-
 import CenumsNSOptions
 
 // CHECK-NOT: warning: imported declaration 'API_NOTES_NAMED_OptionOne' could not be mapped to 'SwiftOptionOneApiNotes'
