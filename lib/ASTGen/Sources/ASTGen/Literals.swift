@@ -23,7 +23,7 @@ extension ASTGenVisitor {
 
   public func visit(_ node: BooleanLiteralExprSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    let value = node.booleanLiteral == .trueKeyword()
+    let value = node.booleanLiteral == .keyword(.true)
     return .expr(SwiftBooleanLiteralExpr_create(ctx, value, loc))
   }
 
