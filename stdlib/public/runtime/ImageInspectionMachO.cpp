@@ -45,8 +45,6 @@ constexpr const char DynamicReplacementSomeSection[] =
     MachODynamicReplacementSomeSection;
 constexpr const char AccessibleFunctionsSection[] =
     MachOAccessibleFunctionsSection;
-constexpr const char RuntimeAttributesSection[] =
-    MachORuntimeAttributesSection;
 constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
@@ -171,12 +169,6 @@ void swift::initializeAccessibleFunctionsLookup() {
   REGISTER_FUNC(
       addImageCallback<TextSegment, AccessibleFunctionsSection,
                        addImageAccessibleFunctionsBlockCallbackUnsafe>);
-}
-
-void swift::initializeRuntimeAttributesLookup() {
-  REGISTER_FUNC(
-      addImageCallback<TextSegment, RuntimeAttributesSection,
-                       addImageRuntimeAttributesBlockCallbackUnsafe>);
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&
