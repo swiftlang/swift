@@ -30,7 +30,7 @@ enum class MacroContext: uint8_t {
   /// A freestanding declaration macro.
   FreestandingDeclaration = 0x02,
   /// An attached declaration macro.
-  AttachedDeclaration = 0x03,
+  AttachedDeclaration = 0x04,
 };
 
 /// The contexts in which a particular macro declaration can be used.

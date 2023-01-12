@@ -3558,8 +3558,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
   // FIXME: deal with macros.
   NominalTypeDecl *nominal = nullptr;
-  if (found)
+  if (found) {
+    // FIXME: Do full checking of the macro arguments here by turning it into
+    // a macro expansion expression (?).
+    if (found.is<MacroDecl *>())
+      return;
+
     nominal = found.dyn_cast<NominalTypeDecl *>();
+  }
 
   // Diagnose errors.
   if (!found) {
