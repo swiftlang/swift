@@ -365,7 +365,8 @@ ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
 }
 
 struct SyntacticElementContext
-    : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> {
+    : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
+                                SingleValueStmtExpr *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -385,11 +386,18 @@ struct SyntacticElementContext
     return {func};
   }
 
+  static SyntacticElementContext
+  forSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
+    return {SVE};
+  }
+
   DeclContext *getAsDeclContext() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return fn;
     } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
       return closure;
+    } else if (auto *SVE = dyn_cast<SingleValueStmtExpr *>()) {
+      return SVE->getDeclContext();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -418,11 +426,13 @@ struct SyntacticElementContext
     }
   }
 
-  BraceStmt *getBody() const {
+  Stmt *getStmt() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return fn->getBody();
     } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
       return closure->getBody();
+    } else if (auto *SVE = dyn_cast<SingleValueStmtExpr *>()) {
+      return SVE->getStmt();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -1788,9 +1798,9 @@ private:
 #undef UNSUPPORTED_STMT
 
 public:
-  /// Apply solution to the closure and return updated body.
-  ASTNode apply() {
-    auto body = visit(context.getBody());
+  /// Apply the solution to the context and return updated statement.
+  Stmt *apply() {
+    auto body = visit(context.getStmt());
 
     // Since local functions can capture variables that are declared
     // after them, let's type-check them after all of the pattern
@@ -1798,7 +1808,7 @@ public:
     for (auto *func : LocalFuncs)
       TypeChecker::typeCheckDecl(func);
 
-    return body;
+    return body ? body.get<Stmt *>() : nullptr;
   }
 };
 
@@ -1815,7 +1825,7 @@ public:
         Transform(transform) {}
 
   bool apply() {
-    auto body = visit(context.getBody());
+    auto body = visit(context.getStmt());
 
     if (!body || hadError)
       return true;
@@ -2208,13 +2218,12 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
       solution, SyntacticElementContext::forFunctionRef(fn), resultTy,
       rewriteTarget);
 
-  auto body = application.apply();
+  auto *body = application.apply();
 
   if (!body || application.hadError)
     return true;
 
-  fn.setTypecheckedBody(castToStmt<BraceStmt>(body),
-                        fn.hasSingleExpressionBody());
+  fn.setTypecheckedBody(cast<BraceStmt>(body), fn.hasSingleExpressionBody());
   return false;
 }
 
