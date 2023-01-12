@@ -21,11 +21,11 @@
 
 /// Return the path of the libswiftCore library.
 ///
-/// This can be used to locate files that are installed alongside the
-/// Swift runtime library.
+/// This can be used to locate files that are installed alongside the Swift
+/// runtime library.
 ///
-/// \return A string containing the full path to libswiftCore.  The string
-///         is owned by the runtime and should not be freed.
+/// \return A string containing the full path to libswiftCore.  The string is
+///         owned by the runtime and should not be freed.
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getRuntimePath();
@@ -35,28 +35,39 @@ swift_getRuntimePath();
 /// If the path to libswiftCore is `/usr/local/swift/lib/libswiftCore.dylib`,
 /// this function would return `/usr/local/swift`.
 ///
-/// The path returned here can be overridden by setting the environment
-/// variable SWIFT_ROOT.
+/// The path returned here can be overridden by setting the environment variable
+/// SWIFT_ROOT.
 ///
-/// \return A string containing the full path to the Swift root directory,
-///         based either on the location of the Swift runtime, or on the
-///         `SWIFT_ROOT` environment variable if set.
+/// \return A string containing the full path to the Swift root directory, based
+///         either on the location of the Swift runtime, or on the `SWIFT_ROOT`
+///         environment variable if set.
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getRootPath();
 
 /// Return the path of the specified auxiliary executable.
 ///
-/// This function will return `/path/to/swift/root/libexec/<name>`, and on
-/// Windows, it will automatically add `.exe` to the end.  (This means that
-/// you don't need to special case the name for Windows.)
+/// This function will search for the auxiliary executable in the following
+/// paths:
 ///
-/// It does not test that the executable exists or that it is indeed
-/// executable by the current user.  If you are using this function to locate
-/// a utility program for use by the runtime, you should provide a way to
-/// override its location using an environment variable.
+///   <swift-root>/libexec/swift/<platform>/<name>
+///   <swift-root>/libexec/swift/<name>
+///   <swift-root>/bin/<name>
+///   <swift-root>/<name>
 ///
-/// \param name The name of the executable to locate.
+/// It will return the first of those that exists, but it does not test that
+/// the file is indeed executable.
+///
+/// On Windows, it will automatically add `.exe` to the name, which means you
+/// do not need to special case the name for Windows.
+///
+/// If you are using this function to locate a utility program for use by the
+/// runtime, you should provide a way to override its location using an
+/// environment variable.
+///
+/// If the executable cannot be found, it will return nullptr.
+///
+/// \param name      The name of the executable to locate.
 ///
 /// \return A string containing the full path to the executable.
 SWIFT_RUNTIME_EXPORT

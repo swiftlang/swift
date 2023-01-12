@@ -1,8 +1,14 @@
 // RUN: %empty-directory(%t)
+
+// RUN: mkdir -p %t/swift-root/libexec/swift %t/swift-root/bin
+// RUN: touch %t/swift-root/libexec/swift/Foo
+// RUN: touch %t/swift-root/libexec/swift/Foo.exe
+// RUN: touch %t/swift-root/bin/Foo.exe
+
 // RUN: %target-clang %s -std=c++11 -I %swift_src_root/include -I %swift_src_root/stdlib/public/SwiftShims -I %clang-include-dir -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name/%target-arch -lswiftCore -o %t/paths-test
 // RUN: %target-codesign %t/paths-test
 // RUN: %target-run %t/paths-test | %FileCheck %s
-
+// RUN: env %env-SWIFT_ROOT=%t/swift-root %target-run %t/paths-test | %FileCheck %s --check-prefix CHECK-FR
 // REQUIRES: executable_test
 // UNSUPPORTED: remote_run
 
@@ -32,13 +38,6 @@ exists(const char *path) {
 }
 
 static bool
-isdir(const char *path) {
-  struct stat st;
-
-  return stat(path, &st) == 0 && (st.st_mode & S_IFDIR);
-}
-
-static bool
 isfile(const char *path) {
   struct stat st;
 
@@ -46,16 +45,18 @@ isfile(const char *path) {
 }
 
 static bool
-endsWithLibSwift(const char *path) {
-  const char *posixSuffix = "/lib/swift/";
-  const char *windowsSuffix = "\\lib\\swift\\";
-  const size_t suffixLen = strlen(posixSuffix);
-  size_t len = strlen(path);
-  if (len < suffixLen)
-    return false;
-  const char *maybeSuffix = path + len - suffixLen;
-  return strcmp(maybeSuffix, posixSuffix) == 0
-    || strcmp(maybeSuffix, windowsSuffix) == 0;
+isdir(const char *path) {
+  struct stat st;
+
+  return stat(path, &st) == 0 && (st.st_mode & S_IFDIR);
+}
+
+static bool
+containsLibSwift(const char *path) {
+  const char *posix = "/lib/swift/";
+  const char *windows = "\\lib\\swift\\";
+
+  return strstr(path, posix) || strstr(path, windows);
 }
 
 int main(void) {
@@ -65,6 +66,9 @@ int main(void) {
 
   // CHECK: runtime path: {{.*[\\/](lib)?}}swiftCore.{{so|dylib|dll}}
   // CHECK-NEXT: runtime is a file: yes
+
+  // CHECK-FR: runtime path: {{.*[\\/](lib)?}}swiftCore.{{so|dylib|dll}}
+  // CHECK-FR-NEXT: runtime is a file: yes
   printf("runtime path: %s\n", runtimePath ? runtimePath: "<NULL>");
   printf("runtime is a file: %s\n", isfile(runtimePath) ? "yes" : "no");
 
@@ -74,22 +78,22 @@ int main(void) {
 
   // CHECK: root path: {{.*[\\/]$}}
   // CHECK-NEXT: root is a directory: yes
+
+  // CHECK-FR: root path: {{.*[\\/]$}}
+  // CHECK-FR-NEXT: root is a directory: yes
   printf("root path: %s\n", rootPath ? rootPath : "<NULL>");
   printf("root is a directory: %s\n", isdir(rootPath) ? "yes" : "no");
 
-  // Root path should not end with /lib/swift/
+  // CHECK: root path contains /lib/swift/: no
+  // CHECK-FR: root path contains /lib/swift/: no
+  printf("root path contains /lib/swift/: %s\n",
+         containsLibSwift(rootPath) ? "yes" : "no");
 
-  // CHECK: root path ends with /lib/swift/: no
-  printf("root path ends with /lib/swift/: %s\n",
-         endsWithLibSwift(rootPath) ? "yes" : "no");
+  const char *auxPath = swift_getAuxiliaryExecutablePath("Foo");
 
-  // Auxiliary executable path must be in swift-root/libexec.
-#define UNLIKELY_NAME "anUnlikelyExecutableName"
+  // CHECK: aux path: <NULL>
+  // CHECK-FR: aux path: {{.*[\\/]libexec[\\/]swift[\\/]Foo(\.exe)?}}
 
-  const size_t unlikelyLen = strlen(UNLIKELY_NAME);
-  const char *auxPath = swift_getAuxiliaryExecutablePath(UNLIKELY_NAME);
-
-  // CHECK: aux path: {{.*[\\/](libexec[\\/])?}}anUnlikelyExecutableName{{(\.exe)?}}
   printf("aux path: %s\n", auxPath ? auxPath : "<NULL>");
 
   return 0;

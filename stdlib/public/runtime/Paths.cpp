@@ -49,7 +49,7 @@ const char *rootPath;
 void _swift_initRuntimePath(void *);
 void _swift_initRootPath(void *);
 const char *_swift_getDefaultRootPath();
-const char *_swift_getAuxExePathIn(const char *path, const char *name);
+char *_swift_getAuxExePathIn(const char *path, const char *name);
 
 bool _swift_isPathSep(char ch) {
 #ifdef _WIN32
@@ -89,6 +89,34 @@ swift_getRootPath()
 
 namespace {
 
+bool
+_swift_lookingAtLibSwift(const char *ptr, const char *base)
+{
+  // /some/path/to/some/thing/lib/swift/libswiftCore.dylib
+  //                         ^         ^
+  //                         |         +---- ptr
+  //                         +-------------- ptr - 10
+
+  return (ptr - base >= 10
+          && _swift_isPathSep(ptr[-10])
+          && std::strncmp(ptr - 9, "lib", 3) == 0
+          && _swift_isPathSep(ptr[-6])
+          && std::strncmp(ptr - 5, "swift", 5) == 0);
+}
+
+bool
+_swift_lookingAtBin(const char *ptr, const char *base)
+{
+  // C:\some\path\to\some\thing\bin\libswiftCore.dylib
+  //                           ^   ^
+  //                           |   +---- ptr
+  //                           +-------- ptr - 4
+
+  return (ptr - base > 4
+          && _swift_isPathSep(ptr[-4])
+          && std::strncmp(ptr - 3, "bin", 3) == 0);
+}
+
 const char *
 _swift_getDefaultRootPath()
 {
@@ -99,13 +127,48 @@ _swift_getDefaultRootPath()
   const char *ptr = runtimePath + runtimePathLen;
   while (ptr > runtimePath && !_swift_isPathSep(*--ptr));
 
+<<<<<<< Updated upstream
   // Remove lib/swift/ if present
   if (ptr - runtimePath >= 10
       && _swift_isPathSep(ptr[-10])
       && std::strncmp(ptr - 9, "lib", 3) == 0
       && _swift_isPathSep(ptr[-6])
       && std::strncmp(ptr - 5, "swift", 5) == 0) {
+=======
+  if (_swift_lookingAtLibSwift(ptr, runtimePath)) {
+    // /some/path/to/some/thing/lib/swift/libswiftCore.dylib
+    //                         ^         ^
+    //                         |         +---- ptr
+    //                         +-------------- ptr - 10
+>>>>>>> Stashed changes
     ptr -= 10;
+  } else {
+    // We *might* be in a <platform> directory, so scan backwards for that too
+    const char *platform = ptr;
+    while (platform > runtimePath && !_swift_isPathSep(*--platform));
+
+    if (_swift_lookingAtLibSwift(platform, runtimePath)) {
+
+      // When we get here, we have:
+      //
+      //      /some/path/to/some/thing/lib/swift/macosx/libswiftCore.dylib
+      //                              ^         ^      ^
+      //                              |         |      +---- ptr
+      //                              |         +----------- platform
+      //                              +--------------------- platform - 10
+
+      ptr = platform - 10;
+    } else {
+      // We *might* also be in a bin directory, for instance on Windows, so
+      // check if we should remove that also.
+      if (_swift_lookingAtBin(ptr, runtimePath)) {
+        // C:\some\path\to\some\thing\bin\libswiftCore.dylib
+        //                           ^   ^
+        //                           |   +---- ptr
+        //                           +-------- ptr - 4
+        ptr -= 4;
+      }
+    }
   }
 
   // If the result is empty, return "./" or ".\\"
@@ -120,6 +183,60 @@ _swift_getDefaultRootPath()
   thePath[len] = 0;
 
   return thePath;
+}
+
+// Join paths together
+char *
+_swift_joinPaths(const char *path, ...)
+{
+  va_list val;
+  size_t baseLen = 0;
+  size_t totalLen = 0;
+  const char *pathSeg;
+
+  baseLen = std::strlen(path);
+  while (baseLen && _swift_isPathSep(path[baseLen - 1]))
+    --baseLen;
+
+  if (!baseLen)
+    totalLen = 1;
+  else
+    totalLen = baseLen;
+
+  va_start(val, path);
+  while ((pathSeg = va_arg(val, const char *))) {
+    size_t len = std::strlen(pathSeg);
+    while (len && _swift_isPathSep(pathSeg[len - 1]))
+      --len;
+    if (len)
+      totalLen += 1 + len;
+  }
+  va_end(val);
+
+  char *buffer = static_cast<char *>(std::malloc(totalLen + 1));
+  char *ptr = buffer;
+
+  if (!baseLen)
+    *ptr++ = PATHSEP_CHR;
+  else {
+    std::memcpy(ptr, path, baseLen);
+    ptr += baseLen;
+  }
+
+  va_start(val, path);
+  while ((pathSeg = va_arg(val, const char *))) {
+    size_t len = std::strlen(pathSeg);
+    while (len && _swift_isPathSep(pathSeg[len - 1]))
+      --len;
+    if (len) {
+      *ptr++ = PATHSEP_CHR;
+      std::memcpy(ptr, pathSeg, len);
+      ptr += len;
+    }
+  }
+  buffer[totalLen] = 0;
+
+  return buffer;
 }
 
 void
@@ -221,7 +338,7 @@ _swift_win32NameFromNTName(LPWSTR pszFilename) {
 }
 #endif
 
-}
+} // namespace
 
 SWIFT_RUNTIME_EXPORT
 const char *
@@ -229,60 +346,107 @@ swift_getAuxiliaryExecutablePath(const char *name)
 {
   const char *rootPath = swift_getRootPath();
 
-  // Form <rootPath>/libexec/swift/
-  size_t rootPathLen = std::strlen(rootPath);
-  const char *libexecStr = PATHSEP_STR "libexec" PATHSEP_STR "swift" PATHSEP_STR;
-  size_t libexecLen = std::strlen(libexecStr);
-  char *libexecPath = (char *)malloc(rootPathLen + libexecLen + 1);
-  std::memcpy(libexecPath, rootPath, rootPathLen);
-  std::memcpy(libexecPath + rootPathLen, libexecStr, libexecLen + 1);
+  const char *platformName = SWIFT_LIB_SUBDIR;
 
-  // If libexec exists, look there
-  if (_swift_exists(libexecPath)) {
-    const char *result = _swift_getAuxExePathIn(libexecPath, name);
+  // <rootPath>/libexec/swift/<platformName>
+  {
+    char *libexecPlatPath = _swift_joinPaths(rootPath,
+                                             "libexec" PATHSEP_STR "swift",
+                                             platformName, nullptr);
 
-    free(libexecPath);
+    // If it exists, look there
+    if (_swift_exists(libexecPlatPath)) {
+      char *result = _swift_getAuxExePathIn(libexecPlatPath, name);
 
-    return result;
+      if (_swift_exists(result)) {
+        std::free(libexecPlatPath);
+
+        return result;
+      }
+
+      std::free(result);
+    }
+
+
+    std::free(libexecPlatPath);
   }
 
-  free(libexecPath);
+  // <rootPath>/libexec/swift
+  {
+    char *libexecPath = _swift_joinPaths(rootPath,
+                                         "libexec" PATHSEP_STR "swift",
+                                         nullptr);
+
+    // If it exists, look there
+    if (_swift_exists(libexecPath)) {
+      char *result = _swift_getAuxExePathIn(libexecPath, name);
+
+      if (_swift_exists(result)) {
+        std::free(libexecPath);
+
+        return result;
+      }
+
+      std::free(result);
+    }
+
+    std::free(libexecPath);
+  }
+
+  // <rootPath>/bin
+  {
+    char *binPath = _swift_joinPaths(rootPath, "bin", nullptr);
+
+    // If bin exists, look there
+    if (_swift_exists(binPath)) {
+      char *result = _swift_getAuxExePathIn(binPath, name);
+
+      if (_swift_exists(result)) {
+        std::free(binPath);
+
+        return result;
+      }
+
+      std::free(result);
+    }
+
+    std::free(binPath);
+  }
 
   // Otherwise, look in the root itself
-  return _swift_getAuxExePathIn(rootPath, name);
+  char *result = _swift_getAuxExePathIn(rootPath, name);
+
+  if (_swift_exists(result))
+    return result;
+
+  std::free(result);
+
+  return nullptr;
 }
 
 namespace {
 
-const char *
+char *
 _swift_getAuxExePathIn(const char *path, const char *name)
 {
-  size_t pathLen = std::strlen(path);
+#ifdef _WIN32
   size_t nameLen = std::strlen(name);
-  size_t extLen = 0;
+  char *nameWithSuffix = nullptr;
+  if (nameLen > 4 && strcmp(name + nameLen - 4, ".exe") != 0) {
+    nameWithSuffix = (char *)std::malloc(nameLen + 4 + 1);
+    std::memcpy(nameWithSuffix, name, nameLen);
+    std::memcpy(nameWithSuffix + nameLen, ".exe", 4 + 1);
 
-#ifdef _WIN32
-  if (nameLen > 4 && strcmp(name + nameLen - 4, ".exe") != 0)
-    extLen = 4;
-#endif
-
-  // <path>/<name>[.exe]<NUL>
-  size_t totalLen = pathLen + nameLen + extLen + 1;
-  char *fullPath = (char *)malloc(totalLen);
-  char *ptr = fullPath;
-  std::memcpy(ptr, path, pathLen);
-  ptr += pathLen;
-  std::memcpy(ptr, name, nameLen);
-  ptr += nameLen;
-
-#ifdef _WIN32
-  if (extLen) {
-    std::memcpy(ptr, ".exe", 4);
-    ptr += 4;
+    name = nameWithSuffix;
   }
 #endif
 
-  *ptr = 0;
+  char *fullPath = _swift_joinPaths(path, name, nullptr);
+
+#ifdef _WIN32
+  if (nameWithSuffix)
+    std::free(nameWithSuffix);
+#endif
 
   return fullPath;
 }
