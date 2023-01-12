@@ -1,14 +1,4 @@
-// RUN: %target-sil-opt %s -ossa-lifetime-analysis -o /dev/null | %FileCheck %s
-//
-// These tests rely on "incomplete" OSSA lifetimes. Incomplete OSSA
-// lifetimes are invalid SIL, but the OSSA liveness utilities still
-// need to handle them! SILGen and textual SIL is allowed to produce
-// incomplete lifetimes. The OSSA liveness utilities need to be able
-// to fixup those incomplete lifetimes. So the utilities need to
-// handle invalid SIL in order to produce valid SIL.
-//
-// For each function, all values used by debug_value [trace] are
-// considered live range defs. Liveness is computed from their direct uses.
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 sil_stage canonical
 
@@ -25,7 +15,7 @@ class D {
   @_borrowed @_hasStorage var borrowed: C { get set }
 }
 
-// CHECK-LABEL: @testSelfLoop
+// CHECK-LABEL: testSelfLoop: ssa-liveness
 // CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
 // CHECK: bb1: LiveOut
 // CHECK: bb2: LiveWithin
@@ -39,6 +29,7 @@ bb0(%0 : @guaranteed $C):
 bb1(%1 : @owned $C):
   destroy_value %1 : $C
   %2 = copy_value %0 : $C
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -50,7 +41,7 @@ bb3:
   return %99 : $()
 }
 
-// CHECK-LABEL: @testSelfKill
+// CHECK-LABEL: testSelfKill: ssa-liveness
 // CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
 // CHECK: bb1: LiveOut
 // CHECK: bb2: LiveWithin
@@ -63,6 +54,7 @@ bb0:
 
 bb1(%1 : @owned $C):
   %2 = move_value %1 : $C
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -80,7 +72,7 @@ bb3:
 //
 // This live range is not dominated by the original borrow.
 //
-// CHECK-LABEL: @testReborrow
+// CHECK-LABEL: testReborrow: multidef-liveness
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def:   [[B:%.*]] = begin_borrow %0 : $C
 // CHECK:   def:   [[RB:%.*]] = argument of bb3 : $C
@@ -100,6 +92,7 @@ bb1:
 
 bb2:
   %borrow2 = begin_borrow %0 : $C
+  test_specification "multidef-liveness @trace[0] @trace[1]"
   debug_value [trace] %borrow2 : $C
   br bb3(%borrow2 : $C)
 
@@ -114,7 +107,7 @@ bb4:
   return %99 : $()
 }
 
-// CHECK-LABEL: @testGuaranteedForwarding
+// CHECK-LABEL: testGuaranteedForwarding: ssa-liveness
 // CHECK: SSA lifetime analysis:   [[C:%.*]] = unchecked_ref_cast %{{.*}} : $D to $C
 // CHECK: bb0: LiveWithin
 // CHECK: regular user: %{{.*}} = load [copy]
@@ -123,6 +116,7 @@ sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
 bb0(%0 : @owned $D):
   %borrow0 = begin_borrow %0 : $D
   %c = unchecked_ref_cast %borrow0 : $D to $C
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %c : $C
   %d = unchecked_ref_cast %c : $C to $D
   %f = ref_element_addr %d : $D, #D.object
@@ -134,12 +128,13 @@ bb0(%0 : @owned $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: @testGuaranteedResult
+// CHECK-LABEL: testGuaranteedResult: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
 // CHECK: bb0: LiveWithin
 // CHECK: last user:   end_apply
 sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %0 : $D
   %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
@@ -148,13 +143,14 @@ bb0(%0 : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: @testScopedAddress
+// CHECK-LABEL: testScopedAddress: ssa-liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = ref_element_addr %0
 // CHECK: bb0: LiveWithin
 // CHECK: last user: end_access
 sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   %f = ref_element_addr %0 : $D, #D.object
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %f : $*C
   %access = begin_access [read] [static] %f : $*C
   %o = load [copy] %access : $*C
@@ -164,12 +160,13 @@ bb0(%0 : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: @testDeadAddress
+// CHECK-LABEL: testDeadAddress: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
 // CHECK: bb0: LiveWithin
 // CHECK: last user: %{{.*}} = ref_element_addr
 sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %0 : $D
   %f = ref_element_addr %0 : $D, #D.object
   %99 = tuple()
@@ -178,7 +175,7 @@ bb0(%0 : @guaranteed $D):
 
 // A LiveOut block with a non-SSA def, bb0, has no liveness boundary.
 //
-// CHECK-LABEL: @testMultiDefLiveOutNoBoundary
+// CHECK-LABEL: testMultiDefLiveOutNoBoundary: multidef-liveness
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
 // CHECK:   def: %{{.*}} = copy_value %0 : $C
@@ -197,6 +194,7 @@ bb0(%0 : @guaranteed $D):
 sil [ossa] @testMultiDefLiveOutNoBoundary : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0 = copy_value %0 : $C
+  test_specification "multidef-liveness @trace[0] @trace[1] @trace[2] @trace[3]"
   debug_value [trace] %copy0 : $C
   cond_br undef, bb1, bb3
 
@@ -217,36 +215,6 @@ bb3:
 bb4(%phi : @owned $C):
   debug_value [trace] %phi : $C
   destroy_value %phi : $C
-  %99 = tuple()
-  return %99 : $()
-}
-
-// A dead-end block with a def can still be a boundary edge. This can
-// only happen in OSSA with incomplete lifetimes.
-//
-// CHECK-LABEL: @testMultiDefDeadDefBoundaryEdge
-// CHECK: MultiDef lifetime analysis:
-// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
-// CHECK:   def: [[CP3:%.*]] = copy_value %0 : $C
-// CHECK: bb0: LiveOut,
-// CHECK: bb1: LiveWithin,
-// CHECK: bb2: LiveWithin,
-// CHECK: last user:   destroy_value [[CP0]] : $C
-// CHECK-NEXT: boundary edge: bb1
-// CHECK-NEXT: dead def: [[CP3]] = copy_value %0 : $C
-sil [ossa] @testMultiDefDeadDefBoundaryEdge : $@convention(thin) (@guaranteed C) -> () {
-bb0(%0 : @guaranteed $C):
-  %copy0 = copy_value %0 : $C
-  debug_value [trace] %copy0 : $C
-  cond_br undef, bb1, bb3
-
-bb1:
-  %dead = copy_value %0 : $C
-  debug_value [trace] %dead : $C
-  unreachable
-
-bb3:
-  destroy_value %copy0 : $C
   %99 = tuple()
   return %99 : $()
 }

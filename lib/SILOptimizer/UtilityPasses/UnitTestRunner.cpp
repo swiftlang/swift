@@ -74,6 +74,7 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -282,6 +283,82 @@ struct PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest : UnitTest {
     }
     boundary.visitInsertionPoints(
         [](SILBasicBlock::iterator point) { point->dump(); });
+  }
+};
+
+// Arguments:
+// - SILValue: value to a analyze
+// Dumps:
+// - the liveness result and boundary
+struct SSALivenessTest : UnitTest {
+  SSALivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    assert(!arguments.hasUntaken());
+    llvm::outs() << "SSA lifetime analysis: " << value;
+
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    SSAPrunedLiveness liveness(&discoveredBlocks);
+    liveness.initializeDef(value);
+    liveness.computeSimple();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value to a analyze
+// Dumps:
+// - the liveness result and boundary
+struct ScopedAddressLivenessTest : UnitTest {
+  ScopedAddressLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    assert(!arguments.hasUntaken());
+    llvm::outs() << "Scoped address analysis: " << value;
+
+    ScopedAddressValue scopedAddress(value);
+    assert(scopedAddress);
+
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    SSAPrunedLiveness liveness(&discoveredBlocks);
+    scopedAddress.computeTransitiveLiveness(liveness);
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value to a analyze
+// Dumps:
+// - the liveness result and boundary
+struct MultiDefLivenessTest : UnitTest {
+  MultiDefLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+
+  void invoke(Arguments &arguments) override {
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    MultiDefPrunedLiveness liveness(getFunction(), &discoveredBlocks);
+
+    llvm::outs() << "MultiDef lifetime analysis:\n";
+    while (arguments.hasUntaken()) {
+      SILValue value = arguments.takeValue();
+      llvm::outs() << "  def: " << value;
+      liveness.initializeDef(value);
+    }
+    liveness.computeSimple();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    boundary.print(llvm::outs());
   }
 };
 
@@ -534,6 +611,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
 
@@ -557,7 +635,9 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
         SimplifyCFGSimplifyTermWithIdenticalDestBlocks)
     ADD_UNIT_TEST_SUBCLASS("simplify-cfg-try-jump-threading",
                            SimplifyCFGTryJumpThreading)
+    ADD_UNIT_TEST_SUBCLASS("scoped-address-liveness", ScopedAddressLivenessTest)
 
+    ADD_UNIT_TEST_SUBCLASS("ssa-liveness", SSALivenessTest)
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
