@@ -75,7 +75,7 @@ extension ASTGenVisitor {
 
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     let isStateic = false  // TODO: compute this
-    let isLet = node.letOrVarKeyword.tokenKind == .letKeyword
+    let isLet = node.letOrVarKeyword.tokenKind == .keyword(.let)
 
     // TODO: don't drop "initializer" on the floor.
     return .decl(
