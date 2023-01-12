@@ -143,6 +143,9 @@ EXPERIMENTAL_FEATURE(ParserValidation, false)
 /// parser.
 EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
 
+/// Whether to allow 'if' and 'switch' statements to be treated as expressions.
+EXPERIMENTAL_FEATURE(StatementExpressions, false)
+
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
 

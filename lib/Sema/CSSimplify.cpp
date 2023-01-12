@@ -6218,13 +6218,17 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::TernaryBranch: {
+  case ConstraintLocator::TernaryBranch:
+  case ConstraintLocator::SingleValueStmtBranch: {
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+      return true;
+
     recordAnyTypeVarAsPotentialHole(lhs);
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If `if` expression has a contextual type, let's consider it a source of
-    // truth and produce a contextual mismatch instead of  per-branch failure,
-    // because it's a better pointer than potential then-to-else type mismatch.
+    // If there's a contextual type, let's consider it the source of truth and
+    // produce a contextual mismatch instead of  per-branch failure, because
+    // it's a better pointer than potential then-to-else type mismatch.
     if (auto contextualType =
             getContextualType(anchor, /*forConstraint=*/false)) {
       auto purpose = getContextualTypePurpose(anchor);
@@ -6246,7 +6250,7 @@ bool ConstraintSystem::repairFailures(
     }
 
     // If there is no contextual type, this is most likely a contextual type
-    // mismatch between then/else branches of ternary operator.
+    // mismatch between the branches.
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -7368,6 +7372,31 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
+      }
+
+      // We also need to propagate this conversion into the branches for single
+      // value statements.
+      //
+      // As with the previous checks, we only allow the Void conversion in
+      // an implicit single-expression closure. In the more general case, we
+      // only allow the Never conversion.
+      if (auto contextualTy = elt->getAs<LocatorPathElt::ContextualType>()) {
+        if (contextualTy->isFor(CTP_SingleValueStmtBranchInSingleExprClosure) ||
+            (type1->isUninhabited() &&
+             contextualTy->isFor(CTP_SingleValueStmtBranch))) {
+          increaseScore(SK_FunctionConversion);
+          return getTypeMatchSuccess();
+        }
+      }
+      // We need to check this in addition to the contextual type purpose for
+      // a single value statement, as this handles the outer join, whereas the
+      // previous check only handles the inner conversion to the branch type.
+      auto *loc = getConstraintLocator(locator);
+      if (loc->isForSingleValueStmtBranchInSingleExprClosure() ||
+          (type1->isUninhabited() &&
+           loc->isLastElement<LocatorPathElt::SingleValueStmtBranch>())) {
+        increaseScore(SK_FunctionConversion);
+        return getTypeMatchSuccess();
       }
     }
   }
@@ -14050,6 +14079,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       if (branchElt->forElse())
         impact = 10;
     }
+    if (auto branchElt =
+            locator
+                ->getLastElementAs<LocatorPathElt::SingleValueStmtBranch>()) {
+      // Similar to a ternary, except we have N branches. Let's prefer the fix
+      // on the first branch.
+      if (branchElt->getExprBranchIndex() > 0)
+        impact = 10;
+    }
 
     // Increase impact of invalid conversions to `Any` and `AnyHashable`
     // associated with collection elements (i.e. for-in sequence element)
@@ -14525,6 +14562,8 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
+  case CTP_SingleValueStmtBranchInSingleExprClosure:
     break;
   }
 

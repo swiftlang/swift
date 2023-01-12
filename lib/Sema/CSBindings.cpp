@@ -1071,6 +1071,15 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
     if (forClosureResult() || forGenericParameter())
       return false;
   }
+
+  if (conjunction->getLocator()->isForSingleValueStmtConjunction()) {
+    // If the bindings should be delayed, try the conjunction first.
+    // TODO: Seems like this ought to apply generally? Currently regresses a
+    // diagnostic in a test.
+    if (isDelayed())
+      return false;
+  }
+
   return true;
 }
 
@@ -1150,8 +1159,11 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // on the other side since it could only be either a closure
     // parameter or a result type, and we can't get a full set
     // of bindings for them until closure's body is opened.
+    // Also do the same for SingleValueStmtExprs, as we must solve the
+    // conjunction for the branches before we have the full set of bindings.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
-      if (typeVar->getImpl().isClosureType()) {
+      if (typeVar->getImpl().isClosureType() ||
+          typeVar->getImpl().getLocator()->directlyAt<SingleValueStmtExpr>()) {
         DelayedBy.push_back(constraint);
         return None;
       }

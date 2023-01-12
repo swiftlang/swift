@@ -5971,6 +5971,58 @@ public:
   }
 };
 
+/// An expression that may wrap a statement which produces a single value.
+class SingleValueStmtExpr : public Expr {
+public:
+  enum class Kind {
+    If, Switch
+  };
+
+private:
+  Stmt *S;
+  DeclContext *DC;
+
+  SingleValueStmtExpr(Stmt *S, DeclContext *DC)
+      : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
+
+public:
+  /// Creates a new SingleValueStmtExpr wrapping a statement.
+  static SingleValueStmtExpr *create(ASTContext &ctx, Stmt *S, DeclContext *DC);
+
+  /// Creates a new SingleValueStmtExpr wrapping a statement, and recursively
+  /// attempts to wrap any branches of that statement that can become single
+  /// value statement expressions.
+  ///
+  /// If \p mustBeExpr is true, branches will be eagerly wrapped even if they
+  /// may not be valid SingleValueStmtExprs (which Sema will later diagnose).
+  static SingleValueStmtExpr *createWithWrappedBranches(ASTContext &ctx,
+                                                        Stmt *S,
+                                                        DeclContext *DC,
+                                                        bool mustBeExpr);
+  /// Retrieve the wrapped statement.
+  Stmt *getStmt() const { return S; }
+  void setStmt(Stmt *newS) { S = newS; }
+
+  /// Retrieve the kind of statement being wrapped.
+  Kind getStmtKind() const;
+
+  /// Retrieve the complete set of branches for the underlying statement.
+  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
+
+  /// Retrieve the single expression branches of the statement, excluding
+  /// branches that either have multiple expressions, or have statements.
+  ArrayRef<Expr *>
+  getSingleExprBranches(SmallVectorImpl<Expr *> &scratch) const;
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SingleValueStmt;
+  }
+};
+
 /// Expression node that effects a "one-way" constraint in
 /// the constraint system, allowing type information to flow from the
 /// subexpression outward but not the other way.

@@ -291,6 +291,11 @@ static void createConjunction(ConstraintSystem &cs,
                               ConstraintLocator *locator) {
   bool isIsolated = false;
 
+  // Single value statement conjunctions are always isolated, as we want to
+  // solve the branches independently of the rest of the system.
+  if (locator->isForSingleValueStmtConjunction())
+    isIsolated = true;
+
   SmallVector<Constraint *, 4> constraints;
   SmallVector<TypeVariableType *, 2> referencedVars;
 
@@ -321,6 +326,11 @@ static void createConjunction(ConstraintSystem &cs,
     // its individual elements are allowed access to type information
     // from the outside e.g. parameters/result type.
     isIsolated = true;
+  }
+
+  if (locator->isForSingleValueStmtConjunction()) {
+    auto *SVE = castToExpr<SingleValueStmtExpr>(locator->getAnchor());
+    referencedVars.push_back(cs.getType(SVE)->castTo<TypeVariableType>());
   }
 
   UnresolvedClosureParameterCollector paramCollector(cs);
@@ -736,17 +746,12 @@ private:
     // Other declarations will be handled at application time.
   }
 
-  void visitBreakStmt(BreakStmt *breakStmt) {
-  }
-
-  void visitContinueStmt(ContinueStmt *continueStmt) {
-  }
-
-  void visitDeferStmt(DeferStmt *deferStmt) {
-  }
-
-  void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-  }
+  // These statements don't require any type-checking.
+  void visitBreakStmt(BreakStmt *breakStmt) {}
+  void visitContinueStmt(ContinueStmt *continueStmt) {}
+  void visitDeferStmt(DeferStmt *deferStmt) {}
+  void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {}
+  void visitFailStmt(FailStmt *fail) {}
 
   void visitStmtCondition(LabeledConditionalStmt *S,
                           SmallVectorImpl<ElementInfo> &elements,
@@ -994,9 +999,13 @@ private:
 
     SmallVector<ElementInfo, 4> elements;
     for (auto element : braceStmt->getElements()) {
-      bool isDiscarded =
-          element.is<Expr *>() &&
-          (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
+      bool isDiscarded = false;
+      auto contextInfo = cs.getContextualTypeInfo(element);
+
+      if (auto *E = element.dyn_cast<Expr *>()) {
+        if (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport)
+          isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
+      }
 
       if (auto *decl = element.dyn_cast<Decl *>()) {
         if (auto *PDB = dyn_cast<PatternBindingDecl>(decl)) {
@@ -1005,17 +1014,21 @@ private:
         }
       }
 
-      elements.push_back(
-          makeElement(element,
-                      cs.getConstraintLocator(
-                          locator, LocatorPathElt::SyntacticElement(element)),
-                      /*contextualInfo=*/{}, isDiscarded));
+      elements.push_back(makeElement(
+          element,
+          cs.getConstraintLocator(locator,
+                                  LocatorPathElt::SyntacticElement(element)),
+          contextInfo.getValueOr(ContextualTypeInfo()), isDiscarded));
     }
 
     createConjunction(cs, elements, locator);
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
+    auto contextualResultInfo = getContextualResultInfo();
+    assert(contextualResultInfo &&
+           "Should have bailed in the precheck if we're not in a function");
+
     // Single-expression closures are effectively a `return` statement,
     // so let's give them a special locator as to indicate that.
     // Return statements might not have a result if we have a closure whose
@@ -1031,9 +1044,8 @@ private:
         return;
       }
 
-      auto contextualResultInfo = getContextualResultInfo();
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       contextualResultInfo.getType(),
+                       contextualResultInfo->getType(),
                        cs.getConstraintLocator(
                            context.getAsAbstractClosureExpr().get(),
                            LocatorPathElt::ClosureBody(
@@ -1054,10 +1066,9 @@ private:
       resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
     }
 
-    auto contextualResultInfo = getContextualResultInfo();
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     contextualResultInfo.purpose,
-                                     contextualResultInfo.getType(),
+                                     contextualResultInfo->purpose,
+                                     contextualResultInfo->getType(),
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -1066,31 +1077,31 @@ private:
     }
 
     cs.setContextualType(target.getAsExpr(),
-                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
-                         contextualResultInfo.purpose);
+                         TypeLoc::withoutLoc(contextualResultInfo->getType()),
+                         contextualResultInfo->purpose);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
-  ContextualTypeInfo getContextualResultInfo() const {
-    auto funcRef = context.getAsAnyFunctionRef();
+  Optional<ContextualTypeInfo> getContextualResultInfo() const {
+    auto funcRef = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
     if (!funcRef)
-      return {Type(), CTP_Unused};
+      return None;
 
     if (auto transform = cs.getAppliedResultBuilderTransform(*funcRef))
-      return {transform->bodyResultType, CTP_ReturnStmt};
+      return ContextualTypeInfo{transform->bodyResultType, CTP_ReturnStmt};
 
     if (auto *closure =
             getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
-      return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
+      return ContextualTypeInfo{cs.getClosureType(closure)->getResult(),
+                                CTP_ClosureResult};
 
-    return {funcRef->getBodyResultType(), CTP_ReturnStmt};
+    return ContextualTypeInfo{funcRef->getBodyResultType(), CTP_ReturnStmt};
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
 private:
@@ -1197,6 +1208,53 @@ bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
   return generator.hadError;
 }
 
+bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
+  auto *S = E->getStmt();
+  auto &ctx = getASTContext();
+
+  auto *loc = getConstraintLocator(E);
+  Type resultTy = createTypeVariable(loc, /*options*/ 0);
+  setType(E, resultTy);
+
+  // Assign contextual types for each of the expression branches, which will
+  // either be the contextual type for the overall expression, or fresh type
+  // variables.
+  SmallVector<std::pair<Type, ConstraintLocator *>, 4> branchTypes;
+  SmallVector<Expr *, 4> scratch;
+  auto branches = E->getSingleExprBranches(scratch);
+  for (auto idx : indices(branches)) {
+    auto *branchExpr = branches[idx];
+    auto *branchLoc =
+        getConstraintLocator(E, LocatorPathElt::SingleValueStmtBranch(idx));
+    auto branchTy = createTypeVariable(branchLoc, /*options*/ 0);
+
+    auto contextPurpose =
+        branchLoc->isForSingleValueStmtBranchInSingleExprClosure()
+            ? CTP_SingleValueStmtBranchInSingleExprClosure
+            : CTP_SingleValueStmtBranch;
+    setContextualType(branchExpr, TypeLoc::withoutLoc(branchTy),
+                      contextPurpose);
+    branchTypes.emplace_back(branchTy, branchLoc);
+  }
+
+  if (branchTypes.empty()) {
+    // If we only have statement branches, the expression is typed as Void. This
+    // should only be the case for 'if' and 'switch' statements that must be
+    // expressions that have branches that all end in a throw, and we'll warn
+    // that we've inferred Void.
+    addConstraint(ConstraintKind::Bind, resultTy, ctx.getVoidType(), loc);
+  } else {
+    // Join the branch types.
+    addJoinConstraint(loc, branchTypes, resultTy);
+  }
+
+  // Generate the conjunction for the branches.
+  auto context = SyntacticElementContext::forSingleValueStmtExpr(E);
+  SyntacticElementConstraintGenerator generator(*this, context, loc);
+  generator.visit(S);
+  return generator.hadError;
+}
+
 bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
   if (!closure->hasSingleExpressionBody()) {
     auto *DC = closure->getParent();
@@ -1246,6 +1304,8 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     context = SyntacticElementContext::forClosure(closure);
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
     context = SyntacticElementContext::forFunction(fn);
+  } else if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor)) {
+    context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
   } else {
     return SolutionKind::Error;
   }
@@ -1304,10 +1364,21 @@ public:
 
   SyntacticElementSolutionApplication(Solution &solution,
                                       SyntacticElementContext context,
-                                      Type resultType,
                                       RewriteTargetFn rewriteTarget)
-      : solution(solution), context(context), resultType(resultType),
-        rewriteTarget(rewriteTarget) {}
+      : solution(solution), context(context), rewriteTarget(rewriteTarget) {
+    if (auto fn = AnyFunctionRef::fromDeclContext(context.getAsDeclContext())) {
+      if (auto transform = solution.getAppliedBuilderTransform(*fn)) {
+        resultType = solution.simplifyType(transform->bodyResultType);
+      } else if (auto *closure =
+                     getAsExpr<ClosureExpr>(fn->getAbstractClosureExpr())) {
+        resultType = solution.getResolvedType(closure)
+                         ->castTo<FunctionType>()
+                         ->getResult();
+      } else {
+        resultType = fn->getBodyResultType();
+      }
+    }
+  }
 
   virtual ~SyntacticElementSolutionApplication() {}
 
@@ -1383,6 +1454,10 @@ private:
     if (checkFallthroughStmt(context.getAsDeclContext(), fallthroughStmt))
       hadError = true;
     return fallthroughStmt;
+  }
+
+  ASTNode visitFailStmt(FailStmt *failStmt) {
+    return failStmt;
   }
 
   ASTNode visitDeferStmt(DeferStmt *deferStmt) {
@@ -1594,7 +1669,7 @@ private:
     return caseStmt;
   }
 
-  ASTNode visitBraceElement(ASTNode node) {
+  virtual ASTNode visitBraceElement(ASTNode node) {
     auto &cs = solution.getConstraintSystem();
     if (auto *expr = node.dyn_cast<Expr *>()) {
       // Rewrite the expression.
@@ -1602,7 +1677,18 @@ private:
       if (auto rewrittenTarget = rewriteTarget(target)) {
         node = rewrittenTarget->getAsExpr();
 
-        if (target.isDiscardedExpr())
+        auto isDiscarded = target.isDiscardedExpr();
+
+        // A branch of a single value statement expression is effectively
+        // discarded if the contextual type ends up being Void.
+        auto contextualPurpose = target.getExprContextualTypePurpose();
+        if (contextualPurpose == CTP_SingleValueStmtBranch ||
+            contextualPurpose == CTP_SingleValueStmtBranchInSingleExprClosure) {
+          isDiscarded = rewrittenTarget->getExprConversionType()
+                                       ->lookThroughAllOptionalTypes()
+                                       ->isVoid();
+        }
+        if (isDiscarded)
           TypeChecker::checkIgnoredExpr(castToExpr(node));
       } else {
         hadError = true;
@@ -1794,7 +1880,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
 public:
@@ -1821,7 +1906,7 @@ public:
                         RewriteTargetFn rewriteTarget)
       : SyntacticElementSolutionApplication(
             solution, SyntacticElementContext::forFunctionRef(context),
-            transform.bodyResultType, rewriteTarget),
+            rewriteTarget),
         Transform(transform) {}
 
   bool apply() {
@@ -1855,6 +1940,15 @@ private:
 
     doStmt->setBody(castToStmt<BraceStmt>(newBody));
     return doStmt;
+  }
+
+  ASTNode visitBraceElement(ASTNode node) override {
+    if (auto *SVE = getAsExpr<SingleValueStmtExpr>(node)) {
+      // This should never be treated as an expression in a result builder,
+      // it should have statement semantics.
+      return visitBraceElement(SVE->getStmt());
+    }
+    return SyntacticElementSolutionApplication::visitBraceElement(node);
   }
 
   NullablePtr<Stmt> transformDo(DoStmt *doStmt) {
@@ -2202,21 +2296,8 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   // transformations.
   llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, fn.getAsDeclContext());
 
-  Type resultTy;
-
-  if (auto transform = solution.getAppliedBuilderTransform(fn)) {
-    resultTy = solution.simplifyType(transform->bodyResultType);
-  } else if (auto *closure =
-                 getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
-    resultTy =
-        solution.getResolvedType(closure)->castTo<FunctionType>()->getResult();
-  } else {
-    resultTy = fn.getBodyResultType();
-  }
-
   SyntacticElementSolutionApplication application(
-      solution, SyntacticElementContext::forFunctionRef(fn), resultTy,
-      rewriteTarget);
+      solution, SyntacticElementContext::forFunctionRef(fn), rewriteTarget);
 
   auto *body = application.apply();
 
@@ -2242,6 +2323,21 @@ bool ConjunctionElement::mightContainCodeCompletionToken(
   }
 }
 
+bool ConstraintSystem::applySolutionToSingleValueStmt(
+    Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
+    RewriteTargetFn rewriteTarget) {
+
+  auto context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
+  SyntacticElementSolutionApplication application(solution, context,
+                                                  rewriteTarget);
+  auto *stmt = application.apply();
+  if (!stmt || application.hadError)
+    return true;
+
+  SVE->setStmt(stmt);
+  return false;
+}
+
 void ConjunctionElement::findReferencedVariables(
     ConstraintSystem &cs, SmallPtrSetImpl<TypeVariableType *> &typeVars) const {
   auto referencedVars = Element->getTypeVariables();
@@ -2250,10 +2346,32 @@ void ConjunctionElement::findReferencedVariables(
   if (Element->getKind() != ConstraintKind::SyntacticElement)
     return;
 
+  // Add any type variables present in the fixed types for the branches of
+  // a single value statement.
+  for (auto *tv : referencedVars) {
+    auto *tvLoc = tv->getImpl().getLocator();
+    if (!tvLoc->isLastElement<LocatorPathElt::SingleValueStmtBranch>())
+      continue;
+
+    auto fixedTy = cs.getFixedTypeRecursive(tv, /*wantRValue*/ false);
+    if (fixedTy->hasTypeVariable()) {
+      SmallPtrSet<TypeVariableType *, 4> tvs;
+      fixedTy->getTypeVariables(tvs);
+      typeVars.insert(tvs.begin(), tvs.end());
+    }
+  }
+
   ASTNode element = Element->getSyntacticElement();
   auto *locator = Element->getLocator();
 
-  TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
+  ASTNode parent = locator->getAnchor();
+  if (auto *SVE = getAsExpr<SingleValueStmtExpr>(parent)) {
+    // Use a parent closure if we have one. This is needed to correctly handle
+    // return statements that refer to an outer closure.
+    if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext()))
+      parent = CE;
+  }
+  TypeVariableRefFinder refFinder(cs, parent, typeVars);
 
   // If this is a pattern of `for-in` statement, let's walk into `for-in`
   // sequence expression because both elements are type-checked together.

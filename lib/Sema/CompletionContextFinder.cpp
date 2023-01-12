@@ -24,6 +24,10 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
                         closure});
   }
 
+  if (isa<SingleValueStmtExpr>(E)) {
+    Contexts.push_back({ContextKind::SingleValueStmtExpr, E});
+  }
+
   if (isa<InterpolatedStringLiteralExpr>(E)) {
     Contexts.push_back({ContextKind::StringInterpolation, E});
   }
@@ -101,6 +105,7 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
   for (auto context : Contexts) {
     switch (context.Kind) {
     case ContextKind::StringInterpolation:
+    case ContextKind::SingleValueStmtExpr:
       LLVM_FALLTHROUGH;
     case ContextKind::FallbackExpression:
       if (!fallback && context.E != InitialExpr)

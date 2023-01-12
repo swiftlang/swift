@@ -415,6 +415,12 @@ protected:
     }
 
     auto expr = node.get<Expr *>();
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+      // This should never be treated as an expression in a result builder, it
+      // should have statement semantics.
+      visitBraceElement(SVE->getStmt(), expressions);
+      return;
+    }
     if (cs && builder.supports(ctx.Id_buildExpression)) {
       expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
                                {expr}, {Identifier()});
@@ -1056,6 +1062,12 @@ protected:
     }
 
     auto *expr = element.get<Expr *>();
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+      // This should never be treated as an expression in a result builder, it
+      // should have statement semantics.
+      return transformBraceElement(SVE->getStmt(), newBody,
+                                   buildBlockArguments);
+    }
     if (builder.supports(ctx.Id_buildExpression)) {
       expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
                                {Identifier()});
@@ -1793,6 +1805,11 @@ public:
     }
 
     if (auto expr = node.dyn_cast<Expr *>()) {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+        // This should never be treated as an expression in a result builder, it
+        // should have statement semantics.
+        return visitBraceElement(SVE->getStmt(), newElements);
+      }
       // Skip error expressions.
       if (isa<ErrorExpr>(expr))
         return false;

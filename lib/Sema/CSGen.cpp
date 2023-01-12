@@ -3711,6 +3711,10 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+      llvm_unreachable("Handled by the walker directly");
+    }
+
     Type visitOneWayExpr(OneWayExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
       auto resultTypeVar = CS.createTypeVariable(locator, 0);
@@ -3986,6 +3990,12 @@ namespace {
 
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
+        return Action::SkipChildren(expr);
+      }
+
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+        if (CS.generateConstraints(SVE))
+          return Action::Stop();
         return Action::SkipChildren(expr);
       }
 

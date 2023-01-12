@@ -23,6 +23,7 @@ namespace swift {
 class CompletionContextFinder : public ASTWalker {
   enum class ContextKind {
     FallbackExpression,
+    SingleValueStmtExpr,
     StringInterpolation,
     SingleStmtClosure,
     MultiStmtClosure,
@@ -76,6 +77,10 @@ public:
 
   bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
+  }
+
+  bool locatedInSingleValueStmtExpr() const {
+    return hasContext(ContextKind::SingleValueStmtExpr);
   }
 
   bool hasCompletionExpr() const {

@@ -2978,6 +2978,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    printCommon(E, "single_value_stmt_expr");
+    OS << '\n';
+    printRec(E->getStmt(), E->getDeclContext()->getASTContext());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOneWayExpr(OneWayExpr *E) {
     printCommon(E, "one_way_expr");
     OS << '\n';

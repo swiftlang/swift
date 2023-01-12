@@ -535,6 +535,12 @@ bool PatternEntryDeclScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 
+bool PatternEntryInitializerScope::isLabeledStmtLookupTerminator() const {
+  // This is needed for SingleValueStmtExprs, which may be used in bindings,
+  // and have nested statements.
+  return false;
+}
+
 llvm::SmallVector<LabeledStmt *, 4>
 ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
   // Find the innermost scope from which to start our search.

@@ -85,6 +85,15 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_SingleValueStmtBranch, ///< The contextual type for a branch in a single
+                             ///< value statement expression.
+
+  CTP_SingleValueStmtBranchInSingleExprClosure, ///< The contextual type for a
+                                                ///< branch in a single value
+                                                ///< statement expression that's
+                                                ///< part of a single expression
+                                                ///< return in a closure.
+
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
 
@@ -294,6 +303,14 @@ public:
 
   /// Determine whether this locator is for a macro expansion.
   bool isForMacroExpansion() const;
+
+  /// Whether this locator identifies a conjunction for the branches of a
+  /// SingleValueStmtExpr.
+  bool isForSingleValueStmtConjunction() const;
+
+  /// Whether this locator identifies a conversion for a SingleValueStmtExpr
+  /// branch in an implicit single-expression return for a closure.
+  bool isForSingleValueStmtBranchInSingleExprClosure() const;
 
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {
@@ -883,6 +900,22 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
+/// The branch of a SingleValueStmtExpr. Note the stored index corresponds to
+/// the expression branches, i.e it skips statement branch indices.
+class LocatorPathElt::SingleValueStmtBranch final
+    : public StoredIntegerElement<1> {
+public:
+  SingleValueStmtBranch(unsigned exprIdx)
+      : StoredIntegerElement(ConstraintLocator::SingleValueStmtBranch,
+                             exprIdx) {}
+
+  unsigned getExprBranchIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::SingleValueStmtBranch;
   }
 };
 

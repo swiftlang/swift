@@ -5080,6 +5080,11 @@ public:
   LLVM_NODISCARD
   bool generateConstraints(AnyFunctionRef fn, BraceStmt *body);
 
+  /// Generate constraints for a given SingleValueStmtExpr.
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(SingleValueStmtExpr *E);
+
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
@@ -5977,6 +5982,22 @@ public:
                            std::function<Optional<SolutionApplicationTarget>(
                                SolutionApplicationTarget)>
                                rewriteTarget);
+
+  /// Apply the given solution to the given SingleValueStmtExpr.
+  ///
+  /// \param solution The solution to apply.
+  /// \param SVE The SingleValueStmtExpr to rewrite.
+  /// \param DC The declaration context in which transformations will be
+  /// applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  /// \returns true if solution cannot be applied.
+  bool applySolutionToSingleValueStmt(
+      Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
+      std::function<
+          Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+          rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

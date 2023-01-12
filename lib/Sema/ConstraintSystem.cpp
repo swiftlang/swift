@@ -5322,6 +5322,16 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::SingleValueStmtBranch: {
+      auto branchElt = path[0].castTo<LocatorPathElt::SingleValueStmtBranch>();
+      auto exprIdx = branchElt.getExprBranchIndex();
+      auto *SVE = castToExpr<SingleValueStmtExpr>(anchor);
+      SmallVector<Expr *, 4> scratch;
+      anchor = SVE->getSingleExprBranches(scratch)[exprIdx];
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::KeyPathDynamicMember:
     case ConstraintLocator::ImplicitDynamicMemberSubscript: {
       // Key path dynamic member lookup should be completely transparent.
@@ -6544,6 +6554,8 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
+  case CTP_SingleValueStmtBranchInSingleExprClosure:
     return false;
   }
   llvm_unreachable("invalid contextual type");

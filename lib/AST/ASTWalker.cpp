@@ -1220,6 +1220,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
+  Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto *S = doIt(E->getStmt())) {
+      E->setStmt(S);
+    } else {
+      return nullptr;
+    }
+    return E;
+  }
+
   Expr *visitOneWayExpr(OneWayExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
