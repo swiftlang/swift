@@ -15,6 +15,11 @@ class D {
   @_borrowed @_hasStorage var borrowed: C { get set }
 }
 
+struct PairC {
+  var first: C
+  var second: C
+}
+
 // CHECK-LABEL: testSelfLoop: ssa-liveness
 // CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
 // CHECK: bb1: LiveOut
@@ -181,11 +186,11 @@ bb0(%0 : @guaranteed $D):
 // CHECK:   def: %{{.*}} = copy_value %0 : $C
 // CHECK:   def: %{{.*}} = move_value [[CP0]] : $C
 // CHECK:   def: %{{.*}} = argument of bb4 : $C
-// CHECK: bb0: LiveOut,
-// CHECK: bb2: LiveWithin,
-// CHECK: bb3: LiveWithin,
-// CHECK: bb4: LiveWithin,
-// CHECK: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveWithin,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb4: LiveWithin,
+// CHECK-NEXT: bb1: LiveWithin,
 // CHECK: last user:   br bb4
 // CHECK-NEXT: last user:   br bb4
 // CHECK-NEXT: last user:   %{{.*}} = move_value [[CP0]] : $C
@@ -215,6 +220,194 @@ bb3:
 bb4(%phi : @owned $C):
   debug_value [trace] %phi : $C
   destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// A dead (ref_element_addr) projection is treated like a pointer
+// escape for convenience. Make sure the pointer escape bubbles up
+// through the phi and casts.
+//
+// CHECK-LABEL: testSSADeadRefElementAddr: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveOut,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb1: LiveOut,
+// CHECK: last user:
+// CHECK-SAME: ref_element_addr %6 : $D, #D.object
+// CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
+sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %f = ref_element_addr %phi : $D, #D.object  
+  %99 = tuple()
+  return %99 : $()
+}
+
+// One of the uses is a reborrowed inner borrow scope.
+//
+// CHECK-LABEL: testSSAInnerReborrowedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
+// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: dead def: %0 = argument of bb0 : $C
+sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  %borrow0 = begin_borrow %0 : $C
+  %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
+  br bb1(%borrow0 : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Confusingly, deadPhi is the "last use", but it does not cause its
+// operands to be live-out of the predecessor block. This is because
+// liveness considers all phis to end liveness on the predecessor side
+// by default. Only the client can tell that a particular guaranteed phi
+// should actually extend liveness if it has no uses.
+//
+// CHECK-LABEL: testSSADeadGuaranteedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveWithin,
+// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: regular user
+// CHECK: last user:
+// CHECK-SAME: br bb3
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: end running
+sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is part of the guaranteed argument's simple live range.
+//
+// CHECK-LABEL: testSSADominatedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveOut,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb1: LiveOut,
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3
+// CHECK-NEXT: regular user:   %{{.*}} = load
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3
+// CHECK-NEXT: last user:   %{{.*}} = load
+// CHECK-NEXT: end running
+sil [ossa] @testSSADominatedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %f = ref_element_addr %phi : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is part of the guaranteed argument's simple live range.
+//
+// CHECK-LABEL: testSSAPartialDominatedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb1: LiveWithin,
+// CHECK: last user:
+// CHECK-SAME: load
+sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  %borrow1 = begin_borrow %1 : $C
+  %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
+  br bb1(%borrow1 : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is protected by an outer adjacent reborrow. It is not part
+// of the guaranteed argument's simple live range. 
+//
+// CHECK-LABEL: testSSAReborrowedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
+// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: regular user: br bb1
+// CHECK-NEXT: regular user: %{{.*}} = struct
+// CHECK-NEXT: last user: br bb1
+// CHECK-NEXT: end running
+sil [ossa] @testSSAReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %borrow : $C
+  %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
+  br bb1(%borrow : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
   %99 = tuple()
   return %99 : $()
 }
