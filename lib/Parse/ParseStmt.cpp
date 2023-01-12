@@ -76,6 +76,11 @@ bool Parser::isStartOfStmt() {
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for
     // better recovery in cases like 'try return'.
+
+    // For 'if' and 'switch' we can parse as an expression.
+    if (peekToken().isAny(tok::kw_if, tok::kw_switch))
+      return false;
+
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::kw_try);
     return isStartOfStmt();

@@ -3816,6 +3816,15 @@ private:
         E = CE->getSubExpr();
         continue;
       }
+      // Look through try/await. We'll warn on these during effect checking.
+      if (auto *TE = dyn_cast<AnyTryExpr>(E)) {
+        E = TE->getSubExpr();
+        continue;
+      }
+      if (auto *AE = dyn_cast<AwaitExpr>(E)) {
+        E = AE->getSubExpr();
+        continue;
+      }
       break;
     }
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E))

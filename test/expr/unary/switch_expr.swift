@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature StatementExpressions
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature StatementExpressions -disable-availability-checking
 
 // MARK: Functions
 
@@ -501,7 +501,7 @@ func stmts() {
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   if try switch Bool.random() { case true: true case false: true } {}
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{'try' on an 'switch' expression has no effect}}
   // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   // expected-error@+1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -876,4 +876,38 @@ func continueToInner() -> Int {
   case false:
     1  // expected-warning {{integer literal is unused}}
   }
+}
+
+// MARK: Effect specifiers
+
+func trySwitch1() -> Int {
+  try switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'try' on an 'switch' expression has no effect}}
+}
+
+func trySwitch2() -> Int {
+  let x = try switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'try' on an 'switch' expression has no effect}}
+  return x
+}
+
+func trySwitch3() -> Int {
+  return try switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'try' on an 'switch' expression has no effect}}
+}
+
+func awaitSwitch1() async -> Int {
+  await switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'await' on an 'switch' expression has no effect}}
+}
+
+func awaitSwitch2() async -> Int {
+  let x = await switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'await' on an 'switch' expression has no effect}}
+  return x
+}
+
+func awaitSwitch3() async -> Int {
+  return await switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'await' on an 'switch' expression has no effect}}
 }

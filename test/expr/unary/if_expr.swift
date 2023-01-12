@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature StatementExpressions
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature StatementExpressions -disable-availability-checking
 
 // MARK: Functions
 
@@ -384,7 +384,7 @@ func stmts() {
 
   if try if .random() { true } else { false } {}
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2 {{'try' on an 'if' expression has no effect}}
 
   // expected-error@+1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
   guard if .random() { true } else { false } else {
@@ -666,4 +666,38 @@ func return4() throws -> Int {
     0
   }
   return i
+}
+
+// MARK: Effect specifiers
+
+func tryIf1() -> Int {
+  try if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'try' on an 'if' expression has no effect}}
+}
+
+func tryIf2() -> Int {
+  let x = try if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'try' on an 'if' expression has no effect}}
+  return x
+}
+
+func tryIf3() -> Int {
+  return try if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'try' on an 'if' expression has no effect}}
+}
+
+func awaitIf1() async -> Int {
+  await if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'await' on an 'if' expression has no effect}}
+}
+
+func awaitIf2() async -> Int {
+  let x = await if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'await' on an 'if' expression has no effect}}
+  return x
+}
+
+func awaitIf3() async -> Int {
+  return await if .random() { 0 } else { 1 }
+  // expected-warning@-1 {{'await' on an 'if' expression has no effect}}
 }
