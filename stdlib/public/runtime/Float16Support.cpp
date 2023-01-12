@@ -15,6 +15,7 @@
 // __gnu_h2f_ieee
 // __gnu_f2h_ieee
 // __truncdfhf2
+// __extendhfxf2
 //
 // On Darwin platforms, these are provided by the host compiler-rt, but we
 // can't depend on that everywhere, so we have to provide them in the Swift
@@ -30,7 +31,7 @@
 // Android NDK <r21 do not provide `__aeabi_d2h` in the compiler runtime,
 // provide shims in that case.
 #if (defined(__ANDROID__) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) || \
-  ((defined(__i386__) || defined(__i686__) || defined(__x86_64__)) && !defined(__APPLE__) && !defined(__linux__))
+    (!defined(__APPLE__) && (defined(__i386__) || defined(__x86_64__)))
 
 #include "swift/shims/Visibility.h"
 
@@ -150,10 +151,23 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
   return __gnu_f2h_ieee(f);
 }
 
+// F16C does not cover FP80 conversions, so we still need an implementation
+// here.
+#if (defined(__i386__) || defined(__x86_64__)) &&                               \
+    !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
+
+SWIFT_RUNTIME_EXPORT long double __extendhfxf2(_Float16 h) {
+  __builtin_trap();
+}
+
+#endif // (defined(__i386__) || defined(__x86_64__)) &&
+       // !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
+
 #if defined(__ARM_EABI__)
 SWIFT_RUNTIME_EXPORT unsigned short __aeabi_d2h(double d) {
   return __truncdfhf2(d);
 }
 #endif
 
-#endif // defined(__x86_64__) && !defined(__APPLE__)
+#endif // (defined(__ANDROID__) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) ||
+       // (!defined(__APPLE__) && (defined(__i386__) || defined(__x86_64__)))

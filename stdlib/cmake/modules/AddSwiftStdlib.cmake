@@ -288,6 +288,18 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
+  # Avoid the need for the FP16 truncation and extension routines from
+  # compiler-rt by assuming that we have hardware capable of performing
+  # half-precision floating point conversions.  This effectively pins the
+  # minimum CPU requirements to Ivy Bridge (~2013).
+  if(CFLAGS_ARCH STREQUAL x86_64 OR CFLAGS_ARCH STREQUAL i686)
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result /clang:-mf16c)
+    else()
+      list(APPEND result -mf16c)
+    endif()
+  endif()
+
   if(CFLAGS_ENABLE_ASSERTIONS)
     list(APPEND result "-UNDEBUG")
   else()

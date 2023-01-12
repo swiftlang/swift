@@ -780,6 +780,16 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcx16");
   }
 
+  if (triple.isX86()) {
+    // Enable the FC16/CVT16 extensions which provide half prevision floating
+    // point support on x86_64.  This bumps the minimum requirement of the CPU
+    // to Ivy Bridge, however, Windows 10 (at least as of 1709) requires
+    // ~Broadwell.  At this point, the complexity of supporting an older release
+    // no longer is justified.  For uniformity, bump the minimum x86 CPU on all
+    // the targets.
+    invocationArgStrs.push_back("-mf16c");
+  }
+
   if (!importerOpts.Optimization.empty()) {
     invocationArgStrs.push_back(importerOpts.Optimization);
   }
