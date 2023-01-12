@@ -174,6 +174,7 @@ llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
 void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   if (!discoveredBlocks) {
     OS << "No deterministic live block list\n";
+    return;
   }
   SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
