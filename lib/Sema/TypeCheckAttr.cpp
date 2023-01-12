@@ -3553,11 +3553,22 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
-  auto nominal = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  auto found = evaluateOrDefault(
+    Ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr);
+
+  // FIXME: deal with macros.
+  NominalTypeDecl *nominal = nullptr;
+  if (found) {
+    // FIXME: Do full checking of the macro arguments here by turning it into
+    // a macro expansion expression (?).
+    if (found.is<MacroDecl *>())
+      return;
+
+    nominal = found.dyn_cast<NominalTypeDecl *>();
+  }
 
   // Diagnose errors.
-  if (!nominal) {
+  if (!found) {
     auto typeRepr = attr->getTypeRepr();
 
     auto type = TypeResolution::forInterface(dc, TypeResolverContext::CustomAttr,
@@ -7377,12 +7388,15 @@ static void forEachCustomAttribute(
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
 
-    auto *nominal = evaluateOrDefault(
+    auto found = evaluateOrDefault(
         ctx.evaluator,
-        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-
-    if (!nominal)
+        CustomAttrDeclRequest{mutableAttr, decl->getDeclContext()}, nullptr);
+    if (!found)
       continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
+    if (!nominal)
+      continue; // FIXME: add another entry point for macros we've found
 
     if (nominal->getAttrs().hasAttribute<ATTR>())
       fn(mutableAttr, nominal);

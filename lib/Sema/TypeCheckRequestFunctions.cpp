@@ -174,11 +174,15 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
   for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
-    auto nominal = evaluateOrDefault(ctx.evaluator,
-                                     CustomAttrNominalRequest{mutableAttr, dc},
-                                     nullptr);
+    auto found = evaluateOrDefault(ctx.evaluator,
+                                   CustomAttrDeclRequest{mutableAttr, dc},
+                                  nullptr);
 
     // Ignore unresolvable custom attributes.
+    if (!found)
+      continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
       continue;
 
