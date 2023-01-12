@@ -24,8 +24,9 @@
 
 using namespace swift;
 
-SWIFT_RUNTIME_EXPORT
-std::atomic<void (*)(SwiftError *error)> swift::_swift_willThrow;
+namespace swift {
+extern "C" std::atomic<void (*)(SwiftError *error)> _swift_willThrow;
+}
 
 void swift::_swift_setWillThrowHandler(void (* handler)(SwiftError *error)) {
   _swift_willThrow.store(handler, std::memory_order_release);
