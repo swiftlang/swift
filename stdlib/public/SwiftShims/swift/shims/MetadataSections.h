@@ -45,7 +45,8 @@ typedef struct MetadataSectionRange {
 ///
 /// \warning If you change the size of this structure by adding fields, it is an
 ///   ABI-breaking change on platforms that use it. Make sure to increment
-///   \c CurrentSectionMetadataVersion if you do.
+///   \c CurrentSectionMetadataVersion if you do. To minimize impact, always add
+///   new fields to the \em end of the structure.
 struct MetadataSections {
   __swift_uintptr_t version;
 
