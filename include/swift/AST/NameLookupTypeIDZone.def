@@ -18,8 +18,8 @@
 SWIFT_REQUEST(NameLookup, AnyObjectLookupRequest,
               QualifiedLookupResult(const DeclContext *, DeclName, NLOptions),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
-              NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
+SWIFT_REQUEST(NameLookup, CustomAttrDeclRequest,
+              MacroOrNominalTypeDecl(CustomAttr *, DeclContext *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, DirectLookupRequest,
               TinyPtrVector<ValueDecl *>(DirectLookupDescriptor), Uncached,

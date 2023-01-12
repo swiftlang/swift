@@ -439,8 +439,12 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   for (auto attr : var->getAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
-    auto nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
+    auto found = evaluateOrDefault(
+      ctx.evaluator, CustomAttrDeclRequest{mutableAttr, dc}, nullptr);
+
+    NominalTypeDecl *nominal = nullptr;
+    if (found)
+      nominal = found.dyn_cast<NominalTypeDecl *>();
 
     // If we didn't find a nominal type with a @propertyWrapper attribute,
     // skip this custom attribute.
