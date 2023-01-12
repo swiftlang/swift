@@ -66,8 +66,8 @@ public enum Empty {
 // CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums3FooO") Foo final {
 // CHECK-NEXT:    public:
 // CHECK:         enum class cases {
-// CHECK-NEXT:      a,
-// NEW_CASE-NEXT:   b,
+// CHECK-NEXT:      a SWIFT_SYMBOL("s:5Enums3FooO1ayACSdcACmF"),
+// NEW_CASE-NEXT:   b SWIFT_SYMBOL("s:5Enums3FooO1byACSicACmF"),
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    }
 // CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault

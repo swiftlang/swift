@@ -124,14 +124,14 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: }
 
 // CHECK: enum class cases {
-// CHECK-NEXT:  some,
-// CHECK-NEXT:  none
+// CHECK-NEXT:  some SWIFT_SYMBOL("s:8Generics10GenericOptO4someyACyxGxcAEmlF"),
+// CHECK-NEXT:  none SWIFT_SYMBOL("s:8Generics10GenericOptO4noneyACyxGAEmlF")
 // CHECK-NEXT: };
 
 // CHECK: inline GenericOpt<T_0_0> operator()(const T_0_0& val) const;
-// CHECK-NEXT: } some;
+// CHECK-NEXT: } some SWIFT_SYMBOL("s:8Generics10GenericOptO4someyACyxGxcAEmlF");
 // CHECK: inline GenericOpt<T_0_0> operator()() const;
-// CHECK-NEXT: } none;
+// CHECK-NEXT: } none SWIFT_SYMBOL("s:8Generics10GenericOptO4noneyACyxGAEmlF");
 
 // CHECK: inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {

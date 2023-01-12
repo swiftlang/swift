@@ -60,7 +60,7 @@
 // CHECK-NEXT: inline Optional(const Optional &other) {
 // CHECK: }
 // CHECK:   enum class cases {
-// CHECK-NEXT: some,
+// CHECK-NEXT: some SWIFT_SYMBOL({{.*}}),
 // CHECK-NEXT: none
 // CHECK-NEXT: };
 // CHECK: inline bool isSome() const;

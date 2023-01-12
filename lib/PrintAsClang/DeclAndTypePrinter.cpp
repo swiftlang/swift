@@ -731,6 +731,8 @@ private:
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
+      if (elementDecl)
+        syntaxPrinter.printSymbolUSRAttribute(elementDecl);
       os << ";\n";
     };
 
@@ -742,6 +744,7 @@ private:
           [&](const auto &pair) {
             os << "\n    ";
             syntaxPrinter.printIdentifier(pair.first->getNameStr());
+            syntaxPrinter.printSymbolUSRAttribute(pair.first);
           },
           ",");
       // TODO: allow custom name for this special case
