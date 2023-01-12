@@ -133,18 +133,18 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   ///
-  ///       try await Task.sleep(until: .now + .seconds(3), clock: .continuous)
+  ///       try await Task.sleep(until: .now + .seconds(3))
   ///
   @available(SwiftStdlib 5.7, *)
   public static func sleep<C: Clock>(
     until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
-    clock: C
+    clock: C = ContinuousClock()
   ) async throws {
     try await clock.sleep(until: deadline, tolerance: tolerance)
   }
   
-  /// Suspends the current task for the given duration on a continuous clock.
+  /// Suspends the current task for the given duration.
   ///
   /// If the task is cancelled before the time ends, this function throws 
   /// `CancellationError`.
@@ -153,11 +153,14 @@ extension Task where Success == Never, Failure == Never {
   ///
   ///       try await Task.sleep(for: .seconds(3))
   ///
-  /// - Parameter duration: The duration to wait.
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  public static func sleep(for duration: Duration) async throws {
-    try await sleep(until: .now + duration, clock: .continuous)
+  public static func sleep<C: Clock>(
+    for duration: C.Instant.Duration,
+    tolerance: C.Instant.Duration? = nil,
+    clock: C = ContinuousClock()
+  ) async throws {
+    try await clock.sleep(for: duration, tolerance: tolerance)
   }
 }
 #else
@@ -169,13 +172,18 @@ extension Task where Success == Never, Failure == Never {
   public static func sleep<C: Clock>(
     until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
-    clock: C
+    clock: C = ContinuousClock()
   ) async throws {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func sleep(for duration: Duration) async throws {
+  @_alwaysEmitIntoClient
+  public static func sleep<C: Clock>(
+    for duration: C.Instant.Duration,
+    tolerance: C.Instant.Duration? = nil,
+    clock: C = ContinuousClock()
+  ) async throws {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
 }
