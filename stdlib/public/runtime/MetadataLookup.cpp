@@ -25,6 +25,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
@@ -1942,14 +1943,26 @@ swift_getTypeByMangledNameInEnvironment(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
-  return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+  TypeLookupErrorOr<TypeInfo> result = swift_getTypeByMangledName(
+    MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
       return substitutions.getMetadata(depth, index);
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
-    }).getType().getMetadata();
+    });
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
+    TypeLookupError *error = result.getError();
+    char *errorString = error->copyErrorString();
+    swift::warning(0, "failed type lookup for %.*s: %s\n",
+                   (int)typeNameLength, typeNameStart,
+                   errorString);
+    error->freeErrorString(errorString);
+    return nullptr;
+  }
+  return result.getType().getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -1962,14 +1975,26 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
-  return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
+  TypeLookupErrorOr<TypeInfo> result = swift_getTypeByMangledName(
+    (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
       return substitutions.getMetadata(depth, index);
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
-    }).getType().getMetadata();
+    });
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
+    TypeLookupError *error = result.getError();
+    char *errorString = error->copyErrorString();
+    swift::warning(0, "failed type lookup for %.*s: %s\n",
+                   (int)typeNameLength, typeNameStart,
+                   errorString);
+    error->freeErrorString(errorString);
+    return nullptr;
+  }
+  return result.getType().getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -1981,14 +2006,26 @@ swift_getTypeByMangledNameInContext(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
-  return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+  TypeLookupErrorOr<TypeInfo> result = swift_getTypeByMangledName(
+    MetadataState::Complete, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
       return substitutions.getMetadata(depth, index);
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
-    }).getType().getMetadata();
+    });
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
+    TypeLookupError *error = result.getError();
+    char *errorString = error->copyErrorString();
+    swift::warning(0, "failed type lookup for %.*s: %s\n",
+                   (int)typeNameLength, typeNameStart,
+                   errorString);
+    error->freeErrorString(errorString);
+    return nullptr;
+  }
+  return result.getType().getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -2001,14 +2038,27 @@ swift_getTypeByMangledNameInContextInMetadataState(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
-  return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
+  TypeLookupErrorOr<TypeInfo> result = swift_getTypeByMangledName(
+    (MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
       return substitutions.getMetadata(depth, index);
     },
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
-    }).getType().getMetadata();
+    });
+  if (result.isError()
+      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
+    TypeLookupError *error = result.getError();
+    char *errorString = error->copyErrorString();
+    swift::warning(0, "failed type lookup for %.*s: %s\n",
+                   (int)typeNameLength, typeNameStart,
+                   errorString);
+    error->freeErrorString(errorString);
+    return nullptr;
+  }
+  return result.getType().getMetadata();
+
 }
 
 /// Demangle a mangled name, but don't allow symbolic references.

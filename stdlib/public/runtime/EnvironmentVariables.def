@@ -78,4 +78,7 @@ VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
 VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
         "Set the binary compatibility level of the Swift Standard Library")
 
+VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, bool, false,
+         "Enable warnings when we fail to look up a type by name.")
+
 #undef VARIABLE
