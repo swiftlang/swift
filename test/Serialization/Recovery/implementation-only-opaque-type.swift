@@ -30,6 +30,7 @@ public struct HiddenType : Proto {
 import BaseLib
 @_implementationOnly import HiddenLib
 
+@available(SwiftStdlib 5.1, *) // for the `some` keyword.
 public struct PublicStruct {
     public init() {}
     public func foo() -> some Proto {
@@ -41,5 +42,7 @@ public struct PublicStruct {
 
 import Lib
 
-var s = PublicStruct()
-let r = s.foo()
+if #available(SwiftStdlib 5.1, *) {
+  let s = PublicStruct()
+  let r = s.foo()
+}
