@@ -55,6 +55,7 @@ class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
+class ReturnStmt;
 class SpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
@@ -3744,6 +3745,24 @@ private:
   friend SimpleRequest;
 
   LabeledStmt *evaluate(Evaluator &evaluator, const ContinueStmt *CS) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Precheck a ReturnStmt, which involves some initial validation, as well as
+/// applying a conversion to a FailStmt if needed.
+class PreCheckReturnStmtRequest
+    : public SimpleRequest<PreCheckReturnStmtRequest,
+                           Stmt *(ReturnStmt *, DeclContext *DC),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Stmt *evaluate(Evaluator &evaluator, ReturnStmt *RS, DeclContext *DC) const;
 
 public:
   bool isCached() const { return true; }
