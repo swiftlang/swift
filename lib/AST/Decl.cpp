@@ -363,6 +363,13 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+SemanticDeclAttributes Decl::getSemanticAttrs() const {
+  auto mutableThis = const_cast<Decl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AttachedSemanticAttrsRequest{mutableThis},
+                           SemanticDeclAttributes());
+}
+
 const Decl *Decl::getInnermostDeclWithAvailability() const {
   const Decl *enclosingDecl = this;
   // Find the innermost enclosing declaration with an @available annotation.

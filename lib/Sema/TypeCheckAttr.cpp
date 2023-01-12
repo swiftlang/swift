@@ -7380,6 +7380,18 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
+SemanticDeclAttributes
+AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  // For now, this returns the same thing as 'getAttrs' using
+  // the SemanticDeclAttribtues representation.
+  SemanticDeclAttributes semanticAttrs;
+  for (auto attr : decl->getAttrs()) {
+    semanticAttrs.add(attr);
+  }
+
+  return semanticAttrs;
+}
+
 template <typename ATTR>
 static void forEachCustomAttribute(
     ValueDecl *decl,

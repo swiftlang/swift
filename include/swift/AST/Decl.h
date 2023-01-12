@@ -849,6 +849,12 @@ public:
     return Attrs;
   }
 
+  /// Returns the semantic attributes attached to this declaration.
+  ///
+  /// \c getSemanticAttrs is intended to be a requestified replacement
+  /// for \c getAttrs
+  SemanticDeclAttributes getSemanticAttrs() const;
+
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
 
