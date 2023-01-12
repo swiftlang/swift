@@ -10,9 +10,8 @@ import Newtype
 // CHECK-CANONICAL-LABEL: sil hidden @$s7newtype17createErrorDomain{{[_0-9a-zA-Z]*}}F
 // CHECK-CANONICAL: bb0([[STR:%[0-9]+]] : $String)
 func createErrorDomain(str: String) -> ErrorDomain {
-  // CHECK-CANONICAL: [[MOVED_STR:%[^,]+]] = move_value [lexical] [[STR]]
   // CHECK-CANONICAL: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
-  // CHECK-CANONICAL-NEXT: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[MOVED_STR]])
+  // CHECK-CANONICAL-NEXT: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[STR]])
   // CHECK-CANONICAL: struct $ErrorDomain ([[BRIDGED]] : $NSString)
   return ErrorDomain(rawValue: str)
 }
