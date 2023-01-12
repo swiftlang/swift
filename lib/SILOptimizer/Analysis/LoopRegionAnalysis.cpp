@@ -871,7 +871,7 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
       auto ExitingSubRegs = R->getExitingSubregions();
       std::copy(ExitingSubRegs.begin(), ExitingSubRegs.end(),
                 std::back_inserter(ExitingSubregions));
-      std::sort(ExitingSubregions.begin(), ExitingSubregions.begin());
+      std::sort(ExitingSubregions.begin(), ExitingSubregions.end());
       for (unsigned SubregionID : ExitingSubregions) {
         os << "\n        ";
         LoopRegion *Subregion = getRegion(SubregionID);
