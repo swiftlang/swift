@@ -127,20 +127,11 @@ _swift_getDefaultRootPath()
   const char *ptr = runtimePath + runtimePathLen;
   while (ptr > runtimePath && !_swift_isPathSep(*--ptr));
 
-<<<<<<< Updated upstream
-  // Remove lib/swift/ if present
-  if (ptr - runtimePath >= 10
-      && _swift_isPathSep(ptr[-10])
-      && std::strncmp(ptr - 9, "lib", 3) == 0
-      && _swift_isPathSep(ptr[-6])
-      && std::strncmp(ptr - 5, "swift", 5) == 0) {
-=======
   if (_swift_lookingAtLibSwift(ptr, runtimePath)) {
     // /some/path/to/some/thing/lib/swift/libswiftCore.dylib
     //                         ^         ^
     //                         |         +---- ptr
     //                         +-------------- ptr - 10
->>>>>>> Stashed changes
     ptr -= 10;
   } else {
     // We *might* be in a <platform> directory, so scan backwards for that too
@@ -244,22 +235,24 @@ _swift_initRootPath(void *)
 {
   // SWIFT_ROOT overrides the path returned by this function
   const char *swiftRoot = swift::runtime::environment::SWIFT_ROOT();
-  if (swiftRoot && *swiftRoot) {
-    size_t len = std::strlen(swiftRoot);
 
-    // Ensure that there's a trailing slash
-    if (_swift_isPathSep(swiftRoot[len - 1])) {
-      rootPath = swiftRoot;
-    } else {
-      char *thePath = (char *)malloc(len + 2);
-      std::memcpy(thePath, swiftRoot, len);
-      thePath[len] = PATHSEP_CHR;
-      thePath[len + 1] = 0;
-
-      rootPath = thePath;
-    }
-  } else {
+  if (!swiftRoot || !*swiftRoot) {
     rootPath = _swift_getDefaultRootPath();
+    return;
+  }
+
+  size_t len = std::strlen(swiftRoot);
+
+  // Ensure that there's a trailing slash
+  if (_swift_isPathSep(swiftRoot[len - 1])) {
+    rootPath = swiftRoot;
+  } else {
+    char *thePath = (char *)malloc(len + 2);
+    std::memcpy(thePath, swiftRoot, len);
+    thePath[len] = PATHSEP_CHR;
+    thePath[len + 1] = 0;
+
+    rootPath = thePath;
   }
 }
 
@@ -478,6 +471,9 @@ void
 _swift_initRuntimePath(void *) {
   const DWORD dwBufSize = 4096;
   LPWSTR lpFilename = (LPWSTR)std::malloc(dwBufSize * sizeof(WCHAR));
+
+  // Again, we can't use GetFinalPathNameByHandle for the reasons given
+  // above.
 
   DWORD dwRet = GetMappedFileNameW(GetCurrentProcess(),
                                    (void *)_swift_initRuntimePath,
