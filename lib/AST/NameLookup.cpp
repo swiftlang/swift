@@ -3040,8 +3040,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+MacroOrNominalTypeDecl
+CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
