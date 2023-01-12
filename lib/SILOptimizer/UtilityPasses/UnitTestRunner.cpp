@@ -113,7 +113,7 @@ public:
 class UnitTestRunner : public SILFunctionTransform {
   void printTestLifetime(bool begin, unsigned testIndex, unsigned testCount,
                          StringRef name, ArrayRef<StringRef> components) {
-    StringRef word = begin ? "begin" : "end";
+    StringRef word = begin ? "\nbegin" : "end";
     llvm::errs() << word << " running test " << testIndex + 1 << " of "
                  << testCount << " on " << getFunction()->getName() << ": "
                  << name << " with: ";
