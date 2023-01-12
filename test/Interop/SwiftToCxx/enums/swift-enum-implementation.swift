@@ -34,7 +34,7 @@ public struct S {
     }
 }
 
-// CHECK:      class E final {
+// CHECK:      class SWIFT_SYMBOL("s:5Enums1EO") E final {
 // CHECK:        enum class cases {
 // CHECK-NEXT:     x,
 // CHECK-NEXT:     y,
@@ -112,9 +112,9 @@ public struct S {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-EMPTY:
-// CHECK-NEXT:   static inline E init();
-// CHECK-NEXT:   inline swift::Int getTen() const;
-// CHECK-NEXT:   inline void printSelf() const;
+// CHECK-NEXT:   static inline E init() SWIFT_SYMBOL("s:5Enums1EOACycfc");
+// CHECK-NEXT:   inline swift::Int getTen() const SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
+// CHECK-NEXT:   inline void printSelf() const SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
 // CHECK-NEXT: private:
 // CHECK:        inline char * _Nonnull _destructiveProjectEnumData() {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
@@ -166,7 +166,7 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
-// CHECK:      namespace Enums __attribute__((swift_private)) {
+// CHECK:      namespace Enums __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        inline E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));

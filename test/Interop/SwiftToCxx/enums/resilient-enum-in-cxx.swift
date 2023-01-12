@@ -42,7 +42,7 @@ public enum Empty {
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT:    class Empty final {
+// CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums5EmptyO") Empty final {
 // CHECK:         enum class cases {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    };
@@ -63,7 +63,7 @@ public enum Empty {
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT:    class Foo final {
+// CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums3FooO") Foo final {
 // CHECK-NEXT:    public:
 // CHECK:         enum class cases {
 // CHECK-NEXT:      a,

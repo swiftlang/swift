@@ -37,12 +37,12 @@ public struct FirstSmallStruct {
     }
 }
 
-// CHECK: class FirstSmallStruct final {
+// CHECK: class SWIFT_SYMBOL("s:4Init16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK:   inline FirstSmallStruct(FirstSmallStruct &&)
-// CHECK-NEXT:   inline uint32_t getX() const;
-// CHECK-NEXT:   static inline FirstSmallStruct init();
-// CHECK-NEXT:   static inline FirstSmallStruct init(swift::Int x);
+// CHECK-NEXT:   inline uint32_t getX() const SWIFT_SYMBOL("s:4Init16FirstSmallStructV1xs6UInt32Vvp");
+// CHECK-NEXT:   static inline FirstSmallStruct init() SWIFT_SYMBOL("s:4Init16FirstSmallStructVACycfc");
+// CHECK-NEXT:   static inline FirstSmallStruct init(swift::Int x) SWIFT_SYMBOL("s:4Init16FirstSmallStructVyACSicfc");
 // CHECK-NEXT: private:
 
 public struct LargeStruct {
@@ -67,10 +67,10 @@ public struct LargeStruct {
     }
 }
 
-// CHECK: class LargeStruct final {
-// CHECK:       inline swift::Int getX6() const;
-// CHECK-NEXT:  static inline LargeStruct init();
-// CHECK-NEXT:  static inline LargeStruct init(swift::Int x, const FirstSmallStruct& y);
+// CHECK: class SWIFT_SYMBOL("s:4Init11LargeStructV") LargeStruct final {
+// CHECK:       inline swift::Int getX6() const SWIFT_SYMBOL("s:4Init11LargeStructV2x6Sivp");
+// CHECK-NEXT:  static inline LargeStruct init() SWIFT_SYMBOL("s:4Init11LargeStructVACycfc");
+// CHECK-NEXT:  static inline LargeStruct init(swift::Int x, const FirstSmallStruct& y) SWIFT_SYMBOL("s:4Init11LargeStructV1x1yACSi_AA010FirstSmallC0Vtcfc");
 // CHECK-NEXT: private:
 
 private class RefCountedClass {
@@ -97,8 +97,8 @@ public struct StructWithRefCountStoredProp {
     }
 }
 
-// CHECK:      static inline StructWithRefCountStoredProp init();
-// CHECK-NEXT: static inline StructWithRefCountStoredProp init(swift::Int x);
+// CHECK:      static inline StructWithRefCountStoredProp init() SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropVACycfc");
+// CHECK-NEXT: static inline StructWithRefCountStoredProp init(swift::Int x) SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropV1xACSi_tcfc");
 
 
 public final class FinalClass {

@@ -788,6 +788,14 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
   EmittedClangHeaderDependencyInfo info;
 
+  // Define the `SWIFT_SYMBOL` macro.
+  os << "#ifdef SWIFT_SYMBOL\n";
+  os << "#undef SWIFT_SYMBOL\n";
+  os << "#endif\n";
+  os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
+  ClangSyntaxPrinter(os).printBaseName(&M);
+  os << "\", usrValue)\n";
+
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
                       AccessLevel::Public, requiresExposedAttribute,
@@ -824,6 +832,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "namespace ";
     M.ValueDecl::getName().print(os);
     os << " __attribute__((swift_private))";
+    ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -842,10 +851,11 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
-      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
 
   if (M.isStdlibModule()) {
     os << "#pragma clang diagnostic pop\n";
   }
+  os << "#undef SWIFT_SYMBOL\n";
   return info;
 }

@@ -25,7 +25,7 @@ public func printBreak(_ x: Int) {
     print("breakpoint \(x)")
 }
 
-// CHECK:      class StructWithRefcountedMember final {
+// CHECK:      class SWIFT_SYMBOL({{.*}}) StructWithRefcountedMember final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~StructWithRefcountedMember() {
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);

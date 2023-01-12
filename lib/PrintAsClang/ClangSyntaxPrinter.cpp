@@ -12,9 +12,11 @@
 
 #include "ClangSyntaxPrinter.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/NestedNameSpecifier.h"
@@ -140,6 +142,7 @@ void ClangSyntaxPrinter::printModuleNamespaceStart(
   os << "namespace ";
   printBaseName(&moduleContext);
   os << " __attribute__((swift_private))";
+  printSymbolUSRAttribute(&moduleContext);
   os << " {\n";
 }
 
@@ -147,11 +150,13 @@ void ClangSyntaxPrinter::printModuleNamespaceStart(
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
-    NamespaceTrivia trivia) const {
+    NamespaceTrivia trivia, const ModuleDecl *moduleContext) const {
   os << "namespace ";
   namePrinter(os);
   if (trivia == NamespaceTrivia::AttributeSwiftPrivate)
     os << " __attribute__((swift_private))";
+  if (moduleContext)
+    printSymbolUSRAttribute(moduleContext);
   os << " {\n\n";
   bodyPrinter(os);
   os << "\n} // namespace ";
@@ -404,4 +409,18 @@ void ClangSyntaxPrinter::printIgnoredDiagnosticBlock(
 void ClangSyntaxPrinter::printIgnoredCxx17ExtensionDiagnosticBlock(
     llvm::function_ref<void()> bodyPrinter) {
   printIgnoredDiagnosticBlock("c++17-extensions", bodyPrinter);
+}
+
+void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
+  if (isa<ModuleDecl>(D)) {
+    os << " SWIFT_SYMBOL_MODULE(\"";
+    printBaseName(D);
+    os << "\")";
+    return;
+  }
+  auto result = evaluateOrDefault(D->getASTContext().evaluator,
+                                  USRGenerationRequest{D}, std::string());
+  if (result.empty())
+    return;
+  os << " SWIFT_SYMBOL(\"" << result << "\")";
 }
