@@ -2752,6 +2752,7 @@ bool SourceFile::hasTestableOrPrivateImport(
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
+  case AccessLevel::Package:
   case AccessLevel::Public:
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such

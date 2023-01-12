@@ -833,6 +833,7 @@ DECL_MODIFIER_KINDS = [
     DeclAttributeAlias('fileprivate', 'AccessControl', swift_name='fileprivateKeyword'),
     DeclAttributeAlias('internal', 'AccessControl', swift_name='internalKeyword'),
     DeclAttributeAlias('public', 'AccessControl', swift_name='publicKeyword'),
+    ContextualDeclAttributeAlias('package', 'AccessControl'),
     ContextualDeclAttributeAlias('open', 'AccessControl'),
     DeclAttribute('__setter_access', 'SetterAccess',
                   OnVar, OnSubscript,

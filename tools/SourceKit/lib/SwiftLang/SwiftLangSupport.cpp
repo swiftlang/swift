@@ -74,11 +74,13 @@ static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
 static UIdent Attr_Private("source.decl.attribute.private");
 static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
 static UIdent Attr_Internal("source.decl.attribute.internal");
+static UIdent Attr_Package("source.decl.attribute.package");
 static UIdent Attr_Public("source.decl.attribute.public");
 static UIdent Attr_Open("source.decl.attribute.open");
 static UIdent Attr_Setter_Private("source.decl.attribute.setter_access.private");
 static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.fileprivate");
 static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
+static UIdent Attr_Setter_Package("source.decl.attribute.setter_access.package");
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
@@ -793,6 +795,8 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
           return Attr_FilePrivate;
         case AccessLevel::Internal:
           return Attr_Internal;
+        case AccessLevel::Package:
+          return Attr_Package;
         case AccessLevel::Public:
           return Attr_Public;
         case AccessLevel::Open:
@@ -807,6 +811,8 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
           return Attr_Setter_FilePrivate;
         case AccessLevel::Internal:
           return Attr_Setter_Internal;
+        case AccessLevel::Package:
+          return Attr_Setter_Package;
         case AccessLevel::Public:
           return Attr_Setter_Public;
         case AccessLevel::Open:

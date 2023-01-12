@@ -3598,6 +3598,7 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   switch (effectiveAccess) {
   case AccessLevel::Open:
     break;
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
@@ -3720,6 +3721,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                                      : AccessLimitKind::None);
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
@@ -3869,6 +3871,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useFile);
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return true;

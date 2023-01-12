@@ -600,6 +600,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
       return SILLinkage::Shared;
     return SILLinkage::Hidden;
 
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     switch (limit) {
@@ -1490,6 +1491,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     // SILModule, so we don't need to do anything.
     return SubclassScope::NotApplicable;
   case AccessLevel::Internal:
+  case AccessLevel::Package:
   case AccessLevel::Public:
     // If the class is internal or public, it can only be subclassed from
     // the same AST Module, but possibly a different SILModule.

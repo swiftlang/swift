@@ -3420,6 +3420,7 @@ public:
         case AccessLevel::Open:
           requiredAccess = AccessLevel::Public;
           break;
+        case AccessLevel::Package:
         case AccessLevel::Public:
         case AccessLevel::Internal:
           requiredAccess = AccessLevel::Internal;

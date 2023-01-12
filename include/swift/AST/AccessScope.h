@@ -70,6 +70,7 @@ public:
       return RHS.isPublic();
     if (isPackage())
       return RHS.isPackage();
+
     return getDeclContext() == RHS.getDeclContext();
   }
 
@@ -98,7 +99,6 @@ public:
     }
     if (isPackage())
       return AS.isPublic();
-
     // If this is public, it can't be less than access level of AS
     // so return false
     return false;
