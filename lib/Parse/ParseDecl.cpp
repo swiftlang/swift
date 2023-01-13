@@ -162,12 +162,14 @@ extern "C" void parseTopLevelSwift(const char *buffer,
                                    void *outputContext,
                                    void (*)(void *, void *));
 
+#if SWIFT_SWIFT_PARSER
 static void appendToVector(void *declPtr, void *vecPtr) {
   auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
   auto decl = static_cast<Decl *>(declPtr);
 
   vec->push_back(decl);
 }
+#endif
 
 /// Parse a source file.
 extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
