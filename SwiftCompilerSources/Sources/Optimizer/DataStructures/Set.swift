@@ -13,6 +13,16 @@
 import SIL
 import OptimizerBridging
 
+protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
+  associatedtype Element
+
+  init(_ context: some Context)
+  mutating func insert(_ element: Element) -> Bool
+  mutating func erase(_ element: Element)
+  func contains(_ element: Element) -> Bool
+  mutating func deinitialize()
+}
+
 /// A set of basic blocks.
 ///
 /// This is an extremely efficient implementation which does not need memory
@@ -21,7 +31,7 @@ import OptimizerBridging
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
+struct BasicBlockSet : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedBasicBlockSet
@@ -46,12 +56,11 @@ struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
   }
 
   var description: String {
+    let function = BasicBlockSet_getFunction(bridged).function
     let blockNames = function.blocks.enumerated().filter { contains($0.1) }
                                                  .map { "bb\($0.0)"}
     return "{" + blockNames.joined(separator: ", ") + "}"
   }
-
-  var function: Function { BasicBlockSet_getFunction(bridged).function }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
@@ -67,7 +76,7 @@ struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct ValueSet : CustomStringConvertible, NoReflectionChildren {
+struct ValueSet : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
@@ -126,7 +135,7 @@ struct ValueSet : CustomStringConvertible, NoReflectionChildren {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionSet : CustomStringConvertible, NoReflectionChildren {
+struct InstructionSet : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
