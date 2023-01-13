@@ -62,6 +62,12 @@ cmake/**/*Windows*    @compnerd
 lib/Basic/Windows     @compnerd
 utils/*windows*       @compnerd
 
+# Repository checkout utils
+
+/utils/update_checkout/ @shahmishal
+/utils/update-checkout* @shahmishal
+
+
 # AST
 /include/swift/AST/               @hborla @slavapestov @xedin
 /include/swift/AST/*Conformance*  @slavapestov
