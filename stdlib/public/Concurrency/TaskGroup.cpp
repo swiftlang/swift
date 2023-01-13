@@ -64,6 +64,21 @@ fprintf(stderr, "[%#lx] [%s:%d][group(%p%s)] (%s) " fmt "\n",           \
 
 using FutureFragment = AsyncTask::FutureFragment;
 
+/// During evolution discussions we opted to implement the following semantic of
+/// a discarding task-group throw:
+/// - the error thrown out of withThrowingDiscardingTaskGroup { ... } always "wins",
+///   even if the group already had an error stored within.
+///
+/// This is harder to implement, since we have to always store the "first error from children",
+/// and keep it around until body completes, and only then are we able to decide which error to
+/// re-throw; If we threw the body task, we must swift_release the stored "first child error" (if it was present).
+///
+/// Implementation of "rethrow the first child error" just works in `waitAll`,
+/// since we poll the error and resume the waiting task with it immediately.
+///
+/// Change this flag, or expose a boolean to offer developers a choice of behavior.
+#define SWIFT_TASK_GROUP_BODY_THROWN_ERROR_WINS 1
+
 namespace {
 class TaskStatusRecord;
 struct TaskGroupStatus;
@@ -237,10 +252,6 @@ public:
     }
 
     static ReadyQueueItem get(ReadyStatus status, AsyncTask *task) {
-      fprintf(stderr, "[%s:%d](%s) store ReadyQueueItem = %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              status == ReadyStatus::Error ? "error" :
-              (status == ReadyStatus::RawError ? "raw-error" :
-              (status == ReadyStatus::Success ? "success" : "other")));
       assert(task == nullptr || task->isFuture());
       return ReadyQueueItem{
           reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
@@ -983,7 +994,8 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     return;
 
   case PollStatus::Error: {
-    fillGroupNextErrorResult(context, reinterpret_cast<SwiftError *>(result.storage));
+    auto error = reinterpret_cast<SwiftError *>(result.storage);
+    fillGroupNextErrorResult(context, error);
     return;
   }
 
@@ -1659,9 +1671,17 @@ static void swift_taskGroup_waitAllImpl(
 #endif /* __ARM_ARCH_7K__ */
 
     case PollStatus::Error:
-      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll found error, waiting task = %p, status:%s",
-                                 waitingTask, group->statusString().c_str());
+      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll found error, waiting task = %p, body error = %p, status:%s",
+                                 waitingTask, bodyError, group->statusString().c_str());
+#if SWIFT_TASK_GROUP_BODY_THROWN_ERROR_WINS
+      if (bodyError) {
+        fillGroupNextErrorResult(context, bodyError);
+      } else {
+        fillGroupNextResult(context, polled);
+      }
+#else // so, not SWIFT_TASK_GROUP_BODY_THROWN_ERROR_WINS
       fillGroupNextResult(context, polled);
+#endif // SWIFT_TASK_GROUP_BODY_THROWN_ERROR_WINS
       if (auto completedTask = polled.retainedTask) {
         // Remove the child from the task group's running tasks list.
         _swift_taskGroup_detachChild(asAbstract(group), completedTask);
@@ -1739,9 +1759,6 @@ PollResult TaskGroupBase::waitAll(AsyncTask *waitingTask) {
       auto discardingGroup = asDiscardingImpl(this);
       ReadyQueueItem firstErrorItem;
       if (readyQueue.dequeue(firstErrorItem)) {
-        fprintf(stderr, "[%s:%d](%s) waitAll EMPTY AND dequeued from readyQueue: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-                (firstErrorItem.getStatus() == ReadyStatus::Error ? "error" :
-                (firstErrorItem.getStatus() == ReadyStatus::RawError) ? "raw-error" : "wat"));
         if (firstErrorItem.getStatus() == ReadyStatus::Error) {
           result = PollResult::get(firstErrorItem.getTask(), /*hadErrorResult=*/true);
         } else if (firstErrorItem.getStatus() == ReadyStatus::RawError) {
@@ -1754,7 +1771,7 @@ PollResult TaskGroupBase::waitAll(AsyncTask *waitingTask) {
       return result;
     }
 
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "group is empty, no pending tasks, status = %s", assumed.to_string(this));
+    SWIFT_TASK_GROUP_DEBUG_LOG(this, "group is empty, no pending tasks, status = %s", assumed.to_string(this).c_str());
     // No tasks in flight, we know no tasks were submitted before this poll
     // was issued, and if we parked here we'd potentially never be woken up.
     // Bail out and return `nil` from `group.next()`.

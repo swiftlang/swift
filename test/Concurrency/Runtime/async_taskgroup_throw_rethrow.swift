@@ -4,7 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: reflection
 
-// REQUIRES: rdar104212282
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
@@ -173,7 +172,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
     // CHECK: Throwing: Boom(id: "task, first, isCancelled:false
     // CHECK: Throwing: Boom(id: "body, second, isCancelled:true
     // and only then the re-throw happens:
-    // CHECK: rethrown: Boom(id: "task, first, isCancelled:false
+    // CHECK: rethrown: Boom(id: "body, second
     print("rethrown: \(error)")
   }
 }
