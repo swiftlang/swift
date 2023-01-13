@@ -265,6 +265,12 @@ public:
   /// Given storage for a projection, return the projected storage by following
   /// single level of projected storage. The returned storage may
   /// recursively be a another projection.
+  const ValueStoragePair &
+  getProjectedStorage(const ValueStorage &storage) const {
+    assert(storage.isProjection());
+    return valueVector[storage.projectedStorageID];
+  }
+
   ValueStoragePair &getProjectedStorage(const ValueStorage &storage) {
     assert(storage.isProjection());
     return valueVector[storage.projectedStorageID];
