@@ -770,8 +770,8 @@ void swift::expandAccessors(
                                               (size_t)evaluatedSourceLength);
     break;
 #else
-    med->diagnose(diag::macro_unsupported);
-    return false;
+    storage->diagnose(diag::macro_unsupported);
+    return;
 #endif
   }
   }
