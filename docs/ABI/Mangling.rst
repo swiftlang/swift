@@ -570,6 +570,7 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     type ::= 'Bj'                              // Builtin.Job
   #endif
+  type ::= 'BP'                              // Builtin.PackIndex
   type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer

@@ -2262,6 +2262,8 @@ OpenPackElementInst::OpenPackElementInst(
 OpenPackElementInst *OpenPackElementInst::create(
     SILFunction &F, SILDebugLocation debugLoc, SILValue indexOperand,
     GenericEnvironment *env) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+
   SmallVector<SILValue, 8> allOperands;
   allOperands.push_back(indexOperand);
 

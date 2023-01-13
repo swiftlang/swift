@@ -287,6 +287,7 @@ namespace {
     IMPL(BuiltinRawUnsafeContinuation, Trivial)
     IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinExecutor, Trivial)
+    IMPL(BuiltinPackIndex, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinVector, Trivial)
