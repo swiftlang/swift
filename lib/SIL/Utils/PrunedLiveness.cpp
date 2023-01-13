@@ -276,9 +276,21 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 
 template <typename LivenessWithDefs>
 SimpleLiveRangeSummary
+PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+  ValueSet visited(def->getFunction());
+  return recursivelyUpdateForDef(def, visited, def);
+}
+
+template <typename LivenessWithDefs>
+SimpleLiveRangeSummary
 PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(SILValue initialDef,
+                                                           ValueSet &visited,
                                                            SILValue value) {
   SimpleLiveRangeSummary summary;
+
+  if (!visited.insert(value))
+    return summary;
+
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
   // everywhere. Non-uses cannot be treated like normal non-lifetime-ending uses
@@ -309,18 +321,16 @@ PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(SILValue initialDef,
           return enclosingDef != initialDef;
         })) {
           // At least one enclosing def was 'def'.
-          summary.meet(recursivelyUpdateForDef(initialDef, phi));
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, phi));
         }
         // Otherwise all enclosing defs are protected by separate reborrow
         // scopes, which are not included in "simple" liveness.
         break;
       }
-      // FIXME: this requires a visited set because struct/tuple can take
-      // multiple borrowed arguments.
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {
-          summary.meet(recursivelyUpdateForDef(initialDef, result));
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, result));
         }
         return true;
       });

@@ -602,13 +602,12 @@ protected:
       : PrunedLiveness(discoveredBlocks) {}
 
   SimpleLiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
+                                                 ValueSet &visited,
                                                  SILValue value);
 
 public:
   /// Update liveness for all direct uses of \p def.
-  SimpleLiveRangeSummary updateForDef(SILValue def) {
-    return recursivelyUpdateForDef(def, def);
-  }
+  SimpleLiveRangeSummary updateForDef(SILValue def);
 
   /// Check if \p inst occurs in between the definition this def and the
   /// liveness boundary.
