@@ -55,6 +55,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.lazy.flatMap { $0.instructions }
   }
 
+  public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
+    blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
+  }
+
   /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int {
     SILFunction_numIndirectResultArguments(bridged)
