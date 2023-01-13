@@ -289,8 +289,17 @@ bool SILValueOwnershipChecker::gatherUsers(
   // that all of its uses (including sub-scopes) are before any end_borrows that
   // may end the lifetime of the borrow introducer. With that in mind, gather up
   // our initial list of uses.
+  ValueSet visitedValues(value->getFunction());
   SmallVector<Operand *, 8> uses;
-  llvm::copy(value->getUses(), std::back_inserter(uses));
+  auto pushUses = [&](SILValue val) {
+    if (!visitedValues.insert(val))
+      return;
+
+    for (Operand *use : val->getUses()) {
+      uses.push_back(use);
+    }
+  };
+  pushUses(value);
 
   bool foundError = false;
   while (!uses.empty()) {
@@ -416,7 +425,7 @@ bool SILValueOwnershipChecker::gatherUsers(
         assert(result->getOwnershipKind() == OwnershipKind::Guaranteed &&
                "Our value is guaranteed and this is a forwarding instruction. "
                "Should have guaranteed ownership as well.");
-        llvm::copy(result->getUses(), std::back_inserter(uses));
+        pushUses(result);
       }
       continue;
     }
@@ -452,7 +461,7 @@ bool SILValueOwnershipChecker::gatherUsers(
 
       // Otherwise add all users of this BBArg to the worklist to visit
       // recursively.
-      llvm::copy(succArg->getUses(), std::back_inserter(uses));
+      pushUses(succArg);
     }
   }
 
