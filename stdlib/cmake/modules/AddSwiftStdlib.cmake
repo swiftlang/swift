@@ -159,6 +159,7 @@ function(_add_target_variant_c_compile_flags)
   list(APPEND result
     "-DSWIFT_RUNTIME"
     "-DSWIFT_LIB_SUBDIR=\"${SWIFT_SDK_${CFLAGS_SDK}_LIB_SUBDIR}\""
+    "-DSWIFT_ARCH=\"${CFLAGS_ARCH}\""
     )
 
   if ("${CFLAGS_ARCH}" STREQUAL "arm64" OR

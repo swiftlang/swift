@@ -50,6 +50,7 @@ void _swift_initRuntimePath(void *);
 void _swift_initRootPath(void *);
 const char *_swift_getDefaultRootPath();
 char *_swift_getAuxExePathIn(const char *path, const char *name);
+const char *_swift_tryAuxExePath(const char *name, const char *path, ...);
 
 bool _swift_isPathSep(char ch) {
 #ifdef _WIN32
@@ -134,22 +135,31 @@ _swift_getDefaultRootPath()
     //                         +-------------- ptr - 10
     ptr -= 10;
   } else {
-    // We *might* be in a <platform> directory, so scan backwards for that too
+    // We *might* be in a <platform> or <platform>/<arch> directory, so scan
+    // backwards for that too
+    bool found = false;
     const char *platform = ptr;
-    while (platform > runtimePath && !_swift_isPathSep(*--platform));
 
-    if (_swift_lookingAtLibSwift(platform, runtimePath)) {
+    for (unsigned n = 0; n < 2; ++n) {
+      while (platform > runtimePath && !_swift_isPathSep(*--platform));
 
-      // When we get here, we have:
-      //
-      //      /some/path/to/some/thing/lib/swift/macosx/libswiftCore.dylib
-      //                              ^         ^      ^
-      //                              |         |      +---- ptr
-      //                              |         +----------- platform
-      //                              +--------------------- platform - 10
+      if (_swift_lookingAtLibSwift(platform, runtimePath)) {
 
-      ptr = platform - 10;
-    } else {
+        // When we get here, we have:
+        //
+        //      /some/path/to/some/thing/lib/swift/macosx/libswiftCore.dylib
+        //                              ^         ^      ^
+        //                              |         |      +---- ptr
+        //                              |         +----------- platform
+        //                              +--------------------- platform - 10
+
+        ptr = platform - 10;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
       // We *might* also be in a bin directory, for instance on Windows, so
       // check if we should remove that also.
       if (_swift_lookingAtBin(ptr, runtimePath)) {
@@ -178,12 +188,14 @@ _swift_getDefaultRootPath()
 
 // Join paths together
 char *
-_swift_joinPaths(const char *path, ...)
+_swift_joinPathsV(const char *path, va_list val)
 {
-  va_list val;
+  va_list val2;
   size_t baseLen = 0;
   size_t totalLen = 0;
   const char *pathSeg;
+
+  va_copy(val2, val);
 
   baseLen = std::strlen(path);
   while (baseLen && _swift_isPathSep(path[baseLen - 1]))
@@ -194,15 +206,13 @@ _swift_joinPaths(const char *path, ...)
   else
     totalLen = baseLen;
 
-  va_start(val, path);
-  while ((pathSeg = va_arg(val, const char *))) {
+  while ((pathSeg = va_arg(val2, const char *))) {
     size_t len = std::strlen(pathSeg);
     while (len && _swift_isPathSep(pathSeg[len - 1]))
       --len;
     if (len)
       totalLen += 1 + len;
   }
-  va_end(val);
 
   char *buffer = static_cast<char *>(std::malloc(totalLen + 1));
   char *ptr = buffer;
@@ -214,7 +224,6 @@ _swift_joinPaths(const char *path, ...)
     ptr += baseLen;
   }
 
-  va_start(val, path);
   while ((pathSeg = va_arg(val, const char *))) {
     size_t len = std::strlen(pathSeg);
     while (len && _swift_isPathSep(pathSeg[len - 1]))
@@ -228,6 +237,19 @@ _swift_joinPaths(const char *path, ...)
   buffer[totalLen] = 0;
 
   return buffer;
+}
+
+char *
+_swift_joinPaths(const char *path, ...)
+{
+  va_list val;
+  char *result;
+
+  va_start(val, path);
+  result = _swift_joinPathsV(path, val);
+  va_end(val);
+
+  return result;
 }
 
 void
@@ -340,81 +362,58 @@ swift_getAuxiliaryExecutablePath(const char *name)
   const char *rootPath = swift_getRootPath();
 
   const char *platformName = SWIFT_LIB_SUBDIR;
+  const char *archName = SWIFT_ARCH;
 
   // <rootPath>/libexec/swift/<platformName>
-  {
-    char *libexecPlatPath = _swift_joinPaths(rootPath,
-                                             "libexec" PATHSEP_STR "swift",
-                                             platformName, nullptr);
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "libexec", "swift",
+                                                platformName, nullptr)) {
+    return result;
+  }
 
-    // If it exists, look there
-    if (_swift_exists(libexecPlatPath)) {
-      char *result = _swift_getAuxExePathIn(libexecPlatPath, name);
-
-      if (_swift_exists(result)) {
-        std::free(libexecPlatPath);
-
-        return result;
-      }
-
-      std::free(result);
-    }
-
-
-    std::free(libexecPlatPath);
+  // <rootPath>/libexec/swift/<platformName>/<arch>
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "libexec", "swift",
+                                                platformName,
+                                                archName, nullptr)) {
+    return result;
   }
 
   // <rootPath>/libexec/swift
-  {
-    char *libexecPath = _swift_joinPaths(rootPath,
-                                         "libexec" PATHSEP_STR "swift",
-                                         nullptr);
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "libexec", "swift",
+                                                nullptr)) {
+    return result;
+  }
 
-    // If it exists, look there
-    if (_swift_exists(libexecPath)) {
-      char *result = _swift_getAuxExePathIn(libexecPath, name);
-
-      if (_swift_exists(result)) {
-        std::free(libexecPath);
-
-        return result;
-      }
-
-      std::free(result);
-    }
-
-    std::free(libexecPath);
+  // <rootPath>/libexec/swift/<arch>
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "libexec", "swift",
+                                                archName, nullptr)) {
+    return result;
   }
 
   // <rootPath>/bin
-  {
-    char *binPath = _swift_joinPaths(rootPath, "bin", nullptr);
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "bin", nullptr)) {
+    return result;
+  }
 
-    // If bin exists, look there
-    if (_swift_exists(binPath)) {
-      char *result = _swift_getAuxExePathIn(binPath, name);
-
-      if (_swift_exists(result)) {
-        std::free(binPath);
-
-        return result;
-      }
-
-      std::free(result);
-    }
-
-    std::free(binPath);
+  // <rootPath>/bin/<arch>
+  if (const char *result = _swift_tryAuxExePath(name,
+                                                rootPath,
+                                                "bin",
+                                                archName, nullptr)) {
+    return result;
   }
 
   // Otherwise, look in the root itself
-  char *result = _swift_getAuxExePathIn(rootPath, name);
-
-  if (_swift_exists(result))
-    return result;
-
-  std::free(result);
-
-  return nullptr;
+  return _swift_tryAuxExePath(name, rootPath, nullptr);
 }
 
 namespace {
@@ -442,6 +441,32 @@ _swift_getAuxExePathIn(const char *path, const char *name)
 #endif
 
   return fullPath;
+}
+
+const char *
+_swift_tryAuxExePath(const char *name, const char *path, ...)
+{
+  va_list val;
+  char *fullPath;
+  va_start(val, path);
+  fullPath = _swift_joinPathsV(path, val);
+  va_end(val);
+
+  if (_swift_exists(fullPath)) {
+    char *result = _swift_getAuxExePathIn(fullPath, name);
+
+    if (_swift_exists(result)) {
+      std::free(fullPath);
+
+      return result;
+    }
+
+    std::free(result);
+  }
+
+  std::free(fullPath);
+
+  return nullptr;
 }
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -494,7 +519,7 @@ _swift_initRuntimePath(void *) {
 
   std::free(lpFilename);
 
-  runtimePath = swift::win32::copyUTF8FromWide(lpWin32Filename);
+  runtimePath = _swift_win32_copyUTF8FromWide(lpWin32Filename);
   if (!runtimePath) {
     swift::fatalError(/* flags = */ 0,
                       "Unable to convert Swift runtime path to UTF-8: %lx, %d\n",
@@ -519,7 +544,7 @@ bool _swift_exists(const char *path)
   struct stat st;
   return stat(path, &st) == 0;
 #else
-  wchar_t *wszPath = swift::win32::copyWideFromUTF8(path);
+  wchar_t *wszPath = _swift_win32_copyWideFromUTF8(path);
   bool result = GetFileAttributesW(wszPath) != INVALID_FILE_ATTRIBUTES;
   free(wszPath);
   return result;
