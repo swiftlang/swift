@@ -22,7 +22,7 @@ func f() {
 // CHECK: .loc	[[ABC]] 42
 // CHECK: .loc	[[MAIN]] 8
 // CHECK: .loc	[[ABC]] 142
-// CHECK: .file	[[DEF:[0-9]+]] "//absolute/path" "def.swift"
+// CHECK: .file	[[DEF:[0-9]+]] "{{(//|\\\\\\\\)}}absolute{{(/|\\\\)}}path" "def.swift"
 // CHECK: .loc	[[DEF]] 142
 // CHECK: .asciz "{{.*}}test/DebugInfo"
 
@@ -35,6 +35,6 @@ func f() {
 // VFS: .loc  [[ABC]] 42
 // VFS: .loc  [[MAIN]] 8
 // VFS: .loc  [[ABC]] 142
-// VFS: .file  [[DEF:[0-9]+]] "//absolute/path" "def.swift"
+// VFS: .file  [[DEF:[0-9]+]] "{{(//|\\\\\\\\)}}absolute{{(/|\\\\)}}path" "def.swift"
 // VFS: .loc  [[DEF]] 142
 // VFS: .asciz "{{.*}}test/DebugInfo"
