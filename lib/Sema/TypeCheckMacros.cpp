@@ -79,6 +79,7 @@ static std::string mangledNameForTypeMetadataAccessor(
   return mangleResult.result();
 }
 
+#if SWIFT_SWIFT_PARSER
 /// Look for macro's type metadata given its external module and type name.
 static void const *lookupMacroTypeMetadataByExternalName(
     ASTContext &ctx, StringRef moduleName, StringRef typeName) {
@@ -106,6 +107,7 @@ static void const *lookupMacroTypeMetadataByExternalName(
   auto accessor = reinterpret_cast<MetadataAccessFunc*>(accessorAddr);
   return accessor(MetadataRequest(MetadataState::Complete));
 }
+#endif
 
 /// Handle the "A.B" spelling of an external macro definition, from early
 /// pitches of the expression-macros proposal, which is also used as the syntax

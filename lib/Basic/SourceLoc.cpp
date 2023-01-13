@@ -32,6 +32,7 @@ void SourceManager::verifyAllBuffers() const {
     arbitraryTotal += buffer->getBufferStart()[0];
     arbitraryTotal += buffer->getBufferEnd()[-1];
   }
+  (void)arbitraryTotal;
 }
 
 SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
