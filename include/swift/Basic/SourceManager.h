@@ -23,6 +23,7 @@
 
 namespace swift {
 
+class CustomAttr;
 class DeclContext;
 
 /// Augments a buffer that was created specifically to hold generated source
@@ -59,6 +60,9 @@ public:
 
   /// The declaration context in which this buffer logically resides.
   DeclContext *declContext;
+
+  /// The custom attribute for an attached macro.
+  CustomAttr *attachedMacroCustomAttr = nullptr;
 };
 
 /// This class manages and owns source buffers.

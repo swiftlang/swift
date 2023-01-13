@@ -21,7 +21,9 @@
 
 namespace swift {
 
+class CustomAttr;
 class Expr;
+class MacroDecl;
 class MacroExpansionDecl;
 class TypeRepr;
 
@@ -39,6 +41,12 @@ Expr *expandMacroExpr(
 /// \returns true if expansion succeeded, false if failed.
 bool expandFreestandingDeclarationMacro(
     MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results);
+
+/// Expand the accessors for the given storage declaration based on the
+/// custom attribute that references the given macro.
+void expandAccessors(
+    AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
+);
 
 } // end namespace swift
 
