@@ -408,9 +408,9 @@ class CMakeProduct(product.Product):
         swift_cmake_options.define('SWIFT_HOST_VARIANT_ARCH', swift_host_variant_arch)
 
         llvm_cmake_options.define('LLVM_LIT_ARGS', '{} -j {}'.format(
-            self.args.lit_args, self.args.build_jobs))
+            self.args.lit_args, self.args.lit_jobs))
         swift_cmake_options.define('LLVM_LIT_ARGS', '{} -j {}'.format(
-            self.args.lit_args, self.args.build_jobs))
+            self.args.lit_args, self.args.lit_jobs))
 
         if self.args.clang_profile_instr_use:
             llvm_cmake_options.define('LLVM_PROFDATA_FILE',
