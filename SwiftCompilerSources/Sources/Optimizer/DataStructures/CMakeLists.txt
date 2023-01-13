@@ -12,5 +12,6 @@ swift_compiler_sources(Optimizer
   DeadEndBlocks.swift
   FunctionUses.swift
   InstructionRange.swift
+  ReachableBlocks.swift
   Set.swift
   Stack.swift)
