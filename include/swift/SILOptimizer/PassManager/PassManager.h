@@ -379,6 +379,7 @@ public:
                                   SILTransform *trans);
 
   static bool isPassDisabled(StringRef passName);
+  static bool isInstructionPassDisabled(StringRef instName);
   static bool disablePassesForFunction(SILFunction *function);
 
 private:

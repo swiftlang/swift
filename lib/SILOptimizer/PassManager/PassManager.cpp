@@ -140,6 +140,10 @@ llvm::cl::opt<bool> SILForceVerifyAll(
     llvm::cl::desc("For all passes, precompute analyses before the pass and "
                    "verify analyses after the pass"));
 
+llvm::cl::list<std::string>
+    SimplifyInstructionTest("simplify-instruction", llvm::cl::CommaSeparated,
+                     llvm::cl::desc("Simplify instruction of specified kind(s)"));
+
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
 namespace {
@@ -483,6 +487,18 @@ bool SILPassManager::isPassDisabled(StringRef passName) {
   for (const std::string &namePattern : SILDisablePass) {
     if (passName.contains(namePattern))
       return true;
+  }
+  return false;
+}
+
+bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
+  StringRef prefix("simplify-");
+  for (const std::string &namePattern : SILDisablePass) {
+    StringRef pattern(namePattern);
+    if (pattern.startswith(prefix) && pattern.endswith(instName) &&
+        pattern.size() == prefix.size() + instName.size()) {
+      return true;
+    }
   }
   return false;
 }
@@ -1704,6 +1720,26 @@ SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   return mod->getOptions().EnableMoveInoutStackProtection;
+}
+
+bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
+  // Fast-path check.
+  if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
+    return true;
+
+  StringRef instName = getSILInstructionName(castToInst(inst)->getKind());
+
+  if (SILPassManager::isInstructionPassDisabled(instName))
+    return false;
+
+  if (SimplifyInstructionTest.empty())
+    return true;
+
+  for (const std::string &testName : SimplifyInstructionTest) {
+    if (testName == instName)
+      return true;
+  }
+  return false;
 }
 
 BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context) {

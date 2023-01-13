@@ -558,8 +558,8 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
         return nullptr;                                                    \
       }                                                                    \
     }                                                                      \
-    passDisabled = SILPassManager::isPassDisabled(#INST) ||                \
-                   SILPassManager::isPassDisabled("sil-combine-" #INST);   \
+    StringRef instName = getSILInstructionName(SILInstructionKind::INST);  \
+    passDisabled = SILPassManager::isInstructionPassDisabled(instName);    \
   }                                                                        \
   if (passDisabled &&                                                      \
       SILPassManager::disablePassesForFunction(inst->getFunction())) {     \

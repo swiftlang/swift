@@ -204,6 +204,7 @@ PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
 SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context);
+bool SILOptions_enableSimplificationFor(BridgedInstruction inst);
 
 BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context);
 
