@@ -6571,6 +6571,64 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
   return Status;
 }
 
+bool Parser::parseAccessorAfterIntroducer(
+    SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
+    bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+    DeclAttributes &Attributes, ParseDeclOptions Flags,
+    AbstractStorageDecl *storage, SourceLoc StaticLoc, ParserStatus &Status
+) {
+  auto *ValueNamePattern = parseOptionalAccessorArgument(Loc, *this, Kind);
+
+  // Next, parse effects specifiers. While it's only valid to have them
+  // on 'get' accessors, we also emit diagnostics if they show up on others.
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  Status |= parseGetEffectSpecifier(accessors, asyncLoc, throwsLoc,
+                                    hasEffectfulGet, Kind, Loc);
+
+  // Set up a function declaration.
+  auto accessor =
+      createAccessorFunc(Loc, ValueNamePattern, Indices, StaticLoc, Flags,
+                         Kind, storage, this, Loc, asyncLoc, throwsLoc);
+  accessor->getAttrs() = Attributes;
+
+  // Collect this accessor and detect conflicts.
+  if (auto existingAccessor = accessors.add(accessor)) {
+    diagnoseRedundantAccessors(*this, Loc, Kind,
+                               /*subscript*/Indices != nullptr,
+                               existingAccessor);
+  }
+
+  // There should be no body in the limited syntax; diagnose unexpected
+  // accessor implementations.
+  if (parsingLimitedSyntax) {
+    if (Tok.is(tok::l_brace))
+      diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
+               getAccessorNameForDiagnostic(Kind, /*article*/ false));
+    return false;
+  }
+
+  // It's okay not to have a body if there's an external asm name.
+  if (!Tok.is(tok::l_brace)) {
+    // Accessors don't need bodies in module interfaces
+    if (SF.Kind == SourceFileKind::Interface)
+      return false;
+
+    // _silgen_name'd accessors don't need bodies.
+    if (!Attributes.hasAttribute<SILGenNameAttr>()) {
+      diagnose(Tok, diag::expected_lbrace_accessor,
+               getAccessorNameForDiagnostic(accessor, /*article*/ false));
+      Status |= makeParserError();
+      return true;
+    }
+
+    return false;
+  }
+
+  parseAbstractFunctionBody(accessor);
+  return false;
+}
+
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
                                  TypeRepr *ResultType,
                                  ParsedAccessors &accessors,
@@ -6703,53 +6761,12 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     if (parsingLimitedSyntax && Tok.is(tok::l_paren)) {
       diagnose(Loc, diag::protocol_setter_name);
     }
-    auto *ValueNamePattern = parseOptionalAccessorArgument(Loc, *this, Kind);
 
-    // Next, parse effects specifiers. While it's only valid to have them
-    // on 'get' accessors, we also emit diagnostics if they show up on others.
-    SourceLoc asyncLoc;
-    SourceLoc throwsLoc;
-    Status |= parseGetEffectSpecifier(accessors, asyncLoc, throwsLoc,
-                                      hasEffectfulGet, Kind, Loc);
-
-    // Set up a function declaration.
-    auto accessor =
-        createAccessorFunc(Loc, ValueNamePattern, Indices, StaticLoc, Flags,
-                           Kind, storage, this, Loc, asyncLoc, throwsLoc);
-    accessor->getAttrs() = Attributes;
-
-    // Collect this accessor and detect conflicts.
-    if (auto existingAccessor = accessors.add(accessor)) {
-      diagnoseRedundantAccessors(*this, Loc, Kind,
-                                 /*subscript*/Indices != nullptr,
-                                 existingAccessor);
-    }
-
-    // There should be no body in the limited syntax; diagnose unexpected
-    // accessor implementations.
-    if (parsingLimitedSyntax) {
-      if (Tok.is(tok::l_brace))
-        diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
-                 getAccessorNameForDiagnostic(Kind, /*article*/ false));
-      continue;
-    }
-
-    // It's okay not to have a body if there's an external asm name.
-    if (!Tok.is(tok::l_brace)) {
-      // Accessors don't need bodies in module interfaces
-      if (SF.Kind == SourceFileKind::Interface)
-        continue;
-      // _silgen_name'd accessors don't need bodies.
-      if (!Attributes.hasAttribute<SILGenNameAttr>()) {
-        diagnose(Tok, diag::expected_lbrace_accessor,
-                 getAccessorNameForDiagnostic(accessor, /*article*/ false));
-        Status |= makeParserError();
-        break;
-      }
-      continue;
-    }
-
-    parseAbstractFunctionBody(accessor);
+    if (parseAccessorAfterIntroducer(
+            Loc, Kind, accessors, hasEffectfulGet, Indices, parsingLimitedSyntax,
+            Attributes, Flags, storage, StaticLoc, Status
+        ))
+      break;
   }
   backtrack->cancelBacktrack();
   backtrack.reset();
