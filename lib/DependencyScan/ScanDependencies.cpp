@@ -1058,6 +1058,10 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
     subInstanceMap = new CompilerArgInstanceCacheMap;
     localSubInstanceMap = true;
   }
+  SWIFT_DEFER {
+    if (localSubInstanceMap)
+      delete subInstanceMap;
+  };
 
   auto &diags = invocationInstance.getDiags();
   ForwardingDiagnosticConsumer FDC(invocationInstance.getDiags());
@@ -1118,8 +1122,6 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
     scanningAction(entry, *pInstance, *pCache);
   }
 
-  if (localSubInstanceMap)
-    delete subInstanceMap;
   return false;
 }
 
