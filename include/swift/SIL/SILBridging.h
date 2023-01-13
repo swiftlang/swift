@@ -317,6 +317,7 @@ std::string SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
 SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
 SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction);
+bool SILType_hasArchetype(BridgedType type);
 SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType, BridgedFunction);
 SwiftInt SILType_isNominal(BridgedType type);
 SwiftInt SILType_isClass(BridgedType type);

@@ -497,6 +497,10 @@ SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) 
   return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
 }
 
+bool SILType_hasArchetype(BridgedType type) {
+  return castToSILType(type).hasArchetype();
+}
+
 SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
                                                   BridgedFunction function) {
   SILFunction *f = castToFunction(function);
