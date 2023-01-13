@@ -99,10 +99,7 @@ extension TypeMetadata {
   
   @usableFromInline
   func _resolve(_ typeRef: MangledTypeReference) -> Any.Type? {
-    typeCache.getOrInsert(
-      typeRef,
-      from: self
-    )
+    typeCache.getOrInsert(typeRef, from: self)
   }
 }
 

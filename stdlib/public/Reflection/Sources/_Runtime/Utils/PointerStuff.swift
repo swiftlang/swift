@@ -11,10 +11,6 @@
 
 import Swift
 
-#if canImport(Darwin)
-import Darwin
-#endif
-
 @available(SwiftStdlib 9999, *)
 @inlinable
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
@@ -81,9 +77,7 @@ extension UnsafeRawPointer {
   }
 }
 
-@available(SwiftStdlib 9999, *)
-@inlinable
-public func getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
+func getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
   var end = base
   while let current = Optional(end.load(as: UInt8.self)), current != 0 {
     // Skip the current character

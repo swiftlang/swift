@@ -11,86 +11,52 @@
 
 import Swift
 
-#if canImport(os)
-import os
-#elseif canImport(Glibc)
-import Glibc
-#else
-import ucrt
-import WinSDK
-#endif
+@_silgen_name("_swift_reflection_lock_size")
+func _lockSize() -> Int
 
-@available(SwiftStdlib 9999, *)
-@usableFromInline
-struct Lock<T> {
-#if canImport(os)
-  @usableFromInline
-  var mutex: OSAllocatedUnfairLock<T>
-#elseif canImport(Glibc)
-  var mutex: ManagedBuffer<T, pthread_mutex_t>
-#else
-  var mutex: ManagedBuffer<T, SRWLOCK>
-#endif
-}
+@_silgen_name("_swift_reflection_lock_init")
+func _lockInit(_: UnsafeRawPointer)
 
-@available(SwiftStdlib 9999, *)
-extension Lock {
-  @inlinable
+@_silgen_name("_swift_reflection_lock_lock")
+func _lockLock(_: UnsafeRawPointer)
+
+@_silgen_name("_swift_reflection_lock_unlock")
+func _lockUnlock(_: UnsafeRawPointer)
+
+class Lock<T> {
+  var value: T
+
+  var mutex: UnsafeRawPointer {
+    UnsafeRawPointer(
+      Builtin.projectTailElems(self, UnsafeRawPointer.self)
+    )
+  }
+
+  init(_ x: T) {
+    value = x
+  }
+
+  static func create(with initialValue: T) -> Lock<T> {
+    let lock = Builtin.allocWithTailElems_1(
+      Lock<T>.self,
+      _lockSize()._builtinWordValue,
+      UnsafeRawPointer.self
+    )
+
+    _lockInit(lock.mutex)
+
+    return lock
+  }
+
   func withLock<U>(_ body: @Sendable (inout T) throws -> U) rethrows -> U {
-#if canImport(os)
-    try mutex.withLock(body)
-#elseif canImport(Glibc)
-    mutex.withUnsafeMutablePointers { state, mutex in
-      pthread_mutex_lock(mutex)
-      
-      defer {
-        pthread_mutex_unlock(mutex)
-      }
-      
-      return try body(&state.pointee)
+    _lockLock(mutex)
+
+    defer {
+      _lockUnlock(mutex)
     }
-#else
-    mutex.withUnsafeMutablePointers { state, mutex in
-      AcquireSRWLockExclusive(mutex)
-      
-      defer {
-        ReleaseSRWLockExclusive(mutex)
-      }
-      
-      return try body(&state.pointee)
-    }
-#endif
+
+    return try body(&value)
   }
 }
 
-@available(SwiftStdlib 9999, *)
-extension Lock where T: Sendable {
-  @usableFromInline
-  init(initialState state: T) {
-#if canImport(os)
-    mutex = OSAllocatedUnfairLock(initialState: state)
-#elseif canImport(Glibc)
-    mutex = ManagedBuffer.create(minimumCapacity: 1) {
-      $0.withUnsafeMutablePointerToElements {
-        var attr = pthread_attr_t()
-        pthread_mutexattr_init(&attr)
-        
-        pthread_mutex_init($0, &attr)
-      }
-      
-      return state
-    }
-#else
-    mutex = ManagedBuffer.create(minimumCapacity: 1) {
-      $0.withUnsafeMutablePointerToElements {
-        InitializeSRWLock($0)
-      }
-      
-      return state
-    }
-#endif
-  }
-}
-
-@available(SwiftStdlib 9999, *)
 extension Lock: @unchecked Sendable {}

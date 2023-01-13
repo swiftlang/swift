@@ -51,6 +51,7 @@ add_swift_target_library(swift_Runtime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_ST
 
   Utils/BufferView.swift
   Utils/Layouts.swift
+  Utils/Lock.cpp
   Utils/Lock.swift
   Utils/MangledTypeReference.swift
   Utils/PointerStuff.swift
@@ -69,13 +70,8 @@ add_swift_target_library(swift_Runtime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_ST
   HeapObject.swift
   WitnessTable.swift
 
-  SWIFT_MODULE_DEPENDS_LINUX Glibc
-  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
-  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
-  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
-  SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT
-
+  C_COMPILE_FLAGS
+    -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     ${SWIFT_REFLECTION_SWIFT_FLAGS}
