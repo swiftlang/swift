@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
@@ -217,6 +219,63 @@ class ValueStorageMap {
   SWIFT_ASSERT_ONLY_DECL(bool stableStorage = false);
 
 public:
+  class ProjectionIterator {
+  public:
+    using This = ProjectionIterator;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = ValueStoragePair const *;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type *;
+    using reference = value_type &;
+
+  protected:
+    value_type Cur;
+    ValueStorageMap const &Map;
+
+  public:
+    explicit ProjectionIterator(value_type cur, ValueStorageMap const &map)
+        : Cur(cur), Map(map) {}
+    ValueStoragePair const *operator->() const { return Cur; }
+    ValueStoragePair const *operator*() const { return Cur; }
+
+    ValueStorage const &getStorage() const { return Cur->storage; }
+    SILValue getValue() const { return Cur->value; }
+    This &operator++() {
+      assert(Cur && "incrementing past end()!");
+      if (Cur->storage.isProjection())
+        Cur = &Map.getProjectedStorage(Cur->storage);
+      else
+        Cur = nullptr;
+      return *this;
+    }
+
+    This operator++(int unused) {
+      This copy = *this;
+      ++*this;
+      return copy;
+    }
+
+    friend bool operator==(This lhs, This rhs) { return lhs.Cur == rhs.Cur; }
+    friend bool operator!=(This lhs, This rhs) { return !(lhs == rhs); }
+  };
+
+  ProjectionIterator projection_begin(SILValue value) const {
+    return ProjectionIterator(&valueVector[getOrdinal(value)], *this);
+  }
+  ProjectionIterator projection_end() const {
+    return ProjectionIterator(nullptr, *this);
+  }
+  /// Returns projections of the specified value from the inside out, starting
+  /// from the projection for the value and walking outwards to its storage
+  /// root.
+  iterator_range<ProjectionIterator> getProjections(SILValue value) const {
+    if (!contains(value))
+      return {projection_end(), projection_end()};
+    return {projection_begin(value), projection_end()};
+  }
+
+  friend class ProjectionIterator;
+
   bool empty() const { return valueVector.empty(); }
 
   void clear() {
@@ -277,34 +336,32 @@ public:
   }
 
   /// Return the non-projection storage that the given storage ultimately refers
-  /// to by following all projections. After allocation, this storage always has
-  /// a valid address.
-  const ValueStorage &getBaseStorage(const ValueStorage &storage) {
-    if (storage.isDefProjection || storage.isUseProjection)
-      return getBaseStorage(getProjectedStorage(storage).storage);
-
-    return storage;
-  }
-
-  /// Return the non-projection storage that the given storage ultimately refers
   /// to by following all projections.
   const ValueStorage &getBaseStorage(SILValue value) {
-    return getBaseStorage(getStorage(value));
+    ValueStorage const *last = nullptr;
+    for (auto *pair : getProjections(value)) {
+      last = &pair->storage;
+    }
+    return *last;
   }
 
   /// Return the non-projection storage that this storage refers to.  If this
   /// storage holds an Enum or any intermediate storage that projects into this
   /// storage holds an Enum, then return nullptr.
-  const ValueStorage *getNonEnumBaseStorage(const ValueStorage &storage) {
-    if (storage.initializesEnum)
-      return nullptr;
+  const ValueStorage *getNonEnumBaseStorage(SILValue value) {
+    for (auto *pair : getProjections(value)) {
+      auto const &storage = pair->storage;
+      if (storage.initializesEnum)
+        return nullptr;
 
-    if (storage.isUseProjection) {
-      auto &storageAndValue = getProjectedStorage(storage);
-      return getNonEnumBaseStorage(storageAndValue.storage);
+      if (storage.isUseProjection) {
+        continue;
+      }
+      assert(!storage.isDefProjection &&
+             "def projections should not reach here");
+      return &storage;
     }
-    assert(!storage.isDefProjection && "def projections should not reach here");
-    return &storage;
+    llvm_unreachable("found no non-projection storage!?");
   }
 
   /// Return the non-projection storage that this storage refers to, or nullptr
@@ -313,7 +370,7 @@ public:
     if (allowInitEnum)
       return &getBaseStorage(value);
 
-    return getNonEnumBaseStorage(getStorage(value));
+    return getNonEnumBaseStorage(value);
   }
 
   void setStorageAddress(SILValue value, SILValue addr) {
