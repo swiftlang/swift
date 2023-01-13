@@ -468,18 +468,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
-//    // If the property wrapper requested an `_enclosingInstance: Never`
-//    // it must be declared as static. TODO: or global once we allow wrappers on top-level code
-//    auto wrappedInfo = var->getPropertyWrapperTypeInfo();
-//    if (wrappedInfo.requireNoEnclosingInstance) {
-//      if (!var->isStatic()) {
-//        ctx.Diags.diagnose(var->getLocation(),
-//                           diag::property_wrapper_var_must_be_static,
-//                           var->getName());
-//        continue;
-//      }
-//    }
-
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
     if (binding && binding->getSingleVar() != var) {
