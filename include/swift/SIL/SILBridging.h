@@ -241,6 +241,8 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
 BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
+void PassContext_eraseBlock(BridgedPassContext passContext,
+                            BridgedBasicBlock block);
 
 llvm::StringRef SILFunction_getName(BridgedFunction function);
 std::string SILFunction_debugDescription(BridgedFunction function);
@@ -293,6 +295,9 @@ BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
                                                BridgedType type,
                                                BridgedOwnership ownership);
 void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index);
+void SILBasicBlock_moveAllInstructionsToBegin(BridgedBasicBlock block, BridgedBasicBlock dest);
+void SILBasicBlock_moveAllInstructionsToEnd(BridgedBasicBlock block, BridgedBasicBlock dest);
+void BasicBlock_moveArgumentsTo(BridgedBasicBlock block, BridgedBasicBlock dest);
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
 OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);

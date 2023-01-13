@@ -175,7 +175,7 @@ extension BridgedValue {
   }
 }
 
-final class Undef : Value {
+public final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {

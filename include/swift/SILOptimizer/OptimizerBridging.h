@@ -146,6 +146,10 @@ BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
 BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab);
 
+bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure);
+
+void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context);
+bool PassContext_getNeedFixStackNesting(BridgedPassContext context);
 void PassContext_fixStackNesting(BridgedPassContext context,
                                  BridgedFunction function);
 
@@ -169,6 +173,9 @@ void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst);
 BridgedFunction NodeSet_getFunction(BridgedNodeSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
+
+void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
+                                  BridgedBasicBlock to);
 
 swift::SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
@@ -197,6 +204,8 @@ PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
 SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context);
+
+BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

@@ -352,6 +352,18 @@ void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index) {
   castToBasicBlock(block)->eraseArgument(index);
 }
 
+void SILBasicBlock_moveAllInstructionsToBegin(BridgedBasicBlock block, BridgedBasicBlock dest) {
+  castToBasicBlock(dest)->spliceAtBegin(castToBasicBlock(block));
+}
+
+void SILBasicBlock_moveAllInstructionsToEnd(BridgedBasicBlock block, BridgedBasicBlock dest) {
+  castToBasicBlock(dest)->spliceAtEnd(castToBasicBlock(block));
+}
+
+void BasicBlock_moveArgumentsTo(BridgedBasicBlock block, BridgedBasicBlock dest) {
+  castToBasicBlock(dest)->moveArgumentList(castToBasicBlock(block));
+}
+
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->pred_begin().getSuccessorRef()};
 }

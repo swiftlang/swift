@@ -36,6 +36,9 @@ protocol MutatingContext : Context {
 }
 
 extension MutatingContext {
+  func notifyInvalidatedStackNesting() { PassContext_notifyInvalidatedStackNesting(_bridged) }
+  var needFixStackNesting: Bool { PassContext_getNeedFixStackNesting(_bridged) }
+
   /// Splits the basic block, which contains `inst`, before `inst` and returns the
   /// new block.
   ///
@@ -66,6 +69,10 @@ extension MutatingContext {
       }
     }
     erase(instruction: inst)
+  }
+
+  func tryDeleteDeadClosure(closure: SingleValueInstruction) -> Bool {
+    PassContext_tryDeleteDeadClosure(_bridged, closure.bridged)
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
@@ -127,6 +134,10 @@ struct FunctionPassContext : MutatingContext {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
       PassContext_loadFunction(_bridged, llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
     }
+  }
+
+  func erase(block: BasicBlock) {
+    PassContext_eraseBlock(_bridged, block.bridged)
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
@@ -204,6 +215,12 @@ extension Builder {
 //                          Modifying the SIL
 //===----------------------------------------------------------------------===//
 
+extension Undef {
+  static func get(type: Type, _ context: some MutatingContext) -> Undef {
+    SILUndef_get(type.bridged, context._bridged).getAs(Undef.self)
+  }
+}
+
 extension BasicBlock {
   func addBlockArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> BlockArgument {
     context.notifyInstructionsChanged()
@@ -213,6 +230,29 @@ extension BasicBlock {
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     SILBasicBlock_eraseArgument(bridged, index)
+  }
+
+  func moveAllInstructions(toBeginOf otherBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    context.notifyBranchesChanged()
+    SILBasicBlock_moveAllInstructionsToBegin(bridged, otherBlock.bridged)
+  }
+
+  func moveAllInstructions(toEndOf otherBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    context.notifyBranchesChanged()
+    SILBasicBlock_moveAllInstructionsToEnd(bridged, otherBlock.bridged)
+  }
+
+  func eraseAllArguments(_ context: some MutatingContext) {
+    // Arguments are stored in an array. We need to erase in reverse order to avoid quadratic complexity.
+    for argIdx in (0 ..< arguments.count).reversed() {
+      eraseArgument(at: argIdx, context)
+    }
+  }
+
+  func moveAllArguments(to otherBlock: BasicBlock, _ context: some MutatingContext) {
+    BasicBlock_moveArgumentsTo(bridged, otherBlock.bridged)
   }
 }
 
@@ -248,6 +288,13 @@ extension RefCountingInst {
     context.notifyInstructionsChanged()
     RefCountingInst_setIsAtomic(bridged, isAtomic)
     context.notifyInstructionChanged(self)
+  }
+}
+
+extension TermInst {
+  func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyBranchesChanged()
+    TermInst_replaceBranchTarget(bridged, fromBlock.bridged, toBlock.bridged)
   }
 }
 

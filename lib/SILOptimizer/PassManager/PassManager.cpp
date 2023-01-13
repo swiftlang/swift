@@ -28,8 +28,10 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1351,6 +1353,7 @@ void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(!needFixStackNesting && "Stack nesting not fixed");
 }
 
 void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
@@ -1461,6 +1464,23 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
+void PassContext_eraseBlock(BridgedPassContext passContext,
+                            BridgedBasicBlock block) {
+  castToBasicBlock(block)->eraseFromParent();
+}
+
+bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
+  return tryDeleteDeadClosure(castToInst<SingleValueInstruction>(closure), InstModCallbacks());
+}
+
+void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context) {
+  castToPassInvocation(context)->setNeedFixStackNesting(true);
+}
+
+bool PassContext_getNeedFixStackNesting(BridgedPassContext context) {
+  return castToPassInvocation(context)->getNeedFixStackNesting();
+}
+
 void PassContext_fixStackNesting(BridgedPassContext passContext,
                                  BridgedFunction function) {
   switch (StackNesting::fixNesting(castToFunction(function))) {
@@ -1473,6 +1493,7 @@ void PassContext_fixStackNesting(BridgedPassContext passContext,
       PassContext_notifyChanges(passContext, branchesChanged);
       break;
   }
+  castToPassInvocation(passContext)->setNeedFixStackNesting(false);
 }
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
@@ -1586,6 +1607,12 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }
 
+void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
+                                  BridgedBasicBlock to) {
+  castToInst<TermInst>(term)->replaceBranchTarget(castToBasicBlock(from),
+                                                  castToBasicBlock(to));
+}
+
 SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType) {
@@ -1677,4 +1704,10 @@ SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   return mod->getOptions().EnableMoveInoutStackProtection;
+}
+
+BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context) {
+  SILUndef *undef = SILUndef::get(castToSILType(type),
+                                  *castToPassInvocation(context)->getFunction());
+  return {undef};
 }
