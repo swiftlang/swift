@@ -212,3 +212,36 @@ public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
     }
   }
 }
+
+public struct PropertyWrapperMacro {}
+
+extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        get {
+          _\(identifier).wrappedValue
+        }
+      """,
+      """
+
+        set {
+          _\(identifier).wrappedValue = newValue
+        }
+      """,
+    ]
+  }
+}
