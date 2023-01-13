@@ -139,8 +139,7 @@ bb0(%0 : @owned $D):
 // CHECK: last user:   end_apply
 sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $D
+  test_specification "ssa-liveness @argument[0]"
   %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   end_apply %4
@@ -171,8 +170,7 @@ bb0(%0 : @guaranteed $D):
 // CHECK: last user: %{{.*}} = ref_element_addr
 sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $D
+  test_specification "ssa-liveness @argument[0]"
   %f = ref_element_addr %0 : $D, #D.object
   %99 = tuple()
   return %99 : $()
@@ -240,8 +238,7 @@ bb4(%phi : @owned $C):
 // CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
 sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -267,8 +264,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-NEXT: dead def: %0 = argument of bb0 : $C
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   %borrow0 = begin_borrow %0 : $C
   %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
   br bb1(%borrow0 : $C, %aggregate : $PairC)
@@ -284,7 +280,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
   return %99 : $()
 }
 
-// Confusingly, deadPhi is the "last use", but it does not cause its
+// Confusingly, %deadPhi is the "last use", but it does not cause its
 // operands to be live-out of the predecessor block. This is because
 // liveness considers all phis to end liveness on the predecessor side
 // by default. Only the client can tell that a particular guaranteed phi
@@ -302,8 +298,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // CHECK-NEXT: end running
 sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -314,7 +309,7 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%phi : @guaranteed $D):
+bb3(%deadPhi : @guaranteed $D):
   %99 = tuple()
   return %99 : $()
 }
@@ -336,8 +331,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-NEXT: end running
 sil [ossa] @testSSADominatedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -366,8 +360,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-SAME: load
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   %borrow1 = begin_borrow %1 : $C
   %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
   br bb1(%borrow1 : $C, %aggregate : $PairC)
@@ -416,8 +409,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 //
 sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
-  debug_value [trace] %0 : $C
+  test_specification "ssa-liveness @argument[0]"
   %s0 = struct $PairC(%0 : $C, %0 : $C)
   %s0a = struct_extract %s0 : $PairC, #PairC.first
   %s0b = struct_extract %s0 : $PairC, #PairC.second
