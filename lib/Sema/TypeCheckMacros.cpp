@@ -833,32 +833,8 @@ void swift::expandAccessors(
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", storage);
 
-  // FIXME: getTopLevelItems() is going to have to figure out how to parse
-  // a sequence of accessor declarations. Specifically, we will have to
-  // encode enough information in the GeneratedSourceInfo to know that
-  // the "top level" here is really a set of accessor declarations, so we
-  // can parse those. Both parsers will need to do it this way. Alternatively,
-  // we can put some extra braces around things and use parseGetSet, but that
-  // doesn't feel quite right, because we might eventually allow additional
-  // accessors to be inserted for properties that already have accesssors.
-  // parseTopLevelItems is where things get interesting... hmmm...
-
-
-#if false
-  // Retrieve the parsed declarations from the list of top-level items.
-  auto topLevelItems = macroSourceFile->getTopLevelItems();
-  for (auto item : topLevelItems) {
-    auto *decl = item.dyn_cast<Decl *>();
-    if (!decl) {
-      ctx.Diags.diagnose(
-          macroBufferRange.getStart(), diag::expected_macro_expansion_decls);
-      return;
-    }
-    decl->setDeclContext(dc);
-    TypeChecker::typeCheckDecl(decl);
-    results.push_back(decl);
-  }
-
-#endif
-  return;
+  // Trigger parsing of the sequence of accessor declarations. This has the
+  // side effect of registering those accessor declarations with the storage
+  // declaration, so there is nothing further to do.
+  (void)macroSourceFile->getTopLevelItems();
 }

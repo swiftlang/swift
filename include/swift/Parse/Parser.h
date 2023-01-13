@@ -1215,6 +1215,12 @@ public:
                                        AccessorKind currentKind,
                                        SourceLoc const& currentLoc);
 
+  /// Parse accessors provided as a separate list, for use in macro
+  /// expansions.
+  void parseTopLevelAccessors(
+      AbstractStorageDecl *storage, SmallVectorImpl<ASTNode> &items
+  );
+
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,

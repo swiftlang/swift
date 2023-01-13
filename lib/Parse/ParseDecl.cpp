@@ -6781,6 +6781,53 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
   return Status;
 }
 
+void Parser::parseTopLevelAccessors(
+    AbstractStorageDecl *storage, SmallVectorImpl<ASTNode> &items
+) {
+  // Prime the lexer.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  SourceLoc staticLoc;
+  ParameterList *indices = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+    staticLoc = subscript->getStaticLoc();
+    indices = subscript->getIndices();
+  } else if (auto binding = cast<VarDecl>(storage)->getParentPatternBinding()) {
+    staticLoc = binding->getStaticLoc();
+  }
+
+  ParserStatus status;
+  ParsedAccessors accessors;
+  bool hasEffectfulGet = false;
+  bool parsingLimitedSyntax = false;
+  while (!Tok.is(tok::eof)) {
+    DeclAttributes attributes;
+    AccessorKind kind = AccessorKind::Get;
+    SourceLoc loc;
+    bool notAccessor = parseAccessorIntroducer(*this, attributes, kind, loc);
+    if (notAccessor)
+      break;
+
+    (void)parseAccessorAfterIntroducer(
+        loc, kind, accessors, hasEffectfulGet, indices, parsingLimitedSyntax,
+        attributes, PD_Default, storage, staticLoc, status
+    );
+  }
+
+  // Consume remaining tokens.
+  // FIXME: Emit a diagnostic here?
+  while (!Tok.is(tok::eof)) {
+    consumeToken();
+  }
+
+  accessors.record(*this, storage, false);
+
+  // Collect these accessors as top-level decls.
+  for (auto accessor : accessors.Accessors)
+    items.push_back(accessor);
+}
+
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
