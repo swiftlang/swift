@@ -843,6 +843,10 @@ BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri
   return {castToInst<FunctionRefBaseInst>(fri)->getInitiallyReferencedFunction()};
 }
 
+llvm::APInt IntegerLiteralInst_getValue(BridgedInstruction ili) {
+  return castToInst<IntegerLiteralInst>(ili)->getValue();
+}
+
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli) {
   return castToInst<StringLiteralInst>(sli)->getValue();
 }

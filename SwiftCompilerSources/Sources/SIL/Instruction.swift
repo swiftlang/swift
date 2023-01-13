@@ -454,7 +454,9 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
-final public class IntegerLiteralInst : SingleValueInstruction {}
+final public class IntegerLiteralInst : SingleValueInstruction {
+  public var value: llvm.APInt { IntegerLiteralInst_getValue(bridged) }
+}
 
 final public class StringLiteralInst : SingleValueInstruction {
   public var string: String { StringLiteralInst_getValue(bridged).string }

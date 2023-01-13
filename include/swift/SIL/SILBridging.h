@@ -374,6 +374,7 @@ SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp);
 SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
+llvm::APInt IntegerLiteralInst_getValue(BridgedInstruction ili);
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
