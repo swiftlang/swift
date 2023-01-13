@@ -1053,6 +1053,15 @@ static void _enqueueCompletedTask(NaiveTaskGroupQueue<ReadyQueueItem> *readyQueu
   readyQueue->enqueue(readyItem);
 }
 
+/// This can only be used by a discarding task group;
+/// Other groups must enqueue a complete Task to the ready queue.
+static void _enqueueRawError(DiscardingTaskGroup* _Nonnull group,
+                             NaiveTaskGroupQueue<ReadyQueueItem> *readyQueue,
+                             SwiftError *error) {
+  auto readyItem = ReadyQueueItem::getRawError(group, error);
+  readyQueue->enqueue(readyItem);
+}
+
 // TaskGroup is locked upon entry and exit
 void AccumulatingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
   // Retain the task while it is in the queue; it must remain alive until
@@ -1226,6 +1235,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     }
 
     auto afterComplete = statusCompletePendingAssumeRelease();
+    (void)afterComplete; // silence "not used" warning
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, either more pending tasks, or no waiting task, status:%s",
                                afterComplete.to_string(this).c_str());
   }
@@ -1341,7 +1351,7 @@ void DiscardingTaskGroup::resumeWaitingTaskWithError(
       // we can't just have the parent task set itself up as a waiter.
       // But since it's what we're doing, we basically take the same
       // path as we would if there wasn't a waiter.
-      enqueueCompletedTask(completedTask, hadErrorResult);
+      _enqueueRawError(this, &readyQueue, error);
       return;
 
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
