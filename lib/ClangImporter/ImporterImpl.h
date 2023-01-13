@@ -528,6 +528,10 @@ private:
   /// used when parsing the attribute text.
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
+  /// If set, the Swift DeclContext from which the current
+  /// import request was triggered.
+  llvm::Optional<const swift::DeclContext *> ImportingContext;
+
 public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
@@ -585,6 +589,16 @@ public:
 
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
+  }
+
+  void setImportingContext(const DeclContext &importingContext) {
+    ImportingContext = &importingContext;
+  }
+
+  void resetImportingContext() { ImportingContext = None; }
+
+  llvm::Optional<const DeclContext *> getImportingContext() {
+    return ImportingContext;
   }
 
 private:

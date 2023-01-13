@@ -640,6 +640,12 @@ public:
   void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
+  /// Look up a value just as "ModuleDecl::lookupValue` does, but provide the
+  /// Swift context from which the lookup is made.
+  void lookupValueWithContext(DeclName Name, NLKind LookupKind,
+                              SmallVectorImpl<ValueDecl *> &Result,
+                              const DeclContext *Context) const;
+
   /// Look up a local type declaration by its mangled name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

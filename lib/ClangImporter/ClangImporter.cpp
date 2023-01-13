@@ -3286,6 +3286,12 @@ void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recu
 
 void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &results) const {
+  lookupValueWithContext(name, lookupKind, results, nullptr);
+}
+
+void ClangModuleUnit::lookupValueWithContext(
+    DeclName name, NLKind lookupKind, SmallVectorImpl<ValueDecl *> &results,
+    const DeclContext *context) const {
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;
@@ -3305,7 +3311,13 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
   // Find the corresponding lookup table.
   if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
-    owner.lookupValue(*lookupTable, name, *consumer);
+    if (context) {
+      owner.setImportingContext(*context);
+      owner.lookupValue(*lookupTable, name, *consumer);
+      owner.resetImportingContext();
+    } else {
+      owner.lookupValue(*lookupTable, name, *consumer);
+    }
   }
 }
 

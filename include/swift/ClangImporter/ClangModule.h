@@ -68,6 +68,10 @@ public:
   virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
+  void lookupValueWithContext(DeclName name, NLKind lookupKind,
+                              SmallVectorImpl<ValueDecl *> &results,
+                              const DeclContext *context) const;
+
   virtual TypeDecl *
   lookupNestedType(Identifier name,
                    const NominalTypeDecl *baseType) const override;

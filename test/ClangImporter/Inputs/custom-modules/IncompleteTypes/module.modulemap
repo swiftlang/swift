@@ -1,0 +1,3 @@
+module ObjCLibraryForwardDeclaringCompleteSwiftTypes {
+    header "objc-library-forward-declaring-complete-swift-types.h"
+}

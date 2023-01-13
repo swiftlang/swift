@@ -4298,19 +4298,21 @@ namespace {
         }
       }
 
-      if (!found) {
-        // Go back to the first list and find classes with matching Swift names
-        // *even if the ObjC name doesn't match.*
-        // This shouldn't be allowed but we need it for source compatibility;
-        // people used `@class SwiftNameOfClass` as a workaround for not
-        // having the previous loop, and it "worked".
-        for (auto result : swiftDeclsByName) {
-          if (auto singleResult = dyn_cast<T>(result)) {
-            if (isMatch(singleResult, /*baseNameMatches=*/true,
-                        /*allowObjCMismatch=*/true)) {
-              if (found)
-                return nullptr;
-              found = singleResult;
+      if (!languageVersion.isVersionAtLeast(6)) {
+        if (!found) {
+          // Go back to the first list and find classes with matching Swift
+          // names *even if the ObjC name doesn't match.* This shouldn't be
+          // allowed but we need it for source compatibility; people used
+          // `@class SwiftNameOfClass` as a workaround for not having the
+          // previous loop, and it "worked".
+          for (auto result : swiftDeclsByName) {
+            if (auto singleResult = dyn_cast<T>(result)) {
+              if (isMatch(singleResult, /*baseNameMatches=*/true,
+                          /*allowObjCMismatch=*/true)) {
+                if (found)
+                  return nullptr;
+                found = singleResult;
+              }
             }
           }
         }
@@ -4335,6 +4337,35 @@ namespace {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
           if (T *result = resolveSwiftDeclImpl<T>(decl, name,
                                                   hasKnownSwiftName, owner))
+            return result;
+        }
+      }
+      if (auto importingContext = Impl.getImportingContext()) {
+        llvm::SmallVector<ValueDecl *> results;
+        llvm::SmallVector<ImportedModule> importedModules;
+
+        const ModuleDecl *importingSwiftModule =
+            importingContext.getValue()->getParentModule();
+
+        if (importingSwiftModule->isNonSwiftModule())
+          return nullptr;
+
+        const SourceFile *importingSwiftSourceFile =
+            importingContext.getValue()->getParentSourceFile();
+
+        // TODO: Make sure we aren't bailing early in legitimate cases
+        if (!importingSwiftSourceFile)
+          return nullptr;
+
+        importingSwiftSourceFile->getImportedModules(
+            importedModules, ModuleDecl::ImportFilterKind::Default);
+
+        for (auto &import : importedModules) {
+          if (import.importedModule->isNonSwiftModule())
+            continue;
+
+          if (T *result = resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName,
+                                                  import.importedModule))
             return result;
         }
       }

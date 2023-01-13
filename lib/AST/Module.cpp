@@ -43,6 +43,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -57,8 +58,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -734,6 +735,30 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
   }
 
   FORWARD(lookupValue, (Name, LookupKind, Result));
+}
+
+void ModuleDecl::lookupValueWithContext(DeclName Name, NLKind LookupKind,
+                                        SmallVectorImpl<ValueDecl *> &Result,
+                                        const DeclContext *Context) const {
+  if (isParsedModule(this)) {
+    getSourceLookupCache().lookupValue(Name, LookupKind, Result);
+    return;
+  }
+
+  for (const FileUnit *file : getFiles()) {
+    // At the time of writing, Clang module units are the only FileUnits
+    // that make use of the Context. If this changes, add appropriate calls
+    // below.
+    if (auto clangModuleUnit = dyn_cast<ClangModuleUnit>(file)) {
+      clangModuleUnit->lookupValueWithContext(Name, LookupKind, Result,
+                                              Context);
+    } else {
+      file->lookupValue(Name, LookupKind, Result);
+    }
+    if (auto *synth = file->getSynthesizedFile()) {
+      synth->lookupValue(Name, LookupKind, Result);
+    }
+  }
 }
 
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
