@@ -119,6 +119,22 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
                                        const void *base) {
   // Resolve the absolute pointer to the entity being referenced.
   auto ptr = resolveSymbolicReferenceOffset(kind, isIndirect, offset, base);
+  if (SWIFT_UNLIKELY(!ptr)) {
+    auto symInfo = SymbolInfo::lookup(base);
+    const char *fileName = "<unknown>";
+    const char *symbolName = "<unknown>";
+    if (symInfo) {
+      if (symInfo->getFilename())
+        fileName = symInfo->getFilename();
+      if (symInfo->getSymbolName())
+        symbolName = symInfo->getSymbolName();
+    }
+    swift::fatalError(
+        0,
+        "Failed to look up symbolic reference at %p - offset %" PRId32
+        " - symbol %s in %s\n",
+        base, offset, symbolName, fileName);
+  }
 
   // Figure out this symbolic reference's grammatical role.
   Node::Kind nodeKind;
