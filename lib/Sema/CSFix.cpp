@@ -400,12 +400,13 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
     auto &cs = solution.getConstraintSystem();
     auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
-        solution, context, NonConformingType, ProtocolType, locator);
+        solution, context, getNonConformingType(), getProtocolType(), locator);
     return failure.diagnose(asNote);
   }
 
   MissingConformanceFailure failure(
-      solution, locator, std::make_pair(NonConformingType, ProtocolType));
+      solution, locator,
+      std::make_pair(getNonConformingType(), getProtocolType()));
   return failure.diagnose(asNote);
 }
 
@@ -433,8 +434,9 @@ bool MissingConformance::isEqual(const ConstraintFix *other) const {
     return false;
 
   return IsContextual == conformanceFix->IsContextual &&
-         NonConformingType->isEqual(conformanceFix->NonConformingType) &&
-         ProtocolType->isEqual(conformanceFix->ProtocolType);
+         getNonConformingType()->isEqual(
+             conformanceFix->getNonConformingType()) &&
+         getProtocolType()->isEqual(conformanceFix->getProtocolType());
 }
 
 MissingConformance *
