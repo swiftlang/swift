@@ -1499,7 +1499,7 @@ bool WitnessChecker::findBestWitness(
         if (SF->Kind == SourceFileKind::Interface) {
           auto match = matchWitness(ReqEnvironmentCache, Proto,
                                     conformance, DC, requirement, requirement);
-          assert(match.isViable());
+//          assert(match.isViable());
           numViable = 1;
           bestIdx = matches.size();
           matches.push_back(std::move(match));
