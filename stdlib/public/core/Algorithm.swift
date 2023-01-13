@@ -164,5 +164,4 @@ extension EnumeratedSequence: Sequence {
   }
 }
 
-@available(SwiftStdlib 5.8, *)
 extension EnumeratedSequence: Sendable where Base: Sendable {}
