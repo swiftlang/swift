@@ -138,10 +138,14 @@ public struct Builder {
   public func createApply(
     function: Value,
     _ substitutionMap: SubstitutionMap,
-    arguments: [Value]
+    arguments: [Value],
+    isNonThrowing: Bool = false,
+    isNonAsync: Bool = false,
+    specializationInfo: ApplyInst.SpecializationInfo = nil
   ) -> ApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
-      SILBuilder_createApply(bridged, function.bridged, substitutionMap.bridged, valuesRef)
+      SILBuilder_createApply(bridged, function.bridged, substitutionMap.bridged, valuesRef,
+                             isNonThrowing, isNonAsync, specializationInfo)
     }
     return notifyNew(apply.getAs(ApplyInst.self))
   }

@@ -635,6 +635,13 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var numArguments: Int { ApplyInst_numArguments(bridged) }
 
   public var singleDirectResult: Value? { self }
+
+  public var isNonThrowing: Bool { ApplyInst_getNonThrowing(bridged) }
+  public var isNonAsync: Bool { ApplyInst_getNonAsync(bridged) }
+
+  public typealias SpecializationInfo = UnsafePointer<swift.GenericSpecializationInformation>?
+
+  public var specializationInfo: SpecializationInfo { ApplyInst_getSpecializationInfo(bridged) }
 }
 
 final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}

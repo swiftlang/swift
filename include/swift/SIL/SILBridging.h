@@ -390,6 +390,10 @@ SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
 SwiftInt RefElementAddrInst_fieldIsLet(BridgedInstruction reai);
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
+bool ApplyInst_getNonThrowing(BridgedInstruction ai);
+bool ApplyInst_getNonAsync(BridgedInstruction ai);
+const swift::GenericSpecializationInformation * _Nullable
+ApplyInst_getSpecializationInfo(BridgedInstruction ai);
 SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai);
 SwiftInt PartialApplyInst_isOnStack(BridgedInstruction pai);
 SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb);
@@ -453,7 +457,8 @@ BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
           BridgedValue op);
 BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,
           BridgedValue function, swift::SubstitutionMap subMap,
-          BridgedValueArray arguments);
+          BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+          const swift::GenericSpecializationInformation * _Nullable specInfo);
 BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder builder,
           BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
           const void * _Nullable enumCases, SwiftInt numEnumCases);

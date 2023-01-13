@@ -907,6 +907,19 @@ SwiftInt ApplyInst_numArguments(BridgedInstruction ai) {
   return castToInst<ApplyInst>(ai)->getNumArguments();
 }
 
+bool ApplyInst_getNonThrowing(BridgedInstruction ai) {
+  return castToInst<ApplyInst>(ai)->isNonThrowing();
+}
+
+bool ApplyInst_getNonAsync(BridgedInstruction ai) {
+  return castToInst<ApplyInst>(ai)->isNonAsync();
+}
+
+const swift::GenericSpecializationInformation * _Nullable
+ApplyInst_getSpecializationInfo(BridgedInstruction ai) {
+  return castToInst<ApplyInst>(ai)->getSpecializationInfo();
+}
+
 SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai) {
   auto *paiInst = castToInst<PartialApplyInst>(pai);
   return ApplySite(paiInst).getCalleeArgIndexOfFirstAppliedArg();
@@ -1139,13 +1152,20 @@ BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
 BridgedInstruction SILBuilder_createApply(BridgedBuilder b,
                                           BridgedValue function,
                                           SubstitutionMap subMap,
-                                          BridgedValueArray arguments) {
+                                          BridgedValueArray arguments,
+                                          bool isNonThrowing, bool isNonAsync,
+                                          const GenericSpecializationInformation * _Nullable specInfo) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   SmallVector<SILValue, 16> argValues;
+  ApplyOptions applyOpts;
+  if (isNonThrowing) { applyOpts |= ApplyFlags::DoesNotThrow; }
+  if (isNonAsync) { applyOpts |= ApplyFlags::DoesNotAwait; }
+
   return {builder.createApply(RegularLocation(b.loc.getLocation()),
                               castToSILValue(function), subMap,
-                              getSILValues(arguments, argValues))};
+                              getSILValues(arguments, argValues),
+                              applyOpts, specInfo)};
 }
 
 static EnumElementDecl *getEnumElement(SILType enumType, int caseIndex) {
