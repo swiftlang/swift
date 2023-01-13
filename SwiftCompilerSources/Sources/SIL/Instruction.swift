@@ -278,6 +278,9 @@ final public class DeallocStackRefInst : Instruction, UnaryInstruction {
   public var allocRef: AllocRefInstBase { operand as! AllocRefInstBase }
 }
 
+final public class MarkUninitializedInst : Instruction, UnaryInstruction {
+}
+
 final public class CondFailInst : Instruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
 
@@ -413,6 +416,8 @@ class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class OpenExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class MetatypeInst : SingleValueInstruction {}
 
 final public
 class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
