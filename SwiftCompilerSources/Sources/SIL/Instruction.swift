@@ -766,13 +766,13 @@ final public class BranchInst : TermInst {
 }
 
 final public class CondBranchInst : TermInst {
-  var trueBlock: BasicBlock { successors[0] }
-  var falseBlock: BasicBlock { successors[1] }
+  public var trueBlock: BasicBlock { successors[0] }
+  public var falseBlock: BasicBlock { successors[1] }
 
-  var condition: Value { operands[0].value }
+  public var condition: Value { operands[0].value }
 
-  var trueOperands: OperandArray { operands[1...CondBranchInst_getNumTrueArgs(bridged)] }
-  var falseOperands: OperandArray {
+  public var trueOperands: OperandArray { operands[1..<(CondBranchInst_getNumTrueArgs(bridged) &+ 1)] }
+  public var falseOperands: OperandArray {
     let ops = operands
     return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
   }
