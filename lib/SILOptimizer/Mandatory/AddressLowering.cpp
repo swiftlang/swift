@@ -433,6 +433,29 @@ void ValueStorageMap::replaceValue(SILValue oldValue, SILValue newValue) {
 }
 
 #ifndef NDEBUG
+void ValueStorage::dump() const {
+  llvm::dbgs() << "projectedStorageID: " << projectedStorageID << "\n";
+  llvm::dbgs() << "projectedOperandNum: " << projectedOperandNum << "\n";
+  llvm::dbgs() << "isDefProjection: " << isDefProjection << "\n";
+  llvm::dbgs() << "isUseProjection: " << isUseProjection << "\n";
+  llvm::dbgs() << "isRewritten: " << isRewritten << "\n";
+  llvm::dbgs() << "initializesEnum: " << initializesEnum << "\n";
+}
+void ValueStorageMap::ValueStoragePair::dump() const {
+  llvm::dbgs() << "value: ";
+  value->dump();
+  llvm::dbgs() << "address:  ";
+  if (storage.storageAddress)
+    storage.storageAddress->dump();
+  else
+    llvm::dbgs() << "UNKNOWN!\n";
+  storage.dump();
+}
+void ValueStorageMap::dumpProjections(SILValue value) {
+  for (auto *pair : getProjections(value)) {
+    pair->dump();
+  }
+}
 void ValueStorageMap::dump() {
   llvm::dbgs() << "ValueStorageMap:\n";
   for (unsigned ordinal : indices(valueVector)) {

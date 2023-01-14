@@ -185,6 +185,10 @@ struct ValueStorage {
     assert(isRewritten && "storage has not been materialized");
     return storageAddress;
   }
+
+#ifndef NDEBUG
+  void dump() const;
+#endif
 };
 
 /// Map each opaque/resilient SILValue to its abstract storage.
@@ -197,6 +201,9 @@ class ValueStorageMap {
     SILValue value;
     ValueStorage storage;
     ValueStoragePair(SILValue v, ValueStorage s) : value(v), storage(s) {}
+#ifndef NDEBUG
+    void dump() const;
+#endif
   };
   typedef std::vector<ValueStoragePair> ValueVector;
   // Hash of values to ValueVector indices.
@@ -335,6 +342,7 @@ public:
   bool isComposingUseProjection(Operand *oper) const;
 
 #ifndef NDEBUG
+  void dumpProjections(SILValue value);
   void dump();
 #endif
 };
