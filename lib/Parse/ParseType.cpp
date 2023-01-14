@@ -793,11 +793,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
   DeclRefTypeRepr *DeclRefTR = nullptr;
   if (!ComponentsR.empty()) {
-    if (ComponentsR.size() == 1) {
-      DeclRefTR = ComponentsR.front();
-    } else {
-      DeclRefTR = MemberTypeRepr::create(Context, ComponentsR);
-    }
+    DeclRefTR = MemberTypeRepr::create(Context, ComponentsR);
   }
 
   if (Status.hasCodeCompletion()) {
