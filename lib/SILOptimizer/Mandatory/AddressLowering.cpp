@@ -552,6 +552,12 @@ struct AddressLoweringState {
     return getBuilder(term->getParent()->end(), term);
   }
 
+  /// The latest instruction which opens an archetype involved in the indicated
+  /// type.
+  ///
+  /// @returns nullable instruction
+  SILInstruction *getLatestOpeningInst(SILType ty) const;
+
   PhiRewriter &getPhiRewriter();
 
   SILValue getMaterializedAddress(SILValue origValue) const {
@@ -1343,6 +1349,32 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   pass.deleter.forceDelete(allocInst);
 }
 
+SILInstruction *AddressLoweringState::getLatestOpeningInst(SILType ty) const {
+  SILInstruction *latestOpeningInst = nullptr;
+  ty.getASTType().visit([&](CanType type) {
+    auto archetype = dyn_cast<ArchetypeType>(type);
+    if (!archetype)
+      return;
+
+    if (auto openedTy = getOpenedArchetypeOf(archetype)) {
+      auto openingVal =
+          getModule()->getRootLocalArchetypeDef(openedTy, function);
+
+      auto *openingInst = openingVal->getDefiningInstruction();
+      assert(openingVal && "all opened archetypes should be resolved");
+      if (latestOpeningInst) {
+        if (domInfo->dominates(openingInst, latestOpeningInst))
+          return;
+
+        assert(domInfo->dominates(latestOpeningInst, openingInst) &&
+               "opened archetypes must dominate their uses");
+      }
+      latestOpeningInst = openingInst;
+    }
+  });
+  return latestOpeningInst;
+}
+
 // Create alloc_stack that dominates an owned value \p value. Create
 // jointly-postdominating dealloc_stack instructions.  Nesting will be fixed
 // later.
@@ -1366,28 +1398,7 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   // definition. Allocating as early as possible provides more opportunity for
   // creating use projections into value. But allocation must be no earlier
   // than the latest type definition.
-  SILInstruction *latestOpeningInst = nullptr;
-  allocTy.getASTType().visit([&](CanType type) {
-    auto archetype = dyn_cast<ArchetypeType>(type);
-    if (!archetype)
-      return;
-
-    if (auto openedTy = getOpenedArchetypeOf(archetype)) {
-      auto openingVal =
-          pass.getModule()->getRootLocalArchetypeDef(openedTy, pass.function);
-
-      auto *openingInst = openingVal->getDefiningInstruction();
-      assert(openingVal && "all opened archetypes should be resolved");
-      if (latestOpeningInst) {
-        if (pass.domInfo->dominates(openingInst, latestOpeningInst))
-          return;
-
-        assert(pass.domInfo->dominates(latestOpeningInst, openingInst) &&
-               "opened archetypes must dominate their uses");
-      }
-      latestOpeningInst = openingInst;
-    }
-  });
+  auto *latestOpeningInst = pass.getLatestOpeningInst(allocTy);
 
   auto allocPt = latestOpeningInst
                      ? latestOpeningInst->getNextInstruction()->getIterator()
