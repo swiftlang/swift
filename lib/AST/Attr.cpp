@@ -1485,6 +1485,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_documentation";
   case DAK_Declaration:
     return "declaration";
+  case DAK_Attached:
+    return "attached";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2311,12 +2313,12 @@ bool CustomAttr::isArgUnsafe() const {
 }
 
 DeclarationAttr::DeclarationAttr(SourceLoc atLoc, SourceRange range,
-                                 MacroContext macroContext,
+                                 MacroRole role,
                                  ArrayRef<MacroIntroducedDeclName> peerNames,
                                  ArrayRef<MacroIntroducedDeclName> memberNames,
                                  bool implicit)
     : DeclAttribute(DAK_Declaration, atLoc, range, implicit),
-      macroContext(macroContext), numPeerNames(peerNames.size()),
+      role(role), numPeerNames(peerNames.size()),
       numMemberNames(memberNames.size()) {
   auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
   std::uninitialized_copy(peerNames.begin(), peerNames.end(),
@@ -2327,14 +2329,14 @@ DeclarationAttr::DeclarationAttr(SourceLoc atLoc, SourceRange range,
 
 DeclarationAttr *
 DeclarationAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-                        MacroContext macroContext,
+                        MacroRole role,
                         ArrayRef<MacroIntroducedDeclName> peerNames,
                         ArrayRef<MacroIntroducedDeclName> memberNames,
                         bool implicit) {
   unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(
       peerNames.size() + memberNames.size());
   auto *mem = ctx.Allocate(size, alignof(DeclarationAttr));
-  return new (mem) DeclarationAttr(atLoc, range, macroContext, peerNames,
+  return new (mem) DeclarationAttr(atLoc, range, role, peerNames,
                                    memberNames, implicit);
 }
 
@@ -2355,6 +2357,34 @@ ArrayRef<MacroIntroducedDeclName> DeclarationAttr::getMemberNames() const {
     numMemberNames
   };
 }
+
+AttachedAttr::AttachedAttr(SourceLoc atLoc, SourceRange range,
+                           MacroRole role,
+                           ArrayRef<MacroIntroducedDeclName> names,
+                           bool implicit)
+    : DeclAttribute(DAK_Attached, atLoc, range, implicit),
+      role(role), numNames(names.size()) {
+  auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
+  std::uninitialized_copy(names.begin(), names.end(), trailingNamesBuffer);
+}
+
+AttachedAttr *
+AttachedAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
+                     MacroRole role,
+                     ArrayRef<MacroIntroducedDeclName> names,
+                     bool implicit) {
+  unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(names.size());
+  auto *mem = ctx.Allocate(size, alignof(AttachedAttr));
+  return new (mem) AttachedAttr(atLoc, range, role, names, implicit);
+}
+
+ArrayRef<MacroIntroducedDeclName> AttachedAttr::getNames() const {
+  return {
+    getTrailingObjects<MacroIntroducedDeclName>(),
+    numNames
+  };
+}
+
 
 const DeclAttribute *
 DeclAttributes::getEffectiveSendableAttr() const {

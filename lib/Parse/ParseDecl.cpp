@@ -2147,9 +2147,8 @@ Parser::parseDeclarationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     errorAndSkipUntilConsumeRightParen(*this, attrName);
     return makeParserError();
   }
-  auto kind = llvm::StringSwitch<Optional<MacroContext>>(Tok.getText())
-      .Case("freestanding", MacroContext::FreestandingDeclaration)
-      .Case("attached", MacroContext::AttachedDeclaration)
+  auto kind = llvm::StringSwitch<Optional<MacroRole>>(Tok.getText())
+      .Case("freestanding", MacroRole::FreestandingDeclaration)
       .Default(None);
   if (!kind) {
     diagnose(Tok, diag::declaration_attr_expected_kind);
@@ -2166,6 +2165,249 @@ Parser::parseDeclarationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   SourceRange range(Loc, rParenLoc);
   return makeParserResult(DeclarationAttr::create(
       Context, AtLoc, range, *kind, {}, {}, /*isImplicit*/ false));
+}
+
+/// If the given argument is effectively a bare identifier, extract that
+/// identifier.
+static Optional<Identifier> getIdentifierFromArgument(Argument argument) {
+  // Handle '_'.
+  if (isa<DiscardAssignmentExpr>(argument.getExpr()))
+    return Identifier();
+
+  auto declRef = dyn_cast<UnresolvedDeclRefExpr>(argument.getExpr());
+  if (argument.isInOut() ||
+      !declRef || !declRef->hasName() ||
+      declRef->getRefKind() != DeclRefKind::Ordinary ||
+      declRef->getName().isCompoundName() ||
+      declRef->getName().isSpecial()) {
+    return None;
+  }
+
+  return declRef->getName().getBaseIdentifier();
+}
+
+/// Retrieve the macro role from the given argument list.
+///
+/// \c returns the role, or None if the role is missing or incorrect. In the
+/// latter case, a diagnostic is produced.
+static Optional<MacroRole> getMacroRole(
+    DiagnosticEngine &diags, ArgumentList *argList, bool attached
+) {
+  // Make sure there's a first argument.
+  if (argList->size() == 0) {
+    diags.diagnose(
+        argList->getEndLoc(), diag::macro_role_attr_expected_kind, attached);
+    return None;
+  }
+
+  // Make sure it's a simple reference to a name.
+  auto roleArg = argList->get(0);
+  auto roleName = getIdentifierFromArgument(roleArg);
+  if (roleArg.hasLabel() || !roleName) {
+    diags.diagnose(
+        roleArg.getStartLoc(), diag::macro_role_attr_expected_kind, attached);
+    return None;
+  }
+
+  // Match the role string to the known set of roles.
+  auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
+      .Case("expression", MacroRole::Expression)
+      .Case("accessor", MacroRole::Accessor)
+      .Default(None);
+
+  if (!role) {
+    diags.diagnose(
+        roleArg.getStartLoc(), diag::macro_role_attr_expected_kind,
+        attached
+    );
+    return None;
+  }
+
+  // Check that the role makes sense.
+  if (attached == !isAttachedMacro(*role)) {
+    diags.diagnose(
+        roleArg.getStartLoc(), diag::macro_role_syntax_mismatch, attached,
+        *roleName
+    );
+
+    return None;
+  }
+
+  return role;
+}
+
+/// Determine whether a macro-introduced name requires an argument (which is
+/// always a string literal).
+static bool introducedNameRequiresArgument(MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+  case MacroIntroducedDeclNameKind::Named:
+  case MacroIntroducedDeclNameKind::Prefixed:
+  case MacroIntroducedDeclNameKind::Suffixed:
+    return true;
+
+  case MacroIntroducedDeclNameKind::Overloaded:
+  case MacroIntroducedDeclNameKind::Arbitrary:
+    return false;
+  }
+}
+
+static Optional<MacroIntroducedDeclNameKind>
+getMacroIntroducedDeclNameKind(Identifier name) {
+  return llvm::StringSwitch<Optional<MacroIntroducedDeclNameKind>>(name.str())
+    .Case("named", MacroIntroducedDeclNameKind::Named)
+    .Case("overloaded", MacroIntroducedDeclNameKind::Overloaded)
+    .Case("prefixed", MacroIntroducedDeclNameKind::Prefixed)
+    .Case("suffixed", MacroIntroducedDeclNameKind::Suffixed)
+    .Case("arbitrary", MacroIntroducedDeclNameKind::Arbitrary)
+    .Default(None);
+}
+
+/// Get the set of names that are introduced by the @freestanding/@attached
+/// macro argument.
+static SmallVector<MacroIntroducedDeclName, 2> getMacroIntroducedNames(
+    DiagnosticEngine &diags, ArgumentList *argList, bool attached
+) {
+  SmallVector<MacroIntroducedDeclName, 2> names;
+
+  bool sawNamesLabel = false;
+  for (unsigned index : range(1, argList->size())) {
+    Argument arg = argList->get(index);
+
+    // Make sure that the label "names" occurs on the first name, and no other
+    // labels occur anywhere else.
+    if (arg.hasLabel()) {
+      if (arg.getLabel().str() != "names") {
+        diags.diagnose(arg.getStartLoc(), diag::macro_attribute_unknown_label,
+                       attached, arg.getLabel());
+        return names;
+      }
+
+      if (sawNamesLabel) {
+        diags.diagnose(arg.getStartLoc(), diag::macro_attribute_duplicate_label,
+                       attached, arg.getLabel());
+      }
+
+      sawNamesLabel = true;
+    } else if (!sawNamesLabel) {
+      diags.diagnose(arg.getStartLoc(), diag::macro_attribute_missing_label,
+                     attached, "names");
+      sawNamesLabel = true;
+    }
+
+    // Handle cases where we have a bare identifier, which can be a name
+    // such as "overloaded" or "arbitrary".
+    if (auto introducedKindName = getIdentifierFromArgument(arg)) {
+      auto introducedKind = getMacroIntroducedDeclNameKind(*introducedKindName);
+      if (!introducedKind) {
+        diags.diagnose(
+            arg.getExpr()->getLoc(), diag::macro_attribute_unknown_name_kind,
+            *introducedKindName
+        );
+
+        continue;
+      }
+
+      if (introducedNameRequiresArgument(*introducedKind)) {
+        diags.diagnose(
+            arg.getExpr()->getLoc(),
+            diag::macro_attribute_introduced_name_requires_argument,
+            *introducedKindName
+        );
+
+        continue;
+      }
+
+      names.push_back(MacroIntroducedDeclName(*introducedKind));
+      continue;
+    }
+
+    // Handle cases where the have a(b), where each is a bare identifier,
+    // for things like "prefixed(_)".
+    auto call = dyn_cast<CallExpr>(arg.getExpr());
+    if (!call || call->getArgs()->size() != 1) {
+      diags.diagnose(
+          arg.getExpr()->getLoc(),
+          diag::macro_attribute_unknown_argument_form
+      );
+      continue;
+    }
+
+    auto fnName = getIdentifierFromArgument(Argument::unlabeled(call->getFn()));
+    if (!fnName) {
+      diags.diagnose(
+          call->getFn()->getLoc(),
+          diag::macro_attribute_unknown_argument_form
+      );
+
+      continue;
+    }
+
+    auto introducedKind = getMacroIntroducedDeclNameKind(*fnName);
+    if (!introducedKind) {
+      diags.diagnose(
+          call->getFn()->getLoc(), diag::macro_attribute_unknown_name_kind,
+          *fnName
+      );
+
+      continue;
+    }
+
+    if (!introducedNameRequiresArgument(*introducedKind)) {
+      diags.diagnose(
+          call->getArgs()->getLoc(),
+          diag::macro_attribute_introduced_name_requires_no_argument,
+          *fnName
+      );
+
+      names.push_back(MacroIntroducedDeclName(*introducedKind));
+      continue;
+    }
+
+    auto argument = getIdentifierFromArgument(call->getArgs()->get(0));
+    if (!argument) {
+      diags.diagnose(
+          call->getArgs()->get(0).getStartLoc(),
+          diag::macro_attribute_unknown_argument_form
+      );
+
+      continue;
+    }
+
+    names.push_back(MacroIntroducedDeclName(*introducedKind, *argument));
+  }
+
+  return names;
+}
+
+ParserResult<AttachedAttr>
+Parser::parseAttachedAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  StringRef attrName = "attached";
+  if (!Tok.isFollowingLParen()) {
+    diagnose(Tok, diag::attr_expected_lparen, attrName, false);
+    return makeParserError();
+  }
+
+  // Parse an argument list. We'll pick out the pieces from here.
+  auto argListResult = parseArgumentList(
+      tok::l_paren, tok::r_paren, /*isExprBasic*/ true,
+      /*allowTrailingClosure=*/false
+  );
+
+  if (argListResult.isParseErrorOrHasCompletion())
+    return ParserStatus(argListResult);
+
+  ArgumentList *argList = argListResult.get();
+
+  // Figure out the role.
+  auto role = getMacroRole(Diags, argList, /*attached=*/true);
+  if (!role)
+    return makeParserError();
+
+  auto names = getMacroIntroducedNames(Diags, argList, /*attached=*/true);
+
+  SourceRange range(Loc, argList->getEndLoc());
+  return makeParserResult(AttachedAttr::create(
+      Context, AtLoc, range, *role, names, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -3160,6 +3402,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
   case DAK_Declaration: {
     auto Attr = parseDeclarationAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    else
+      return false;
+    break;
+  }
+  case DAK_Attached: {
+    auto Attr = parseAttachedAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else

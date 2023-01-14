@@ -1100,6 +1100,10 @@ public:
   ParserResult<DeclarationAttr> parseDeclarationAttribute(SourceLoc AtLoc,
                                                           SourceLoc Loc);
 
+  /// Parse the @attached attribute.
+  ParserResult<AttachedAttr> parseAttachedAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,

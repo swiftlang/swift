@@ -1601,14 +1601,14 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
 
 SmallVector<MacroDecl *, 1>
 TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroContexts contexts) {
+                          SourceLoc loc, MacroRoles contexts) {
   auto result = lookupUnqualified(dc, DeclNameRef(macroName), loc,
                                   (defaultUnqualifiedLookupOptions |
                                       NameLookupFlags::IncludeOuterResults));
   SmallVector<MacroDecl *, 1> choices;
   for (const auto &found : result.allResults())
     if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
-      if (contexts.contains(macro->getMacroContexts()))
+      if (contexts.contains(macro->getMacroRoles()))
         choices.push_back(macro);
   return choices;
 }
