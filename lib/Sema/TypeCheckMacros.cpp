@@ -527,8 +527,8 @@ bool swift::expandFreestandingDeclarationMacro(
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
-  assert(macro->getMacroContexts()
-             .contains(MacroContext::FreestandingDeclaration));
+  assert(macro->getMacroRoles()
+             .contains(MacroRole::FreestandingDeclaration));
 
   if (isFromExpansionOfMacro(sourceFile, macro)) {
     med->diagnose(diag::macro_recursive, macro->getName());

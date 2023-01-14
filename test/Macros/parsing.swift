@@ -27,6 +27,24 @@ protocol Q { associatedtype Assoc }
 @declaration(freestanding) macro m9(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm9'; the type must be public and provided via '-load-plugin-library'}}
 
-@expression @declaration(freestanding) @declaration(attached)
+@expression @declaration(freestanding) @attached(accessor)
 macro m10(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm10'; the type must be public and provided via '-load-plugin-library'}}
+
+
+@attached(
+  accessor,
+  names: overloaded, arbitrary, named(hello), prefixed(_), suffixed(_favorite)
+)
+macro am1: Void
+// expected-error@-1{{macro 'am1' requires a definition}}
+
+@attached(
+  accessor,
+  overloaded, // expected-error{{@attached argument is missing label 'names'}}
+  unknown, // expected-error{{unknown introduced name kind 'unknown'}}
+  named, // expected-error{{introduced name kind 'named' requires a single argument '(name)'}}
+  arbitrary(a) // expected-error{{introduced name kind 'arbitrary' must not have an argument}}
+)
+macro am2: Void
+// expected-error@-1{{macro 'am2' requires a definition}}

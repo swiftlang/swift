@@ -3061,7 +3061,7 @@ static MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   for (const auto &result : lookup.allResults()) {
     // Only keep attached macros, which can be spelled as custom attributes.
     if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
-      if (macro->getMacroContexts().contains(MacroContext::AttachedDeclaration))
+      if (isAttachedMacro(macro->getMacroRoles()))
         macros.push_back(macro);
   }
 

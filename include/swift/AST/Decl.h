@@ -8372,7 +8372,7 @@ public:
   Type getResultInterfaceType() const;
 
   /// Determine the contexts in which this macro can be applied.
-  MacroContexts getMacroContexts() const;
+  MacroRoles getMacroRoles() const;
 
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;

@@ -912,6 +912,10 @@ DECL_MODIFIER_KINDS = [
                   OnMacro, AllowMultipleAttributes,
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
                   code=141),
+    DeclAttribute('attached', 'Attached',
+                  OnMacro, AllowMultipleAttributes,
+                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
+                  code=142),
 ]
 
 DEPRECATED_MODIFIER_KINDS = [

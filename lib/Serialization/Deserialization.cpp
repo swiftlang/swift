@@ -2646,15 +2646,15 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   }
 }
 
-static Optional<swift::MacroContext>
-getActualMacroContext(uint8_t context) {
+static Optional<swift::MacroRole>
+getActualMacroRole(uint8_t context) {
   switch (context) {
 #define CASE(THE_DK) \
-  case (uint8_t)serialization::MacroContext::THE_DK: \
-    return swift::MacroContext::THE_DK;
+  case (uint8_t)serialization::MacroRole::THE_DK: \
+    return swift::MacroRole::THE_DK;
   CASE(Expression)
   CASE(FreestandingDeclaration)
-  CASE(AttachedDeclaration)
+  CASE(Accessor)
 #undef CASE
   default:
     return None;
@@ -2669,7 +2669,6 @@ getActualMacroIntroducedDeclNameKind(uint8_t context) {
     return swift::MacroIntroducedDeclNameKind::THE_DK;
   CASE(Named)
   CASE(Overloaded)
-  CASE(Accessors)
   CASE(Prefixed)
   CASE(Suffixed)
   CASE(Arbitrary)
@@ -5422,13 +5421,13 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Declaration_DECL_ATTR: {
         bool isImplicit;
-        uint8_t rawMacroContext;
+        uint8_t rawMacroRole;
         uint64_t numPeers, numMembers;
         ArrayRef<uint64_t> introducedDeclNames;
         serialization::decls_block::DeclarationDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroContext, numPeers,
+            readRecord(scratch, isImplicit, rawMacroRole, numPeers,
                        numMembers, introducedDeclNames);
-        auto macroContext = *getActualMacroContext(rawMacroContext);
+        auto role = *getActualMacroRole(rawMacroRole);
         if (introducedDeclNames.size() != (numPeers + numMembers) * 2)
           return MF.diagnoseFatal();
         SmallVector<MacroIntroducedDeclName, 1> peersAndMembers;
@@ -5441,7 +5440,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           peersAndMembers.push_back(MacroIntroducedDeclName(*kind, identifier));
         }
         Attr = DeclarationAttr::create(
-            ctx, SourceLoc(), SourceRange(), macroContext,
+            ctx, SourceLoc(), SourceRange(), role,
             peersAndMembersRef.take_front(numPeers),
             peersAndMembersRef.take_back(numMembers),
             isImplicit);
