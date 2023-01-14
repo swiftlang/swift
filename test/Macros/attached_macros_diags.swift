@@ -2,6 +2,7 @@
 
 @declaration(attached) macro m1: Void = #externalMacro(module: "MyMacros", type: "Macro1")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1'}}
+// expected-note@-2{{'m1' declared here}}
 
 @declaration(attached) macro m2(_: Int) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
@@ -27,4 +28,5 @@ struct SkipNestedType {
 
   // We select the macro, not the property wrapper.
   @m1 var x: Int = 0
+  // expected-error@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1'; the type must be public and provided via '-load-plugin-library'}}
 }
