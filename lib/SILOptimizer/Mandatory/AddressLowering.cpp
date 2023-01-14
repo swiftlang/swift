@@ -571,6 +571,13 @@ struct AddressLoweringState {
   void getDominandsForUseProjection(SILValue userValue,
                                     SmallVectorImpl<SILValue> &dominands) const;
 
+  /// Finds and caches the latest opening instruction of the type of the value
+  /// in \p pair.
+  ///
+  /// @returns nullable instruction
+  SILInstruction *
+  getLatestOpeningInst(const ValueStorageMap::ValueStoragePair *) const;
+
   /// The latest instruction which opens an archetype involved in the indicated
   /// type.
   ///
@@ -1256,6 +1263,14 @@ void OpaqueStorageAllocation::allocateValue(SILValue value) {
   // this value's storage with a branch use.
   createStackAllocationStorage(value);
 }
+SILInstruction *AddressLoweringState::getLatestOpeningInst(
+    const ValueStorageMap::ValueStoragePair *pair) const {
+  if (!pair->storage.latestOpeningInst.has_value()) {
+    auto *loi = getLatestOpeningInst(pair->value->getType());
+    pair->storage.latestOpeningInst = {loi};
+  }
+  return pair->storage.latestOpeningInst.value();
+}
 
 void AddressLoweringState::getDominandsForUseProjection(
     SILValue userValue, SmallVectorImpl<SILValue> &dominands) const {
@@ -1283,6 +1298,12 @@ void AddressLoweringState::getDominandsForUseProjection(
     assert(storage.isUseProjection || !storage.isProjection());
     assert(!(storage.isProjection() && storage.storageAddress) &&
            "projections have not yet been materialized!?");
+    if (auto *loi = getLatestOpeningInst(pair)) {
+      // In order for an opaque value to reuse the storage of some recursive
+      // aggregate, it must dominate the instructions that open archetypes that
+      // occur at every layer of the aggregation.
+      dominands.push_back(cast<SingleValueInstruction>(loi));
+    }
     if (!storage.isProjection()) {
       // Reached the bottom of the projection tower.  There must be storage.
       assert(storage.storageAddress);
@@ -1348,13 +1369,15 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
       continue;
     }
 
-    // Recurse through all storage projections to find the point where the
-    // storage has been allocated.
+    // Recurse through all storage projections to find (1) the point where the
+    // storage has been allocated and (2) any opening instructions involved in
+    // any of those projections' types.
     //
-    // The base storage address must dominate `incomingValues` because the
-    // address projection for each `incomingValue` must be materialized no
-    // later than at `incomingValue->getDefiningInsertionPoint()` (but perhaps
-    // earlier, see getProjectionInsertionPoint).
+    // The base storage address and all of the opened types used by the
+    // projections must dominate `incomingValues` because the address
+    // projections for each `incomingValue` must be materialized no later than
+    // at `incomingValue->getDefiningInsertionPoint()` (but perhaps earlier,
+    // see getProjectionInsertionPoint).
     SmallVector<SILValue, 4> dominands;
     pass.getDominandsForUseProjection(userValue, dominands);
 
@@ -1830,6 +1853,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
 
 SILInstruction *AddressMaterialization::getProjectionInsertionPoint(
     SILValue userValue, AddressLoweringState &pass) {
+  SILInstruction *latestOpeningInst = nullptr;
   SILInstruction *retval = userValue->getDefiningInsertionPoint();
   for (auto *pair : pass.valueStorageMap.getProjections(userValue)) {
     auto const &storage = pair->storage;
@@ -1838,8 +1862,33 @@ SILInstruction *AddressMaterialization::getProjectionInsertionPoint(
       retval = storage.storageAddress->getNextInstruction();
       break;
     }
+    // It's necessary to consider obstructions at every level of aggregation*
+    // because there is no ordering among the opening instructions which
+    // define the types used in the aggregate.
+    //
+    // * Levels above the first projection for which storage has already been
+    //   allocated, however, do not need to be considered _here_ because they
+    //   were already considered when determining where to create that
+    //   instruction, either in getProjectionInsertionPoint or in
+    //   OpaqueStorageAllocation::createStackAllocation.
+    if (auto *loi = pass.getLatestOpeningInst(pair)) {
+      if (latestOpeningInst) {
+        if (pass.domInfo->dominates(loi, latestOpeningInst)) {
+          continue;
+
+          assert(pass.domInfo->dominates(latestOpeningInst, loi));
+        }
+      }
+      latestOpeningInst = loi->getNextInstruction();
+    }
   }
   assert(retval);
+  if (latestOpeningInst) {
+    if (pass.domInfo->dominates(retval, latestOpeningInst))
+      retval = latestOpeningInst;
+    else
+      assert(pass.domInfo->dominates(latestOpeningInst, retval));
+  }
   return retval;
 }
 

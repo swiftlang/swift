@@ -128,6 +128,10 @@ struct ValueStorage {
   /// after materialization (during instruction rewriting).
   SILValue storageAddress;
 
+  /// The latest instruction which opens an archetype involved in the value's
+  /// type.  Just a cache of getLatestOpeningInst(value).
+  mutable llvm::Optional<SILInstruction *> latestOpeningInst = llvm::None;
+
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this
   /// storage projects into via its "use.
@@ -205,6 +209,7 @@ struct ValueStorage {
 /// Mapped values are expected to be created in a single RPO pass. "erase" is
 /// unsupported. Values must be replaced using 'replaceValue()'.
 class ValueStorageMap {
+public:
   struct ValueStoragePair {
     SILValue value;
     ValueStorage storage;
@@ -213,6 +218,8 @@ class ValueStorageMap {
     void dump() const;
 #endif
   };
+
+private:
   typedef std::vector<ValueStoragePair> ValueVector;
   // Hash of values to ValueVector indices.
   typedef llvm::DenseMap<SILValue, unsigned> ValueHashMap;
