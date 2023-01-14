@@ -838,3 +838,175 @@ void swift::expandAccessors(
   // declaration, so there is nothing further to do.
   (void)macroSourceFile->getTopLevelItems();
 }
+
+// FIXME: Almost entirely duplicated code from `expandAccessors`.
+// Factor this out into an `expandAttachedMacro` function, with
+// arguments for the PrettyStackTrace string, 'attachedTo' decl, etc.
+void swift::expandAttributes(
+    CustomAttr *attr, MacroDecl *macro, Decl *member) {
+  auto *dc = member->getInnermostDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto moduleDecl = dc->getParentModule();
+
+  auto attrSourceFile =
+    moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
+  if (!attrSourceFile)
+    return;
+
+  auto declSourceFile =
+      moduleDecl->getSourceFileContainingLocation(member->getStartLoc());
+  if (!declSourceFile)
+    return;
+
+  // Evaluate the macro.
+  NullTerminatedStringRef evaluatedSource;
+
+  if (isFromExpansionOfMacro(attrSourceFile, macro) ||
+      isFromExpansionOfMacro(declSourceFile, macro)) {
+    member->diagnose(diag::macro_recursive, macro->getName());
+    return;
+  }
+
+  auto macroDef = macro->getDefinition();
+  switch (macroDef.kind) {
+  case MacroDefinition::Kind::Undefined:
+  case MacroDefinition::Kind::Invalid:
+    // Already diagnosed as an error elsewhere.
+    return;
+
+  case MacroDefinition::Kind::Builtin: {
+    switch (macroDef.getBuiltinKind()) {
+    case BuiltinMacroKind::ExternalMacro:
+      // FIXME: Error here.
+      return;
+    }
+  }
+
+  case MacroDefinition::Kind::External: {
+    // Retrieve the external definition of the macro.
+    auto external = macroDef.getExternalMacro();
+    ExternalMacroDefinitionRequest request{
+        &ctx, external.moduleName, external.macroTypeName
+    };
+    auto externalDef = evaluateOrDefault(
+        ctx.evaluator, request, ExternalMacroDefinition()
+    );
+    if (!externalDef.opaqueHandle) {
+      member->diagnose(diag::external_macro_not_found,
+                        external.moduleName.str(),
+                        external.macroTypeName.str(),
+                        macro->getName()
+      );
+      macro->diagnose(diag::decl_declared_here, macro->getName());
+      return;
+    }
+
+    // Make sure macros are enabled before we expand.
+    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
+      member->diagnose(diag::macro_experimental);
+      return;
+    }
+
+#if SWIFT_SWIFT_PARSER
+    PrettyStackTraceDecl debugStack("expanding attribute macro", member);
+
+    auto astGenAttrSourceFile = attrSourceFile->exportedSourceFile;
+    if (!astGenAttrSourceFile)
+      return;
+
+    auto astGenDeclSourceFile = declSourceFile->exportedSourceFile;
+    if (!astGenDeclSourceFile)
+      return;
+
+    // FIXME: Pass parentDecl to the expansion.
+    Decl *parentDecl = member->getDeclContext()->getAsDecl();
+    Decl *searchDecl = member;
+    if (auto *var = dyn_cast<VarDecl>(member))
+      searchDecl = var->getParentPatternBinding();
+
+    const char *evaluatedSourceAddress;
+    ptrdiff_t evaluatedSourceLength;
+    swift_ASTGen_expandAttachedMacro(
+        &ctx.Diags,
+        externalDef.opaqueHandle,
+        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
+        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
+        &evaluatedSourceAddress, &evaluatedSourceLength);
+    if (!evaluatedSourceAddress)
+      return;
+    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
+                                              (size_t)evaluatedSourceLength);
+    break;
+#else
+    member->diagnose(diag::macro_unsupported);
+    return;
+#endif
+  }
+  }
+
+  // Figure out a reasonable name for the macro expansion buffer.
+  std::string bufferName;
+  {
+    llvm::raw_string_ostream out(bufferName);
+
+    out << "macro:" // << member->getDescriptiveK()
+        << "@" << macro->getName().getBaseName();
+    if (auto bufferID = declSourceFile->getBufferID()) {
+      unsigned startLine, startColumn;
+      std::tie(startLine, startColumn) =
+          sourceMgr.getLineAndColumnInBuffer(member->getStartLoc(), *bufferID);
+
+      SourceLoc endLoc =
+          Lexer::getLocForEndOfToken(sourceMgr, member->getEndLoc());
+      unsigned endLine, endColumn;
+      std::tie(endLine, endColumn) =
+          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
+
+      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
+          << startLine << ":" << startColumn
+          << "-" << endLine << ":" << endColumn;
+    }
+  }
+
+  // Dump macro expansions to standard output, if requested.
+  if (ctx.LangOpts.DumpMacroExpansions) {
+    llvm::errs() << bufferName
+                 << "\n------------------------------\n"
+                 << evaluatedSource
+                 << "\n------------------------------\n";
+  }
+
+  // Create a new source buffer with the contents of the expanded macro.
+  auto macroBuffer =
+      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
+  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
+  GeneratedSourceInfo sourceInfo{
+      GeneratedSourceInfo::MacroExpansion,
+      member->getEndLoc(),
+      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
+      ASTNode(member).getOpaqueValue(),
+      dc,
+      attr
+  };
+  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
+  free((void*)evaluatedSource.data());
+
+  // Create a source file to hold the macro buffer. This is automatically
+  // registered with the enclosing module.
+  auto macroSourceFile = new (ctx) SourceFile(
+      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
+      /*parsingOpts=*/{}, /*isPrimary=*/false);
+
+  PrettyStackTraceDecl debugStack(
+      "type checking expanded declaration macro", member);
+
+
+  // FIXME: Top-level item parsing needs to produce a MissingDecl
+  // node for an attribute list that is not attached to anything.
+  // The attributes will then be represented in the result of
+  // 'getTopLevelItems' as an ASTNode for the missing declaration,
+  // with an attribute list attached.
+}

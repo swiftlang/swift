@@ -48,6 +48,11 @@ void expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 );
 
+/// Expand the attributes for the given member declaration based
+/// on the custom attribute that references the given macro.
+void expandAttributes(
+    CustomAttr *attr, MacroDecl *macro, Decl *member);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

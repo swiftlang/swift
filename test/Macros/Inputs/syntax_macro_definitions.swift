@@ -245,3 +245,24 @@ extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
     ]
   }
 }
+
+public struct WrapAllProperties: MemberAttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    annotating member: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard member.is(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    let propertyWrapperAttr = AttributeSyntax(
+      attributeName: SimpleTypeIdentifierSyntax(
+        name: .identifier("Wrapper")
+      )
+    )
+
+    return [propertyWrapperAttr]
+  }
+}

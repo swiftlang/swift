@@ -316,6 +316,22 @@ func expandAttachedMacro(
         $0.withoutTrivia().description
       }.joined(separator: "\n\n")
 
+    case let attachedMacro as MemberAttributeMacro.Type:
+      // FIXME: We need the decl the attribute is attached to.
+      // We need to pass through another source file and source
+      // location pointer for the 'attachedTo' declaration.
+      let attributes = try attachedMacro.expansion(
+        of: customAttrNode,
+        attachedTo: DeclSyntax(MissingDeclSyntax()),
+        annotating: declarationNode,
+        in: &context
+      )
+
+      // Form a buffer containing an attribute list to return to the caller.
+      evaluatedSyntaxStr = attributes.map {
+        $0.withoutTrivia().description
+      }.joined(separator: " ")
+
     default:
       print("\(macroPtr) does not conform to any known attached macro protocol")
       return 1

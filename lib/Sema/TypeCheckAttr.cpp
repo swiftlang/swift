@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -7387,6 +7388,36 @@ AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
   SemanticDeclAttributes semanticAttrs;
   for (auto attr : decl->getAttrs()) {
     semanticAttrs.add(attr);
+  }
+
+  auto *parentDecl = decl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return semanticAttrs;
+
+  auto parentAttrs = parentDecl->getSemanticAttrs();
+  for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto customAttrDecl = evaluateOrDefault(
+        evaluator,
+        CustomAttrDeclRequest{
+          customAttr,
+          parentDecl->getInnermostDeclContext()
+        },
+        nullptr);
+    if (!customAttrDecl)
+      continue;
+
+    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
+    if (!macroDecl)
+      continue;
+
+    // FIXME: Make sure it's an member-attribute macro. We're not
+    // currently parsing this information in the @declaration attribute.
+
+    // Expand the attributes.
+    expandAttributes(customAttr, macroDecl, decl);
+
+    // TODO: append the expanded attributes to 'semanticAttrs'.
   }
 
   return semanticAttrs;
