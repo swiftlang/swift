@@ -16,7 +16,7 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@declaration(attached)
+@attached(accessor)
 macro myPropertyWrapper: Void =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperMacro")
 

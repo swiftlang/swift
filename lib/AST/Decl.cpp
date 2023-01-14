@@ -9672,6 +9672,20 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+static MacroRoles freestandingMacroRoles =
+  (MacroRoles() |
+   MacroRole::Expression |
+   MacroRole::FreestandingDeclaration);
+static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor);
+
+bool swift::isFreestandingMacro(MacroRoles contexts) {
+  return bool(contexts & freestandingMacroRoles);
+}
+
+bool swift::isAttachedMacro(MacroRoles contexts) {
+  return bool(contexts & attachedMacroRoles);
+}
+
 MacroDecl::MacroDecl(
     SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
     GenericParamList *genericParams,
@@ -9712,12 +9726,14 @@ SourceRange MacroDecl::getSourceRange() const {
   return SourceRange(macroLoc, endLoc);
 }
 
-MacroContexts MacroDecl::getMacroContexts() const {
-  MacroContexts contexts = None;
+MacroRoles MacroDecl::getMacroRoles() const {
+  MacroRoles contexts = None;
   if (getAttrs().hasAttribute<ExpressionAttr>())
-    contexts |= MacroContext::Expression;
+    contexts |= MacroRole::Expression;
   for (auto attr : getAttrs().getAttributes<DeclarationAttr>())
-    contexts |= attr->getMacroContext();
+    contexts |= attr->getMacroRole();
+  for (auto attr : getAttrs().getAttributes<AttachedAttr>())
+    contexts |= attr->getMacroRole();
   return contexts;
 }
 

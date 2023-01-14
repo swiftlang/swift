@@ -1,14 +1,14 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
 
-@declaration(attached) macro m1: Void = #externalMacro(module: "MyMacros", type: "Macro1")
+@attached(accessor) macro m1: Void = #externalMacro(module: "MyMacros", type: "Macro1")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1'}}
 // expected-note@-2{{'m1' declared here}}
 
-@declaration(attached) macro m2(_: Int) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
+@attached(accessor) macro m2(_: Int) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
 // expected-note@-2 2{{macro 'm2' declared here}}
 
-@declaration(attached) macro m2(_: Double) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
+@attached(accessor) macro m2(_: Double) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
 // expected-note@-2 2{{macro 'm2' declared here}}
 
