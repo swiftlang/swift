@@ -39,6 +39,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class IdentTypeRepr;
   class IDEInspectionCallbacks;
   class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
@@ -1308,6 +1309,13 @@ public:
   ///   an empty parser error.
   ParserResult<TypeRepr> parseTypeIdentifier(
       bool isParsingQualifiedDeclBaseType = false);
+
+  /// Parse an identifier type, e.g 'Foo' or 'Bar<Int>'.
+  ParserResult<IdentTypeRepr> parseSimpleTypeIdentifier();
+
+  /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
+  ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
