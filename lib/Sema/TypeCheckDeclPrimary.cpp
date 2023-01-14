@@ -1992,6 +1992,10 @@ public:
     checkAccessControl(PGD);
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    // nothing to do for missing decls.
+  }
+
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
     llvm_unreachable("should always be type-checked already");
   }

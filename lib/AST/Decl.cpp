@@ -168,6 +168,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumElement);
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
+  TRIVIAL_KIND(Missing);
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
@@ -352,6 +353,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(ModifyAccessor, "_modify accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
+  ENTRY(Missing, "missing decl");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
@@ -1194,6 +1196,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("not a ValueDecl");
@@ -2644,6 +2647,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("Not a ValueDecl");

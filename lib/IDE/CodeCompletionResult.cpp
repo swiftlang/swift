@@ -204,6 +204,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::TopLevelCode:
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::OpaqueType:
   case DeclKind::BuiltinTuple:

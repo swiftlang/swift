@@ -2332,6 +2332,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::OpaqueType:

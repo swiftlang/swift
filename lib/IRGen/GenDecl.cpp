@@ -146,6 +146,10 @@ public:
     // We'll visit nested types separately if necessary.
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in IRGen");
+  }
+
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
   void visitFuncDecl(FuncDecl *method) {
@@ -343,6 +347,10 @@ public:
 
   void visitTypeDecl(TypeDecl *type) {
     // We'll visit nested types separately if necessary.
+  }
+
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in IRGen");
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
@@ -2476,6 +2484,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::MissingMember:
     llvm_unreachable("there are no global member placeholders");
+
+  case DeclKind::Missing:
+    llvm_unreachable("missing decl in IRGen");
 
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleType made it to IRGen");
@@ -5439,6 +5450,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType made it to IRGen");
+
+    case DeclKind::Missing:
+      llvm_unreachable("missing decl in IRGen");
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:

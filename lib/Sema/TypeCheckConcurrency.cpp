@@ -3521,6 +3521,7 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Class:
   case DeclKind::Enum:
@@ -5198,6 +5199,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::PatternBinding:
