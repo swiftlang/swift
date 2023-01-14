@@ -7411,8 +7411,8 @@ AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
     if (!macroDecl)
       continue;
 
-    // FIXME: Make sure it's an member-attribute macro. We're not
-    // currently parsing this information in the @declaration attribute.
+    if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
+      continue;
 
     // Expand the attributes.
     expandAttributes(customAttr, macroDecl, decl);

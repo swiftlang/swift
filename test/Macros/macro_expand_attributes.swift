@@ -6,7 +6,7 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@declaration(attached) macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+@attached(memberAttributes) macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
 
 @propertyWrapper
 struct Wrapper<T> {

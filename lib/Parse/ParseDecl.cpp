@@ -2213,6 +2213,7 @@ static Optional<MacroRole> getMacroRole(
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
       .Case("expression", MacroRole::Expression)
       .Case("accessor", MacroRole::Accessor)
+      .Case("memberAttributes", MacroRole::MemberAttribute)
       .Default(None);
 
   if (!role) {

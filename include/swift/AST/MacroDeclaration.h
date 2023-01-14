@@ -32,6 +32,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that declares accessors for a variable or subscript
   /// declaration.
   Accessor = 0x04,
+  /// An attached macro that generates attributes for the
+  /// members inside the declaration.
+  MemberAttribute = 0x08,
 };
 
 /// The contexts in which a particular macro declaration can be used.
