@@ -187,9 +187,9 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
-        // Guaranteed values are considered uses of the value when the value is
-        // an owned phi and the guaranteed values are adjacent reborrow phis or
-        // reborrow of such.
+        // Guaranteed values are considered uses of the value when the value
+        // owneed. If user is a guaranteed phi, then the owned lifetime either
+        // dominates it or its lifetime ends at an outer adjacent reborrow.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::Reborrow:

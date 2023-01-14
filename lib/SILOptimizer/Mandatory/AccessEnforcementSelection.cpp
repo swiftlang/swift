@@ -109,16 +109,13 @@ raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
 // passed as a box in all closures within the cycle. DynamicCaptures does not
 // care about boxes, because they are always dynamically enforced.
 class DynamicCaptures {
-  const ClosureFunctionOrder &closureOrder;
-
   // This only maps functions that have at least one inout_aliasable argument.
   llvm::DenseMap<SILFunction *, SmallVector<unsigned, 4>> dynamicCaptureMap;
 
   DynamicCaptures(DynamicCaptures &) = delete;
 
 public:
-  DynamicCaptures(const ClosureFunctionOrder &closureOrder):
-    closureOrder(closureOrder) {}
+  DynamicCaptures() {}
 
   void recordCapture(AddressCapture capture) {
     LLVM_DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
@@ -630,7 +627,7 @@ void AccessEnforcementSelection::run() {
   ClosureFunctionOrder closureOrder(CSA);
   closureOrder.compute();
 
-  dynamicCaptures = std::make_unique<DynamicCaptures>(closureOrder);
+  dynamicCaptures = std::make_unique<DynamicCaptures>();
   SWIFT_DEFER { dynamicCaptures.reset(); };
 
   for (SILFunction *function : closureOrder.getTopDownFunctions()) {
