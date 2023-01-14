@@ -2004,7 +2004,7 @@ public:
       MD->diagnose(diag::macro_experimental);
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
-    if (!MD->getMacroContexts())
+    if (!MD->getMacroRoles())
       MD->diagnose(diag::macro_without_context, MD->getName());
 
     // Check the macro definition.
@@ -3666,7 +3666,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
   auto foundMacros = TypeChecker::lookupMacros(
       MED->getDeclContext(), MED->getMacro(),
-      MED->getLoc(), MacroContext::FreestandingDeclaration);
+      MED->getLoc(), MacroRole::FreestandingDeclaration);
   if (foundMacros.empty()) {
     MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
         .highlight(MED->getMacroLoc().getSourceRange());

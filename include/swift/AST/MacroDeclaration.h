@@ -23,23 +23,31 @@ namespace swift {
 
 /// The context in which a macro can be used, which determines the syntax it
 /// uses.
-enum class MacroContext: uint8_t {
+enum class MacroRole: uint32_t {
   /// An expression macro, referenced explicitly via "#stringify" or similar
   /// in the source code.
   Expression = 0x01,
   /// A freestanding declaration macro.
   FreestandingDeclaration = 0x02,
-  /// An attached declaration macro.
-  AttachedDeclaration = 0x04,
+  /// An attached macro that declares accessors for a variable or subscript
+  /// declaration.
+  Accessor = 0x04,
 };
 
 /// The contexts in which a particular macro declaration can be used.
-using MacroContexts = OptionSet<MacroContext>;
+using MacroRoles = OptionSet<MacroRole>;
+
+/// Whether a macro with the given set of macro contexts is freestanding, i.e.,
+/// written in the source code with the `#` syntax.
+bool isFreestandingMacro(MacroRoles contexts);
+
+/// Whether a macro with the given set of macro contexts is attached, i.e.,
+/// written in the source code as an attribute with the `@` syntax.
+bool isAttachedMacro(MacroRoles contexts);
 
 enum class MacroIntroducedDeclNameKind {
   Named,
   Overloaded,
-  Accessors,
   Prefixed,
   Suffixed,
   Arbitrary,
@@ -63,10 +71,6 @@ public:
 
   static MacroIntroducedDeclName getOverloaded() {
     return MacroIntroducedDeclName(Kind::Overloaded);
-  }
-
-  static MacroIntroducedDeclName getAccessors() {
-    return MacroIntroducedDeclName(Kind::Accessors);
   }
 
   static MacroIntroducedDeclName getPrefixed(Identifier prefix) {
