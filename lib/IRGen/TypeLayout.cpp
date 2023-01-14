@@ -118,37 +118,6 @@ public:
   // }
 
   void result(std::vector<uint8_t> &layoutStr) const {
-    // extra inhabitants type tag, i.e. bitmask vs type pointer
-    layoutStr.push_back(static_cast<uint8_t>(extraInhabitantsKind));
-
-    // extra inhabitant mask/pointer pointer size
-    uint64_t extraInhabitantBE;
-    llvm::support::endian::write64be(&extraInhabitantBE, extraInhabitant);
-
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&extraInhabitantBE,
-                     (uint8_t *)(&extraInhabitantBE + 1));
-
-    // extra inhabitants field offset 32-bit
-    uint32_t extraInhabitantOffsetBE;
-    llvm::support::endian::write32be(&extraInhabitantOffsetBE,
-                                     extraInhabitantOffset);
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&extraInhabitantOffsetBE,
-                     (uint8_t *)(&extraInhabitantOffsetBE + 1));
-
-    uint32_t sizeBE;
-    llvm::support::endian::write32be(&sizeBE, size);
-
-    // size 32-bit
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&sizeBE,
-                     (uint8_t *)(&sizeBE + 1));
-
-    uint64_t alignmentBE;
-    llvm::support::endian::write64be(&alignmentBE, alignment);
-
-    // alignment 64-bit
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&alignmentBE,
-                     (uint8_t *)(&alignmentBE + 1));
-
     std::vector<uint8_t> refCountingStr;
     uint32_t skip = 0;
     std::vector<uint8_t> genericInstStr;
@@ -200,11 +169,6 @@ public:
     llvm::support::endian::write32be(&refCountBytesBE, refCountingStr.size());
     layoutStr.insert(layoutStr.end(), (uint8_t *)&refCountBytesBE,
                      (uint8_t *)(&refCountBytesBE + 1));
-
-    // padding
-    layoutStr.push_back(0);
-    layoutStr.push_back(0);
-    layoutStr.push_back(0);
 
     layoutStr.insert(layoutStr.end(), refCountingStr.begin(),
                      refCountingStr.end());
