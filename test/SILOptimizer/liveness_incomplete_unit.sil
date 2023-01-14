@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -ossa-lifetime-analysis -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // These tests rely on "incomplete" OSSA lifetimes. Incomplete OSSA
 // lifetimes are invalid SIL, but the OSSA liveness utilities still
@@ -20,7 +20,7 @@ enum Never {}
 
 class C {}
 
-// CHECK-LABEL: @testDeadTerminatorResult
+// CHECK-LABEL: testDeadTerminatorResult: ssa-liveness
 // CHECK-LABEL: SSA lifetime analysis: %{{.*}} = argument of bb1 : $C
 // CHECK: bb1: LiveWithin
 // CHECK-NOT: "last user"
@@ -31,6 +31,7 @@ bb0(%0 : @owned $FakeOptional<C>):
   switch_enum %0 : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%payload : @owned $C):
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %payload : $C
   unreachable
 
@@ -39,7 +40,7 @@ bb2:
   return %99 : $()
 }
 
-// CHECK-LABEL: @testDeadPhi
+// CHECK-LABEL: testDeadPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = argument of bb3 : $C
 // CHECK: bb3: LiveWithin
 // CHECK: dead def: %{{.*}} = argument of bb3 : $C
@@ -54,17 +55,19 @@ bb2:
   br bb3(%1 : $C)
 
 bb3(%2 : @owned $C):
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   unreachable
 }
 
-// CHECK-LABEL: @testDeadInstruction
+// CHECK-LABEL: testDeadInstruction: ssa-liveness
 // CHECK: SSA lifetime analysis:   %{{.*}} = copy_value %0 : $C
 // CHECK: bb0: LiveWithin
 // CHECK: dead def:   %{{.*}} = copy_value %0 : $C
 sil [ossa] @testDeadInstruction : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %1 = copy_value %0 : $C
+  test_specification "ssa-liveness @trace[0]"
   debug_value [trace] %1 : $C
   unreachable
 }
@@ -73,7 +76,7 @@ bb0(%0 : @guaranteed $C):
 // boundary. Once as a last use, and once as a dead def.
 // This is a particularly problematic corner case.
 //
-// CHECK-LABEL: @testDeadSelfKill
+// CHECK-LABEL: testDeadSelfKill: multidef-liveness
 // CHECK: MultiDef lifetime analysis:
 // CHECK: def: %1 = argument of bb1 : $C
 // CHECK: def: [[V:%.*]] = move_value %1 : $C
@@ -86,6 +89,7 @@ bb0:
   br bb3
 
 bb1(%1 : @owned $C):
+  test_specification "multidef-liveness @trace[0] @trace[1]"
   debug_value [trace] %1 : $C
   %2 = move_value %1 : $C
   debug_value [trace] %2 : $C
@@ -102,7 +106,7 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
 // incomplete. Since the store_borrow produces an address, the load
 // borrow is considered a ScopedAddressUse, and all of its uses,
 // including the Apply will contribute to the store_borrow liveness.
-// CHECK-LABEL: @testInnerUnreachable
+// CHECK-LABEL: testInnerUnreachable: scoped-address-liveness
 // CHECK: Scoped address analysis: [[SB:%.*]] = store_borrow %0
 // CHECK: bb0: LiveWithin
 // CHECK-NEXT: regular user: %{{.*}} = apply
@@ -111,10 +115,42 @@ sil shared [ossa] @testInnerUnreachable : $@convention(thin) (@guaranteed C, @th
 bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
   %2 = alloc_stack $C
   %3 = store_borrow %0 to %2 : $*C
+  test_specification "scoped-address-liveness @trace[0]"
   debug_value [trace] %3 : $*C
   %5 = load_borrow %3 : $*C
   %6 = function_ref @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
   %7 = alloc_stack $Never
   %8 = apply %6<Never>(%7, %5) : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
   unreachable
+}
+
+// A dead-end block with a def can still be a boundary edge. This can
+// only happen in OSSA with incomplete lifetimes.
+//
+// CHECK-LABEL: testMultiDefDeadDefBoundaryEdge: multidef-liveness
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def: [[CP3:%.*]] = copy_value %0 : $C
+// CHECK: bb0: LiveOut,
+// CHECK: bb1: LiveWithin,
+// CHECK: bb2: LiveWithin,
+// CHECK: last user:   destroy_value [[CP0]] : $C
+// CHECK-NEXT: boundary edge: bb1
+// CHECK-NEXT: dead def: [[CP3]] = copy_value %0 : $C
+sil [ossa] @testMultiDefDeadDefBoundaryEdge : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %copy0 = copy_value %0 : $C
+  test_specification "multidef-liveness @trace[0] @trace[1]"
+  debug_value [trace] %copy0 : $C
+  cond_br undef, bb1, bb3
+
+bb1:
+  %dead = copy_value %0 : $C
+  debug_value [trace] %dead : $C
+  unreachable
+
+bb3:
+  destroy_value %copy0 : $C
+  %99 = tuple()
+  return %99 : $()
 }
