@@ -1658,39 +1658,32 @@ extension BinaryInteger {
   public static func == <
     Other: BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
-    let lhsNegative = Self.isSigned && lhs < (0 as Self)
-    let rhsNegative = Other.isSigned && rhs < (0 as Other)
-
-    if lhsNegative != rhsNegative { return false }
-
-    // Here we know the values are of the same sign.
+    let rhs_ = Self(truncatingIfNeeded: rhs)
+    // Is `rhs` representable as a value of `Self` type? In other words, does
+    // the bit pattern conversion above preserve the value of `rhs`?
     //
-    // There are a few possible scenarios from here:
-    //
-    // 1. Both values are negative
-    //  - If one value is strictly wider than the other, then it is safe to
-    //    convert to the wider type.
-    //  - If the values are of the same width, it does not matter which type we
-    //    choose to convert to as the values are already negative, and thus
-    //    include the sign bit if two's complement representation already.
-    // 2. Both values are non-negative
-    //  - If one value is strictly wider than the other, then it is safe to
-    //    convert to the wider type.
-    //  - If the values are of the same width, than signedness matters, as not
-    //    unsigned types are 'wider' in a sense they don't need to 'waste' the
-    //    sign bit. Therefore it is safe to convert to the unsigned type.
-
-    if lhs.bitWidth < rhs.bitWidth {
-      return Other(truncatingIfNeeded: lhs) == rhs
-    }
-    if lhs.bitWidth > rhs.bitWidth {
-      return lhs == Self(truncatingIfNeeded: rhs)
+    // To find out the answer, we see if the value roundtrips by bit pattern
+    // conversion back to `Self` [1], and we also check that the original bit
+    // pattern conversion doesn't change the sign [2].
+    if Other(truncatingIfNeeded: rhs_) == rhs /* [1] */
+      && (rhs < (0 as Other)) == (rhs_ < (0 as Self)) /* [2] */ {
+      return lhs == rhs_
     }
 
-    if Self.isSigned {
-      return Other(truncatingIfNeeded: lhs) == rhs
+    let lhs_ = Other(truncatingIfNeeded: lhs)
+    // Is `lhs` representable as a value of `Other` type?
+    if Self(truncatingIfNeeded: lhs_) == lhs
+      && (lhs < (0 as Self)) == (lhs_ < (0 as Other)) {
+      return lhs_ == rhs
     }
-    return lhs == Self(truncatingIfNeeded: rhs)
+
+    // If we're here, then either:
+    // - `Self` is signed and fixed-width, `Other` is unsigned,
+    //   `lhs` is negative, and `rhs` is greater than `Self.max`; or
+    // - `Other` is signed and fixed-width, `Self` is unsigned, 
+    //   `rhs` is negative, and `lhs` is greater than `Other.max`.
+    // Thus, `lhs != rhs`.
+    return false
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1730,34 +1723,32 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   public static func < <Other: BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
-    let lhsNegative = Self.isSigned && lhs < (0 as Self)
-    let rhsNegative = Other.isSigned && rhs < (0 as Other)
-    if lhsNegative != rhsNegative { return lhsNegative }
-
-    if lhs == (0 as Self) && rhs == (0 as Other) { return false }
-
-    // if we get here, lhs and rhs have the same sign. If they're negative,
-    // then Self and Other are both signed types, and one of them can represent
-    // values of the other type. Otherwise, lhs and rhs are positive, and one
-    // of Self, Other may be signed and the other unsigned.
-
-    let rhsAsSelf = Self(truncatingIfNeeded: rhs)
-    let rhsAsSelfNegative = rhsAsSelf < (0 as Self)
-
-
-    // Can we round-trip rhs through Other?
-    if Other(truncatingIfNeeded: rhsAsSelf) == rhs &&
-      // This additional check covers the `Int8.max < (128 as UInt8)` case.
-      // Since the types are of the same width, init(truncatingIfNeeded:)
-      // will result in a simple bitcast, so that rhsAsSelf would be -128, and
-      // `lhs < rhsAsSelf` will return false.
-      // We basically guard against that bitcast by requiring rhs and rhsAsSelf
-      // to be the same sign.
-      rhsNegative == rhsAsSelfNegative {
-      return lhs < rhsAsSelf
+    let rhs_ = Self(truncatingIfNeeded: rhs)
+    // Is `rhs` representable as a value of `Self` type? In other words, does
+    // the bitcast operation above preserve the value of `rhs`?
+    //
+    // To find out the answer, we see if the value roundtrips by bitcasting back
+    // to `Self` [1], and we also check that bitcasting doesn't change the sign
+    // [2].
+    if Other(truncatingIfNeeded: rhs_) == rhs /* [1] */
+      && (rhs < (0 as Other)) == (rhs_ < (0 as Self)) /* [2] */ {
+      return lhs < rhs_
     }
 
-    return Other(truncatingIfNeeded: lhs) < rhs
+    let lhs_ = Other(truncatingIfNeeded: lhs)
+    // Is `lhs` representable as a value of `Other` type?
+    if Self(truncatingIfNeeded: lhs_) == lhs
+      && (lhs < (0 as Self)) == (lhs_ < (0 as Other)) {
+      return lhs_ < rhs
+    }
+
+    // If we're here, then either:
+    // - `Self` is signed and fixed-width, `Other` is unsigned,
+    //   `lhs` is negative, and `rhs` is greater than `Self.max`; or
+    // - `Other` is signed and fixed-width, `Self` is unsigned, 
+    //   `rhs` is negative, and `lhs` is greater than `Other.max`.
+    // Thus, `lhs < rhs` if and only if `Self.isSigned`.
+    return Self.isSigned
   }
 
   /// Returns a Boolean value indicating whether the value of the first
