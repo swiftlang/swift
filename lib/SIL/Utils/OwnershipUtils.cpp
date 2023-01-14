@@ -64,6 +64,7 @@ bool swift::hasPointerEscape(BorrowedValue value) {
       break;
     }
     case OperandOwnership::GuaranteedForwarding: {
+      // This may follow a guaranteed phis.
       ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() == OwnershipKind::None)
@@ -217,7 +218,9 @@ bool swift::findInnerTransitiveGuaranteedUses(
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
-        if (auto *phi = SILArgument::asPhi(result)) {
+
+        // Bailout on guaranteed phis because the caller may assume dominance.
+        if (SILArgument::asPhi(result)) {
           leafUse(use);
           foundPointerEscape = true;
           return true;
@@ -335,6 +338,11 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       recordUse(use);
       break;
     case OperandOwnership::GuaranteedForwarding: {
+      // Conservatively assume that a forwarding phi is not dominated by the
+      // initial borrowed value and bailout.
+      if (PhiOperand(use)) {
+        return false;
+      }
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() == OwnershipKind::None)
