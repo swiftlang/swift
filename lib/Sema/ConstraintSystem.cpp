@@ -5263,10 +5263,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
       break;
 
-    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::GlobalActorType:
+    case ConstraintLocator::ContextualType: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
+    }
 
     case ConstraintLocator::KeyPathComponent: {
       auto elt = path[0].castTo<LocatorPathElt::KeyPathComponent>();
