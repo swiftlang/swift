@@ -3056,9 +3056,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (func1->getGlobalActor() || func2->getGlobalActor()) {
     if (func1->getGlobalActor() && func2->getGlobalActor()) {
       // If both have a global actor, match them.
-      TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(),
-                               ConstraintKind::Equal, subflags, locator);
+      const auto subflags = getDefaultDecompositionOptions(flags);
+      auto result = matchTypes(
+          func1->getGlobalActor(), func2->getGlobalActor(),
+          ConstraintKind::Equal, subflags,
+          locator.withPathElement(LocatorPathElt::GlobalActorType()));
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
 
@@ -6333,6 +6335,15 @@ bool ConstraintSystem::repairFailures(
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+  case ConstraintLocator::GlobalActorType: {
+    // Drop global actor element as it servers only to indentify the global
+    // actor matching.
+    path.pop_back();
+
+    conversionsOrFixes.push_back(AllowGlobalActorMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(anchor, path)));
     break;
   }
 
@@ -13900,7 +13911,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MacroMissingPound:
-  case FixKind::MacroMissingArguments: {
+  case FixKind::MacroMissingArguments:
+  case FixKind::AllowGlobalActorMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

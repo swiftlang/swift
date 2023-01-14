@@ -102,6 +102,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
   case ConstraintLocator::AnyPatternDecl:
+  case ConstraintLocator::GlobalActorType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -473,6 +474,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::AnyPatternDecl: {
     out << "'_' pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::GlobalActorType: {
+    out << "global actor type";
     break;
   }
   }

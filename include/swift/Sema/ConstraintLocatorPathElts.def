@@ -255,6 +255,9 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
   /// The anonymous variable declared by a `_` pattern.
   CUSTOM_LOCATOR_PATH_ELT(AnyPatternDecl)
 
+/// A function type global actor.
+SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT
