@@ -46,15 +46,27 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include <llvm/ADT/StringExtras.h>
-
 using namespace swift;
 
+/**
+ * CompilerInstance is a class that contains the compiler state, such as the set of loaded modules and the type checker.
+ */
 CompilerInstance::CompilerInstance() = default;
+
+/**
+ * CompilerInstance destructor
+ */
 CompilerInstance::~CompilerInstance() = default;
 
+/**
+ * Returns the PCH hash of the current CompilerInvocation.
+ * The PCH hash is a hash of the compiler options that affect PCH generation.
+ * @return std::string - The PCH hash.
+ */
 std::string CompilerInvocation::getPCHHash() const {
   using llvm::hash_combine;
 
+  // Combine the hash components of all the options that affect PCH generation
   auto Code = hash_combine(LangOpts.getPCHHashComponents(),
                            FrontendOpts.getPCHHashComponents(),
                            ClangImporterOpts.getPCHHashComponents(),
@@ -63,12 +75,19 @@ std::string CompilerInvocation::getPCHHash() const {
                            SILOpts.getPCHHashComponents(),
                            IRGenOpts.getPCHHashComponents());
 
+  // Convert the hash to a string
   return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
 
+/**
+ * Returns the module scanning hash of the current CompilerInvocation.
+ * The module scanning hash is a hash of the compiler options that affect module scanning.
+ * @return std::string - The module scanning hash.
+ */
 std::string CompilerInvocation::getModuleScanningHash() const {
   using llvm::hash_combine;
 
+  // Combine the hash components of all the options that affect module scanning
   auto Code = hash_combine(LangOpts.getModuleScanningHashComponents(),
                            FrontendOpts.getModuleScanningHashComponents(),
                            ClangImporterOpts.getModuleScanningHashComponents(),
@@ -77,9 +96,14 @@ std::string CompilerInvocation::getModuleScanningHash() const {
                            SILOpts.getModuleScanningHashComponents(),
                            IRGenOpts.getModuleScanningHashComponents());
 
+  // Convert the hash to a string
   return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
 
+/**
+ * Returns the PrimarySpecificPaths for at most one primary.
+ * @return const PrimarySpecificPaths & - The PrimarySpecificPaths
+ */
 const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
@@ -87,90 +111,145 @@ CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
 
 const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForPrimary(
-    StringRef filename) const {
-  return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
+    StringRef filename) const 
+{
+    /**
+     * Returns the primary specific paths for the primary with the given filename
+     * @param filename The filename of the primary for which the primary specific paths are being returned
+     * @return primary specific paths for the primary with the given filename
+     */
+    return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
 }
 
 const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForSourceFile(
-    const SourceFile &SF) const {
-  return getPrimarySpecificPathsForPrimary(SF.getFilename());
+    const SourceFile &SF) const 
+{
+    /**
+     * Returns the primary specific paths for the given source file
+     * @param SF The source file for which the primary specific paths are being returned
+     * @return primary specific paths for the given source file
+     */
+    return getPrimarySpecificPathsForPrimary(SF.getFilename());
 }
 
-std::string CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const {
-  return getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename;
+std::string CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const 
+{
+    /**
+     * Returns the output filename for at most one primary
+     * @return output filename for at most one primary
+     */
+    return getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename;
 }
 std::string
-CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
-    const {
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .MainInputFilenameForDebugInfo;
+CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary() const
+{
+    /**
+     * Returns the main input filename for debug info for at most one primary
+     * @return main input filename for debug info for at most one primary
+     */
+    return getPrimarySpecificPathsForAtMostOnePrimary().MainInputFilenameForDebugInfo;
 }
 std::string
-CompilerInvocation::getClangHeaderOutputPathForAtMostOnePrimary() const {
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ClangHeaderOutputPath;
+CompilerInvocation::getClangHeaderOutputPathForAtMostOnePrimary() const 
+{
+    /**
+     * Returns the clang header output path for at most one primary
+     * @return clang header output path for at most one primary
+     */
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.ClangHeaderOutputPath;
 }
-std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ModuleOutputPath;
+std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const 
+{
+    /**
+     * Returns the module output path for at most one primary
+     * @return module output path for at most one primary
+     */
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.ModuleOutputPath;
 }
 std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.ReferenceDependenciesFilePath;
+    StringRef filename) const 
+{
+    /**
+     * Returns the reference dependencies file path for the primary with the given filename
+     * @param filename The filename of the primary for which the reference dependencies file path is being returned
+     * @return reference dependencies file path for the primary with the given filename
+     */
+    return getPrimarySpecificPathsForPrimary(filename).SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
 std::string CompilerInvocation::getConstValuesFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.ConstValuesOutputPath;
+    StringRef filename) const 
+{
+    /**
+     * Returns the const values file path for the primary with the given filename
+     * @param filename The filename of the primary for which the const values file path is being returned
+     * @return const values file path for the primary with the given filename
+     */
+    return getPrimarySpecificPathsForPrimary(filename).SupplementaryOutputs.ConstValuesOutputPath;
 }
 std::string
-CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.SerializedDiagnosticsPath;
+CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const 
+{
+    /**
+     * Returns the serialized diagnostics path for at most one primary
+     * @return serialized diagnostics path for at most one primary
+     */
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.SerializedDiagnosticsPath;
 }
-std::string CompilerInvocation::getTBDPathForWholeModule() const {
-  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "TBDPath only makes sense when the whole module can be seen");
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.TBDPath;
+std::string CompilerInvocation::getTBDPathForWholeModule() const 
+{
+    /**
+     * Returns the TBDPath for the whole module
+     * @return TBDPath for the whole module
+     */
+    assert(getFrontendOptions().InputsAndOutputs.isWholeModule() && "TBDPath only makes sense when the whole module can be seen");
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.TBDPath;
 }
 
 std::string
-CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
-  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "ModuleInterfaceOutputPath only makes sense when the whole module "
-         "can be seen");
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ModuleInterfaceOutputPath;
+CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const 
+{
+    /**
+     * Returns the module interface output path for the whole module
+     * @return module interface output path for the whole module
+     */
+    assert(getFrontendOptions().InputsAndOutputs.isWholeModule() && "ModuleInterfaceOutputPath only makes sense when the whole module can be seen");
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.ModuleInterfaceOutputPath;
 }
 
 std::string
-CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
-  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "PrivateModuleInterfaceOutputPath only makes sense when the whole "
-         "module can be seen");
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
+CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const 
+{
+    /**
+     * Returns the private module interface output path for the whole module
+     * @return private module interface output path for the whole module
+     */
+    assert(getFrontendOptions().InputsAndOutputs.isWholeModule() && "PrivateModuleInterfaceOutputPath only makes sense when the whole module can be seen");
+    return getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
-  const FrontendOptions &opts = getFrontendOptions();
+    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const 
+{
+    /**
+     * Returns the serialization options computed from the given supplementary output paths and module.
+     * @param outs The supplementary output paths used to compute the serialization options.
+     * @param module The module used to compute the serialization options.
+     * @return the serialization options computed from the given supplementary output paths and module.
+     */
+    const FrontendOptions &opts = getFrontendOptions();
 
-  SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = outs.ModuleOutputPath;
-  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
-  serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
-  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
-    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-  serializationOpts.UserModuleVersion = opts.UserModuleVersion;
-  serializationOpts.AllowableClients = opts.AllowableClients;
-
-  serializationOpts.PublicDependentLibraries =
+    SerializationOptions serializationOpts;
+    serializationOpts.OutputPath = outs.ModuleOutputPath;
+    serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
+    serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
+    serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+    if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
+        serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+    serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+    serializationOpts.UserModuleVersion = opts.UserModuleVersion;
+    serializationOpts.AllowableClients = opts.AllowableClients;
+    serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
