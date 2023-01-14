@@ -2900,6 +2900,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose function types global actor mismatches
+/// e.g.  `@MainActor () -> Void` vs.`@OtherActor () -> Void`
+class GlobalActorFunctionMismatchFailure final : public ContextualFailure {
+public:
+  GlobalActorFunctionMismatchFailure(const Solution &solution, Type fromType,
+                                     Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Diag<Type, Type> getDiagnosticMessage() const;
+  bool diagnoseTupleElement();
+};
+
 } // end namespace constraints
 } // end namespace swift
 

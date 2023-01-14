@@ -18,9 +18,7 @@ func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (
 
   let _: (Int) -> Void = f // expected-warning 2{{converting function value of type '@SomeGlobalActor (Int) -> Void' to '(Int) -> Void' loses global actor 'SomeGlobalActor'}}
   let _: @SomeGlobalActor (Int) -> Void = g // okay
-
-  // FIXME: this could be better.
-  let _: @OtherGlobalActor (Int) -> Void = f // expected-error{{cannot convert value of type 'SomeGlobalActor' to specified type 'OtherGlobalActor'}}
+  let _: @OtherGlobalActor (Int) -> Void = f // expected-error{{cannot convert value actor-isolated to 'SomeGlobalActor' to specified type actor-isolated to 'OtherGlobalActor'}}
 }
 
 @SomeGlobalActor func onSomeGlobalActor() -> Int { 5 }
@@ -342,4 +340,49 @@ class SubClass: MAIsolatedParent {
   // expected to type-check as-is.
   let f: @MainActor () -> () = (true ? mainActorFn : {})
   f()
+}
+
+// https://github.com/apple/swift/issues/62544
+@globalActor
+struct GA {
+  actor A {}
+  static let shared: A = A()
+}
+
+@globalActor
+struct GAB {
+  actor B {}
+  static let shared: B = B()
+}
+
+func test_global_actor_mismatch() {
+  let y: @GA () -> Void = {}
+  let z: @GAB () -> Void = {}
+  let x: @MainActor () -> Void  = y // expected-error{{cannot convert value actor-isolated to 'GA' to specified type actor-isolated to 'MainActor'}}
+  let _ = y as @MainActor () -> Void // expected-error{{cannot convert value actor-isolated to 'GA' to function actor-isolated to 'MainActor' in coercion}}
+
+  func f(_ fn: @GA () -> Void) {}
+  f(x) // expected-error{{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+
+  let _: [@MainActor () -> Void] = [y] // expected-error{{cannot convert value actor-isolated to 'GA' to expected element type actor-isolated to 'MainActor'}}
+  let _: [@MainActor () -> Void] = [y, z] // expected-error{{cannot convert value actor-isolated to 'GA' to expected element type actor-isolated to 'MainActor'}}
+  // expected-error@-1{{cannot convert value actor-isolated to 'GAB' to expected element type actor-isolated to 'MainActor'}}
+
+  let _: [Int : @MainActor () -> Void] = [1: y] // expected-error{{cannot convert value actor-isolated to 'GA' to expected dictionary value type actor-isolated to 'MainActor'}}
+  let _: [Int : @MainActor () -> Void] = [1: y, 2: z]  // expected-error{{cannot convert value actor-isolated to 'GA' to expected dictionary value type actor-isolated to 'MainActor'}}
+  // expected-error@-1{{cannot convert value actor-isolated to 'GAB' to expected dictionary value type actor-isolated to 'MainActor'}}
+
+  let _: () -> @MainActor () -> Void = {
+    return y // expected-error{{cannot convert value actor-isolated to 'GA' to expected closure result type actor-isolated to 'MainActor'}}
+  }
+
+  let _: (@MainActor () -> Void, @GA () -> Void) = (y, y) // expected-error{{cannot convert type actor-isolated to 'GA' to type actor-isolated to 'MainActor' at tuple element '#0'}}
+  let _: (@MainActor () -> Void, @MainActor () -> Void) = (y, z) // expected-error{{cannot convert type actor-isolated to 'GA' to type actor-isolated to 'MainActor' at tuple element '#0'}}
+  // expected-error@-1{{cannot convert type actor-isolated to 'GAB' to type actor-isolated to 'MainActor' at tuple element '#1'}}
+
+  f(true ? z : y) // expected-error{{result values in '? :' expression are functions isolated to different actors ('GAB' vs. 'GA')}}
+  
+  func g<T> ( _ fn: @escaping @GA () -> T) {
+    let _: @MainActor () -> T = fn // expected-error{{cannot convert value actor-isolated to 'GA' to specified type actor-isolated to 'MainActor'}}
+  }
 }
