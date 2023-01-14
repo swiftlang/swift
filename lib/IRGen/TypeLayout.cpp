@@ -149,12 +149,10 @@ public:
     layoutStr.insert(layoutStr.end(), (uint8_t *)&alignmentBE,
                      (uint8_t *)(&alignmentBE + 1));
 
-    // number of ref counting ops
-    layoutStr.push_back(0);
-    layoutStr.push_back(0);
-    layoutStr.push_back(0);
-
+    std::vector<uint8_t> refCountingStr;
     uint32_t skip = 0;
+    std::vector<uint8_t> genericInstStr;
+    uint32_t instCopyBytes = 0;
     for (auto &refCounting : refCountings) {
       if (refCounting.kind == RefCountingKind::Skip) {
         skip += refCounting.offset;
@@ -165,23 +163,51 @@ public:
         // TODO: crash and burn!!!
       }
 
-      skip |= (static_cast<uint32_t>(refCounting.kind) << 24);
-
-      uint32_t skipBE = 0;
-      llvm::support::endian::write32be(&skipBE, skip);
-      layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
-                       (uint8_t *)(&skipBE + 1));
-
       if (refCounting.kind == RefCountingKind::Generic) {
+        if (instCopyBytes > 0) {
+          uint32_t copyOp = (1 << 24) | (instCopyBytes & ~(0xff << 24));
+          uint32_t copyOpBE = 0;
+          llvm::support::endian::write32be(&copyOpBE, copyOp);
+          genericInstStr.insert(genericInstStr.end(), (uint8_t *)&copyOpBE,
+                                (uint8_t *)(&copyOpBE + 1));
+          instCopyBytes = 0;
+        }
+        uint paramIndex = (2 << 24) | (refCounting.offset & ~(0xff << 24));
         uint32_t paramIdxBE = 0;
-        llvm::support::endian::write32be(&paramIdxBE, refCounting.offset);
-        layoutStr.insert(layoutStr.end(), (uint8_t *)&paramIdxBE,
-                         (uint8_t *)(&paramIdxBE + 1));
-      } else if (refCounting.kind == RefCountingKind::Witness) {
+        llvm::support::endian::write32be(&paramIdxBE, paramIndex);
+        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&paramIdxBE,
+                              (uint8_t *)(&paramIdxBE + 1));
+        uint32_t skipBE = 0;
+        llvm::support::endian::write32be(&skipBE, skip);
+        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&skipBE,
+                              (uint8_t *)(&skipBE + 1));
+      } else {
+        skip |= (static_cast<uint32_t>(refCounting.kind) << 24);
+
+        uint32_t skipBE = 0;
+        llvm::support::endian::write32be(&skipBE, skip);
+        refCountingStr.insert(refCountingStr.end(), (uint8_t *)&skipBE,
+                              (uint8_t *)(&skipBE + 1));
+
+        instCopyBytes += 4;
       }
 
       skip = 0;
     }
+
+    // size of ref counting ops in bytes
+    uint32_t refCountBytesBE = 0;
+    llvm::support::endian::write32be(&refCountBytesBE, refCountingStr.size());
+    layoutStr.insert(layoutStr.end(), (uint8_t *)&refCountBytesBE,
+                     (uint8_t *)(&refCountBytesBE + 1));
+
+    // padding
+    layoutStr.push_back(0);
+    layoutStr.push_back(0);
+    layoutStr.push_back(0);
+
+    layoutStr.insert(layoutStr.end(), refCountingStr.begin(),
+                     refCountingStr.end());
 
     // Encoding `End` with the last skip bytes count
     // this is necessary to correctly build layout
@@ -194,6 +220,18 @@ public:
     llvm::support::endian::write32be(&skipBE, skip);
     layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
                      (uint8_t *)(&skipBE + 1));
+
+    if (!genericInstStr.empty()) {
+      if (instCopyBytes > 0) {
+        uint32_t copyOp = (1 << 24) | (instCopyBytes & ~(0xff << 24));
+        uint32_t copyOpBE = 0;
+        llvm::support::endian::write32be(&copyOpBE, copyOp);
+        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&copyOpBE,
+                              (uint8_t *)(&copyOpBE + 1));
+      }
+      layoutStr.insert(layoutStr.end(), genericInstStr.begin(),
+                       genericInstStr.end());
+    }
   }
 };
 }
@@ -979,63 +1017,20 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 
 llvm::Optional<std::vector<uint8_t>>
 ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  switch (scalarKind) {
-  case ScalarKind::POD: {
-    assert(typeInfo.isFixedSize());
-    Size size = cast<FixedTypeInfo>(typeInfo).getFixedSize();
-    switch (size.getValueInBits()) {
-    case 8:
-      return {{'c'}};
-    case 16:
-      return {{'s'}};
-    case 32:
-      return {{'l'}};
-    case 64:
-      return {{'L'}};
-    case 128:
-      return {{'Q'}};
-    default:
-      assert(false && "unsupported size");
-    }
-  }
-  case ScalarKind::ErrorReference:
-    return {{'r'}};
-  case ScalarKind::NativeStrongReference:
-    return {{'N'}};
-  case ScalarKind::NativeWeakReference:
-    return {{'W'}};
-  case ScalarKind::UnknownWeakReference:
-    return {{'w'}};
-  case ScalarKind::UnknownReference:
-  case ScalarKind::UnknownUnownedReference:
-    return {{'u'}};
-  case ScalarKind::BridgeReference:
-    return {{'B'}};
-  case ScalarKind::BlockReference:
-    return {{'b'}};
-  case ScalarKind::ObjCReference:
-    return {{'o'}};
-  case ScalarKind::ThickFunc: {
-    // Return a struct of { pointer sized POD, native reference }
-    size_t pointerBits = IGM.TargetInfo.PointerSpareBits.size();
-    uint8_t pointerPOD;
-    if (pointerBits <= 8) {
-      pointerPOD = 's';
-    } else if (pointerBits <= 16) {
-      pointerPOD = 's';
-    } else if (pointerBits <= 32) {
-      pointerPOD = 'l';
-    } else if (pointerBits <= 64) {
-      pointerPOD = 'L';
-    } else {
-      assert(false && "Unhandled pointer size");
-    }
-    return {{'a', 0x0, 0x0, 0x0, 0x2, '3', 0x0, 0x0, 0x0, 0x1, pointerPOD, '3',
-             0x0, 0x0, 0x0, 0x1, 'N'}};
-  }
-  default:
-    return None;
-  }
+  std::vector<uint8_t> layoutStr;
+
+  LayoutStringBuilder B{};
+
+  if (auto size = fixedSize(IGM))
+    B.addSize(size->getValue());
+  if (auto alignment = fixedAlignment(IGM))
+    B.setAlignment(alignment->getValue());
+
+  refCountString(IGM, B);
+
+  B.result(layoutStr);
+
+  return {layoutStr};
 }
 
 void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1046,6 +1041,9 @@ void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     break;
   case ScalarKind::NativeStrongReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
+    break;
+  case ScalarKind::NativeUnownedReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeUnowned, 1);
     break;
   case ScalarKind::NativeWeakReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeWeak, 1);
@@ -1074,12 +1072,15 @@ void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
     break;
   case ScalarKind::POD:
-  default:
     if (auto size = fixedSize(IGM)) {
       B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
                     size->getValue());
+    } else {
+      // TODO: properly handle dynamic sizes
     }
     break;
+  default:
+    llvm_unreachable("Unsupported ScalarKind");
   }
 }
 

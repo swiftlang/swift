@@ -2206,12 +2206,12 @@ FUNCTION(GenericInitWithTake,
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
 
-// void *swift_assignLayoutString(Metadata* type, const uint8_t *layoutString);
-FUNCTION(AssignLayoutString,
-         swift_assignLayoutString,
+// void swift_generic_instantiateLayoutString(const uint8_t* layoutStr, Metadata* type);
+FUNCTION(GenericInstantiateLayoutString,
+         swift_generic_instantiateLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(MetaData))
 

@@ -160,7 +160,8 @@ void swift_generic_initWithCopy(void *dest, void *src, void *metadata);
 SWIFT_RUNTIME_EXPORT
 void swift_generic_initWithTake(void *dest, void *src, void *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_assignLayoutString(Metadata *type, const uint8_t *layoutString);
+void swift_generic_instantiateLayoutString(const uint8_t *typeLayout,
+                                           Metadata *type);
 } // namespace swift
 
 /// A simple version of swift/Basic/ClusteredBitVector that doesn't use

@@ -3025,13 +3025,6 @@ namespace {
       llvm::Value *metadata =
         asImpl().emitAllocateMetadata(IGF, descriptor, args, templatePointer);
 
-      if (IGM.getOptions().ForceStructTypeLayouts) {
-        if (auto *layoutString = getLayoutString()) {
-          IGF.Builder.CreateCall(IGM.getAssignLayoutStringFunctionPointer(),
-                                 {metadata, layoutString});
-        }
-      }
-
       IGF.Builder.CreateRet(metadata);
     }
 
@@ -3057,6 +3050,22 @@ namespace {
 
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
+
+        if (IGM.getOptions().ForceStructTypeLayouts) {
+          if (auto *layoutString = getLayoutString()) {
+
+            // auto layoutStrAddr = emitAddressOfMetadataSlotAtIndex(IGF,
+            //                                     metadata,
+            //                                     isa<ClassDecl>(Target) ? -3 :
+            //                                     -2, IGM.Int8PtrTy);
+
+            // IGF.Builder.CreateStore(layoutString, layoutStrAddr);
+
+            IGF.Builder.CreateCall(
+                IGM.getGenericInstantiateLayoutStringFunctionPointer(),
+                {layoutString, metadata});
+          }
+        }
       });
     }
 
