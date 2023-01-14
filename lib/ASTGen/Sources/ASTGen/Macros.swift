@@ -215,3 +215,138 @@ func evaluateMacro(
 
   return 0
 }
+
+/// Retrieve a syntax node in the given source file, with the given type.
+private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  type: Node.Type
+) -> Node? {
+  guard let sourceLocationPtr = sourceLocationPtr else {
+    return nil
+  }
+
+  let sourceFilePtr = sourceFilePtr.bindMemory(
+    to: ExportedSourceFile.self, capacity: 1
+  )
+
+  // Find the offset.
+  let buffer = sourceFilePtr.pointee.buffer
+  let offset = sourceLocationPtr - buffer.baseAddress!
+  if offset < 0 || offset >= buffer.count {
+    print("source location isn't inside this buffer")
+    return nil
+  }
+
+  // Find the token at that offset.
+  let sf = sourceFilePtr.pointee.syntax
+  guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
+    print("couldn't find token at offset \(offset)")
+    return nil
+  }
+
+  // Dig out its parent.
+  guard let parentSyntax = token.parent else {
+    print("not on a macro expansion node: \(token.recursiveDescription)")
+    return nil
+  }
+
+  return parentSyntax.as(type)
+}
+
+@_cdecl("swift_ASTGen_expandAttachedMacro")
+@usableFromInline
+func expandAttachedMacro(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  macroPtr: UnsafeRawPointer,
+  customAttrSourceFilePtr: UnsafeRawPointer,
+  customAttrSourceLocPointer: UnsafePointer<UInt8>?,
+  declarationSourceFilePtr: UnsafeRawPointer,
+  attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
+  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  expandedSourceLength: UnsafeMutablePointer<Int>
+) -> Int {
+  // We didn't expand anything so far.
+  expandedSourcePointer.pointee = nil
+  expandedSourceLength.pointee = 0
+
+  // Dig out the custom attribute for the attached macro declarations.
+  guard let customAttrNode = findSyntaxNodeInSourceFile(
+    sourceFilePtr: customAttrSourceFilePtr,
+    sourceLocationPtr: customAttrSourceLocPointer,
+    type: AttributeSyntax.self
+  ) else {
+    return 1
+  }
+
+  // Dig out the node for the declaration to which the custom attribute is
+  // attached.
+  guard let declarationNode = findSyntaxNodeInSourceFile(
+    sourceFilePtr: declarationSourceFilePtr,
+    sourceLocationPtr: declarationSourceLocPointer,
+    type: DeclSyntax.self
+  ) else {
+    return 1
+  }
+
+  // Get the macro.
+  let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
+  let macro = macroPtr.pointee.macro
+
+  // FIXME: Which source file? I don't know! This should go.
+  let declarationSourceFilePtr = declarationSourceFilePtr.bindMemory(
+    to: ExportedSourceFile.self, capacity: 1
+  )
+
+  var context = MacroExpansionContext(
+    moduleName: declarationSourceFilePtr.pointee.moduleName,
+    fileName: declarationSourceFilePtr.pointee.fileName.withoutPath()
+  )
+
+  var evaluatedSyntaxStr: String
+  do {
+    switch macro {
+    case let attachedMacro as AccessorDeclarationMacro.Type:
+      let accessors = try attachedMacro.expansion(
+        of: customAttrNode, attachedTo: declarationNode, in: &context
+      )
+
+      // Form a buffer of accessor declarations to return to the caller.
+      evaluatedSyntaxStr = accessors.map {
+        $0.withoutTrivia().description
+      }.joined(separator: "\n\n")
+
+    default:
+      print("\(macroPtr) does not conform to any known attached macro protocol")
+      return 1
+    }
+  } catch {
+    // Record the error
+    // FIXME: Need to decide where to diagnose the error:
+    context.diagnose(
+      Diagnostic(
+        node: Syntax(declarationNode),
+        message: ThrownErrorDiagnostic(message: String(describing: error))
+      )
+    )
+
+    return 1
+  }
+
+  // FIXME: Emit diagnostics, but how do we figure out which source file to
+  // use?
+
+  // Form the result buffer for our caller.
+  evaluatedSyntaxStr.withUTF8 { utf8 in
+    let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
+    if let baseAddress = utf8.baseAddress {
+      evaluatedResultPtr.initialize(from: baseAddress, count: utf8.count)
+    }
+    evaluatedResultPtr[utf8.count] = 0
+
+    expandedSourcePointer.pointee = UnsafePointer(evaluatedResultPtr)
+    expandedSourceLength.pointee = utf8.count
+  }
+
+  return 0
+}

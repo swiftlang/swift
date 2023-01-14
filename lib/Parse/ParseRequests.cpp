@@ -164,16 +164,31 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state);
   PrettyStackTraceParser StackTrace(parser);
 
-  // If the buffer is generated source information that is conceptually within
-  // a particular declaration context, use that for the parser's declaration
-  // context instead of the source file.
+  // If the buffer is generated source information, we might have more
+  // context that we need to set up for parsing.
+  AbstractStorageDecl *accessorsForStorage = nullptr;
   if (auto generatedInfo = ctx.SourceMgr.getGeneratedSourceInfo(*bufferID)) {
     if (generatedInfo->declContext)
       parser.CurDeclContext = generatedInfo->declContext;
+
+    // If there's a custom attribute naming an attached macro, and the
+    // corresponding ASTNode
+    // FIXME: This is wrong. We should see specifically whether this buffer
+    // is for accessors.
+    if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {
+      ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
+      if (auto attachedDecl = astNode.dyn_cast<Decl *>()) {
+        accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
+      }
+    }
   }
 
   SmallVector<ASTNode, 128> items;
-  parser.parseTopLevelItems(items);
+  if (accessorsForStorage) {
+    parser.parseTopLevelAccessors(accessorsForStorage, items);
+  } else {
+    parser.parseTopLevelItems(items);
+  }
 
   Optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = parser.takeTokenReceiver()->finalize())
