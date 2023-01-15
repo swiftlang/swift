@@ -16,6 +16,7 @@
 #ifndef SWIFT_SEMA_TYPECHECKMACROS_H
 #define SWIFT_SEMA_TYPECHECKMACROS_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Type.h"
 
@@ -50,8 +51,8 @@ void expandAccessors(
 
 /// Expand the attributes for the given member declaration based
 /// on the custom attribute that references the given macro.
-void expandAttributes(
-    CustomAttr *attr, MacroDecl *macro, Decl *member);
+void expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
+                      SemanticDeclAttributes &result);
 
 } // end namespace swift
 

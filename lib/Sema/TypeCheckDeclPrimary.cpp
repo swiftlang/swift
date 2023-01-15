@@ -1993,7 +1993,10 @@ public:
   }
 
   void visitMissingDecl(MissingDecl *missing) {
-    // nothing to do for missing decls.
+    // FIXME: Expanded attribute lists should be type checked against
+    // the real declaration they will be attached to. Attempting to
+    // type check a missing decl should produce an error.
+    TypeChecker::checkDeclAttributes(missing);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {

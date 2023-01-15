@@ -842,8 +842,8 @@ void swift::expandAccessors(
 // FIXME: Almost entirely duplicated code from `expandAccessors`.
 // Factor this out into an `expandAttachedMacro` function, with
 // arguments for the PrettyStackTrace string, 'attachedTo' decl, etc.
-void swift::expandAttributes(
-    CustomAttr *attr, MacroDecl *macro, Decl *member) {
+void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
+                             SemanticDeclAttributes &result) {
   auto *dc = member->getInnermostDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -1004,6 +1004,17 @@ void swift::expandAttributes(
       "type checking expanded declaration macro", member);
 
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
+  for (auto decl : topLevelDecls) {
+    // FIXME: We want to type check decl attributes applied to
+    // the real declaration, ideally by appending the new attributes
+    // to the result and changing TypeChecker::checkDeclAttributes
+    // to use the semantic attribute list.
+    decl->setDeclContext(dc);
+    TypeChecker::typeCheckDecl(decl);
 
-  // TODO: Return the attribute lists attached to top-level decls.
+    // Add the new attributes to the semantic attribute list.
+    for (auto *attr : decl->getAttrs()) {
+      result.add(attr);
+    }
+  }
 }

@@ -3609,6 +3609,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
   if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    // FIXME: We shouldn't be type checking missing decls.
+    if (isa<MissingDecl>(D))
+      return;
+
     // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D)) {
       diagnose(attr->getLocation(),
@@ -7414,10 +7418,7 @@ AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
     if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
       continue;
 
-    // Expand the attributes.
-    expandAttributes(customAttr, macroDecl, decl);
-
-    // TODO: append the expanded attributes to 'semanticAttrs'.
+    expandAttributes(customAttr, macroDecl, decl, semanticAttrs);
   }
 
   return semanticAttrs;
