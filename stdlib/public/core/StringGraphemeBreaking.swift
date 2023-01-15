@@ -723,11 +723,17 @@ extension _GraphemeBreakingState {
     case (_, .extend),
          (_, .zwj):
 
-      // If we're currently in an emoji sequence, then extends and ZWJ help
-      // continue the grapheme cluster by combining more scalars later. If we're
-      // not currently in an emoji sequence, but our lhs scalar is a pictograph,
-      // then that's a signal that it's the start of an emoji sequence.
-      if self.isInEmojiSequence || x == .extendedPictographic {
+      // Prepare for recognizing GB11, by remembering if we're in an emoji
+      // sequence.
+      //
+      //   GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
+      //
+      // If our left-side scalar is a pictograph, then it starts a new emoji
+      // sequence; the sequence continues through subsequent extend/extend and
+      // extend/zwj pairs.
+      if (
+        x == .extendedPictographic || (self.isInEmojiSequence && x == .extend)
+      ) {
         enterEmojiSequence = true
       }
 
