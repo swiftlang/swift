@@ -1658,32 +1658,26 @@ extension BinaryInteger {
   public static func == <
     Other: BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
-    let rhs_ = Self(truncatingIfNeeded: rhs)
-    // Is `rhs` representable as a value of `Self` type? In other words, does
-    // the bit pattern conversion above preserve the value of `rhs`?
-    //
-    // To find out the answer, we see if the value roundtrips by bit pattern
-    // conversion back to `Self` [1], and we also check that the original bit
-    // pattern conversion doesn't change the sign [2].
-    if Other(truncatingIfNeeded: rhs_) == rhs /* [1] */
-      && (rhs < (0 as Other)) == (rhs_ < (0 as Self)) /* [2] */ {
-      return lhs == rhs_
+    // Use bit pattern conversion to widen the comparand with smaller bit width.
+    if Self.isSigned == Other.isSigned {
+      return lhs.bitWidth >= rhs.bitWidth ?
+        lhs == Self(truncatingIfNeeded: rhs) :
+        Other(truncatingIfNeeded: lhs) == rhs
     }
-
-    let lhs_ = Other(truncatingIfNeeded: lhs)
-    // Is `lhs` representable as a value of `Other` type?
-    if Self(truncatingIfNeeded: lhs_) == lhs
-      && (lhs < (0 as Self)) == (lhs_ < (0 as Other)) {
-      return lhs_ == rhs
+    // If `Self` is signed but `Other` is unsigned, then we have to
+    // be a little more careful about widening, since:
+    // (1) a fixed-width signed type can't represent the largest values of
+    //     a fixed-width unsigned type of equal bit width; and
+    // (2) an unsigned type (obviously) can't represent a negative value.
+    if Self.isSigned {    
+      return lhs.bitWidth > rhs.bitWidth ? // (1)
+        lhs == Self(truncatingIfNeeded: rhs) :
+        lhs < (0 as Self) ? false : Other(truncatingIfNeeded: lhs) == rhs // (2)
     }
-
-    // If we're here, then either:
-    // - `Self` is signed and fixed-width, `Other` is unsigned,
-    //   `lhs` is negative, and `rhs` is greater than `Self.max`; or
-    // - `Other` is signed and fixed-width, `Self` is unsigned, 
-    //   `rhs` is negative, and `lhs` is greater than `Other.max`.
-    // Thus, `lhs != rhs`.
-    return false
+    // Analogous reasoning applies if `Other` is signed but `Self` is not.
+    return lhs.bitWidth < rhs.bitWidth ?
+      Other(truncatingIfNeeded: lhs) == rhs :
+      rhs < (0 as Other) ? false : lhs == Self(truncatingIfNeeded: rhs)
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1723,32 +1717,26 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   public static func < <Other: BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
-    let rhs_ = Self(truncatingIfNeeded: rhs)
-    // Is `rhs` representable as a value of `Self` type? In other words, does
-    // the bitcast operation above preserve the value of `rhs`?
-    //
-    // To find out the answer, we see if the value roundtrips by bitcasting back
-    // to `Self` [1], and we also check that bitcasting doesn't change the sign
-    // [2].
-    if Other(truncatingIfNeeded: rhs_) == rhs /* [1] */
-      && (rhs < (0 as Other)) == (rhs_ < (0 as Self)) /* [2] */ {
-      return lhs < rhs_
+    // Use bit pattern conversion to widen the comparand with smaller bit width.
+    if Self.isSigned == Other.isSigned {
+      return lhs.bitWidth >= rhs.bitWidth ?
+        lhs < Self(truncatingIfNeeded: rhs) :
+        Other(truncatingIfNeeded: lhs) < rhs
     }
-
-    let lhs_ = Other(truncatingIfNeeded: lhs)
-    // Is `lhs` representable as a value of `Other` type?
-    if Self(truncatingIfNeeded: lhs_) == lhs
-      && (lhs < (0 as Self)) == (lhs_ < (0 as Other)) {
-      return lhs_ < rhs
+    // If `Self` is signed but `Other` is unsigned, then we have to
+    // be a little more careful about widening, since:
+    // (1) a fixed-width signed type can't represent the largest values of
+    //     a fixed-width unsigned type of equal bit width; and
+    // (2) an unsigned type (obviously) can't represent a negative value.
+    if Self.isSigned {
+      return lhs.bitWidth > rhs.bitWidth ? // (1)
+        lhs < Self(truncatingIfNeeded: rhs) :
+        lhs < (0 as Self) ? true : Other(truncatingIfNeeded: lhs) < rhs // (2)
     }
-
-    // If we're here, then either:
-    // - `Self` is signed and fixed-width, `Other` is unsigned,
-    //   `lhs` is negative, and `rhs` is greater than `Self.max`; or
-    // - `Other` is signed and fixed-width, `Self` is unsigned, 
-    //   `rhs` is negative, and `lhs` is greater than `Other.max`.
-    // Thus, `lhs < rhs` if and only if `Self.isSigned`.
-    return Self.isSigned
+    // Analogous reasoning applies if `Other` is signed but `Self` is not.
+    return lhs.bitWidth < rhs.bitWidth ?
+      Other(truncatingIfNeeded: lhs) < rhs :
+      rhs < (0 as Other) ? false : lhs < Self(truncatingIfNeeded: rhs)
   }
 
   /// Returns a Boolean value indicating whether the value of the first
