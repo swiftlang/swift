@@ -87,6 +87,11 @@ getGlibcModuleMapPath(SearchPathOptions &Opts, const llvm::Triple &triple) {
 }
 
 static Optional<Path>
+getWinSDKModuleMapPath(SearchPathOptions &Opts, const llvm::Triple &triple) {
+  return getActualModuleMapPath("WinSDK.modulemap", Opts, triple);
+}
+
+static Optional<Path>
 getLibStdCxxModuleMapPath(SearchPathOptions &opts, const llvm::Triple &triple) {
   return getActualModuleMapPath("libstdcxx.modulemap", opts, triple);
 }
@@ -223,6 +228,45 @@ getGlibcFileMapping(ASTContext &ctx) {
   return {
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
       {std::string(injectedHeaderPath), std::string(actualHeaderPath)},
+  };
+}
+
+static SmallVector<std::pair<std::string, std::string>, 2>
+getWinSDKFileMapping(ASTContext &ctx) {
+  const llvm::Triple &triple = ctx.LangOpts.Target;
+
+  // Extract Windows SDK path from Clang driver.
+  auto clangDriver = createClangDriver(ctx);
+  auto clangDriverArgs = createClangArgs(ctx, clangDriver);
+
+  llvm::opt::ArgStringList includeArgStrings;
+  const auto &clangToolchain =
+      clangDriver.getToolChain(clangDriverArgs, triple);
+  clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
+  auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
+
+  // Find the include path that contains Windows.h header, which should be
+  // located under %UniversalCRTSdkDir%\Include\%UCRTVersion%\um.
+  Path winSDKDir;
+  if (auto dir = findFirstIncludeDir(parsedIncludeArgs, {"Windows.h"})) {
+    winSDKDir = dir.value();
+  } else {
+    ctx.Diags.diagnose(SourceLoc(), diag::windows_sdk_not_found, triple.str());
+    return {};
+  }
+
+  Path actualModuleMapPath;
+  if (auto path = getWinSDKModuleMapPath(ctx.SearchPathOpts, triple))
+    actualModuleMapPath = path.value();
+  else
+    // FIXME: Emit a warning of some kind.
+    return {};
+
+  Path injectedModuleMapPath(winSDKDir);
+  llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
+
+  return {
+    {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
   };
 }
 
