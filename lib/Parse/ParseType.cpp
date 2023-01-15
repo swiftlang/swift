@@ -208,7 +208,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       if (auto *ITR = cast_or_null<IdentTypeRepr>(ty.getPtrOrNull())) {
         if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
           if (IDECallbacks)
-            IDECallbacks->completeTypeIdentifierWithoutDot(ITR);
+            IDECallbacks->completeTypeSimpleWithoutDot(ITR);
 
           ty.setHasCodeCompletionAndIsError();
           consumeToken(tok::code_complete);
@@ -219,7 +219,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   case tok::kw_Any:
     ty = parseAnyType();
-    // FIXME: Offer completions in 'Any<#HERE#>' and 'Any.<#HERE#>'.
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -262,6 +261,18 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   // '.X', '.Type', '.Protocol', '?', '!', '[]'.
   while (ty.isNonNull()) {
     if (Tok.isAny(tok::period, tok::period_prefix)) {
+      if (peekToken().is(tok::code_complete)) {
+        consumeToken();
+
+        if (IDECallbacks) {
+          IDECallbacks->completeTypeSimpleWithDot(ty.get());
+        }
+
+        ty.setHasCodeCompletionAndIsError();
+        consumeToken(tok::code_complete);
+        break;
+      }
+
       ty = parseTypeDotted(ty);
       continue;
     }
@@ -280,6 +291,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         ty = parseTypeArray(ty);
         continue;
       }
+    }
+
+    if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
+      if (IDECallbacks) {
+        IDECallbacks->completeTypeSimpleWithoutDot(ty.get());
+      }
+
+      ty.setHasCodeCompletionAndIsError();
+      consumeToken(tok::code_complete);
     }
     break;
   }
@@ -807,10 +827,10 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       // We have a dot.
       consumeToken();
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithDot(DeclRefTR);
+        IDECallbacks->completeTypeSimpleWithDot(DeclRefTR);
     } else {
       if (IDECallbacks)
-        IDECallbacks->completeTypeIdentifierWithoutDot(DeclRefTR);
+        IDECallbacks->completeTypeSimpleWithoutDot(DeclRefTR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -853,9 +873,9 @@ ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
 
   SmallVector<IdentTypeRepr *, 4> MemberComponents;
 
-  while (true) {
-    if (Tok.isNot(tok::period, tok::period_prefix) ||
-        peekToken().is(tok::code_complete)) {
+  while (Tok.isAny(tok::period, tok::period_prefix)) {
+    if (peekToken().is(tok::code_complete)) {
+      // Code completion for "type-simple '.'" is handled in 'parseTypeSimple'.
       break;
     }
 
@@ -888,32 +908,8 @@ ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
     MemberComponents.push_back(cast<IdentTypeRepr>(IdentResult.get()));
   }
 
-  TypeRepr *TR = MemberTypeRepr::create(Context, Base.get(), MemberComponents);
-
-  // FIXME: Offer completions in 'X.Type<#HERE#>' and 'X.Type.<#HERE#>'.
-  if (Tok.is(tok::code_complete)) {
-    if (!Tok.isAtStartOfLine()) {
-      Base.setHasCodeCompletionAndIsError();
-
-      if (IDECallbacks) {
-        if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(TR))
-          IDECallbacks->completeTypeIdentifierWithoutDot(DeclRefTR);
-      }
-
-      consumeToken(tok::code_complete);
-    }
-  } else if (Tok.isAny(tok::period, tok::period_prefix)) {
-    Base.setHasCodeCompletionAndIsError();
-    consumeToken();
-
-    if (IDECallbacks) {
-      if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(TR))
-        IDECallbacks->completeTypeIdentifierWithDot(DeclRefTR);
-    }
-    consumeToken(tok::code_complete);
-  }
-
-  return makeParserResult(Base, TR);
+  return makeParserResult(
+      Base, MemberTypeRepr::create(Context, Base.get(), MemberComponents));
 }
 
 /// parseTypeSimpleOrComposition
