@@ -324,6 +324,17 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
       // in it.
       if (expansionDecl->getMacro().getFullName() == macro->getName())
         return true;
+    } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
+      auto *decl = expansion.dyn_cast<Decl *>();
+      auto &ctx = decl->getASTContext();
+      auto attrDecl = evaluateOrDefault(ctx.evaluator,
+          CustomAttrDeclRequest{macroAttr, decl->getDeclContext()},
+          nullptr);
+      auto *macroDecl = attrDecl.dyn_cast<MacroDecl *>();
+      if (!macroDecl)
+        return false;
+
+      return macroDecl == macro;
     } else {
       llvm_unreachable("Unknown macro expansion node kind");
     }
