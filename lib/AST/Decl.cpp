@@ -9672,6 +9672,54 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+StringRef swift::getMacroRoleString(MacroRole role) {
+  switch (role) {
+  case MacroRole::Expression:
+    return "expression";
+
+  case MacroRole::FreestandingDeclaration:
+    return "freestanding";
+
+  case MacroRole::Accessor:
+    return "accessor";
+  }
+}
+
+bool swift::macroIntroducedNameRequiresArgument(
+  MacroIntroducedDeclNameKind kind
+) {
+  switch (kind) {
+  case MacroIntroducedDeclNameKind::Named:
+  case MacroIntroducedDeclNameKind::Prefixed:
+  case MacroIntroducedDeclNameKind::Suffixed:
+    return true;
+
+  case MacroIntroducedDeclNameKind::Overloaded:
+  case MacroIntroducedDeclNameKind::Arbitrary:
+    return false;
+  }
+}
+
+StringRef swift::getMacroIntroducedDeclNameString(
+    MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+  case MacroIntroducedDeclNameKind::Named:
+    return "named";
+
+  case MacroIntroducedDeclNameKind::Overloaded:
+    return "overloaded";
+
+  case MacroIntroducedDeclNameKind::Prefixed:
+    return "prefixed";
+
+  case MacroIntroducedDeclNameKind::Suffixed:
+    return "suffixed";
+
+  case MacroIntroducedDeclNameKind::Arbitrary:
+    return "arbitrary";
+  }
+}
+
 static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
