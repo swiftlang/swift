@@ -98,17 +98,15 @@ alternatively, see the ICU project for details on building ICU from source.
 
 ## One-time Setup (re-run on Visual Studio upgrades)
 
-Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
+Set up the `ucrt` and `visualc` modules by:
 
 - copying `ucrt.modulemap` located at `swift/stdlib/public/Platform/ucrt.modulemap` into
   `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`
 - copying `vcruntime.modulemap` located at `swift/stdlib/public/Platform/vcruntime.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`
-- copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um`
 - and setup the `vcruntime.apinotes` located at `swift/stdlib/public/Platform/vcruntime.apinotes` into `${VCToolsInstallDir}/include` as `vcruntime.apinotes`
 
 ```cmd
 mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
 mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\vcruntime.modulemap
 mklink "%VCToolsInstallDir%\include\vcruntime.apinotes" S:\swift\stdlib\public\Platform\vcruntime.apinotes
 ```
