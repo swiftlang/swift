@@ -260,7 +260,10 @@ void SourceManager::setGeneratedSourceInfo(
   GeneratedSourceInfos[bufferID] = info;
 
   switch (info.kind) {
-  case GeneratedSourceInfo::MacroExpansion:
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 

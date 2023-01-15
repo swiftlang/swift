@@ -166,26 +166,34 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 
   // If the buffer is generated source information, we might have more
   // context that we need to set up for parsing.
-  AbstractStorageDecl *accessorsForStorage = nullptr;
+  SmallVector<ASTNode, 128> items;
   if (auto generatedInfo = ctx.SourceMgr.getGeneratedSourceInfo(*bufferID)) {
     if (generatedInfo->declContext)
       parser.CurDeclContext = generatedInfo->declContext;
 
-    // If there's a custom attribute naming an attached macro, and the
-    // corresponding ASTNode
-    // FIXME: This is wrong. We should see specifically whether this buffer
-    // is for accessors.
-    if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {
-      ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
-      if (auto attachedDecl = astNode.dyn_cast<Decl *>()) {
-        accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
-      }
+    switch (generatedInfo->kind) {
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::PrettyPrinted: {
+      parser.parseTopLevelItems(items);
+      break;
     }
-  }
 
-  SmallVector<ASTNode, 128> items;
-  if (accessorsForStorage) {
-    parser.parseTopLevelAccessors(accessorsForStorage, items);
+    case GeneratedSourceInfo::AccessorMacroExpansion: {
+      ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
+      auto attachedDecl = astNode.get<Decl *>();
+      auto accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
+
+      parser.parseTopLevelAccessors(accessorsForStorage, items);
+      break;
+    }
+
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
+      // TODO
+      break;
+    }
+    }
   } else {
     parser.parseTopLevelItems(items);
   }

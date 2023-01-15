@@ -1311,7 +1311,10 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
         ASTNode::getFromOpaqueValue(generatedInfo->astNode);
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::MacroExpansion: {
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::AccessorMacroExpansion:
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName;
       if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {

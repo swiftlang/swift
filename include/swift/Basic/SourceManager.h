@@ -32,8 +32,17 @@ class GeneratedSourceInfo {
 public:
   /// The kind of generated source code.
   enum Kind {
-    /// The expansion of a macro.
-    MacroExpansion,
+    /// The expansion of a freestanding expression macro.
+    ExpressionMacroExpansion,
+
+    /// The expansion of a freestanding declaration macro.
+    FreestandingDeclMacroExpansion,
+
+    /// The expansion of an accessor attached macro.
+    AccessorMacroExpansion,
+
+    /// The expansion of a member attribute attached macro.
+    MemberAttributeMacroExpansion,
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,

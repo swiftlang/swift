@@ -461,7 +461,7 @@ Expr *swift::expandMacroExpr(
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
-    GeneratedSourceInfo::MacroExpansion,
+    GeneratedSourceInfo::ExpressionMacroExpansion,
     expr->getSourceRange(),
     SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
     ASTNode(expr).getOpaqueValue(),
@@ -639,7 +639,7 @@ bool swift::expandFreestandingDeclarationMacro(
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::MacroExpansion,
+      GeneratedSourceInfo::FreestandingDeclMacroExpansion,
       med->getSourceRange(),
       SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
       ASTNode(med).getOpaqueValue(),
@@ -814,7 +814,7 @@ void swift::expandAccessors(
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::MacroExpansion,
+      GeneratedSourceInfo::AccessorMacroExpansion,
       storage->getEndLoc(),
       SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
       ASTNode(storage).getOpaqueValue(),
@@ -984,7 +984,7 @@ void swift::expandAttributes(
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::MacroExpansion,
+      GeneratedSourceInfo::MemberAttributeMacroExpansion,
       member->getEndLoc(),
       SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
       ASTNode(member).getOpaqueValue(),
