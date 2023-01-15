@@ -35,11 +35,6 @@ namespace irgen {
 
 class LayoutStringBuilder {
 public:
-  enum class ExtraInhabitantsKind : uint8_t {
-    Mask = 0,
-    Pointer = 1,
-  };
-
   enum class RefCountingKind : uint8_t {
     End = 0x00,
     Error = 0x01,
@@ -68,16 +63,10 @@ private:
   struct RefCounting {
     RefCountingKind kind;
     union {
-      uint32_t offset;
-      uintptr_t witness;
+      uint32_t stride;
+      uint32_t genericIdx;
     };
   };
-
-  ExtraInhabitantsKind extraInhabitantsKind;
-  uintptr_t extraInhabitant;
-  uint32_t extraInhabitantOffset;
-  size_t size;
-  uint64_t alignment;
 
   std::vector<RefCounting> refCountings;
 
@@ -85,11 +74,7 @@ public:
   LayoutStringBuilder() = default;
   ~LayoutStringBuilder() = default;
 
-  void addSize(size_t s) { size += s; }
-
-  void setAlignment(uint64_t a) { alignment = std::max(alignment, a); }
-
-  void addRefCount(RefCountingKind kind, uint32_t offset) {
+  void addRefCount(RefCountingKind kind, uint32_t stride) {
     if (kind == RefCountingKind::Skip) {
       if (refCountings.empty() ||
           refCountings.back().kind != RefCountingKind::Skip) {
@@ -97,9 +82,9 @@ public:
       }
       auto &refCounting = refCountings.back();
 
-      refCounting.offset += offset;
+      refCounting.stride += stride;
     } else {
-      refCountings.push_back({kind, {offset}});
+      refCountings.push_back({kind, {stride}});
     }
   }
 
@@ -124,7 +109,7 @@ public:
     uint32_t instCopyBytes = 0;
     for (auto &refCounting : refCountings) {
       if (refCounting.kind == RefCountingKind::Skip) {
-        skip += refCounting.offset;
+        skip += refCounting.stride;
         continue;
       }
 
@@ -141,11 +126,11 @@ public:
                                 (uint8_t *)(&copyOpBE + 1));
           instCopyBytes = 0;
         }
-        uint paramIndex = (2 << 24) | (refCounting.offset & ~(0xff << 24));
-        uint32_t paramIdxBE = 0;
-        llvm::support::endian::write32be(&paramIdxBE, paramIndex);
-        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&paramIdxBE,
-                              (uint8_t *)(&paramIdxBE + 1));
+        uint genericIdx = (2 << 24) | (refCounting.genericIdx & ~(0xff << 24));
+        uint32_t genericIdxBE = 0;
+        llvm::support::endian::write32be(&genericIdxBE, genericIdx);
+        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&genericIdxBE,
+                              (uint8_t *)(&genericIdxBE + 1));
         uint32_t skipBE = 0;
         llvm::support::endian::write32be(&skipBE, skip);
         genericInstStr.insert(genericInstStr.end(), (uint8_t *)&skipBE,
@@ -161,7 +146,7 @@ public:
         instCopyBytes += 4;
       }
 
-      skip = 0;
+      skip = refCounting.stride;
     }
 
     // size of ref counting ops in bytes
@@ -985,11 +970,6 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
   LayoutStringBuilder B{};
 
-  if (auto size = fixedSize(IGM))
-    B.addSize(size->getValue());
-  if (auto alignment = fixedAlignment(IGM))
-    B.setAlignment(alignment->getValue());
-
   refCountString(IGM, B);
 
   B.result(layoutStr);
@@ -999,49 +979,46 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
 void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                            LayoutStringBuilder &B) const {
+  auto size = typeInfo.getFixedSize().getValue();
   switch (scalarKind) {
   case ScalarKind::ErrorReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Error, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Error, size);
     break;
   case ScalarKind::NativeStrongReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, size);
     break;
   case ScalarKind::NativeUnownedReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeUnowned, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeUnowned, size);
     break;
   case ScalarKind::NativeWeakReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeWeak, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeWeak, size);
     break;
   case ScalarKind::UnknownWeakReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownWeak, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownWeak, size);
     break;
   case ScalarKind::UnknownReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Unknown, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Unknown, size);
     break;
   case ScalarKind::UnknownUnownedReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownUnowned, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::UnknownUnowned, size);
     break;
   case ScalarKind::BridgeReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Bridge, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Bridge, size);
     break;
   case ScalarKind::BlockReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
     break;
   case ScalarKind::ThickFunc:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
                   IGM.getPointerSize().getValue());
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong, 1);
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,
+                  IGM.getPointerSize().getValue());
     break;
   case ScalarKind::POD:
-    if (auto size = fixedSize(IGM)) {
-      B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
-                    size->getValue());
-    } else {
-      // TODO: properly handle dynamic sizes
-    }
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size);
     break;
   default:
     llvm_unreachable("Unsupported ScalarKind");
@@ -1435,11 +1412,6 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
   std::vector<uint8_t> layoutStr;
 
   LayoutStringBuilder B{};
-
-  if (auto size = fixedSize(IGM))
-    B.addSize(size->getValue());
-  if (auto alignment = fixedAlignment(IGM))
-    B.setAlignment(alignment->getValue());
 
   refCountString(IGM, B);
 
