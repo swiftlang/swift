@@ -903,6 +903,11 @@ public:
   /// Each item will be a declaration, statement, or expression.
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
+  /// Parse the source file via the Swift Parser using the ASTGen library.
+  void parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
+                                Optional<DiagnosticTransaction> &transaction,
+                                bool suppressDiagnostics = false);
+
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
