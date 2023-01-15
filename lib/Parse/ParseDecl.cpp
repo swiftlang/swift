@@ -2236,21 +2236,6 @@ static Optional<MacroRole> getMacroRole(
   return role;
 }
 
-/// Determine whether a macro-introduced name requires an argument (which is
-/// always a string literal).
-static bool introducedNameRequiresArgument(MacroIntroducedDeclNameKind kind) {
-  switch (kind) {
-  case MacroIntroducedDeclNameKind::Named:
-  case MacroIntroducedDeclNameKind::Prefixed:
-  case MacroIntroducedDeclNameKind::Suffixed:
-    return true;
-
-  case MacroIntroducedDeclNameKind::Overloaded:
-  case MacroIntroducedDeclNameKind::Arbitrary:
-    return false;
-  }
-}
-
 static Optional<MacroIntroducedDeclNameKind>
 getMacroIntroducedDeclNameKind(Identifier name) {
   return llvm::StringSwitch<Optional<MacroIntroducedDeclNameKind>>(name.str())
@@ -2307,7 +2292,7 @@ static SmallVector<MacroIntroducedDeclName, 2> getMacroIntroducedNames(
         continue;
       }
 
-      if (introducedNameRequiresArgument(*introducedKind)) {
+      if (macroIntroducedNameRequiresArgument(*introducedKind)) {
         diags.diagnose(
             arg.getExpr()->getLoc(),
             diag::macro_attribute_introduced_name_requires_argument,
@@ -2352,7 +2337,7 @@ static SmallVector<MacroIntroducedDeclName, 2> getMacroIntroducedNames(
       continue;
     }
 
-    if (!introducedNameRequiresArgument(*introducedKind)) {
+    if (!macroIntroducedNameRequiresArgument(*introducedKind)) {
       diags.diagnose(
           call->getArgs()->getLoc(),
           diag::macro_attribute_introduced_name_requires_no_argument,
