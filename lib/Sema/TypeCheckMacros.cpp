@@ -48,6 +48,8 @@ extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     const void *customAttrSourceLocation,
     void *declarationSourceFile,
     const void *declarationSourceLocation,
+    void *parentDeclSourceFile,
+    const void *parentDeclSourceLocation,
     const char **evaluatedSource,
     ptrdiff_t *evaluatedSourceLength
 );
@@ -774,6 +776,7 @@ void swift::expandAccessors(
         externalDef.opaqueHandle,
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
+        /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return;
@@ -871,6 +874,15 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
   if (!declSourceFile)
     return;
 
+  Decl *parentDecl = member->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return;
+
+  auto parentDeclSourceFile =
+    moduleDecl->getSourceFileContainingLocation(parentDecl->getLoc());
+  if (!parentDeclSourceFile)
+    return;
+
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
@@ -931,8 +943,10 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
     if (!astGenDeclSourceFile)
       return;
 
-    // FIXME: Pass parentDecl to the expansion.
-    Decl *parentDecl = member->getDeclContext()->getAsDecl();
+    auto astGenParentDeclSourceFile = parentDeclSourceFile->exportedSourceFile;
+    if (!astGenParentDeclSourceFile)
+      return;
+
     Decl *searchDecl = member;
     if (auto *var = dyn_cast<VarDecl>(member))
       searchDecl = var->getParentPatternBinding();
@@ -944,6 +958,7 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
         externalDef.opaqueHandle,
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
+        astGenParentDeclSourceFile, parentDecl->getStartLoc().getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return;

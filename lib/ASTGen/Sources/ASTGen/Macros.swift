@@ -263,6 +263,8 @@ func expandAttachedMacro(
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
   declarationSourceFilePtr: UnsafeRawPointer,
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
+  parentDeclSourceFilePtr: UnsafeRawPointer,
+  parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
   expandedSourceLength: UnsafeMutablePointer<Int>
 ) -> Int {
@@ -317,12 +319,19 @@ func expandAttachedMacro(
       }.joined(separator: "\n\n")
 
     case let attachedMacro as MemberAttributeMacro.Type:
-      // FIXME: We need the decl the attribute is attached to.
-      // We need to pass through another source file and source
-      // location pointer for the 'attachedTo' declaration.
+      // Dig out the node for the parent declaration of the to-expand
+      // declaration. Only member attribute macros need this.
+      guard let parentDeclNode = findSyntaxNodeInSourceFile(
+        sourceFilePtr: parentDeclSourceFilePtr,
+        sourceLocationPtr: parentDeclSourceLocPointer,
+        type: DeclSyntax.self
+      ) else {
+        return 1
+      }
+
       let attributes = try attachedMacro.expansion(
         of: customAttrNode,
-        attachedTo: DeclSyntax(MissingDeclSyntax()),
+        attachedTo: parentDeclNode,
         annotating: declarationNode,
         in: &context
       )

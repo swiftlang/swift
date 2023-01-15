@@ -249,7 +249,7 @@ extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo decl: DeclSyntax,
+    attachedTo parent: DeclSyntax,
     annotating member: DeclSyntax,
     in context: inout MacroExpansionContext
   ) throws -> [AttributeSyntax] {
@@ -257,9 +257,16 @@ public struct WrapAllProperties: MemberAttributeMacro {
       return []
     }
 
+    let wrapperTypeName: String
+    if parent.is(ClassDeclSyntax.self) {
+      wrapperTypeName = "EnclosingSelfWrapper"
+    } else {
+      wrapperTypeName = "Wrapper"
+    }
+
     let propertyWrapperAttr = AttributeSyntax(
       attributeName: SimpleTypeIdentifierSyntax(
-        name: .identifier("Wrapper")
+        name: .identifier(wrapperTypeName)
       )
     )
 
