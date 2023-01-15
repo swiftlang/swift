@@ -7064,6 +7064,29 @@ void Parser::parseTopLevelAccessors(
     items.push_back(accessor);
 }
 
+void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  DeclAttributes attributes;
+  parseDeclAttributeList(attributes);
+
+  // Consume remaining tokens.
+  while (!Tok.is(tok::eof)) {
+    diagnose(Tok.getLoc(), diag::unexpected_attribute_expansion,
+             Tok.getText());
+    consumeToken();
+  }
+
+  // Create a `MissingDecl` as a placeholder for the declaration the
+  // macro will attach the attribute list to.
+  MissingDecl *missing = MissingDecl::create(Context, CurDeclContext);
+  missing->getAttrs() = attributes;
+
+  items.push_back(ASTNode(missing));
+  return;
+}
+
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,

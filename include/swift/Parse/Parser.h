@@ -1225,6 +1225,13 @@ public:
       AbstractStorageDecl *storage, SmallVectorImpl<ASTNode> &items
   );
 
+  /// Parse the result of attribute macro expansion, which is a floating
+  /// attribute list.
+  ///
+  /// Parsing a floating attribute list will produce a `MissingDecl` with
+  /// the attribute list attached.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
+
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,

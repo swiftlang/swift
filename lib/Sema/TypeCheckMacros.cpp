@@ -1003,10 +1003,7 @@ void swift::expandAttributes(
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
 
+  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
 
-  // FIXME: Top-level item parsing needs to produce a MissingDecl
-  // node for an attribute list that is not attached to anything.
-  // The attributes will then be represented in the result of
-  // 'getTopLevelItems' as an ASTNode for the missing declaration,
-  // with an attribute list attached.
+  // TODO: Return the attribute lists attached to top-level decls.
 }

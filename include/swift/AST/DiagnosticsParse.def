@@ -2044,6 +2044,10 @@ ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
 ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
       "introduced name kind %0 must not have an argument", (Identifier))
 
+ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded attribute list'",
+      (StringRef))
+
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())
 ERROR(parser_new_parser_errors,none,
