@@ -37,6 +37,10 @@ enum class MacroRole: uint32_t {
 /// The contexts in which a particular macro declaration can be used.
 using MacroRoles = OptionSet<MacroRole>;
 
+/// Retrieve the string form of the given macro role, as written on the
+/// corresponding attribute.
+StringRef getMacroRoleString(MacroRole role);
+
 /// Whether a macro with the given set of macro contexts is freestanding, i.e.,
 /// written in the source code with the `#` syntax.
 bool isFreestandingMacro(MacroRoles contexts);
@@ -52,6 +56,12 @@ enum class MacroIntroducedDeclNameKind {
   Suffixed,
   Arbitrary,
 };
+
+/// Whether a macro-introduced name of this kind requires an argument.
+bool macroIntroducedNameRequiresArgument(MacroIntroducedDeclNameKind kind);
+
+StringRef getMacroIntroducedDeclNameString(
+    MacroIntroducedDeclNameKind kind);
 
 class MacroIntroducedDeclName {
 public:

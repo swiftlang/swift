@@ -15,3 +15,8 @@ func test(a: Int, b: Int) {
   _ = #internalStringify(a + b)
   // expected-error@-1{{no macro named 'internalStringify'}}
 }
+
+struct TestStruct {
+  @myWrapper var x: Int
+  // expected-error@-1{{external macro implementation type 'SomeModule.MyWrapperMacro' could not be found for macro 'myWrapper'}}
+}

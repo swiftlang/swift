@@ -1309,6 +1309,30 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Attached: {
+    Printer.printAttrName("@attached");
+    Printer << "(";
+    auto Attr = cast<AttachedAttr>(this);
+    Printer << getMacroRoleString(Attr->getMacroRole());
+    if (!Attr->getNames().empty()) {
+      Printer << ", names: ";
+      interleave(
+          Attr->getNames(),
+          [&](MacroIntroducedDeclName name) {
+            Printer << getMacroIntroducedDeclNameString(name.getKind());
+            if (macroIntroducedNameRequiresArgument(name.getKind())) {
+              Printer << "(" << name.getIdentifier() << ")";
+            }
+          },
+          [&] {
+            Printer << ", ";
+          }
+      );
+    }
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
