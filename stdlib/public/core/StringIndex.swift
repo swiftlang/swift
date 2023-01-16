@@ -19,7 +19,7 @@ String's Index has the following layout:
  ┌──────────┬────────────────╥────────────────┬───────╥───────┐
  │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b4 ║ b3:b0 │
  ├──────────┼────────────────╫────────────────┼───────╫───────┤
- │ position │ transc. offset ║ grapheme cache │ rsvd  ║ flags │
+ │ position │ transc. offset ║ gphm break prop│ rsvd  ║ flags │
  └──────────┴────────────────╨────────────────┴───────╨───────┘
                              └────── resilient ───────┘
 
@@ -121,12 +121,6 @@ extension String.Index {
     return Int(truncatingIfNeeded: orderingValue & 0x3)
   }
 
-  @usableFromInline
-  internal var characterStride: Int? {
-    let value = (_rawBits & 0x3F00) &>> 8
-    return value > 0 ? Int(truncatingIfNeeded: value) : nil
-  }
-
   @inlinable @inline(__always)
   internal init(encodedOffset: Int, transcodedOffset: Int) {
     let pos = UInt64(truncatingIfNeeded: encodedOffset)
@@ -168,21 +162,6 @@ extension String.Index {
     self.init(encodedOffset: offset, transcodedOffset: 0)
   }
 
-  @usableFromInline
-  internal init(
-    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
-  ) {
-    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
-    if _slowPath(characterStride > 0x3F) { return }
-    self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
-    self._invariantCheck()
-  }
-
-  @usableFromInline
-  internal init(encodedOffset pos: Int, characterStride char: Int) {
-    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
-  }
-
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
@@ -198,6 +177,72 @@ extension String.Index {
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
+
+extension String.Index {
+  @available(swift, deprecated: 5.8, message: """
+    String indices no longer cache grapheme cluster sizes.
+    """)
+  @usableFromInline
+  internal var characterStride: Int? {
+    // As of 5.8, we no longer cache character strides within string indices.
+    return nil
+  }
+
+  @available(swift, deprecated: 5.8, message: """
+    String indices no longer cache grapheme cluster sizes.
+    """)
+  @usableFromInline
+  internal init(
+    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
+  ) {
+    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
+  }
+
+  @available(swift, deprecated: 5.8, message: """
+    String indices no longer cache grapheme cluster sizes.
+    """)
+  @usableFromInline
+  internal init(encodedOffset pos: Int, characterStride char: Int) {
+    self.init(encodedOffset: pos, transcodedOffset: 0)
+  }
+}
+
+extension Unicode._GraphemeBreakProperty {
+  internal init?(cachedBitPattern v: UInt8) {
+    guard v > 0 else { return nil }
+    self.init(rawValue: v &- 1)
+  }
+
+  internal var cachedBitPattern: UInt8 {
+    _internalInvariant(self.rawValue < 0x3F)
+    return (self.rawValue &+ 1) & 0x3F
+  }
+}
+
+extension String.Index {
+  internal var _graphemeBreakProperty: Unicode._GraphemeBreakProperty? {
+    let value = UInt8(truncatingIfNeeded: (_rawBits &>> 8) & 0x3F)
+    return Unicode._GraphemeBreakProperty(cachedBitPattern: value)
+  }
+
+  internal init(
+    _encodedOffset: Int,
+    transcodedOffset: Int,
+    graphemeBreakProperty gbp: Unicode._GraphemeBreakProperty
+  ) {
+    self.init(encodedOffset: _encodedOffset, transcodedOffset: transcodedOffset)
+    self._rawBits |= UInt64(gbp.cachedBitPattern) &<< 8
+  }
+
+  internal init(
+    _encodedOffset: Int,
+    graphemeBreakProperty gbp: Unicode._GraphemeBreakProperty
+  ) {
+    self.init(encodedOffset: _encodedOffset)
+    self._rawBits |= UInt64(gbp.cachedBitPattern) &<< 8
+  }
+}
+
 
 // Creation helpers, which will make migration easier if we decide to use and
 // propagate the reserved bits.
@@ -546,18 +591,31 @@ extension String.Index {
   @_alwaysEmitIntoClient
   @inline(never)
   public var _debugDescription: String {
-    var d = "String.Index("
-    d += "offset: \(_encodedOffset)[\(_encodingDescription)]"
-    if transcodedOffset != 0 {
-      d += "+\(transcodedOffset)"
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.9
+      return _opaqueDebugDescription
     }
+    var d = "String.Index(offset: \(_description)"
     if _isCharacterAligned {
       d += ", aligned: character"
     } else if _isScalarAligned {
       d += ", aligned: scalar"
     }
-    if let stride = characterStride {
-      d += ", stride: \(stride)"
+    d += ")"
+    return d
+  }
+
+  /// A textual representation of this instance, suitable for debugging.
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  internal var _opaqueDebugDescription: String {
+    var d = "String.Index(offset: \(_description)"
+    if _isCharacterAligned {
+      d += ", aligned: character"
+    } else if _isScalarAligned {
+      d += ", aligned: scalar"
+    }
+    if let gbp = _graphemeBreakProperty {
+      d += ", gbp: \(gbp)"
     }
     d += ")"
     return d
