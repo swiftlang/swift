@@ -51,15 +51,24 @@
 using namespace swift;
 
 #if 0
-#define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...) \
+#define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...)                     \
 fprintf(stderr, "[%#lx] [%s:%d][group(%p%s)] (%s) " fmt "\n",           \
       (unsigned long)Thread::current().platformThreadId(),              \
       __FILE__, __LINE__,                                               \
       group, group->isDiscardingResults() ? ",discardResults" : "",     \
       __FUNCTION__,                                                     \
       __VA_ARGS__)
+
+#define SWIFT_TASK_GROUP_DEBUG_LOG_0(group, fmt, ...)                   \
+fprintf(stderr, "[%#lx] [%s:%d][group(%p)] (%s) " fmt "\n",             \
+      (unsigned long)Thread::current().platformThreadId(),              \
+      __FILE__, __LINE__,                                               \
+      group,                                                            \
+      __FUNCTION__,                                                     \
+      __VA_ARGS__)
 #else
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...) (void)0
+#define SWIFT_TASK_GROUP_DEBUG_LOG_0(group, fmt, ...) (void)0
 #endif
 
 using FutureFragment = AsyncTask::FutureFragment;
@@ -354,7 +363,11 @@ public:
   /// There can be only at-most-one waiting task on a group at any given time,
   /// and the waiting task is expected to be the parent task in which the group
   /// body is running.
-  PollResult waitAll(AsyncTask *waitingTask);
+  ///
+  /// \param bodyError error thrown by the body of a with...TaskGroup method
+  /// \param waitingTask the task waiting on the group
+  /// \return how the waiting task should be handled, e.g. must wait or can be completed immediately
+  PollResult waitAll(SwiftError* bodyError, AsyncTask *waitingTask);
 
   // Enqueue the completed task onto ready queue if there are no waiting tasks yet
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
@@ -410,6 +423,16 @@ public:
 
   virtual TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) = 0;
 };
+
+[[maybe_unused]]
+static std::string to_string(TaskGroupBase::PollStatus status) {
+  switch (status) {
+    case TaskGroupBase::PollStatus::Empty: return "Empty";
+    case TaskGroupBase::PollStatus::MustWait: return "MustWait";
+    case TaskGroupBase::PollStatus::Success: return "Success";
+    case TaskGroupBase::PollStatus::Error: return "Error";
+  }
+}
 
 /// The status of a task group.
 ///
@@ -619,7 +642,7 @@ public:
   /// so unconditionally.
   ///
   /// Returns *assumed* new status, including the just performed +1.
-  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) {
+  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) override {
     auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
                                 std::memory_order_relaxed);
     auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
@@ -713,7 +736,7 @@ public:
   /// so unconditionally.
   ///
   /// Returns *assumed* new status, including the just performed +1.
-  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) {
+  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) override {
     auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
                                 std::memory_order_relaxed);
     auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
@@ -771,8 +794,6 @@ public:
   /// or a `PollStatus::MustWait` result if there are tasks in flight
   /// and the waitingTask eventually be woken up by a completion.
   PollResult poll(AsyncTask *waitingTask);
-
-  bool offerBodyError(SwiftError* _Nonnull bodyError);
 
 private:
   /// Resume waiting task with specified error
@@ -855,8 +876,8 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
 
   TaskGroupFlags groupFlags(rawGroupFlags);
-  SWIFT_TASK_DEBUG_LOG("group(%p) create; flags: isDiscardingResults=%d",
-                       group, groupFlags.isDiscardResults());
+  SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group; flags: isDiscardingResults=%d",
+                               groupFlags.isDiscardResults());
 
   TaskGroupBase *impl;
   if (groupFlags.isDiscardResults()) {
@@ -1151,7 +1172,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p , status:%s", completedTask, statusString().c_str());
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p, status:%s", completedTask, statusString().c_str());
 
   // The current ownership convention is that we are *not* given ownership
   // of a retain on completedTask; we're called from the task completion
@@ -1217,7 +1238,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     }
 
     auto afterComplete = statusCompletePendingAssumeRelease();
-    (void)afterComplete; // silence "not used" warning
+    (void) afterComplete;
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, either more pending tasks, or no waiting task, status:%s",
                                afterComplete.to_string(this).c_str());
   }
@@ -1628,7 +1649,7 @@ static void swift_taskGroup_waitAllImpl(
   waitingTask->ResumeContext = rawContext;
 
   auto group = asBaseImpl(_group);
-  PollResult polled = group->waitAll(waitingTask);
+  PollResult polled = group->waitAll(bodyError, waitingTask);
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   context->ResumeParent =
@@ -1637,23 +1658,13 @@ static void swift_taskGroup_waitAllImpl(
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
 
-  SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl, waiting task = %p, bodyError = %p, status:%s",
-                       waitingTask, bodyError, group->statusString().c_str());
+  SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl, waiting task = %p, bodyError = %p, status:%s, polled.status = %s",
+                       waitingTask, bodyError, group->statusString().c_str(), to_string(polled.status).c_str());
 
   switch (polled.status) {
     case PollStatus::MustWait:
-    SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll MustWait, pending tasks exist, waiting task = %p",
+    SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl MustWait, pending tasks exist, waiting task = %p",
                                waitingTask);
-      if (bodyError && group->isDiscardingResults()) {
-        auto discardingGroup = asDiscardingImpl(_group);
-        bool storedBodyError = discardingGroup->offerBodyError(bodyError);
-        if (storedBodyError) {
-          SWIFT_TASK_GROUP_DEBUG_LOG(
-              group, "waitAll, stored error thrown by with...Group body, error = %p",
-              bodyError);
-        }
-      }
-
       // The waiting task has been queued on the channel,
       // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
@@ -1664,7 +1675,7 @@ static void swift_taskGroup_waitAllImpl(
 #endif /* __ARM_ARCH_7K__ */
 
     case PollStatus::Error:
-      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll found error, waiting task = %p, body error = %p, status:%s",
+      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl Error, waiting task = %p, body error = %p, status:%s",
                                  waitingTask, bodyError, group->statusString().c_str());
 #if SWIFT_TASK_GROUP_BODY_THROWN_ERROR_WINS
       if (bodyError) {
@@ -1686,17 +1697,10 @@ static void swift_taskGroup_waitAllImpl(
       return waitingTask->runInFullyEstablishedContext();
 
     case PollStatus::Empty:
-      /// Anything else than a "MustWait" can be treated as a successful poll.
-      /// Only if there are in flight pending tasks do we need to wait after all.
-      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll %s, waiting task = %p, status:%s",
-                                 polled.status == TaskGroupBase::PollStatus::Empty ? "empty" : "success",
-                                 waitingTask, group->statusString().c_str());
-
-
     case PollStatus::Success:
       /// Anything else than a "MustWait" can be treated as a successful poll.
       /// Only if there are in flight pending tasks do we need to wait after all.
-      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAll %s, waiting task = %p, status:%s",
+      SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl %s, waiting task = %p, status:%s",
                                  polled.status == TaskGroupBase::PollStatus::Empty ? "empty" : "success",
                                  waitingTask, group->statusString().c_str());
 
@@ -1711,26 +1715,13 @@ static void swift_taskGroup_waitAllImpl(
   }
 }
 
-bool DiscardingTaskGroup::offerBodyError(SwiftError* _Nonnull bodyError) {
+/// Must be called while holding the `taskGroup.lock`!
+/// This is because the discarding task group still has some follow-up operations that must
+/// be performed atomically after this operation sometimes, so we cannot unlock inside `waitAll` itself.
+PollResult TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask) {
   lock(); // TODO: remove group lock, and use status for synchronization
 
-  if (!readyQueue.isEmpty()) {
-    // already other error stored, discard this one
-    unlock();
-    return false;
-  }
-
-  auto readyItem = ReadyQueueItem::getRawError(this, bodyError);
-  readyQueue.enqueue(readyItem);
-  unlock();
-
-  return true;
-}
-
-PollResult TaskGroupBase::waitAll(AsyncTask *waitingTask) {
-  lock(); // TODO: remove group lock, and use status for synchronization
-
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "waitAll, status = %s", statusString().c_str());
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "waitAll, bodyError = %p, status = %s", bodyError, statusString().c_str());
   PollResult result = PollResult::getEmpty(this->successType);
   result.status = PollStatus::Empty;
   result.storage = nullptr;
@@ -1774,6 +1765,16 @@ PollResult TaskGroupBase::waitAll(AsyncTask *waitingTask) {
   }
 
   // ==== 2) Add to wait queue -------------------------------------------------
+
+  // ---- 2.1) Discarding task group may need to story the bodyError before we park
+  if (bodyError && isDiscardingResults()) {
+    auto discardingGroup = asDiscardingImpl(this);
+    assert(readyQueue.isEmpty() &&
+           "only a single error may be stored in discarding task group, but something was enqueued already");
+    auto readyItem = ReadyQueueItem::getRawError(discardingGroup, bodyError);
+    readyQueue.enqueue(readyItem);
+  }
+
   auto waitHead = waitQueue.load(std::memory_order_acquire);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
