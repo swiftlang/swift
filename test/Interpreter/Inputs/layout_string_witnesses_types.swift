@@ -114,6 +114,18 @@ public struct ClosureWrapper {
     }
 }
 
+public protocol SomeProtocol {
+}
+
+public struct ExistentialWrapper {
+    let x: any SomeProtocol
+    let y: Int = 0
+
+    public init(x: any SomeProtocol) {
+        self.x = x
+    }
+}
+
 #if os(macOS)
 @objc
 public class ObjcClass: NSObject {

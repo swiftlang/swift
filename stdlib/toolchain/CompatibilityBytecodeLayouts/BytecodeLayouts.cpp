@@ -82,7 +82,11 @@ void writeBytes(uint8_t *typeLayout, size_t i, T value) {
   typeLayout[i] = (uint8_t)(value & 0xff);
 }
 
-typedef void *(*DestrFn)(void *);
+Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
+  return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
+}
+
+typedef void (*DestrFn)(void*);
 
 struct DestroyFuncAndMask {
   DestrFn fn;
@@ -90,7 +94,13 @@ struct DestroyFuncAndMask {
   bool isIndirect;
 };
 
-void *skipDestroy(void *ignore) { return nullptr; }
+void skipDestroy(void* ignore) { }
+
+void existential_destroy(OpaqueValue* object) {
+  auto* metadata = getExistentialTypeMetadata(object);
+
+  metadata->vw_destroy(object);
+}
 
 const DestroyFuncAndMask destroyTable[] = {
     {(DestrFn)&skipDestroy, UINTPTR_MAX, false},
@@ -114,6 +124,9 @@ const DestroyFuncAndMask destroyTable[] = {
 #endif
     // TODO: how to handle Custom?
     {nullptr, UINTPTR_MAX, true},
+    {nullptr, UINTPTR_MAX, true},
+    {nullptr, UINTPTR_MAX, true},
+    {(DestrFn)&existential_destroy, UINTPTR_MAX, false},
 };
 
 __attribute__((weak)) extern "C" void
@@ -163,6 +176,11 @@ typedef void* (*RetainFn)(void*);
 typedef void* (*CopyInitFn)(void*, void*);
 
 void* skipRetain(void* ignore) { return nullptr; }
+void* existential_initializeWithCopy(OpaqueValue* dest, OpaqueValue* src) {
+  auto* metadata = getExistentialTypeMetadata(src);
+
+  return metadata->vw_initializeWithCopy(dest, src);
+}
 
 const RetainFuncAndMask retainTable[] = {
   {(void*)&skipRetain, UINTPTR_MAX, true},
@@ -183,6 +201,9 @@ const RetainFuncAndMask retainTable[] = {
 #endif
   // TODO: how to handle Custom?
   {nullptr, UINTPTR_MAX, true},
+  {nullptr, UINTPTR_MAX, true},
+  {nullptr, UINTPTR_MAX, true},
+  {(void*)&existential_initializeWithCopy, UINTPTR_MAX, false},
 };
 
 __attribute__((weak)) extern "C" void
@@ -259,6 +280,14 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
       addrOffset += type->vw_size();
+      break;
+    }
+    case RefCountingKind::Existential: {
+      auto *type = getExistentialTypeMetadata((OpaqueValue*)((uintptr_t)src + addrOffset));
+      if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
+        type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
+                                    (OpaqueValue*)((uintptr_t)src + addrOffset));
+      }
       break;
     }
     default:

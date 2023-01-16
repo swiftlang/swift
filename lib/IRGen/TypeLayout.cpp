@@ -53,6 +53,8 @@ public:
 
     Generic = 0x0d,
 
+    Existential = 0x0e,
+
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
     // so all following values are reserved
@@ -65,6 +67,10 @@ private:
     union {
       uint32_t stride;
       uint32_t genericIdx;
+      struct {
+        uint32_t stride;
+        uintptr_t metatype;
+      } metadata;
     };
   };
 
@@ -143,6 +149,7 @@ public:
         refCountingStr.insert(refCountingStr.end(), (uint8_t *)&skipBE,
                               (uint8_t *)(&skipBE + 1));
 
+        // TODO: adjust for metatypes and proper target size_t
         instCopyBytes += 4;
       }
 
@@ -1019,6 +1026,9 @@ void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     break;
   case ScalarKind::POD:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size);
+    break;
+  case ScalarKind::ExistentialReference:
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Existential, size);
     break;
   default:
     llvm_unreachable("Unsupported ScalarKind");

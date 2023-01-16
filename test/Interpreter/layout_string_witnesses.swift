@@ -183,7 +183,7 @@ enum TestEnum {
 }
 
 func testGenericWithEnumNonEmpty() {
-let ptr = allocateInternalGenericPtr(of: TestEnum.self)
+    let ptr = allocateInternalGenericPtr(of: TestEnum.self)
     
     do {
         let x = TestClass()
@@ -203,6 +203,34 @@ let ptr = allocateInternalGenericPtr(of: TestEnum.self)
 }
 
 testGenericWithEnumNonEmpty()
+
+class ClassWithSomeProtocol: SomeProtocol {
+    deinit {
+        print("ClassWithSomeProtocol deinitialized!")
+    }
+}
+
+func testExistential() {
+    let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = ClassWithSomeProtocol()
+        testInit(ptr, to: ExistentialWrapper(x: x))
+    }
+
+    do {
+        let y = ClassWithSomeProtocol()
+        // CHECK: ClassWithSomeProtocol deinitialized!
+        testAssign(ptr, from: ExistentialWrapper(x: y))
+    }
+
+    // CHECK-NEXT: ClassWithSomeProtocol deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testExistential()
 
 #if os(macOS)
 func testObjc() {
