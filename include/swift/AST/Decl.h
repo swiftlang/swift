@@ -191,6 +191,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  Missing,
   MissingMember,
   Requirement,
   OpaqueResultType,
@@ -848,6 +849,12 @@ public:
   DeclAttributes &getAttrs() {
     return Attrs;
   }
+
+  /// Returns the semantic attributes attached to this declaration.
+  ///
+  /// \c getSemanticAttrs is intended to be a requestified replacement
+  /// for \c getAttrs
+  SemanticDeclAttributes getSemanticAttrs() const;
 
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
@@ -8273,6 +8280,34 @@ public:
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PostfixOperator;
+  }
+};
+
+/// Represents a missing declaration in the source code. This
+/// is used for parser recovery, e.g. when parsing a floating
+/// attribute list.
+class MissingDecl: public Decl {
+  MissingDecl(DeclContext *DC) : Decl(DeclKind::Missing, DC) {
+    setImplicit();
+  }
+
+  friend class Decl;
+  SourceLoc getLocFromSource() const {
+    return SourceLoc();
+  }
+
+public:
+  static MissingDecl *
+  create(ASTContext &ctx, DeclContext *DC) {
+    return new (ctx) MissingDecl(DC);
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Missing;
   }
 };
 

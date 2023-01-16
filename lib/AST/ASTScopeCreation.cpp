@@ -288,6 +288,7 @@ public:
   VISIT_AND_IGNORE(ModuleDecl)
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
+  VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
   VISIT_AND_IGNORE(MacroExpansionDecl)
 

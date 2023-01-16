@@ -1801,6 +1801,10 @@ void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
   llvm_unreachable("top-level subscript?");
 }
 
+void SILGenModule::visitMissingDecl(MissingDecl *sd) {
+  llvm_unreachable("missing decl in SILGen");
+}
+
 void SILGenModule::visitMacroDecl(MacroDecl *d) {
   // nothing to emit for macros
 }

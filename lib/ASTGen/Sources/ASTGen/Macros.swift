@@ -263,6 +263,8 @@ func expandAttachedMacro(
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
   declarationSourceFilePtr: UnsafeRawPointer,
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
+  parentDeclSourceFilePtr: UnsafeRawPointer,
+  parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
   expandedSourceLength: UnsafeMutablePointer<Int>
 ) -> Int {
@@ -315,6 +317,29 @@ func expandAttachedMacro(
       evaluatedSyntaxStr = accessors.map {
         $0.withoutTrivia().description
       }.joined(separator: "\n\n")
+
+    case let attachedMacro as MemberAttributeMacro.Type:
+      // Dig out the node for the parent declaration of the to-expand
+      // declaration. Only member attribute macros need this.
+      guard let parentDeclNode = findSyntaxNodeInSourceFile(
+        sourceFilePtr: parentDeclSourceFilePtr,
+        sourceLocationPtr: parentDeclSourceLocPointer,
+        type: DeclSyntax.self
+      ) else {
+        return 1
+      }
+
+      let attributes = try attachedMacro.expansion(
+        of: customAttrNode,
+        attachedTo: parentDeclNode,
+        annotating: declarationNode,
+        in: &context
+      )
+
+      // Form a buffer containing an attribute list to return to the caller.
+      evaluatedSyntaxStr = attributes.map {
+        $0.withoutTrivia().description
+      }.joined(separator: " ")
 
     default:
       print("\(macroPtr) does not conform to any known attached macro protocol")
