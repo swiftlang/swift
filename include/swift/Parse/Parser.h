@@ -903,6 +903,11 @@ public:
   /// Each item will be a declaration, statement, or expression.
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
+  /// Parse the source file via the Swift Parser using the ASTGen library.
+  void parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
+                                Optional<DiagnosticTransaction> &transaction,
+                                bool suppressDiagnostics = false);
+
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
@@ -1224,6 +1229,13 @@ public:
   void parseTopLevelAccessors(
       AbstractStorageDecl *storage, SmallVectorImpl<ASTNode> &items
   );
+
+  /// Parse the result of attribute macro expansion, which is a floating
+  /// attribute list.
+  ///
+  /// Parsing a floating attribute list will produce a `MissingDecl` with
+  /// the attribute list attached.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
 
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,

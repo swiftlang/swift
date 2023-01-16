@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -3608,6 +3609,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
   if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    // FIXME: We shouldn't be type checking missing decls.
+    if (isa<MissingDecl>(D))
+      return;
+
     // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D)) {
       diagnose(attr->getLocation(),
@@ -7378,6 +7383,45 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
+}
+
+SemanticDeclAttributes
+AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  // For now, this returns the same thing as 'getAttrs' using
+  // the SemanticDeclAttribtues representation.
+  SemanticDeclAttributes semanticAttrs;
+  for (auto attr : decl->getAttrs()) {
+    semanticAttrs.add(attr);
+  }
+
+  auto *parentDecl = decl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return semanticAttrs;
+
+  auto parentAttrs = parentDecl->getSemanticAttrs();
+  for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto customAttrDecl = evaluateOrDefault(
+        evaluator,
+        CustomAttrDeclRequest{
+          customAttr,
+          parentDecl->getInnermostDeclContext()
+        },
+        nullptr);
+    if (!customAttrDecl)
+      continue;
+
+    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
+    if (!macroDecl)
+      continue;
+
+    if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
+      continue;
+
+    expandAttributes(customAttr, macroDecl, decl, semanticAttrs);
+  }
+
+  return semanticAttrs;
 }
 
 template <typename ATTR>
