@@ -84,6 +84,16 @@ extension _StringGuts {
   ) -> String.Index {
     let offset = i._encodedOffset
 
+    let quickBreak = isFastUTF8 && withFastUTF8 { utf8 in
+      let prev = _decodeScalar(utf8, endingAt: offset).0
+      let next = _decodeScalar(utf8, startingAt: offset).0
+      return _GraphemeBreakingState.hasKnownBreak(
+        between: prev, and: next) == true
+    }
+    if quickBreak {
+      return i
+    }
+
     let offsetBounds = bounds._encodedOffsetRange
     let prior =
       offset - _opaqueCharacterStride(endingAt: offset, in: offsetBounds)
