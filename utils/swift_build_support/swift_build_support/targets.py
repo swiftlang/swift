@@ -122,6 +122,9 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
+        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k'):
+            return True
+
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
         if not sdk_path:
             raise RuntimeError('Cannot find SDK path for %s' % xcrun_sdk_name)
