@@ -783,3 +783,14 @@ func rdar92358570(_ x: RDAR92358570<ClassBoundProtocol>, _ y: RDAR92358570<SomeC
   y.doSomething() // expected-error {{referencing instance method 'doSomething()' on 'RDAR92358570' requires that 'any SomeClassBound & ClassBoundProtocol' inherit from 'AnyObject'}}
   RDAR92358570<SomeClassBound & ClassBoundProtocol>.doSomethingStatically() // expected-error {{referencing static method 'doSomethingStatically()' on 'RDAR92358570' requires that 'any SomeClassBound & ClassBoundProtocol' inherit from 'AnyObject'}}
 }
+
+func test_diagnose_inaccessible_member_in_ambiguous_context() {
+  struct S {
+    private var x: Int // expected-note {{'x' declared here}}
+  }
+
+  func test<T>(_: KeyPath<S, T>, y: Int = 42) {}
+  func test<T>(_: KeyPath<S, T>, x: Int = 42) {}
+
+  test(\.x) // expected-error {{'x' is inaccessible due to 'private' protection level}}
+}
