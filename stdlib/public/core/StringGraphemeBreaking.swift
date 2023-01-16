@@ -164,7 +164,7 @@ extension _StringGuts {
     }
 
     let previousIdx = withFastUTF8 { utf8 in
-      previousBoundary(endingAt: i) { j in
+      _GraphemeBreakingState.previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= utf8.count)
         guard j > 0 else { return nil }
         let (scalar, len) = _decodeScalar(utf8, endingAt: j)
@@ -193,7 +193,7 @@ extension _StringGuts {
     }
 
     let previousIdx = withFastUTF8 { utf8 in
-      previousBoundary(endingAt: i) { j in
+      _GraphemeBreakingState.previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= bounds.upperBound)
         guard j > bounds.lowerBound else { return nil }
         let (scalar, len) = _decodeScalar(utf8, endingAt: j)
@@ -263,7 +263,7 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     _internalInvariant(isForeign)
 
-    let previousIdx = previousBoundary(endingAt: i) { j in
+    let previousIdx = _GraphemeBreakingState.previousBoundary(endingAt: i) { j in
       _internalInvariant(j <= self.count)
       guard j > 0 else { return nil }
       let scalars = String.UnicodeScalarView(self)
@@ -291,7 +291,7 @@ extension _StringGuts {
     _internalInvariant(isForeign)
     _internalInvariant(i > bounds.lowerBound && i <= bounds.upperBound)
 
-    let previousIdx = previousBoundary(endingAt: i) { j in
+    let previousIdx = _GraphemeBreakingState.previousBoundary(endingAt: i) { j in
       _internalInvariant(j <= bounds.upperBound)
       guard j > bounds.lowerBound else { return nil }
       let scalars = String.UnicodeScalarView(self)
@@ -597,13 +597,13 @@ extension _GraphemeBreakingState {
   }
 }
 
-extension _StringGuts {
+extension _GraphemeBreakingState {
   // Returns the stride of the grapheme cluster ending at offset `index`.
   //
   // This method uses `previousScalar` to looks back in the string as far as
   // necessary to find a correct grapheme cluster boundary, whether or not
   // `index` happens to be on a boundary itself.
-  internal func previousBoundary(
+  internal static func previousBoundary(
     endingAt index: Int,
     previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Int {
@@ -855,7 +855,7 @@ extension _GraphemeBreakingState {
   }
 }
 
-extension _StringGuts {
+extension _GraphemeBreakingState {
   // Return true if there is an extended grapheme cluster boundary between two
   // scalars, with no previous knowledge about preceding scalars.
   //
@@ -864,7 +864,7 @@ extension _StringGuts {
   //
   // This is based off of the Unicode Annex #29 for [Grapheme Cluster Boundary
   // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  internal func shouldBreakWithLookback(
+  internal static func shouldBreakWithLookback(
     between scalar1: Unicode.Scalar,
     and scalar2: Unicode.Scalar,
     at index: Int,
@@ -933,25 +933,19 @@ extension _StringGuts {
     case (.regionalIndicator, .regionalIndicator):
       return countRIs(at: index, with: previousScalar)
 
+    // GB9c
+    case (.extend, _):
+      guard scalar2._isLinkingConsonant else { return true }
+      let extendNormData = Unicode._NormData(scalar1, fastUpperbound: 0x300)
+      guard extendNormData.ccc != 0 else { return true }
+      return !checkIfInIndicSequence(at: index, with: previousScalar)
+    case (.zwj, _):
+      guard scalar2._isLinkingConsonant else { return true }
+      return !checkIfInIndicSequence(at: index, with: previousScalar)
+
     // GB999
     default:
-      // GB9c
-      switch (x, scalar2._isLinkingConsonant) {
-      case (.extend, true):
-        let extendNormData = Unicode._NormData(scalar1, fastUpperbound: 0x300)
-
-        guard extendNormData.ccc != 0 else {
-          return true
-        }
-
-        return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      case (.zwj, true):
-        return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      default:
-        return true
-      }
+      return true
     }
   }
 
@@ -998,7 +992,7 @@ extension _StringGuts {
   //                | = We found our starting .extendedPictographic letting us
   //                    know that we are in an emoji sequence so our initial
   //                    break question is answered as NO.
-  internal func checkIfInEmojiSequence(
+  internal static func checkIfInEmojiSequence(
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
@@ -1047,7 +1041,7 @@ extension _StringGuts {
   //         ^
   //         | = Is a linking consonant and we've seen a virama, so this is a
   //             legitimate indic sequence, so do NOT break the initial question.
-  internal func checkIfInIndicSequence(
+  internal static func checkIfInIndicSequence(
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
@@ -1116,7 +1110,7 @@ extension _StringGuts {
   //         ^
   //         | = Not a .regionalIndicator. riCount = 1 which is odd, so break
   //             the last two .regionalIndicators.
-  internal func countRIs(
+  internal static func countRIs(
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
