@@ -9703,6 +9703,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::MemberAttribute:
     return "memberAttributes";
+
+  case MacroRole::SynthesizedMembers:
+    return "synthesizedMembers";
   }
 }
 
@@ -9745,8 +9748,10 @@ static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
    MacroRole::FreestandingDeclaration);
-static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor |
-                                        MacroRole::MemberAttribute);
+static MacroRoles attachedMacroRoles = (MacroRoles() |
+                                        MacroRole::Accessor |
+                                        MacroRole::MemberAttribute |
+                                        MacroRole::SynthesizedMembers);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
