@@ -13,27 +13,54 @@
 import SwiftShims
 
 extension Unicode {
-  internal enum _GraphemeBreakProperty {
-    case any
-    case control
-    case extend
-    case extendedPictographic
-    case l
-    case lv
-    case lvt
-    case prepend
-    case regionalIndicator
-    case spacingMark
-    case t
-    case v
-    case zwj
+  internal enum _GraphemeBreakProperty: UInt8 {
+    // Values 0...4 are aligned with bit field values in generated data.
+    case control = 0
+    case extend = 1
+    case prepend = 2
+    case spacingMark = 3
+    case extendedPictographic = 4
+    case l = 5
+    case lv = 6
+    case lvt = 7
+    case v = 8
+    case t = 9
+    case zwj = 10
+    case regionalIndicator = 11
+    case any = 12
 
     init(from scalar: Unicode.Scalar) {
+      // FIXME: Reimplement this as a linear scan in a short lookup table
       switch scalar.value {
-      // Some fast paths for ascii characters...
+      // NOTE: CR-LF special case has already been checked.
       case 0x0 ... 0x1F:
         self = .control
-      case 0x20 ... 0x7E:
+
+      // Some fast paths for common characters.
+      case 0x20 ... 0x7E, // ASCII
+           // TODO: This doesn't generate optimal code, tune/re-write at a lower
+           // level.
+           //
+           // NOTE: Order of case ranges affects codegen, and thus performance.
+           // All things being equal, keep existing order below.
+
+           // Unified CJK Han ideographs, common and some supplemental, amongst
+           // others.
+           0x3400...0xa4cf,
+           // Latin characters.
+           0x0100...0x02ff,
+           // Non-combining kana.
+           0x3041...0x3096,
+           0x30a1...0x30fc,
+           // Non-combining modern (and some archaic) Cyrillic.
+           // (First half of Cyrillic block)
+           0x0400...0x0482,
+           // Modern Arabic, excluding extenders and prependers.
+           0x061d...0x064a,
+           // Common general use punctuation, excluding extenders.
+           0x2010...0x2027,
+           // CJK punctuation characters, excluding extenders.
+           0x3000...0x3029:
         self = .any
 
       case 0x200D:

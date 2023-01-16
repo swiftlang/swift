@@ -12,75 +12,10 @@
 
 import SwiftShims
 
-/// CR and LF are common special cases in grapheme breaking logic
-private var _CR: UInt8 { return 0x0d }
-private var _LF: UInt8 { return 0x0a }
-
-internal func _hasGraphemeBreakBetween(
-  _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> Bool {
-
-  // CR-LF is a special case: no break between these
-  if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) {
-    return false
-  }
-
-  // Whether the given scalar, when it appears paired with another scalar
-  // satisfying this property, has a grapheme break between it and the other
-  // scalar.
-  func hasBreakWhenPaired(_ x: Unicode.Scalar) -> Bool {
-    // TODO: This doesn't generate optimal code, tune/re-write at a lower
-    // level.
-    //
-    // NOTE: Order of case ranges affects codegen, and thus performance. All
-    // things being equal, keep existing order below.
-    switch x.value {
-    // Unified CJK Han ideographs, common and some supplemental, amongst
-    // others:
-    //   U+3400 ~ U+A4CF
-    case 0x3400...0xa4cf: return true
-
-    // Repeat sub-300 check, this is beneficial for common cases of Latin
-    // characters embedded within non-Latin script (e.g. newlines, spaces,
-    // proper nouns and/or jargon, punctuation).
-    //
-    // NOTE: CR-LF special case has already been checked.
-    case 0x0000...0x02ff: return true
-
-    // Non-combining kana:
-    //   U+3041 ~ U+3096
-    //   U+30A1 ~ U+30FC
-    case 0x3041...0x3096: return true
-    case 0x30a1...0x30fc: return true
-
-    // Non-combining modern (and some archaic) Cyrillic:
-    //   U+0400 ~ U+0482 (first half of Cyrillic block)
-    case 0x0400...0x0482: return true
-
-    // Modern Arabic, excluding extenders and prependers:
-    //   U+061D ~ U+064A
-    case 0x061d...0x064a: return true
-
-    // Precomposed Hangul syllables:
-    //   U+AC00 ~ U+D7AF
-    case 0xac00...0xd7af: return true
-
-    // Common general use punctuation, excluding extenders:
-    //   U+2010 ~ U+2029
-    case 0x2010...0x2029: return true
-
-    // CJK punctuation characters, excluding extenders:
-    //   U+3000 ~ U+3029
-    case 0x3000...0x3029: return true
-
-    // Full-width forms:
-    //   U+FF01 ~ U+FF9D
-    case 0xFF01...0xFF9D: return true
-
-    default: return false
-    }
-  }
-  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
+extension Unicode.Scalar {
+  /// CR and LF are common special cases in grapheme breaking logic
+  fileprivate static var _cr: Self { .init(0x0d as UInt8) }
+  fileprivate static var _lf: Self { .init(0x0a as UInt8) }
 }
 
 extension _StringGuts {
@@ -204,7 +139,7 @@ extension _StringGuts {
     }
 
     let nextIdx = withFastUTF8 { utf8 in
-      nextBoundary(startingAt: i) { j in
+      _GraphemeBreakingState.nextBoundary(startingAt: i) { j in
         _internalInvariant(j >= 0)
         guard j < utf8.count else { return nil }
         let (scalar, len) = _decodeScalar(utf8, startingAt: j)
@@ -276,7 +211,7 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     _internalInvariant(isForeign)
 
-    let nextIdx = nextBoundary(startingAt: i) { j in
+    let nextIdx = _GraphemeBreakingState.nextBoundary(startingAt: i) { j in
       _internalInvariant(j >= 0)
       guard j < count else { return nil }
       let scalars = String.UnicodeScalarView(self)
@@ -304,7 +239,7 @@ extension _StringGuts {
     _internalInvariant(isForeign)
     _internalInvariant(bounds.contains(i))
 
-    let nextIdx = nextBoundary(startingAt: i) { j in
+    let nextIdx = _GraphemeBreakingState.nextBoundary(startingAt: i) { j in
       _internalInvariant(j >= bounds.lowerBound)
       guard j < bounds.upperBound else { return nil }
       let scalars = String.UnicodeScalarView(self)
@@ -407,24 +342,74 @@ extension Unicode.Scalar {
   }
 }
 
-internal struct _GraphemeBreakingState: Sendable, Equatable {
+internal struct _GraphemeBreakingState: Sendable {
+  /// The last scalar we have seen.
+  internal var lastScalar: Unicode.Scalar
+
+  /// The grapheme break property of the last scalar.
+  internal var lastBreakProperty: Unicode._GraphemeBreakProperty
+
+  /// Information about the scalars we have seen so far.
+  internal var _flags: UInt8
+
+  internal init() {
+    // We don't have a "start of text" value in _GraphemeBreakProperty, so we
+    // cannot implement rule GB1 directly. However, NUL is a reasonable
+    // substitution, because of rule GB5.
+    lastScalar = Unicode.Scalar(0 as UInt8)
+    lastBreakProperty = .control
+    _flags = 0
+  }
+
+  internal init(_ firstScalar: Unicode.Scalar) {
+    lastScalar = firstScalar
+    lastBreakProperty = Unicode._GraphemeBreakProperty(from: firstScalar)
+    _flags = 0
+  }
+
+  @inline(__always) internal static var _viramaBit: UInt8 { 1 }
+  @inline(__always) internal static var _emojiBit: UInt8 { 2 }
+  @inline(__always) internal static var _indicBit: UInt8 { 4 }
+  @inline(__always) internal static var _regionalIndicatorBit: UInt8 { 8 }
+
   // When we're looking through an indic sequence, one of the requirements is
   // that there is at LEAST 1 Virama present between two linking consonants.
   // This value helps ensure that when we ultimately need to decide whether or
   // not to break that we've at least seen 1 when walking.
-  var hasSeenVirama = false
+  @inline(__always)
+  internal var hasSeenVirama: Bool {
+    get { _flags & Self._viramaBit != 0 }
+    set {
+      if newValue { _flags |= Self._viramaBit }
+      else { _flags &= ~Self._viramaBit }
+    }
+  }
 
   // When walking forwards in a string, we need to know whether or not we've
   // entered an emoji sequence to be able to eventually break after all of the
   // emoji's various extenders and zero width joiners. This bit allows us to
   // keep track of whether or not we're still in an emoji sequence when deciding
   // to break.
-  var isInEmojiSequence = false
+  @inline(__always)
+  internal var isInEmojiSequence: Bool {
+    get { _flags & Self._emojiBit != 0 }
+    set {
+      if newValue { _flags |= Self._emojiBit }
+      else { _flags &= ~Self._emojiBit }
+    }
+  }
 
   // Similar to emoji sequences, we need to know not to break an Indic grapheme
   // sequence. This sequence is (potentially) composed of many scalars and isn't
   // as trivial as comparing two grapheme properties.
-  var isInIndicSequence = false
+  @inline(__always)
+  internal var isInIndicSequence: Bool {
+    get { _flags & Self._indicBit != 0 }
+    set {
+      if newValue { _flags |= Self._indicBit }
+      else { _flags &= ~Self._indicBit }
+    }
+  }
 
   // When walking forward in a string, we need to not break on emoji flag
   // sequences. Emoji flag sequences are composed of 2 regional indicators, so
@@ -433,16 +418,33 @@ internal struct _GraphemeBreakingState: Sendable, Equatable {
   // is another regional indicator, we reach the same decision rule, but in this
   // case we actually need to break there's a boundary between emoji flag
   // sequences.
-  var shouldBreakRI = false
+  @inline(__always)
+  internal  var shouldBreakRI: Bool {
+    get { _flags & Self._regionalIndicatorBit != 0 }
+    set {
+      if newValue { _flags |= Self._regionalIndicatorBit }
+      else { _flags &= ~Self._regionalIndicatorBit }
+    }
+  }
+}
+
+extension _GraphemeBreakingState: Equatable {
+  internal static func ==(left: Self, right: Self) -> Bool {
+    left.lastScalar == right.lastScalar
+    && left._flags == right._flags
+  }
 }
 
 extension _GraphemeBreakingState: CustomStringConvertible {
-  var description: String {
-    var r = "["
-    if hasSeenVirama { r += "V" }
-    if isInEmojiSequence { r += "E" }
-    if isInIndicSequence { r += "I" }
-    if shouldBreakRI { r += "R" }
+  internal var description: String {
+    var f = ""
+    if hasSeenVirama { f += "V" }
+    if isInEmojiSequence { f += "E" }
+    if isInIndicSequence { f += "I" }
+    if shouldBreakRI { f += "R" }
+    let us = String(lastScalar.value, radix: 16, uppercase: true)
+    var r = "[U+\(us):\(lastBreakProperty)"
+    if !f.isEmpty { r += ":\(f)" }
     r += "]"
     return r
   }
@@ -461,7 +463,6 @@ extension Unicode {
   @available(SwiftStdlib 5.8, *)
   public // SPI(Foundation) FIXME: We need API for this
   struct _CharacterRecognizer: Sendable {
-    internal var _previous: Unicode.Scalar
     internal var _state: _GraphemeBreakingState
 
     /// Returns a non-nil value if it can be determined whether there is a
@@ -474,13 +475,7 @@ extension Unicode {
       between scalar1: Unicode.Scalar,
       and scalar2: Unicode.Scalar
     ) -> Bool? {
-      if scalar1.value == 0xD, scalar2.value == 0xA {
-        return false
-      }
-      if _hasGraphemeBreakBetween(scalar1, scalar2) {
-        return true
-      }
-      return nil
+      _GraphemeBreakingState.hasKnownBreak(between: scalar1, and: scalar2)
     }
 
     /// Initialize a new character recognizer at the _start of text_ (sot)
@@ -490,11 +485,6 @@ extension Unicode {
     /// first scalar that is fed to it.
     public init() {
       _state = _GraphemeBreakingState()
-      // To avoid having to handle the empty case specially, we use NUL as the
-      // placeholder before the first scalar. NUL is a control character, so per
-      // rule GB5, it will induce an unconditional grapheme break before the
-      // first actual scalar, emulating GB1.
-      _previous = Unicode.Scalar(0 as UInt8)
     }
 
     /// Feeds the next scalar to the state machine, returning a Boolean value
@@ -509,14 +499,9 @@ extension Unicode {
     /// recognizer instance.
     @_effects(releasenone)
     public mutating func hasBreak(
-      before next: Unicode.Scalar
+      before nextScalar: Unicode.Scalar
     ) -> Bool {
-      let r = _state.shouldBreak(between: _previous, and: next)
-      if r {
-        _state = _GraphemeBreakingState()
-      }
-      _previous = next
-      return r
+      _state.hasBreak(before: nextScalar)
     }
 
     /// Decode the scalars in the given UTF-8 buffer and feed them to the
@@ -562,19 +547,19 @@ extension Unicode {
 @available(SwiftStdlib 5.8, *)
 extension Unicode._CharacterRecognizer: Equatable {
   public static func ==(left: Self, right: Self) -> Bool {
-    left._previous == right._previous && left._state == right._state
+    left._state == right._state
   }
 }
 
 @available(SwiftStdlib 5.8, *)
 extension Unicode._CharacterRecognizer: CustomStringConvertible {
   public var description: String {
-    return "\(_state)U+\(String(_previous.value, radix: 16, uppercase: true))"
+    "\(_state)"
   }
 }
 
 
-extension _StringGuts {
+extension _GraphemeBreakingState {
   // Returns the stride of the grapheme cluster starting at offset `index`,
   // assuming it is on a grapheme cluster boundary.
   //
@@ -583,30 +568,36 @@ extension _StringGuts {
   // actual breaks in the string. `Substring` relies on this to generate the
   // right breaks if its start index isn't aligned on one -- in this case, the
   // substring's breaks may not match the ones in its base string.
-  internal func nextBoundary(
+  internal static func nextBoundary(
     startingAt index: Int,
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
-    _internalInvariant(index < endIndex._encodedOffset)
-
-    // Note: If `index` in't already on a boundary, then starting with an empty
+    // Note: If `index` isn't already on a boundary, then starting with an empty
     // state here sometimes leads to this method returning results that diverge
     // from the true breaks in the string.
-    var state = _GraphemeBreakingState()
-    var (scalar, index) = nextScalar(index)!
-
-    while true {
-      guard let (scalar2, nextIndex) = nextScalar(index) else { break }
-      if state.shouldBreak(between: scalar, and: scalar2) {
-        break
-      }
-      index = nextIndex
-      scalar = scalar2
-    }
-
-    return index
+    let next = nextScalar(index)!
+    var state = _GraphemeBreakingState(next.scalar)
+    return state.nextBoundary(startingAt: next.end, nextScalar: nextScalar)
   }
 
+  internal mutating func nextBoundary(
+    startingAt index: Int,
+    nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
+  ) -> Int {
+    // Note: If `index` isn't already on a boundary, then starting with an empty
+    // state here sometimes leads to this method returning results that diverge
+    // from the true breaks in the string.
+    var index = index
+    while true {
+      guard let next = nextScalar(index) else { break }
+      if self.hasBreak(before: next.scalar) { break }
+      index = next.end
+    }
+    return index
+  }
+}
+
+extension _StringGuts {
   // Returns the stride of the grapheme cluster ending at offset `index`.
   //
   // This method uses `previousScalar` to looks back in the string as far as
@@ -644,6 +635,85 @@ extension _StringGuts {
 }
 
 extension _GraphemeBreakingState {
+  static func hasKnownBreak(
+    between scalar1: Unicode.Scalar, and scalar2: Unicode.Scalar
+  ) -> Bool? {
+    if scalar1 == ._cr && scalar2 == ._lf {
+      return false
+    }
+    let x = Unicode._GraphemeBreakProperty(from: scalar1)
+    let y = Unicode._GraphemeBreakProperty(from: scalar2)
+
+    switch (x, y) {
+    // Fast path: If we know our scalars have no properties the decision is
+    //            trivial and we don't need to crawl to the default statement.
+    case (.any, .any):
+      return true
+
+    // GB4
+    case (.control, _):
+      return true
+
+    // GB5
+    case (_, .control):
+      return true
+
+    // GB6
+    case (.l, .l),
+         (.l, .v),
+         (.l, .lv),
+         (.l, .lvt):
+      return false
+
+    // GB7
+    case (.lv, .v),
+         (.v, .v),
+         (.lv, .t),
+         (.v, .t):
+      return false
+
+    // GB8
+    case (.lvt, .t),
+         (.t, .t):
+      return false
+
+    // GB9
+    case (_, .extend),
+         (_, .zwj):
+      return false
+
+    // GB9a
+    case (_, .spacingMark):
+      return false
+
+    // GB9b
+    case (.prepend, _):
+      return false
+
+    // GB11
+    case (.zwj, .extendedPictographic):
+      return nil
+
+    // GB12 & GB13
+    case (.regionalIndicator, .regionalIndicator):
+      return nil
+
+    // GB9c
+    case (.extend, _),
+         (.zwj, _):
+      if scalar2._isLinkingConsonant {
+        return nil
+      }
+      return true
+
+    // GB999
+    default:
+      return true
+    }
+  }
+}
+
+extension _GraphemeBreakingState {
   // Return true if there is an extended grapheme cluster boundary between two
   // scalars, based on state information previously collected about preceding
   // scalars.
@@ -655,35 +725,23 @@ extension _GraphemeBreakingState {
   //
   // This is based on the Unicode Annex #29 for [Grapheme Cluster Boundary
   // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  internal mutating func shouldBreak(
-    between scalar1: Unicode.Scalar,
-    and scalar2: Unicode.Scalar
-  ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
+  internal mutating func hasBreak(before nextScalar: Unicode.Scalar) -> Bool {
+    let last = self
+    self.lastScalar = nextScalar
+
+    // We need to toggle each flag to false after every scalar, unless we happen
+    // to fall into one of the narrow cases that indicate otherwise below.
+    self._flags = 0
+
+    // GB3 (CR/LF)
+    if last.lastScalar == ._cr && nextScalar == ._lf {
+      self.lastBreakProperty = .control
       return false
     }
 
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
-    }
-
-    let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    let y = Unicode._GraphemeBreakProperty(from: scalar2)
-
-    // This variable and the defer statement help toggle the isInEmojiSequence
-    // state variable to false after every decision of 'shouldBreak'. If we
-    // happen to see a rhs .extend or .zwj, then it's a signal that we should
-    // continue treating the current grapheme cluster as an emoji sequence.
-    var enterEmojiSequence = false
-
-    // Very similar to emoji sequences, but for Indic grapheme sequences.
-    var enterIndicSequence = false
-
-    defer {
-      self.isInEmojiSequence = enterEmojiSequence
-      self.isInIndicSequence = enterIndicSequence
-    }
+    let x = last.lastBreakProperty
+    let y = Unicode._GraphemeBreakProperty(from: nextScalar)
+    self.lastBreakProperty = y
 
     switch (x, y) {
 
@@ -734,25 +792,26 @@ extension _GraphemeBreakingState {
       if (
         x == .extendedPictographic || (self.isInEmojiSequence && x == .extend)
       ) {
-        enterEmojiSequence = true
+        self.isInEmojiSequence = true
       }
 
       // If we're currently in an indic sequence (or if our lhs is a linking
       // consonant), then this check and everything underneath ensures that
       // we continue being in one and may check if this extend is a Virama.
-      if self.isInIndicSequence || scalar1._isLinkingConsonant {
+      if last.isInIndicSequence || last.lastScalar._isLinkingConsonant {
         if y == .extend {
-          let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
+          let extendNormData = Unicode._NormData(nextScalar, fastUpperbound: 0x300)
 
           // If our extend's CCC is 0, then this rule does not apply.
           guard extendNormData.ccc != 0 else {
+            // Note: last.hasSeenVirama may be true, but it's cleared now
             return false
           }
         }
 
-        enterIndicSequence = true
+        self.isInIndicSequence = true
 
-        if scalar2._isVirama {
+        if last.hasSeenVirama || nextScalar._isVirama {
           self.hasSeenVirama = true
         }
       }
@@ -769,23 +828,23 @@ extension _GraphemeBreakingState {
 
     // GB11
     case (.zwj, .extendedPictographic):
-      return !self.isInEmojiSequence
+      return !last.isInEmojiSequence
 
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
-      defer {
-        self.shouldBreakRI.toggle()
+      if last.shouldBreakRI {
+        return true
       }
-
-      return self.shouldBreakRI
+      self.shouldBreakRI = true
+      return false
 
     // GB999
     default:
       // GB9c
       if
-        self.isInIndicSequence,
-        self.hasSeenVirama,
-        scalar2._isLinkingConsonant
+        last.isInIndicSequence,
+        last.hasSeenVirama,
+        nextScalar._isLinkingConsonant
       {
         self.hasSeenVirama = false
         return false
@@ -812,12 +871,8 @@ extension _StringGuts {
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
     // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
+    if scalar1 == ._cr, scalar2 == ._lf {
       return false
-    }
-
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
@@ -857,7 +912,7 @@ extension _StringGuts {
          (.t, .t):
       return false
 
-    // GB9 (partial GB11)
+    // GB9
     case (_, .extend),
          (_, .zwj):
       return false

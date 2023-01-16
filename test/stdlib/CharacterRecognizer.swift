@@ -138,12 +138,12 @@ if #available(SwiftStdlib 5.8, *) {
 if #available(SwiftStdlib 5.8, *) {
   suite.test("CustomStringConvertible") {
     var r = Unicode._CharacterRecognizer()
-    expectEqual("\(r)", "[]U+0")
+    expectEqual("\(r)", "[U+0:control]")
     expectTrue(r.hasBreak(before: "\u{1F1FA}")) // REGIONAL INDICATOR SYMBOL LETTER U
-    expectEqual("\(r)", "[]U+1F1FA")
+    expectEqual("\(r)", "[U+1F1FA:regionalIndicator]")
     expectFalse(r.hasBreak(before: "\u{1F1F8}")) // REGIONAL INDICATOR SYMBOL LETTER S
-    expectEqual("\(r)", "[R]U+1F1F8")
+    expectEqual("\(r)", "[U+1F1F8:regionalIndicator:R]")
     expectTrue(r.hasBreak(before: "$"))
-    expectEqual("\(r)", "[]U+24")
+    expectEqual("\(r)", "[U+24:any]")
   }
 }
