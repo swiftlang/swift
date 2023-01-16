@@ -1768,6 +1768,10 @@ namespace {
       }
     }
 
+    void visitMissingDecl(MissingDecl *missing) {
+      llvm_unreachable("missing decl in IRGen");
+    }
+
     void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
       llvm_unreachable("should not IRGen classes with missing members");
     }

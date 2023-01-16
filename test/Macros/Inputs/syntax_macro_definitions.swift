@@ -245,3 +245,85 @@ extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
     ]
   }
 }
+
+public struct WrapAllProperties: MemberAttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo parent: DeclSyntax,
+    annotating member: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard member.is(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    let wrapperTypeName: String
+    if parent.is(ClassDeclSyntax.self) {
+      wrapperTypeName = "EnclosingSelfWrapper"
+    } else {
+      wrapperTypeName = "Wrapper"
+    }
+
+    let propertyWrapperAttr = AttributeSyntax(
+      attributeName: SimpleTypeIdentifierSyntax(
+        name: .identifier(wrapperTypeName)
+      )
+    )
+
+    return [propertyWrapperAttr]
+  }
+}
+
+public struct TypeWrapperMacro: MemberAttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    annotating member: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard let varDecl = member.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil
+    else {
+      return []
+    }
+
+    if identifier.text == "_storage" {
+      return []
+    }
+
+    let customAttr = AttributeSyntax(
+      attributeName: SimpleTypeIdentifierSyntax(
+        name: .identifier("accessViaStorage")
+      )
+    )
+
+    return [customAttr]
+  }
+}
+
+public struct AccessViaStorageMacro: AccessorDeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil
+    else {
+      return []
+    }
+
+    if identifier.text == "_storage" {
+      return []
+    }
+
+    return [
+      "get { _storage.\(identifier) }",
+      "set { _storage.\(identifier) = newValue }",
+    ]
+  }
+}

@@ -403,6 +403,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMissingDecl(MissingDecl *missing) {
+    return false;
+  }
+
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
     return false;
   }

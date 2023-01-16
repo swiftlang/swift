@@ -168,6 +168,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumElement);
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
+  TRIVIAL_KIND(Missing);
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
@@ -352,6 +353,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(ModifyAccessor, "_modify accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
+  ENTRY(Missing, "missing decl");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
@@ -361,6 +363,13 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
+}
+
+SemanticDeclAttributes Decl::getSemanticAttrs() const {
+  auto mutableThis = const_cast<Decl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AttachedSemanticAttrsRequest{mutableThis},
+                           SemanticDeclAttributes());
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
@@ -1187,6 +1196,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("not a ValueDecl");
@@ -2637,6 +2647,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("Not a ValueDecl");
@@ -6732,10 +6743,8 @@ llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
 
 /// Whether this property has any attached property wrappers.
 bool VarDecl::hasAttachedPropertyWrapper() const {
-  if (getAttrs().hasAttribute<CustomAttr>()) {
-    if (!getAttachedPropertyWrappers().empty())
-      return true;
-  }
+  if (!getAttachedPropertyWrappers().empty())
+    return true;
 
   if (hasImplicitPropertyWrapper())
     return true;
@@ -9682,6 +9691,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Accessor:
     return "accessor";
+
+  case MacroRole::MemberAttribute:
+    return "memberAttributes";
   }
 }
 
@@ -9724,7 +9736,8 @@ static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
    MacroRole::FreestandingDeclaration);
-static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor);
+static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor |
+                                        MacroRole::MemberAttribute);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);

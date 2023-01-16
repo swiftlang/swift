@@ -2655,6 +2655,7 @@ getActualMacroRole(uint8_t context) {
   CASE(Expression)
   CASE(FreestandingDeclaration)
   CASE(Accessor)
+  CASE(MemberAttribute)
 #undef CASE
   default:
     return None;

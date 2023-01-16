@@ -208,54 +208,9 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  if ((Context.LangOpts.hasFeature(Feature::Macros) ||
-       Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
-       Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
-       Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
-       Context.LangOpts.hasFeature(Feature::ParserValidation) ||
-       Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
-      !SourceMgr.hasIDEInspectionTargetBuffer() &&
-      SF.Kind != SourceFileKind::SIL) {
-    StringRef contents =
-        SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
-
-    // Parse the source file.
-    auto exportedSourceFile = swift_ASTGen_parseSourceFile(
-        contents.begin(), contents.size(),
-        SF.getParentModule()->getName().str().str().c_str(),
-        SF.getFilename().str().c_str());
-    SF.exportedSourceFile = exportedSourceFile;
-    Context.addCleanup([exportedSourceFile] {
-      swift_ASTGen_destroySourceFile(exportedSourceFile);
-    });
-
-    // If we're supposed to emit diagnostics from the parser, do so now.
-    if ((Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
-         Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
-        swift_ASTGen_emitParserDiagnostics(
-            &Context.Diags, SF.exportedSourceFile) &&
-        Context.Diags.hadAnyError() &&
-        !Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
-      // Errors were emitted, and we're still using the C++ parser, so
-      // disable diagnostics from the C++ parser.
-      existingParsingTransaction.emplace(Context.Diags);
-    }
-
-    // If we want to do ASTGen, do so now.
-    if (Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
-      swift_ASTGen_buildTopLevelASTNodes(
-          exportedSourceFile, CurDeclContext, &Context, &items, appendToVector);
-
-      // Spin the C++ parser to the end; we won't be using it.
-      while (!Tok.is(tok::eof)) {
-        consumeToken();
-      }
-
-      return;
-    }
-  }
+  parseSourceFileViaASTGen(items, existingParsingTransaction);
 #endif
-  
+
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
@@ -326,6 +281,62 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
         loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
       }
       diagnose(loc, diag::parser_new_parser_errors);
+    }
+  }
+#endif
+}
+
+void
+Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
+                                 Optional<DiagnosticTransaction> &transaction,
+                                 bool suppressDiagnostics) {
+#if SWIFT_SWIFT_PARSER
+  Optional<DiagnosticTransaction> existingParsingTransaction;
+  if ((Context.LangOpts.hasFeature(Feature::Macros) ||
+       Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
+       Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
+       Context.LangOpts.hasFeature(Feature::ParserValidation) ||
+       Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
+      !SourceMgr.hasIDEInspectionTargetBuffer() &&
+      SF.Kind != SourceFileKind::SIL) {
+    StringRef contents =
+        SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
+
+    // Parse the source file.
+    auto exportedSourceFile = swift_ASTGen_parseSourceFile(
+        contents.begin(), contents.size(),
+        SF.getParentModule()->getName().str().str().c_str(),
+        SF.getFilename().str().c_str());
+    SF.exportedSourceFile = exportedSourceFile;
+    Context.addCleanup([exportedSourceFile] {
+      swift_ASTGen_destroySourceFile(exportedSourceFile);
+    });
+
+    // If we're supposed to emit diagnostics from the parser, do so now.
+    if ((Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
+         Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
+        !suppressDiagnostics &&
+        swift_ASTGen_emitParserDiagnostics(
+            &Context.Diags, SF.exportedSourceFile) &&
+        Context.Diags.hadAnyError() &&
+        !Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
+      // Errors were emitted, and we're still using the C++ parser, so
+      // disable diagnostics from the C++ parser.
+      transaction.emplace(Context.Diags);
+    }
+
+    // If we want to do ASTGen, do so now.
+    if (Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
+      swift_ASTGen_buildTopLevelASTNodes(
+          exportedSourceFile, CurDeclContext, &Context, &items, appendToVector);
+
+      // Spin the C++ parser to the end; we won't be using it.
+      while (!Tok.is(tok::eof)) {
+        consumeToken();
+      }
+
+      return;
     }
   }
 #endif
@@ -2213,6 +2224,7 @@ static Optional<MacroRole> getMacroRole(
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
       .Case("expression", MacroRole::Expression)
       .Case("accessor", MacroRole::Accessor)
+      .Case("memberAttributes", MacroRole::MemberAttribute)
       .Default(None);
 
   if (!role) {
@@ -7061,6 +7073,32 @@ void Parser::parseTopLevelAccessors(
   // Collect these accessors as top-level decls.
   for (auto accessor : accessors.Accessors)
     items.push_back(accessor);
+}
+
+void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
+  Optional<DiagnosticTransaction> transaction;
+  parseSourceFileViaASTGen(items, transaction, /*suppressDiagnostics*/true);
+
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  DeclAttributes attributes;
+  parseDeclAttributeList(attributes);
+
+  // Consume remaining tokens.
+  while (!Tok.is(tok::eof)) {
+    diagnose(Tok.getLoc(), diag::unexpected_attribute_expansion,
+             Tok.getText());
+    consumeToken();
+  }
+
+  // Create a `MissingDecl` as a placeholder for the declaration the
+  // macro will attach the attribute list to.
+  MissingDecl *missing = MissingDecl::create(Context, CurDeclContext);
+  missing->getAttrs() = attributes;
+
+  items.push_back(ASTNode(missing));
+  return;
 }
 
 /// Parse the brace-enclosed getter and setter for a variable.

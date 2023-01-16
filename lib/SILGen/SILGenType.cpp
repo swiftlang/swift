@@ -1230,6 +1230,10 @@ public:
     });
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in types");
   }
@@ -1402,6 +1406,10 @@ public:
     asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
+  }
+
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
   }
 
   void visitMacroDecl(MacroDecl *md) {

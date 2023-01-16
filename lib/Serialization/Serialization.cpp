@@ -1824,6 +1824,9 @@ static bool shouldSerializeMember(Decl *D) {
       return false;
     llvm_unreachable("decl should never be a member");
 
+  case DeclKind::Missing:
+    llvm_unreachable("attempting to serialize a missing decl");
+
   case DeclKind::MissingMember:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
@@ -2220,6 +2223,7 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   CASE(Expression)
   CASE(FreestandingDeclaration)
   CASE(Accessor)
+  CASE(MemberAttribute)
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");
@@ -4463,6 +4467,10 @@ public:
 
   void visitModuleDecl(const ModuleDecl *) {
     llvm_unreachable("module decls are not serialized");
+  }
+
+  void visitMissingDecl(const MissingDecl *) {
+    llvm_unreachable("missing decls are not serialized");
   }
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
