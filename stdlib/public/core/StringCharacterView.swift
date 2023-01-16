@@ -53,6 +53,7 @@ extension String: BidirectionalCollection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
+  @_effects(releasenone)
   public func index(after i: Index) -> Index {
     let i = _guts.validateCharacterIndex(i)
     return _uncheckedIndex(after: i)
@@ -82,6 +83,7 @@ extension String: BidirectionalCollection {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
+  @_effects(releasenone)
   public func index(before i: Index) -> Index {
     // FIXME: This method used to not properly validate indices before 5.7;
     // temporarily allow older binaries to keep invoking undefined behavior as
@@ -137,6 +139,7 @@ extension String: BidirectionalCollection {
   ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
+  @_effects(releasenone)
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     // Note: prior to Swift 5.7, this method used to be inlinable, forwarding to
     // `_index(_:offsetBy:)`.
@@ -200,6 +203,7 @@ extension String: BidirectionalCollection {
   ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
+  @_effects(releasenone)
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
@@ -254,6 +258,7 @@ extension String: BidirectionalCollection {
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
+  @_effects(releasenone)
   public func distance(from start: Index, to end: Index) -> Int {
     // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
     // to `BidirectionalCollection._distance(from:to:)`.
