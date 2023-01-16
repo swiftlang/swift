@@ -8,6 +8,10 @@
 // REQUIRES: executable_test
 // REQUIRES: PTRSIZE=64
 // RUN: %target-run-simple-swift(-O)
+//
+// rdar://104232602
+// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
+//
 // END.
 //
 //===----------------------------------------------------------------------===//

@@ -5,3 +5,7 @@
 //
 // RUN: %line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
+//
+// rdar://104232602
+// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
+//
