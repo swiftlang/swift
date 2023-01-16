@@ -2592,8 +2592,10 @@ namespace {
         conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
       }
-
-      addExplicitProtocolConformances(cast<NominalTypeDecl>(result));
+        
+      // FIXME:
+      if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
+        addExplicitProtocolConformances(ntd);
 
       return result;
     }
