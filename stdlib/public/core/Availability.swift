@@ -88,14 +88,17 @@ extension _SwiftStdlibVersion {
   @_alwaysEmitIntoClient
   public static var v5_7_0: Self { Self(_value: 0x050700) }
 
-  // Note: As of now, there is no bincompat level defined for v5.8. If you need
-  // to use this in a call to `_isExecutableLinkedOnOrAfter`, then you'll need
-  // to define this version in the runtime.
+  // Note: As of now, there is no bincompat level defined for the versions
+  // below. If you need to use one of these in a call to
+  // `_isExecutableLinkedOnOrAfter`, then you'll need to define the
+  // corresponding version in the runtime.
   @_alwaysEmitIntoClient
   public static var v5_8_0: Self { Self(_value: 0x050800) }
+  @_alwaysEmitIntoClient
+  public static var v5_9_0: Self { Self(_value: 0x050900) }
 
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v5_8_0 }
+  public static var current: Self { .v5_9_0 }
 }
 
 @available(SwiftStdlib 5.7, *)
