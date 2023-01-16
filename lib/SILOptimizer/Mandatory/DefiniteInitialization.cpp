@@ -3236,14 +3236,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilderWithScope B(TheMemory.getUninitializedValue());
   Identifier ShiftRightFn, TruncateFn, CmpEqFn;
 
-  unsigned NumMemoryElements = TheMemory.getNumElements();
-
   unsigned SelfInitializedElt = TheMemory.getNumElements();
   unsigned SuperInitElt = TheMemory.getNumElements() - 1;
-
-  // We might need an extra bit to check if self was consumed.
-  if (HasConditionalSelfInitialized)
-    ++NumMemoryElements;
 
   // Utilities.
 
