@@ -588,7 +588,7 @@ cmake --build %BuildRoot%\14 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\15 ^
 
-  -D BUILD_SHARED_LIBS=YES ^
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
