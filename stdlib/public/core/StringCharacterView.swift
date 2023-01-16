@@ -400,14 +400,23 @@ extension String {
     }
 
     public mutating func next() -> Character? {
-      // Prior to Swift 5.7, this function used to be inlinable.
+      // Prior to Swift 5.7, this function used to be inlinable,
+      // calling `_opaqueCharacterStride(startingAt: _position)`.
+
       guard _fastPath(_position < _end) else { return nil }
 
-      let len = _guts._opaqueCharacterStride(startingAt: _position)
-      let nextPosition = _position &+ len
+      // Ideally we would preserve the state across iterations, but sadly this
+      // struct is frozen and we can't stash the state anywhere. This entire
+      // iterator used to be inlinable, so we can't change the meaning of stored
+      // properties -- even though it would be tempting to repurpose `_end`.
+      //
+      // FIXME: Perhaps we could hide the state bits within the reserved flags
+      // of _guts -- we have plenty of room there for the gbp...
+      var p = _guts.forwardGraphemeBreakingState(at: _position, with: nil)
+      _guts.formNextGraphemeBreak(after: &p)
       let result = _guts.errorCorrectedCharacter(
-        startingAt: _position, endingAt: nextPosition)
-      _position = nextPosition
+        startingAt: _position, endingAt: p.offset)
+      _position = p.offset
       return result
     }
   }
