@@ -10,6 +10,7 @@
 // REQUIRES: OS=macosx
 
 @attached(memberAttributes) macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
+@attached(synthesizedMembers) macro typeWrapperStorage() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperStorageMacro")
 @attached(accessor) macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
 
 struct _Storage {
@@ -21,10 +22,9 @@ struct _Storage {
   }
 }
 
+@typeWrapperStorage
 @myTypeWrapper
 struct S {
-  var _storage = _Storage()
-
   var x: Int
   var y: Int
 }

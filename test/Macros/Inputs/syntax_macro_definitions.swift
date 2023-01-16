@@ -327,3 +327,20 @@ public struct AccessViaStorageMacro: AccessorDeclarationMacro {
     ]
   }
 }
+
+public struct TypeWrapperStorageMacro: MemberDeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let storageVariable: VariableDeclSyntax =
+      """
+      private var _storage = _Storage()
+      """
+
+    return [
+      DeclSyntax(storageVariable),
+    ]
+  }
+}

@@ -344,6 +344,18 @@ func expandAttachedMacro(
         $0.withoutTrivia().description
       }.joined(separator: " ")
 
+    case let attachedMacro as MemberDeclarationMacro.Type:
+      let members = try attachedMacro.expansion(
+        of: customAttrNode,
+        attachedTo: declarationNode,
+        in: &context
+      )
+
+      // Form a buffer of member declarations to return to the caller.
+      evaluatedSyntaxStr = members.map {
+        $0.withoutTrivia().description
+      }.joined(separator: "\n\n")
+
     default:
       print("\(macroPtr) does not conform to any known attached macro protocol")
       return 1
