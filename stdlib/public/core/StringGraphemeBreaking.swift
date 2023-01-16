@@ -133,6 +133,103 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
+  internal struct _ForwardGraphemeBreakingState {
+    internal var offset: Int
+    internal var _length: UInt8
+    internal var state: _GraphemeBreakingState
+
+    internal init(offset: Int, length: Int, state: _GraphemeBreakingState) {
+      _internalInvariant(length >= 0 && length <= 4)
+      self.offset = offset
+      self._length = UInt8(truncatingIfNeeded: length)
+      self.state = state
+    }
+
+    @inline(__always)
+    internal var length: Int {
+      get { Int(_length) }
+      set {
+        _internalInvariant(newValue >= 0 && newValue <= 4)
+        _length = UInt8(truncatingIfNeeded: newValue)
+      }
+    }
+  }
+
+  internal func forwardGraphemeBreakingState(
+    at i: Int,
+    with gbp: Unicode._GraphemeBreakProperty?
+  ) -> _ForwardGraphemeBreakingState {
+    guard i < count else {
+      return .init(offset: i, length: 0, state: _GraphemeBreakingState())
+    }
+    if _slowPath(isForeign) {
+      return _foreignForwardGraphemeBreakingState(at: i, with: gbp)
+    }
+    let (scalar, len) = withFastUTF8 { utf8 in
+      _decodeScalar(utf8, startingAt: i)
+    }
+    let state = _GraphemeBreakingState(scalar, gbp)
+    return .init(offset: i, length: len, state: state)
+  }
+
+  @inline(never)
+  internal func _foreignForwardGraphemeBreakingState(
+    at i: Int,
+    with gbp: Unicode._GraphemeBreakProperty?
+  ) -> _ForwardGraphemeBreakingState {
+    _internalInvariant(isForeign)
+    _internalInvariant(i < count)
+    let scalars = String.UnicodeScalarView(self)
+    let idx = String.Index(_encodedOffset: i)
+    let state = _GraphemeBreakingState(scalars[idx], gbp)
+    let next = scalars.index(after: idx)
+    let length = next._encodedOffset - i
+    return .init(offset: i, length: length, state: state)
+  }
+
+  internal func formNextGraphemeBreak(
+    after p: inout _ForwardGraphemeBreakingState
+  ) {
+    if _slowPath(isForeign) {
+      return _foreignFormNextGraphemeBreak(after: &p)
+    }
+    withFastUTF8 { utf8 in
+      var i = p.offset &+ p.length
+      while i < utf8.count {
+        let (scalar, len) = _decodeScalar(utf8, startingAt: i)
+        if p.state.hasBreak(before: scalar) {
+          p.offset = i
+          p.length = len
+          return
+        }
+        i &+= len
+      }
+      p.offset = i
+      p.length = 0
+    }
+  }
+
+  internal func _foreignFormNextGraphemeBreak(
+    after p: inout _ForwardGraphemeBreakingState
+  ) {
+    let scalars = String.UnicodeScalarView(self)
+    var i = String.Index(_encodedOffset: p.offset + p.length)
+    while i < scalars.endIndex {
+      let scalar = scalars[i]
+      let j = scalars.index(after: i)
+      if p.state.hasBreak(before: scalar) {
+        p.offset = i._encodedOffset
+        p.length = j._encodedOffset - i._encodedOffset
+        return
+      }
+      i = j
+    }
+    p.offset = i._encodedOffset
+    p.length = 0
+  }
+}
+
+extension _StringGuts {
   /// Return the length of the extended grapheme cluster starting at offset `i`,
   /// assuming it falls on a grapheme cluster boundary.
   ///
@@ -371,9 +468,12 @@ internal struct _GraphemeBreakingState: Sendable {
     _flags = 0
   }
 
-  internal init(_ firstScalar: Unicode.Scalar) {
+  internal init(
+    _ firstScalar: Unicode.Scalar,
+    _ gbp: Unicode._GraphemeBreakProperty? = nil
+  ) {
     lastScalar = firstScalar
-    lastBreakProperty = Unicode._GraphemeBreakProperty(from: firstScalar)
+    lastBreakProperty = gbp ?? .init(from: firstScalar)
     _flags = 0
   }
 

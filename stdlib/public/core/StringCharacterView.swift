@@ -69,13 +69,9 @@ extension String: BidirectionalCollection {
     _internalInvariant(i < endIndex)
     _internalInvariant(i._isCharacterAligned)
 
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let stride = _characterStride(startingAt: i)
-    let nextOffset = i._encodedOffset &+ stride
-    let nextIndex = Index(_encodedOffset: nextOffset)._characterAligned
-    let nextStride = _characterStride(startingAt: nextIndex)
-    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
-    return _guts.markEncoding(r._characterAligned)
+    var p = _forwardState(at: i)
+    _formForwardState(after: &p)
+    return _index(at: p)
   }
 
   /// Returns the position immediately before the given index.
@@ -113,7 +109,7 @@ extension String: BidirectionalCollection {
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
 
-    let r = Index(encodedOffset: priorOffset, characterStride: stride)
+    let r = Index(_encodedOffset: priorOffset)
     return _guts.markEncoding(r._characterAligned)
   }
 
@@ -144,23 +140,24 @@ extension String: BidirectionalCollection {
     // Note: prior to Swift 5.7, this method used to be inlinable, forwarding to
     // `_index(_:offsetBy:)`.
 
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-
     // FIXME: This method used to not properly validate indices before 5.7;
     // temporarily allow older binaries to keep invoking undefined behavior as
     // before.
     var i = _guts.validateInclusiveCharacterIndex_5_7(i)
 
+    guard distance != 0 else { return i }
     if distance >= 0 {
+      var p = _forwardState(at: i)
       for _ in stride(from: 0, to: distance, by: 1) {
-        _precondition(i < endIndex, "String index is out of bounds")
-        i = _uncheckedIndex(after: i)
+        _precondition(p.offset < _guts.count, "String index is out of bounds")
+        _formForwardState(after: &p)
       }
-    } else {
-      for _ in stride(from: 0, to: distance, by: -1) {
-        _precondition(i > startIndex, "String index is out of bounds")
-        i = _uncheckedIndex(before: i)
-      }
+      return _index(at: p)
+    }
+    // distance < 0
+    for _ in stride(from: 0, to: distance, by: -1) {
+      _precondition(i > startIndex, "String index is out of bounds")
+      i = _uncheckedIndex(before: i)
     }
     return i
   }
@@ -231,21 +228,26 @@ extension String: BidirectionalCollection {
     // before.
     var i = _guts.validateInclusiveCharacterIndex_5_7(i)
 
+    if distance == 0 { return i }
+
     if distance >= 0 {
+      var p = _forwardState(at: i)
+      let limit = limit < start ? Int.max : limit._encodedOffset
       for _ in stride(from: 0, to: distance, by: 1) {
-        guard limit < start || i < limit else { return nil }
-        _precondition(i < endIndex, "String index is out of bounds")
-        i = _uncheckedIndex(after: i)
+        guard p.offset < limit else { return nil }
+        _precondition(p.offset < _guts.count, "String index is out of bounds")
+        _formForwardState(after: &p)
       }
-      guard limit < start || i <= limit else { return nil }
-    } else {
-      for _ in stride(from: 0, to: distance, by: -1) {
-        guard limit > start || i > limit else { return nil }
-        _precondition(i > startIndex, "String index is out of bounds")
-        i = _uncheckedIndex(before: i)
-      }
-      guard limit > start || i >= limit else { return nil }
+      guard p.offset <= limit else { return nil }
+      return _index(at: p)
     }
+    // distance < 0
+    for _ in stride(from: 0, to: distance, by: -1) {
+      guard limit > start || i > limit else { return nil }
+      _precondition(i > startIndex, "String index is out of bounds")
+      i = _uncheckedIndex(before: i)
+    }
+    guard limit > start || i >= limit else { return nil }
     return i
   }
 
@@ -278,9 +280,10 @@ extension String: BidirectionalCollection {
     var i = start
     var count = 0
     if i < end {
-      while i < end { // Note `<` instead of `==`
+      var p = _forwardState(at: i)
+      while p.offset < end._encodedOffset {
         count += 1
-        i = _uncheckedIndex(after: i)
+        _formForwardState(after: &p)
       }
     } else if i > end {
       while i > end { // Note `<` instead of `==`
@@ -312,9 +315,34 @@ extension String: BidirectionalCollection {
     // Note: SE-0180 requires us not to round `i` down to the nearest whole
     // `Character` boundary.
     let i = _guts.validateScalarIndex(i)
-    let distance = _characterStride(startingAt: i)
+
+    var p = _forwardState(at: i)
+    _formForwardState(after: &p)
+
     return _guts.errorCorrectedCharacter(
-      startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
+      startingAt: i._encodedOffset, endingAt: p.offset)
+  }
+
+  internal typealias _ForwardState = _StringGuts._ForwardGraphemeBreakingState
+
+  @inline(__always)
+  internal func _forwardState(at i: Index) -> _ForwardState {
+    _guts.forwardGraphemeBreakingState(
+      at: i._encodedOffset, with: i._graphemeBreakProperty)
+  }
+
+  @inline(__always)
+  internal func _formForwardState(after p: inout _ForwardState) {
+    _guts.formNextGraphemeBreak(after: &p)
+  }
+
+  @inline(__always)
+  internal func _index(at p: _ForwardState) -> Index {
+    let i = Index(
+      _encodedOffset: p.offset,
+      graphemeBreakProperty: p.state.lastBreakProperty
+    )
+    return _guts.markEncoding(i._characterAligned)
   }
 
   /// Return the length of the `Character` starting at the given index, measured
@@ -330,18 +358,15 @@ extension String: BidirectionalCollection {
   /// This method is called from inlinable `subscript` implementations in
   /// current and previous versions of the stdlib, which require this contract
   /// not to be violated.
+  @available(swift, deprecated: 5.8, message: "Only used by inlined code from past versions.")
   @usableFromInline
-  @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
     // Prior to Swift 5.7, this function used to be inlinable.
-    _internalInvariant_5_1(i._isScalarAligned)
-
-    // Fast check if it's already been measured, otherwise check resiliently
-    if let d = i.characterStride { return d }
-
-    if i == endIndex { return 0 }
-
-    return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
+    _internalInvariant(i._isScalarAligned)
+    guard i < endIndex else { return 0 }
+    var p = _forwardState(at: i)
+    _formForwardState(after: &p)
+    return p.offset - i._encodedOffset
   }
 
   @usableFromInline
