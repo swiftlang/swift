@@ -37,15 +37,25 @@ extension String {
   }
 }
 
+func check(
+  _ string: String,
+  _ pieces: [[Unicode.Scalar]],
+  file: String = #file, line: UInt = #line
+) {
+  expectEqual(
+    string.forwardPieces, pieces,
+    "string: \(String(reflecting: string)) (forward)",
+    file: file, line: line)
+  expectEqual(
+    string.backwardPieces, pieces,
+    "string: \(String(reflecting: string)) (backward)",
+    file: file, line: line)
+}
+
 if #available(SwiftStdlib 5.6, *) {
   StringGraphemeBreaking.test("grapheme breaking") {
     for test in graphemeBreakTests {
-      expectEqual(
-        test.string.forwardPieces, test.pieces,
-        "string: \(String(reflecting: test.string)) (forward)")
-      expectEqual(
-        test.string.backwardPieces, test.pieces,
-        "string: \(String(reflecting: test.string)) (backward)")
+      check(test.string, test.pieces)
     }
   }
 }
@@ -65,8 +75,8 @@ class NonContiguousNSString: NSString {
     super.init()
   }
 
-  init(_ value: [UInt16]) {
-    _value = value
+  init(_ value: some Sequence<UInt16>) {
+    _value = Array(value)
     super.init()
   }
 
@@ -95,16 +105,27 @@ extension _StringGuts {
 if #available(SwiftStdlib 5.6, *) {
   StringGraphemeBreaking.test("grapheme breaking foreign") {
     for test in graphemeBreakTests {
-      let foreign = NonContiguousNSString(Array(test.string.utf16))
+      let foreign = NonContiguousNSString(test.string.utf16)
       let string = foreign as String
 
       expectTrue(string._guts._isForeign())
-      expectEqual(
-        string.forwardPieces, test.pieces,
-        "string: \(String(reflecting: test.string)) (forward)")
-      expectEqual(
-        string.backwardPieces, test.pieces,
-        "string: \(String(reflecting: test.string)) (backward)")
+      check(string, test.pieces)
     }
+  }
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  StringGraphemeBreaking.test("GB11") {
+    // MAN, ZERO WIDTH JOINER, ZERO WIDTH JOINER, GIRL
+    let string = "\u{1f468}\u{200d}\u{200d}\u{1f467}"
+    let pieces: [[Unicode.Scalar]] = [
+      ["\u{1f468}", "\u{200d}", "\u{200d}"],
+      ["\u{1f467}"]
+    ]
+    check(string, pieces)
+
+    let foreign = NonContiguousNSString(string.utf16) as String
+    expectTrue(foreign._guts._isForeign())
+    check(foreign, pieces)
   }
 }
