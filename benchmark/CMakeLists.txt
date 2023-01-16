@@ -57,6 +57,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
     single-source/CharacterProperties
+    single-source/CharacterRecognizer
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/CodableTest
