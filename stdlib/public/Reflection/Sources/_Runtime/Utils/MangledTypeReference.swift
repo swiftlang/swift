@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct MangledTypeReference {
   @usableFromInline
@@ -23,7 +23,7 @@ public struct MangledTypeReference {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension MangledTypeReference {
   @inlinable
   var standardSubstitution: Any.Type? {

@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ValueWitnessTable: PublicLayout {
   public typealias Layout = UnsafePointer<(
@@ -41,7 +41,7 @@ public struct ValueWitnessTable: PublicLayout {
 // Function Typealiases
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ValueWitnessTable {
   public typealias InitializeBufferWithCopyOfBuffer = @convention(c) (
     // Destination
@@ -120,7 +120,7 @@ extension ValueWitnessTable {
 // Function API
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ValueWitnessTable {
   @inlinable
   @discardableResult
@@ -259,7 +259,7 @@ extension ValueWitnessTable {
 // Property API
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ValueWitnessTable {
   @inlinable
   public var size: Int {
@@ -286,7 +286,7 @@ extension ValueWitnessTable {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ValueWitnessTable: Equatable {
   @inlinable
   public static func ==(
@@ -297,7 +297,7 @@ extension ValueWitnessTable: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ValueWitnessTable: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

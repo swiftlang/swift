@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ExtendedExistentialMetadata: PrivateLayout {
   typealias Layout = (
@@ -27,7 +27,7 @@ public struct ExtendedExistentialMetadata: PrivateLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialMetadata {
   public var shape: ExtendedExistentialShape {
     PtrAuth.signNonUniqueExtendedExistentialShape(layout.shape)
@@ -38,7 +38,7 @@ extension ExtendedExistentialMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialMetadata: Equatable {
   public static func ==(
     lhs: ExtendedExistentialMetadata,
@@ -48,7 +48,7 @@ extension ExtendedExistentialMetadata: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialMetadata: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

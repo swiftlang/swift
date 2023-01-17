@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ModuleDescriptor: PublicLayout {
   public typealias Layout = (
@@ -27,7 +27,7 @@ public struct ModuleDescriptor: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ModuleDescriptor {
   @inlinable
   public var name: String {
@@ -39,7 +39,7 @@ extension ModuleDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ModuleDescriptor: Equatable {
   @inlinable
   public static func ==(lhs: ModuleDescriptor, rhs: ModuleDescriptor) -> Bool {
@@ -47,7 +47,7 @@ extension ModuleDescriptor: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ModuleDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

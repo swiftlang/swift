@@ -12,7 +12,7 @@
 import Swift
 import _Runtime
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct Case {
   @usableFromInline
@@ -44,7 +44,7 @@ public struct Case {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Case {
   @inlinable
   public var hasPayload: Bool {
@@ -77,7 +77,7 @@ extension Case {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Case: CustomStringConvertible {
   @inlinable
   public var description: String {
@@ -97,7 +97,7 @@ extension Case: CustomStringConvertible {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct Cases {
   @usableFromInline
@@ -109,7 +109,7 @@ public struct Cases {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Cases: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {
@@ -143,7 +143,7 @@ extension Cases: RandomAccessCollection {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Type {
   @inlinable
   public var cases: Cases {

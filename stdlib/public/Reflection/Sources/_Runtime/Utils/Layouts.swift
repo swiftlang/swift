@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 public protocol PublicLayout {
   associatedtype Layout
   
@@ -20,7 +20,7 @@ public protocol PublicLayout {
   init(_ ptr: UnsafeRawPointer)
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PublicLayout {
   @inline(__always)
   @inlinable
@@ -62,7 +62,7 @@ extension PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 protocol PrivateLayout {
   associatedtype Layout
   
@@ -71,7 +71,7 @@ protocol PrivateLayout {
   init(_ ptr: UnsafeRawPointer)
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PrivateLayout {
   var layout: Layout {
     ptr.loadUnaligned(as: Layout.self)

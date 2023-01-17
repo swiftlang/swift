@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct MetatypeMetadata: PrivateLayout {
   typealias Layout = (
@@ -27,7 +27,7 @@ public struct MetatypeMetadata: PrivateLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension MetatypeMetadata {
   public var instanceMetadata: Metadata {
     layout.instanceMetadata
@@ -38,14 +38,14 @@ extension MetatypeMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension MetatypeMetadata: Equatable {
   public static func ==(lhs: MetatypeMetadata, rhs: MetatypeMetadata) -> Bool {
     lhs.ptr == rhs.ptr
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension MetatypeMetadata: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

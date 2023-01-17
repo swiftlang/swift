@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct FieldDescriptor: PublicLayout {
   public typealias Layout = (
@@ -30,7 +30,7 @@ public struct FieldDescriptor: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension FieldDescriptor {
   @frozen
   public struct Element: PublicLayout {
@@ -65,7 +65,7 @@ extension FieldDescriptor {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension FieldDescriptor {
   @inlinable
   @inline(__always)
@@ -87,7 +87,7 @@ extension FieldDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension FieldDescriptor: Equatable {
   @inlinable
   public static func ==(lhs: FieldDescriptor, rhs: FieldDescriptor) -> Bool {
@@ -95,7 +95,7 @@ extension FieldDescriptor: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension FieldDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

@@ -11,17 +11,17 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 struct TypeCache {
   var cache: Lock<[Key: Any.Type?]>
   
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.9, *)
   init() {
     cache = Lock.create(with: [:])
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TypeCache {
   struct Key {
     let typeRef: MangledTypeReference
@@ -34,7 +34,7 @@ extension TypeCache {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TypeCache.Key: Equatable {
   static func ==(_ lhs: TypeCache.Key, _ rhs: TypeCache.Key) -> Bool {
     var lhsEnd = lhs.typeRef.ptr
@@ -106,7 +106,7 @@ extension TypeCache.Key: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TypeCache.Key: Hashable {
   func hash(into hasher: inout Hasher) {
     var isGeneric = false
@@ -160,7 +160,7 @@ extension TypeCache.Key: Hashable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TypeCache {
   func getOrInsert(
     _ typeRef: MangledTypeReference,
@@ -187,7 +187,7 @@ extension TypeCache {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 var typeCache: TypeCache = {
   var result = TypeCache()
   
