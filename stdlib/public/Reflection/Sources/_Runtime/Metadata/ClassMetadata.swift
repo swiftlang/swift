@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ClassMetadata: PublicLayout {
 #if canImport(ObjectiveC)
@@ -54,7 +54,7 @@ public struct ClassMetadata: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassMetadata {
   @inlinable
   public var superclass: Metadata? {
@@ -75,7 +75,7 @@ extension ClassMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassMetadata: Equatable {
   @inlinable
   public static func ==(lhs: ClassMetadata, rhs: ClassMetadata) -> Bool {
@@ -83,7 +83,7 @@ extension ClassMetadata: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassMetadata: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

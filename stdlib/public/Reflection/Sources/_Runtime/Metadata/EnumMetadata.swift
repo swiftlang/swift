@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct EnumMetadata: PublicLayout {
   public typealias Layout = (
@@ -27,7 +27,7 @@ public struct EnumMetadata: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumMetadata {
   @inlinable
   public var vwt: ValueWitnessTable {
@@ -45,7 +45,7 @@ extension EnumMetadata {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumMetadata {
   @inlinable
   public var type: TypeMetadata {
@@ -57,7 +57,7 @@ extension EnumMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumMetadata: Equatable {
   @inlinable
   public static func ==(_ lhs: EnumMetadata, _ rhs: EnumMetadata) -> Bool {
@@ -65,7 +65,7 @@ extension EnumMetadata: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumMetadata: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
