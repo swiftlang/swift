@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ExtendedExistentialShape: PublicLayout {
   public typealias Layout = (
@@ -28,7 +28,7 @@ public struct ExtendedExistentialShape: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialShape {
   @inlinable
   public var flags: Flags {
@@ -40,7 +40,7 @@ extension ExtendedExistentialShape {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialShape: Equatable {
   @inlinable
   public static func ==(
@@ -51,7 +51,7 @@ extension ExtendedExistentialShape: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExtendedExistentialShape: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

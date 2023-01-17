@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ExistentialMetadata: PrivateLayout {
   typealias Layout = (
@@ -28,7 +28,7 @@ public struct ExistentialMetadata: PrivateLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExistentialMetadata {
   public var protocols: BufferView<ProtocolDescriptor> {
     var start = trailing
@@ -48,7 +48,7 @@ extension ExistentialMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExistentialMetadata: Equatable {
   public static func ==(
     lhs: ExistentialMetadata,
@@ -58,7 +58,7 @@ extension ExistentialMetadata: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ExistentialMetadata: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

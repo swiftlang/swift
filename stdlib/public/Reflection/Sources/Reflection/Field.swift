@@ -12,7 +12,7 @@
 import Swift
 import _Runtime
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct Field {
   @usableFromInline
@@ -28,7 +28,7 @@ public struct Field {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Field {
   @inlinable
   public var isVar: Bool {
@@ -94,7 +94,7 @@ extension Field {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Field: CustomStringConvertible {
   @inlinable
   public var description: String {
@@ -112,7 +112,7 @@ extension Field: CustomStringConvertible {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct Fields {
   @usableFromInline
@@ -124,7 +124,7 @@ public struct Fields {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Fields: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {
@@ -164,7 +164,7 @@ extension Fields: RandomAccessCollection {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension Type {
   @inlinable
   public var fields: Fields {

@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ClassDescriptor: PublicLayout {
   public typealias Layout = (
@@ -32,7 +32,7 @@ public struct ClassDescriptor: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassDescriptor {
   @inlinable
   public var base: TypeDescriptor {
@@ -45,7 +45,7 @@ extension ClassDescriptor {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassDescriptor {
   @inlinable
   public var genericSignature: GenericSignature? {
@@ -57,7 +57,7 @@ extension ClassDescriptor {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassDescriptor {
   @inlinable
   var genericArgumentOffset: Int {
@@ -100,7 +100,7 @@ extension ClassDescriptor {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassDescriptor: Equatable {
   @inlinable
   public static func ==(lhs: ClassDescriptor, rhs: ClassDescriptor) -> Bool {
@@ -108,7 +108,7 @@ extension ClassDescriptor: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ClassDescriptor: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
