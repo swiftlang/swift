@@ -8,6 +8,11 @@ module ClassTemplateWithPrimitiveArgument {
   requires cplusplus
 }
 
+module ClassTemplateWithOutOfLineMember {
+  header "class-template-with-static-out-of-line-member.h"
+  requires cplusplus
+}
+
 module NotPreDefinedClassTemplate {
   header "not-pre-defined-class-template.h"
   requires cplusplus
