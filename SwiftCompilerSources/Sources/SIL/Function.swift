@@ -55,6 +55,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.lazy.flatMap { $0.instructions }
   }
 
+  public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
+    blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
+  }
+
   /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int {
     SILFunction_numIndirectResultArguments(bridged)
@@ -376,7 +380,7 @@ public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
 
   public func reversed() -> ReverseBasicBlockList {
     if let block = currentBlock {
-      let lastBlock = SILFunction_lastBlock(block.function.bridged).block
+      let lastBlock = SILFunction_lastBlock(block.parentFunction.bridged).block
       return ReverseBasicBlockList(first: lastBlock)
     }
     return ReverseBasicBlockList(first: nil)

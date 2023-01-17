@@ -61,8 +61,7 @@ struct Stack<Element> : CollectionLikeSequence {
     }
   }
   
-  init(_ context: PassContext) { self.bridgedContext = context._bridged }
-  init(_ context: ModulePassContext) { self.bridgedContext = context._bridged }
+  init(_ context: some Context) { self.bridgedContext = context._bridged }
 
   func makeIterator() -> Iterator {
     return Iterator(slab: firstSlab, index: 0, lastSlab: lastSlab, endIndex: endIndex)

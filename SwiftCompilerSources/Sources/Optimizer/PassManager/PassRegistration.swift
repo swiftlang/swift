@@ -38,11 +38,24 @@ private func registerPass(
   }
 }
 
-private func registerPass<InstType: Instruction>(
-      _ pass: InstructionPass<InstType>,
+protocol SILCombineSimplifyable : Instruction {
+  func simplify(_ context: SimplifyContext)
+}
+
+private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
+                                                   _ bridgedCtxt: BridgedInstructionPassCtxt) {
+  let inst = bridgedCtxt.instruction.getAs(instType)
+  let context = SimplifyContext(_bridged: bridgedCtxt.passContext,
+                                notifyInstructionChanged: {inst in},
+                                preserveDebugInfo: false)
+  inst.simplify(context)
+}
+
+private func registerForSILCombine<InstType: SILCombineSimplifyable>(
+      _ instType: InstType.Type,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
-  pass.name._withStringRef { nameStr in
-    SILCombine_registerInstructionPass(nameStr, runFn)
+  String(describing: instType)._withStringRef { instClassStr in
+    SILCombine_registerInstructionPass(instClassStr, runFn)
   }
 }
 
@@ -61,10 +74,10 @@ private func registerSwiftPasses() {
   registerPass(releaseDevirtualizerPass, { releaseDevirtualizerPass.run($0) })
 
   // Instruction passes
-  registerPass(simplifyBeginCOWMutationPass, { simplifyBeginCOWMutationPass.run($0) })
-  registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
-  registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
-  registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
+  registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
+  registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
+  registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
+  registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
 
   // Test passes
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })

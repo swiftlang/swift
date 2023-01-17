@@ -13,7 +13,7 @@
 import SIL
 
 let deadEndBlockDumper = FunctionPass(name: "dump-deadendblocks", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   
   print("Function \(function.name)")

@@ -63,8 +63,7 @@ static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
   // Then change all of the original predecessors to target Preheader instead of
   // header.
   for (auto *Pred : Preds) {
-    replaceBranchTarget(Pred->getTerminator(), Header, Preheader,
-                        true /*PreserveArgs*/);
+    Pred->getTerminator()->replaceBranchTarget(Header, Preheader);
   }
 
   // Update dominance info.

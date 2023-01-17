@@ -8535,6 +8535,8 @@ public:
     });
   }
 
+  void replaceBranchTarget(SILBasicBlock *oldDest, SILBasicBlock *newDest);
+
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(TermInst)
 
   bool isBranch() const { return !getSuccessors().empty(); }

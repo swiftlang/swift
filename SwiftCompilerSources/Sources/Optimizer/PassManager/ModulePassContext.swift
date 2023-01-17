@@ -18,7 +18,7 @@ import OptimizerBridging
 /// It provides access to all functions, v-tables and witness tables of a module,
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
-struct ModulePassContext {
+struct ModulePassContext : Context {
   let _bridged: BridgedPassContext
 
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
@@ -91,15 +91,13 @@ struct ModulePassContext {
     DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
   }
 
-  var options: Options { Options(_bridged: _bridged) }
-
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
   ///
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
-  func transform(function: Function, _ runOnFunction: (PassContext) -> ()) {
+  func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
     PassContext_beginTransformFunction(function.bridged, _bridged)
-    runOnFunction(PassContext(_bridged: _bridged))
+    runOnFunction(FunctionPassContext(_bridged: _bridged))
     PassContext_endTransformFunction(_bridged);
   }
 }
