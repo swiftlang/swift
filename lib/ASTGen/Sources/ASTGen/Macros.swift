@@ -31,6 +31,14 @@ struct ExportedMacro {
   var macro: Macro.Type
 }
 
+enum MacroRole: UInt8 {
+  case Expression = 0x01
+  case FreestandingDeclaration = 0x02
+  case Accessor = 0x04
+  case MemberAttribute = 0x08
+  case SynthesizedMembers = 0x10
+}
+
 /// Resolve a reference to type metadata into a macro, if posible.
 ///
 /// Returns an unmanaged pointer to an ExportedMacro instance that describes
@@ -262,6 +270,7 @@ private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
 func expandAttachedMacro(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroPtr: UnsafeRawPointer,
+  rawMacroRole: UInt8,
   customAttrSourceFilePtr: UnsafeRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
   declarationSourceFilePtr: UnsafeRawPointer,
@@ -297,6 +306,7 @@ func expandAttachedMacro(
   // Get the macro.
   let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
   let macro = macroPtr.pointee.macro
+  let macroRole = MacroRole(rawValue: rawMacroRole)
 
   // FIXME: Which source file? I don't know! This should go.
   let declarationSourceFilePtr = declarationSourceFilePtr.bindMemory(
@@ -310,8 +320,8 @@ func expandAttachedMacro(
 
   var evaluatedSyntaxStr: String
   do {
-    switch macro {
-    case let attachedMacro as AccessorDeclarationMacro.Type:
+    switch (macro, macroRole) {
+    case (let attachedMacro as AccessorDeclarationMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
         of: customAttrNode, attachedTo: declarationNode, in: &context
       )
@@ -321,7 +331,7 @@ func expandAttachedMacro(
         $0.withoutTrivia().description
       }.joined(separator: "\n\n")
 
-    case let attachedMacro as MemberAttributeMacro.Type:
+    case (let attachedMacro as MemberAttributeMacro.Type, .MemberAttribute):
       // Dig out the node for the parent declaration of the to-expand
       // declaration. Only member attribute macros need this.
       guard let parentDeclNode = findSyntaxNodeInSourceFile(
@@ -344,7 +354,7 @@ func expandAttachedMacro(
         $0.withoutTrivia().description
       }.joined(separator: " ")
 
-    case let attachedMacro as MemberDeclarationMacro.Type:
+    case (let attachedMacro as MemberDeclarationMacro.Type, .SynthesizedMembers):
       let members = try attachedMacro.expansion(
         of: customAttrNode,
         attachedTo: declarationNode,

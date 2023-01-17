@@ -896,6 +896,34 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   return genInfo.attachedMacroCustomAttr;
 }
 
+Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return None;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  switch (genInfo.kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+    return MacroRole::Expression;
+
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    return MacroRole::FreestandingDeclaration;
+
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+    return MacroRole::Accessor;
+
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    return MacroRole::MemberAttribute;
+
+  case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
+    return MacroRole::SynthesizedMembers;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::PrettyPrinted:
+    return None;
+  }
+}
+
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   auto macroExpansion = getMacroExpansion();
   if (!macroExpansion)

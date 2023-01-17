@@ -44,6 +44,7 @@ extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *diagEngine, void *macro,
+    uint32_t rawMacroRole,
     void *customAttrSourceFile,
     const void *customAttrSourceLocation,
     void *declarationSourceFile,
@@ -366,7 +367,8 @@ bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
 
 /// Determine whether the given source file is from an expansion of the given
 /// macro.
-static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
+static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
+                                   MacroRole role) {
   while (sourceFile) {
     auto expansion = sourceFile->getMacroExpansion();
     if (!expansion)
@@ -391,7 +393,8 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
       if (!macroDecl)
         return false;
 
-      return macroDecl == macro;
+      return macroDecl == macro &&
+             sourceFile->getFulfilledMacroRole() == role;
     } else {
       llvm_unreachable("Unknown macro expansion node kind");
     }
@@ -418,7 +421,7 @@ Expr *swift::expandMacroExpr(
 
   MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
 
-  if (isFromExpansionOfMacro(sourceFile, macro)) {
+  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression)) {
     ctx.Diags.diagnose(expr->getLoc(), diag::macro_recursive, macro->getName());
     return nullptr;
   }
@@ -599,7 +602,7 @@ bool swift::expandFreestandingDeclarationMacro(
   assert(macro->getMacroRoles()
              .contains(MacroRole::FreestandingDeclaration));
 
-  if (isFromExpansionOfMacro(sourceFile, macro)) {
+  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::FreestandingDeclaration)) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return false;
   }
@@ -765,8 +768,8 @@ void swift::expandAccessors(
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  if (isFromExpansionOfMacro(attrSourceFile, macro) ||
-      isFromExpansionOfMacro(declSourceFile, macro)) {
+  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::Accessor) ||
+      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::Accessor)) {
     storage->diagnose(diag::macro_recursive, macro->getName());
     return;
   }
@@ -831,6 +834,7 @@ void swift::expandAccessors(
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        static_cast<uint32_t>(MacroRole::Accessor),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
@@ -943,8 +947,8 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  if (isFromExpansionOfMacro(attrSourceFile, macro) ||
-      isFromExpansionOfMacro(declSourceFile, macro)) {
+  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::MemberAttribute) ||
+      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::MemberAttribute)) {
     member->diagnose(diag::macro_recursive, macro->getName());
     return false;
   }
@@ -1013,6 +1017,7 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        static_cast<uint32_t>(MacroRole::MemberAttribute),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDecl->getStartLoc().getOpaquePointerValue(),
@@ -1127,8 +1132,8 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  if (isFromExpansionOfMacro(attrSourceFile, macro) ||
-      isFromExpansionOfMacro(declSourceFile, macro)) {
+  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::SynthesizedMembers) ||
+      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::SynthesizedMembers)) {
     decl->diagnose(diag::macro_recursive, macro->getName());
     return false;
   }
@@ -1189,6 +1194,7 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        static_cast<uint32_t>(MacroRole::SynthesizedMembers),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, decl->getStartLoc().getOpaquePointerValue(),
         /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,

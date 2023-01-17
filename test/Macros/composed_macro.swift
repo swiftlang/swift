@@ -9,8 +9,9 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(memberAttributes) macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
-@attached(synthesizedMembers) macro typeWrapperStorage() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperStorageMacro")
+@attached(memberAttributes)
+@attached(synthesizedMembers)
+macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
 @attached(accessor) macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
 
 struct _Storage {
@@ -22,7 +23,6 @@ struct _Storage {
   }
 }
 
-@typeWrapperStorage
 @myTypeWrapper
 struct S {
   var x: Int
