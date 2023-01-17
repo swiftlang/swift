@@ -306,9 +306,8 @@ void DCE::markLive() {
             disableBorrowDCE(root);
           }
         }
-        // If we have a lexical borrow scope or a pointer escape, disable DCE.
-        if (borrowInst->isLexical() ||
-            hasPointerEscape(BorrowedValue(borrowInst))) {
+        // If we have a pointer escape, disable DCE.
+        if (hasPointerEscape(BorrowedValue(borrowInst))) {
           disableBorrowDCE(borrowInst);
         }
         break;

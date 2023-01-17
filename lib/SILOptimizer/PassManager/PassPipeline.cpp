@@ -404,6 +404,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Run DCE here to cleanup dead phis that may be added to support lexical
+  // lifetimes in mem2reg.
+  P.addDCE();
+
   // Run the existential specializer Pass.
   P.addExistentialSpecializer();
 

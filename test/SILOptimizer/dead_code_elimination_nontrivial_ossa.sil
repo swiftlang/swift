@@ -1149,3 +1149,30 @@ bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_phiarg :
+// CHECK-NOT: begin_borrow
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_phiarg'
+sil [ossa] @multi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = begin_borrow [lexical] %1 : $Klass
+  %4 = copy_value %3 : $Klass
+  destroy_value %0 : $Klass
+  br bb3(%1 : $Klass, %3 : $Klass, %4 : $Klass)
+
+bb2:
+  %7 = begin_borrow [lexical] %0 : $Klass
+  %8 = copy_value %7 : $Klass
+  destroy_value %1 : $Klass
+  br bb3(%0 : $Klass, %7 : $Klass, %8 : $Klass)
+
+bb3(%11 : @owned $Klass, %12 : @guaranteed $Klass, %13 : @owned $Klass):
+  end_borrow %12 : $Klass
+  destroy_value %11 : $Klass
+  destroy_value %13 : $Klass
+  %17 = tuple ()
+  return %17 : $()
+}
