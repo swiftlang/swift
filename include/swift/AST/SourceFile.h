@@ -500,17 +500,6 @@ public:
   /// the \c SourceFileKind is \c MacroExpansion.
   ASTNode getMacroExpansion() const;
 
-  /// For source files created to hold the source code created by expanding
-  /// an attached macro, this is the custom attribute that describes the macro
-  /// expansion.
-  ///
-  /// The source location of this attribute is the place in the source that
-  /// triggered the creation of the macro expansion whose resulting source
-  /// code is in this source file. This will only produce a non-null value when
-  /// the \c SourceFileKind is \c MacroExpansion , and the macro is an attached
-  /// macro.
-  CustomAttr *getAttachedMacroAttribute() const;
-
   /// When this source file is enclosed within another source file, for example
   /// because it describes a macro expansion, return the source file it was
   /// enclosed in.
