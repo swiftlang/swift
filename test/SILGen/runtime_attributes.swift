@@ -65,3 +65,39 @@ struct MemberTests {
   // CHECK-NEXT: {{.*}} = apply [[IGNORE_INIT]]<(inout MemberTests) -> Int>({{.*}})
   @Ignore mutating func mutatingFn() -> Int { 42 }
 }
+
+@runtimeMetadata
+struct Flag<U> {
+  init<T>(attachedTo: T, value: U) {}
+}
+
+struct TestSelfUse {
+  static var answer: Int = 42
+  static var question: String = ""
+
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11TestSelfUseV1xSSvpfaAA4Flag : $@convention(thin) () -> @out Optional<Flag<Int>>
+  // CHECK: [[ADDRESSOR:%.*]] = function_ref @$s18runtime_attributes11TestSelfUseV6answerSivau
+  // CHECK-NEXT: [[ADDR_RESULT:%.*]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+  // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*Int
+  // CHECK-NEXT: [[PROP_ACCESS:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*Int
+  // CHECK-NEXT: [[PROP_VALUE:%.*]] = load [trivial] [[PROP_ACCESS]] : $*Int
+  // CHECK_NEXT: end_access [[PROP_ACCESS]] : $*Int
+  // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $Int
+  // CHECK: store [[PROP_VALUE]] to [trivial] [[PROP_VAL_COPY]] : $*Int
+  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
+  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<Int, WritableKeyPath<TestSelfUse, String>>({{.*}}, [[PROP_VAL_COPY]], {{.*}})
+  @Flag(value: Self.answer) var x: String = ""
+
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11TestSelfUseV4testyycvpfaAA4Flag : $@convention(thin) () -> @out Optional<Flag<String>>
+  // CHECK: [[ADDRESSOR:%.*]] = function_ref @$s18runtime_attributes11TestSelfUseV8questionSSvau
+  // CHECK-NEXT: [[ADDR_RESULT:%.*]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+  // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*String
+  // CHECK-NEXT: [[PROP_ACCESS:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
+  // CHECK-NEXT: [[PROP_VALUE:%.*]] = load [copy] [[PROP_ACCESS]] : $*String
+  // CHECK_NEXT: end_access [[PROP_ACCESS]] : $*String
+  // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $String
+  // CHECK: store [[PROP_VALUE]] to [init] [[PROP_VAL_COPY]] : $*String
+  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
+  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<String, (TestSelfUse) -> ()>({{.*}}, [[PROP_VAL_COPY]], {{.*}})
+  @Flag(value: Self.question) func test() {}
+}
