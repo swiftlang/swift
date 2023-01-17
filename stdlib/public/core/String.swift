@@ -676,11 +676,49 @@ extension String: ExpressibleByStringLiteral {
 extension String: CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
   public var debugDescription: String {
-    var result = "\""
-    for us in self.unicodeScalars {
-      result += us.escaped(asASCII: false)
+    func hasBreak(between left: String, and right: Unicode.Scalar) -> Bool {
+      // Note: we know `left` ends with an ASCII character, so we only need to
+      // look at its last scalar.
+      var state = _GraphemeBreakingState()
+      return state.shouldBreak(between: left.unicodeScalars.last!, and: right)
     }
-    result += "\""
+
+    // Prevent unquoted scalars in the string from combining with the opening
+    // `"` or the tail of the preceding quoted scalar.
+    var result = "\""
+    var wantBreak = true // true if next scalar must not combine with the last
+    for us in self.unicodeScalars {
+      if let escaped = us._escaped(asASCII: false) {
+        result += escaped
+        wantBreak = true
+      } else if wantBreak && !hasBreak(between: result, and: us) {
+        result += us.escaped(asASCII: true)
+        wantBreak = true
+      } else {
+        result.unicodeScalars.append(us)
+        wantBreak = false
+      }
+    }
+    // Also prevent the last scalar from combining with the closing `"`.
+    var suffix = "\"".unicodeScalars
+    while !result.isEmpty {
+      // Append first scalar of suffix, then check if it combines.
+      result.unicodeScalars.append(suffix.first!)
+      let i = result.index(before: result.endIndex)
+      let j = result.unicodeScalars.index(before: result.endIndex)
+      if i >= j {
+        // All good; append the rest and we're done.
+        result.unicodeScalars.append(contentsOf: suffix.dropFirst())
+        break
+      }
+      // Cancel appending the scalar, then quote the last scalar in `result` and
+      // prepend it to `suffix`.
+      result.unicodeScalars.removeLast()
+      let last = result.unicodeScalars.removeLast()
+      suffix.insert(
+        contentsOf: last.escaped(asASCII: true).unicodeScalars,
+        at: suffix.startIndex)
+    }
     return result
   }
 }

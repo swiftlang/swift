@@ -29,16 +29,60 @@ PrintTests.test("Printable") {
 
   let us1: UnicodeScalar = "\\"
   expectPrinted("\\", us1)
-  expectEqual("\"\\\\\"", us1.description)
+  expectEqual("\\", us1.description)
   expectDebugPrinted("\"\\\\\"", us1)
 
   let us2: UnicodeScalar = "あ"
   expectPrinted("あ", us2)
-  expectEqual("\"あ\"", us2.description)
+  expectEqual("あ", us2.description)
   expectDebugPrinted("\"\\u{3042}\"", us2)
 }
 
-PrintTests.test("Printable") {
+PrintTests.test("TrickyQuoting") {
+  guard #available(SwiftStdlib 5.9, *) else { return }
+  // U+301: COMBINING ACUTE ACCENT (Grapheme_Cluster_Break = Extend)
+  let s1 = "\u{301}Foo"
+  expectPrinted(s1, s1)
+  expectDebugPrinted("\"\\u{0301}Foo\"", s1)
+
+  // U+302: COMBINING CIRCUMFLEX ACCENT (Grapheme_Cluster_Break = Extend)
+  let s2 = "\u{301}\u{302}Foo"
+  expectPrinted(s2, s2)
+  expectDebugPrinted("\"\\u{0301}\\u{0302}Foo\"", s2)
+
+  let s3 = "Foo\n\u{301}\u{302}Foo"
+  expectPrinted(s3, s3)
+  expectDebugPrinted("\"Foo\\n\\u{0301}\\u{0302}Foo\"", s3)
+
+  // U+200D: ZERO WIDTH JOINER (Grapheme_Cluster_Break = ZWJ)
+  let s4 = "\u{200d}Foo"
+  expectPrinted(s4, s4)
+  expectDebugPrinted("\"\\u{200D}Foo\"", s4)
+
+  // U+110BD: KAITHI NUMBER SIGN (Grapheme_Cluster_Break = Prepend)
+  let s5 = "Foo\u{110BD}"
+  expectPrinted(s5, s5)
+  expectDebugPrinted("\"Foo\\u{000110BD}\"", s5)
+
+  // U+070F: SYRIAC ABBREVIATION MARK (Grapheme_Cluster_Break = Prepend)
+  let s6 = "Foo\u{070F}\u{110BD}"
+  expectPrinted(s6, s6)
+  expectDebugPrinted("\"Foo\\u{070F}\\u{000110BD}\"", s6)
+
+  let s7 = "Foo\u{301}\u{070F}\u{110BD}"
+  expectPrinted(s7, s7)
+  expectDebugPrinted("\"Foo\u{301}\\u{070F}\\u{000110BD}\"", s7)
+
+  let s8 = "Foo\u{301}\u{302}\u{070F}\u{110BD}Foo"
+  expectPrinted(s8, s8)
+  expectDebugPrinted("\"Foo\u{0301}\u{0302}\u{070F}\u{110BD}Foo\"", s8)
+
+  let s9 = "Foo\u{301}"
+  expectPrinted(s9, s9)
+  expectDebugPrinted("\"Foo\u{0301}\"", s9)
+}
+
+PrintTests.test("Optional") {
   expectPrinted("Optional(\"meow\")", String?("meow"))
 }
 
