@@ -2905,7 +2905,22 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                           call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                echo "--- #################################### Running LLDB test ---"
+                mkdir -p "${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym/"
+                echo "Following ${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym/Incomplete.log"
+                tail -F "${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym/Incomplete.log" &
+                call "${lldb_build_dir}/bin/lldb-dotest" -p TestSwiftPlayground -t -v &
+                sleep 120;
+                echo "--- #################################### ---"
+                ls ${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym;
+                echo "--- #################################### ---"
+                cat "${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym/Incomplete.log"
+                echo "--- #################################### ---"
+                cat "${lldb_build_dir}/lldb-test-build.noindex/lang/swift/playgrounds/TestSwiftPlaygrounds.test_cross_module_extension_dsym/types.log"
+                echo "--- #################################### ---"
+                exit 1
+                
                 echo "--- Running LLDB tests (Swift tests using ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
