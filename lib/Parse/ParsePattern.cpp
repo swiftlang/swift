@@ -486,11 +486,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     return status;
   });
 }
-template <typename T>
+
 static TypeRepr *
-validateParameterWithSpecifier(Parser &parser,
+validateParameterWithOwnership(Parser &parser,
                                Parser::ParsedParameter &paramInfo,
-                               StringRef specifierName,
+                               ParamSpecifier specifier,
                                bool parsingEnumElt) {
   auto type = paramInfo.Type;
   auto loc = paramInfo.SpecifierLoc;
@@ -498,12 +498,13 @@ validateParameterWithSpecifier(Parser &parser,
   // at all - Sema will catch this for us.  In all other contexts, we
   // assume the user put 'inout' in the wrong place and offer a fixit.
   if (parsingEnumElt) {
-    return new (parser.Context) T(type, loc);
+    return new (parser.Context) OwnershipTypeRepr(type, specifier, loc);
   }
   
   if (isa<SpecifierTypeRepr>(type)) {
     parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
   } else {
+    auto specifierName = OwnershipTypeRepr::getSpecifierSpelling(specifier);
     llvm::SmallString<128> replacement(specifierName);
     replacement += " ";
     parser
@@ -511,7 +512,7 @@ validateParameterWithSpecifier(Parser &parser,
                   specifierName)
         .fixItRemove(loc)
         .fixItInsert(type->getStartLoc(), replacement);
-    type = new (parser.Context) T(type, loc);
+    type = new (parser.Context) OwnershipTypeRepr(type, specifier, loc);
   }
 
   return type;
@@ -559,17 +560,17 @@ mapParsedParameters(Parser &parser,
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
       if (paramInfo.SpecifierKind == ParamDecl::Specifier::InOut) {
-        type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
-                                                             "inout",
-                                                             parsingEnumElt);
+        type = validateParameterWithOwnership(parser, paramInfo,
+                                              ParamSpecifier::InOut,
+                                              parsingEnumElt);
       } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Shared) {
-        type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
-                                                              "__shared",
-                                                              parsingEnumElt);
+        type = validateParameterWithOwnership(parser, paramInfo,
+                                              ParamSpecifier::Shared,
+                                              parsingEnumElt);
       } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Owned) {
-        type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
-                                                             "__owned",
-                                                             parsingEnumElt);
+        type = validateParameterWithOwnership(parser, paramInfo,
+                                              ParamSpecifier::Owned,
+                                              parsingEnumElt);
       }
 
       if (paramInfo.IsolatedLoc.isValid()) {

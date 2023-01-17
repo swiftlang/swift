@@ -45,13 +45,9 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   if (specifierLoc.isValid()) {
     switch (specifier) {
     case ParamDecl::Specifier::Owned:
-      ty = new (Context) OwnedTypeRepr(ty, specifierLoc);
-      break;
     case ParamDecl::Specifier::InOut:
-      ty = new (Context) InOutTypeRepr(ty, specifierLoc);
-      break;
     case ParamDecl::Specifier::Shared:
-      ty = new (Context) SharedTypeRepr(ty, specifierLoc);
+      ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
       break;
     case ParamDecl::Specifier::Default:
       break;
@@ -1190,7 +1186,9 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         // Build inout type. Note that we bury the inout locator within the
         // named locator. This is weird but required by Sema apparently.
         element.Type =
-            new (Context) InOutTypeRepr(element.Type, ObsoletedInOutLoc);
+            new (Context) OwnershipTypeRepr(element.Type,
+                                            ParamSpecifier::InOut,
+                                            ObsoletedInOutLoc);
       }
     }
 

@@ -3260,24 +3260,15 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitInOutTypeRepr(InOutTypeRepr *T) {
-    printCommon("type_inout") << '\n';
+  void visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
+    printCommon("type_ownership")
+      << ' '
+      << T->getSpecifierSpelling()
+      << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   
-  void visitSharedTypeRepr(SharedTypeRepr *T) {
-    printCommon("type_shared") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
-    printCommon("type_owned") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
     printCommon("isolated") << '\n';
     printRec(T->getBase());

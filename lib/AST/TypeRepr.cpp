@@ -591,15 +591,11 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
 #include "swift/AST/TypeReprNodes.def"
     llvm_unreachable("invalid repr kind");
     break;
-  case TypeReprKind::InOut:
-    Printer.printKeyword("inout", Opts, " ");
+  case TypeReprKind::Ownership: {
+    auto ownershipRepr = cast<OwnershipTypeRepr>(this);
+    Printer.printKeyword(ownershipRepr->getSpecifierSpelling(), Opts, " ");
     break;
-  case TypeReprKind::Shared:
-    Printer.printKeyword("__shared", Opts, " ");
-    break;
-  case TypeReprKind::Owned:
-    Printer.printKeyword("__owned", Opts, " ");
-    break;
+  }
   case TypeReprKind::Isolated:
     Printer.printKeyword("isolated", Opts, " ");
     break;
@@ -608,6 +604,34 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     break;
   }
   printTypeRepr(Base, Printer, Opts);
+}
+
+StringRef OwnershipTypeRepr::getSpecifierSpelling(ParamSpecifier specifier) {
+  switch (specifier) {
+  case ParamSpecifier::InOut:
+    return "inout";
+  case ParamSpecifier::Shared:
+    return "__shared";
+  case ParamSpecifier::Owned:
+    return "__owned";
+  case ParamSpecifier::Default:
+    return "";
+  }
+  llvm_unreachable("invalid ParamSpecifier");
+}
+
+ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
+  switch (getSpecifier()) {
+  case ParamSpecifier::InOut:
+    return ValueOwnership::InOut;
+    
+  case ParamSpecifier::Shared:
+    return ValueOwnership::Shared;
+  case ParamSpecifier::Owned:
+    return ValueOwnership::Owned;
+  case ParamSpecifier::Default:
+    return ValueOwnership::Default;
+  }
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,

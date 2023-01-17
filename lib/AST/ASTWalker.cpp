@@ -2069,15 +2069,7 @@ bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
-bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
-bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
+bool Traversal::visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
   return doIt(T->getBase());
 }
 

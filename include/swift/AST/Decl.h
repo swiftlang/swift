@@ -5983,10 +5983,19 @@ public:
   }
 };
 
+/// The various spellings of ownership modifier that can be used in source.
 enum class ParamSpecifier : uint8_t {
+  /// No explicit ownership specifier was provided. The parameter will use the
+  /// default ownership convention for the declaration.
   Default = 0,
+
+  /// `inout`, indicating exclusive mutable access to the argument for the
+  /// duration of a call.
   InOut = 1,
+
+  /// `__shared`, a legacy spelling of `borrowing`.
   Shared = 2,
+    /// `__owned`, a legacy spelling of `consuming`.
   Owned = 3,
 };
 
