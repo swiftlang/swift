@@ -1,5 +1,5 @@
 import XCTest
-import Runtime
+import _Runtime
 
 enum ValueWitnessTableTests {
   struct Dog: Equatable {

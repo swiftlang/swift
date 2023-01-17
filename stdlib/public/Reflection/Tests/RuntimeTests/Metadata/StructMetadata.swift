@@ -1,5 +1,5 @@
 import XCTest
-import Runtime
+import _Runtime
 
 enum StructMetadataTests {
   struct Dog {
