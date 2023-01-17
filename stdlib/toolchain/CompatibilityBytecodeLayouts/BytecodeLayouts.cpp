@@ -37,7 +37,7 @@ using namespace swift;
 #define MASK_PTR(x)                                                            \
   ((__swift_uintptr_t)x & ~heap_object_abi::SwiftSpareBitsMask)
 
-static const size_t layoutStringHeaderSize = 4;
+static const size_t layoutStringHeaderSize = sizeof(size_t);
 
 /// Get the generic argument vector for the passed in metadata
 ///
@@ -56,18 +56,7 @@ const Metadata **getGenericArgs(Metadata *metadata) {
 template <typename T>
 T readBytes(const uint8_t *typeLayout, size_t &i) {
   T returnVal = *(const T *)(typeLayout + i);
-  for (size_t j = 0; j < sizeof(T); j++) {
-    returnVal <<= 8;
-    returnVal |= *(typeLayout + i + j);
-  }
   i += sizeof(T);
-  return returnVal;
-}
-
-template <>
-uint8_t readBytes<uint8_t>(const uint8_t *typeLayout, size_t &i) {
-  uint8_t returnVal = *(typeLayout + i);
-  i += 1;
   return returnVal;
 }
 
@@ -75,11 +64,7 @@ uint8_t readBytes<uint8_t>(const uint8_t *typeLayout, size_t &i) {
 /// offset in big-endian order
 template <typename T>
 void writeBytes(uint8_t *typeLayout, size_t i, T value) {
-  for (size_t j = sizeof(T) - 1; j > 0; j--) {
-    typeLayout[i + j] = (uint8_t)(value & 0xff);
-    value >>= 8;
-  }
-  typeLayout[i] = (uint8_t)(value & 0xff);
+  *((T*)(typeLayout + i)) = value;
 }
 
 Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
@@ -139,26 +124,28 @@ swift_generic_destroy(void *address, void *metadata) {
   // fixed data is 32 bytes
   size_t offset = layoutStringHeaderSize;
 
-  do {
-    uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
-    uint8_t tag = ((uint8_t)(skip >> 24));
-    skip &= ~(0xff << 24);
+  while (true) {
+    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
+    auto tag = static_cast<RefCountingKind>(skip >> 56);
+    skip &= ~(0xffULL << 56);
     addr += skip;
 
-    if (SWIFT_UNLIKELY(tag == (uint8_t)RefCountingKind::Witness)) {
+    if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
+      return;
+    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Witness)) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_destroy((OpaqueValue *)addr);
       addr += type->vw_size();
     } else {
-      const auto &destroyFunc = destroyTable[tag];
+      const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
         destroyFunc.fn((void *)((*(uintptr_t *)addr) & destroyFunc.mask));
       } else {
         destroyFunc.fn(((void *)addr));
       }
     }
-  } while (typeLayout[offset] != 0);
+  }
 }
 
 struct RetainFuncAndMask {
@@ -218,20 +205,22 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
 
   memcpy(dest, src, size);
 
-  do {
-    uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
-    auto tag = static_cast<uint8_t>(skip >> 24);
-    skip &= ~(0xff << 24);
+  while (true) {
+    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
+    auto tag = static_cast<RefCountingKind>(skip >> 56);
+    skip &= ~(0xffULL << 56);
     addrOffset += skip;
 
-    if (SWIFT_UNLIKELY(tag == (uint8_t)RefCountingKind::Witness)) {
+    if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
+      return;
+    } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Witness)) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
       addrOffset += type->vw_size();
     } else {
-      const auto &retainFunc = retainTable[tag];
+      const auto &retainFunc = retainTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(retainFunc.isSingle)) {
         ((RetainFn)retainFunc.fn)(
             *(void **)(((uintptr_t)dest + addrOffset) & retainFunc.mask));
@@ -239,7 +228,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
         ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset), (void*)((uintptr_t)src + addrOffset));
       }
     }
-  } while (typeLayout[offset] != 0);
+  }
 }
 
 __attribute__((weak)) extern "C" void
@@ -257,10 +246,10 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   auto offset = layoutStringHeaderSize;
   uintptr_t addrOffset = 0;
 
-  do {
-    uint32_t skip = readBytes<uint32_t>(typeLayout, offset);
-    auto tag = static_cast<RefCountingKind>(skip >> 24);
-    skip &= ~(0xff << 24);
+  while (true) {
+    uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
+    auto tag = static_cast<RefCountingKind>(skip >> 56);
+    skip &= ~(0xffULL << 56);
     addrOffset += skip;
 
     switch (tag) {
@@ -290,10 +279,12 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
       }
       break;
     }
+    case RefCountingKind::End:
+      return;
     default:
       break;
     }
-  } while (typeLayout[offset] != 0);
+  }
 }
 
 __attribute__((weak)) extern "C" void
@@ -312,78 +303,77 @@ __attribute__((weak)) extern "C" void
 swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
                                       Metadata* type) {
   size_t offset = 0;
-  const auto refCountSize = readBytes<uint32_t>(layoutStr, offset);
+  const auto refCountSize = readBytes<size_t>(layoutStr, offset);
 
-  const size_t genericDescOffset = layoutStringHeaderSize + refCountSize + 4;
+  const size_t genericDescOffset = layoutStringHeaderSize + refCountSize + sizeof(size_t);
   offset = genericDescOffset;
 
-  uint32_t genericRefCountSize = 0;
-  do {
-    const auto tagAndIdx = readBytes<uint32_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndIdx >> 24);
-    const auto index = tagAndIdx & ~(0xff << 24);
+  size_t genericRefCountSize = 0;
+  while (true) {
+    const auto tagAndIdx = readBytes<uint64_t>(layoutStr, offset);
+    const auto tag = (uint8_t)(tagAndIdx >> 56);
+    const auto index = tagAndIdx & ~(0xffULL << 56);
 
-    if (tag == 2) {
+    if (tag == 0) {
+      break;
+    } else if (tag == 2) {
       offset += 4;
       const Metadata *genericType = getGenericArgs(type)[index];
       if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 25;
-        genericRefCountSize +=
-            readBytes<uint32_t>(genericLayoutStr, countOffset);
+        genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
       } else if (genericType->isClassObject()) {
-        genericRefCountSize += sizeof(uint32_t);
+        genericRefCountSize += sizeof(uint64_t);
       } else {
-        genericRefCountSize += sizeof(uint32_t) + sizeof(uintptr_t);
+        genericRefCountSize += sizeof(uint64_t) + sizeof(uintptr_t);
       }
     }
-  } while (layoutStr[offset] != 0);
+  }
 
-  const auto instancedLayoutStrSize =
-      layoutStringHeaderSize + refCountSize + genericRefCountSize + 4 + 1;
+  const auto instancedLayoutStrSize = layoutStringHeaderSize + refCountSize + genericRefCountSize + sizeof(size_t) + 1;
 
   uint8_t *instancedLayoutStr = (uint8_t*)calloc(instancedLayoutStrSize, sizeof(uint8_t));
 
-  writeBytes<uint32_t>(instancedLayoutStr, 0,
-                       refCountSize + genericRefCountSize);
+  writeBytes<size_t>(instancedLayoutStr, 0, refCountSize + genericRefCountSize);
 
   offset = genericDescOffset;
   size_t layoutStrOffset = layoutStringHeaderSize;
   size_t instancedLayoutStrOffset = layoutStringHeaderSize;
-  uint32_t skipBytes = 0;
-  do {
-    const auto tagAndIdx = readBytes<uint32_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndIdx >> 24);
-    const auto index = tagAndIdx & ~(0xff << 24);
+  size_t skipBytes = 0;
+  while (true) {
+    const auto tagAndIdx = readBytes<uint64_t>(layoutStr, offset);
+    const auto tag = (uint8_t)(tagAndIdx >> 56);
+    const auto index = tagAndIdx & ~(0xffULL << 56);
 
-    if (tag == 1) {
+    if (tag == 0) {
+      break;
+    } else if (tag == 1) {
       memcpy((void *)(layoutStr + layoutStrOffset),
              (void *)(instancedLayoutStr + instancedLayoutStrOffset), index);
       layoutStrOffset += index;
       instancedLayoutStrOffset += index;
       if (skipBytes) {
         size_t firstRCOffset = instancedLayoutStrOffset;
-        auto firstRC = readBytes<uint32_t>(instancedLayoutStr, firstRCOffset);
+        auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
         firstRC += skipBytes;
         writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
         skipBytes = 0;
       }
     } else if (tag == 2) {
-      skipBytes = readBytes<uint32_t>(layoutStr, offset);
+      skipBytes += readBytes<size_t>(layoutStr, offset);
       const Metadata *genericType = getGenericArgs(type)[index];
       if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
-        auto genericRefCountSize =
-            readBytes<uint32_t>(genericLayoutStr, countOffset);
+        auto genericRefCountSize = readBytes<size_t>(genericLayoutStr, countOffset);
         if (genericRefCountSize > 0) {
           memcpy((void *)(genericLayoutStr + layoutStringHeaderSize),
                  (void *)(instancedLayoutStr + instancedLayoutStrOffset),
                  genericRefCountSize);
           if (skipBytes) {
             size_t firstRCOffset = instancedLayoutStrOffset;
-            auto firstRC =
-                readBytes<uint32_t>(instancedLayoutStr, firstRCOffset);
+            auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
             firstRC += skipBytes;
             writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
             skipBytes = 0;
@@ -391,16 +381,15 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
           instancedLayoutStrOffset += genericRefCountSize;
           size_t trailingBytesOffset = layoutStringHeaderSize + genericRefCountSize;
-          skipBytes +=
-              readBytes<uint32_t>(genericLayoutStr, trailingBytesOffset);
+          skipBytes += readBytes<size_t>(genericLayoutStr, trailingBytesOffset);
         }
       } else if (genericType->isClassObject()) {
-        uint32_t op = static_cast<uint32_t>(RefCountingKind::Unknown) << 24;
-        op |= (skipBytes & ~(0xff << 24));
+        uint64_t op = static_cast<uint64_t>(RefCountingKind::Unknown) << 56;
+        op |= (skipBytes & ~(0xffULL << 56));
 
-        writeBytes<uint32_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
+        writeBytes<uint64_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
 
-        instancedLayoutStrOffset += sizeof(uint32_t);
+        instancedLayoutStrOffset += sizeof(uint64_t);
 
         skipBytes = 0;
       } else {
@@ -410,12 +399,12 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
           continue;
         }
 
-        uint32_t op = static_cast<uint32_t>(RefCountingKind::Witness) << 24;
-        op |= (skipBytes & ~(0xff << 24));
+        uint64_t op = static_cast<uint64_t>(RefCountingKind::Witness) << 56;
+        op |= (skipBytes & ~(0xffULL << 56));
 
-        writeBytes<uint32_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
+        writeBytes<uint64_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
 
-        instancedLayoutStrOffset += sizeof(uint32_t);
+        instancedLayoutStrOffset += sizeof(uint64_t);
 
         writeBytes<uintptr_t>(instancedLayoutStr, instancedLayoutStrOffset, reinterpret_cast<uintptr_t>(genericType));
         instancedLayoutStrOffset += sizeof(uintptr_t);
@@ -423,15 +412,13 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
         skipBytes = 0;
       }
     }
-  } while (layoutStr[offset] != 0);
+  };
 
   size_t trailingBytesOffset = layoutStringHeaderSize + refCountSize;
-  skipBytes += readBytes<uint32_t>(layoutStr, trailingBytesOffset);
+  skipBytes += readBytes<size_t>(layoutStr, trailingBytesOffset);
 
   if (skipBytes > 0) {
-    writeBytes<uint32_t>(
-        instancedLayoutStr,
-        layoutStringHeaderSize + refCountSize + genericRefCountSize, skipBytes);
+    writeBytes<size_t>(instancedLayoutStr, layoutStringHeaderSize + refCountSize + genericRefCountSize, skipBytes);
   }
 
   type->setLayoutString(instancedLayoutStr);

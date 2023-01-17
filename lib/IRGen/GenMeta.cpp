@@ -2972,14 +2972,7 @@ namespace {
     llvm::Constant *emitLayoutString() {
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
-      auto layoutStr = typeLayoutEntry.layoutString(IGM);
-      // assert(layoutStr && "Failed to make layout string");
-      if (!layoutStr) {
-        return nullptr;
-      }
-      llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
-          llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
-      return layoutArray;
+      return typeLayoutEntry.layoutString(IGM);
     }
 
     llvm::Constant *getLayoutString() {
@@ -3053,17 +3046,12 @@ namespace {
 
         if (IGM.getOptions().ForceStructTypeLayouts) {
           if (auto *layoutString = getLayoutString()) {
-
-            // auto layoutStrAddr = emitAddressOfMetadataSlotAtIndex(IGF,
-            //                                     metadata,
-            //                                     isa<ClassDecl>(Target) ? -3 :
-            //                                     -2, IGM.Int8PtrTy);
-
-            // IGF.Builder.CreateStore(layoutString, layoutStrAddr);
+            auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
+                                                              IGM.Int8PtrTy);
 
             IGF.Builder.CreateCall(
-                IGM.getGenericInstantiateLayoutStringFunctionPointer(),
-                {layoutString, metadata});
+              IGM.getGenericInstantiateLayoutStringFunctionPointer(),
+              {layoutStringCast, metadata});
           }
         }
       });
@@ -4834,14 +4822,7 @@ namespace {
     llvm::Constant *emitLayoutString() {
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
-      auto layoutStr = typeLayoutEntry.layoutString(IGM);
-      // assert(layoutStr && "Failed to make layout string");
-      if (!layoutStr) {
-        return nullptr;
-      }
-      llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
-          llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
-      return layoutArray;
+      return typeLayoutEntry.layoutString(IGM);
     }
 
     llvm::Constant *getLayoutString() {

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeLayout.h"
+#include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
 #include "GenOpaque.h"
@@ -65,12 +66,25 @@ private:
   struct RefCounting {
     RefCountingKind kind;
     union {
-      uint32_t stride;
+      size_t size;
       uint32_t genericIdx;
+      uintptr_t metatype;
+    };
+  };
+
+  struct GenericInstOp {
+    enum Type : uint8_t {
+      Copy = 1,
+      Param = 2,
+    };
+
+    Type type;
+    union {
+      size_t size;
       struct {
-        uint32_t stride;
-        uintptr_t metatype;
-      } metadata;
+        size_t offset;
+        uint32_t idx;
+      } generic;
     };
   };
 
@@ -80,7 +94,7 @@ public:
   LayoutStringBuilder() = default;
   ~LayoutStringBuilder() = default;
 
-  void addRefCount(RefCountingKind kind, uint32_t stride) {
+  void addRefCount(RefCountingKind kind, uint32_t size) {
     if (kind == RefCountingKind::Skip) {
       if (refCountings.empty() ||
           refCountings.back().kind != RefCountingKind::Skip) {
@@ -88,9 +102,9 @@ public:
       }
       auto &refCounting = refCountings.back();
 
-      refCounting.stride += stride;
+      refCounting.size += size;
     } else {
-      refCountings.push_back({kind, {stride}});
+      refCountings.push_back({kind, {size}});
     }
   }
 
@@ -108,86 +122,71 @@ public:
   //   }
   // }
 
-  void result(std::vector<uint8_t> &layoutStr) const {
-    std::vector<uint8_t> refCountingStr;
-    uint32_t skip = 0;
-    std::vector<uint8_t> genericInstStr;
-    uint32_t instCopyBytes = 0;
+  void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
+    auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
+    size_t skip = 0;
+    std::vector<GenericInstOp> genericInstOps;
+    size_t instCopyBytes = 0;
+    size_t refCountBytes = 0;
     for (auto &refCounting : refCountings) {
       if (refCounting.kind == RefCountingKind::Skip) {
-        skip += refCounting.stride;
+        skip += refCounting.size;
         continue;
-      }
-
-      if ((skip & ~(0xff << 24)) != skip) {
-        // TODO: crash and burn!!!
       }
 
       if (refCounting.kind == RefCountingKind::Generic) {
         if (instCopyBytes > 0) {
-          uint32_t copyOp = (1 << 24) | (instCopyBytes & ~(0xff << 24));
-          uint32_t copyOpBE = 0;
-          llvm::support::endian::write32be(&copyOpBE, copyOp);
-          genericInstStr.insert(genericInstStr.end(), (uint8_t *)&copyOpBE,
-                                (uint8_t *)(&copyOpBE + 1));
+          genericInstOps.push_back({GenericInstOp::Type::Copy, {instCopyBytes}});
           instCopyBytes = 0;
         }
-        uint genericIdx = (2 << 24) | (refCounting.genericIdx & ~(0xff << 24));
-        uint32_t genericIdxBE = 0;
-        llvm::support::endian::write32be(&genericIdxBE, genericIdx);
-        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&genericIdxBE,
-                              (uint8_t *)(&genericIdxBE + 1));
-        uint32_t skipBE = 0;
-        llvm::support::endian::write32be(&skipBE, skip);
-        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&skipBE,
-                              (uint8_t *)(&skipBE + 1));
-      } else {
-        skip |= (static_cast<uint32_t>(refCounting.kind) << 24);
+        
+        GenericInstOp op;
+        op.type = GenericInstOp::Type::Param;
+        op.generic = {skip, refCounting.genericIdx};
 
-        uint32_t skipBE = 0;
-        llvm::support::endian::write32be(&skipBE, skip);
-        refCountingStr.insert(refCountingStr.end(), (uint8_t *)&skipBE,
-                              (uint8_t *)(&skipBE + 1));
+        genericInstOps.push_back(op);
+      } else {
+        // TODO: handle 32 bit platforms
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
 
         // TODO: adjust for metatypes and proper target size_t
-        instCopyBytes += 4;
+        instCopyBytes += 8;
+        refCountBytes += 8;
       }
 
-      skip = refCounting.stride;
+      skip = refCounting.size;
     }
 
     // size of ref counting ops in bytes
-    uint32_t refCountBytesBE = 0;
-    llvm::support::endian::write32be(&refCountBytesBE, refCountingStr.size());
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&refCountBytesBE,
-                     (uint8_t *)(&refCountBytesBE + 1));
+    B.fillPlaceholderWithInt(sizePlaceholder, IGM.SizeTy, refCountBytes);
 
-    layoutStr.insert(layoutStr.end(), refCountingStr.begin(),
-                     refCountingStr.end());
+    B.addSize(Size(skip));
 
-    // Encoding `End` with the last skip bytes count
-    // this is necessary to correctly build layout
-    // strings for generic types at runtime.
-    if ((skip & ~(0xff << 24)) != skip) {
-      // TODO: crash and burn!!!
-    }
-
-    uint32_t skipBE = 0;
-    llvm::support::endian::write32be(&skipBE, skip);
-    layoutStr.insert(layoutStr.end(), (uint8_t *)&skipBE,
-                     (uint8_t *)(&skipBE + 1));
-
-    if (!genericInstStr.empty()) {
+    if (!genericInstOps.empty()) {
       if (instCopyBytes > 0) {
-        uint32_t copyOp = (1 << 24) | (instCopyBytes & ~(0xff << 24));
-        uint32_t copyOpBE = 0;
-        llvm::support::endian::write32be(&copyOpBE, copyOp);
-        genericInstStr.insert(genericInstStr.end(), (uint8_t *)&copyOpBE,
-                              (uint8_t *)(&copyOpBE + 1));
+        genericInstOps.push_back({GenericInstOp::Type::Copy, {instCopyBytes}});
       }
-      layoutStr.insert(layoutStr.end(), genericInstStr.begin(),
-                       genericInstStr.end());
+
+      for (auto &genOp : genericInstOps) {
+        switch (genOp.type) {
+        case GenericInstOp::Type::Copy: {
+          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.size;
+          B.addInt64(op);
+          break;
+        }
+        case GenericInstOp::Type::Param: {
+          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.generic.idx;
+          B.addInt64(op);
+          B.addSize(Size(genOp.generic.offset));
+          break;
+        }
+        }
+      }
     }
+
+    // NUL terminator
+    B.addInt(IGM.Int8Ty, 0);
   }
 };
 }
@@ -332,10 +331,9 @@ llvm::Value *TypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty, true);
 }
 
-llvm::Optional<std::vector<uint8_t>>
-TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   assert(isEmpty());
-  return {{}};
+  return nullptr;
 }
 
 void TypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -971,17 +969,19 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
       IGF.IGM.Int1Ty, typeInfo.isBitwiseTakable(ResilienceExpansion::Maximal));
 }
 
-llvm::Optional<std::vector<uint8_t>>
-ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  std::vector<uint8_t> layoutStr;
-
+llvm::Constant *ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   LayoutStringBuilder B{};
 
   refCountString(IGM, B);
 
-  B.result(layoutStr);
+  ConstantInitBuilder IB(IGM);
+  auto SB = IB.beginStruct();
+  SB.setPacked(true);
 
-  return {layoutStr};
+  B.result(IGM, SB);
+
+  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                  /*constant*/ true);
 }
 
 void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1417,17 +1417,18 @@ llvm::Value *AlignedGroupEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
-llvm::Optional<std::vector<uint8_t>>
-AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
-  std::vector<uint8_t> layoutStr;
-
+llvm::Constant *AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
   LayoutStringBuilder B{};
 
   refCountString(IGM, B);
 
-  B.result(layoutStr);
+  ConstantInitBuilder IB(IGM);
+  auto SB = IB.beginStruct();
 
-  return {layoutStr};
+  B.result(IGM, SB);
+
+  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                  /*constant*/ true);
 }
 
 void AlignedGroupEntry::refCountString(IRGenModule &IGM,
@@ -1770,25 +1771,8 @@ ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, archetype);
 }
 
-llvm::Optional<std::vector<uint8_t>>
-ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  std::vector<uint8_t> layoutStr;
-  auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
-  assert(archetypeType && "archetype wasn't GenericTypeParam!");
-  auto params = archetypeType->getGenericEnvironment()->getGenericParams();
-  for (auto param : params) {
-    if (param->getName() == archetypeType->getName()) {
-      // INDEX := UINT32
-      // ARCHETYPE := 'A' INDEX
-      layoutStr.push_back('A');
-      uint32_t index;
-      llvm::support::endian::write32be(&index, param->getIndex());
-      layoutStr.insert(layoutStr.end(), (uint8_t *)(&index),
-                       (uint8_t *)(&index + 1));
-      return layoutStr;
-    }
-  }
-  return None;
+llvm::Constant *ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return nullptr;
 }
 
 void ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1910,52 +1894,8 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
-llvm::Optional<std::vector<uint8_t>>
-EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  // If there are no cases, we can treat this as a scalar
-  if (cases.empty()) {
-    if (numEmptyCases <= UINT8_MAX) {
-      return {{'b'}};
-    } else if (numEmptyCases <= UINT16_MAX) {
-      return {{'c'}};
-    } else if (numEmptyCases <= UINT32_MAX) {
-      return {{'l'}};
-    } else {
-      return {{'L'}};
-    }
-  }
-  std::vector<uint8_t> layoutStr;
-  if (isMultiPayloadEnum()) {
-    // MULTIENUM := 'E' SIZE SIZE SIZE+ VALUE+
-    // E numEmptyPayloads numPayloads legnthOfEachPayload payloads
-    //
-    // Not yet supported/implemented
-    return None;
-  } else {
-    // SINGLEENUM := 'e' SIZE SIZE VALUE
-    // e NumEmptyPayloads LengthOfPayload Payload
-    layoutStr.push_back('e');
-    uint32_t numEmptyCasesBE;
-    llvm::support::endian::write32be(&numEmptyCasesBE, numEmptyCases);
-    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numEmptyCasesBE),
-                     (uint8_t *)(&numEmptyCasesBE + 1));
-
-    llvm::Optional<std::vector<uint8_t>> payloadLayout =
-        cases[0]->layoutString(IGM);
-    if (!payloadLayout) {
-      return None;
-    }
-    assert(payloadLayout->size() <= UINT32_MAX &&
-           "Enum layout exceeds length limit");
-
-    uint32_t payloadLengthBE;
-    llvm::support::endian::write32be(&payloadLengthBE, payloadLayout->size());
-    layoutStr.insert(layoutStr.end(), (uint8_t *)(&payloadLengthBE),
-                     (uint8_t *)(&payloadLengthBE + 1));
-    layoutStr.insert(layoutStr.end(), payloadLayout->begin(),
-                     payloadLayout->end());
-  }
-  return {layoutStr};
+llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return nullptr;
 }
 
 void EnumTypeLayoutEntry::computeProperties() {
@@ -3098,18 +3038,8 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, ty);
 }
 
-llvm::Optional<std::vector<uint8_t>>
-ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  std::vector<uint8_t> layoutStr;
-  layoutStr.push_back('R');
-  std::string mangledName = ty.getMangledName();
-  uint32_t nameLength;
-  llvm::support::endian::write32be(&nameLength, mangledName.size());
-  layoutStr.insert(layoutStr.end(), (uint8_t *)(&nameLength),
-                   (uint8_t *)(&nameLength + 1));
-
-  layoutStr.insert(layoutStr.end(), mangledName.begin(), mangledName.end());
-  return layoutStr;
+llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return nullptr;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
@@ -3347,9 +3277,9 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
                                      representative, true);
 }
 
-llvm::Optional<std::vector<uint8_t>>
+llvm::Constant *
 TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return None;
+  return nullptr;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

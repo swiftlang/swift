@@ -9,6 +9,7 @@
 // RUN: %target-swift-frontend -O -enable-autolinking-runtime-compatibility-bytecode-layouts -force-struct-type-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -module-name layout_string_witnesses %t/layout_string_witnesses_types.o -I %t -o %t/main %s
+// RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -parse-as-library -emit-ir %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
@@ -212,7 +213,7 @@ class ClassWithSomeProtocol: SomeProtocol {
 
 func testExistential() {
     let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
-
+    
     do {
         let x = ClassWithSomeProtocol()
         testInit(ptr, to: ExistentialWrapper(x: x))
