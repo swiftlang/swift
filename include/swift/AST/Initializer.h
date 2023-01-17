@@ -247,7 +247,7 @@ class RuntimeAttributeInitializer : public Initializer {
 public:
   explicit RuntimeAttributeInitializer(CustomAttr *attr, ValueDecl *attachedTo)
       : Initializer(InitializerKind::RuntimeAttribute,
-                    attachedTo->getDeclContext()->getModuleScopeContext()),
+                    attachedTo->getDeclContext()),
         Attr(attr), AttachedTo(attachedTo) {}
 
   CustomAttr *getAttr() const { return Attr; }

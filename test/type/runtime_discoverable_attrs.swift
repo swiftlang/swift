@@ -225,3 +225,10 @@ struct TestStaticFuncs {
   @FlagForStaticFuncs static func test1(_: Int.Type) {}
   @FlagForStaticFuncs static func test2(_: inout [String], x: Int) {}
 }
+
+struct TestSelfUse {
+  static var description: String = "TestSelfUse"
+
+  @Flag(Self.description) var x: Int = 42
+  @Flag(Self.description) func test() {}
+}
