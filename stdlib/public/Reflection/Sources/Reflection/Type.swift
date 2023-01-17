@@ -10,8 +10,9 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import Runtime
+import _Runtime
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct Type {
   @usableFromInline
@@ -33,6 +34,7 @@ public struct Type {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Type {
   @inlinable
   public var isClass: Bool {
@@ -60,6 +62,7 @@ extension Type {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Type {
   @inlinable
   public var swiftType: Any.Type {
@@ -67,6 +70,7 @@ extension Type {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Type {
   @inlinable
   public var genericArguments: GenericArguments {
@@ -109,6 +113,7 @@ extension Type {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 extension Type: CustomStringConvertible {
   @inlinable
   public var description: String {
@@ -116,6 +121,7 @@ extension Type: CustomStringConvertible {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Type: Equatable {
   @inlinable
   public static func ==(_ lhs: Type, _ rhs: Type) -> Bool {
@@ -123,6 +129,7 @@ extension Type: Equatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Type: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
