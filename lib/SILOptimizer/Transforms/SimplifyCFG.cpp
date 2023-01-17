@@ -1289,7 +1289,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       DestBB->moveArgumentList(BB);
       while (!BB->pred_empty()) {
         SILBasicBlock *pred = *BB->pred_begin();
-        replaceBranchTarget(pred->getTerminator(), BB, DestBB, true);
+        pred->getTerminator()->replaceBranchTarget(BB, DestBB);
       }
       remainingBlock = DestBB;
       deletedBlock = BB;

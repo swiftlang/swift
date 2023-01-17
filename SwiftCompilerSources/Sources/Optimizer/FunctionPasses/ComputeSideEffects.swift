@@ -25,7 +25,7 @@ import SIL
 /// are computed.
 ///
 let computeSideEffects = FunctionPass(name: "compute-side-effects", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   if function.isAvailableExternally {
     // We cannot assume anything about function, which are defined in another module,
@@ -76,13 +76,13 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
 /// The collected argument and global side effects of the function.
 private struct CollectedEffects {
 
-  private let context: PassContext
+  private let context: FunctionPassContext
   private let calleeAnalysis: CalleeAnalysis
 
   private(set) var argumentEffects: [SideEffects.ArgumentEffects]
   private(set) var globalEffects = SideEffects.GlobalEffects()
 
-  init(function: Function, _ context: PassContext) {
+  init(function: Function, _ context: FunctionPassContext) {
     self.context = context
     self.calleeAnalysis = context.calleeAnalysis
     self.argumentEffects = Array(repeating: SideEffects.ArgumentEffects(), count: function.entryBlock.arguments.count)
@@ -304,7 +304,7 @@ private struct CollectedEffects {
 
       var walkUpCache = WalkerCache<SmallProjectionPath>()
 
-      init(_ context: PassContext) {
+      init(_ context: FunctionPassContext) {
         self.roots = Stack(context)
       }
 
@@ -417,7 +417,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     let inst = address.instruction
-    let function = inst.function
+    let function = inst.parentFunction
     switch inst {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&
@@ -469,7 +469,7 @@ private extension SideEffects.ArgumentEffects {
 }
 
 private extension PartialApplyInst {
-  func canBeAppliedInFunction(_ context: PassContext) -> Bool {
+  func canBeAppliedInFunction(_ context: FunctionPassContext) -> Bool {
     struct EscapesToApply : EscapeVisitor {
       func visitUse(operand: Operand, path: EscapePath) -> UseResult {
         switch operand.instruction {
@@ -483,9 +483,7 @@ private extension PartialApplyInst {
           return .continueWalk
         }
       }
-      func hasRelevantType(_ value: Value, at path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
-        true
-      }
+      var followTrivialTypes: Bool { true }
     }
 
     return self.isEscapingWhenWalkingDown(using: EscapesToApply(), context)
