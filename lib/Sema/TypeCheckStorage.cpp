@@ -3441,7 +3441,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   // Check for an accessor macro.
-  for (auto customAttrConst : storage->getSemanticAttrs().getAttributes<CustomAttr>()) {
+  for (auto customAttrConst : storage->getAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto decl = evaluateOrDefault(
         evaluator,
@@ -3457,8 +3457,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     if (!macro)
       continue;
 
-    if (!macro->getMacroRoles().contains(MacroRole::Accessor))
-      continue;
+    // FIXME: Make sure it's an accessors macro. We're not currently parsing
+    // this information in the @declaration attribute.
 
     // Expand the accessors.
     expandAccessors(storage, customAttr, macro);
