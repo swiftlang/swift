@@ -79,3 +79,12 @@ class I55049 {
 
 #line 1_000 "issue-55049.swift"
 class I55049_1 {}
+
+// https://github.com/apple/swift/issues/57553
+class I57553 {
+  // These #sourceLocation statements should be followed by carriage return
+  // characters. They can be easily lost if this file is modified on macOS or
+  // Linux. Take care to add them back if that happens.
+#sourceLocation(file: "issue-57553.swift", line: 12345)
+#sourceLocation()
+}

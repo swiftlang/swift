@@ -5950,6 +5950,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   // line.
   while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
     ++LastTokTextEnd;
+  if (*LastTokTextEnd == '\r') {
+    ++LastTokTextEnd;
+  }
   SourceLoc nextLineStartLoc = Lexer::getSourceLoc(LastTokTextEnd);
   
   if (*LastTokTextEnd == '\n')
