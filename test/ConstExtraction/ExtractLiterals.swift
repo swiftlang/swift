@@ -91,7 +91,8 @@ public struct PropertyWrappers : MyProto {
      var projectedValue: (V, V?) { (self.value, self.lastValue) }
 }
 
-// CHECK: [
+// CHECK:{
+// CHECK-NEXT:"extractedTypes": [
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractLiterals.Bools",
 // CHECK-NEXT:    "kind": "struct",
@@ -365,3 +366,4 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+// CHECK-NEXT:}

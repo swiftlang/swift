@@ -492,34 +492,37 @@ void writeAttributes(
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
-  JSON.array([&] {
-    for (const auto &TypeInfo : ConstValueInfos) {
-      JSON.object([&] {
-        const auto *TypeDecl = TypeInfo.TypeDecl;
-        JSON.attribute("typeName", toFullyQualifiedTypeNameString(TypeDecl->getDeclaredInterfaceType()));
-        JSON.attribute(
-            "kind",
-            TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
-                .str());
-        writeFileInformation(JSON, TypeDecl);
-        JSON.attributeArray("properties", [&] {
-          for (const auto &PropertyInfo : TypeInfo.Properties) {
-            JSON.object([&] {
-              const auto *decl = PropertyInfo.VarDecl;
-              JSON.attribute("label", decl->getName().str().str());
-              JSON.attribute("type",
-                             toFullyQualifiedTypeNameString(decl->getType()));
-              JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
-              JSON.attribute("isComputed",
-                             !decl->hasStorage() ? "true" : "false");
-              writeFileInformation(JSON, decl);
-              writeValue(JSON, PropertyInfo.Value);
-              writeAttributes(JSON, PropertyInfo.PropertyWrappers);
-            });
-          }
+  JSON.object([&]() {
+    JSON.attributeArray("extractedTypes", [&] {
+      for (const auto &TypeInfo : ConstValueInfos) {
+        JSON.object([&] {
+          const auto *TypeDecl = TypeInfo.TypeDecl;
+          JSON.attribute("typeName", toFullyQualifiedTypeNameString(
+                                         TypeDecl->getDeclaredInterfaceType()));
+          JSON.attribute(
+              "kind",
+              TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
+                  .str());
+          writeFileInformation(JSON, TypeDecl);
+          JSON.attributeArray("properties", [&] {
+            for (const auto &PropertyInfo : TypeInfo.Properties) {
+              JSON.object([&] {
+                const auto *decl = PropertyInfo.VarDecl;
+                JSON.attribute("label", decl->getName().str().str());
+                JSON.attribute("type",
+                               toFullyQualifiedTypeNameString(decl->getType()));
+                JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
+                JSON.attribute("isComputed",
+                               !decl->hasStorage() ? "true" : "false");
+                writeFileInformation(JSON, decl);
+                writeValue(JSON, PropertyInfo.Value);
+                writeAttributes(JSON, PropertyInfo.PropertyWrappers);
+              });
+            }
+          });
         });
-      });
-    }
+      }
+    });
   });
   JSON.flush();
   return false;

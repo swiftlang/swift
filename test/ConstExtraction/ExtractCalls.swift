@@ -34,7 +34,8 @@ public struct Bat {
     }
 }
 
-// CHECK: [
+// CHECK:{
+// CHECK-NEXT:"extractedTypes": [
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractCalls.Foo",
 // CHECK-NEXT:    "kind": "struct",
@@ -130,3 +131,4 @@ public struct Bat {
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+// CHECK-NEXT:}

@@ -35,7 +35,8 @@ public struct Bar: Foo {}
 extension Int: Foo {}
 extension String: Foo {}
 
-// CHECK: [
+// CHECK:{
+// CHECK-NEXT:"extractedTypes": [
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractGroups.Arrays",
 // CHECK-NEXT:    "kind": "struct",
@@ -309,3 +310,4 @@ extension String: Foo {}
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+// CHECK-NEXT:}
