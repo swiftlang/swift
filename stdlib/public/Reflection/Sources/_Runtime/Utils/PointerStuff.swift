@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @inlinable
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
   Swift.unsafeBitCast(x, to: type)

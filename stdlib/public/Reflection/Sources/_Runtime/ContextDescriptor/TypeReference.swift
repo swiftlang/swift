@@ -9,7 +9,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct TypeReference: PublicLayout {
   public typealias Layout = Int32
@@ -22,7 +22,7 @@ public struct TypeReference: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TypeReference {
   @inlinable
   public func descriptor(_ kind: Kind) -> ContextDescriptor {

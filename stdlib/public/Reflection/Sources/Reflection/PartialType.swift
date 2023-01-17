@@ -12,7 +12,7 @@
 import Swift
 import _Runtime
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct PartialType {
   @usableFromInline
@@ -24,7 +24,7 @@ public struct PartialType {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PartialType {
   @inlinable
   public var isGeneric: Bool {
@@ -37,7 +37,7 @@ extension PartialType {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PartialType {
   @inlinable
   public func create() -> Type? {
@@ -98,7 +98,7 @@ extension PartialType {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PartialType {
   @inlinable
   public func create(with arg: Any.Type) -> Type? {
@@ -158,7 +158,7 @@ extension PartialType {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PartialType: Equatable {
   @inlinable
   public static func ==(_ lhs: PartialType, _ rhs: PartialType) -> Bool {
@@ -166,7 +166,7 @@ extension PartialType: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension PartialType: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {

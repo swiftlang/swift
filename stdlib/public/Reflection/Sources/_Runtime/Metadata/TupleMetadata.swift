@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct TupleMetadata: PrivateLayout {
   typealias Layout = (
@@ -28,7 +28,7 @@ public struct TupleMetadata: PrivateLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata {
   @frozen
   public struct Elements {
@@ -42,7 +42,7 @@ extension TupleMetadata {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata.Elements {
   @frozen
   public struct Element: PrivateLayout {
@@ -75,7 +75,7 @@ extension TupleMetadata.Elements {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata.Elements.Element {
   public var label: String {
     // Go back up n times the size of our layout to get the beginning element
@@ -118,7 +118,7 @@ extension TupleMetadata.Elements.Element {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata.Elements: RandomAccessCollection {
   @inlinable
   public var startIndex: Int {
@@ -145,7 +145,7 @@ extension TupleMetadata.Elements: RandomAccessCollection {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata {
   @inlinable
   public var elements: Elements {
@@ -157,14 +157,14 @@ extension TupleMetadata {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata: Equatable {
   public static func ==(lhs: TupleMetadata, rhs: TupleMetadata) -> Bool {
     lhs.ptr == rhs.ptr
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension TupleMetadata: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ptr)

@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct EnumValueWitnessTable: PublicLayout {
   public typealias Layout = UnsafePointer<(
@@ -39,7 +39,7 @@ public struct EnumValueWitnessTable: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumValueWitnessTable {
   @inlinable
   public func getEnumTag(_ value: UnsafeRawPointer) -> UInt32 {
@@ -64,7 +64,7 @@ extension EnumValueWitnessTable {
 // Stdlib conformances
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumValueWitnessTable: Equatable {
   @inlinable
   public static func ==(
@@ -75,7 +75,7 @@ extension EnumValueWitnessTable: Equatable {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension EnumValueWitnessTable: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
