@@ -5,6 +5,15 @@
 # standard library from the Swift compiler build.
 project(swift-stdlib LANGUAGES C CXX)
 
+# CMake passes `-external:I` to clang-cl which results in the search order being
+# altered, and this impacts the definitions of the intrinsics. When building
+# with a MSVC toolset 19.29.30036.3 or newer, this will prevent the runtime from
+# being built on Windows.  Since we know that we only support `clang-cl` as the
+# compiler for the runtime due to the use of the Swift calling convention, we
+# simply override the CMake behaviour unconditionally.
+set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-I")
+set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-I")
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
