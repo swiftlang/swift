@@ -17,7 +17,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
 
-  public var function: Function { SILBasicBlock_getFunction(bridged).function }
+  public var parentFunction: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
     let stdString = SILBasicBlock_debugDescription(bridged)
@@ -56,7 +56,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging
   public var index: Int {
-    for (idx, block) in function.blocks.enumerated() {
+    for (idx, block) in parentFunction.blocks.enumerated() {
       if block == self { return idx }
     }
     fatalError()
@@ -97,7 +97,7 @@ public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
 
   public func reversed() -> ReverseInstructionList {
     if let inst = currentInstruction {
-      let lastInst = SILBasicBlock_lastInst(inst.block.bridged).instruction
+      let lastInst = SILBasicBlock_lastInst(inst.parentBlock.bridged).instruction
       return ReverseInstructionList(first: lastInst)
     }
     return ReverseInstructionList(first: nil)
@@ -167,7 +167,7 @@ public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
     if let succPtr = currentSucc.succ {
       let succ = BridgedSuccessor(succ: succPtr)
       currentSucc = SILSuccessor_getNext(succ)
-      return SILSuccessor_getContainingInst(succ).instruction.block
+      return SILSuccessor_getContainingInst(succ).instruction.parentBlock
     }
     return nil
   }

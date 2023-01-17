@@ -93,7 +93,7 @@ struct FunctionUses {
         result += "<unknown uses>\n"
       }
       for inst in self {
-        result += "@\(inst.function.name): \(inst)\n"
+        result += "@\(inst.parentFunction.name): \(inst)\n"
   
       }
       result += "]"

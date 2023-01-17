@@ -1586,6 +1586,14 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   llvm_unreachable("bad instruction kind");
 }
 
+void TermInst::replaceBranchTarget(SILBasicBlock *oldDest, SILBasicBlock *newDest) {
+  for (SILSuccessor &succ : getSuccessors()) {
+    if (succ.getBB() == oldDest) {
+      succ = newDest;
+    }
+  }
+}
+
 bool TermInst::isFunctionExiting() const {
   switch (getTermKind()) {
   case TermKind::AwaitAsyncContinuationInst:

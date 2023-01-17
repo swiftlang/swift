@@ -66,7 +66,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
   
-  init(begin: BasicBlock, _ context: PassContext) {
+  init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
     self.inserted = Stack(context)
@@ -110,7 +110,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the range is valid and that's iff the begin block dominates all blocks of the range.
   var isValid: Bool {
-    let entry = begin.function.entryBlock
+    let entry = begin.parentFunction.entryBlock
     return begin == entry ||
       // If any block in the range is not dominated by `begin`, the range propagates back to the entry block.
       !inclusiveRangeContains(entry)

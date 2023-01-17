@@ -15,36 +15,18 @@ import OptimizerBridging
 struct FunctionPass {
 
   let name: String
-  let runFunction: (Function, PassContext) -> ()
+  let runFunction: (Function, FunctionPassContext) -> ()
 
   public init(name: String,
-              _ runFunction: @escaping (Function, PassContext) -> ()) {
+              _ runFunction: @escaping (Function, FunctionPassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }
 
   func run(_ bridgedCtxt: BridgedFunctionPassCtxt) {
     let function = bridgedCtxt.function.function
-    let context = PassContext(_bridged: bridgedCtxt.passContext)
+    let context = FunctionPassContext(_bridged: bridgedCtxt.passContext)
     runFunction(function, context)
-  }
-}
-
-struct InstructionPass<InstType: Instruction> {
-
-  let name: String
-  let runFunction: (InstType, PassContext) -> ()
-
-  public init(name: String,
-              _ runFunction: @escaping (InstType, PassContext) -> ()) {
-    self.name = name
-    self.runFunction = runFunction
-  }
-
-  func run(_ bridgedCtxt: BridgedInstructionPassCtxt) {
-    let inst = bridgedCtxt.instruction.getAs(InstType.self)
-    let context = PassContext(_bridged: bridgedCtxt.passContext)
-    runFunction(inst, context)
   }
 }
 
