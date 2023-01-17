@@ -910,7 +910,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     } else if (IGM.getOptions().ForceStructTypeLayouts) {
       if (auto *typeLayoutEntry =
               concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
-        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
+        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup ||
+            typeLayoutEntry->getKind() == TypeLayoutEntryKind::Resilient) {
           return addFunction(IGM.getGenericDestroyFn());
         }
       }
@@ -933,7 +934,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     } else if (IGM.getOptions().ForceStructTypeLayouts) {
       if (auto *typeLayoutEntry =
               concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
-        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
+        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup ||
+            typeLayoutEntry->getKind() == TypeLayoutEntryKind::Resilient) {
           return addFunction(IGM.getGenericInitWithTakeFn());
         }
       }
@@ -948,7 +950,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     } else if (IGM.getOptions().ForceStructTypeLayouts) {
       if (auto *typeLayoutEntry =
               concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
-        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
+        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup ||
+            typeLayoutEntry->getKind() == TypeLayoutEntryKind::Resilient) {
           return addFunction(IGM.getGenericAssignWithCopyFn());
         }
       }
@@ -963,7 +966,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     } else if (IGM.getOptions().ForceStructTypeLayouts) {
       if (auto *typeLayoutEntry =
               concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
-        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
+        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup ||
+            typeLayoutEntry->getKind() == TypeLayoutEntryKind::Resilient) {
           return addFunction(IGM.getGenericAssignWithTakeFn());
         }
       }
@@ -978,7 +982,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     } else if (IGM.getOptions().ForceStructTypeLayouts) {
       if (auto *typeLayoutEntry =
               concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
-        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup) {
+        if (typeLayoutEntry->getKind() == TypeLayoutEntryKind::AlignedGroup ||
+            typeLayoutEntry->getKind() == TypeLayoutEntryKind::Resilient) {
           return addFunction(IGM.getGenericInitWithCopyFn());
         }
       }

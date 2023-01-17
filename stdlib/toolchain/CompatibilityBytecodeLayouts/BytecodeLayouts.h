@@ -131,9 +131,10 @@ enum class RefCountingKind : uint8_t {
   ObjC = 0x0a,
   Custom = 0x0b,
 
-  Witness = 0x0c,
+  Metatype = 0x0c,
   Generic = 0x0d,
   Existential = 0x0e,
+  Resilient = 0x0f,
 
   Skip = 0x80,
   // We may use the MSB as flag that a count follows,

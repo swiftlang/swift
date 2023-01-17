@@ -1,21 +1,25 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-build-swift -O -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -O -module-name layout_string_witnesses %t/layout_string_witnesses_types.o -I %t -o %t/main %s
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -O -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -O -module-name layout_string_witnesses %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -enable-autolinking-runtime-compatibility-bytecode-layouts -force-struct-type-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -module-name layout_string_witnesses %t/layout_string_witnesses_types.o -I %t -o %t/main %s
-// RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -parse-as-library -emit-ir %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -O -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -force-struct-type-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -O -Xfrontend -enable-library-evolution -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -O -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -module-name layout_string_witnesses %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
 
 import layout_string_witnesses_types
+import layout_string_witnesses_types_resilient
 
 func testSimple() {
     let ptr = UnsafeMutablePointer<Simple>.allocate(capacity: 1)
@@ -232,6 +236,33 @@ func testExistential() {
 }
 
 testExistential()
+
+public struct ResilientWrapper {
+    let x: SimpleResilient
+    let y: Int = 2
+}
+
+func testResilient() {
+    let ptr = UnsafeMutablePointer<ResilientWrapper>.allocate(capacity: 1)
+    
+    do {
+        let x = TestClass()
+        testInit(ptr, to: ResilientWrapper(x: SimpleResilient(x: 23, y: x)))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: TestClass deinitialized!
+        testAssign(ptr, from: ResilientWrapper(x: SimpleResilient(x: 23, y: y)))
+    }
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testResilient()
 
 #if os(macOS)
 func testObjc() {

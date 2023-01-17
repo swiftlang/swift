@@ -316,6 +316,7 @@ public:
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
+  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 

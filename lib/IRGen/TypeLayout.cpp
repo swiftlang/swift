@@ -50,11 +50,12 @@ public:
     ObjC = 0x0a,
     Custom = 0x0b,
 
-    Witness = 0x0c,
+    Metatype = 0x0c,
 
     Generic = 0x0d,
 
     Existential = 0x0e,
+    Resilient = 0x0f,
 
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
@@ -68,7 +69,7 @@ private:
     union {
       size_t size;
       uint32_t genericIdx;
-      uintptr_t metatype;
+      ConstantReference metaTypeRef{};
     };
   };
 
@@ -94,7 +95,7 @@ public:
   LayoutStringBuilder() = default;
   ~LayoutStringBuilder() = default;
 
-  void addRefCount(RefCountingKind kind, uint32_t size) {
+  void addRefCount(RefCountingKind kind, size_t size) {
     if (kind == RefCountingKind::Skip) {
       if (refCountings.empty() ||
           refCountings.back().kind != RefCountingKind::Skip) {
@@ -108,19 +109,19 @@ public:
     }
   }
 
-  // void addWitnessRefCount(WitnessTa count) {
-  //   if (kind == RefCountingKind::Skip) {
-  //     if (refCountings.empty() ||
-  //         refCountings.back().kind != RefCountingKind::Skip) {
-  //       refCountings.push_back({kind, 0});
-  //     }
-  //     auto &refCounting = refCountings.back();
+  void addResilientRefCount(ConstantReference metaTypeRef) {
+    RefCounting op;
+    op.kind = RefCountingKind::Resilient;
+    op.metaTypeRef = metaTypeRef;
+    refCountings.push_back(op);
+  }
 
-  //     refCounting.count += count;
-  //   } else {
-  //     refCountings.push_back({kind, count});
-  //   }
-  // }
+  void addGenericRefCount(uint32_t genericIdx) {
+    RefCounting op;
+    op.kind = RefCountingKind::Generic;
+    op.genericIdx = genericIdx;
+    refCountings.push_back(op);
+  }
 
   void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
     auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
@@ -145,6 +146,18 @@ public:
         op.generic = {skip, refCounting.genericIdx};
 
         genericInstOps.push_back(op);
+
+        skip = 0;
+      } else if (refCounting.kind == RefCountingKind::Resilient) {
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
+        B.addRelativeAddress(refCounting.metaTypeRef);
+
+        // TODO: adjust for metatypes and proper target size_t
+        instCopyBytes += 12;
+        refCountBytes += 12;
+
+        skip = 0;
       } else {
         // TODO: handle 32 bit platforms
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
@@ -153,9 +166,9 @@ public:
         // TODO: adjust for metatypes and proper target size_t
         instCopyBytes += 8;
         refCountBytes += 8;
-      }
 
-      skip = refCounting.size;
+        skip = refCounting.size;
+      }
     }
 
     // size of ref counting ops in bytes
@@ -1780,8 +1793,7 @@ void ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
   auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
   auto params = archetypeType->getGenericEnvironment()->getGenericParams();
   for (auto param : params) {
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Generic,
-                  param->getIndex());
+    B.addGenericRefCount(param->getIndex());
   }
 }
 
@@ -3039,7 +3051,25 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return nullptr;
+  LayoutStringBuilder B{};
+
+  refCountString(IGM, B);
+
+  ConstantInitBuilder IB(IGM);
+  auto SB = IB.beginStruct();
+
+  B.result(IGM, SB);
+
+  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                  /*constant*/ true);
+}
+
+void ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
+                                              LayoutStringBuilder &B) const {
+  // USE PROPER SymbolReferenceKind
+  auto metaTypeRef = IGM.getAddrOfTypeMetadata(
+      ty.getASTType(), SymbolReferenceKind::Relative_Indirectable);
+  B.addResilientRefCount(metaTypeRef);
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
