@@ -742,26 +742,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request the semantic attributes attached to the given declaration.
-class AttachedSemanticAttrsRequest :
-    public SimpleRequest<AttachedSemanticAttrsRequest,
-                         SemanticDeclAttributes(Decl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  SemanticDeclAttributes
-  evaluate(Evaluator &evaluator, Decl *decl) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Request the raw (possibly unbound generic) type of the property wrapper
 /// that is attached to the given variable.
 class AttachedPropertyWrapperTypeRequest :
@@ -3835,6 +3815,24 @@ private:
 
   ArrayRef<Decl *> evaluate(Evaluator &evaluator,
                             MacroExpansionDecl *med) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand all member attribute macros attached to the given
+/// declaration.
+class ExpandMemberAttributeMacros
+    : public SimpleRequest<ExpandMemberAttributeMacros,
+                           bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
