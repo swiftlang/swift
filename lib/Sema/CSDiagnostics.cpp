@@ -5963,6 +5963,16 @@ bool MissingGenericArgumentsFailure::hasLoc(GenericTypeParamType *GP) const {
 }
 
 bool MissingGenericArgumentsFailure::diagnoseAsError() {
+  auto locator = getLocator();
+  // Opaque result types that could not be inferred from return expressions.
+  if (auto opaqueElt =
+          locator->findLast<LocatorPathElt::OpenedOpaqueArchetype>()) {
+    auto *opaqueDecl = opaqueElt->getDecl();
+    emitDiagnostic(diag::cannot_infer_concrete_for_opaque_result,
+                   opaqueDecl->getDeclaredInterfaceType());
+    return true;
+  }
+
   llvm::SmallDenseMap<TypeRepr *, SmallVector<GenericTypeParamType *, 4>>
       scopedParameters;
 
