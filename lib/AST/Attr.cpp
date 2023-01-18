@@ -23,6 +23,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
@@ -2334,6 +2335,21 @@ bool CustomAttr::isArgUnsafe() const {
   }
 
   return isArgUnsafeBit;
+}
+
+bool CustomAttr::isAttachedMacro(const Decl *decl) const {
+  auto &ctx = decl->getASTContext();
+  auto *dc = decl->getInnermostDeclContext();
+
+  auto attrDecl = evaluateOrDefault(
+      ctx.evaluator,
+      CustomAttrDeclRequest{const_cast<CustomAttr *>(this), dc},
+      nullptr);
+
+  if (!attrDecl)
+    return false;
+
+  return attrDecl.dyn_cast<MacroDecl *>();
 }
 
 DeclarationAttr::DeclarationAttr(SourceLoc atLoc, SourceRange range,
