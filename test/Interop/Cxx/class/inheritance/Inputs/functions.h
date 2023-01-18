@@ -77,6 +77,12 @@ struct DerivedFromDerived : Derived {
 struct __attribute__((swift_attr("import_unsafe"))) DerivedFromNonTrivial
     : NonTrivial {};
 
+struct PrivatelyInherited : private Base {
+};
+
+struct ProtectedInherited : protected Base {
+};
+
 struct EmptyBaseClass {
   const char *inBase() const __attribute__((swift_attr("import_unsafe"))) {
     return "EmptyBaseClass::inBase";
