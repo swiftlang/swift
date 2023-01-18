@@ -92,3 +92,11 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func inNonTrivialWithArgs(_ a: Int32, _ b: Int32) -> UnsafePointer<CChar>?
 // CHECK-NEXT: }
+
+// CHECK-NEXT: struct PrivatelyInherited {
+// CHECK-NEXT:   init()
+// CHECK-NEXT: }
+
+// CHECK-NEXT: struct ProtectedInherited {
+// CHECK-NEXT:   init()
+// CHECK-NEXT: }
