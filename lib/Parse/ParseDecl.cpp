@@ -5946,21 +5946,24 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 
   const char *LastTokTextEnd = Tok.getText().end();
 
-  // Skip over trailing whitespace and a single \n to the start of the next
-  // line.
+  // Skip over trailing whitespace and a single \r and/or \n to the start of the
+  // next line.
   while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
     ++LastTokTextEnd;
+  bool hadCROrLF = false;
   if (*LastTokTextEnd == '\r') {
+    hadCROrLF = true;
     ++LastTokTextEnd;
   }
-  SourceLoc nextLineStartLoc = Lexer::getSourceLoc(LastTokTextEnd);
-  
-  if (*LastTokTextEnd == '\n')
-    nextLineStartLoc = nextLineStartLoc.getAdvancedLoc(1);
-  else {
+  if (*LastTokTextEnd == '\n') {
+    hadCROrLF = true;
+    ++LastTokTextEnd;
+  }
+  if (!hadCROrLF) {
     diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
     return makeParserError();
   }
+  SourceLoc nextLineStartLoc = Lexer::getSourceLoc(LastTokTextEnd);
 
   int LineOffset =
       StartLine - SourceMgr.getLineAndColumnInBuffer(nextLineStartLoc).first;
