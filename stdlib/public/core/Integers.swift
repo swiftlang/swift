@@ -1658,39 +1658,26 @@ extension BinaryInteger {
   public static func == <
     Other: BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
-    let lhsNegative = Self.isSigned && lhs < (0 as Self)
-    let rhsNegative = Other.isSigned && rhs < (0 as Other)
-
-    if lhsNegative != rhsNegative { return false }
-
-    // Here we know the values are of the same sign.
-    //
-    // There are a few possible scenarios from here:
-    //
-    // 1. Both values are negative
-    //  - If one value is strictly wider than the other, then it is safe to
-    //    convert to the wider type.
-    //  - If the values are of the same width, it does not matter which type we
-    //    choose to convert to as the values are already negative, and thus
-    //    include the sign bit if two's complement representation already.
-    // 2. Both values are non-negative
-    //  - If one value is strictly wider than the other, then it is safe to
-    //    convert to the wider type.
-    //  - If the values are of the same width, than signedness matters, as not
-    //    unsigned types are 'wider' in a sense they don't need to 'waste' the
-    //    sign bit. Therefore it is safe to convert to the unsigned type.
-
-    if lhs.bitWidth < rhs.bitWidth {
-      return Other(truncatingIfNeeded: lhs) == rhs
+    // Use bit pattern conversion to widen the comparand with smaller bit width.
+    if Self.isSigned == Other.isSigned {
+      return lhs.bitWidth >= rhs.bitWidth ?
+        lhs == Self(truncatingIfNeeded: rhs) :
+        Other(truncatingIfNeeded: lhs) == rhs
     }
-    if lhs.bitWidth > rhs.bitWidth {
-      return lhs == Self(truncatingIfNeeded: rhs)
+    // If `Self` is signed but `Other` is unsigned, then we have to
+    // be a little more careful about widening, since:
+    // (1) a fixed-width signed type can't represent the largest values of
+    //     a fixed-width unsigned type of equal bit width; and
+    // (2) an unsigned type (obviously) can't represent a negative value.
+    if Self.isSigned {    
+      return lhs.bitWidth > rhs.bitWidth ? // (1)
+        lhs == Self(truncatingIfNeeded: rhs) :
+        (lhs >= (0 as Self) && Other(truncatingIfNeeded: lhs) == rhs) // (2)
     }
-
-    if Self.isSigned {
-      return Other(truncatingIfNeeded: lhs) == rhs
-    }
-    return lhs == Self(truncatingIfNeeded: rhs)
+    // Analogous reasoning applies if `Other` is signed but `Self` is not.
+    return lhs.bitWidth < rhs.bitWidth ?
+      Other(truncatingIfNeeded: lhs) == rhs :
+      (rhs >= (0 as Other) && lhs == Self(truncatingIfNeeded: rhs))
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1730,34 +1717,26 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   public static func < <Other: BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
-    let lhsNegative = Self.isSigned && lhs < (0 as Self)
-    let rhsNegative = Other.isSigned && rhs < (0 as Other)
-    if lhsNegative != rhsNegative { return lhsNegative }
-
-    if lhs == (0 as Self) && rhs == (0 as Other) { return false }
-
-    // if we get here, lhs and rhs have the same sign. If they're negative,
-    // then Self and Other are both signed types, and one of them can represent
-    // values of the other type. Otherwise, lhs and rhs are positive, and one
-    // of Self, Other may be signed and the other unsigned.
-
-    let rhsAsSelf = Self(truncatingIfNeeded: rhs)
-    let rhsAsSelfNegative = rhsAsSelf < (0 as Self)
-
-
-    // Can we round-trip rhs through Other?
-    if Other(truncatingIfNeeded: rhsAsSelf) == rhs &&
-      // This additional check covers the `Int8.max < (128 as UInt8)` case.
-      // Since the types are of the same width, init(truncatingIfNeeded:)
-      // will result in a simple bitcast, so that rhsAsSelf would be -128, and
-      // `lhs < rhsAsSelf` will return false.
-      // We basically guard against that bitcast by requiring rhs and rhsAsSelf
-      // to be the same sign.
-      rhsNegative == rhsAsSelfNegative {
-      return lhs < rhsAsSelf
+    // Use bit pattern conversion to widen the comparand with smaller bit width.
+    if Self.isSigned == Other.isSigned {
+      return lhs.bitWidth >= rhs.bitWidth ?
+        lhs < Self(truncatingIfNeeded: rhs) :
+        Other(truncatingIfNeeded: lhs) < rhs
     }
-
-    return Other(truncatingIfNeeded: lhs) < rhs
+    // If `Self` is signed but `Other` is unsigned, then we have to
+    // be a little more careful about widening, since:
+    // (1) a fixed-width signed type can't represent the largest values of
+    //     a fixed-width unsigned type of equal bit width; and
+    // (2) an unsigned type (obviously) can't represent a negative value.
+    if Self.isSigned {
+      return lhs.bitWidth > rhs.bitWidth ? // (1)
+        lhs < Self(truncatingIfNeeded: rhs) :
+        (lhs < (0 as Self) || Other(truncatingIfNeeded: lhs) < rhs) // (2)
+    }
+    // Analogous reasoning applies if `Other` is signed but `Self` is not.
+    return lhs.bitWidth < rhs.bitWidth ?
+      Other(truncatingIfNeeded: lhs) < rhs :
+      (rhs > (0 as Other) && lhs < Self(truncatingIfNeeded: rhs))
   }
 
   /// Returns a Boolean value indicating whether the value of the first
