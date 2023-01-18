@@ -486,12 +486,11 @@ This should print your updated version string.
 
 ## Reproducing an issue
 
-Starter bugs typically have small code examples that fit within a single file.
-You can reproduce such an issue in various ways, such as compiling it from the
-command line using `/path/to/swiftc MyFile.swift`, pasting the code into
-[Compiler Explorer][] (aka godbolt) or using an Xcode Playground.
-
-[Compiler Explorer]: https://godbolt.org
+[Good first issues](https://github.com/apple/swift/contribute) typically have
+small code examples that fit within a single file. You can reproduce such an
+issue in various ways, such as compiling it from the command line using
+`/path/to/swiftc MyFile.swift`, pasting the code into [Compiler Explorer](https://godbolt.org)
+(aka godbolt) or using an Xcode Playground.
 
 For files using frameworks from an SDK bundled with Xcode, you need the pass
 the SDK explicitly. Here are a couple of examples:
