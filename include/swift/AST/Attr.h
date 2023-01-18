@@ -2613,55 +2613,6 @@ public:
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
-/// Semantic attributes that are applied to a declaration.
-///
-/// This attribute list can include attributes that are not written in
-/// source on a declaration, such as attributes that are applied during
-/// macro expansion or inferred from the declaration context.
-class SemanticDeclAttributes {
-  llvm::SmallVector<DeclAttribute *, 4> attrList;
-
-public:
-  SemanticDeclAttributes() {}
-
-  /// Add a constructed DeclAttribute to this list.
-  void add(DeclAttribute *attr) {
-    attrList.push_back(attr);
-  }
-
-  using SemanticAttrList = llvm::SmallVectorImpl<DeclAttribute *>;
-
-  template <typename AttrType, bool AllowInvalid>
-  using AttributeKindRange =
-      OptionalTransformRange<iterator_range<SemanticAttrList::const_iterator>,
-                             ToAttributeKind<AttrType, AllowInvalid>,
-                             SemanticAttrList::const_iterator>;
-
-  template <typename AttrType, bool AllowInvalid = false>
-  AttributeKindRange<AttrType, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<AttrType, AllowInvalid>(
-        make_range(attrList.begin(), attrList.end()),
-                   ToAttributeKind<AttrType, AllowInvalid>());
-  }
-
-  /// Retrieve the first attribute of the given attribute class.
-  template <typename AttrType>
-  const AttrType *getAttribute(bool allowInvalid = false) const {
-    for (auto attr : attrList)
-      if (auto *specificAttr = dyn_cast<AttrType>(attr))
-        if (specificAttr->isValid() || allowInvalid)
-          return specificAttr;
-
-    return nullptr;
-  }
-
-  /// Determine whether there is an attribute with the given attribute class.
-  template <typename AttrType>
-  bool hasAttribute(bool allowInvalid = false) const {
-    return getAttribute<AttrType>(allowInvalid) != nullptr;
-  }
-};
-
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
   // Get a SourceLoc for every possible attribute that can be parsed in source.
