@@ -7,6 +7,11 @@ func swiftTemplateArgNotSupported() {
   var _ = MagicWrapper<Optional>(t: "asdf")
 }
 
+// CHECK: class-template-instantiation-typechecker.swift:12:11: error: could not generate C++ types from the generic Swift types provided. The following Swift type(s) provided to 'MagicWrapperWithExplicitCtor' could not be converted: String.
+func swiftTemplateArgNotSupportedExplicitCtor() {
+  var _ = MagicWrapperWithExplicitCtor<String>("asdf")
+}
+
 // CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
 // CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::CannotBeInstantianted' requested here
 
