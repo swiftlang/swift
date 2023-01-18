@@ -3886,6 +3886,9 @@ ERROR(unresolved_member_no_inference,none,
       (DeclNameRef))
 ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
+ERROR(cannot_infer_concrete_for_opaque_result,none,
+      "cannot infer concrete type for opaque result %0 from return expression",
+      (Type))
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
 ERROR(cannot_force_unwrap_nil_literal,none,
