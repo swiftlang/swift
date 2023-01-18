@@ -32,6 +32,6 @@ public func testFunction() -> String {
     return ""
 }
 
-// CHECK: namespace Swift __attribute__((swift_private)) {
-// CHECK: namespace SwiftMod __attribute__((swift_private)) {
+// CHECK: namespace Swift __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Swift") {
+// CHECK: namespace SwiftMod __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("SwiftMod") {
 // CHECK-NOT: namespace Swift {

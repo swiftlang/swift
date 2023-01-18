@@ -6,12 +6,12 @@
 
 // CHECK-NOT: SWIFT_EXTERN double $s9Functions9asyncFuncyS2dYaF(double x) SWIFT_NOEXCEPT SWIFT_CALL; // asyncFunc(_:)
 
-// CHECK:       namespace Functions __attribute__((swift_private)) {
+// CHECK:       namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
-// CHECK-NOT: inline double asyncFunc(double x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NOT: inline double asyncFunc(double x) noexcept {{.*}}{
 // CHECK-NOT:   return _impl::$s9Functions9asyncFuncyS2dYaF(x);
 // CHECK-NOT: }
 

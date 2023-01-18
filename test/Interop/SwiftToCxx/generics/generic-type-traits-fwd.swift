@@ -28,23 +28,23 @@ public struct LaterGeneric<T> {
 }
 
 
-// CHECK: class LaterGeneric;
+// CHECK: class SWIFT_SYMBOL("s:8Generics12LaterGenericV") LaterGeneric;
 
-// CHECK: class ComesFirstStruct;
+// CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct;
 // CHECK: static inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstStruct> = true;
 
-// CHECK: class ComesFirstEnum;
+// CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum;
 // CHECK: static inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstEnum> = true;
 
-// CHECK: class ComesFirstEnum final {
-// CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const;
+// CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum final {
+// CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO15returnsLaterOptAA0F7GenericVyACGyF");
 
-// CHECK: namespace Generics __attribute__((swift_private)) {
+// CHECK: namespace Generics __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Generics") {
 // CHECK-EMPTY:
 // CHECK-NEXT:  namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT:  class _impl_ComesFirstStruct;
 
-// CHECK: class ComesFirstStruct final {
-// CHECK: LaterGeneric<ComesFirstStruct> returnsLaterOpt() const;
-// CHECK: class LaterGeneric final {
+// CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct final {
+// CHECK: LaterGeneric<ComesFirstStruct> returnsLaterOpt() const SWIFT_SYMBOL("s:8Generics16ComesFirstStructV15returnsLaterOptAA0F7GenericVyACGyF");
+// CHECK: class SWIFT_SYMBOL("s:8Generics12LaterGenericV") LaterGeneric final {

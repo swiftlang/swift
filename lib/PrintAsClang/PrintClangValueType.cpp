@@ -88,7 +88,9 @@ void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
         typeDecl->getGenericSignature().getCanonicalSignature();
     ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
   }
-  os << "class ";
+  os << "class";
+  ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+  os << ' ';
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << ";\n";
   printTypePrecedingGenericTraits(os, typeDecl, typeDecl->getModuleContext());
@@ -259,7 +261,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   // Print out the C++ class itself.
   printGenericSignature(os);
-  os << "class ";
+  os << "class";
+  ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+  os << ' ';
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << " final {\n";
   os << "public:\n";

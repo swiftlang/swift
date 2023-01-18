@@ -4,12 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
-// CHECK: namespace Structs __attribute__((swift_private)) {
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 // CHECK: namespace _impl {
 
-// CHECK: namespace Structs __attribute__((swift_private)) {
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 
-// CHECK: class StructWithIntField;
+// CHECK: class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField;
 // CHECK-NEXT: } // end namespace
 
 // CHECK: namespace swift {
@@ -20,7 +20,7 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
-// CHECK: namespace Structs __attribute__((swift_private)) {
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 
 // CHECK:      namespace _impl {
 // CHECK-EMPTY:
@@ -32,7 +32,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: }
 
-// CHECK:      class StructWithIntField final {
+// CHECK:      class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~StructWithIntField() {
 // CHECK:        }
@@ -95,14 +95,14 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs __attribute__((swift_private)) {
+// CHECK-NEXT: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 
 public struct StructWithIntField {
   let field: Int64
 }
 
 // Special name gets renamed in C++.
-// CHECK: class register_ final {
+// CHECK: class SWIFT_SYMBOL({{.*}}) register_ final {
 // CHECK: alignas(8) char _storage[16];
 // CHECK-NEXT:   friend class
 // CHECK-NEXT: };

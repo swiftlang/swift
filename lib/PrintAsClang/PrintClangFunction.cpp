@@ -903,6 +903,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   os << ')';
   if (modifiers.isConst)
     os << " const";
+  if (modifiers.isNoexcept)
+    os << " noexcept";
+  if (modifiers.hasSymbolUSR)
+    ClangSyntaxPrinter(os).printSymbolUSRAttribute(
+        modifiers.symbolUSROverride ? modifiers.symbolUSROverride : FD);
   return resultingRepresentation;
 }
 
@@ -1309,6 +1314,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst =
       !isa<ClassDecl>(typeDeclContext) && !isMutating && !isConstructor;
+  modifiers.hasSymbolUSR = !isDefinition;
   auto result = printFunctionSignature(
       FD, signature,
       isConstructor ? getConstructorName(FD)
@@ -1373,6 +1379,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   modifiers.isInline = true;
   modifiers.isConst =
       !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
+  modifiers.hasSymbolUSR = !isDefinition;
+  modifiers.symbolUSROverride = accessor->getStorage();
   auto result = printFunctionSignature(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);

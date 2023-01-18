@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-shadow -Wno-unused-function)
 
-// CHECK-LABEL: namespace Functions __attribute__((swift_private)) {
+// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -30,7 +30,7 @@ public enum NaiveErrors : Error {
 @_expose(Cxx)
 public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 
-// CHECK: inline Swift::ThrowingResult<void> emptyThrowFunction() {
+// CHECK: inline Swift::ThrowingResult<void> emptyThrowFunction() SWIFT_SYMBOL("s:9Functions18emptyThrowFunctionyyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(_ctx, &opaqueError);
@@ -56,7 +56,7 @@ public struct DestroyedError : Error {
 @_expose(Cxx)
 public func testDestroyedError() throws { throw DestroyedError() }
 
-// CHECK: inline Swift::ThrowingResult<void> testDestroyedError() {
+// CHECK: inline Swift::ThrowingResult<void> testDestroyedError() SWIFT_SYMBOL("s:9Functions18testDestroyedErroryyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18testDestroyedErroryyKF(_ctx, &opaqueError);
@@ -74,7 +74,7 @@ public func throwFunction() throws {
     throw NaiveErrors.throwError
 }
 
-// CHECK: inline Swift::ThrowingResult<void> throwFunction() {
+// CHECK: inline Swift::ThrowingResult<void> throwFunction() SWIFT_SYMBOL("s:9Functions13throwFunctionyyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions13throwFunctionyyKF(_ctx, &opaqueError);
@@ -95,7 +95,7 @@ public func throwFunctionWithPossibleReturn(_ a: Int) throws -> Int {
     return 0
 }
 
-// CHECK: inline Swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline Swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_SYMBOL("s:9Functions31throwFunctionWithPossibleReturnyS2iKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
@@ -115,7 +115,7 @@ public func throwFunctionWithReturn() throws -> Int {
     return 0
 }
 
-// CHECK: inline Swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline Swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_SYMBOL("s:9Functions23throwFunctionWithReturnSiyKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
