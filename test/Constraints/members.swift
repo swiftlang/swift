@@ -794,3 +794,11 @@ func test_diagnose_inaccessible_member_in_ambiguous_context() {
 
   test(\.x) // expected-error {{'x' is inaccessible due to 'private' protection level}}
 }
+
+// rdar://104302974
+func test_leading_dot_syntax_unknown_base_ambiguity() {
+  func fn<S: StringProtocol, T: Hashable>(_: S, value: T?) {}
+  func fn<T: Hashable>(_: String, value: T?) {}
+
+  fn("", value: .member) // expected-error {{cannot infer contextual base in reference to member 'member'}}
+}
