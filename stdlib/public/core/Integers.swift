@@ -1672,12 +1672,12 @@ extension BinaryInteger {
     if Self.isSigned {    
       return lhs.bitWidth > rhs.bitWidth ? // (1)
         lhs == Self(truncatingIfNeeded: rhs) :
-        lhs < (0 as Self) ? false : Other(truncatingIfNeeded: lhs) == rhs // (2)
+        (lhs >= (0 as Self) && Other(truncatingIfNeeded: lhs) == rhs) // (2)
     }
     // Analogous reasoning applies if `Other` is signed but `Self` is not.
     return lhs.bitWidth < rhs.bitWidth ?
       Other(truncatingIfNeeded: lhs) == rhs :
-      rhs < (0 as Other) ? false : lhs == Self(truncatingIfNeeded: rhs)
+      (rhs >= (0 as Other) && lhs == Self(truncatingIfNeeded: rhs))
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1731,12 +1731,12 @@ extension BinaryInteger {
     if Self.isSigned {
       return lhs.bitWidth > rhs.bitWidth ? // (1)
         lhs < Self(truncatingIfNeeded: rhs) :
-        lhs < (0 as Self) ? true : Other(truncatingIfNeeded: lhs) < rhs // (2)
+        (lhs < (0 as Self) || Other(truncatingIfNeeded: lhs) < rhs) // (2)
     }
     // Analogous reasoning applies if `Other` is signed but `Self` is not.
     return lhs.bitWidth < rhs.bitWidth ?
       Other(truncatingIfNeeded: lhs) < rhs :
-      rhs < (0 as Other) ? false : lhs < Self(truncatingIfNeeded: rhs)
+      (rhs > (0 as Other) && lhs < Self(truncatingIfNeeded: rhs))
   }
 
   /// Returns a Boolean value indicating whether the value of the first
