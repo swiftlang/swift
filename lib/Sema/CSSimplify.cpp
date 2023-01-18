@@ -6171,6 +6171,17 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isPlaceholder())
       return true;
 
+    // The base is a placeholder, let's report an unknown base issue.
+    if (lhs->isPlaceholder()) {
+      auto *baseExpr =
+          castToExpr<UnresolvedMemberChainResultExpr>(anchor)->getChainBase();
+
+      auto *fix = SpecifyBaseTypeForContextualMember::create(
+          *this, baseExpr->getName(), getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
