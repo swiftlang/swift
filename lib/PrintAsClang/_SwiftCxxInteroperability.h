@@ -31,6 +31,29 @@
 // FIXME: Use always_inline, artificial.
 #define SWIFT_INLINE_THUNK inline
 
+/// The `SWIFT_SYMBOL_MODULE` and `SWIFT_SYMBOL_MODULE_USR` macros apply
+/// `external_source_symbol` Clang attributes to C++ declarations that represent
+/// Swift declarations. This allows Clang to index them as external
+/// declarations, using the specified Swift USR values.
+#if __has_attribute(external_source_symbol)
+#define SWIFT_SYMBOL_MODULE(moduleValue)                                       \
+  __attribute__((external_source_symbol(                                       \
+      language = "Swift", defined_in = moduleValue, generated_declaration)))
+#if __has_attribute(external_source_symbol_with_usr)
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)                         \
+  __attribute__((                                                              \
+      external_source_symbol(language = "Swift", defined_in = moduleValue,     \
+                             generated_declaration, USR = usrValue)))
+#else
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)                         \
+  __attribute__((external_source_symbol(                                       \
+      language = "Swift", defined_in = moduleValue, generated_declaration)))
+#endif
+#else
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)
+#define SWIFT_SYMBOL_MODULE(moduleValue)
+#endif
+
 namespace swift {
 namespace _impl {
 

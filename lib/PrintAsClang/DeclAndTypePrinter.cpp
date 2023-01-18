@@ -731,6 +731,8 @@ private:
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
+      if (elementDecl)
+        syntaxPrinter.printSymbolUSRAttribute(elementDecl);
       os << ";\n";
     };
 
@@ -742,6 +744,7 @@ private:
           [&](const auto &pair) {
             os << "\n    ";
             syntaxPrinter.printIdentifier(pair.first->getNameStr());
+            syntaxPrinter.printSymbolUSRAttribute(pair.first);
           },
           ",");
       // TODO: allow custom name for this special case
@@ -1413,6 +1416,8 @@ private:
         owningPrinter.interopContext, owningPrinter);
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
+    // FIXME: Support throwing exceptions for Swift errors.
+    modifiers.isNoexcept = !funcTy->isThrowing();
     auto result = funcPrinter.printFunctionSignature(
         FD, funcABI.getSignature(), cxx_translation::getNameForCxx(FD),
         resultTy,
@@ -1420,9 +1425,6 @@ private:
         modifiers);
     assert(
         !result.isUnsupported()); // The C signature should be unsupported too.
-    // FIXME: Support throwing exceptions for Swift errors.
-    if (!funcTy->isThrowing())
-      os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";

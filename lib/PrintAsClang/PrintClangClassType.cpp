@@ -58,7 +58,9 @@ void ClangClassTypePrinter::printClassTypeDecl(
     baseClassQualifiedName = "swift::_impl::RefCountedClass";
   }
 
-  os << "class ";
+  os << "class";
+  ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+  os << ' ';
   printer.printBaseName(typeDecl);
   if (typeDecl->isFinal())
     os << " final";
