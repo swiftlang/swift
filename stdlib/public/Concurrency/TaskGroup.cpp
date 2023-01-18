@@ -374,7 +374,7 @@ public:
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
 
   /// Resume waiting task with result from `completedTask`
-  void resumeWaitingTask(AsyncTask *completedTask, TaskGroupStatus &assumed, bool hadErrorResult);
+  void resumeWaitingTask(AsyncTask *completedTask, TaskGroupStatus &assumed, bool hadErrorResult, bool alreadyDecremented = false);
 
   // ==== Status manipulation -------------------------------------------------
 
@@ -415,6 +415,8 @@ public:
   /// A waiting task MUST have been already enqueued in the `waitQueue`.
   TaskGroupStatus statusMarkWaitingAssumeRelease();
 
+  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally);
+
   /// Cancels the group and returns true if was already cancelled before.
   /// After this function returns, the group is guaranteed to be cancelled.
   ///
@@ -427,7 +429,6 @@ public:
   /// This also sets
   bool cancelAll();
 
-  virtual TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) = 0;
 };
 
 [[maybe_unused]]
@@ -494,13 +495,14 @@ struct TaskGroupStatus {
 
   /// Status value decrementing the Ready, Pending and Waiting counters by one.
   TaskGroupStatus completingPendingReadyWaiting(const TaskGroupBase* _Nonnull group) {
-    assert(pendingTasks(group) &&
-           "can only complete waiting task when pending tasks available");
+//    assert(pendingTasks(group) &&
+//           "can only complete waiting task when pending tasks available");
     assert(group->isDiscardingResults() || readyTasks(group) &&
                                            "can only complete waiting task when ready tasks available");
     assert(hasWaitingTask() &&
            "can only complete waiting task when waiting task available");
-    uint64_t change = waiting + onePendingTask;
+    uint64_t change = waiting;
+    change += pendingTasks(group) ? onePendingTask : 0;
     // only while accumulating results does the status contain "ready" bits;
     // so if we're in "discard results" mode, we must not decrement the ready count,
     // as there is no ready count in the status.
@@ -509,11 +511,12 @@ struct TaskGroupStatus {
   }
 
   TaskGroupStatus completingPendingReady(const TaskGroupBase* _Nonnull group) {
-    assert(pendingTasks(group) &&
-           "can only complete waiting task when pending tasks available");
+//    assert(pendingTasks(group) &&
+//           "can only complete waiting task when pending tasks available");
     assert(group->isDiscardingResults() || readyTasks(group) &&
                                            "can only complete waiting task when ready tasks available");
-    auto change = onePendingTask;
+    auto change = 0;
+    change += pendingTasks(group) ? onePendingTask : 0;
     change += group->isAccumulatingResults() ? oneReadyTask : 0;
     return TaskGroupStatus{status - change};
   }
@@ -596,6 +599,39 @@ TaskGroupStatus TaskGroupBase::statusMarkWaitingAssumeRelease() {
   return TaskGroupStatus{old | TaskGroupStatus::waiting};
 }
 
+/// Add a single pending task to the status counter.
+/// This is used to implement next() properly, as we need to know if there
+/// are pending tasks worth suspending/waiting for or not.
+///
+/// Note that the group does *not* store child tasks at all, as they are
+/// stored in the `TaskGroupTaskStatusRecord` inside the current task, that
+/// is currently executing the group. Here we only need the counts of
+/// pending/ready tasks.
+///
+/// If the `unconditionally` parameter is `true` the operation always successfully
+/// adds a pending task, even if the group is cancelled. If the unconditionally
+/// flag is `false`, the added pending count will be *reverted* before returning.
+/// This is because we will NOT add a task to a cancelled group, unless doing
+/// so unconditionally.
+///
+/// Returns *assumed* new status, including the just performed +1.
+TaskGroupStatus TaskGroupBase::statusAddPendingTaskRelaxed(bool unconditionally) {
+
+  auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
+                              std::memory_order_relaxed);
+  auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
+
+  if (!unconditionally && s.isCancelled()) {
+    // revert that add, it was meaningless
+    auto o = status.fetch_sub(TaskGroupStatus::onePendingTask,
+                              std::memory_order_relaxed);
+    s = TaskGroupStatus{o - TaskGroupStatus::onePendingTask};
+  }
+
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "addPending, after = %s", s.to_string(this).c_str());
+  return s;
+}
+
 TaskGroupStatus TaskGroupBase::statusRemoveWaitingRelease() {
   auto old = status.fetch_and(~TaskGroupStatus::waiting,
                               std::memory_order_release);
@@ -642,49 +678,6 @@ public:
     return s;
   }
 
-  /// Add a single pending task to the status counter.
-  /// This is used to implement next() properly, as we need to know if there
-  /// are pending tasks worth suspending/waiting for or not.
-  ///
-  /// Note that the group does *not* store child tasks at all, as they are
-  /// stored in the `TaskGroupTaskStatusRecord` inside the current task, that
-  /// is currently executing the group. Here we only need the counts of
-  /// pending/ready tasks.
-  ///
-  /// If the `unconditionally` parameter is `true` the operation always successfully
-  /// adds a pending task, even if the group is cancelled. If the unconditionally
-  /// flag is `false`, the added pending count will be *reverted* before returning.
-  /// This is because we will NOT add a task to a cancelled group, unless doing
-  /// so unconditionally.
-  ///
-  /// Returns *assumed* new status, including the just performed +1.
-  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) override {
-    auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
-                                std::memory_order_relaxed);
-    auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
-
-    if (!unconditionally && s.isCancelled()) {
-      // revert that add, it was meaningless
-      auto o = status.fetch_sub(TaskGroupStatus::onePendingTask,
-                                std::memory_order_relaxed);
-      s = TaskGroupStatus{o - TaskGroupStatus::onePendingTask};
-    }
-
-    return s;
-  }
-
-  /// Decrement the pending status count.
-  /// Returns the *assumed* new status, including the just performed -1.
-  TaskGroupStatus statusCompletePendingAssumeRelease() {
-    assert(this->isDiscardingResults()
-           && "only a discardResults TaskGroup may use completePending, "
-              "since it avoids updating the ready count, which other groups need.");
-    auto old = status.fetch_sub(TaskGroupStatus::onePendingTask,
-                                std::memory_order_release);
-    assert(TaskGroupStatus{old}.pendingTasks(this) > 0 && "attempted to decrement pending count when it was 0 already");
-    return TaskGroupStatus{old - TaskGroupStatus::onePendingTask};
-  }
-
   virtual void offer(AsyncTask *completed, AsyncContext *context) override;
 
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) override;
@@ -724,37 +717,6 @@ public:
     return TaskGroupStatus{status.load(std::memory_order_acquire)};
   }
 
-  /// Add a single pending task to the status counter.
-  /// This is used to implement next() properly, as we need to know if there
-  /// are pending tasks worth suspending/waiting for or not.
-  ///
-  /// Note that the group does *not* store child tasks at all, as they are
-  /// stored in the `TaskGroupTaskStatusRecord` inside the current task, that
-  /// is currently executing the group. Here we only need the counts of
-  /// pending/ready tasks.
-  ///
-  /// If the `unconditionally` parameter is `true` the operation always successfully
-  /// adds a pending task, even if the group is cancelled. If the unconditionally
-  /// flag is `false`, the added pending count will be *reverted* before returning.
-  /// This is because we will NOT add a task to a cancelled group, unless doing
-  /// so unconditionally.
-  ///
-  /// Returns *assumed* new status, including the just performed +1.
-  TaskGroupStatus statusAddPendingTaskRelaxed(bool unconditionally) override {
-    auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
-                                std::memory_order_relaxed);
-    auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
-
-    if (!unconditionally && s.isCancelled()) {
-      // revert that add, it was meaningless
-      auto o = status.fetch_sub(TaskGroupStatus::onePendingTask,
-                                std::memory_order_relaxed);
-      s = TaskGroupStatus{o - TaskGroupStatus::onePendingTask};
-    }
-
-    return s;
-  }
-
   TaskGroupStatus statusLoadRelaxed() {
     return TaskGroupStatus{status.load(std::memory_order_relaxed)};
   }
@@ -777,9 +739,6 @@ public:
   /// Decrement the pending status count.
   /// Returns the *assumed* new status, including the just performed -1.
   TaskGroupStatus statusCompletePendingAssumeRelease() {
-    assert(this->isDiscardingResults()
-           && "only a discardResults TaskGroup may use completePending, "
-              "since it avoids updating the ready count, which other groups need.");
     auto old = status.fetch_sub(TaskGroupStatus::onePendingTask,
                                 std::memory_order_release);
     assert(TaskGroupStatus{old}.pendingTasks(this) > 0 && "attempted to decrement pending count when it was 0 already");
@@ -1116,7 +1075,6 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p , status:%s", completedTask, statusString().c_str());
 
   // The current ownership convention is that we are *not* given ownership
   // of a retain on completedTask; we're called from the task completion
@@ -1127,6 +1085,8 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
   // transfer ownership of a retain into this function, in which case we
   // will need to release in the other path.
   lock(); // TODO: remove fragment lock, and use status for synchronization
+
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p , status:%s", completedTask, statusString().c_str());
 
   // Immediately increment ready count and acquire the status
   //
@@ -1176,16 +1136,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p, status:%s", completedTask, statusString().c_str());
 
-  // The current ownership convention is that we are *not* given ownership
-  // of a retain on completedTask; we're called from the task completion
-  // handler, and the task will release itself.  So if we need the task
-  // to survive this call (e.g. because there isn't an immediate waiting
-  // task), we will need to retain it, which we do in enqueueCompletedTask.
-  // This is wasteful, and the task completion function should be fixed to
-  // transfer ownership of a retain into this function, in which case we
-  // will need to release in the other path.
   lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // Since we don't maintain ready counts in a discarding group, only load the status.
@@ -1200,59 +1151,57 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     hadErrorResult = true;
   }
 
-  /// If we're the last task we've been waiting for, and there is a waiting task on the group
-  bool lastPendingTaskAndWaitingTask =
-      assumed.pendingTasks(this) == 1 &&
-      assumed.hasWaitingTask();
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p, error:%d, status:%s",
+                             completedTask, hadErrorResult, assumed.to_string(this).c_str());
 
   // Immediately decrement the pending count.
   // We can do this, since in this mode there is no ready count to keep track of,
   // and we immediately discard the result.
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "discard result, hadError:%d, was pending:%llu, status = %s",
                              hadErrorResult, assumed.pendingTasks(this), assumed.to_string(this).c_str());
-  // If this was the last pending task, and there is a waiting task (from waitAll),
-  // we must resume the task; but not otherwise. There cannot be any waiters on next()
-  // while we're discarding results.
-  if (lastPendingTaskAndWaitingTask) {
-    ReadyQueueItem item;
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, offered last pending task, resume waiting task:%p",
-                               waitQueue.load(std::memory_order_relaxed));
-    if (readyQueue.dequeue(item)) {
-      switch (item.getStatus()) {
-        case ReadyStatus::RawError:
-          resumeWaitingTaskWithError(item.getRawError(this), assumed);
-          break;
-        case ReadyStatus::Error:
-          resumeWaitingTask(item.getTask(), assumed, /*hadErrorResult=*/true);
-          break;
-        default:
-          swift_Concurrency_fatalError(0, "only errors can be stored by a discarding task group, yet it wasn't an error!");
-      }
-    } else {
-      resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult);
-    }
-  } else {
-    assert(!lastPendingTaskAndWaitingTask);
+
     if (hadErrorResult && readyQueue.isEmpty()) {
       // a discardResults throwing task group must retain the FIRST error it encounters.
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, completedTask:%p", completedTask);
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, error:%d, completedTask:%p", hadErrorResult, completedTask);
       enqueueCompletedTask(completedTask, /*hadErrorResult=*/hadErrorResult);
     } else {
       // we just are going to discard it.
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer discard the completedTask:%p, status=%s", completedTask, statusString().c_str());
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
     }
 
     auto afterComplete = statusCompletePendingAssumeRelease();
     (void) afterComplete;
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, either more pending tasks, or no waiting task, status:%s",
+    SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, status:%s",
                                afterComplete.to_string(this).c_str());
-  }
 
   // Discarding results mode, immediately treats a child failure as group cancellation.
   // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
   // such that the discarding group can exit as soon as possible.
   if (hadErrorResult) {
     cancelAll();
+  }
+
+  if (afterComplete.hasWaitingTask() && afterComplete.pendingTasks(this) == 0) {
+    ReadyQueueItem priorErrorItem;
+    if (readyQueue.dequeue(priorErrorItem)) {
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, last pending task, prior error found, fail waitingTask:%p",
+                                 waitQueue.load(std::memory_order_relaxed));
+      switch (priorErrorItem.getStatus()) {
+        case ReadyStatus::RawError:
+          resumeWaitingTaskWithError(priorErrorItem.getRawError(this), assumed);
+          break;
+        case ReadyStatus::Error:
+          resumeWaitingTask(priorErrorItem.getTask(), assumed, /*hadErrorResult=*/true, /*alreadyDecremented=*/true);
+          break;
+        default:
+          swift_Concurrency_fatalError(0, "only errors can be stored by a discarding task group, yet it wasn't an error!");
+      }
+    } else {
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, last pending task, completing with completedTask:%p, completedTask.error:%d, waitingTask:%p",
+                                 completedTask, hadErrorResult, waitQueue.load(std::memory_order_relaxed));
+      resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult);
+    }
   }
 
   unlock();
@@ -1262,21 +1211,23 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
 void TaskGroupBase::resumeWaitingTask(
     AsyncTask *completedTask,
     TaskGroupStatus &assumed,
-    bool hadErrorResult) {
+    bool hadErrorResult,
+    bool alreadyDecremented) {
+  auto backup = waitQueue.load(std::memory_order_acquire);
   auto waitingTask = waitQueue.load(std::memory_order_acquire);
   assert(waitingTask && "waitingTask must not be null when attempting to resume it");
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume waiting task = %p, complete with = %p",
-                       waitingTask, completedTask);
+  assert(assumed.hasWaitingTask());
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume waiting task = %p, error:%d, complete with = %p",
+                       waitingTask, hadErrorResult, completedTask);
   while (true) {
     // ==== a) run waiting task directly -------------------------------------
-    assert(assumed.hasWaitingTask());
     // assert(assumed.pendingTasks(this) && "offered to group with no pending tasks!");
     // We are the "first" completed task to arrive,
     // and since there is a task waiting we immediately claim and complete it.
     if (waitQueue.compare_exchange_strong(
         waitingTask, nullptr,
-        /*success*/ std::memory_order_release,
-        /*failure*/ std::memory_order_acquire)) {
+        /*success*/ std::memory_order_seq_cst,
+        /*failure*/ std::memory_order_seq_cst)) {
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
       // In the task-to-thread model, child tasks are always actually
@@ -1296,10 +1247,13 @@ void TaskGroupBase::resumeWaitingTask(
       return;
 
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
-      if (statusCompletePendingReadyWaiting(assumed)) {
+      fprintf(stderr, "[%s:%d](%s) assumed:%s\n", __FILE_NAME__, __LINE__, __FUNCTION__, assumed.to_string(this).c_str());
+      fprintf(stderr, "[%s:%d](%s)     had:%s\n", __FILE_NAME__, __LINE__, __FUNCTION__, this->statusString().c_str());
+
+      if (alreadyDecremented || statusCompletePendingReadyWaiting(assumed)) {
         // Run the task.
         auto result = PollResult::get(completedTask, hadErrorResult);
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume waiting DONE, task = %p, complete with = %p, status  = %s",
+        SWIFT_TASK_GROUP_DEBUG_LOG(this, "resume waiting DONE, task = %p, complete with = %p, status = %s",
                                    waitingTask, completedTask, statusString().c_str());
 
         // Remove the child from the task group's running tasks list.
@@ -1663,8 +1617,8 @@ static void swift_taskGroup_waitAllImpl(
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
 
-  SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl, waiting task = %p, bodyError = %p, status:%s, polled.status = %s",
-                       waitingTask, bodyError, group->statusString().c_str(), to_string(polled.status).c_str());
+  SWIFT_TASK_GROUP_DEBUG_LOG(group, "waitAllImpl, waiting task = %p, bodyError = %p, status:%s, polled.status = %s, status.NOW=%s",
+                       waitingTask, bodyError, group->statusString().c_str(), to_string(polled.status).c_str(), group->statusString().c_str());
 
   switch (polled.status) {
     case PollStatus::MustWait: {
@@ -1797,6 +1751,7 @@ PollResult TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
       statusMarkWaitingAssumeRelease();
+      SWIFT_TASK_GROUP_DEBUG_LOG(this, "waitAll, marked waiting status = %s", statusString().c_str());
       unlock();
       
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
