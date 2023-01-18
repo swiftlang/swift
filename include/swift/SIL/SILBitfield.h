@@ -85,6 +85,9 @@ public:
     unsigned clearMask = mask;
     if (bitfieldID > entity->lastInitializedBitfieldID) {
 
+      if (entity->isMarkedAsDeleted())
+        return;
+
       // The bitfield is not initialized yet in this block.
       // Initialize the bitfield, and also initialize all parent bitfields,
       // which are not initialized, yet. Example:

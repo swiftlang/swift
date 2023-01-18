@@ -52,6 +52,7 @@ namespace swift {
   class SourceManager;
   class TupleType;
   class TypeLoc;
+  class UUID;
   
   struct EnumElementInfo;
 
@@ -902,6 +903,11 @@ public:
   /// Each item will be a declaration, statement, or expression.
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
+  /// Parse the source file via the Swift Parser using the ASTGen library.
+  void parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
+                                Optional<DiagnosticTransaction> &transaction,
+                                bool suppressDiagnostics = false);
+
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
@@ -1018,6 +1024,11 @@ public:
   parseExtendedAvailabilitySpecList(SourceLoc AtLoc, SourceLoc AttrLoc,
                                     StringRef AttrName);
 
+  /// Parse a string literal whose contents can be interpreted as a UUID.
+  ///
+  /// \returns false on success, true on error.
+  bool parseUUIDString(UUID &uuid, Diag<> diag);
+
   /// Parse the Objective-C selector inside @objc
   void parseObjCSelector(SmallVector<Identifier, 4> &Names,
                          SmallVector<SourceLoc, 4> &NameLocs,
@@ -1089,6 +1100,14 @@ public:
   /// Parse a single argument from a @_documentation attribute.
   bool parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
                                            Optional<AccessLevel> &Visibility);
+
+  /// Parse the @declaration attribute.
+  ParserResult<DeclarationAttr> parseDeclarationAttribute(SourceLoc AtLoc,
+                                                          SourceLoc Loc);
+
+  /// Parse the @attached attribute.
+  ParserResult<AttachedAttr> parseAttachedAttribute(SourceLoc AtLoc,
+                                                    SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1179,6 +1198,14 @@ public:
                bool HasLetOrVarKeyword = true);
 
   struct ParsedAccessors;
+
+  bool parseAccessorAfterIntroducer(
+      SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
+      bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+      DeclAttributes &Attributes, ParseDeclOptions Flags,
+      AbstractStorageDecl *storage, SourceLoc StaticLoc, ParserStatus &Status
+  );
+
   ParserStatus parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
                            TypeRepr *ResultType, ParsedAccessors &accessors,
                            AbstractStorageDecl *storage, SourceLoc StaticLoc);
@@ -1196,6 +1223,19 @@ public:
                                        bool &hasEffectfulGet,
                                        AccessorKind currentKind,
                                        SourceLoc const& currentLoc);
+
+  /// Parse accessors provided as a separate list, for use in macro
+  /// expansions.
+  void parseTopLevelAccessors(
+      AbstractStorageDecl *storage, SmallVectorImpl<ASTNode> &items
+  );
+
+  /// Parse the result of attribute macro expansion, which is a floating
+  /// attribute list.
+  ///
+  /// Parsing a floating attribute list will produce a `MissingDecl` with
+  /// the attribute list attached.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
 
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,

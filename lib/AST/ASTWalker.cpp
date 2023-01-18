@@ -403,6 +403,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMissingDecl(MissingDecl *missing) {
+    return false;
+  }
+
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
     return false;
   }
@@ -428,8 +432,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     if (MED->getArgs() && doIt(MED->getArgs()))
       return true;
-    if (MED->getRewritten() && doIt(MED->getRewritten()))
-      return true;
+    for (auto *decl : MED->getRewritten())
+      if (doIt(decl))
+        return true;
     return false;
   }
 
@@ -2005,6 +2010,13 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
 
 bool Traversal::visitVarargTypeRepr(VarargTypeRepr *T) {
   return doIt(T->getElementType());
+}
+
+bool Traversal::visitPackTypeRepr(PackTypeRepr *T) {
+  for (auto &elem : T->getMutableElements())
+    if (doIt(elem))
+      return true;
+  return false;
 }
 
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {

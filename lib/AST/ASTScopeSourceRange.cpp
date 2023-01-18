@@ -51,9 +51,8 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
 
-  auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
-
-  bool childContainedInParent = [&]() {
+  std::function<bool(CharSourceRange)> containedInParent;
+  containedInParent = [&](CharSourceRange childCharRange) {
     // HACK: For code completion. Handle replaced range.
     for (const auto &pair : sourceMgr.getReplacedRanges()) {
       auto originalRange =
@@ -65,10 +64,28 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
         return true;
     }
 
-    return range.contains(childCharRange);
-  }();
+    if (range.contains(childCharRange))
+      return true;
 
-  if (!childContainedInParent) {
+    // If this is from a macro expansion, look at the where the expansion
+    // occurred.
+    auto childBufferID =
+      sourceMgr.findBufferContainingLoc(childCharRange.getStart());
+    auto generatedInfo = sourceMgr.getGeneratedSourceInfo(childBufferID);
+    if (!generatedInfo)
+      return false;
+
+    SourceRange expansionRange = generatedInfo->originalSourceRange;
+    if (expansionRange.isInvalid())
+      return false;
+
+    return containedInParent(
+        Lexer::getCharSourceRangeFromSourceRange(sourceMgr, expansionRange));
+  };
+
+  auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
+
+  if (!containedInParent(childCharRange)) {
     auto &out = verificationError() << "child not contained in its parent:\n";
     child->print(out);
     out << "\n***Parent node***\n";

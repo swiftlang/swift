@@ -1666,12 +1666,20 @@ for host in "${ALL_HOSTS[@]}"; do
 
     if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
         CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
+        if [[ ! -f "${CLANG_BIN}/clang" ]] ; then
+            echo "error: clang does not exist at the specified native tools path: ${CLANG_BIN}/clang"
+            exit 1
+        fi
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
     fi
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
+        if [[ ! -f "${SWIFTC_BIN}" ]] ; then
+            echo "error: swiftc does not exist at the specified native tools path: ${SWIFTC_BIN}"
+            exit 1
+        fi
     else
         SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
     fi

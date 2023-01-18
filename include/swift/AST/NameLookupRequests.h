@@ -323,11 +323,14 @@ private:
                                        ExtensionDecl *ext) const;
 };
 
-/// Request the nominal type declaration to which the given custom attribute
-/// refers.
-class CustomAttrNominalRequest :
-    public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
+using MacroOrNominalTypeDecl =
+    llvm::PointerUnion<MacroDecl *, NominalTypeDecl *>;
+
+/// Request the macro or nominal type declaration to which the given custom
+/// attribute refers.
+class CustomAttrDeclRequest :
+    public SimpleRequest<CustomAttrDeclRequest,
+                         MacroOrNominalTypeDecl(CustomAttr *, DeclContext *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -336,7 +339,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
+  MacroOrNominalTypeDecl
   evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
 
 public:

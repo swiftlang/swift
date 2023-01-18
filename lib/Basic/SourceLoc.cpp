@@ -32,6 +32,7 @@ void SourceManager::verifyAllBuffers() const {
     arbitraryTotal += buffer->getBufferStart()[0];
     arbitraryTotal += buffer->getBufferEnd()[-1];
   }
+  (void)arbitraryTotal;
 }
 
 SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
@@ -259,7 +260,10 @@ void SourceManager::setGeneratedSourceInfo(
   GeneratedSourceInfos[bufferID] = info;
 
   switch (info.kind) {
-  case GeneratedSourceInfo::MacroExpansion:
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 

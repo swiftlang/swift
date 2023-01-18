@@ -164,15 +164,10 @@ extension Function {
 public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
   public var arguments: [ArgumentEffect]
 
-  public func canEscape(argumentIndex: Int, path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
+  public func canEscape(argumentIndex: Int, path: SmallProjectionPath) -> Bool {
     return !arguments.contains(where: {
       if case .notEscaping = $0.kind, $0.argumentIndex == argumentIndex {
-
-        // Any address of a class property of an object, which is passed to the function, cannot
-        // escape the function. Whereas a value stored in such a property could escape.
-        let p = (analyzeAddresses ? path.popLastClassAndValuesFromTail() : path)
-
-        if p.matches(pattern: $0.pathPattern) {
+        if path.matches(pattern: $0.pathPattern) {
           return true
         }
       }

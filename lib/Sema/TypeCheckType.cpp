@@ -141,6 +141,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::None:
   case TypeResolverContext::Inherited:
   case TypeResolverContext::FunctionInput:
+  case TypeResolverContext::PackElement:
   case TypeResolverContext::TupleElement:
   case TypeResolverContext::GenericArgument:
   case TypeResolverContext::ProtocolGenericArgument:
@@ -2034,6 +2035,8 @@ namespace {
                                   TypeResolutionOptions options);
     NeverNullType resolveVarargType(VarargTypeRepr *repr,
                                     TypeResolutionOptions options);
+    NeverNullType resolvePackType(PackTypeRepr *repr,
+                                  TypeResolutionOptions options);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
     NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
@@ -2230,6 +2233,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Vararg:
     return resolveVarargType(cast<VarargTypeRepr>(repr), options);
+
+  case TypeReprKind::Pack:
+    return resolvePackType(cast<PackTypeRepr>(repr), options);
 
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
@@ -4108,6 +4114,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::PatternBindingDecl:
     doDiag = !isDirect;
     break;
+  case TypeResolverContext::PackElement:
   case TypeResolverContext::TupleElement:
   case TypeResolverContext::GenericArgument:
   case TypeResolverContext::ProtocolGenericArgument:
@@ -4218,6 +4225,32 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   return element;
+}
+
+NeverNullType TypeResolver::resolvePackType(PackTypeRepr *repr,
+                                            TypeResolutionOptions options) {
+  // This form is currently only allowed in SIL, so we're lax about
+  // where we allow this.  If this is ever made a proper language feature,
+  // it should only be allowed in contexts where an expansion would be
+  // allowed and where structure could be ambiguous.  That really just
+  // means generic argument lists.
+  //
+  // Its presence should also affect how arguments are implicitly grouped
+  // into packs, of course.
+
+  auto elementReprs = repr->getElements();
+  SmallVector<Type, 8> elementTypes;
+  elementTypes.reserve(elementReprs.size());
+
+  auto elementOptions = options;
+  elementOptions.setContext(TypeResolverContext::PackElement);
+
+  for (auto elementRepr : elementReprs) {
+    auto elementType = resolveType(elementRepr, elementOptions);
+    elementTypes.push_back(elementType);
+  }
+
+  return PackType::get(getASTContext(), elementTypes);
 }
 
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
@@ -4789,6 +4822,7 @@ public:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::Vararg:
+    case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackReference:
       return false;
@@ -4988,7 +5022,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via
-  // CustomAttrNominalRequest.
+  // CustomAttrDeclRequest.
   auto checkType = [](Type type) -> bool {
     while (auto *genericDecl = type->getAnyGeneric()) {
       if (isa<NominalTypeDecl>(genericDecl))

@@ -45,6 +45,7 @@ import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import CharacterProperties
+import CharacterRecognizer
 import Chars
 import ClassArrayGetter
 import CodableTest
@@ -230,6 +231,7 @@ register(ChainedFilterMap.benchmarks)
 register(CharacterLiteralsLarge.benchmarks)
 register(CharacterLiteralsSmall.benchmarks)
 register(CharacterProperties.benchmarks)
+register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)

@@ -10,9 +10,10 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import Runtime
+import _Runtime
 
 extension KeyPath {
+  @available(SwiftStdlib 5.9, *)
   @usableFromInline
   static func create(for field: Field) -> KeyPath {
     let result = Builtin.allocWithTailElems_1(
@@ -49,6 +50,7 @@ extension KeyPath {
   }
 }
 
+@available(SwiftStdlib 5.9, *)
 extension Case {
   @inlinable
   public func get(from instance: Any) -> Any? {

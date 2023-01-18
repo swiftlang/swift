@@ -1311,10 +1311,17 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
         ASTNode::getFromOpaqueValue(generatedInfo->astNode);
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::MacroExpansion: {
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::AccessorMacroExpansion:
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName;
-      if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+      if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {
+        // FIXME: How will we handle deserialized custom attributes like this?
+        auto declRefType = dyn_cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
+        macroName = declRefType->getNameRef().getFullName();
+      } else if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
               expansionNode.dyn_cast<Expr *>())) {
         macroName = expansionExpr->getMacroName().getFullName();
       } else {

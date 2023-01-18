@@ -257,11 +257,15 @@ swift::checkGlobalActorAttributes(
   NominalTypeDecl *globalActorNominal = nullptr;
   for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
-    auto nominal = evaluateOrDefault(ctx.evaluator,
-                                     CustomAttrNominalRequest{attr, dc},
-                                     nullptr);
+    auto found = evaluateOrDefault(ctx.evaluator,
+                                   CustomAttrDeclRequest{attr, dc},
+                                    nullptr);
 
     // Ignore unresolvable custom attributes.
+    if (!found)
+      continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
       continue;
 
@@ -3517,6 +3521,7 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Class:
   case DeclKind::Enum:
@@ -5194,6 +5199,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::PatternBinding:

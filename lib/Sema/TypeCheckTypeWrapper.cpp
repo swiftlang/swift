@@ -123,9 +123,13 @@ static void getTypeWrappers(NominalTypeDecl *decl,
   // Attributes applied directly to the type.
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
-    auto *nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{mutableAttr, decl}, nullptr);
+    auto found = evaluateOrDefault(
+        ctx.evaluator, CustomAttrDeclRequest{mutableAttr, decl}, nullptr);
 
+    if (!found)
+      continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
       continue;
 

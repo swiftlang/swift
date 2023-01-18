@@ -1824,6 +1824,9 @@ static bool shouldSerializeMember(Decl *D) {
       return false;
     llvm_unreachable("decl should never be a member");
 
+  case DeclKind::Missing:
+    llvm_unreachable("attempting to serialize a missing decl");
+
   case DeclKind::MissingMember:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
@@ -2210,6 +2213,36 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
+}
+
+static uint8_t getRawStableMacroRole(swift::MacroRole context) {
+  switch (context) {
+#define CASE(NAME) \
+  case swift::MacroRole::NAME: \
+    return static_cast<uint8_t>(serialization::MacroRole::NAME);
+  CASE(Expression)
+  CASE(FreestandingDeclaration)
+  CASE(Accessor)
+  CASE(MemberAttribute)
+  }
+#undef CASE
+  llvm_unreachable("bad result declaration macro kind");
+  }
+
+static uint8_t getRawStableMacroIntroducedDeclNameKind(
+    swift::MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(NAME) \
+  case swift::MacroIntroducedDeclNameKind::NAME: \
+    return static_cast<uint8_t>(serialization::MacroIntroducedDeclNameKind::NAME);
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+  }
+#undef CASE
+  llvm_unreachable("bad result macro-introduced decl name kind");
 }
 
 #ifndef NDEBUG
@@ -2944,6 +2977,46 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
+
+    case DAK_Declaration: {
+      auto *theAttr = cast<DeclarationAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[DeclarationDeclAttrLayout::Code];
+      auto rawMacroRole =
+          getRawStableMacroRole(theAttr->getMacroRole());
+      SmallVector<IdentifierID, 4> introducedDeclNames;
+      for (auto name : theAttr->getPeerAndMemberNames()) {
+        introducedDeclNames.push_back(IdentifierID(
+            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
+        introducedDeclNames.push_back(
+            S.addDeclBaseNameRef(name.getIdentifier()));
+      }
+
+      DeclarationDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          rawMacroRole, theAttr->getPeerNames().size(),
+          theAttr->getMemberNames().size(), introducedDeclNames);
+      return;
+    }
+
+    case DAK_Attached: {
+      auto *theAttr = cast<AttachedAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[AttachedDeclAttrLayout::Code];
+      auto rawMacroRole =
+          getRawStableMacroRole(theAttr->getMacroRole());
+      SmallVector<IdentifierID, 4> introducedDeclNames;
+      for (auto name : theAttr->getNames()) {
+        introducedDeclNames.push_back(IdentifierID(
+            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
+        introducedDeclNames.push_back(
+            S.addDeclBaseNameRef(name.getIdentifier()));
+      }
+
+      AttachedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          rawMacroRole, theAttr->getNames().size(),
+          introducedDeclNames);
       return;
     }
     }
@@ -4394,6 +4467,10 @@ public:
 
   void visitModuleDecl(const ModuleDecl *) {
     llvm_unreachable("module decls are not serialized");
+  }
+
+  void visitMissingDecl(const MissingDecl *) {
+    llvm_unreachable("missing decls are not serialized");
   }
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {

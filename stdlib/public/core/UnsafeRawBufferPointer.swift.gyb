@@ -148,8 +148,21 @@ extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
   public mutating func next() -> UInt8? {
     if _position == _end { return nil }
 
-    let result = _position!.load(as: UInt8.self)
-    _position! += 1
+    // We can do an unchecked unwrap here by borrowing invariants from the pointer.
+    // For a validly constructed buffer pointer, the only way _position can be nil is
+    // if _end is also nil. We checked that case above. Thus, we can safely do an
+    // unchecked unwrap here.
+    //
+    // Additionally, validly constructed buffer pointers also have an _end that is
+    // strictly greater than or equal to _position, and so we do not need to do checked
+    // arithmetic here as we cannot possibly overflow.
+    //
+    // We check these invariants in debug builds to defend against invalidly constructed
+    // pointers.
+    _debugPrecondition(_position! < _end!)
+    let position = _position._unsafelyUnwrappedUnchecked
+    let result = position.load(as: UInt8.self)
+    _position = position + 1
     return result
   }
 }

@@ -33,6 +33,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/KnownProtocols.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
@@ -1711,7 +1712,7 @@ public:
   }
 
 private:
-  friend class CustomAttrNominalRequest;
+  friend class CustomAttrDeclRequest;
   void resetTypeInformation(TypeExpr *repr);
 
 private:
@@ -2302,6 +2303,84 @@ public:
   }
 };
 
+class DeclarationAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DeclarationAttr, MacroIntroducedDeclName> {
+  friend TrailingObjects;
+
+  MacroRole role;
+  unsigned numPeerNames, numMemberNames;
+
+  DeclarationAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
+                  ArrayRef<MacroIntroducedDeclName> peerNames,
+                  ArrayRef<MacroIntroducedDeclName> memberNames,
+                  bool implicit);
+
+public:
+  static DeclarationAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                                 SourceRange range, MacroRole role,
+                                 ArrayRef<MacroIntroducedDeclName> peerNames,
+                                 ArrayRef<MacroIntroducedDeclName> memberNames,
+                                 bool implicit);
+
+  size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
+    return numPeerNames + numMemberNames;
+  }
+
+  MacroRole getMacroRole() const { return role; }
+  ArrayRef<MacroIntroducedDeclName> getPeerAndMemberNames() const;
+  ArrayRef<MacroIntroducedDeclName> getPeerNames() const;
+  ArrayRef<MacroIntroducedDeclName> getMemberNames() const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Declaration;
+  }
+};
+
+/// The @attached attribute, which declares that a given macro can be
+/// "attached" as an attribute to declarations.
+class AttachedAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<AttachedAttr, MacroIntroducedDeclName> {
+  friend TrailingObjects;
+
+  MacroRole role;
+  unsigned numNames;
+
+  AttachedAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
+               ArrayRef<MacroIntroducedDeclName> names,
+               bool implicit);
+
+public:
+  static AttachedAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                              SourceRange range, MacroRole role,
+                              ArrayRef<MacroIntroducedDeclName> names,
+                              bool implicit);
+
+  size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
+    return numNames;
+  }
+
+  MacroRole getMacroRole() const { return role; }
+  ArrayRef<MacroIntroducedDeclName> getNames() const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Attached;
+  }
+};
+
+/// Predicate used to filter MatchingAttributeRange.
+template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
+  ToAttributeKind() {}
+
+  Optional<const ATTR *>
+  operator()(const DeclAttribute *Attr) const {
+    if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+      return cast<ATTR>(Attr);
+    return None;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2475,19 +2554,6 @@ public:
          const_cast<const DeclAttributes *>(this)->getEffectiveSendableAttr());
   }
 
-private:
-  /// Predicate used to filter MatchingAttributeRange.
-  template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
-    ToAttributeKind() {}
-
-    Optional<const ATTR *>
-    operator()(const DeclAttribute *Attr) const {
-      if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
-        return cast<ATTR>(Attr);
-      return None;
-    }
-  };
-
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
@@ -2541,6 +2607,55 @@ public:
   }
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
+};
+
+/// Semantic attributes that are applied to a declaration.
+///
+/// This attribute list can include attributes that are not written in
+/// source on a declaration, such as attributes that are applied during
+/// macro expansion or inferred from the declaration context.
+class SemanticDeclAttributes {
+  llvm::SmallVector<DeclAttribute *, 4> attrList;
+
+public:
+  SemanticDeclAttributes() {}
+
+  /// Add a constructed DeclAttribute to this list.
+  void add(DeclAttribute *attr) {
+    attrList.push_back(attr);
+  }
+
+  using SemanticAttrList = llvm::SmallVectorImpl<DeclAttribute *>;
+
+  template <typename AttrType, bool AllowInvalid>
+  using AttributeKindRange =
+      OptionalTransformRange<iterator_range<SemanticAttrList::const_iterator>,
+                             ToAttributeKind<AttrType, AllowInvalid>,
+                             SemanticAttrList::const_iterator>;
+
+  template <typename AttrType, bool AllowInvalid = false>
+  AttributeKindRange<AttrType, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<AttrType, AllowInvalid>(
+        make_range(attrList.begin(), attrList.end()),
+                   ToAttributeKind<AttrType, AllowInvalid>());
+  }
+
+  /// Retrieve the first attribute of the given attribute class.
+  template <typename AttrType>
+  const AttrType *getAttribute(bool allowInvalid = false) const {
+    for (auto attr : attrList)
+      if (auto *specificAttr = dyn_cast<AttrType>(attr))
+        if (specificAttr->isValid() || allowInvalid)
+          return specificAttr;
+
+    return nullptr;
+  }
+
+  /// Determine whether there is an attribute with the given attribute class.
+  template <typename AttrType>
+  bool hasAttribute(bool allowInvalid = false) const {
+    return getAttribute<AttrType>(allowInvalid) != nullptr;
+  }
 };
 
 /// TypeAttributes - These are attributes that may be applied to types.

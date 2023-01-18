@@ -556,6 +556,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData;
 
+  case SILInstructionKind::OpenPackElementInst:
+    // We do potentially have to build type metadata as part of this
+    // instruction (if we have to materialize a concrete pack).
+    // The interface doesn't let us be specific about what metadata,
+    // though.
+    impactType = SILType();
+    return RuntimeEffect::MetaData;
+
   case SILInstructionKind::OpenExistentialAddrInst:
     if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
         OpenedExistentialAccess::Mutable)

@@ -1627,6 +1627,8 @@ namespace  {
     UNINTERESTING_ATTR(RuntimeMetadata)
 
     UNINTERESTING_ATTR(Expression)
+    UNINTERESTING_ATTR(Declaration)
+    UNINTERESTING_ATTR(Attached)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

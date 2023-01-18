@@ -268,7 +268,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.8")
+set(SWIFT_VERSION "5.9")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -568,6 +568,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
 
 option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
+  FALSE)
+
+option(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION
+  "Enable build of the Swift reflection module"
   FALSE)
 
 option(SWIFT_ENABLE_DISPATCH
@@ -1115,6 +1119,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
+  message(STATUS "Reflection Support:                 ${SWIFT_ENABLE_EXPERIMENTAL_REFLECTION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")

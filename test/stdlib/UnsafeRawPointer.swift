@@ -54,6 +54,23 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   expectEqual(5, Missile.missilesLaunched)
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemorySingleElement")
+.skip(.custom({
+   if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+ }, reason: "Requires standard library from Swift 5.8"))
+.code {
+  Missile.missilesLaunched = 0
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: MemoryLayout<Missile>.stride, alignment: MemoryLayout<Missile>.alignment
+  )
+  defer { p1.deallocate() }
+  var p2 = p1.initializeMemory(as: Missile.self, to: Missile(1))
+  expectEqual(1, p2.pointee.number)
+  expectEqual(p1, p2)
+  p2.deinitialize()
+  expectEqual(Missile.missilesLaunched, 1)
+}
+
 UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
   let p1 = UnsafeMutableRawPointer.allocate(

@@ -842,7 +842,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
-  Cloner.registerOpenedExistentialRemapping(
+  Cloner.registerLocalArchetypeRemapping(
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
 

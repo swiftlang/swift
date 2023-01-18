@@ -114,6 +114,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   assert(isFuture());
   auto fragment = futureFragment();
 
+  // NOTE: this acquire synchronizes with `completeFuture`.
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
   bool contextInitialized = false;
   auto escalatedPriority = JobPriority::Unspecified;
@@ -214,6 +215,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     continue;
 #else
     // Put the waiting task at the beginning of the wait queue.
+    // NOTE: this acquire-release synchronizes with `completeFuture`.
     waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
@@ -267,8 +269,10 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     hadErrorResult ? Status::Error : Status::Success,
     nullptr
   );
+
+  // NOTE: this acquire-release synchronizes with `waitFuture`.
   auto queueHead = fragment->waitQueue.exchange(
-      newQueueHead, std::memory_order_acquire);
+      newQueueHead, std::memory_order_acq_rel);
   assert(queueHead.getStatus() == Status::Executing);
 
   // If this is task group child, notify the parent group about the completion.

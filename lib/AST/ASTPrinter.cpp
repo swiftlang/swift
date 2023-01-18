@@ -2938,6 +2938,10 @@ static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
 
 static bool usesFeatureBuiltinUnprotectedAddressOf(Decl *) { return false; }
 
+static bool usesFeatureBuiltinCreateTaskGroupWithFlags(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
@@ -4465,6 +4469,10 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
 
+void PrintAST::visitMissingDecl(MissingDecl *missing) {
+  Printer << "missing_decl";
+}
+
 void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << "/* placeholder for ";
   recordDeclLoc(decl, [&]{ Printer << decl->getName(); });
@@ -5416,6 +5424,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto existential = dyn_cast<ExistentialMetatypeType>(T.getPointer())) {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getInstanceType());
+    } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
+      if (param->isParameterPack() && Options.PrintExplicitEach)
+        return false;
+    } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
+      if (archetype->isParameterPack() && Options.PrintExplicitEach)
+        return false;
     }
     return T->hasSimpleTypeRepr();
   }
@@ -5731,8 +5745,11 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    visit(T->getPatternType());
-    Printer << "...";
+    PrintOptions innerOptions = Options;
+    innerOptions.PrintExplicitEach = true;
+
+    Printer << "repeat ";
+    TypePrinter(Printer, innerOptions).visit(T->getPatternType());
   }
 
   void visitTupleType(TupleType *T) {
@@ -6567,10 +6584,16 @@ public:
     }
   }
 
+  void printEach() {
+    if (Options.PrintExplicitEach)
+      Printer << "each ";
+  }
+
   void printArchetypeCommon(ArchetypeType *T) {
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
       if (found != Options.AlternativeTypeNames->end()) {
+        if (T->isParameterPack()) printEach();
         Printer << found->second.str();
         return;
       }
@@ -6683,12 +6706,17 @@ public:
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
+    auto printPrefix = [&]{
+      if (T->isParameterPack()) printEach();
+    };
+
     auto decl = T->getDecl();
     if (!decl) {
       // If we have an alternate name for this type, use it.
       if (Options.AlternativeTypeNames) {
         auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
         if (found != Options.AlternativeTypeNames->end()) {
+          printPrefix();
           Printer << found->second.str();
           return;
         }
@@ -6705,6 +6733,7 @@ public:
       // If we have and should print based on the type representation, do so.
       if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
         if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
+          printPrefix();
           opaqueRepr->print(Printer, Options);
           return;
         }
@@ -6721,6 +6750,8 @@ public:
       constraintType->print(Printer, Options);
       return;
     }
+
+    printPrefix();
 
     const auto Name = T->getName();
     if (Name.empty()) {

@@ -2944,10 +2944,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     swiftParams.push_back(var);
   };
 
-  // Determine the number of parameters.
-  unsigned numEffectiveParams = params.size();
-  if (errorInfo) --numEffectiveParams;
-
   auto argNames = importedName.getDeclName().getArgumentNames();
   unsigned nameIndex = 0;
   for (size_t paramIndex = 0, e = params.size(); paramIndex != e;

@@ -318,8 +318,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
   for (auto *Pred : FailurePreds) {
     TermInst *TI = Pred->getTerminator();
     // Replace branch to BB by branch to TargetFailureBB.
-    replaceBranchTarget(TI, CCBBlock, TargetFailureBB,
-    /*PreserveArgs=*/true);
+    TI->replaceBranchTarget(CCBBlock, TargetFailureBB);
   }
   Cloner.updateSSAAfterCloning();
 }
@@ -370,8 +369,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
   for (auto *Pred : SuccessPreds) {
     TermInst *TI = Pred->getTerminator();
     // Replace branch to BB by branch to TargetSuccessBB.
-    replaceBranchTarget(TI, CCBBlock, clonedCCBBlock,
-                        /*PreserveArgs=*/true);
+    TI->replaceBranchTarget(CCBBlock, clonedCCBBlock);
   }
   // Remove the unreachable checked_cast_br target.
   auto *clonedCCBI =

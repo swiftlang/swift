@@ -19,8 +19,10 @@ import SIL
 /// instruction and blocks from which all paths end in "unreachable" blocks.
 struct DeadEndBlocks : CustomStringConvertible, NoReflectionChildren {
   private var worklist: BasicBlockWorklist
+  private var function: Function
   
-  init(function: Function, _ context: PassContext) {
+  init(function: Function, _ context: FunctionPassContext) {
+    self.function = function
     self.worklist = BasicBlockWorklist(context)
     
     // Initialize the worklist with all function-exiting blocks.
@@ -40,7 +42,7 @@ struct DeadEndBlocks : CustomStringConvertible, NoReflectionChildren {
   }
 
   var description: String {
-    let blockNames = worklist.function.blocks.filter(isDeadEnd).map(\.name)
+    let blockNames = function.blocks.filter(isDeadEnd).map(\.name)
     return "[" + blockNames.joined(separator: ",") + "]"
   }
 

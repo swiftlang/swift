@@ -74,15 +74,6 @@ TermInst *deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 void erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
                       bool cleanupDeadPhiOp = true);
 
-/// Replace a branch target.
-///
-/// \param t The terminating instruction to modify.
-/// \param oldDest The successor block that will be replaced.
-/// \param newDest The new target block.
-/// \param preserveArgs If set, preserve arguments on the replaced edge.
-void replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
-                         SILBasicBlock *newDest, bool preserveArgs);
-
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
 

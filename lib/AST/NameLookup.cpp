@@ -31,6 +31,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -2552,6 +2553,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::Pack:
     return { };
 
   case TypeReprKind::OpaqueReturn:
@@ -3038,9 +3040,57 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+/// Perform lookup to determine whether the given custom attribute refers to
+/// a macro declaration, and return that macro declaration.
+static MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
+  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+  if (!identTypeRepr)
+    return nullptr;
+
+  // Look for macros at module scope. They can only occur at module scope, and
+  // we need to be sure not to trigger name lookup into type contexts along
+  // the way.
+  llvm::TinyPtrVector<MacroDecl *> macros;
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+  UnqualifiedLookupDescriptor descriptor(
+      identTypeRepr->getNameRef(), moduleScopeDC
+  );
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &result : lookup.allResults()) {
+    // Only keep attached macros, which can be spelled as custom attributes.
+    if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
+      if (isAttachedMacro(macro->getMacroRoles()))
+        macros.push_back(macro);
+  }
+
+  if (macros.empty())
+    return nullptr;
+
+  if (macros.size() > 1) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::ambiguous_macro_reference,
+                       identTypeRepr->getNameRef().getFullName());
+
+    for (auto macro : macros) {
+      macro->diagnose(
+          diag::kind_declname_declared_here, macro->getDescriptiveKind(),
+          macro->getName());
+    }
+  }
+
+  return macros.front();
+}
+
+MacroOrNominalTypeDecl
+CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
+                                CustomAttr *attr, DeclContext *dc) const {
+  // Look for names at module scope, so we don't trigger name lookup for
+  // nested scopes. At this point, we're looking to see whether there are
+  // any suitable macros.
+  if (auto macro = findMacroForCustomAttr(attr, dc))
+    return macro;
+
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
   DirectlyReferencedTypeDecls decls;

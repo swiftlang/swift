@@ -3757,20 +3757,14 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
-    lookupMacros(
-        Identifier macroName, SourceLoc loc, FunctionRefKind functionRefKind
-    ) {
-      auto result = TypeChecker::lookupUnqualified(
-          CurDC, DeclNameRef(macroName), loc,
-          (defaultUnqualifiedLookupOptions |
-           NameLookupFlags::IncludeOuterResults));
-
+    lookupMacros(Identifier macroName, SourceLoc loc,
+                 FunctionRefKind functionRefKind) {
       SmallVector<OverloadChoice, 1> choices;
-      for (const auto &found : result.allResults()) {
-        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
-          OverloadChoice choice = OverloadChoice(Type(), macro, functionRefKind);
-          choices.push_back(choice);
-        }
+      auto results = TypeChecker::lookupMacros(
+          CurDC, DeclNameRef(macroName), loc, MacroRole::Expression);
+      for (const auto &result : results) {
+        OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
+        choices.push_back(choice);
       }
 
       // FIXME: At some point, we need to check for function-like macros without

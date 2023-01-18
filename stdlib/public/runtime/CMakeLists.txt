@@ -70,7 +70,6 @@ set(swift_runtime_sources
     SwiftTLSContext.cpp
     ThreadingError.cpp
     AccessibleFunction.cpp
-    RuntimeAttribute.cpp
     Win32.cpp)
 
 # Acknowledge that the following sources are known.

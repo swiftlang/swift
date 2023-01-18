@@ -1597,6 +1597,20 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
+SmallVector<MacroDecl *, 1>
+TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
+                          SourceLoc loc, MacroRoles contexts) {
+  auto result = lookupUnqualified(dc, DeclNameRef(macroName), loc,
+                                  (defaultUnqualifiedLookupOptions |
+                                      NameLookupFlags::IncludeOuterResults));
+  SmallVector<MacroDecl *, 1> choices;
+  for (const auto &found : result.allResults())
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
+      if (contexts.contains(macro->getMacroRoles()))
+        choices.push_back(macro);
+  return choices;
+}
+
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -2318,6 +2332,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::OpaqueType:

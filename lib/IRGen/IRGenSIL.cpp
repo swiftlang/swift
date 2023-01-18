@@ -1259,6 +1259,8 @@ public:
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
+  void visitOpenPackElementInst(swift::OpenPackElementInst *i);
+
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
@@ -2657,6 +2659,9 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
+
+    if (name.equals("swift_taskGroup_waitAll"))
+      return SpecialKind::TaskGroupWaitAll;
 
     if (name.equals("swift_distributed_execute_target"))
       return SpecialKind::DistributedExecuteTarget;
@@ -6739,6 +6744,15 @@ void IRGenSILFunction::visitOpenExistentialMetatypeInst(
 void IRGenSILFunction::visitOpenExistentialValueInst(
     OpenExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
+}
+
+void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndexOperand());
+
+  // FIXME: bind the archetypes
+  (void) index;
+
+  // The result is just used for type dependencies.
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){

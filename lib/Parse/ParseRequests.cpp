@@ -164,16 +164,39 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state);
   PrettyStackTraceParser StackTrace(parser);
 
-  // If the buffer is generated source information that is conceptually within
-  // a particular declaration context, use that for the parser's declaration
-  // context instead of the source file.
+  // If the buffer is generated source information, we might have more
+  // context that we need to set up for parsing.
+  SmallVector<ASTNode, 128> items;
   if (auto generatedInfo = ctx.SourceMgr.getGeneratedSourceInfo(*bufferID)) {
     if (generatedInfo->declContext)
       parser.CurDeclContext = generatedInfo->declContext;
-  }
 
-  SmallVector<ASTNode, 128> items;
-  parser.parseTopLevelItems(items);
+    switch (generatedInfo->kind) {
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::PrettyPrinted: {
+      parser.parseTopLevelItems(items);
+      break;
+    }
+
+    case GeneratedSourceInfo::AccessorMacroExpansion: {
+      ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
+      auto attachedDecl = astNode.get<Decl *>();
+      auto accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
+
+      parser.parseTopLevelAccessors(accessorsForStorage, items);
+      break;
+    }
+
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
+      parser.parseExpandedAttributeList(items);
+      break;
+    }
+    }
+  } else {
+    parser.parseTopLevelItems(items);
+  }
 
   Optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = parser.takeTokenReceiver()->finalize())

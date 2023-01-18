@@ -1,5 +1,5 @@
 import XCTest
-import Runtime
+import _Runtime
 
 enum TypeMetadataTests {
   struct Struct<T> {
@@ -81,7 +81,6 @@ extension RuntimeTests {
     XCTAssertEqual(weirdMeta.descriptor.name, "WeirdClass")
     
     let weirdGenericArg = weirdMeta.genericArguments.load(as: Any.Type.self)
-    print(weirdGenericArg)
     
     XCTAssert(weirdGenericArg == Float.self)
   }

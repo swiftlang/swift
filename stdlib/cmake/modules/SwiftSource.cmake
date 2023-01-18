@@ -298,6 +298,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_REFLECTION")
+  endif()
+
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()

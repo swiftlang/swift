@@ -36,7 +36,7 @@ public struct FileIDMacro: ExpressionMacro {
   public static func expansion(
     of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
   ) -> ExprSyntax {
-    let fileLiteral: ExprSyntax = #""\#(context.moduleName)/\#(context.fileName)""#
+    let fileLiteral: ExprSyntax = #""\#(raw: context.moduleName)/\#(raw: context.fileName)""#
     if let leadingTrivia = macro.leadingTrivia {
       return fileLiteral.withLeadingTrivia(leadingTrivia)
     }
@@ -82,9 +82,9 @@ public enum AddBlocker: ExpressionMacro {
     }
 
     // Link the folded argument back into the tree.
-    var node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
+    let node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
 
-   class AddVisitor: SyntaxRewriter {
+    class AddVisitor: SyntaxRewriter {
       var diagnostics: [Diagnostic] = []
 
       override func visit(
@@ -117,7 +117,7 @@ public enum AddBlocker: ExpressionMacro {
                         oldNode: Syntax(binOp.operatorToken.withoutTrivia()),
                         newNode: Syntax(
                           TokenSyntax(
-                            .spacedBinaryOperator("-"),
+                            .binaryOperator("-"),
                             presence: .present
                           )
                         )
@@ -132,7 +132,7 @@ public enum AddBlocker: ExpressionMacro {
               node.withOperatorOperand(
                 ExprSyntax(
                   binOp.withOperatorToken(
-                    binOp.operatorToken.withKind(.spacedBinaryOperator("-"))
+                    binOp.operatorToken.withKind(.binaryOperator("-"))
                   )
                 )
               )
@@ -178,5 +178,98 @@ public class NestedDeclInExprMacro: ExpressionMacro {
       return ()
     }
     """
+  }
+}
+
+enum CustomError: Error, CustomStringConvertible {
+  case message(String)
+
+  var description: String {
+    switch self {
+    case .message(let text):
+      return text
+    }
+  }
+}
+
+public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
+  public static func expansion(
+    of node: MacroExpansionDeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let firstElement = node.argumentList.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(prefix) = stringLiteral.segments.first else {
+      throw CustomError.message("#bitwidthNumberedStructs macro requires a string literal")
+    }
+
+    return [8, 16, 32, 64].map { bitwidth in
+      """
+
+      struct \(raw: prefix)\(raw: String(bitwidth)) { }
+      """
+    }
+  }
+}
+
+public struct PropertyWrapperMacro {}
+
+extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        get {
+          _\(identifier).wrappedValue
+        }
+      """,
+      """
+
+        set {
+          _\(identifier).wrappedValue = newValue
+        }
+      """,
+    ]
+  }
+}
+
+public struct WrapAllProperties: MemberAttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo parent: DeclSyntax,
+    annotating member: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard member.is(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    let wrapperTypeName: String
+    if parent.is(ClassDeclSyntax.self) {
+      wrapperTypeName = "EnclosingSelfWrapper"
+    } else {
+      wrapperTypeName = "Wrapper"
+    }
+
+    let propertyWrapperAttr = AttributeSyntax(
+      attributeName: SimpleTypeIdentifierSyntax(
+        name: .identifier(wrapperTypeName)
+      )
+    )
+
+    return [propertyWrapperAttr]
   }
 }

@@ -30,3 +30,8 @@ module SwiftOverlayShims {
   header "LibcOverlayShims.h"
   export *
 }
+
+module _SwiftRuntimeShims {
+  header "_SwiftRuntimeShims/Functions.h"
+  export *
+}

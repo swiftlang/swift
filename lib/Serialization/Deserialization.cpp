@@ -158,6 +158,8 @@ void InvalidRecordKindError::anchor() {}
 const char UnsafeDeserializationError::ID = '\0';
 void UnsafeDeserializationError::anchor() {}
 
+static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error);
+
 /// Skips a single record in the bitstream.
 ///
 /// Destroys the stream position if the next entry is not a record.
@@ -1360,7 +1362,12 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(replacementTypeIDs.size());
   for (auto typeID : replacementTypeIDs) {
-    replacementTypes.push_back(getType(typeID));
+    auto typeOrError = getTypeChecked(typeID);
+    if (!typeOrError) {
+      consumeError(typeOrError.takeError());
+      continue;
+    }
+    replacementTypes.push_back(typeOrError.get());
   }
 
   // Read the conformances.
@@ -2639,6 +2646,39 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   }
 }
 
+static Optional<swift::MacroRole>
+getActualMacroRole(uint8_t context) {
+  switch (context) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::MacroRole::THE_DK: \
+    return swift::MacroRole::THE_DK;
+  CASE(Expression)
+  CASE(FreestandingDeclaration)
+  CASE(Accessor)
+  CASE(MemberAttribute)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
+static Optional<swift::MacroIntroducedDeclNameKind>
+getActualMacroIntroducedDeclNameKind(uint8_t context) {
+  switch (context) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::MacroIntroducedDeclNameKind::THE_DK: \
+    return swift::MacroIntroducedDeclNameKind::THE_DK;
+  CASE(Named)
+  CASE(Overloaded)
+  CASE(Prefixed)
+  CASE(Suffixed)
+  CASE(Arbitrary)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
@@ -3601,7 +3641,10 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    const auto resultType = MF.getType(resultInterfaceTypeID);
+    auto resultTypeOrError = MF.getTypeChecked(resultInterfaceTypeID);
+    if (!resultTypeOrError)
+      return resultTypeOrError.takeError();
+    const auto resultType = resultTypeOrError.get();
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3674,9 +3717,13 @@ public:
                               std::move(needsNewVTableEntry));
 
     if (opaqueReturnTypeID) {
+      auto declOrError = MF.getDeclChecked(opaqueReturnTypeID);
+      if (!declOrError)
+        return declOrError.takeError();
+
       ctx.evaluator.cacheOutput(
           OpaqueResultTypeRequest{fn},
-          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+          cast<OpaqueTypeDecl>(declOrError.get()));
     }
 
     if (!isAccessor)
@@ -3817,26 +3864,31 @@ public:
       opaqueDecl->setGenericSignature(GenericSignature());
     if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
-      if (!subMapOrError)
-        return subMapOrError.takeError();
-
-      // Check whether there are any conditionally available substitutions.
-      // If there are, it means that "unique" we just read is a universally
-      // available substitution.
-      SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
-          limitedAvailability;
-
-      deserializeConditionalSubstitutions(limitedAvailability);
-
-      if (limitedAvailability.empty()) {
-        opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+      if (!subMapOrError) {
+        // If the underlying type references internal details, ignore it.
+        auto unconsumedError =
+          consumeErrorIfXRefNonLoadedModule(subMapOrError.takeError());
+        if (unconsumedError)
+          return std::move(unconsumedError);
       } else {
-        limitedAvailability.push_back(
-            OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                ctx, {{VersionRange::empty(), /*unavailability=*/false}},
-                subMapOrError.get()));
+        // Check whether there are any conditionally available substitutions.
+        // If there are, it means that "unique" we just read is a universally
+        // available substitution.
+        SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+            limitedAvailability;
 
-        opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
+        deserializeConditionalSubstitutions(limitedAvailability);
+
+        if (limitedAvailability.empty()) {
+          opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+        } else {
+          limitedAvailability.push_back(
+              OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+                  ctx, {{VersionRange::empty(), /*unavailability=*/false}},
+                  subMapOrError.get()));
+
+          opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
+        }
       }
     }
     return opaqueDecl;
@@ -5365,6 +5417,58 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
                                                 SourceRange(), isImplicit,
                                                 isCategoryNameInvalid);
+        break;
+      }
+
+      case decls_block::Declaration_DECL_ATTR: {
+        bool isImplicit;
+        uint8_t rawMacroRole;
+        uint64_t numPeers, numMembers;
+        ArrayRef<uint64_t> introducedDeclNames;
+        serialization::decls_block::DeclarationDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroRole, numPeers,
+                       numMembers, introducedDeclNames);
+        auto role = *getActualMacroRole(rawMacroRole);
+        if (introducedDeclNames.size() != (numPeers + numMembers) * 2)
+          return MF.diagnoseFatal();
+        SmallVector<MacroIntroducedDeclName, 1> peersAndMembers;
+        ArrayRef<MacroIntroducedDeclName> peersAndMembersRef;
+        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
+          auto kind = getActualMacroIntroducedDeclNameKind(
+              (uint8_t)introducedDeclNames[i]);
+          auto identifier =
+              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
+          peersAndMembers.push_back(MacroIntroducedDeclName(*kind, identifier));
+        }
+        Attr = DeclarationAttr::create(
+            ctx, SourceLoc(), SourceRange(), role,
+            peersAndMembersRef.take_front(numPeers),
+            peersAndMembersRef.take_back(numMembers),
+            isImplicit);
+        break;
+      }
+
+      case decls_block::Attached_DECL_ATTR: {
+        bool isImplicit;
+        uint8_t rawMacroRole;
+        uint64_t numNames;
+        ArrayRef<uint64_t> introducedDeclNames;
+        serialization::decls_block::AttachedDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroRole, numNames,
+                       introducedDeclNames);
+        auto role = *getActualMacroRole(rawMacroRole);
+        if (introducedDeclNames.size() != numNames * 2)
+          return MF.diagnoseFatal();
+        SmallVector<MacroIntroducedDeclName, 1> names;
+        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
+          auto kind = getActualMacroIntroducedDeclNameKind(
+              (uint8_t)introducedDeclNames[i]);
+          auto identifier =
+              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
+          names.push_back(MacroIntroducedDeclName(*kind, identifier));
+        }
+        Attr = AttachedAttr::create(
+            ctx, SourceLoc(), SourceRange(), role, names, isImplicit);
         break;
       }
 
@@ -7088,7 +7192,8 @@ static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
     // Missing module errors are most likely caused by an
     // implementation-only import hiding types and decls.
     // rdar://problem/60291019
-    if (error.isA<XRefNonLoadedModuleError>()) {
+    if (error.isA<XRefNonLoadedModuleError>() ||
+        error.isA<UnsafeDeserializationError>()) {
       consumeError(std::move(error));
       return llvm::Error::success();
     }
@@ -7100,7 +7205,8 @@ static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
       auto errorInfo = takeErrorInfo(std::move(error));
       auto *TE = static_cast<TypeError*>(errorInfo.get());
 
-      if (TE->underlyingReasonIsA<XRefNonLoadedModuleError>()) {
+      if (TE->underlyingReasonIsA<XRefNonLoadedModuleError>() ||
+          TE->underlyingReasonIsA<UnsafeDeserializationError>()) {
         consumeError(std::move(errorInfo));
         return llvm::Error::success();
       }
@@ -7436,6 +7542,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // errors - we're just doing a best effort to create the
       // module in that case.
       if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>() ||
+          witnessSubstitutions.errorIsA<UnsafeDeserializationError>() ||
           allowCompilerErrors()) {
         consumeError(witnessSubstitutions.takeError());
         isOpaque = true;

@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -160,6 +161,8 @@ public:
   IGNORED_ATTR(BackDeploy)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(Expression)
+  IGNORED_ATTR(Declaration)
+  IGNORED_ATTR(Attached)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -3552,11 +3555,22 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
-  auto nominal = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  auto found = evaluateOrDefault(
+    Ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr);
+
+  // FIXME: deal with macros.
+  NominalTypeDecl *nominal = nullptr;
+  if (found) {
+    // FIXME: Do full checking of the macro arguments here by turning it into
+    // a macro expansion expression (?).
+    if (found.is<MacroDecl *>())
+      return;
+
+    nominal = found.dyn_cast<NominalTypeDecl *>();
+  }
 
   // Diagnose errors.
-  if (!nominal) {
+  if (!found) {
     auto typeRepr = attr->getTypeRepr();
 
     auto type = TypeResolution::forInterface(dc, TypeResolverContext::CustomAttr,
@@ -3595,6 +3609,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
   if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    // FIXME: We shouldn't be type checking missing decls.
+    if (isa<MissingDecl>(D))
+      return;
+
     // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D)) {
       diagnose(attr->getLocation(),
@@ -7367,6 +7385,45 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
+SemanticDeclAttributes
+AttachedSemanticAttrsRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  // For now, this returns the same thing as 'getAttrs' using
+  // the SemanticDeclAttribtues representation.
+  SemanticDeclAttributes semanticAttrs;
+  for (auto attr : decl->getAttrs()) {
+    semanticAttrs.add(attr);
+  }
+
+  auto *parentDecl = decl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return semanticAttrs;
+
+  auto parentAttrs = parentDecl->getSemanticAttrs();
+  for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto customAttrDecl = evaluateOrDefault(
+        evaluator,
+        CustomAttrDeclRequest{
+          customAttr,
+          parentDecl->getInnermostDeclContext()
+        },
+        nullptr);
+    if (!customAttrDecl)
+      continue;
+
+    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
+    if (!macroDecl)
+      continue;
+
+    if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
+      continue;
+
+    expandAttributes(customAttr, macroDecl, decl, semanticAttrs);
+  }
+
+  return semanticAttrs;
+}
+
 template <typename ATTR>
 static void forEachCustomAttribute(
     ValueDecl *decl,
@@ -7376,12 +7433,15 @@ static void forEachCustomAttribute(
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
 
-    auto *nominal = evaluateOrDefault(
+    auto found = evaluateOrDefault(
         ctx.evaluator,
-        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-
-    if (!nominal)
+        CustomAttrDeclRequest{mutableAttr, decl->getDeclContext()}, nullptr);
+    if (!found)
       continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
+    if (!nominal)
+      continue; // FIXME: add another entry point for macros we've found
 
     if (nominal->getAttrs().hasAttribute<ATTR>())
       fn(mutableAttr, nominal);

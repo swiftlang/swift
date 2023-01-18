@@ -146,14 +146,12 @@ public:
     // We'll visit nested types separately if necessary.
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in IRGen");
+  }
+
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
-  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro should have already been rewritten by IRGen");
-    visit(rewritten);
-  }
-  
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
 
@@ -351,13 +349,11 @@ public:
     // We'll visit nested types separately if necessary.
   }
 
-  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
-
-  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro should have already been rewritten by IRGen");
-    visit(rewritten);
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in IRGen");
   }
+
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     if (isa<AccessorDecl>(method)) {
@@ -2489,6 +2485,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::MissingMember:
     llvm_unreachable("there are no global member placeholders");
 
+  case DeclKind::Missing:
+    llvm_unreachable("missing decl in IRGen");
+
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleType made it to IRGen");
 
@@ -2540,11 +2539,10 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     // type's metadata.
     return;
 
-  case DeclKind::MacroExpansion: {
-    auto *rewritten = cast<MacroExpansionDecl>(D)->getRewritten();
-    assert(rewritten && "Macro should have already been expanded by IRGen");
-    emitGlobalDecl(rewritten);
-  }
+  case DeclKind::MacroExpansion:
+    for (auto *rewritten : cast<MacroExpansionDecl>(D)->getRewritten())
+      emitGlobalDecl(rewritten);
+    return;
   }
 
   llvm_unreachable("bad decl kind!");
@@ -5460,8 +5458,8 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType made it to IRGen");
 
-    case DeclKind::MacroExpansion:
-      llvm_unreachable("FIXME: MacroExpansion made it to IRGen");
+    case DeclKind::Missing:
+      llvm_unreachable("missing decl in IRGen");
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
@@ -5502,6 +5500,10 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
     case DeclKind::Class:
       emitClassDecl(cast<ClassDecl>(member));
+      continue;
+    case DeclKind::MacroExpansion:
+      for (auto *decl : cast<MacroExpansionDecl>(member)->getRewritten())
+        emitNestedTypeDecls({decl, nullptr});
       continue;
     }
   }

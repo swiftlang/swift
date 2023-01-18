@@ -174,6 +174,7 @@ llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
 void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   if (!discoveredBlocks) {
     OS << "No deterministic live block list\n";
+    return;
   }
   SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
@@ -276,7 +277,20 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 template <typename LivenessWithDefs>
 SimpleLiveRangeSummary
 PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+  ValueSet visited(def->getFunction());
+  return recursivelyUpdateForDef(def, visited, def);
+}
+
+template <typename LivenessWithDefs>
+SimpleLiveRangeSummary
+PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(SILValue initialDef,
+                                                           ValueSet &visited,
+                                                           SILValue value) {
   SimpleLiveRangeSummary summary;
+
+  if (!visited.insert(value))
+    return summary;
+
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
   // everywhere. Non-uses cannot be treated like normal non-lifetime-ending uses
@@ -284,7 +298,7 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   // the return point, and on forwarding instructions, like
   // init_existential_ref, which need to consume their use even when
   // type-dependent operands exist.
-  for (Operand *use : def->getUses()) {
+  for (Operand *use : value->getUses()) {
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
       break;
@@ -298,10 +312,25 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
     case OperandOwnership::GuaranteedForwarding: {
+      updateForUse(use->getUser(), /*lifetimeEnding*/false);
+      if (auto phiOper = PhiOperand(use)) {
+        SILValue phi = phiOper.getValue();
+        // If 'def' is any of the enclosing defs, then it must dominate the phi
+        // and all phi uses should be handled recursively.
+        if (!visitEnclosingDefs(phi, [initialDef](SILValue enclosingDef) {
+          return enclosingDef != initialDef;
+        })) {
+          // At least one enclosing def was 'def'.
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, phi));
+        }
+        // Otherwise all enclosing defs are protected by separate reborrow
+        // scopes, which are not included in "simple" liveness.
+        break;
+      }
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {
-          updateForDef(result);
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, result));
         }
         return true;
       });
@@ -318,6 +347,7 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
       break;
     }
     default:
+      // Note: An outer reborrow ends the outer lifetime here.
       updateForUse(use->getUser(), use->isLifetimeEnding());
       break;
     }

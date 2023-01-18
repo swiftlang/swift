@@ -1,0 +1,505 @@
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class C {}
+class D {
+  var object: C
+  @_borrowed @_hasStorage var borrowed: C { get set }
+}
+
+struct PairC {
+  var first: C
+  var second: C
+}
+
+// CHECK-LABEL: testSelfLoop: ssa-liveness
+// CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
+// CHECK: bb1: LiveOut
+// CHECK: bb2: LiveWithin
+// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
+// CHECK: last user:   br bb1([[V]] : $C)
+// CHECK-NOT: dead def
+sil [ossa] @testSelfLoop : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  br bb3
+
+bb1(%1 : @owned $C):
+  destroy_value %1 : $C
+  %2 = copy_value %0 : $C
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %2 : $C
+  br bb2
+
+bb2:
+  br bb1(%2 : $C)
+
+bb3:
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testSelfKill: ssa-liveness
+// CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
+// CHECK: bb1: LiveOut
+// CHECK: bb2: LiveWithin
+// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
+// CHECK: last user:   br bb1([[V]] : $C)
+// CHECK-NOT: dead def
+sil [ossa] @testSelfKill : $@convention(thin) () -> () {
+bb0:
+  br bb3
+
+bb1(%1 : @owned $C):
+  %2 = move_value %1 : $C
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %2 : $C
+  br bb2
+
+bb2:
+  br bb1(%2 : $C)
+
+bb3:
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test a live range that is extended through reborrows,
+// considering them new defs.
+// (e.g. BorrowedValue::visitTransitiveLifetimeEndingUses)
+//
+// This live range is not dominated by the original borrow.
+//
+// CHECK-LABEL: testReborrow: multidef-liveness
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def:   [[B:%.*]] = begin_borrow %0 : $C
+// CHECK:   def:   [[RB:%.*]] = argument of bb3 : $C
+// CHECK-NEXT: bb2: LiveWithin
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   br bb3([[B]] : $C)
+// CHECK-NEXT: lifetime-ending user:   end_borrow [[RB]] : $C
+// CHECK-NEXT: last user:   br bb3([[B]] : $C)
+// CHECK-NEXT: last user:   end_borrow [[RB]] : $C
+sil [ossa] @testReborrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %0 : $C
+  br bb3(%borrow1 : $C)
+
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  test_specification "multidef-liveness @trace[0] @trace[1]"
+  debug_value [trace] %borrow2 : $C
+  br bb3(%borrow2 : $C)
+
+bb3(%reborrow : @guaranteed $C):
+  debug_value [trace] %reborrow : $C
+  end_borrow %reborrow : $C
+  br bb4
+
+bb4:
+  destroy_value %0 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testGuaranteedForwarding: ssa-liveness
+// CHECK: SSA lifetime analysis:   [[C:%.*]] = unchecked_ref_cast %{{.*}} : $D to $C
+// CHECK: bb0: LiveWithin
+// CHECK: regular user: %{{.*}} = load [copy]
+// CHECK: last user:    %{{.*}} = load [copy]
+sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %borrow0 = begin_borrow %0 : $D
+  %c = unchecked_ref_cast %borrow0 : $D to $C
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %c : $C
+  %d = unchecked_ref_cast %c : $C to $D
+  %f = ref_element_addr %d : $D, #D.object
+  %o = load [copy] %f : $*C
+  end_borrow %borrow0 : $D
+  destroy_value %o : $C
+  destroy_value %0 : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testGuaranteedResult: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
+// CHECK: bb0: LiveWithin
+// CHECK: last user:   end_apply
+sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  test_specification "ssa-liveness @argument[0]"
+  %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  end_apply %4
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testScopedAddress: ssa-liveness
+// CHECK: SSA lifetime analysis: %{{.*}} = ref_element_addr %0
+// CHECK: bb0: LiveWithin
+// CHECK: last user: end_access
+sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  %f = ref_element_addr %0 : $D, #D.object
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %f : $*C
+  %access = begin_access [read] [static] %f : $*C
+  %o = load [copy] %access : $*C
+  end_access %access : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testDeadAddress: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
+// CHECK: bb0: LiveWithin
+// CHECK: last user: %{{.*}} = ref_element_addr
+sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  test_specification "ssa-liveness @argument[0]"
+  %f = ref_element_addr %0 : $D, #D.object
+  %99 = tuple()
+  return %99 : $()
+}
+
+// A LiveOut block with a non-SSA def, bb0, has no liveness boundary.
+//
+// CHECK-LABEL: testMultiDefLiveOutNoBoundary: multidef-liveness
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def: %{{.*}} = copy_value %0 : $C
+// CHECK:   def: %{{.*}} = move_value [[CP0]] : $C
+// CHECK:   def: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveWithin,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb4: LiveWithin,
+// CHECK-NEXT: bb1: LiveWithin,
+// CHECK: last user:   br bb4
+// CHECK-NEXT: last user:   br bb4
+// CHECK-NEXT: last user:   %{{.*}} = move_value [[CP0]] : $C
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $C
+// CHECK-NEXT: last user:   destroy_value [[CP0]] : $C
+sil [ossa] @testMultiDefLiveOutNoBoundary : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %copy0 = copy_value %0 : $C
+  test_specification "multidef-liveness @trace[0] @trace[1] @trace[2] @trace[3]"
+  debug_value [trace] %copy0 : $C
+  cond_br undef, bb1, bb3
+
+bb1:
+  destroy_value %copy0 : $C
+  br bb2
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  debug_value [trace] %copy2 : $C
+  br bb4(%copy2 : $C)
+
+bb3:
+  %copy3 = move_value %copy0 : $C
+  debug_value [trace] %copy3 : $C
+  br bb4(%copy3 : $C)
+
+bb4(%phi : @owned $C):
+  debug_value [trace] %phi : $C
+  destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// A dead (ref_element_addr) projection is treated like a pointer
+// escape for convenience. Make sure the pointer escape bubbles up
+// through the phi and casts.
+//
+// CHECK-LABEL: testSSADeadRefElementAddr: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveOut,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb1: LiveOut,
+// CHECK: last user:
+// CHECK-SAME: ref_element_addr %6 : $D, #D.object
+// CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
+sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %f = ref_element_addr %phi : $D, #D.object  
+  %99 = tuple()
+  return %99 : $()
+}
+
+// One of the uses is a reborrowed inner borrow scope.
+//
+// CHECK-LABEL: testSSAInnerReborrowedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
+// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: dead def: %0 = argument of bb0 : $C
+sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  %borrow0 = begin_borrow %0 : $C
+  %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
+  br bb1(%borrow0 : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Confusingly, %deadPhi is the "last use", but it does not cause its
+// operands to be live-out of the predecessor block. This is because
+// liveness considers all phis to end liveness on the predecessor side
+// by default. Only the client can tell that a particular guaranteed phi
+// should actually extend liveness if it has no uses.
+//
+// CHECK-LABEL: testSSADeadGuaranteedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveWithin,
+// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: regular user
+// CHECK: last user:
+// CHECK-SAME: br bb3
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: end running
+sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%deadPhi : @guaranteed $D):
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is part of the guaranteed argument's simple live range.
+//
+// CHECK-LABEL: testSSADominatedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb2: LiveOut,
+// CHECK-NEXT: bb3: LiveWithin,
+// CHECK-NEXT: bb1: LiveOut,
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3
+// CHECK-NEXT: regular user:   %{{.*}} = load
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3
+// CHECK-NEXT: last user:   %{{.*}} = load
+// CHECK-NEXT: end running
+sil [ossa] @testSSADominatedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %f = ref_element_addr %phi : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is part of the guaranteed argument's simple live range.
+//
+// CHECK-LABEL: testSSAPartialDominatedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut,
+// CHECK-NEXT: bb1: LiveWithin,
+// CHECK: last user:
+// CHECK-SAME: load
+sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  %borrow1 = begin_borrow %1 : $C
+  %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
+  br bb1(%borrow1 : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// The phi is protected by an outer adjacent reborrow. It is not part
+// of the guaranteed argument's simple live range. 
+//
+// CHECK-LABEL: testSSAReborrowedPhi: ssa-liveness
+// CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
+// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: regular user: br bb1
+// CHECK-NEXT: regular user: %{{.*}} = struct
+// CHECK-NEXT: last user: br bb1
+// CHECK-NEXT: end running
+sil [ossa] @testSSAReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  test_specification "ssa-liveness @trace[0]"
+  debug_value [trace] %borrow : $C
+  %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
+  br bb1(%borrow : $C, %aggregate : $PairC)
+
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+  %first = struct_extract %phi : $PairC, #PairC.first
+  %d = unchecked_ref_cast %first : $C to $D
+  %f = ref_element_addr %d : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Ensure that forwarding chains don't result in exponential run time.
+//
+sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ssa-liveness @argument[0]"
+  %s0 = struct $PairC(%0 : $C, %0 : $C)
+  %s0a = struct_extract %s0 : $PairC, #PairC.first
+  %s0b = struct_extract %s0 : $PairC, #PairC.second
+  %s1 = struct $PairC(%s0a : $C, %s0b : $C)
+  %s1a = struct_extract %s1 : $PairC, #PairC.first
+  %s1b = struct_extract %s1 : $PairC, #PairC.second
+  %s2 = struct $PairC(%s1a : $C, %s1b : $C)
+  %s2a = struct_extract %s2 : $PairC, #PairC.first
+  %s2b = struct_extract %s2 : $PairC, #PairC.second
+  %s3 = struct $PairC(%s2a : $C, %s2b : $C)
+  %s3a = struct_extract %s3 : $PairC, #PairC.first
+  %s3b = struct_extract %s3 : $PairC, #PairC.second
+  %s4 = struct $PairC(%s3a : $C, %s3b : $C)
+  %s4a = struct_extract %s4 : $PairC, #PairC.first
+  %s4b = struct_extract %s4 : $PairC, #PairC.second
+  %s5 = struct $PairC(%s4a : $C, %s4b : $C)
+  %s5a = struct_extract %s5 : $PairC, #PairC.first
+  %s5b = struct_extract %s5 : $PairC, #PairC.second
+  %s6 = struct $PairC(%s5a : $C, %s5b : $C)
+  %s6a = struct_extract %s6 : $PairC, #PairC.first
+  %s6b = struct_extract %s6 : $PairC, #PairC.second
+  %s7 = struct $PairC(%s6a : $C, %s6b : $C)
+  %s7a = struct_extract %s7 : $PairC, #PairC.first
+  %s7b = struct_extract %s7 : $PairC, #PairC.second
+  %s8 = struct $PairC(%s7a : $C, %s7b : $C)
+  %s8a = struct_extract %s8 : $PairC, #PairC.first
+  %s8b = struct_extract %s8 : $PairC, #PairC.second
+  %s9 = struct $PairC(%s8a : $C, %s8b : $C)
+  %s9a = struct_extract %s9 : $PairC, #PairC.first
+  %s9b = struct_extract %s9 : $PairC, #PairC.second
+  %s10 = struct $PairC(%s9a : $C, %s9b : $C)
+  %s10a = struct_extract %s10 : $PairC, #PairC.first
+  %s10b = struct_extract %s10 : $PairC, #PairC.second
+  %s11 = struct $PairC(%s10a : $C, %s10b : $C)
+  %s11a = struct_extract %s11 : $PairC, #PairC.first
+  %s11b = struct_extract %s11 : $PairC, #PairC.second
+  %s12 = struct $PairC(%s11a : $C, %s11b : $C)
+  %s12a = struct_extract %s12 : $PairC, #PairC.first
+  %s12b = struct_extract %s12 : $PairC, #PairC.second
+  %s13 = struct $PairC(%s12a : $C, %s12b : $C)
+  %s13a = struct_extract %s13 : $PairC, #PairC.first
+  %s13b = struct_extract %s13 : $PairC, #PairC.second
+  %s14 = struct $PairC(%s13a : $C, %s13b : $C)
+  %s14a = struct_extract %s14 : $PairC, #PairC.first
+  %s14b = struct_extract %s14 : $PairC, #PairC.second
+  %s15 = struct $PairC(%s14a : $C, %s14b : $C)
+  %s15a = struct_extract %s15 : $PairC, #PairC.first
+  %s15b = struct_extract %s15 : $PairC, #PairC.second
+  %s16 = struct $PairC(%s15a : $C, %s15b : $C)
+  %s16a = struct_extract %s16 : $PairC, #PairC.first
+  %s16b = struct_extract %s16 : $PairC, #PairC.second
+  %s17 = struct $PairC(%s16a : $C, %s16b : $C)
+  %s17a = struct_extract %s17 : $PairC, #PairC.first
+  %s17b = struct_extract %s17 : $PairC, #PairC.second
+  %s18 = struct $PairC(%s17a : $C, %s17b : $C)
+  %s18a = struct_extract %s18 : $PairC, #PairC.first
+  %s18b = struct_extract %s18 : $PairC, #PairC.second
+  %s19 = struct $PairC(%s18a : $C, %s18b : $C)
+  %s19a = struct_extract %s19 : $PairC, #PairC.first
+  %s19b = struct_extract %s19 : $PairC, #PairC.second
+  %s20 = struct $PairC(%s19a : $C, %s19b : $C)
+  %s20a = struct_extract %s20 : $PairC, #PairC.first
+  %s20b = struct_extract %s20 : $PairC, #PairC.second
+  %s21 = struct $PairC(%s20a : $C, %s20b : $C)
+  %s21a = struct_extract %s21 : $PairC, #PairC.first
+  %s21b = struct_extract %s21 : $PairC, #PairC.second
+  %s22 = struct $PairC(%s21a : $C, %s21b : $C)
+  %s22a = struct_extract %s22 : $PairC, #PairC.first
+  %s22b = struct_extract %s22 : $PairC, #PairC.second
+  %s23 = struct $PairC(%s22a : $C, %s22b : $C)
+  %s23a = struct_extract %s23 : $PairC, #PairC.first
+  %s23b = struct_extract %s23 : $PairC, #PairC.second
+  %s24 = struct $PairC(%s23a : $C, %s23b : $C)
+  %s24a = struct_extract %s24 : $PairC, #PairC.first
+  %s24b = struct_extract %s24 : $PairC, #PairC.second
+  %s25 = struct $PairC(%s24a : $C, %s24b : $C)
+  %s25a = struct_extract %s25 : $PairC, #PairC.first
+  %s25b = struct_extract %s25 : $PairC, #PairC.second
+  %s26 = struct $PairC(%s25a : $C, %s25b : $C)
+  %s26a = struct_extract %s26 : $PairC, #PairC.first
+  %s26b = struct_extract %s26 : $PairC, #PairC.second
+  %s27 = struct $PairC(%s26a : $C, %s26b : $C)
+  %s27a = struct_extract %s27 : $PairC, #PairC.first
+  %s27b = struct_extract %s27 : $PairC, #PairC.second
+  %s28 = struct $PairC(%s27a : $C, %s27b : $C)
+  %s28a = struct_extract %s28 : $PairC, #PairC.first
+  %s28b = struct_extract %s28 : $PairC, #PairC.second
+  %s29 = struct $PairC(%s28a : $C, %s28b : $C)
+  %s29a = struct_extract %s29 : $PairC, #PairC.first
+  %s29b = struct_extract %s29 : $PairC, #PairC.second
+  %99 = tuple()
+  return %99 : $()
+}

@@ -191,6 +191,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  Missing,
   MissingMember,
   Requirement,
   OpaqueResultType,
@@ -848,6 +849,12 @@ public:
   DeclAttributes &getAttrs() {
     return Attrs;
   }
+
+  /// Returns the semantic attributes attached to this declaration.
+  ///
+  /// \c getSemanticAttrs is intended to be a requestified replacement
+  /// for \c getAttrs
+  SemanticDeclAttributes getSemanticAttrs() const;
 
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
@@ -8276,6 +8283,34 @@ public:
   }
 };
 
+/// Represents a missing declaration in the source code. This
+/// is used for parser recovery, e.g. when parsing a floating
+/// attribute list.
+class MissingDecl: public Decl {
+  MissingDecl(DeclContext *DC) : Decl(DeclKind::Missing, DC) {
+    setImplicit();
+  }
+
+  friend class Decl;
+  SourceLoc getLocFromSource() const {
+    return SourceLoc();
+  }
+
+public:
+  static MissingDecl *
+  create(ASTContext &ctx, DeclContext *DC) {
+    return new (ctx) MissingDecl(DC);
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Missing;
+  }
+};
+
 /// Represents a hole where a declaration should have been.
 ///
 /// Among other things, these are used to keep vtable layout consistent.
@@ -8331,17 +8366,6 @@ public:
   }
 };
 
-/// The context in which a macro can be used, which determines the syntax it
-/// uses.
-enum class MacroContext: uint8_t {
-  /// An expression macro, referenced explicitly via "#stringify" or similar
-  /// in the source code.
-  Expression = 0x01,
-};
-
-/// The contexts in which a particular macro declaration can be used.
-using MacroContexts = OptionSet<MacroContext>;
-
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.
@@ -8383,7 +8407,7 @@ public:
   Type getResultInterfaceType() const;
 
   /// Determine the contexts in which this macro can be applied.
-  MacroContexts getMacroContexts() const;
+  MacroRoles getMacroRoles() const;
 
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
@@ -8414,7 +8438,10 @@ class MacroExpansionDecl : public Decl {
   SourceLoc LeftAngleLoc, RightAngleLoc;
   ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
-  Decl *Rewritten;
+  ArrayRef<Decl *> Rewritten;
+
+  /// The referenced macro.
+  ConcreteDeclRef macroRef;
 
 public:
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
@@ -8426,7 +8453,7 @@ public:
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
         Macro(macro), MacroLoc(macroLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(args), Rewritten(nullptr) {}
+        GenericArgs(genericArgs), ArgList(args), Rewritten({}) {}
 
   ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
 
@@ -8440,8 +8467,10 @@ public:
   DeclNameLoc getMacroLoc() const { return MacroLoc; }
   DeclNameRef getMacro() const { return Macro; }
   ArgumentList *getArgs() const { return ArgList; }
-  Decl *getRewritten() const { return Rewritten; }
-  void setRewritten(Decl *rewritten) { Rewritten = rewritten; }
+  ArrayRef<Decl *> getRewritten() const { return Rewritten; }
+  void setRewritten(ArrayRef<Decl *> rewritten) { Rewritten = rewritten; }
+  ConcreteDeclRef getMacroRef() const { return macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;

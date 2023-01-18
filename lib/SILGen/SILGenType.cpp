@@ -1230,14 +1230,17 @@ public:
     });
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in types");
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 
@@ -1405,14 +1408,17 @@ public:
     });
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in extensions");
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 
