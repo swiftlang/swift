@@ -1255,26 +1255,9 @@ protected:
         auto *builderCall =
             buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
 
-        auto isTopLevel = [&](Stmt *anchor) {
-          if (ifStmt->getThenStmt() == anchor)
-            return true;
-
-          // The situation is this:
-          //
-          // if <cond> {
-          //   ...
-          // } else if <other-cond> {
-          //   ...
-          // }
-          if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt()))
-            return innerIf->getThenStmt() == anchor;
-
-          return ifStmt->getElseStmt() == anchor;
-        };
-
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
-        if (isOptional && isTopLevel(anchor)) {
+        if (isOptional) {
           builderCall = buildCallIfWanted(ifStmt->getThenStmt()->getStartLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
