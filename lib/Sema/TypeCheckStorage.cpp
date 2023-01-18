@@ -3447,26 +3447,11 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     return info;
   }
 
-  // Check for an accessor macro.
-  for (auto customAttrConst : storage->getSemanticAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macro = evaluateOrDefault(
-        evaluator,
-        ResolveAttachedMacroRequest{
-          customAttr,
-          storage->getInnermostDeclContext()
-        },
-        nullptr);
-
-    if (!macro)
-      continue;
-
-    if (!macro->getMacroRoles().contains(MacroRole::Accessor))
-      continue;
-
-    // Expand the accessors.
-    expandAccessors(storage, customAttr, macro);
-  }
+  // Expand any attached accessor macros.
+  storage->forEachAttachedMacro(MacroRole::Accessor,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        expandAccessors(storage, customAttr, macro);
+      });
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);

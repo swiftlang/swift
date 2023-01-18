@@ -316,51 +316,21 @@ bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
     return false;
 
   bool addedAttributes = false;
-  auto parentAttrs = parentDecl->getSemanticAttrs();
-  for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = evaluateOrDefault(
-        evaluator,
-          ResolveAttachedMacroRequest{
-          customAttr,
-          parentDecl->getInnermostDeclContext()
-        },
-        nullptr);
-
-    if (!macroDecl)
-      continue;
-
-    if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
-      continue;
-
-    addedAttributes |= expandAttributes(customAttr, macroDecl, decl);
-  }
+  parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        addedAttributes |= expandAttributes(attr, macro, decl);
+      });
 
   return addedAttributes;
 }
 
 bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
                                                    Decl *decl) const {
-  auto &ctx = decl->getASTContext();
-  auto *dc = decl->getInnermostDeclContext();
   bool synthesizedMembers = false;
-
-  for (auto customAttrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = evaluateOrDefault(
-        ctx.evaluator,
-        ResolveAttachedMacroRequest{customAttr, dc},
-        nullptr);
-
-    if (!macroDecl)
-      continue;
-
-    if (!macroDecl->getMacroRoles().contains(MacroRole::SynthesizedMembers))
-      continue;
-
-    // Expand the synthesized members.
-    synthesizedMembers |= expandSynthesizedMembers(customAttr, macroDecl, decl);
-  }
+  decl->forEachAttachedMacro(MacroRole::SynthesizedMembers,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        synthesizedMembers |= expandSynthesizedMembers(attr, macro, decl);
+      });
 
   return synthesizedMembers;
 }

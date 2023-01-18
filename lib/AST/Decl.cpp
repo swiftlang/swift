@@ -374,6 +374,28 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
+void Decl::forEachAttachedMacro(MacroRole role,
+                                MacroCallback macroCallback) const {
+  auto *dc = getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  for (auto customAttrConst : getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto *macroDecl = evaluateOrDefault(
+        ctx.evaluator,
+        ResolveAttachedMacroRequest{customAttr, dc},
+        nullptr);
+
+    if (!macroDecl)
+      continue;
+
+    if (!macroDecl->getMacroRoles().contains(role))
+      continue;
+
+    macroCallback(customAttr, macroDecl);
+  }
+}
+
 const Decl *Decl::getInnermostDeclWithAvailability() const {
   const Decl *enclosingDecl = this;
   // Find the innermost enclosing declaration with an @available annotation.
