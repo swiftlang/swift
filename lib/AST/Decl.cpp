@@ -365,11 +365,13 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
-SemanticDeclAttributes Decl::getSemanticAttrs() const {
+DeclAttributes Decl::getSemanticAttrs() const {
   auto mutableThis = const_cast<Decl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           AttachedSemanticAttrsRequest{mutableThis},
-                           SemanticDeclAttributes());
+  evaluateOrDefault(getASTContext().evaluator,
+                    ExpandMemberAttributeMacros{mutableThis},
+                    false);
+
+  return getAttrs();
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
