@@ -92,7 +92,7 @@ func f4(_ j: Wibble) { } // expected-error{{cannot find type 'Wibble' in scope}}
 f4(5)
 
 func f1() {
-  var c : Class // expected-error{{cannot find type 'Class' in scope}}
+  var c : Klass // expected-error{{cannot find type 'Klass' in scope}}
   markUsed(c.x) // make sure error does not cascade here
 }
 
