@@ -76,20 +76,20 @@ public final class PassStructInClassMethod {
 // CHECK: SWIFT_EXTERN void $s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(SWIFT_INDIRECT_RESULT void * _Nonnull, ptrdiff_t x, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // retStruct(_:)
 // CHECK: SWIFT_EXTERN void $s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(ptrdiff_t x, const void * _Nonnull y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // updateStruct(_:_:)
 
-// CHECK: class ClassWithMethods final : public swift::_impl::RefCountedClass {
+// CHECK: class SWIFT_SYMBOL("s:7Methods09ClassWithA0C") ClassWithMethods final : public swift::_impl::RefCountedClass {
 // CHECK:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
-// CHECK-NEXT:   inline void dump();
-// CHECK-NEXT:   inline ClassWithMethods sameRet();
-// CHECK-NEXT:   inline void mutate();
-// CHECK-NEXT:   inline ClassWithMethods deepCopy(swift::Int x);
+// CHECK-NEXT:   inline void dump() SWIFT_SYMBOL("s:7Methods09ClassWithA0C4dumpyyF");
+// CHECK-NEXT:   inline ClassWithMethods sameRet() SWIFT_SYMBOL("s:7Methods09ClassWithA0C7sameRetACyF");
+// CHECK-NEXT:   inline void mutate() SWIFT_SYMBOL("s:7Methods09ClassWithA0C6mutateyyF");
+// CHECK-NEXT:   inline ClassWithMethods deepCopy(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C8deepCopyyACSiF");
 
-// CHECK: class LargeStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
 // CHECK: inline LargeStruct(LargeStruct &&)
-// CHECK-NEXT: inline LargeStruct doubled() const;
-// CHECK-NEXT: inline void dump() const;
-// CHECK-NEXT: inline LargeStruct scaled(swift::Int x, swift::Int y) const;
-// CHECK-NEXT: inline LargeStruct added(const LargeStruct& x) const;
+// CHECK-NEXT: inline LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
+// CHECK-NEXT: inline void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
+// CHECK-NEXT: inline LargeStruct scaled(swift::Int x, swift::Int y) const SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
+// CHECK-NEXT: inline LargeStruct added(const LargeStruct& x) const SWIFT_SYMBOL("s:7Methods11LargeStructV5addedyA2CF");
 // CHECK-NEXT: private
 
 public func createClassWithMethods(_ x: Int) -> ClassWithMethods {

@@ -86,6 +86,11 @@ public:
     bool isStatic = false;
     bool isInline = false;
     bool isConst = false;
+    bool isNoexcept = false;
+    bool hasSymbolUSR = true;
+    /// Specific declaration that should be used to emit the symbol's
+    /// USR instead of the original function declaration.
+    const ValueDecl *symbolUSROverride = nullptr;
 
     FunctionSignatureModifiers() {}
   };

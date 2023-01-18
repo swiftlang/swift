@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
 
-// CHECK-LABEL: namespace CdeclFunctions __attribute__((swift_private)) {
+// CHECK-LABEL: namespace CdeclFunctions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("CdeclFunctions") {
 
 // CHECK: namespace _impl {
 // CHECK: SWIFT_EXTERN int cfuncPassTwo(int x, int y) SWIFT_NOEXCEPT;
@@ -13,6 +13,6 @@
 @_cdecl("cfuncPassTwo")
 public func differentCDeclName(x: CInt, y: CInt) -> CInt { return x + y }
 
-// CHECK: inline int differentCDeclName(int x, int y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline int differentCDeclName(int x, int y) noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: return _impl::cfuncPassTwo(x, y);
 // CHECK: }
