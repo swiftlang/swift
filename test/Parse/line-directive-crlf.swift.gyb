@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/line-directive-crlf.swift
-// RUN: %target-typecheck-verify-swift %t/line-directive-crlf.swift
+// RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/line-directive-crlf.swift
 
 // https://github.com/apple/swift/issues/57553
 func I57553() {
