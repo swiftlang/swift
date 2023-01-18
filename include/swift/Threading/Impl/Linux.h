@@ -227,4 +227,4 @@ inline void tls_set(tls_key_t key, void *value) {
 
 } // namespace swift
 
-#endif // SWIFT_THREADING_IMPL_PTHREADS_H
+#endif // SWIFT_THREADING_IMPL_LINUX_H

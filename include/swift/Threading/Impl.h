@@ -33,37 +33,40 @@ struct stack_bounds {
 
 
 // Try to autodetect if we aren't told what to do
-#if !SWIFT_THREADING_NONE && !SWIFT_THREADING_DARWIN &&                        \
-    !SWIFT_THREADING_LINUX && !SWIFT_THREADING_PTHREADS &&                     \
-    !SWIFT_THREADING_C11 && !SWIFT_THREADING_WIN32
+#if !defined(SWIFT_THREADING_NONE)  && !defined(SWIFT_THREADING_DARWIN)   && \
+    !defined(SWIFT_THREADING_LINUX) && !defined(SWIFT_THREADING_PTHREADS) && \
+    !defined(SWIFT_THREADING_C11)   && !defined(SWIFT_THREADING_WIN32)    && \
+    !defined(SWIFT_THREADING_MUSL)
 #ifdef __APPLE__
-#define SWIFT_THREADING_DARWIN 1
+#define SWIFT_THREADING_DARWIN
 #elif defined(__linux__)
-#define SWIFT_THREADING_LINUX 1
+#define SWIFT_THREADING_LINUX
 #elif defined(_WIN32)
-#define SWIFT_THREADING_WIN32 1
+#define SWIFT_THREADING_WIN32
 #elif defined(__wasi__)
-#define SWIFT_THREADING_NONE 1
+#define SWIFT_THREADING_NONE
 #elif __has_include(<threads.h>)
-#define SWIFT_THREADING_C11 1
+#define SWIFT_THREADING_C11
 #elif __has_include(<pthread.h>)
-#define SWIFT_THREADING_PTHREADS 1
+#define SWIFT_THREADING_PTHREADS
 #else
 #error Unable to autodetect threading package.  Please define SWIFT_THREADING_x as appropriate for your platform.
 #endif
 #endif
 
-#if SWIFT_THREADING_NONE
+#if defined(SWIFT_THREADING_NONE)
 #include "Impl/Nothreads.h"
-#elif SWIFT_THREADING_DARWIN
+#elif defined(SWIFT_THREADING_DARWIN)
 #include "Impl/Darwin.h"
-#elif SWIFT_THREADING_LINUX
+#elif defined(SWIFT_THREADING_LINUX)
 #include "Impl/Linux.h"
-#elif SWIFT_THREADING_PTHREADS
+#elif defined(SWIFT_THREADING_PTHREADS)
 #include "Impl/Pthreads.h"
-#elif SWIFT_THREADING_C11
+#elif defined(SWIFT_THREADING_MUSL)
+#include "Impl/Musl.h"
+#elif defined(SWIFT_THREADING_C11)
 #include "Impl/C11.h"
-#elif SWIFT_THREADING_WIN32
+#elif defined(SWIFT_THREADING_WIN32)
 #include "Impl/Win32.h"
 #else
 #error You need to implement Threading/Impl.h for your threading package.

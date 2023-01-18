@@ -29,6 +29,10 @@
 
 #include "swift/Threading/Errors.h"
 
+#ifndef SWIFT_LAZY_MUTEX_INITIALIZER
+#define SWIFT_LAZY_MUTEX_INITIALIZER threading_impl::lazy_mutex_initializer()
+#endif
+
 namespace swift {
 namespace threading_impl {
 
@@ -105,11 +109,14 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 
 using lazy_mutex_handle = ::pthread_mutex_t;
 
+#if !defined(SWIFT_THREADING_MUSL)
 // We don't actually need to be lazy here because pthreads has
 // PTHREAD_MUTEX_INITIALIZER.
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
   return PTHREAD_MUTEX_INITIALIZER;
 }
+#endif
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_destroy(&handle));
 }

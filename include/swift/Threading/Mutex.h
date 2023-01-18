@@ -144,7 +144,7 @@ class LazyMutex {
   LazyMutex &operator=(LazyMutex &&) = delete;
 
 public:
-  constexpr LazyMutex() : Handle(threading_impl::lazy_mutex_initializer()) {}
+  constexpr LazyMutex() : Handle(SWIFT_LAZY_MUTEX_INITIALIZER) {}
 
   // No destructor; this is intentional; this class is for STATIC allocation
   // and you don't need to delete mutexes on termination.
