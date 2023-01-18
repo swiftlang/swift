@@ -14,5 +14,5 @@ public func test() -> String {
     return ""
 }
 
-// CHECK: namespace Swift __attribute__((swift_private)) {
-// CHECK: class String final {
+// CHECK: namespace Swift __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Swift") {
+// CHECK: class SWIFT_SYMBOL("{{.*}}") String final {

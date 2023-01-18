@@ -8,10 +8,10 @@ public struct FirstSmallStruct {
     public let x: UInt32
 }
 
-// CHECK: class FirstSmallStruct final {
+// CHECK: class SWIFT_SYMBOL({{.*}}) FirstSmallStruct final {
 // CHECK: public:
 // CHECK:   inline FirstSmallStruct(FirstSmallStruct &&)
-// CHECK-NEXT:   inline uint32_t getX() const;
+// CHECK-NEXT:   inline uint32_t getX() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   private:
 
 public struct LargeStruct {
@@ -34,19 +34,19 @@ public struct LargeStruct {
     }
 }
 
-// CHECK: class LargeStruct final {
+// CHECK: class SWIFT_SYMBOL({{.*}}) LargeStruct final {
 // CHECK: public:
 // CHECK: inline LargeStruct(LargeStruct &&)
-// CHECK-NEXT: inline swift::Int getX1() const;
-// CHECK-NEXT: inline swift::Int getX2() const;
-// CHECK-NEXT: inline swift::Int getX3() const;
-// CHECK-NEXT: inline swift::Int getX4() const;
-// CHECK-NEXT: inline swift::Int getX5() const;
-// CHECK-NEXT: inline swift::Int getX6() const;
-// CHECK-NEXT: inline LargeStruct getAnotherLargeStruct() const;
-// CHECK-NEXT: inline FirstSmallStruct getFirstSmallStruct() const;
-// CHECK-NEXT: static inline swift::Int getStaticX();
-// CHECK-NEXT: static inline FirstSmallStruct getStaticSmallStruct();
+// CHECK-NEXT: inline swift::Int getX1() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getX2() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getX3() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getX4() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getX5() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getX6() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline LargeStruct getAnotherLargeStruct() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline FirstSmallStruct getFirstSmallStruct() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: static inline swift::Int getStaticX() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: static inline FirstSmallStruct getStaticSmallStruct() SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
 public final class PropertiesInClass {
@@ -65,11 +65,11 @@ public final class PropertiesInClass {
     }
 }
 
-// CHECK: class PropertiesInClass final : public swift::_impl::RefCountedClass {
+// CHECK: class SWIFT_SYMBOL({{.*}}) PropertiesInClass final : public swift::_impl::RefCountedClass {
 // CHECK: using RefCountedClass::operator=;
-// CHECK-NEXT: inline int32_t getStoredInt();
-// CHECK-NEXT: inline swift::Int getComputedInt();
-// CHECK-NEXT: inline FirstSmallStruct getSmallStruct();
+// CHECK-NEXT: inline int32_t getStoredInt() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getComputedInt() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline FirstSmallStruct getSmallStruct() SWIFT_SYMBOL({{.*}});
 
 public func createPropsInClass(_ x: Int32) -> PropertiesInClass {
     return PropertiesInClass(x)
@@ -90,13 +90,13 @@ public struct SmallStructWithGetters {
     }
 }
 
-// CHECK: class SmallStructWithGetters final {
+// CHECK: class SWIFT_SYMBOL({{.*}}) SmallStructWithGetters final {
 // CHECK: public:
 // CHECK:   inline SmallStructWithGetters(SmallStructWithGetters &&)
-// CHECK-NEXT:  inline uint32_t getStoredInt() const;
-// CHECK-NEXT:  inline swift::Int getComputedInt() const;
-// CHECK-NEXT:  inline LargeStruct getLargeStruct() const;
-// CHECK-NEXT:  inline SmallStructWithGetters getSmallStruct() const;
+// CHECK-NEXT:  inline uint32_t getStoredInt() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  inline swift::Int getComputedInt() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  inline LargeStruct getLargeStruct() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  inline SmallStructWithGetters getSmallStruct() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
 public func createSmallStructWithGetter() -> SmallStructWithGetters {

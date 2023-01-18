@@ -114,12 +114,12 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline T_0_0 genericMethodPassThrough(const T_0_0& x) const;
+// CHECK-NEXT: inline T_0_0 genericMethodPassThrough(const T_0_0& x) const SWIFT_SYMBOL("s:9Functions15TestSmallStructV24genericMethodPassThroughyxxlF");
 // CHECK-NEXT: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline void genericMethodMutTake(const T_0_0& x);
+// CHECK-NEXT: inline void genericMethodMutTake(const T_0_0& x) SWIFT_SYMBOL("s:9Functions15TestSmallStructV20genericMethodMutTakeyyxlF");
 // CHECK:      template<class T>
 // CHECK-NEXT: returnNewValue
 
@@ -127,7 +127,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline void genericPrintFunction(const T_0_0& x) noexcept {
+// CHECK-NEXT: inline void genericPrintFunction(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions20genericPrintFunctionyyxlF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
@@ -139,7 +139,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline void genericPrintFunctionMultiGeneric(swift::Int x, const T_0_0& t1, const T_0_0& t1p, swift::Int y, const T_0_1& t2) noexcept {
+// CHECK-NEXT: inline void genericPrintFunctionMultiGeneric(swift::Int x, const T_0_0& t1, const T_0_0& t1p, swift::Int y, const T_0_1& t2) noexcept SWIFT_SYMBOL("s:9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -152,7 +152,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T_0_0& x, swift::Int y) noexcept {
+// CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T_0_0& x, swift::Int y) noexcept SWIFT_SYMBOL("s:9Functions26genericPrintFunctionTwoArgyyx_SitlF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
@@ -163,7 +163,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline T_0_0 genericRet(const T_0_0& x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: inline T_0_0 genericRet(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions10genericRetyxxlF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
@@ -196,7 +196,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: inline void genericSwap(T_0_0& x, T_0_0& y) noexcept {
+// CHECK-NEXT: inline void genericSwap(T_0_0& x, T_0_0& y) noexcept SWIFT_SYMBOL("s:9Functions11genericSwapyyxz_xztlF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif

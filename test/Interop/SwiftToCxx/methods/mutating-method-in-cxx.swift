@@ -56,18 +56,18 @@ public struct SmallStruct {
 // CHECK: SWIFT_EXTERN struct swift_interop_returnStub_Methods_float_0_4 $s7Methods11SmallStructV5scaleyACSfF(float y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // scale(_:)
 // CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV6invertyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // invert()
 
-// CHECK: class LargeStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
 // CHECK: inline LargeStruct(LargeStruct &&)
-// CHECK-NEXT:   inline void dump() const;
-// CHECK-NEXT:   inline void double_();
-// CHECK-NEXT:   inline LargeStruct scale(swift::Int x, swift::Int y);
+// CHECK-NEXT:   inline void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
+// CHECK-NEXT:   inline void double_() SWIFT_SYMBOL("s:7Methods11LargeStructV6doubleyyF");
+// CHECK-NEXT:   inline LargeStruct scale(swift::Int x, swift::Int y) SWIFT_SYMBOL("s:7Methods11LargeStructV5scaleyACSi_SitF");
 // CHECK-NEXT: private
 
-// CHECK: class SmallStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Methods11SmallStructV") SmallStruct final {
 // CHECK:   inline SmallStruct(SmallStruct &&)
-// CHECK-NEXT:   inline void dump() const;
-// CHECK-NEXT:   inline SmallStruct scale(float y);
-// CHECK-NEXT:   inline void invert();
+// CHECK-NEXT:   inline void dump() const SWIFT_SYMBOL("s:7Methods11SmallStructV4dumpyyF");
+// CHECK-NEXT:   inline SmallStruct scale(float y) SWIFT_SYMBOL("s:7Methods11SmallStructV5scaleyACSfF");
+// CHECK-NEXT:   inline void invert() SWIFT_SYMBOL("s:7Methods11SmallStructV6invertyyF");
 // CHECK-NEXT: private:
 
 
