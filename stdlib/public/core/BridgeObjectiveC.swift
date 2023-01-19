@@ -15,7 +15,6 @@
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each element of the source container.
-@_fixed_layout
 public protocol _ObjectiveCBridgeable {
   associatedtype _ObjectiveCType: AnyObject
 
