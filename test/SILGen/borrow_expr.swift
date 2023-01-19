@@ -189,6 +189,9 @@ protocol P {
   var q: Q { get /*_read*/ }
   func doSomething()
   func doSomething(_ k: Klass)
+
+  mutating func mutatingExtensionPointCallMethodOnSelf()
+  mutating func mutatingExtensionPointPassSelfAsArg()
 }
 
 func usePExistential(_ p: P) {}
@@ -238,7 +241,7 @@ func simpleTestGenericArgField<T : P>(_ pArg: T) {
 
     // Without borrow.
     useQGeneric(p.q)
-    
+
     // With borrow.
     //
     // TODO: This doesn't work now. We should support this potentially for
@@ -287,10 +290,208 @@ func simpleTestExistentialArgField(_ pArg: P) {
 
     // Without borrow.
     useQGeneric(p.q)
-    
+
     // With borrow.
     //
     // TODO: This doesn't work now. We should support this potentially for
     // _read. But protocols seem to not support _read at this time.
     // useQGeneric(_borrow p.q)
+}
+
+/////////////
+// Globals //
+/////////////
+
+var globalKlass = Klass()
+
+// CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr0A6GlobalyyF : $@convention(thin) () -> () {
+// CHECK: [[ADDR:%.*]] = global_addr @$s11borrow_expr11globalKlassAA0D0Cvp
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+// CHECK: [[VAL:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
+// CHECK: apply [[FUNC]]([[VAL]]
+// CHECK: end_borrow [[VAL]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+// CHECK: [[VAL:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr8useKlassyyAA0D0CF : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: apply [[FUNC]]([[VAL]])
+// CHECK: end_borrow [[VAL]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: } // end sil function '$s11borrow_expr0A6GlobalyyF'
+func borrowGlobal() {
+  (_borrow globalKlass).doSomething()
+  useKlass(_borrow globalKlass)
+}
+
+/////////////
+// Methods //
+/////////////
+
+struct MethodTestingStruct {
+  var k = Klass()
+
+  func doSomething() {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr19MethodTestingStructV012mutatingCallC6OnSelfyyF : $@convention(method) (@inout MethodTestingStruct) -> () {
+  // CHECK: bb0([[SELF:%.*]] :
+  //
+  // Without borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
+  // CHECK: [[VAL:%.*]] = load [copy] [[ACCESS]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr19MethodTestingStructV11doSomethingyyF : $@convention(method) (@guaranteed MethodTestingStruct) -> ()
+  // CHECK: apply [[FUNC]]([[VAL]])
+  // CHECK: destroy_value [[VAL]]
+  //
+  // With borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
+  // CHECK: [[VAL:%.*]] = load_borrow [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr19MethodTestingStructV11doSomethingyyF : $@convention(method) (@guaranteed MethodTestingStruct) -> ()
+  // CHECK: apply [[FUNC]]([[VAL]])
+  // CHECK: end_borrow [[VAL]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr19MethodTestingStructV012mutatingCallC6OnSelfyyF'
+  mutating func mutatingCallMethodOnSelf() {
+    // Without borrow
+    doSomething()
+    // With borrow
+    (_borrow self).doSomething()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr19MethodTestingStructV26mutatingPassSelfAsArgumentyyF : $@convention(method) (@inout MethodTestingStruct) -> () {
+  // CHECK: bb0([[SELF:%.*]] :
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
+  // CHECK: [[VAL:%.*]] = load [copy] [[ACCESS]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr22useMethodTestingStructyyAA0deF0VF : $@convention(thin) (@guaranteed MethodTestingStruct) -> ()
+  // CHECK: apply [[FUNC]]([[VAL]])
+  // CHECK: destroy_value [[VAL]]
+  //
+  // With borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
+  // CHECK: [[VAL:%.*]] = load_borrow [[ACCESS]]
+    // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr22useMethodTestingStructyyAA0deF0VF : $@convention(thin) (@guaranteed MethodTestingStruct) -> ()
+  // CHECK: apply [[FUNC]]([[VAL]])
+  // CHECK: end_borrow [[VAL]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr19MethodTestingStructV26mutatingPassSelfAsArgumentyyF'
+  mutating func mutatingPassSelfAsArgument() {
+    // Without borrow
+    useMethodTestingStruct(self)
+    // With borrow
+    useMethodTestingStruct(_borrow self)
+  }
+}
+
+func useMethodTestingStruct(_ x: MethodTestingStruct) {}
+
+extension P {
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr1PPAAE27mutatingCallingMethodOnSelfyyF : $@convention(method) <Self where Self : P> (@inout Self) -> () {
+  // CHECK: bb0([[ADDR:%.*]] :
+  //
+  // First without borrow.
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[STACK:%.*]] = alloc_stack $Self
+  // CHECK: copy_addr [[ACCESS]] to [init] [[STACK]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[STACK]])
+  // CHECK: destroy_addr [[STACK]]
+  // CHECK: dealloc_stack [[STACK]]
+  //
+  // Now with borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<(Self)>([[ACCESS]])
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr1PPAAE27mutatingCallingMethodOnSelfyyF'
+  mutating func mutatingCallingMethodOnSelf() {
+    // Without borrow
+    doSomething()
+
+    // With borrow
+    (_borrow self).doSomething()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr1PPAAE26mutatingPassSelfAsArgumentyyF : $@convention(method) <Self where Self : P> (@inout Self) -> () {
+  // CHECK: bb0([[ADDR:%.*]] :
+  //
+  // First without borrow.
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[STACK:%.*]] = alloc_stack $Self
+  // CHECK: copy_addr [[ACCESS]] to [init] [[STACK]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr11usePGenericyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[STACK]])
+  // CHECK: destroy_addr [[STACK]]
+  // CHECK: dealloc_stack [[STACK]]
+  //
+  // Now with borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr11usePGenericyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[ACCESS]])
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr1PPAAE26mutatingPassSelfAsArgumentyyF'
+  mutating func mutatingPassSelfAsArgument() {
+    // Without borrow
+    usePGeneric(self)
+
+    // With borrow
+    usePGeneric(_borrow self)
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr1PPAAE38mutatingExtensionPointCallMethodOnSelfyyF : $@convention(method) <Self where Self : P> (@inout Self) -> () {
+  // CHECK: bb0([[ADDR:%.*]] :
+  //
+  // First without borrow.
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[STACK:%.*]] = alloc_stack $Self
+  // CHECK: copy_addr [[ACCESS]] to [init] [[STACK]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[STACK]])
+  // CHECK: destroy_addr [[STACK]]
+  // CHECK: dealloc_stack [[STACK]]
+  //
+  // Now with borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<(Self)>([[ACCESS]])
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr1PPAAE38mutatingExtensionPointCallMethodOnSelfyyF'
+  mutating func mutatingExtensionPointCallMethodOnSelf() {
+    // Without borrow
+    doSomething()
+
+    // With borrow
+    (_borrow self).doSomething()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s11borrow_expr1PPAAE35mutatingExtensionPointPassSelfAsArgyyF : $@convention(method) <Self where Self : P> (@inout Self) -> () {
+  // CHECK: bb0([[ADDR:%.*]] :
+  //
+  // First without borrow.
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[STACK:%.*]] = alloc_stack $Self
+  // CHECK: copy_addr [[ACCESS]] to [init] [[STACK]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr11usePGenericyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[STACK]])
+  // CHECK: destroy_addr [[STACK]]
+  // CHECK: dealloc_stack [[STACK]]
+  //
+  // Now with borrow
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+  // CHECK: [[FUNC:%.*]] = function_ref @$s11borrow_expr11usePGenericyyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FUNC]]<Self>([[ACCESS]])
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: } // end sil function '$s11borrow_expr1PPAAE35mutatingExtensionPointPassSelfAsArgyyF'
+  mutating func mutatingExtensionPointPassSelfAsArg() {
+    // Without borrow
+    usePGeneric(self)
+
+    // With borrow
+    usePGeneric(_borrow self)
+  }
 }

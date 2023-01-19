@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify -emit-sil %s
 
-// rdar://104107922
-// REQUIRES: rdar104107922
-
 class Klass {}
 
 var globalMoveOnlyStruct = MoveOnlyStruct()

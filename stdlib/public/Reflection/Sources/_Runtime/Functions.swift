@@ -12,7 +12,7 @@
 import Swift
 import _SwiftRuntimeShims
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct BoxPair {
   public typealias Storage = (
@@ -34,11 +34,11 @@ public struct BoxPair {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @_silgen_name("swift_allocBox")
 public func swift_allocBox(_: Metadata) -> BoxPair
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @inlinable
 public func swift_conformsToProtocol(
   _ type: Metadata,
@@ -51,7 +51,7 @@ public func swift_conformsToProtocol(
   return WitnessTable(wt)
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @inlinable
 public func swift_projectBox(
   _ obj: HeapObject
