@@ -8,6 +8,9 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
+// Currently broken rdar://104199930
+// UNSUPPORTED: OS=watchos
+
 import SwiftReflectionTest
 
 // Only one case has a non-zero-sized payload, so this gets
