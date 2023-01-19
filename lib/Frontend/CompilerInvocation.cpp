@@ -2482,6 +2482,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_collocate_metadata_functions,
                    OPT_disable_collocate_metadata_functions,
                    Opts.CollocatedMetadataFunctions);
+  Opts.UseRelativeProtocolWitnessTables =
+    Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
+                 OPT_disable_relative_protocol_witness_tables,
+                 Opts.UseRelativeProtocolWitnessTables);
   return false;
 }
 

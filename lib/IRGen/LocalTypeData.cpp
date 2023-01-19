@@ -470,9 +470,8 @@ void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
           WitnessIndex wIndex(privateWitnessTableIndexToTableOffset(index),
                               /*prefix*/ false);
 
-          auto table =
-              emitInvariantLoadOfOpaqueWitness(*this, selfTable,
-                                        wIndex.forProtocolWitnessTable());
+          auto table = loadConditionalConformance(*this ,selfTable,
+                                                  wIndex.forProtocolWitnessTable());
           table = Builder.CreateBitCast(table, IGM.WitnessTablePtrTy);
           setProtocolWitnessTableName(IGM, table, archetype, proto);
 
