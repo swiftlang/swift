@@ -988,6 +988,56 @@ static bool isDependentConformance(
     conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
+static bool hasConditionalConformances(IRGenModule &IGM,
+                                       const RootProtocolConformance *rootConformance,
+                                       llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited) {
+  // Self-conformances are never dependent.
+  auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
+  if (!conformance)
+    return false;
+
+  // Check whether we've visited this conformance already.  If so,
+  // optimistically assume it's fine --- we want the maximal fixed point.
+  if (!visited.insert(conformance).second)
+    return false;
+
+  // Check whether any of the conformances are dependent.
+  auto proto = conformance->getProtocol();
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto assocProtocol = req.getProtocolDecl();
+    if (assocProtocol->isObjC())
+      continue;
+
+    auto assocConformance =
+      conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
+
+    // We might be presented with a broken AST.
+    if (assocConformance.isInvalid())
+      return false;
+
+    if (assocConformance.isAbstract())
+      continue;
+
+    if (hasConditionalConformances(IGM,
+                               assocConformance.getConcrete()
+                                 ->getRootConformance(),
+                               visited))
+      return true;
+  }
+
+  // Check if there are any conditional conformances. Other forms of conditional
+  // requirements don't exist in the witness table.
+  return SILWitnessTable::enumerateWitnessTableConditionalConformances(
+    conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
+}
+static bool hasConditionalConformances(IRGenModule &IGM,
+                                       const RootProtocolConformance *conformance) {
+  llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
+  return hasConditionalConformances(IGM, conformance, visited);
+}
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
@@ -1059,7 +1109,11 @@ static llvm::Value *emitWitnessTableAccessorCall(
   auto conditionalTables =
       emitConditionalConformancesBuffer(IGF, conformance);
 
-  auto call = IGF.Builder.CreateCall(
+  auto call = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+    IGF.Builder.CreateCall(
+      IGF.IGM.getGetWitnessTableRelativeFunctionPointer(),
+      {conformanceDescriptor, *srcMetadataCache, conditionalTables}) :
+    IGF.Builder.CreateCall(
       IGF.IGM.getGetWitnessTableFunctionPointer(),
       {conformanceDescriptor, *srcMetadataCache, conditionalTables});
 
@@ -1279,6 +1333,7 @@ public:
     const ProtocolInfo &PI;
 
     SmallVector<size_t, 4> ConditionalRequirementPrivateDataIndices;
+    bool isRelative;
 
     void addConditionalConformances() {
       for (auto reqtIndex : indices(SILConditionalConformances)) {
@@ -1290,12 +1345,13 @@ public:
 
   public:
     FragileWitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
-                               SILWitnessTable *SILWT)
+                               SILWitnessTable *SILWT, bool isRelative)
         : WitnessTableBuilderBase(IGM, SILWT), Table(table),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
-                                 ProtocolInfoKind::Full)) {}
+                                 ProtocolInfoKind::Full)),
+          isRelative(isRelative) {}
 
     /// The number of entries in the witness table.
     unsigned getTableSize() const { return TableSize; }
@@ -1312,7 +1368,10 @@ public:
     void addProtocolConformanceDescriptor() {
       auto descriptor =
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
-      Table.addBitCast(descriptor, IGM.Int8PtrTy);
+      if (isRelative)
+        Table.addRelativeAddress(descriptor);
+      else
+        Table.addBitCast(descriptor, IGM.Int8PtrTy);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -1343,13 +1402,22 @@ public:
 
       // If we can emit the base witness table as a constant, do so.
       llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
-      if (baseWitness) {
+
+      if (baseWitness && isRelative) {
+        Table.addRelativeAddress(baseWitness);
+        return;
+      } else if (baseWitness) {
         Table.addBitCast(baseWitness, IGM.Int8PtrTy);
         return;
       }
 
       // Otherwise, we'll need to derive it at instantiation time.
       SpecializedBaseConformances.push_back({Table.size(), &conf});
+
+      if (isRelative) {
+        Table.addInt32(0);
+        return;
+      }
       Table.addNullPointer(IGM.Int8PtrTy);
     }
 
@@ -1393,11 +1461,17 @@ public:
       }
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
 
+      if (isRelative) {
+        Table.addRelativeAddress(witness);
+        return;
+      }
+
       PointerAuthSchema schema =
           isAsyncRequirement
               ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
               : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
+
       return;
     }
 
@@ -1431,6 +1505,11 @@ public:
             Conformance.getDeclContext()->getGenericSignatureOfContext(),
             /*inProtocolContext=*/false);
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+
+      if (isRelative) {
+        Table.addRelativeAddress(witness);
+        return;
+      }
 
       auto &schema = IGM.getOptions().PointerAuth
                         .ProtocolAssociatedTypeAccessFunctions;
@@ -1471,6 +1550,11 @@ public:
       llvm::Constant *witnessEntry =
         getAssociatedConformanceWitness(requirement, associate,
                                         associatedConformance);
+
+      if (isRelative) {
+        Table.addRelativeAddress(witnessEntry);
+        return;
+      }
 
       auto &schema = IGM.getOptions().PointerAuth
                         .ProtocolAssociatedTypeWitnessTableAccessFunctions;
@@ -2143,15 +2227,22 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
+  // Under a relative protocol witness table implementation conformances are
+  // always direct.
   //
   // FIXME: Both implementations of ConformanceInfo are trivially-destructible,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
-  if (isDependentConformance(rootConformance) ||
+  if (!IRGen.Opts.UseRelativeProtocolWitnessTables &&
+      (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
-      isSynthesizedNonUnique(rootConformance)) {
+      isSynthesizedNonUnique(rootConformance))) {
+    info = new AccessorConformanceInfo(conformance);
+    Conformances.try_emplace(conformance, info);
+  } else if(IRGen.Opts.UseRelativeProtocolWitnessTables &&
+            hasConditionalConformances(*this, rootConformance)) {
     info = new AccessorConformanceInfo(conformance);
     Conformances.try_emplace(conformance, info);
   } else {
@@ -2262,23 +2353,32 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   llvm::Function *instantiationFunction = nullptr;
   bool isDependent = isDependentConformance(conf);
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
-
-  if (!isResilientConformance(conf)) {
+  bool isResilient = isResilientConformance(conf);
+  bool useRelativeProtocolWitnessTable =
+    IRGen.Opts.UseRelativeProtocolWitnessTables;
+  if (!isResilient) {
     // Build the witness table.
     ConstantInitBuilder builder(*this);
-    auto wtableContents = builder.beginArray(Int8PtrTy);
-    FragileWitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+    auto witnessTableEntryTy = useRelativeProtocolWitnessTable ?
+      (llvm::Type*)RelativeAddressTy : (llvm::Type*)Int8PtrTy;
+    auto wtableContents = builder.beginArray(witnessTableEntryTy);
+    FragileWitnessTableBuilder wtableBuilder(*this, wtableContents, wt,
+                                             useRelativeProtocolWitnessTable);
     wtableBuilder.build();
 
     // Produce the initializer value.
     auto initializer = wtableContents.finishAndCreateFuture();
 
     global = cast<llvm::GlobalVariable>(
-      (isDependent && conf->getDeclContext()->isGenericContext())
+      (isDependent && conf->getDeclContext()->isGenericContext() &&
+       !useRelativeProtocolWitnessTable)
         ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
-    global->setConstant(isConstantWitnessTable(wt));
+    // Eelative protocol witness tables are always constant. They don't cache
+    // results in the table.
+    global->setConstant(useRelativeProtocolWitnessTable ||
+                        isConstantWitnessTable(wt));
     global->setAlignment(
         llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
 
@@ -2289,6 +2389,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
+    assert(!IRGen.Opts.UseRelativeProtocolWitnessTables &&
+           "resilient relative protocol witness tables are not supported");
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);
 
@@ -2486,6 +2588,100 @@ MetadataResponse MetadataPath::follow(IRGenFunction &IGF,
   return source;
 }
 
+llvm::Value *IRGenFunction::optionallyLoadFromConditionalProtocolWitnessTable(
+  llvm::Value *wtable) {
+  if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables)
+    return wtable;
+
+  auto *ptrVal = Builder.CreatePtrToInt(wtable, IGM.IntPtrTy);
+  auto *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  auto *isCond = Builder.CreateAnd(ptrVal, one);
+  auto *isCondBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto *endBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto *origBB = Builder.GetInsertBlock();
+  isCond = Builder.CreateICmpEQ(isCond, one);
+  Builder.CreateCondBr(isCond, isCondBB, endBB);
+
+  Builder.emitBlock(isCondBB);
+  ConditionalDominanceScope condition (*this);
+  auto *mask = Builder.CreateNot(one);
+  auto *wtableAddr = Builder.CreateAnd(ptrVal, mask);
+  wtableAddr = Builder.CreateIntToPtr(wtableAddr, IGM.WitnessTablePtrPtrTy);
+  auto *wtableDeref = Builder.CreateLoad(Address(wtableAddr,
+                                                 IGM.WitnessTablePtrTy,
+                                                 IGM.getPointerAlignment()));
+  Builder.CreateBr(endBB);
+
+  Builder.emitBlock(endBB);
+  auto *phi = Builder.CreatePHI(wtable->getType(), 2);
+  phi->addIncoming(wtable, origBB);
+  phi->addIncoming(wtableDeref, isCondBB);
+  return phi;
+}
+
+llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
+                                            llvm::Value *wtable,
+                                            WitnessIndex index) {
+  auto &IGM = IGF.IGM;
+  if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
+    auto baseWTable =
+      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+    return baseWTable;
+  }
+  auto &Builder = IGF.Builder;
+  auto *ptrVal = Builder.CreatePtrToInt(wtable, IGM.IntPtrTy);
+  auto *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  auto *isCond = Builder.CreateAnd(ptrVal, one);
+  auto *isNotCondBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto *isCondBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto *endBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  isCond = Builder.CreateICmpEQ(isCond, one);
+  Builder.CreateCondBr(isCond, isCondBB, isNotCondBB);
+
+  Builder.emitBlock(isCondBB);
+  auto *mask = Builder.CreateNot(one);
+  auto *wtableAddr = Builder.CreateAnd(ptrVal, mask);
+  wtableAddr = Builder.CreateIntToPtr(wtableAddr, IGM.WitnessTablePtrTy);
+  auto addr = slotForLoadOfOpaqueWitness(IGF, wtableAddr, index,
+                                         false /*isRelative*/);
+  llvm::Value *baseWTable = Builder.CreateLoad(addr);
+  baseWTable = IGF.Builder.CreateBitCast(baseWTable, IGF.IGM.WitnessTablePtrTy);
+  Builder.CreateBr(endBB);
+
+  Builder.emitBlock(isNotCondBB);
+  auto baseWTable2 =
+      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
+                                          IGF.IGM.WitnessTablePtrTy);
+  Builder.CreateBr(endBB);
+
+  Builder.emitBlock(endBB);
+  auto *phi = Builder.CreatePHI(wtable->getType(), 2);
+  phi->addIncoming(baseWTable, isCondBB);
+  phi->addIncoming(baseWTable2, isNotCondBB);
+  return phi;
+}
+
+llvm::Value *irgen::loadConditionalConformance(IRGenFunction &IGF,
+                                               llvm::Value *wtable,
+                                               WitnessIndex index) {
+
+  auto &IGM = IGF.IGM;
+  if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
+    return emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  }
+
+  auto &Builder = IGF.Builder;
+  auto *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  auto *mask = Builder.CreateNot(one);
+  auto *ptrVal = Builder.CreatePtrToInt(wtable, IGM.IntPtrTy);
+  auto *wtableAddr = Builder.CreateAnd(ptrVal, mask);
+  wtableAddr = Builder.CreateIntToPtr(wtableAddr, IGM.WitnessTablePtrTy);
+  auto addr = slotForLoadOfOpaqueWitness(IGF, wtableAddr, index,
+                                         false /*isRelative*/);
+  return Builder.CreateLoad(addr);
+}
+
 /// Call an associated-type witness table access function.  Does not do
 /// any caching or drill down to implied protocols.
 static llvm::Value *
@@ -2500,7 +2696,12 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   auto baseDescriptor =
     IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(sourceProtocol);
 
-  auto call = IGF.Builder.CreateCall(
+  auto call = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+    IGF.Builder.CreateCall(
+      IGF.IGM.getGetAssociatedConformanceWitnessRelativeFunctionPointer(),
+      {wtable, parentMetadata, associatedTypeMetadata, baseDescriptor,
+       assocConformanceDescriptor}) :
+    IGF.Builder.CreateCall(
       IGF.IGM.getGetAssociatedConformanceWitnessFunctionPointer(),
       {wtable, parentMetadata, associatedTypeMetadata, baseDescriptor,
        assocConformanceDescriptor});
@@ -2606,8 +2807,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     auto wtable = source.getMetadata();
     WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
-    auto baseWTable =
-      emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+    auto baseWTable = loadParentProtocolWitnessTable(IGF, wtable,
                                        index.forProtocolWitnessTable());
     baseWTable =
       IGF.Builder.CreateBitCast(baseWTable, IGF.IGM.WitnessTablePtrTy);
@@ -2762,8 +2962,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
                        /*prefix*/ false);
 
     auto sourceWTable = source.getMetadata();
-    auto capturedWTable =
-      emitInvariantLoadOfOpaqueWitness(IGF, sourceWTable, index);
+    auto capturedWTable = loadConditionalConformance(IGF, sourceWTable,
+                                                     index.forProtocolWitnessTable());
     capturedWTable =
       IGF.Builder.CreateBitCast(capturedWTable, IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, capturedWTable, sourceKey.Type,
@@ -3532,7 +3732,8 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
 }
 
 static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
-                                       SILDeclRef member, Address slot) {
+                                       SILDeclRef member, Address slot,
+                                       bool isRelativeTable) {
   if (IGF.IGM.getOptions().WitnessMethodElimination) {
     // For LLVM IR WME, emit a @llvm.type.checked.load with the type of the
     // method.
@@ -3551,8 +3752,12 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
     // which could mean redundant loads don't get removed.
     llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::type_checked_load, args);
+    assert(!isRelativeTable && "Not yet implemented");
     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
   }
+
+  if (isRelativeTable)
+    return IGF.emitLoadOfRelativePointer(slot, false, IGF.IGM.Int8Ty);
 
   // Not doing LLVM IR WME, can just be a direct load.
   return IGF.emitInvariantLoad(slot);
@@ -3569,15 +3774,23 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   auto index = fnProtoInfo.getFunctionIndex(member);
+  auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables;
+  wtable = IGF.optionallyLoadFromConditionalProtocolWitnessTable(wtable);
   auto slot =
-      slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable());
-  llvm::Value *witnessFnPtr = emitWTableSlotLoad(IGF, wtable, member, slot);
+      slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable(),
+                                 isRelativeTable);
+  llvm::Value *witnessFnPtr = emitWTableSlotLoad(IGF, wtable, member, slot,
+                                                 isRelativeTable);
 
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
+  if (isRelativeTable) {
+    return FunctionPointer::createUnsigned(fnType, witnessFnPtr, signature,
+                                           true);
+  }
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
@@ -3644,9 +3857,12 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   // Extract the associated type descriptor.
   auto assocTypeDescriptor =
     IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
-
   // Call swift_getAssociatedTypeWitness().
   auto call =
+    IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+      IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessRelativeFunctionPointer(),
+                             {request.get(IGF), wtable, parentMetadata,
+                              reqBaseDescriptor, assocTypeDescriptor}) :
       IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFunctionPointer(),
                              {request.get(IGF), wtable, parentMetadata,
                               reqBaseDescriptor, assocTypeDescriptor});

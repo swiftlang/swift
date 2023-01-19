@@ -354,6 +354,11 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
+const WitnessTable *
+swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
+
 /// Retrieve an associated type witness from the given witness table.
 ///
 /// \param wtable The witness table.
@@ -364,6 +369,13 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 /// \returns metadata for the associated type witness.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
+                                          MetadataRequest request,
+                                          WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *reqBase,
+                                          const ProtocolRequirement *assocType);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
                                           const Metadata *conformingType,
@@ -382,6 +394,14 @@ MetadataResponse swift_getAssociatedTypeWitness(
 /// \returns corresponding witness table.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable *swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable *swift_getAssociatedConformanceWitnessRelative(
                                   WitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,

@@ -99,6 +99,14 @@ namespace irgen {
     return -1 - (int)index;
   }
 
+  llvm::Value *loadParentProtocolWitnessTable(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              WitnessIndex index);
+
+  llvm::Value *loadConditionalConformance(IRGenFunction &IGF,
+                                          llvm::Value *wtable,
+                                          WitnessIndex index);
+
   struct ExpandedSignature {
     unsigned numShapes;
     unsigned numTypeMetadataPtrs;
