@@ -229,9 +229,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   if (!bestAvailAttr)
     return None;
 
-  return AvailabilityContext{
-    VersionRange::allGTE(bestAvailAttr->Introduced.value()),
-    bestAvailAttr->IsSPI};
+  return availableRange(bestAvailAttr, Ctx);
 }
 
 bool Decl::isAvailableAsSPI() const {
@@ -283,11 +281,8 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
       bestAvailAttr = availAttr;
   }
 
-  if (bestAvailAttr) {
-    return AvailabilityContext{
-      VersionRange::allGTE(bestAvailAttr->Introduced.value())
-    };
-  }
+  if (bestAvailAttr)
+    return availableRange(bestAvailAttr, ctx);
 
   return AvailabilityContext::alwaysAvailable();
 }
@@ -318,6 +313,14 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
 
   // Treat unannotated declarations as always available.
   return AvailabilityContext::alwaysAvailable();
+}
+
+AvailabilityContext
+AvailabilityInference::availableRange(const AvailableAttr *attr,
+                                      ASTContext &Ctx) {
+  assert(attr->isActivePlatform(Ctx));
+  return AvailabilityContext{VersionRange::allGTE(attr->Introduced.value()),
+                             attr->IsSPI};
 }
 
 namespace {

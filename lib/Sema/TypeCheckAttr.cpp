@@ -1885,8 +1885,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   Optional<AvailabilityContext> EnclosingAnnotatedRange;
-  AvailabilityContext AttrRange{
-      VersionRange::allGTE(attr->Introduced.value())};
+  AvailabilityContext AttrRange =
+      AvailabilityInference::availableRange(attr, Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingUnavailable = parent->getSemanticUnavailableAttr()) {
@@ -1904,7 +1904,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
       const Decl *enclosingDecl = enclosingAvailable.value().second;
       EnclosingAnnotatedRange.emplace(
-          VersionRange::allGTE(enclosingAttr->Introduced.value()));
+          AvailabilityInference::availableRange(enclosingAttr, Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
         // Members of extensions of nominal types with available ranges were
         // not diagnosed previously, so only emit a warning in that case.
