@@ -246,7 +246,18 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 39,
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Buffered<Swift.String>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Hello"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "_propertyWrapper2",
@@ -255,7 +266,30 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 42,
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "128"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "min",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "0"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "max",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "255"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "_propertyWrapper3",
@@ -264,7 +298,40 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 45,
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Buffered<ExtractLiterals.Clamping<Swift.Int>>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:              "valueKind": "InitCall",
+// CHECK-NEXT:              "value": {
+// CHECK-NEXT:                "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:                "arguments": [
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "wrappedValue",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral"
+// CHECK-NEXT:                    "value": "128"
+// CHECK-NEXT:                  },
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "min",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral",
+// CHECK-NEXT:                    "value": "0"
+// CHECK-NEXT:                  },
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "max",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral",
+// CHECK-NEXT:                    "value": "255"
+// CHECK-NEXT:                  }
+// CHECK-NEXT:                ]
+// CHECK-NEXT:              }
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "propertyWrapper1",
@@ -273,8 +340,18 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 39,
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "Hello",
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Buffered<Swift.String>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "Hello"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        },
 // CHECK-NEXT:        "attributes": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Buffered",
@@ -298,8 +375,30 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 42,
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "128",
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "128"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "min",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "0"
+// CHECK-NEXT:            },
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "max",
+// CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "valueKind": "RawLiteral",
+// CHECK-NEXT:              "value": "255"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        },
 // CHECK-NEXT:        "attributes": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Clamping",
@@ -327,8 +426,40 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 45,
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "128",
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractLiterals.Buffered<ExtractLiterals.Clamping<Swift.Int>>",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "wrappedValue",
+// CHECK-NEXT:              "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:              "valueKind": "InitCall",
+// CHECK-NEXT:              "value": {
+// CHECK-NEXT:                "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:                "arguments": [
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "wrappedValue",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral",
+// CHECK-NEXT:                    "value": "128"
+// CHECK-NEXT:                  },
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "min",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral",
+// CHECK-NEXT:                    "value": "0"
+// CHECK-NEXT:                  },
+// CHECK-NEXT:                  {
+// CHECK-NEXT:                    "label": "max",
+// CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "valueKind": "RawLiteral",
+// CHECK-NEXT:                    "value": "255"
+// CHECK-NEXT:                  }
+// CHECK-NEXT:                ]
+// CHECK-NEXT:              }
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        },
 // CHECK-NEXT:        "attributes": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Buffered",
