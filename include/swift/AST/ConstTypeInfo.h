@@ -34,6 +34,7 @@ public:
     Dictionary,
     Array,
     Tuple,
+    Enum,
     Runtime
   };
 
@@ -73,19 +74,19 @@ struct FunctionParameter {
 /// with a collection of (potentially compile-time-known) parameters
 class InitCallValue : public CompileTimeValue {
 public:
-  InitCallValue(std::string Name, std::vector<FunctionParameter> Parameters)
-  : CompileTimeValue(ValueKind::InitCall), Name(Name),
-  Parameters(Parameters) {}
+  InitCallValue(swift::Type Type, std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::InitCall), Type(Type),
+        Parameters(Parameters) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::InitCall;
   }
 
-  std::string getName() const { return Name; }
+  swift::Type getType() const { return Type; }
   std::vector<FunctionParameter> getParameters() const { return Parameters; }
 
 private:
-  std::string Name;
+  swift::Type Type;
   std::vector<FunctionParameter> Parameters;
 };
 
@@ -159,6 +160,28 @@ private:
   std::vector<std::shared_ptr<TupleValue>> Elements;
 };
 
+/// An enum value representation
+class EnumValue : public CompileTimeValue {
+public:
+  EnumValue(std::string Identifier,
+            llvm::Optional<std::vector<FunctionParameter>> Parameters)
+      : CompileTimeValue(ValueKind::Enum), Identifier(Identifier),
+        Parameters(Parameters) {}
+
+  std::string getIdentifier() const { return Identifier; }
+  llvm::Optional<std::vector<FunctionParameter>> getParameters() const {
+    return Parameters;
+  }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Enum;
+  }
+
+private:
+  std::string Identifier;
+  llvm::Optional<std::vector<FunctionParameter>> Parameters;
+};
+
 /// A representation of an arbitrary value that does not fall under
 /// any of the above categories.
 class RuntimeValue : public CompileTimeValue {
@@ -173,6 +196,19 @@ public:
 struct CustomAttrValue {
   swift::Type Type;
   std::vector<FunctionParameter> Parameters;
+};
+
+/// A representation of a single associated value for an enumeration case.
+struct EnumElementParameterValue {
+  llvm::Optional<std::string> Label;
+  swift::Type Type;
+};
+
+/// A representation of a single enumeration case.
+struct EnumElementDeclValue {
+  std::string Name;
+  llvm::Optional<std::string> RawValue;
+  llvm::Optional<std::vector<EnumElementParameterValue>> Parameters;
 };
 
 struct ConstValueTypePropertyInfo {
@@ -194,6 +230,7 @@ struct ConstValueTypePropertyInfo {
 struct ConstValueTypeInfo {
   swift::NominalTypeDecl *TypeDecl;
   std::vector<ConstValueTypePropertyInfo> Properties;
+  llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements;
 };
 } // namespace swift
 #endif
