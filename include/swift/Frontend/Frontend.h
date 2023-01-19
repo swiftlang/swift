@@ -559,6 +559,10 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
 
+  /// Whether the Swift Concurrency Shims support Clang library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftConcurrencyShims() const;
+
   /// Verify that if an implicit import of the `StringProcessing` module if
   /// expected, it can actually be imported. Emit a warning, otherwise.
   void verifyImplicitStringProcessingImport();
