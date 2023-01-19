@@ -72,6 +72,7 @@ public struct PublicStruct {
 // SAFETY-PRIVATE: Serialization safety, safe: 'inlinableFunc()'
     public func publicFunc() {}
 // SAFETY-PRIVATE: Serialization safety, safe: 'publicFunc()'
+@available(SwiftStdlib 5.1, *) // for the `some` keyword.
     public func opaqueTypeFunc() -> some PublicProto {
         return InternalStruct()
     }

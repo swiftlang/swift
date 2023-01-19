@@ -3099,22 +3099,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   /// XRef errors and such.
   ///
   /// \p decl should be either an \c ExtensionDecl or a \c ValueDecl.
-  static bool declIsDeserializationSafe(const Decl *decl) {
+  static bool isDeserializationSafe(const Decl *decl) {
     if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
       // Consider extensions as safe as their extended type.
       auto nominalType = ext->getExtendedNominal();
       if (!nominalType ||
-          !declIsDeserializationSafe(nominalType))
+          !isDeserializationSafe(nominalType))
         return false;
 
       // We can mark the extension unsafe only if it has no public members.
       auto members = ext->getMembers();
-      int membersCount = 0;
       auto hasSafeMembers = std::any_of(members.begin(), members.end(),
-        [&membersCount](const Decl *D) -> bool {
-          membersCount ++;
+        [](const Decl *D) -> bool {
           if (auto VD = dyn_cast<ValueDecl>(D))
-            return declIsDeserializationSafe(VD);
+            return isDeserializationSafe(VD);
           return true;
         });
       if (hasSafeMembers)
@@ -3126,12 +3124,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                         ConformanceLookupKind::OnlyExplicit);
       bool hasSafeConformances = std::any_of(protocols.begin(),
                                              protocols.end(),
-                                             declIsDeserializationSafe);
+                                             isDeserializationSafe);
       if (hasSafeConformances)
         return true;
 
       // Truly empty extensions are safe, it may happen in swiftinterfaces.
-      if (membersCount == 0 && protocols.size() == 0)
+      if (members.empty() && protocols.size() == 0)
         return true;
 
       return false;
@@ -3152,7 +3150,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     if (auto accessor = dyn_cast<AccessorDecl>(value))
       // Accessors are as safe as their storage.
-      if (declIsDeserializationSafe(accessor->getStorage()))
+      if (isDeserializationSafe(accessor->getStorage()))
         return true;
 
     // Frozen fields are always safe.
@@ -3168,7 +3166,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       // Property wrappers storage is as safe as the wrapped property.
       if (VarDecl *wrapped = var->getOriginalWrappedProperty())
-        if (declIsDeserializationSafe(wrapped))
+        if (isDeserializationSafe(wrapped))
           return true;
     }
 
@@ -3178,7 +3176,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   /// Write a \c DeserializationSafetyLayout record only when \p decl is unsafe
   /// to deserialize.
   ///
-  /// \sa declIsDeserializationSafe
+  /// \sa isDeserializationSafe
   void writeDeserializationSafety(const Decl *decl) {
     using namespace decls_block;
 
@@ -3217,7 +3215,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // Don't look at decls inside functions and
     // check the ValueDecls themselves.
     auto declIsSafe = DC->isLocalContext() ||
-                      declIsDeserializationSafe(decl);
+                      isDeserializationSafe(decl);
 #ifdef NDEBUG
     // In release builds, bail right away if the decl is safe.
     // In debug builds, wait to bail after the debug prints and asserts.
@@ -3246,6 +3244,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     );
 
 #ifndef NDEBUG
+    // Bail out here in debug builds, release builds would bailed out earlier.
     if (declIsSafe)
       return;
 #endif
