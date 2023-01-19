@@ -887,6 +887,15 @@ ASTNode SourceFile::getMacroExpansion() const {
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
+CustomAttr *SourceFile::getAttachedMacroAttribute() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return genInfo.attachedMacroCustomAttr;
+}
+
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   auto macroExpansion = getMacroExpansion();
   if (!macroExpansion)

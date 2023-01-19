@@ -308,6 +308,41 @@ ExternalMacroDefinitionRequest::evaluate(
   return ExternalMacroDefinition{nullptr};
 }
 
+bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
+                                           Decl *decl) const {
+  auto *parentDecl = decl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return false;
+
+  bool addedAttributes = false;
+  auto parentAttrs = parentDecl->getSemanticAttrs();
+  for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto customAttrDecl = evaluateOrDefault(
+        evaluator,
+        CustomAttrDeclRequest{
+          customAttr,
+          parentDecl->getInnermostDeclContext()
+        },
+        nullptr);
+
+    if (!customAttrDecl)
+      continue;
+
+    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
+    if (!macroDecl)
+      continue;
+
+    if (!macroDecl->getMacroRoles().contains(MacroRole::MemberAttribute))
+      continue;
+
+    addedAttributes |= expandAttributes(customAttr, macroDecl, decl);
+  }
+
+  return addedAttributes;
+}
+
+
 /// Determine whether the given source file is from an expansion of the given
 /// macro.
 static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
@@ -326,6 +361,17 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
       // in it.
       if (expansionDecl->getMacro().getFullName() == macro->getName())
         return true;
+    } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
+      auto *decl = expansion.dyn_cast<Decl *>();
+      auto &ctx = decl->getASTContext();
+      auto attrDecl = evaluateOrDefault(ctx.evaluator,
+          CustomAttrDeclRequest{macroAttr, decl->getDeclContext()},
+          nullptr);
+      auto *macroDecl = attrDecl.dyn_cast<MacroDecl *>();
+      if (!macroDecl)
+        return false;
+
+      return macroDecl == macro;
     } else {
       llvm_unreachable("Unknown macro expansion node kind");
     }
@@ -845,8 +891,7 @@ void swift::expandAccessors(
 // FIXME: Almost entirely duplicated code from `expandAccessors`.
 // Factor this out into an `expandAttachedMacro` function, with
 // arguments for the PrettyStackTrace string, 'attachedTo' decl, etc.
-void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
-                             SemanticDeclAttributes &result) {
+bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   auto *dc = member->getInnermostDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -856,21 +901,21 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
   auto attrSourceFile =
     moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
   if (!attrSourceFile)
-    return;
+    return false;
 
   auto declSourceFile =
       moduleDecl->getSourceFileContainingLocation(member->getStartLoc());
   if (!declSourceFile)
-    return;
+    return false;
 
   Decl *parentDecl = member->getDeclContext()->getAsDecl();
   if (!parentDecl)
-    return;
+    return false;
 
   auto parentDeclSourceFile =
     moduleDecl->getSourceFileContainingLocation(parentDecl->getLoc());
   if (!parentDeclSourceFile)
-    return;
+    return false;
 
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
@@ -878,7 +923,7 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
   if (isFromExpansionOfMacro(attrSourceFile, macro) ||
       isFromExpansionOfMacro(declSourceFile, macro)) {
     member->diagnose(diag::macro_recursive, macro->getName());
-    return;
+    return false;
   }
 
   auto macroDef = macro->getDefinition();
@@ -886,13 +931,13 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
-    return;
+    return false;
 
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
       // FIXME: Error here.
-      return;
+      return false;
     }
   }
 
@@ -912,13 +957,13 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
                         macro->getName()
       );
       macro->diagnose(diag::decl_declared_here, macro->getName());
-      return;
+      return false;
     }
 
     // Make sure macros are enabled before we expand.
     if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
       member->diagnose(diag::macro_experimental);
-      return;
+      return false;
     }
 
 #if SWIFT_SWIFT_PARSER
@@ -926,15 +971,15 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
 
     auto astGenAttrSourceFile = attrSourceFile->exportedSourceFile;
     if (!astGenAttrSourceFile)
-      return;
+      return false;
 
     auto astGenDeclSourceFile = declSourceFile->exportedSourceFile;
     if (!astGenDeclSourceFile)
-      return;
+      return false;
 
     auto astGenParentDeclSourceFile = parentDeclSourceFile->exportedSourceFile;
     if (!astGenParentDeclSourceFile)
-      return;
+      return false;
 
     Decl *searchDecl = member;
     if (auto *var = dyn_cast<VarDecl>(member))
@@ -950,13 +995,13 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
         astGenParentDeclSourceFile, parentDecl->getStartLoc().getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
-      return;
+      return false;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
                                               (size_t)evaluatedSourceLength);
     break;
 #else
     member->diagnose(diag::macro_unsupported);
-    return;
+    return false;
 #endif
   }
   }
@@ -1018,6 +1063,7 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
 
+  bool addedAttributes = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto decl : topLevelDecls) {
     // FIXME: We want to type check decl attributes applied to
@@ -1029,7 +1075,10 @@ void swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
 
     // Add the new attributes to the semantic attribute list.
     for (auto *attr : decl->getAttrs()) {
-      result.add(attr);
+      addedAttributes = true;
+      member->getAttrs().add(attr);
     }
   }
+
+  return addedAttributes;
 }

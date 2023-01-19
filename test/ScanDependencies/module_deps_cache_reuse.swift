@@ -41,6 +41,7 @@ import SubE
 // CHECK-DAG:     "swift": "_Concurrency"
 // CHECK-DAG:     "swift": "_StringProcessing"
 // CHECK-DAG:     "swift": "_cross_import_E"
+// CHECK-DAG:     "clang": "_SwiftConcurrencyShims"
 // CHECK: ],
 
 // CHECK:      "extraPcmArgs": [
