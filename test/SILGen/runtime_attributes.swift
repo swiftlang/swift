@@ -81,7 +81,7 @@ struct TestSelfUse {
   // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*Int
   // CHECK-NEXT: [[PROP_ACCESS:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*Int
   // CHECK-NEXT: [[PROP_VALUE:%.*]] = load [trivial] [[PROP_ACCESS]] : $*Int
-  // CHECK_NEXT: end_access [[PROP_ACCESS]] : $*Int
+  // CHECK-NEXT: end_access [[PROP_ACCESS]] : $*Int
   // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $Int
   // CHECK: store [[PROP_VALUE]] to [trivial] [[PROP_VAL_COPY]] : $*Int
   // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
@@ -94,7 +94,7 @@ struct TestSelfUse {
   // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*String
   // CHECK-NEXT: [[PROP_ACCESS:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
   // CHECK-NEXT: [[PROP_VALUE:%.*]] = load [copy] [[PROP_ACCESS]] : $*String
-  // CHECK_NEXT: end_access [[PROP_ACCESS]] : $*String
+  // CHECK-NEXT: end_access [[PROP_ACCESS]] : $*String
   // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $String
   // CHECK: store [[PROP_VALUE]] to [init] [[PROP_VAL_COPY]] : $*String
   // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
