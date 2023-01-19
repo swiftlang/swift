@@ -78,9 +78,9 @@
 using namespace swift;
 using llvm::SmallSetVector;
 
-llvm::Statistic swift::NumCopiesEliminated = {
-    DEBUG_TYPE, "NumCopiesEliminated",
-    "number of copy_value instructions removed"};
+llvm::Statistic swift::NumCopiesAndMovesEliminated = {
+    DEBUG_TYPE, "NumCopiesAndMovesEliminated",
+    "number of copy_value and move_value instructions removed"};
 
 llvm::Statistic swift::NumCopiesGenerated = {
     DEBUG_TYPE, "NumCopiesGenerated",
@@ -970,7 +970,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
       } else {
         if (instsToDelete.insert(srcCopy)) {
           LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
-          ++NumCopiesEliminated;
+          ++NumCopiesAndMovesEliminated;
         }
       }
     }
