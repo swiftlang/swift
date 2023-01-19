@@ -224,6 +224,9 @@ public:
 /// See #unionWith, #intersectWith, and #constrainWith.
 ///
 /// [lattice]: http://mathworld.wolfram.com/Lattice.html
+///
+/// NOTE: Generally you should use the utilities on \c AvailabilityInference
+/// to create an \c AvailabilityContext, rather than creating one directly.
 class AvailabilityContext {
   VersionRange OSVersion;
   llvm::Optional<bool> SPI;
@@ -344,6 +347,13 @@ public:
   /// Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
   static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
+
+  /// Returns the availability context for a declaration with the given
+  /// @available attribute.
+  ///
+  /// NOTE: The attribute must be active on the current platform.
+  static AvailabilityContext availableRange(const AvailableAttr *attr,
+                                            ASTContext &C);
 
   /// Returns the attribute that should be used to determine the availability
   /// range of the given declaration, or nullptr if there is none.
