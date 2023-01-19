@@ -7420,10 +7420,10 @@ class DeinitExistentialValueInst
 /// dependencies on the bound archetypes.
 ///
 ///   %0 = open_pack_element %index
-///          of <t_1_0... as $@opened t_10101 from {T...}>
-///          where t_1_0: Equatable
-///
-/// %index is always a $Builtin.Word.
+///          of <t_1_0... where t_1_0: Equatable>   // opened signature
+///          at <Pack{repeat each T}>,              // contextual subs
+///          shape $t_1_0,
+///          uuid "01234567-89AB-CDEF-0123-000000000000"
 ///
 /// In the printed representation, only the relevant portions of the
 /// opened generic environment are given: the pack type parameters,
