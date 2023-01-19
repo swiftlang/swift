@@ -3,23 +3,31 @@
 
 // REQUIRES: asserts
 
+/// Build libraries.
 // RUN: %target-swift-frontend -emit-module %t/HiddenLib.swift \
-// RUN:   -enable-library-evolution \
+// RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-path %t/HiddenLib.swiftmodule
-
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
+/// Build clients, with and without safety.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -verify -Xllvm -debug-only=Serialization 2>&1 \
+// RUN:   -verify -Xllvm -debug-only=Serialization \
+// RUN:   -disable-deserialization-safety 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=NEEDED,UNSAFE %s
 
-// RUN: rm %t/Lib.swiftmodule
-
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -verify -Xllvm -debug-only=Serialization 2>&1 \
+// RUN:   -verify -Xllvm -debug-only=Serialization \
+// RUN:   -enable-deserialization-safety 2>&1 \
+// RUN:   | %FileCheck --check-prefixes=NEEDED,CLEAN,SAFE %s
+
+/// Build against the swiftinterface.
+// RUN: rm %t/Lib.swiftmodule
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -verify -Xllvm -debug-only=Serialization \
+// RUN:   -disable-deserialization-safety 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=NEEDED,CLEAN %s
 
 /// Decls part of the API needed by the client.
@@ -37,6 +45,12 @@
 // CLEAN-NOT: Deserialized: 'privateFunc()'
 // CLEAN-NOT: Deserialized: 'fileprivateFunc()'
 
+/// Decls skips by the deserialization safety logic.
+// SAFE: Skipping unsafe deserialization: 'internalFunc()'
+// SAFE: Skipping unsafe deserialization: 'privateFunc()'
+// SAFE: Skipping unsafe deserialization: 'fileprivateFunc()'
+// SAFE: Skipping unsafe deserialization: 'refToIOI()'
+
 //--- HiddenLib.swift
 
 public struct HiddenStruct {
@@ -47,7 +61,7 @@ public struct HiddenStruct {
 
 @_implementationOnly import HiddenLib
 
-public class PublicStruct {
+public struct PublicStruct {
     public init() {}
 
     public func publicFunc() {}
