@@ -200,6 +200,11 @@ private:
   }
   ExternalUnion<Kind, Members, getMemberIndexForKind> Storage;
 
+  explicit LoweredValue(llvm::Value *singletonValue)
+      : kind(Kind::SingletonExplosion) {
+    Storage.emplace<SingletonExplosion>(kind, singletonValue);
+  }
+
 public:
 
   /// Create an address value without a stack restore point.
@@ -273,6 +278,10 @@ public:
   LoweredValue(LoweredValue &&lv)
       : kind(lv.kind) {
     Storage.moveConstruct(kind, std::move(lv.Storage));
+  }
+
+  static LoweredValue forSingletonExplosion(llvm::Value *value) {
+    return LoweredValue(value);
   }
 
   LoweredValue &operator=(LoweredValue &&lv) {
@@ -490,6 +499,10 @@ public:
   void setLoweredExplosion(SILValue v, Explosion &e) {
     assert(v->getType().isObject() && "explosion for address value?!");
     setLoweredValue(v, LoweredValue(e));
+  }
+  void setLoweredSingletonExplosion(SILValue v, llvm::Value *value) {
+    assert(v->getType().isObject() && "explosion for address value?!");
+    setLoweredValue(v, LoweredValue::forSingletonExplosion(value));
   }
 
   void setCorrespondingLoweredValues(SILInstructionResultArray results,
