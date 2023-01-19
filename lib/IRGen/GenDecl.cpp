@@ -496,12 +496,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
         !getSwiftModule()->getName().is("Cxx") &&
         !getSwiftModule()->getName().is("CxxStdlib") &&
         !getSwiftModule()->getName().is("std")) {
-      // TODO: link with swiftCxxStdlib unconditionally once the overlay module
-      // is renamed in CMake
+      this->addLinkLibrary(LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
       if (target.isOSDarwin())
-        this->addLinkLibrary(
-            LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
-      this->addLinkLibrary(LinkLibrary("swiftstd", LibraryKind::Library));
+        this->addLinkLibrary(LinkLibrary("swiftstd", LibraryKind::Library));
     }
   }
 
