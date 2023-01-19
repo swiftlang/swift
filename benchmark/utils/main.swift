@@ -33,6 +33,7 @@ import BitCount
 import Breadcrumbs
 import BucketSort
 import BufferFill
+import BufferFind
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -219,6 +220,7 @@ register(BitCount.benchmarks)
 register(Breadcrumbs.benchmarks)
 register(BucketSort.benchmarks)
 register(BufferFill.benchmarks)
+register(BufferFind.benchmarks)
 register(ByteSwap.benchmarks)
 register(COWTree.benchmarks)
 register(COWArrayGuaranteedParameterOverhead.benchmarks)
