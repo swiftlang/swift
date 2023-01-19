@@ -2252,6 +2252,70 @@ OpenExistentialValueInst::OpenExistentialValueInst(
     : UnaryInstructionBase(debugLoc, operand, selfTy, forwardingOwnershipKind) {
 }
 
+DynamicPackIndexInst *DynamicPackIndexInst::create(SILFunction &F,
+                                                   SILDebugLocation loc,
+                                                   SILValue indexOperand,
+                                                   CanPackType packType) {
+  auto packIndexType = SILType::getPackIndexType(F.getASTContext());
+
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, packType);
+
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(DynamicPackIndexInst));
+  return ::new (buffer)
+      DynamicPackIndexInst(loc, indexOperand, typeDependentOperands,
+                           packIndexType, packType);
+}
+
+PackPackIndexInst *PackPackIndexInst::create(SILFunction &F,
+                                             SILDebugLocation loc,
+                                             unsigned componentStartIndex,
+                                             SILValue indexWithinComponent,
+                                             CanPackType packType) {
+  assert(componentStartIndex < packType->getNumElements() &&
+         "component start index is out of bounds for indexed-into pack type");
+  // TODO: assert that the shapes are similar?
+
+  auto packIndexType = SILType::getPackIndexType(F.getASTContext());
+
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, packType);
+
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(PackPackIndexInst));
+  return ::new (buffer)
+      PackPackIndexInst(loc, componentStartIndex, indexWithinComponent,
+                        typeDependentOperands, packIndexType, packType);
+}
+
+ScalarPackIndexInst *ScalarPackIndexInst::create(SILFunction &F,
+                                                 SILDebugLocation loc,
+                                                 unsigned componentIndex,
+                                                 CanPackType packType) {
+  assert(componentIndex < packType->getNumElements() &&
+         "component index is out of bounds for indexed-into pack type");
+  assert(!isa<PackExpansionType>(packType.getElementType(componentIndex)) &&
+         "component index for scalar pack index is a pack expansion");
+
+  auto packIndexType = SILType::getPackIndexType(F.getASTContext());
+
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, packType);
+
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(ScalarPackIndexInst));
+  return ::new (buffer)
+      ScalarPackIndexInst(loc, componentIndex, typeDependentOperands,
+                          packIndexType, packType);
+}
+
 OpenPackElementInst::OpenPackElementInst(
     SILDebugLocation debugLoc, SILValue packIndexOperand,
     ArrayRef<SILValue> typeDependentOperands,
@@ -2264,6 +2328,9 @@ OpenPackElementInst::OpenPackElementInst(
 OpenPackElementInst *OpenPackElementInst::create(
     SILFunction &F, SILDebugLocation debugLoc, SILValue indexOperand,
     GenericEnvironment *env) {
+  // We can't assert that this is a pack-indexing instruction here
+  // because of forward declarations while parsing/deserializing, but
+  // we can at least assert the type.
   assert(indexOperand->getType().is<BuiltinPackIndexType>());
 
   SmallVector<SILValue, 8> typeDependentOperands;
@@ -2284,6 +2351,18 @@ OpenPackElementInst *OpenPackElementInst::create(
   auto buffer = F.getModule().allocateInst(size, alignof(OpenPackElementInst));
   return ::new (buffer) OpenPackElementInst(debugLoc, indexOperand,
                                             typeDependentOperands, type, env);
+}
+
+CanPackType OpenPackElementInst::getOpenedShapeClass() const {
+  PackType *pack = nullptr;
+  auto env = getOpenedGenericEnvironment();
+  env->forEachPackElementBinding([&](ElementArchetypeType *elementType,
+                                     PackType *packSubstitution) {
+    // Just pick one of these, they all have to have the same shape class.
+    pack = packSubstitution;
+  });
+  assert(pack);
+  return cast<PackType>(pack->getCanonicalType());
 }
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,

@@ -79,6 +79,7 @@
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
+#include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
@@ -1272,7 +1273,10 @@ public:
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
-  void visitOpenPackElementInst(swift::OpenPackElementInst *i);
+  void visitOpenPackElementInst(OpenPackElementInst *i);
+  void visitDynamicPackIndexInst(DynamicPackIndexInst *i);
+  void visitPackPackIndexInst(PackPackIndexInst *i);
+  void visitScalarPackIndexInst(ScalarPackIndexInst *i);
 
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -6757,6 +6761,29 @@ void IRGenSILFunction::visitOpenExistentialMetatypeInst(
 void IRGenSILFunction::visitOpenExistentialValueInst(
     OpenExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
+}
+
+void IRGenSILFunction::visitDynamicPackIndexInst(DynamicPackIndexInst *i) {
+  // At the IRGen level, this is just a type change.
+  auto index = getLoweredSingletonExplosion(i->getOperand());
+  setLoweredSingletonExplosion(i, index);
+}
+
+void IRGenSILFunction::visitPackPackIndexInst(PackPackIndexInst *i) {
+  auto startIndexOfSlice =
+    emitIndexOfStructuralPackComponent(*this, i->getIndexedPackType(),
+                                       i->getComponentStartIndex());
+  auto indexWithinSlice =
+    getLoweredSingletonExplosion(i->getSliceIndexOperand());
+  auto index = Builder.CreateAdd(startIndexOfSlice, indexWithinSlice);
+  setLoweredSingletonExplosion(i, index);
+}
+
+void IRGenSILFunction::visitScalarPackIndexInst(ScalarPackIndexInst *i) {
+  auto index =
+    emitIndexOfStructuralPackComponent(*this, i->getIndexedPackType(),
+                                       i->getComponentIndex());
+  setLoweredSingletonExplosion(i, index);
 }
 
 void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {

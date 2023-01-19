@@ -7414,6 +7414,133 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// An abstract class for instructions which producing variadic
+/// pack indices.
+///
+/// All of these instructions produce a Builtin.PackIndex value which
+/// can only be used in packs with a specific shape class.  In
+/// principle, that shape class could be reflected into the result type,
+/// but we actually need more structue than that in order to get the
+/// type-safety properties we want.  It therefore makes more sense to
+/// enforce structural properties on pack-index derivation than try
+/// to go all-in on dependent types.
+class AnyPackIndexInst : public SingleValueInstruction {
+  CanPackType IndexedPackType;
+
+protected:
+  AnyPackIndexInst(SILInstructionKind kind, SILDebugLocation loc,
+                   SILType type, CanPackType packType)
+      : SingleValueInstruction(kind, loc, type), IndexedPackType(packType) {
+    assert(type.isObject() && type.is<BuiltinPackIndexType>());
+  }
+
+public:
+  /// Return the type that this pack index indexes into.
+  CanPackType getIndexedPackType() const { return IndexedPackType; }
+
+  static bool classof(const AnyPackIndexInst *) { return true; }
+  static bool classof(SILNodePointer node) {
+    return node->getKind() >= SILNodeKind::First_AnyPackIndexInst &&
+           node->getKind() <= SILNodeKind::Last_AnyPackIndexInst;
+  }
+};
+
+/// Produce a dynamic pack index from a Builtin.Int32.
+///
+/// This instruction has undefined behavior if the value is out of
+/// bounds for the given pack (including the "one past the end" value).
+class DynamicPackIndexInst final :
+    public UnaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::DynamicPackIndexInst,
+                                DynamicPackIndexInst,
+                                AnyPackIndexInst> {
+  friend SILBuilder;
+  DynamicPackIndexInst(SILDebugLocation loc,
+                       SILValue indexOperand,
+                       ArrayRef<SILValue> typeDependentOperands,
+                       SILType type, CanPackType packType)
+    : UnaryInstructionWithTypeDependentOperandsBase(loc, indexOperand,
+                                                    typeDependentOperands,
+                                                    type, packType) {}
+
+  static DynamicPackIndexInst *create(SILFunction &parent,
+                                      SILDebugLocation loc,
+                                      SILValue indexOperand,
+                                      CanPackType packType);
+};
+
+/// Compute the pack index of an element of a slice of a pack.
+class PackPackIndexInst final :
+    public UnaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::PackPackIndexInst,
+                                PackPackIndexInst,
+                                AnyPackIndexInst> {
+  unsigned ComponentStartIndex;
+
+  friend SILBuilder;
+  PackPackIndexInst(SILDebugLocation loc,
+                    unsigned componentStartIndex,
+                    SILValue indexWithinComponent,
+                    ArrayRef<SILValue> typeDependentOperands,
+                    SILType type, CanPackType packType)
+    : UnaryInstructionWithTypeDependentOperandsBase(loc,
+                                                    indexWithinComponent,
+                                                    typeDependentOperands,
+                                                    type, packType),
+      ComponentStartIndex(componentStartIndex) {}
+
+  static PackPackIndexInst *create(SILFunction &parent,
+                                   SILDebugLocation loc,
+                                   unsigned componentIndex,
+                                   SILValue indexWithinComponent,
+                                   CanPackType packType);
+public:
+  /// Return the instruction which produces the index within the
+  /// pack slice.
+  AnyPackIndexInst *getSliceIndexOperand() const {
+    return cast<AnyPackIndexInst>(getOperand());
+  }
+
+  /// Return the structural index of the start of the pack slice.
+  unsigned getComponentStartIndex() const {
+    return ComponentStartIndex;
+  }
+
+  /// Return the structural index of the end of the pack slice.
+  unsigned getComponentEndIndex() const {
+    return getComponentStartIndex()
+         + getSliceIndexOperand()->getIndexedPackType()->getNumElements();
+  }
+};
+
+/// Compute the pack index of a scalar component of a pack.
+class ScalarPackIndexInst final :
+    public NullaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::ScalarPackIndexInst,
+                                ScalarPackIndexInst,
+                                AnyPackIndexInst> {
+  unsigned ComponentIndex;
+
+  friend SILBuilder;
+  ScalarPackIndexInst(SILDebugLocation loc,
+                      unsigned componentIndex,
+                      ArrayRef<SILValue> typeDependentOperands,
+                      SILType type, CanPackType packType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                  typeDependentOperands, type, packType),
+      ComponentIndex(componentIndex) {}
+
+  static ScalarPackIndexInst *create(SILFunction &parent,
+                                     SILDebugLocation loc,
+                                     unsigned index,
+                                     CanPackType packType);
+public:
+  /// Return the structural index of the component within the pack.
+  unsigned getComponentIndex() const {
+    return ComponentIndex;
+  }
+};
+
 /// Bind archetypes to the given element of one or more type packs.
 ///
 /// The result of this instruction is just for use in recording type
@@ -7425,11 +7552,8 @@ class DeinitExistentialValueInst
 ///          shape $t_1_0,
 ///          uuid "01234567-89AB-CDEF-0123-000000000000"
 ///
-/// In the printed representation, only the relevant portions of the
-/// opened generic environment are given: the pack type parameters,
-/// the opened element archetypes, the contextual substitutions of
-/// the pack type parameters, and the requirements on the pack type
-/// parameters.
+/// The %index operand is always a $Builtin.PackIndex and must be
+/// the immediate result of one of the pack-indexing instructions.
 class OpenPackElementInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
                                         SILInstructionKind::OpenPackElementInst,
@@ -7490,8 +7614,12 @@ public:
     return Env;
   }
 
-  SILValue getIndexOperand() const {
-    return getAllOperands()[0].get();
+  /// Return a pack type which represents the contextual shape class
+  /// of the types this opens.
+  CanPackType getOpenedShapeClass() const;
+
+  AnyPackIndexInst *getIndexOperand() const {
+    return cast<AnyPackIndexInst>(getOperand());
   }
 };
 

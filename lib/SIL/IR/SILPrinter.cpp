@@ -2279,6 +2279,19 @@ public:
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
   }
+  void visitDynamicPackIndexInst(DynamicPackIndexInst *DPII) {
+    *this << Ctx.getID(DPII->getOperand()) << " of $"
+          << DPII->getIndexedPackType();
+  }
+  void visitPackPackIndexInst(PackPackIndexInst *PPII) {
+    *this << PPII->getComponentStartIndex() << ", "
+          << Ctx.getID(PPII->getOperand()) << " of $"
+          << PPII->getIndexedPackType();
+  }
+  void visitScalarPackIndexInst(ScalarPackIndexInst *SPII) {
+    *this << SPII->getComponentIndex() << " of $"
+          << SPII->getIndexedPackType();
+  }
   void visitOpenPackElementInst(OpenPackElementInst *OPEI) {
     auto env = OPEI->getOpenedGenericEnvironment();
     auto subs = env->getPackElementContextSubstitutions();

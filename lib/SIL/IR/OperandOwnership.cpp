@@ -122,6 +122,7 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(TestSpecification)
+SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -192,6 +193,8 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
+OPERAND_OWNERSHIP(TrivialUse, DynamicPackIndex)
+OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
