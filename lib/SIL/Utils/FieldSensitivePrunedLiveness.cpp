@@ -781,7 +781,13 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
   LLVM_DEBUG(llvm::dbgs() << "Has multiple defs!\n");
 
   // Handle a live-out or live-within block with potentially multiple defs
+#ifndef NDEBUG
+  // We only use prevCount when checking a specific invariant when asserts are
+  // enabled. boundary.getNumLastUsersAndDeadDefs actually asserts if you try to
+  // call it in a non-asserts compiler since it is relatively inefficient and
+  // not needed.
   unsigned prevCount = boundary.getNumLastUsersAndDeadDefs(bitNo);
+#endif
   bool isLive = isLiveOut;
   for (auto &inst : llvm::reverse(*block)) {
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << inst);
