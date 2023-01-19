@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct AnyExistentialContainer {
   public typealias Storage = (
@@ -38,7 +38,7 @@ public struct AnyExistentialContainer {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension AnyExistentialContainer {
   @inlinable
   public mutating func allocateBox(_ body: (UnsafeMutableRawPointer) -> ()) {
@@ -80,7 +80,7 @@ extension AnyExistentialContainer {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ExistentialContainer {
   public typealias Storage = (
@@ -92,7 +92,7 @@ public struct ExistentialContainer {
   var storage: Storage
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @inlinable
 public func container(for box: Any) -> AnyExistentialContainer {
   unsafeBitCast(box)
