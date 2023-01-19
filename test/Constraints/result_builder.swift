@@ -1252,3 +1252,134 @@ do {
   }
   // CHECK: the answer
 }
+
+protocol TestIfSequences {
+}
+
+struct A: TestIfSequences {}
+struct B: TestIfSequences {}
+struct C: TestIfSequences {}
+struct D: TestIfSequences {}
+
+func testOptionalIfElseSequences() {
+  func check<T>(_ v: TestIfSequences,
+                @TupleBuilder body: (TestIfSequences) throws -> T) rethrows {
+    print(try body(v))
+  }
+
+  check(A()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(B()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(C()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(D()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    } else {
+      D()
+    }
+  }
+
+  check(A()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(B()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(C()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(D()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+}
+
+testOptionalIfElseSequences()
+// CHECK: Optional(main.Either<main.Either<main.A, main.B>, main.C>.first(main.Either<main.A, main.B>.first(main.A())))
+// CHECK-NEXT: Optional(main.Either<main.Either<main.A, main.B>, main.C>.first(main.Either<main.A, main.B>.second(main.B())))
+// CHECK-NEXT: Optional(main.Either<main.Either<main.A, main.B>, main.C>.second(main.C()))
+// CHECK-NEXT: second(main.Either<main.C, main.D>.second(main.D()))
+// CHECK-NEXT: first(main.A())
+// CHECK-NEXT: second(Optional(main.B()), nil)
+// CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.first(main.C())))
+// CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.second(main.D())))
