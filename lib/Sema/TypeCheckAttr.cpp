@@ -4425,12 +4425,6 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
                           D->getDescriptiveKind());
   }
 
-  // @objc conflicts with back deployment since it implies dynamic dispatch.
-  if (auto *OA = D->getAttrs().getAttribute<ObjCAttr>()) {
-    diagnose(OA->getLocation(), diag::attr_incompatible_with_back_deploy, OA,
-             D->getDescriptiveKind());
-  }
-
   // Only functions, methods, computed properties, and subscripts are
   // back-deployable, so D should be ValueDecl.
   auto *VD = cast<ValueDecl>(D);
@@ -4443,10 +4437,40 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
       continue;
 
-    // Back deployment isn't compatible with dynamic dispatch.
-    if (VD->isSyntacticallyOverridable()) {
+    if (isa<DestructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
+    if (VD->isObjC()) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_incompatible_with_objc, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
+    // If the decl isn't effectively final then it could be invoked via dynamic
+    // dispatch.
+    if (D->isSyntacticallyOverridable()) {
       diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
                Attr, D->getDescriptiveKind());
+      continue;
+    }
+
+    // Some methods declared in classes aren't syntactically overridable but
+    // still may have vtable entries, implying dynamic dispatch.
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (isa<ClassDecl>(D->getDeclContext()) && AFD->needsNewVTableEntry()) {
+        diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
+                 Attr, D->getDescriptiveKind());
+        continue;
+      }
+    }
+
+    // If the decl is final but overrides another decl, that also indicates it
+    // could be invoked via dynamic dispatch.
+    if (VD->getOverriddenDecl()) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_incompatible_with_override, Attr);
       continue;
     }
 
@@ -4457,12 +4481,6 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
-    }
-
-    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
-      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
-                            D->getDescriptiveKind());
-      continue;
     }
 
     auto AtLoc = Attr->AtLoc;

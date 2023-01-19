@@ -3311,6 +3311,14 @@ ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %1",
       (DeclAttribute, DescriptiveDeclKind))
 
+ERROR(attr_incompatible_with_override,none,
+      "'%0' cannot be combined with 'override'",
+      (DeclAttribute))
+
+ERROR(attr_incompatible_with_objc,none,
+      "'%0' must not be used on an '@objc' %1",
+      (DeclAttribute, DescriptiveDeclKind))
+
 ERROR(final_not_on_accessors,none,
       "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
