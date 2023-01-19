@@ -35,7 +35,7 @@ public func v2APIsAreStripped() -> Bool {
 /// Describes types that can be appended to.
 public protocol Appendable {
   associatedtype Element
-  mutating func append(_ x: Element)
+  mutating func append(_ x: __owned Element)
 }
 
 /// Describes types that can be counted.
@@ -107,7 +107,7 @@ public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
 @_backDeploy(before: BackDeploy 2.0)
 public func genericAppend<T: Appendable>(
   _ a: inout T,
-  _ x: T.Element
+  _ x: __owned T.Element
 ) {
   return a.append(x)
 }
