@@ -706,19 +706,19 @@ ResponseBuilder::Dictionary ResponseBuilder::Array::appendDictionary() {
 // Internal RequestDict Implementation
 //===----------------------------------------------------------------------===//
 
-sourcekitd_uid_t RequestDict::getUID(UIdent Key) {
+sourcekitd_uid_t RequestDict::getUID(UIdent Key) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   return Object ? Object->getUID() : nullptr;
 }
 
-Optional<StringRef> RequestDict::getString(UIdent Key) {
+Optional<StringRef> RequestDict::getString(UIdent Key) const {
   if (auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key))) {
     return Object->getString();
   }
   return None;
 }
 
-Optional<RequestDict> RequestDict::getDictionary(SourceKit::UIdent Key) {
+Optional<RequestDict> RequestDict::getDictionary(SourceKit::UIdent Key) const {
   SKDDictionary *DictObject = nullptr;
   if (auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key))) {
     DictObject = dyn_cast<SKDDictionary>(Object);
@@ -728,7 +728,7 @@ Optional<RequestDict> RequestDict::getDictionary(SourceKit::UIdent Key) {
 
 bool RequestDict::getStringArray(SourceKit::UIdent Key,
                                  llvm::SmallVectorImpl<const char *> &Arr,
-                                 bool isOptional) {
+                                 bool isOptional) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return !isOptional;
@@ -748,7 +748,7 @@ bool RequestDict::getStringArray(SourceKit::UIdent Key,
 
 bool RequestDict::getUIDArray(SourceKit::UIdent Key,
                               llvm::SmallVectorImpl<sourcekitd_uid_t> &Arr,
-                              bool isOptional) {
+                              bool isOptional) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return !isOptional;
@@ -767,7 +767,8 @@ bool RequestDict::getUIDArray(SourceKit::UIdent Key,
 }
 
 bool RequestDict::dictionaryArrayApply(
-    SourceKit::UIdent Key, llvm::function_ref<bool(RequestDict)> Applier) {
+    SourceKit::UIdent Key,
+    llvm::function_ref<bool(RequestDict)> Applier) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return true;
@@ -784,7 +785,7 @@ bool RequestDict::dictionaryArrayApply(
 }
 
 bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
-                           bool isOptional) {
+                           bool isOptional) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return !isOptional;
@@ -792,7 +793,7 @@ bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
   return false;
 }
 
-Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
+Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return None;
