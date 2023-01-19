@@ -360,8 +360,8 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            SILFunction &F, Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime,
                            bool reflection)
-    : InstructionBaseWithTrailingOperands(
-          TypeDependentOperands, Loc, SILType::getPrimitiveObjectType(BoxType)),
+    : NullaryInstructionWithTypeDependentOperandsBase(
+          Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()),
       HasDynamicLifetime(hasDynamicLifetime),
       Reflection(reflection) {}
@@ -2253,9 +2253,11 @@ OpenExistentialValueInst::OpenExistentialValueInst(
 }
 
 OpenPackElementInst::OpenPackElementInst(
-    SILDebugLocation debugLoc, ArrayRef<SILValue> allOperands,
+    SILDebugLocation debugLoc, SILValue packIndexOperand,
+    ArrayRef<SILValue> typeDependentOperands,
     SILType type, GenericEnvironment *env)
-    : InstructionBaseWithTrailingOperands(allOperands, debugLoc, type),
+    : UnaryInstructionWithTypeDependentOperandsBase(debugLoc, packIndexOperand,
+                                                    typeDependentOperands, type),
       Env(env) {
 }
 
@@ -2264,24 +2266,24 @@ OpenPackElementInst *OpenPackElementInst::create(
     GenericEnvironment *env) {
   assert(indexOperand->getType().is<BuiltinPackIndexType>());
 
-  SmallVector<SILValue, 8> allOperands;
-  allOperands.push_back(indexOperand);
+  SmallVector<SILValue, 8> typeDependentOperands;
 
   // open_pack_element references the pack substitutions and
   // the types used in the shape class.
-  TypeDependentOperandCollector typeDependentOperands;
+  TypeDependentOperandCollector collector;
   env->forEachPackElementBinding([&](ElementArchetypeType *elementType,
                                      PackType *packSubstitution) {
-    typeDependentOperands.collect(packSubstitution->getCanonicalType());
+    collector.collect(packSubstitution->getCanonicalType());
   });
-  typeDependentOperands.collect(env->getOpenedElementShapeClass());
-  typeDependentOperands.addTo(allOperands, F);
+  collector.collect(env->getOpenedElementShapeClass());
+  collector.addTo(typeDependentOperands, F);
 
   SILType type = SILType::getSILTokenType(F.getASTContext());
 
-  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto size = totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
   auto buffer = F.getModule().allocateInst(size, alignof(OpenPackElementInst));
-  return ::new (buffer) OpenPackElementInst(debugLoc, allOperands, type, env);
+  return ::new (buffer) OpenPackElementInst(debugLoc, indexOperand,
+                                            typeDependentOperands, type, env);
 }
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,

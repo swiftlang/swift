@@ -1823,6 +1823,49 @@ public:
   }
 };
 
+/// A template base class for instructions that take no operands except
+/// for type-dependent operands. The operands are tail allocated after the
+/// instruction. Further trailing data can be allocated as well if
+/// TRAILING_TYPES are provided.
+template<SILInstructionKind Kind,
+         typename Derived,
+         typename Base,
+         typename... OtherTrailingTypes>
+class NullaryInstructionWithTypeDependentOperandsBase
+    : public InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                                 OtherTrailingTypes...> {
+protected:
+  friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                             OtherTrailingTypes...>;
+
+  using TrailingObjects =
+      InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                          OtherTrailingTypes...>;
+
+  template <typename... Args>
+  NullaryInstructionWithTypeDependentOperandsBase(SILDebugLocation debugLoc,
+                                    ArrayRef<SILValue> typeDependentOperands,
+                                    Args &&...args)
+      : InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                            OtherTrailingTypes...>(
+                                              typeDependentOperands,
+                                              debugLoc,
+                                              std::forward<Args>(args)...) {}
+
+public:
+  unsigned getNumTypeDependentOperands() const {
+    return this->getAllOperands().size();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return this->getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return this->getAllOperands();
+  }
+};
+
 /// A template base class for instructions that take a single regular SILValue
 /// operand, a set of type dependent operands and has no result
 /// or a single value result. The operands are tail allocated after the
@@ -2351,7 +2394,7 @@ public:
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
 class AllocBoxInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                            SILInstructionKind::AllocBoxInst,
                                            AllocBoxInst, AllocationInst, char>
 {
@@ -2392,14 +2435,6 @@ public:
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// This represents the allocation of a heap box for an existential container.
@@ -2408,7 +2443,7 @@ public:
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
 class AllocExistentialBoxInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                    SILInstructionKind::AllocExistentialBoxInst,
                                    AllocExistentialBoxInst, AllocationInst> {
   friend SILBuilder;
@@ -2420,7 +2455,8 @@ class AllocExistentialBoxInst final
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           ArrayRef<SILValue> TypeDependentOperands,
                           SILFunction *Parent)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+    : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands,
                                           ExistentialType.getObjectType()),
       ConcreteType(ConcreteType), Conformances(Conformances) {}
 
@@ -2436,14 +2472,6 @@ public:
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
-  }
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
   }
 };
 
@@ -6660,7 +6688,7 @@ public:
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                          SILInstructionKind::MetatypeInst,
                                          MetatypeInst, SingleValueInstruction> {
   friend SILBuilder;
@@ -6668,20 +6696,11 @@ class MetatypeInst final
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
                ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
-                                          Metatype) {}
+    : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands, Metatype) {}
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F);
-
-public:
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// Represents loading a dynamic metatype from a value.
@@ -7029,7 +7048,7 @@ class ObjCSuperMethodInst
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
 class WitnessMethodInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                           SILInstructionKind::WitnessMethodInst,
                                           WitnessMethodInst, MethodInst> {
   friend SILBuilder;
@@ -7040,8 +7059,8 @@ class WitnessMethodInst final
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
-      : InstructionBaseWithTrailingOperands(TypeDependentOperands,
-                                            DebugLoc, Ty, Member),
+      : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands, Ty, Member),
         LookupType(LookupType), Conformance(Conformance) {}
 
   /// Create a witness method call of a protocol requirement, passing in a lookup
@@ -7068,14 +7087,6 @@ public:
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
@@ -7420,7 +7431,7 @@ class DeinitExistentialValueInst
 /// the pack type parameters, and the requirements on the pack type
 /// parameters.
 class OpenPackElementInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public UnaryInstructionWithTypeDependentOperandsBase<
                                         SILInstructionKind::OpenPackElementInst,
                                         OpenPackElementInst,
                                         SingleValueInstruction> {
@@ -7460,7 +7471,8 @@ class OpenPackElementInst final
   GenericEnvironment *Env;
 
   OpenPackElementInst(SILDebugLocation debugLoc,
-                      ArrayRef<SILValue> allOperands,
+                      SILValue packIndexOperand,
+                      ArrayRef<SILValue> typeDependentOperands,
                       SILType type,
                       GenericEnvironment *env);
 
@@ -7480,14 +7492,6 @@ public:
 
   SILValue getIndexOperand() const {
     return getAllOperands()[0].get();
-  }
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(1);
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(1);
   }
 };
 
