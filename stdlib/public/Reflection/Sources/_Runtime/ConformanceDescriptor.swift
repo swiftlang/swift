@@ -11,7 +11,7 @@
 
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 @frozen
 public struct ConformanceDescriptor: PublicLayout {
   public typealias Layout = (
@@ -29,7 +29,7 @@ public struct ConformanceDescriptor: PublicLayout {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.9, *)
 extension ConformanceDescriptor {
   @inlinable
   public var `protocol`: ProtocolDescriptor {
