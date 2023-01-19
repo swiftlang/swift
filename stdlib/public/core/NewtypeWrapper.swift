@@ -13,6 +13,7 @@
 /// An implementation detail used to implement support importing
 /// (Objective-)C entities marked with the swift_newtype Clang
 /// attribute.
+@_fixed_layout
 public protocol _SwiftNewtypeWrapper
 : RawRepresentable, _HasCustomAnyHashableRepresentation { }
 
