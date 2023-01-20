@@ -250,6 +250,25 @@ public:
     return asImpl().remapASTType(ty);
   }
 
+  /// Remap a structural index into a pack so that it will point to the
+  /// corresponding structural index in the remapped pack type.
+  unsigned getOpStructuralPackIndex(CanPackType origPackType,
+                                    unsigned origIndex) {
+    assert(origIndex < origPackType->getNumElements());
+    unsigned newIndex = 0;
+    for (unsigned i = 0; i != origIndex; ++i) {
+      auto origComponentType = origPackType.getElementType(i);
+      if (auto origExpansionType =
+            dyn_cast<PackExpansionType>(origComponentType)) {
+        auto newShapeClass = getOpASTType(origExpansionType.getCountType());
+        newIndex += cast<PackType>(newShapeClass)->getNumElements();
+      } else {
+        newIndex++;
+      }
+    }
+    return newIndex;
+  }
+
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
     assert(archetypeTy->isRoot());
 
@@ -2390,6 +2409,54 @@ void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
   recordClonedInstruction(
       Inst, getBuilder().createDeinitExistentialValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDynamicPackIndexInst(
+    DynamicPackIndexInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  auto newIndexValue = getOpValue(Inst->getOperand());
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newPackType = cast<PackType>(getOpASTType(Inst->getIndexedPackType()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createDynamicPackIndex(loc, newIndexValue,
+                                                newPackType));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitPackPackIndexInst(PackPackIndexInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  auto newIndexValue = getOpValue(Inst->getOperand());
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newPackType = cast<PackType>(getOpASTType(Inst->getIndexedPackType()));
+
+  auto newComponentStartIndex =
+    getOpStructuralPackIndex(Inst->getIndexedPackType(),
+                             Inst->getComponentStartIndex());
+
+  recordClonedInstruction(
+      Inst, getBuilder().createPackPackIndex(loc, newComponentStartIndex,
+                                             newIndexValue, newPackType));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitScalarPackIndexInst(
+    ScalarPackIndexInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newPackType = cast<PackType>(getOpASTType(Inst->getIndexedPackType()));
+
+  auto newComponentIndex =
+    getOpStructuralPackIndex(Inst->getIndexedPackType(),
+                             Inst->getComponentIndex());
+
+  recordClonedInstruction(
+      Inst, getBuilder().createScalarPackIndex(loc, newComponentIndex,
+                                               newPackType));
 }
 
 template <typename ImplClass>

@@ -162,6 +162,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
 /// The name of the Builtin type for Word
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_WORD = {
     "Builtin.Word"};
+/// The name of the Builtin type for PackIndex
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_PACKINDEX = {
+    "Builtin.PackIndex"};
 
 } // end namespace swift
 

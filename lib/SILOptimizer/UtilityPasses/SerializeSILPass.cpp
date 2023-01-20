@@ -348,6 +348,12 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
     // Handle by operand and result check.
     break;
 
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+    return opaqueArchetypeWouldChange(context,
+              cast<AnyPackIndexInst>(&inst)->getIndexedPackType());
+
   case SILInstructionKind::OpenPackElementInst: {
     auto open = cast<OpenPackElementInst>(&inst);
     bool wouldChange = false;

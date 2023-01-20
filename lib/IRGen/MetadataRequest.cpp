@@ -1388,6 +1388,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinPackIndexType(CanBuiltinPackIndexType type,
+                              DynamicMetadataRequest request) {
+      llvm_unreachable("metadata unsupported for this builtin type");
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);

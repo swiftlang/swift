@@ -3789,6 +3789,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinJob, builtin_job)
     TRIVIAL_TYPE_PRINTER(BuiltinExecutor, builtin_executor_ref)
     TRIVIAL_TYPE_PRINTER(BuiltinDefaultActorStorage, builtin_default_actor_storage)
+    TRIVIAL_TYPE_PRINTER(BuiltinPackIndex, builtin_pack_index)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)

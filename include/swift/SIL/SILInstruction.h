@@ -1823,6 +1823,49 @@ public:
   }
 };
 
+/// A template base class for instructions that take no operands except
+/// for type-dependent operands. The operands are tail allocated after the
+/// instruction. Further trailing data can be allocated as well if
+/// TRAILING_TYPES are provided.
+template<SILInstructionKind Kind,
+         typename Derived,
+         typename Base,
+         typename... OtherTrailingTypes>
+class NullaryInstructionWithTypeDependentOperandsBase
+    : public InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                                 OtherTrailingTypes...> {
+protected:
+  friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                             OtherTrailingTypes...>;
+
+  using TrailingObjects =
+      InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                          OtherTrailingTypes...>;
+
+  template <typename... Args>
+  NullaryInstructionWithTypeDependentOperandsBase(SILDebugLocation debugLoc,
+                                    ArrayRef<SILValue> typeDependentOperands,
+                                    Args &&...args)
+      : InstructionBaseWithTrailingOperands<Kind, Derived, Base,
+                                            OtherTrailingTypes...>(
+                                              typeDependentOperands,
+                                              debugLoc,
+                                              std::forward<Args>(args)...) {}
+
+public:
+  unsigned getNumTypeDependentOperands() const {
+    return this->getAllOperands().size();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return this->getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return this->getAllOperands();
+  }
+};
+
 /// A template base class for instructions that take a single regular SILValue
 /// operand, a set of type dependent operands and has no result
 /// or a single value result. The operands are tail allocated after the
@@ -2351,7 +2394,7 @@ public:
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
 class AllocBoxInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                            SILInstructionKind::AllocBoxInst,
                                            AllocBoxInst, AllocationInst, char>
 {
@@ -2392,14 +2435,6 @@ public:
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// This represents the allocation of a heap box for an existential container.
@@ -2408,7 +2443,7 @@ public:
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
 class AllocExistentialBoxInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                    SILInstructionKind::AllocExistentialBoxInst,
                                    AllocExistentialBoxInst, AllocationInst> {
   friend SILBuilder;
@@ -2420,7 +2455,8 @@ class AllocExistentialBoxInst final
                           ArrayRef<ProtocolConformanceRef> Conformances,
                           ArrayRef<SILValue> TypeDependentOperands,
                           SILFunction *Parent)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
+    : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands,
                                           ExistentialType.getObjectType()),
       ConcreteType(ConcreteType), Conformances(Conformances) {}
 
@@ -2436,14 +2472,6 @@ public:
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
-  }
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
   }
 };
 
@@ -6660,7 +6688,7 @@ public:
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                          SILInstructionKind::MetatypeInst,
                                          MetatypeInst, SingleValueInstruction> {
   friend SILBuilder;
@@ -6668,20 +6696,11 @@ class MetatypeInst final
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
                ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, DebugLoc,
-                                          Metatype) {}
+    : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands, Metatype) {}
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F);
-
-public:
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// Represents loading a dynamic metatype from a value.
@@ -7029,7 +7048,7 @@ class ObjCSuperMethodInst
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
 class WitnessMethodInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public NullaryInstructionWithTypeDependentOperandsBase<
                                           SILInstructionKind::WitnessMethodInst,
                                           WitnessMethodInst, MethodInst> {
   friend SILBuilder;
@@ -7040,8 +7059,8 @@ class WitnessMethodInst final
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
                     SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
-      : InstructionBaseWithTrailingOperands(TypeDependentOperands,
-                                            DebugLoc, Ty, Member),
+      : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
+                                          TypeDependentOperands, Ty, Member),
         LookupType(LookupType), Conformance(Conformance) {}
 
   /// Create a witness method call of a protocol requirement, passing in a lookup
@@ -7068,14 +7087,6 @@ public:
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
-
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
-  }
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
@@ -7403,24 +7414,148 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// An abstract class for instructions which producing variadic
+/// pack indices.
+///
+/// All of these instructions produce a Builtin.PackIndex value which
+/// can only be used in packs with a specific shape class.  In
+/// principle, that shape class could be reflected into the result type,
+/// but we actually need more structue than that in order to get the
+/// type-safety properties we want.  It therefore makes more sense to
+/// enforce structural properties on pack-index derivation than try
+/// to go all-in on dependent types.
+class AnyPackIndexInst : public SingleValueInstruction {
+  CanPackType IndexedPackType;
+
+protected:
+  AnyPackIndexInst(SILInstructionKind kind, SILDebugLocation loc,
+                   SILType type, CanPackType packType)
+      : SingleValueInstruction(kind, loc, type), IndexedPackType(packType) {
+    assert(type.isObject() && type.is<BuiltinPackIndexType>());
+  }
+
+public:
+  /// Return the type that this pack index indexes into.
+  CanPackType getIndexedPackType() const { return IndexedPackType; }
+
+  static bool classof(const AnyPackIndexInst *) { return true; }
+  static bool classof(SILNodePointer node) {
+    return node->getKind() >= SILNodeKind::First_AnyPackIndexInst &&
+           node->getKind() <= SILNodeKind::Last_AnyPackIndexInst;
+  }
+};
+
+/// Produce a dynamic pack index from a Builtin.Int32.
+///
+/// This instruction has undefined behavior if the value is out of
+/// bounds for the given pack (including the "one past the end" value).
+class DynamicPackIndexInst final :
+    public UnaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::DynamicPackIndexInst,
+                                DynamicPackIndexInst,
+                                AnyPackIndexInst> {
+  friend SILBuilder;
+  DynamicPackIndexInst(SILDebugLocation loc,
+                       SILValue indexOperand,
+                       ArrayRef<SILValue> typeDependentOperands,
+                       SILType type, CanPackType packType)
+    : UnaryInstructionWithTypeDependentOperandsBase(loc, indexOperand,
+                                                    typeDependentOperands,
+                                                    type, packType) {}
+
+  static DynamicPackIndexInst *create(SILFunction &parent,
+                                      SILDebugLocation loc,
+                                      SILValue indexOperand,
+                                      CanPackType packType);
+};
+
+/// Compute the pack index of an element of a slice of a pack.
+class PackPackIndexInst final :
+    public UnaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::PackPackIndexInst,
+                                PackPackIndexInst,
+                                AnyPackIndexInst> {
+  unsigned ComponentStartIndex;
+
+  friend SILBuilder;
+  PackPackIndexInst(SILDebugLocation loc,
+                    unsigned componentStartIndex,
+                    SILValue indexWithinComponent,
+                    ArrayRef<SILValue> typeDependentOperands,
+                    SILType type, CanPackType packType)
+    : UnaryInstructionWithTypeDependentOperandsBase(loc,
+                                                    indexWithinComponent,
+                                                    typeDependentOperands,
+                                                    type, packType),
+      ComponentStartIndex(componentStartIndex) {}
+
+  static PackPackIndexInst *create(SILFunction &parent,
+                                   SILDebugLocation loc,
+                                   unsigned componentIndex,
+                                   SILValue indexWithinComponent,
+                                   CanPackType packType);
+public:
+  /// Return the instruction which produces the index within the
+  /// pack slice.
+  AnyPackIndexInst *getSliceIndexOperand() const {
+    return cast<AnyPackIndexInst>(getOperand());
+  }
+
+  /// Return the structural index of the start of the pack slice.
+  unsigned getComponentStartIndex() const {
+    return ComponentStartIndex;
+  }
+
+  /// Return the structural index of the end of the pack slice.
+  unsigned getComponentEndIndex() const {
+    return getComponentStartIndex()
+         + getSliceIndexOperand()->getIndexedPackType()->getNumElements();
+  }
+};
+
+/// Compute the pack index of a scalar component of a pack.
+class ScalarPackIndexInst final :
+    public NullaryInstructionWithTypeDependentOperandsBase<
+                                SILInstructionKind::ScalarPackIndexInst,
+                                ScalarPackIndexInst,
+                                AnyPackIndexInst> {
+  unsigned ComponentIndex;
+
+  friend SILBuilder;
+  ScalarPackIndexInst(SILDebugLocation loc,
+                      unsigned componentIndex,
+                      ArrayRef<SILValue> typeDependentOperands,
+                      SILType type, CanPackType packType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                  typeDependentOperands, type, packType),
+      ComponentIndex(componentIndex) {}
+
+  static ScalarPackIndexInst *create(SILFunction &parent,
+                                     SILDebugLocation loc,
+                                     unsigned index,
+                                     CanPackType packType);
+public:
+  /// Return the structural index of the component within the pack.
+  unsigned getComponentIndex() const {
+    return ComponentIndex;
+  }
+};
+
 /// Bind archetypes to the given element of one or more type packs.
 ///
 /// The result of this instruction is just for use in recording type
 /// dependencies on the bound archetypes.
 ///
 ///   %0 = open_pack_element %index
-///          of <t_1_0... as $@opened t_10101 from {T...}>
-///          where t_1_0: Equatable
+///          of <t_1_0... where t_1_0: Equatable>   // opened signature
+///          at <Pack{repeat each T}>,              // contextual subs
+///          shape $t_1_0,
+///          uuid "01234567-89AB-CDEF-0123-000000000000"
 ///
-/// %index is always a $Builtin.Word.
-///
-/// In the printed representation, only the relevant portions of the
-/// opened generic environment are given: the pack type parameters,
-/// the opened element archetypes, the contextual substitutions of
-/// the pack type parameters, and the requirements on the pack type
-/// parameters.
+/// The %index operand is always a $Builtin.PackIndex and must be
+/// the immediate result of one of the pack-indexing instructions.
 class OpenPackElementInst final
-    : public InstructionBaseWithTrailingOperands<
+    : public UnaryInstructionWithTypeDependentOperandsBase<
                                         SILInstructionKind::OpenPackElementInst,
                                         OpenPackElementInst,
                                         SingleValueInstruction> {
@@ -7460,7 +7595,8 @@ class OpenPackElementInst final
   GenericEnvironment *Env;
 
   OpenPackElementInst(SILDebugLocation debugLoc,
-                      ArrayRef<SILValue> allOperands,
+                      SILValue packIndexOperand,
+                      ArrayRef<SILValue> typeDependentOperands,
                       SILType type,
                       GenericEnvironment *env);
 
@@ -7478,16 +7614,12 @@ public:
     return Env;
   }
 
-  SILValue getIndexOperand() const {
-    return getAllOperands()[0].get();
-  }
+  /// Return a pack type which represents the contextual shape class
+  /// of the types this opens.
+  CanPackType getOpenedShapeClass() const;
 
-  ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands().slice(1);
-  }
-
-  MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands().slice(1);
+  AnyPackIndexInst *getIndexOperand() const {
+    return cast<AnyPackIndexInst>(getOperand());
   }
 };
 
