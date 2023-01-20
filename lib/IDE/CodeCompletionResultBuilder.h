@@ -179,6 +179,11 @@ public:
     case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
       break;
+    case AccessLevel::Package:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "package ");
+      break;
     case AccessLevel::Public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,

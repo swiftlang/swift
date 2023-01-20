@@ -177,6 +177,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
     switch (Conf->getProtocol()->getEffectiveAccess()) {
       case AccessLevel::Open:
         llvm_unreachable("protocols cannot have open access level");
+      case AccessLevel::Package:
       case AccessLevel::Public:
         canCallUnknown = true;
         break;

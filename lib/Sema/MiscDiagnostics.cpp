@@ -5626,6 +5626,7 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
   case AccessLevel::Private:      fixItString = "private ";      break;
   case AccessLevel::FilePrivate:  fixItString = "fileprivate ";  break;
   case AccessLevel::Internal:     fixItString = "internal ";     break;
+  case AccessLevel::Package:      fixItString = "package ";      break;
   case AccessLevel::Public:       fixItString = "public ";       break;
   case AccessLevel::Open:         fixItString = "open ";         break;
   }
