@@ -646,6 +646,37 @@ void writeEnumCases(
   });
 }
 
+void writeResultBuilderInformation(llvm::json::OStream &JSON,
+                                   const swift::NominalTypeDecl *TypeDecl,
+                                   const swift::VarDecl *VarDecl) {
+  if (auto *attr = VarDecl->getAttachedResultBuilder()) {
+    JSON.attributeObject("resultBuilder", [&] {
+      JSON.attribute("type", toFullyQualifiedTypeNameString(attr->getType()));
+    });
+
+    return;
+  }
+
+  for (ProtocolDecl *Decl :
+       TypeDecl->getLocalProtocols(ConformanceLookupKind::All)) {
+    for (auto Member : Decl->getMembers()) {
+      if (auto *VD = dyn_cast<swift::VarDecl>(Member)) {
+        if (VD->getName() != VarDecl->getName())
+          continue;
+
+        if (auto *attr = VD->getAttachedResultBuilder()) {
+          JSON.attributeObject("resultBuilder", [&] {
+            JSON.attribute("type",
+                           toFullyQualifiedTypeNameString(attr->getType()));
+          });
+        }
+
+        return;
+      }
+    }
+  }
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -653,7 +684,8 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
     for (const auto &TypeInfo : ConstValueInfos) {
       JSON.object([&] {
         const auto *TypeDecl = TypeInfo.TypeDecl;
-        JSON.attribute("typeName", toFullyQualifiedTypeNameString(TypeDecl->getDeclaredInterfaceType()));
+        JSON.attribute("typeName", toFullyQualifiedTypeNameString(
+                                       TypeDecl->getDeclaredInterfaceType()));
         JSON.attribute(
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
@@ -672,6 +704,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               writeFileInformation(JSON, decl);
               writeValue(JSON, PropertyInfo.Value);
               writeAttributes(JSON, PropertyInfo.PropertyWrappers);
+              writeResultBuilderInformation(JSON, TypeDecl, decl);
             });
           }
         });
