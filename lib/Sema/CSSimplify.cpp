@@ -4544,14 +4544,30 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (!anchor)
     return false;
 
-  bool possibleContextualMismatch = false;
   // If this is a conversion to a non-optional contextual type e.g.
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
   // we should diagnose it as type mismatch instead of missing unwrap.
-  if (auto last = locator.last()) {
-    possibleContextualMismatch = last->is<LocatorPathElt::ContextualType>() &&
-                                 !toType->getOptionalObjectType();
-  }
+  bool possibleContextualMismatch = [&]() {
+    auto last = locator.last();
+    if (!(last && last->is<LocatorPathElt::ContextualType>()))
+      return false;
+
+    // If the contextual type is optional as well, it's definitely a
+    // missing unwrap.
+    if (toType->getOptionalObjectType())
+      return false;
+
+    // If this is a leading-dot syntax member chain with `?.`
+    // notation, it wouldn't be possible to infer the base type
+    // without the contextual type, so we have to treat it as
+    // a missing unwrap.
+    if (auto *OEE = getAsExpr<OptionalEvaluationExpr>(anchor)) {
+      if (isExpr<UnresolvedMemberChainResultExpr>(OEE->getSubExpr()))
+        return false;
+    }
+
+    return true;
+  }();
 
   // `OptionalEvaluationExpr` doesn't add a new level of
   // optionality but it could be hiding concrete types
