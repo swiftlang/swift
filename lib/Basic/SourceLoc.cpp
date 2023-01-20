@@ -12,9 +12,11 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Signals.h"
 
 using namespace swift;
 
@@ -43,13 +45,14 @@ SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
       .getAdvancedLoc(IDEInspectionTargetOffset);
 }
 
-StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
+StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc, bool ForceGeneratedSourceToDisk) const {
   // Respect #line first
   if (auto VFile = getVirtualFile(Loc))
     return VFile->Name;
 
   // Next, try the stat cache
-  auto Ident = getIdentifierForBuffer(findBufferContainingLoc(Loc));
+  auto Ident = getIdentifierForBuffer(
+      findBufferContainingLoc(Loc), ForceGeneratedSourceToDisk);
   auto found = StatusCache.find(Ident);
   if (found != StatusCache.end()) {
     return found->second.getName();
@@ -184,9 +187,53 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   return It->second;
 }
 
-StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
+/// Dump the contents of the given memory buffer to a file, returning the
+/// name of that file (when successful) and \c None otherwise.
+static Optional<std::string>
+dumpBufferToFile(const llvm::MemoryBuffer *buffer) {
+  // Create file in the system temporary directory.
+  SmallString<128> tempFileModel;
+  llvm::sys::path::system_temp_directory(true, tempFileModel);
+  llvm::sys::path::append(
+      tempFileModel, "swift-generated-sources-%%%%%%.swift");
+
+  // Open up a unique file.
+  int tempFD = 0;
+  SmallString<128> tempFileName;
+  if (llvm::sys::fs::createUniqueFile(tempFileModel, tempFD, tempFileName))
+    return None;
+
+  // Dump the contents there.
+  llvm::raw_fd_ostream out(tempFD, true);
+  out << buffer->getBuffer();
+  out.flush();
+
+  llvm::sys::DontRemoveFileOnSignal(tempFileName);
+  return tempFileName.str().str();
+}
+
+StringRef SourceManager::getIdentifierForBuffer(
+    unsigned bufferID, bool ForceGeneratedSourceToDisk
+) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
   assert(buffer && "invalid buffer ID");
+
+  // If this is generated source code, and we're supposed to force it to disk
+  // so external clients can see it, do so now.
+  if (ForceGeneratedSourceToDisk) {
+    if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
+      if (generatedInfo->onDiskBufferCopyFileName.empty()) {
+        if (auto newFileNameOpt = dumpBufferToFile(buffer)) {
+          generatedInfo->onDiskBufferCopyFileName =
+              strdup(newFileNameOpt->c_str());
+        }
+      }
+
+      if (!generatedInfo->onDiskBufferCopyFileName.empty())
+        return generatedInfo->onDiskBufferCopyFileName;
+    }
+  }
+
   return buffer->getBufferIdentifier();
 }
 
