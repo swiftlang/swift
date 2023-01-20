@@ -606,32 +606,12 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Base, Printer, Opts);
 }
 
-StringRef OwnershipTypeRepr::getSpecifierSpelling(ParamSpecifier specifier) {
-  switch (specifier) {
-  case ParamSpecifier::InOut:
-    return "inout";
-  case ParamSpecifier::Shared:
-    return "__shared";
-  case ParamSpecifier::Owned:
-    return "__owned";
-  case ParamSpecifier::Default:
-    return "";
-  }
-  llvm_unreachable("invalid ParamSpecifier");
+StringRef OwnershipTypeRepr::getSpecifierSpelling() const {
+  return ParamDecl::getSpecifierSpelling(getSpecifier());
 }
 
 ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
-  switch (getSpecifier()) {
-  case ParamSpecifier::InOut:
-    return ValueOwnership::InOut;
-    
-  case ParamSpecifier::Shared:
-    return ValueOwnership::Shared;
-  case ParamSpecifier::Owned:
-    return ValueOwnership::Owned;
-  case ParamSpecifier::Default:
-    return ValueOwnership::Default;
-  }
+  return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,

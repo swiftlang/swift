@@ -1099,16 +1099,12 @@ public:
   ValueOwnership getValueOwnership() const;
   
   /// Return the spelling of the ownership specifier as a string.
-  StringRef getSpecifierSpelling() const {
-    return getSpecifierSpelling(getSpecifier());
-  }
+  StringRef getSpecifierSpelling() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership;
   }
   static bool classof(const OwnershipTypeRepr *T) { return true; }
-
-  static StringRef getSpecifierSpelling(ParamSpecifier spell);
 };
   
 /// An 'isolated' type.

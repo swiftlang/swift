@@ -410,12 +410,10 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
-    /// Whether we've computed the specifier yet.
-    SpecifierComputed : 1,
-
-    /// The specifier associated with this parameter.  This determines
-    /// the storage semantics of the value e.g. mutability.
-    Specifier : 2,
+    /// The specifier associated with this parameter + 1, or zero if the
+    /// specifier has not been computed yet.  This determines
+    /// the ownership semantics of the parameter.
+    OwnershipSpecifier : 3,
 
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
@@ -5993,10 +5991,17 @@ enum class ParamSpecifier : uint8_t {
   /// duration of a call.
   InOut = 1,
 
+  /// `borrowing`, indicating nonexclusive access to the argument for the
+  /// duration of a call.
+  Borrowing = 2,
+  /// `consuming`, indicating ownership transfer of the argument from caller
+  /// to callee.
+  Consuming = 3,
+
   /// `__shared`, a legacy spelling of `borrowing`.
-  Shared = 2,
-    /// `__owned`, a legacy spelling of `consuming`.
-  Owned = 3,
+  LegacyShared = 4,
+  /// `__owned`, a legacy spelling of `consuming`.
+  LegacyOwned = 5,
 };
 
 /// A function parameter declaration.
@@ -6285,8 +6290,8 @@ public:
   using Specifier = ParamSpecifier;
 
   Optional<Specifier> getCachedSpecifier() const {
-    if (Bits.ParamDecl.SpecifierComputed)
-      return Specifier(Bits.ParamDecl.Specifier);
+    if (Bits.ParamDecl.OwnershipSpecifier != 0)
+      return Specifier(Bits.ParamDecl.OwnershipSpecifier - 1);
 
     return None;
   }
@@ -6297,20 +6302,18 @@ public:
 
   /// Is the type of this parameter 'inout'?
   bool isInOut() const { return getSpecifier() == Specifier::InOut; }
-  /// Is this an immutable 'shared' property?
-  bool isShared() const { return getSpecifier() == Specifier::Shared; }
-  /// Is this an immutable 'owned' property?
-  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
 
-  bool isImmutable() const {
-    return isImmutableSpecifier(getSpecifier());
+  bool isImmutableInFunctionBody() const {
+    return isSpecifierImmutableInFunctionBody(getSpecifier());
   }
-  static bool isImmutableSpecifier(Specifier sp) {
+  static bool isSpecifierImmutableInFunctionBody(Specifier sp) {
     switch (sp) {
     case Specifier::Default:
-    case Specifier::Shared:
-    case Specifier::Owned:
+    case Specifier::Borrowing:
+    case Specifier::LegacyShared:
+    case Specifier::LegacyOwned:
       return true;
+    case Specifier::Consuming:
     case Specifier::InOut:
       return false;
     }
@@ -6323,29 +6326,32 @@ public:
 
   static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
     switch (specifier) {
-    case Specifier::Default:
-      return ValueOwnership::Default;
-    case Specifier::InOut:
+    case ParamSpecifier::InOut:
       return ValueOwnership::InOut;
-    case Specifier::Shared:
+    case ParamSpecifier::Borrowing:
+    case ParamSpecifier::LegacyShared:
       return ValueOwnership::Shared;
-    case Specifier::Owned:
+    case ParamSpecifier::Consuming:
+    case ParamSpecifier::LegacyOwned:
       return ValueOwnership::Owned;
+    case ParamSpecifier::Default:
+      return ValueOwnership::Default;
     }
-    llvm_unreachable("unhandled specifier");
+    llvm_unreachable("invalid ParamSpecifier");
   }
 
   static Specifier
   getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
+  #warning "todo: switch over to consuming/borrowing once they're fully supported"
     switch (ownership) {
     case ValueOwnership::Default:
       return Specifier::Default;
     case ValueOwnership::Shared:
-      return Specifier::Shared;
+      return Specifier::LegacyShared; // should become Borrowing
     case ValueOwnership::InOut:
       return Specifier::InOut;
     case ValueOwnership::Owned:
-      return Specifier::Owned;
+      return Specifier::LegacyOwned; // should become Consuming
     }
     llvm_unreachable("unhandled ownership");
   }
@@ -6358,6 +6364,9 @@ public:
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Param;
   }
+  
+  /// Get the source code spelling of a parameter specifier value as a string.
+  static StringRef getSpecifierSpelling(Specifier spec);
 };
   
 /// Describes the kind of subscripting used in Objective-C.

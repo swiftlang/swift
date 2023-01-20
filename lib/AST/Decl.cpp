@@ -6825,7 +6825,7 @@ bool VarDecl::isLet() const {
   // a high-level request. Once this is done, all callers of the introducer and
   // specifier setters can be removed.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    return PD->isImmutable();
+    return PD->isImmutableInFunctionBody();
   }
   return getIntroducer() == Introducer::Let;
 }
@@ -6849,13 +6849,28 @@ bool VarDecl::isOrdinaryStoredProperty() const {
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {
-  // FIXME: Revisit this; in particular shouldn't __owned parameters be
-  // ::Let also?
-  setIntroducer(specifier == ParamSpecifier::Default
-                ? VarDecl::Introducer::Let
-                : VarDecl::Introducer::Var);
-  Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
-  Bits.ParamDecl.SpecifierComputed = true;
+  VarDecl::Introducer introducer;
+  switch (specifier) {
+  // Unannotated or `borrowing` parameters are locally immutable.
+  // So are parameters using the legacy `__shared` or `__owned` modifiers.
+  case ParamSpecifier::Default:
+  case ParamSpecifier::Borrowing:
+  case ParamSpecifier::LegacyShared:
+  case ParamSpecifier::LegacyOwned:
+    introducer = VarDecl::Introducer::Let;
+    break;
+  
+  // `inout` and `consuming` parameters are locally mutable.
+  case ParamSpecifier::InOut:
+  case ParamSpecifier::Consuming:
+    introducer = VarDecl::Introducer::Var;
+    break;
+  }
+  
+  setIntroducer(introducer);
+  Bits.ParamDecl.OwnershipSpecifier = static_cast<unsigned>(specifier) + 1;
+  assert(getCachedSpecifier() == specifier
+         && "not enough bits in ParamDecl flags for specifier anymore!");
 }
 
 bool ParamDecl::isAnonClosureParam() const {
@@ -6883,6 +6898,24 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
   return evaluateOrDefault(ctx.evaluator,
                            ParamSpecifierRequest{mutableThis},
                            ParamDecl::Specifier::Default);
+}
+
+StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
+  switch (specifier) {
+  case ParamSpecifier::Default:
+    return "";
+  case ParamSpecifier::Borrowing:
+    return "borrowing";
+  case ParamSpecifier::Consuming:
+    return "consuming";
+  case ParamSpecifier::InOut:
+    return "inout";
+  case ParamSpecifier::LegacyShared:
+    return "__shared";
+  case ParamSpecifier::LegacyOwned:
+    return "__owned";
+  }
+  llvm_unreachable("invalid ParamSpecifier");
 }
 
 StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
@@ -7254,7 +7287,7 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
       ArgumentNameAndFlags(argumentName, None),
       ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
-  Bits.ParamDecl.SpecifierComputed = false;
+  Bits.ParamDecl.OwnershipSpecifier = 0;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
 }

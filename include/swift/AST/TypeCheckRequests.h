@@ -2133,7 +2133,8 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determines the specifier for a parameter (inout, __owned, etc).
+/// Determines the ownership specifier for a parameter
+/// (inout/consuming/borrowing)
 class ParamSpecifierRequest
     : public SimpleRequest<ParamSpecifierRequest,
                            ParamSpecifier(ParamDecl *),

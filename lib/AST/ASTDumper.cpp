@@ -1015,19 +1015,8 @@ namespace {
       }
 
       if (auto specifier = P->getCachedSpecifier()) {
-        switch (*specifier) {
-        case ParamDecl::Specifier::Default:
-          /* nothing */
-          break;
-        case ParamDecl::Specifier::InOut:
-          OS << " inout";
-          break;
-        case ParamDecl::Specifier::Shared:
-          OS << " shared";
-          break;
-        case ParamDecl::Specifier::Owned:
-          OS << " owned";
-          break;
+        if (*specifier != ParamDecl::Specifier::Default) {
+          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
         }
       }
 

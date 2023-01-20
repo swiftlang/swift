@@ -239,7 +239,9 @@ template <class S>
 struct SpecifiedParamSynthesizer { ParamSpecifier specifier; S sub; };
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
-  return {ParamSpecifier::Owned, sub};
+  // TODO: We should probably synthesize decls to use the standard `consuming`
+  // modifier, once we're certain doing so won't break anything.
+  return {ParamSpecifier::LegacyOwned, sub};
 }
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
@@ -257,10 +259,8 @@ FunctionType::Param synthesizeParamType(SynthesisContext &SC,
                                         const SpecifiedParamSynthesizer<S> &s) {
   auto param = synthesizeParamType(SC, s.sub);
   auto flags = param.getParameterFlags();
-  if (s.specifier == ParamSpecifier::Owned)
-    flags = flags.withOwned(true);
-  if (s.specifier == ParamSpecifier::InOut)
-    flags = flags.withInOut(true);
+  if (s.specifier != ParamSpecifier::Default)
+    flags = flags.withValueOwnership(s.specifier);
   return param.withFlags(flags);
 }
 

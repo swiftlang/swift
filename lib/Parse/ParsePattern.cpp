@@ -253,6 +253,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       while (Tok.is(tok::kw_inout) ||
              Tok.isContextualKeyword("__shared") ||
              Tok.isContextualKeyword("__owned") ||
+             Tok.isContextualKeyword("borrowing") ||
+             Tok.isContextualKeyword("consuming") ||
              Tok.isContextualKeyword("isolated") ||
              Tok.isContextualKeyword("_const")) {
         if (Tok.isContextualKeyword("isolated")) {
@@ -287,20 +289,22 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (!hasSpecifier) {
+          // These cases are handled later when mapping to ParamDecls for
+          // better fixits.
           if (Tok.is(tok::kw_inout)) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
             param.SpecifierKind = ParamDecl::Specifier::InOut;
             param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("borrowing")) {
+            param.SpecifierKind = ParamDecl::Specifier::Borrowing;
+            param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("consuming")) {
+            param.SpecifierKind = ParamDecl::Specifier::Consuming;
+            param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__shared")) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
-            param.SpecifierKind = ParamDecl::Specifier::Shared;
+            param.SpecifierKind = ParamDecl::Specifier::LegacyShared;
             param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__owned")) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
-            param.SpecifierKind = ParamDecl::Specifier::Owned;
+            param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
           }
           hasSpecifier = true;
@@ -504,7 +508,7 @@ validateParameterWithOwnership(Parser &parser,
   if (isa<SpecifierTypeRepr>(type)) {
     parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
   } else {
-    auto specifierName = OwnershipTypeRepr::getSpecifierSpelling(specifier);
+    auto specifierName = ParamDecl::getSpecifierSpelling(specifier);
     llvm::SmallString<128> replacement(specifierName);
     replacement += " ";
     parser
@@ -559,17 +563,9 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (paramInfo.SpecifierKind == ParamDecl::Specifier::InOut) {
+      if (paramInfo.SpecifierKind != ParamDecl::Specifier::Default) {
         type = validateParameterWithOwnership(parser, paramInfo,
-                                              ParamSpecifier::InOut,
-                                              parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Shared) {
-        type = validateParameterWithOwnership(parser, paramInfo,
-                                              ParamSpecifier::Shared,
-                                              parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Owned) {
-        type = validateParameterWithOwnership(parser, paramInfo,
-                                              ParamSpecifier::Owned,
+                                              paramInfo.SpecifierKind,
                                               parsingEnumElt);
       }
 
@@ -619,20 +615,12 @@ mapParsedParameters(Parser &parser,
         }
       }
     } else if (paramInfo.SpecifierLoc.isValid()) {
-      StringRef specifier;
-      switch (paramInfo.SpecifierKind) {
-      case ParamDecl::Specifier::InOut:
-        specifier = "'inout'";
-        break;
-      case ParamDecl::Specifier::Shared:
-        specifier = "'shared'";
-        break;
-      case ParamDecl::Specifier::Owned:
-        specifier = "'owned'";
-        break;
-      case ParamDecl::Specifier::Default:
-        llvm_unreachable("can't have default here");
-        break;
+      llvm::SmallString<16> specifier;
+      {
+        llvm::raw_svector_ostream ss(specifier);
+        
+        ss << '\'' << ParamDecl::getSpecifierSpelling(paramInfo.SpecifierKind)
+           << '\'';
       }
       parser.diagnose(paramInfo.SpecifierLoc, diag::specifier_must_have_type,
                       specifier);

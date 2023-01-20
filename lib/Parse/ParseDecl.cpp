@@ -4496,6 +4496,8 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
          Tok.isContextualKeyword("__shared") ||
          Tok.isContextualKeyword("__owned") ||
          Tok.isContextualKeyword("isolated") ||
+         Tok.isContextualKeyword("consuming") ||
+         Tok.isContextualKeyword("borrowing") ||
          Tok.isContextualKeyword("_const")) {
 
     if (Tok.isContextualKeyword("isolated")) {
@@ -4520,9 +4522,13 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
         Specifier = ParamDecl::Specifier::InOut;
       } else if (Tok.is(tok::identifier)) {
         if (Tok.getRawText().equals("__shared")) {
-          Specifier = ParamDecl::Specifier::Shared;
+          Specifier = ParamDecl::Specifier::LegacyShared;
         } else if (Tok.getRawText().equals("__owned")) {
-          Specifier = ParamDecl::Specifier::Owned;
+          Specifier = ParamDecl::Specifier::LegacyOwned;
+        } else if (Tok.getRawText().equals("borrowing")) {
+          Specifier = ParamDecl::Specifier::Borrowing;
+        } else if (Tok.getRawText().equals("consuming")) {
+          Specifier = ParamDecl::Specifier::Consuming;
         }
       }
     }

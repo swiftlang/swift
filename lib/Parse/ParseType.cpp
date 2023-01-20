@@ -42,18 +42,11 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   }
 
   // Apply 'inout' or '__shared' or '__owned'
-  if (specifierLoc.isValid()) {
-    switch (specifier) {
-    case ParamDecl::Specifier::Owned:
-    case ParamDecl::Specifier::InOut:
-    case ParamDecl::Specifier::Shared:
-      ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
-      break;
-    case ParamDecl::Specifier::Default:
-      break;
-    }
+  if (specifierLoc.isValid() &&
+      specifier != ParamDecl::Specifier::Default) {
+    ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
   }
-
+  
   // Apply 'isolated'.
   if (isolatedLoc.isValid()) {
     ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
@@ -366,7 +359,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
-                                               ParamDecl::Specifier::Owned,
+                                               ParamDecl::Specifier::LegacyOwned,
                                                SourceLoc(), SourceLoc(),
                                                SourceLoc()));
 }

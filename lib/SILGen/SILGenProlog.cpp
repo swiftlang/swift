@@ -432,13 +432,16 @@ struct ArgumentInitHelper {
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else {
-      assert(pd->isImmutable() && "expected parameter to be immutable!");
+    #warning "todo"
+      assert(pd->isImmutableInFunctionBody()
+             && "consuming mutable params not implemented yet");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
     SILValue value = argrv.getValue();
-    SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
+    #warning "todo"
+    SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
