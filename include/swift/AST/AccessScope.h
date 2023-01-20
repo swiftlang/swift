@@ -98,7 +98,6 @@ public:
     }
     if (isPackage())
       return AS.isPublic();
-
     // If this is public, it can't be less than access level of AS
     // so return false
     return false;

@@ -693,13 +693,14 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 3+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
     /// An encoding of the default and maximum access level for this extension.
+    /// The value 4 corresponds to AccessLevel::Public
     ///
     /// This is encoded as (1 << (maxAccess-1)) | (1 << (defaultAccess-1)),
     /// which works because the maximum is always greater than or equal to the
     /// default, and 'private' is never used. 0 represents an uncomputed value.
-    DefaultAndMaxAccessLevel : 3,
+    DefaultAndMaxAccessLevel : 4,
 
     /// Whether there is are lazily-loaded conformances for this extension.
     HasLazyConformances : 1

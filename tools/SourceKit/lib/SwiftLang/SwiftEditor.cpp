@@ -1134,6 +1134,7 @@ namespace  {
 static UIdent getAccessLevelUID(AccessLevel Access) {
   static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
+  static UIdent AccessPackage("source.lang.swift.accessibility.package");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
   static UIdent AccessFilePrivate("source.lang.swift.accessibility.fileprivate");
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
@@ -1145,6 +1146,8 @@ static UIdent getAccessLevelUID(AccessLevel Access) {
     return AccessFilePrivate;
   case AccessLevel::Internal:
     return AccessInternal;
+  case AccessLevel::Package:
+    return AccessPackage;
   case AccessLevel::Public:
     return AccessPublic;
   case AccessLevel::Open:

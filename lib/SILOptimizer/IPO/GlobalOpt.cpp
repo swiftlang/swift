@@ -490,6 +490,7 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
       return false;
     case AccessLevel::Internal:
       return !SILG->getModule().isWholeModule();
+    case AccessLevel::Package:
     case AccessLevel::Public:
     case AccessLevel::Open:
       return true;
