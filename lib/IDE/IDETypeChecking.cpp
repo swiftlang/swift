@@ -918,34 +918,29 @@ SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
 swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (auto Capture : CaptureList->getCaptureList()) {
-    if (Capture.PBD->getPatternList().size() != 1) {
+    if (Capture.PBD->getPatternList().size() != 1)
       continue;
-    }
+
     Expr *Init = Capture.PBD->getInit(0);
-    if (!Init) {
+    if (!Init)
       continue;
-    }
-    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
-    }
-    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Init);
-    if (!DRE) {
-      continue;
-    }
 
     auto DeclaredVar = Capture.getVar();
-    if (DeclaredVar->getLoc() != DRE->getLoc()) {
+    if (DeclaredVar->getLoc() != Init->getLoc()) {
       // We have a capture like `[foo]` if the declared var and the
       // reference share the same location.
       continue;
     }
 
-    auto *ReferencedVar = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-    if (!ReferencedVar) {
-      continue;
+    if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
+      if (DC) {
+        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
+      }
     }
+
+    auto *ReferencedVar = Init->getReferencedDecl().getDecl();
+    if (!ReferencedVar)
+      continue;
 
     assert(DeclaredVar->getName() == ReferencedVar->getName());
 
@@ -958,28 +953,23 @@ SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
 swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
   for (const StmtConditionElement &Cond : CondStmt->getCond()) {
-    if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+    if (Cond.getKind() != StmtConditionElement::CK_PatternBinding)
       continue;
-    }
+
     Expr *Init = Cond.getInitializer();
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
       if (DC) {
         Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
       }
     }
-    auto InitDeclRef = dyn_cast<DeclRefExpr>(Init);
-    if (!InitDeclRef) {
+
+    auto ReferencedVar = Init->getReferencedDecl().getDecl();
+    if (!ReferencedVar)
       continue;
-    }
-    auto ReferencedVar = dyn_cast_or_null<VarDecl>(InitDeclRef->getDecl());
-    if (!ReferencedVar) {
-      continue;
-    }
 
     Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
-      if (DeclaredVar->getLoc() != Init->getLoc()) {
+      if (DeclaredVar->getLoc() != Init->getLoc())
         return;
-      }
       assert(DeclaredVar->getName() == ReferencedVar->getName());
       Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
     });
