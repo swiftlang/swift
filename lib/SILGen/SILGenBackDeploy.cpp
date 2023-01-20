@@ -178,19 +178,27 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
 
   F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(thunk));
 
-  emitBasicProlog(FD->getParameters(), FD->getImplicitSelfDecl(),
-                  FD->getResultInterfaceType(), FD, FD->hasThrows(),
-                  FD->getThrowsLoc());
+  // Generate the thunk prolog by collecting parameters.
+  SmallVector<ManagedValue, 4> params;
+  SmallVector<SILArgument *, 4> indirectParams;
+  collectThunkParams(loc, params, &indirectParams);
+
+  // Build up the list of arguments that we're going to invoke the the real
+  // function with.
+  SmallVector<SILValue, 8> paramsForForwarding;
+  for (auto indirectParam : indirectParams) {
+    paramsForForwarding.emplace_back(indirectParam);
+  }
+
+  for (auto param : params) {
+    // We're going to directly call either the original function or the fallback
+    // function with these arguments and then return. Therefore we just forward
+    // the arguments instead of handling their ownership conventions.
+    paramsForForwarding.emplace_back(param.forward(*this));
+  }
+
   prepareEpilog(FD->getResultInterfaceType(), FD->hasThrows(),
                 CleanupLocation(FD));
-
-  // Gather the entry block's arguments up so that we can forward them.
-  SmallVector<SILValue, 8> paramsForForwarding;
-  SILBasicBlock *entryBlock = getFunction().getEntryBlock();
-  for (SILArgument *arg :
-       make_range(entryBlock->args_begin(), entryBlock->args_end())) {
-    paramsForForwarding.emplace_back(arg);
-  }
 
   SILBasicBlock *availableBB = createBasicBlock("availableBB");
   SILBasicBlock *unavailableBB = createBasicBlock("unavailableBB");
