@@ -316,6 +316,41 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
     }
     return 0
   }
+
+  public func _customIndexOfEquatableElement(_ element: UInt8) -> Index?? {
+    guard !isEmpty else { return Optional(nil) }
+
+    let ptr = baseAddress._unsafelyUnwrappedUnchecked
+    var i = 0
+
+    let stride = MemoryLayout<UInt>.stride
+    let address = Int(bitPattern: ptr)
+
+    while (address &+ i) % stride != 0 && i < count {
+      guard self[i] != element else { return Optional(i) }
+      i &+= 1
+    }
+
+    var mask = UInt(0)
+    withUnsafeMutableBytes(of: &mask) {
+      $0.initializeMemory(as: UInt8.self, repeating: element)
+    }
+
+    while (i &+ stride) <= count {
+      let word: UInt = UnsafePointer<UInt>(
+          bitPattern: address &+ i
+        )._unsafelyUnwrappedUnchecked.pointee
+      guard word & mask == 0 else { break }
+      i &+= stride
+    }
+
+    while i < count {
+      guard self[i] != element else { return Optional(i) }
+      i &+= 1
+    }
+
+    return Optional(nil)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
