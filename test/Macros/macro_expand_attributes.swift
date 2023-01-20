@@ -29,11 +29,11 @@ protocol P {
 
 extension P {
   func reading<EnclosingSelf, Value>(from keyPath: KeyPath<EnclosingSelf, Value>) {
-    print("reading from \(keyPath)")
+    print("reading from key-path")
   }
 
   func writing<EnclosingSelf, Value>(to keyPath: KeyPath<EnclosingSelf, Value>) {
-    print("writing to \(keyPath)")
+    print("writing to key-path")
   }
 }
 
@@ -90,12 +90,12 @@ class C: P {
 }
 
 var c = C()
-// CHECK: reading from \C.x
+// CHECK: reading from key-path
 _ = c.x
-// CHECK: reading from \C.y
+// CHECK: reading from key-path
 _ = c.y
 
-// CHECK: writing to \C.x
+// CHECK: writing to key-path
 c.x = 10
-// CHECK: writing to \C.y
+// CHECK: writing to key-path
 c.y = 100
