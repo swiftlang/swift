@@ -485,8 +485,7 @@ namespace {
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
   using BlockSetVector = BasicBlockSetVector;
-  template <typename Inst = SILInstruction>
-  using BlockToInstMap = llvm::DenseMap<SILBasicBlock *, Inst *>;
+  using BlockToInstMap = llvm::DenseMap<SILBasicBlock *, SILInstruction *>;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
   // are handled from the bottom of the dom tree upwards.
@@ -534,7 +533,7 @@ class StackAllocationPromoter {
   /// value stored into the StoreInst and a CopyValueInst of the result of the
   /// BeginBorrowInst or a StoreBorrowInst, and a BeginBorrowInst of the stored
   /// value if it did not have a guaranteed lexical scope.
-  BlockToInstMap<> initializationPoints;
+  BlockToInstMap initializationPoints;
 
   /// The first instruction in each block that deinitializes the storage that is
   /// not preceded by an instruction that initializes it.
@@ -548,7 +547,7 @@ class StackAllocationPromoter {
   /// Ending lexical lifetimes before these instructions is one way that the
   /// cross-block lexical lifetimes of initializationPoints can be ended in
   /// StackAllocationPromoter::endLexicalLifetime.
-  BlockToInstMap<> deinitializationPoints;
+  BlockToInstMap deinitializationPoints;
 
 public:
   /// C'tor.
@@ -894,7 +893,7 @@ StackAllocationPromoter::getLiveOutValues(BlockSetVector &phiBlocks,
     SILBasicBlock *domBlock = domNode->getBlock();
 
     // If there is a store (that must come after the phi), use its value.
-    BlockToInstMap<>::iterator it = initializationPoints.find(domBlock);
+    BlockToInstMap::iterator it = initializationPoints.find(domBlock);
     if (it != initializationPoints.end()) {
       auto *inst = it->second;
       assert(isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst));
