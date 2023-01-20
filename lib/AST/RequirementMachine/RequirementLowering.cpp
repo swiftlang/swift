@@ -482,11 +482,25 @@ struct InferRequirementsWalker : public TypeWalker {
   }
 
   Action walkToTypePost(Type ty) override {
+    // Skip `Sendable` conformance requirements that are inferred from
+    // `@preconcurrency` declarations.
+    auto skipRequirement = [](Requirement req, Decl *fromDecl) {
+      if (!fromDecl->preconcurrency())
+        return false;
+
+      return (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+            ->isSpecificProtocol(KnownProtocolKind::Sendable));
+    };
+
     // Infer from generic typealiases.
     if (auto typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       auto decl = typeAlias->getDecl();
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
+        if (skipRequirement(rawReq, decl))
+          continue;
+
         desugarRequirement(rawReq.subst(subMap), SourceLoc(), reqs, errors);
       }
 
@@ -567,6 +581,9 @@ struct InferRequirementsWalker : public TypeWalker {
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
+      if (skipRequirement(rawReq, decl))
+        continue;
+
       auto req = rawReq.subst(subMap);
       desugarRequirement(req, SourceLoc(), reqs, errors);
     }
