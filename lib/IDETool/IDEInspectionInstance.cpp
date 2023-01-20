@@ -346,10 +346,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
         newBufferID,
         GeneratedSourceInfo{
           GeneratedSourceInfo::ReplacedFunctionBody,
-          *AFD->getParentSourceFile()->getBufferID(),
           AFD->getOriginalBodySourceRange(),
           newBodyRange,
-          AFD
+          AFD,
+          nullptr
         }
     );
 

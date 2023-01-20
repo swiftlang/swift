@@ -86,7 +86,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     case let arg as FunctionArgument     : self = .argument(arg)
     case let ga as GlobalAddrInst        : self = .global(ga.global)
     case let mvr as MultipleValueInstructionResult:
-      if let ba = mvr.instruction as? BeginApplyInst, baseAddress.type.isAddress {
+      if let ba = mvr.parentInstruction as? BeginApplyInst, baseAddress.type.isAddress {
         self = .yield(ba)
       } else {
         self = .unidentified

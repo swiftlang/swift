@@ -279,8 +279,9 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   switch (user->getKind()) {
   default:
     return false;
-  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::StrongReleaseInst:
@@ -553,6 +554,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData;
+
+  case SILInstructionKind::OpenPackElementInst:
+    // We do potentially have to build type metadata as part of this
+    // instruction (if we have to materialize a concrete pack).
+    // The interface doesn't let us be specific about what metadata,
+    // though.
+    impactType = SILType();
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::OpenExistentialAddrInst:

@@ -64,7 +64,7 @@ add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
 add_subdirectory(Threading)
 
-# This static library is shared across swiftCore and swiftReflection
+# This static library is shared across swiftCore and swiftRemoteInspection
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
@@ -146,10 +146,14 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(StringProcessing)
     add_subdirectory(RegexBuilder)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+    add_subdirectory(Reflection)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
-  add_subdirectory(Reflection)
+  add_subdirectory(RemoteInspection)
   add_subdirectory(SwiftRemoteMirror)
 endif()
 

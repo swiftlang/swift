@@ -21,6 +21,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -112,6 +113,10 @@ EnableObjCInterop("enable-objc-interop",
 static llvm::cl::opt<bool>
 DisableObjCInterop("disable-objc-interop",
                    llvm::cl::desc("Disable Objective-C interoperability."));
+
+static llvm::cl::list<std::string>
+ExperimentalFeatures("enable-experimental-feature",
+                     llvm::cl::desc("Enable the given experimental feature."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
@@ -562,6 +567,7 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  Invocation.getLangOptions().EnableDeserializationSafety = false;
   if (auto overrideKind = getASTOverrideKind()) {
     Invocation.getLangOptions().ASTVerifierOverride = *overrideKind;
   }
@@ -571,6 +577,15 @@ int main(int argc, char **argv) {
       toOptionalBool(EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
     Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
+  for (auto &featureName : ExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureName)) {
+      Invocation.getLangOptions().Features.insert(*feature);
+    } else {
+      llvm::errs() << "error: unknown feature "
+                   << QuotedString(featureName) << "\n";
+      exit(-1);
+    }
+  }
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :

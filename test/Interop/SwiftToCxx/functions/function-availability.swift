@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions __attribute__((swift_private)) {
+// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -16,22 +16,22 @@
 
 // CHECK: }
 
-// CHECK: inline void alwaysDeprecated() noexcept SWIFT_DEPRECATED {
+// CHECK: inline void alwaysDeprecated() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED {
 @available(*, deprecated)
 public func alwaysDeprecated() {}
 
-// CHECK: inline void alwaysDeprecatedTwo() noexcept SWIFT_DEPRECATED_MSG("it should not be used")
+// CHECK: inline void alwaysDeprecatedTwo() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED_MSG("it should not be used")
 @available(*, deprecated, message: "it should not be used")
 public func alwaysDeprecatedTwo() {}
 
-// CHECK: inline void alwaysUnavailable() noexcept SWIFT_UNAVAILABLE
+// CHECK: inline void alwaysUnavailable() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE
 @available(*, unavailable)
 public func alwaysUnavailable() {}
 
-// CHECK: inline void alwaysUnavailableMessage() noexcept SWIFT_UNAVAILABLE_MSG("stuff happened")
+// CHECK: inline void alwaysUnavailableMessage() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE_MSG("stuff happened")
 @available(*, unavailable, message: "stuff happened")
 public func alwaysUnavailableMessage() {}
 
-// CHECK: inline void singlePlatAvailability() noexcept SWIFT_AVAILABILITY(macos,introduced=11)
+// CHECK: inline void singlePlatAvailability() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_AVAILABILITY(macos,introduced=11)
 @available(macOS 11, *)
 public func singlePlatAvailability() {}

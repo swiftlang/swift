@@ -760,10 +760,9 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
       swift::getSpecializedLinkage(Orig, Orig->getLinkage()), ClonedName,
       ClonedTy, Orig->getGenericEnvironment(), Orig->getLocation(),
       Orig->isBare(), Orig->isTransparent(), Serialized, IsNotDynamic,
-      IsNotDistributed, Orig->getEntryCount(), Orig->isThunk(),
-      Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      IsNotDistributed, IsNotRuntimeAccessible, Orig->getEntryCount(),
+      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }

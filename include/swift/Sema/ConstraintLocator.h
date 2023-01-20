@@ -292,6 +292,9 @@ public:
   /// Determine whether this locator is for a result builder body result type.
   bool isForResultBuilderBodyResult() const;
 
+  /// Determine whether this locator is for a macro expansion.
+  bool isForMacroExpansion() const;
+
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {
     if (auto *expr = getAnchor().dyn_cast<Expr *>())
@@ -684,21 +687,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PackElement;
-  }
-};
-
-class LocatorPathElt::OpenedPackElement final
-    : public StoredPointerElement<GenericEnvironment> {
-public:
-  OpenedPackElement(GenericEnvironment *env)
-      : StoredPointerElement(PathElementKind::OpenedPackElement, env) {}
-
-  GenericEnvironment *getGenericEnvironment() const {
-    return getStoredPointer();
-  }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::OpenedPackElement;
   }
 };
 

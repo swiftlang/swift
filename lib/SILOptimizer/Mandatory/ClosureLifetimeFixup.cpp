@@ -21,6 +21,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -477,6 +478,7 @@ static SILValue tryRewriteToPartialApplyStack(
     ConvertEscapeToNoEscapeInst *cvt, SILInstruction *closureUser,
     DominanceAnalysis *dominanceAnalysis, InstructionDeleter &deleter,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
+    llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
     const bool &modifiedCFG) {
 
   auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
@@ -583,6 +585,13 @@ static SILValue tryRewriteToPartialApplyStack(
   dominanceAnalysis->invalidate(closureUser->getFunction(),
                                 analysisInvalidationKind(modifiedCFG));
   // Insert dealloc_stacks of any in_guaranteed captures.
+
+  // Don't run insertDeallocOfCapturedArguments if newPA is in an unreachable
+  // block insertDeallocOfCapturedArguments will run code that computes the DF
+  // for newPA that will loop infinetly.
+  if (unreachableBlocks.count(newPA->getParent()))
+    return closure;
+
   insertDeallocOfCapturedArguments(
       newPA, dominanceAnalysis->get(closureUser->getFunction()));
   return closure;
@@ -591,6 +600,7 @@ static SILValue tryRewriteToPartialApplyStack(
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *cvt, DominanceAnalysis *dominanceAnalysis,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
+    llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
     InstructionDeleter &deleter, const bool &modifiedCFG) {
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
@@ -614,7 +624,7 @@ static bool tryExtendLifetimeToLastUse(
 
   if (SILValue closure = tryRewriteToPartialApplyStack(
           cvt, singleUser, dominanceAnalysis, deleter, memoized,
-          /*const*/ modifiedCFG)) {
+          unreachableBlocks, /*const*/ modifiedCFG)) {
     if (auto *cfi = dyn_cast<ConvertFunctionInst>(closure))
       closure = cfi->getOperand();
     if (endAsyncLet && isa<MarkDependenceInst>(closure)) {
@@ -1009,6 +1019,22 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   return true;
 }
 
+static void computeUnreachableBlocks(
+  llvm::DenseSet<SILBasicBlock*> &unreachableBlocks,
+  SILFunction &fn) {
+
+  ReachableBlocks isReachable(&fn);
+  llvm::DenseSet<SILBasicBlock *> reachable;
+  isReachable.visit([&] (SILBasicBlock *block) -> bool {
+                    reachable.insert(block);
+                    return true;
+                   });
+  for (auto &block : fn) {
+    if (!reachable.count(&block))
+      unreachableBlocks.insert(&block);
+  }
+}
+
 static bool fixupClosureLifetimes(SILFunction &fn,
                                   DominanceAnalysis *dominanceAnalysis,
                                   bool &checkStackNesting, bool &modifiedCFG) {
@@ -1017,6 +1043,9 @@ static bool fixupClosureLifetimes(SILFunction &fn,
   // tryExtendLifetimeToLastUse uses a cache of recursive instruction use
   // queries.
   llvm::DenseMap<SILInstruction *, SILInstruction *> memoizedQueries;
+
+  llvm::DenseSet<SILBasicBlock *> unreachableBlocks;
+  computeUnreachableBlocks(unreachableBlocks, fn);
 
   for (auto &block : fn) {
     SILSSAUpdater updater;
@@ -1045,7 +1074,7 @@ static bool fixupClosureLifetimes(SILFunction &fn,
       }
 
       if (tryExtendLifetimeToLastUse(cvt, dominanceAnalysis, memoizedQueries,
-                                     updater.getDeleter(),
+                                     unreachableBlocks, updater.getDeleter(),
                                      /*const*/ modifiedCFG)) {
         changed = true;
         checkStackNesting = true;

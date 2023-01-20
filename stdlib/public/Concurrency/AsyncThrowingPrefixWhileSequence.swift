@@ -41,7 +41,7 @@ extension AsyncSequence {
   ///     } catch {
   ///         print("Error: \(error)")
   ///     }
-  ///     // Prints "1 2 3 4 Error: MyError()"
+  ///     // Prints "1 2 3 4 Error: MyError() "
   ///
   /// - Parameter predicate: A error-throwing closure that takes an element of
   ///   the asynchronous sequence as its argument and returns a Boolean value

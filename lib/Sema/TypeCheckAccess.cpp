@@ -117,14 +117,14 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
   AccessScope accessScope;
   const DeclContext *useDC;
   bool treatUsableFromInlineAsPublic;
-  const ComponentIdentTypeRepr *offendingType = nullptr;
+  const IdentTypeRepr *offendingType = nullptr;
 
   PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
-    auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
-    if (!CITR)
+    auto ITR = dyn_cast<IdentTypeRepr>(TR);
+    if (!ITR)
       return Action::Continue();
 
-    const ValueDecl *VD = CITR->getBoundDecl();
+    const ValueDecl *VD = ITR->getBoundDecl();
     if (!VD)
       return Action::Continue();
 
@@ -132,7 +132,7 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
         != accessScope)
       return Action::Continue();
 
-    offendingType = CITR;
+    offendingType = ITR;
     return Action::Stop();
   }
 
@@ -295,8 +295,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   diag.highlight(complainRepr->getSourceRange());
   diag.flush();
 
-  if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = CITR->getBoundDecl();
+  if (auto ITR = dyn_cast<IdentTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = ITR->getBoundDecl();
     VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
@@ -476,6 +476,7 @@ public:
   UNREACHABLE(PoundDiagnostic, "does not have access control")
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(Missing, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
   UNREACHABLE(MacroExpansion, "does not have access control")
 
@@ -1157,6 +1158,7 @@ public:
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(Missing, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
   UNREACHABLE(MacroExpansion, "does not have access control")
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
@@ -1764,6 +1766,7 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Missing, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")

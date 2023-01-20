@@ -195,9 +195,6 @@ CUSTOM_LOCATOR_PATH_ELT(PackType)
 /// An element of a pack type - the T in <T, U, V, ...>
 CUSTOM_LOCATOR_PATH_ELT(PackElement)
 
-/// Stores the generic environment for an opened pack element.
-CUSTOM_LOCATOR_PATH_ELT(OpenedPackElement)
-
 /// The shape of a parameter pack.
 SIMPLE_LOCATOR_PATH_ELT(PackShape)
 
@@ -257,6 +254,9 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
   CUSTOM_LOCATOR_PATH_ELT(NamedPatternDecl)
   /// The anonymous variable declared by a `_` pattern.
   CUSTOM_LOCATOR_PATH_ELT(AnyPatternDecl)
+
+/// A function type global actor.
+SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

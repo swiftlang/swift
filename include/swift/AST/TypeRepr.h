@@ -36,7 +36,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class DeclContext;
-  class IdentTypeRepr;
+  class DeclRefTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
 
@@ -79,18 +79,16 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, TypeRepr);
-  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, IdentTypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(DeclRefTypeRepr, TypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, DeclRefTypeRepr);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, ComponentIdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, IdentTypeRepr, 32,
     : NumPadBits,
     NumGenericArgs : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CompoundIdentTypeRepr, IdentTypeRepr, 32,
-    : NumPadBits,
-    NumComponents : 32
-  );
+  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, DeclRefTypeRepr, 32,
+                             : NumPadBits, NumMemberComponents : 32);
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
     : NumPadBits,
@@ -100,6 +98,11 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(SILBoxTypeRepr, TypeRepr, 32,
     NumGenericArgs : NumPadBits,
     NumFields : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(PackTypeRepr, TypeRepr, 32,
+    /// The number of elements contained.
+    NumElements : 32
   );
 
   } Bits;
@@ -245,34 +248,47 @@ private:
   friend class TypeRepr;
 };
 
-class ComponentIdentTypeRepr;
+class IdentTypeRepr;
 
-/// This is the abstract base class for types with identifier components.
+/// This is the abstract base class for types that directly reference a
+/// type declaration. In written syntax, this type representation consists of
+/// one or more components, separated by dots.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
-class IdentTypeRepr : public TypeRepr {
+class DeclRefTypeRepr : public TypeRepr {
 protected:
-  explicit IdentTypeRepr(TypeReprKind K) : TypeRepr(K) {}
+  explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
-  /// Copies the provided array and creates a CompoundIdentTypeRepr or just
-  /// returns the single entry in the array if it contains only one.
-  static IdentTypeRepr *create(ASTContext &C,
-                               ArrayRef<ComponentIdentTypeRepr *> Components);
-  
-  class ComponentRange;
-  inline ComponentRange getComponentRange();
+  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
+  /// is a \c MemberTypeRepr, and the method returns its base component.
+  TypeRepr *getBaseComponent();
+
+  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
+  /// is a \c MemberTypeRepr, and the method returns its last member component.
+  IdentTypeRepr *getLastComponent();
+
+  /// The type declaration the last component is bound to.
+  TypeDecl *getBoundDecl() const;
+
+  /// The identifier that describes the last component.
+  DeclNameRef getNameRef() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent  ||
+    return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent ||
-           T->getKind() == TypeReprKind::CompoundIdent;
+           T->getKind() == TypeReprKind::Member;
   }
-  static bool classof(const IdentTypeRepr *T) { return true; }
+  static bool classof(const DeclRefTypeRepr *T) { return true; }
 };
 
-class ComponentIdentTypeRepr : public IdentTypeRepr {
+/// An identifier type with an optional set of generic arguments.
+/// \code
+///   Foo
+///   Bar<Gen>
+/// \endcode
+class IdentTypeRepr : public DeclRefTypeRepr {
   DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
@@ -287,8 +303,8 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
-    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
+  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
+      : DeclRefTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -318,7 +334,7 @@ public:
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent;
   }
-  static bool classof(const ComponentIdentTypeRepr *T) { return true; }
+  static bool classof(const IdentTypeRepr *T) { return true; }
 
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -328,10 +344,10 @@ protected:
 };
 
 /// A simple identifier type like "Int".
-class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
+class SimpleIdentTypeRepr : public IdentTypeRepr {
 public:
   SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-    : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
+      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -355,16 +371,17 @@ private:
 /// \code
 ///   Bar<Gen>
 /// \endcode
-class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
-    private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+class GenericIdentTypeRepr final
+    : public IdentTypeRepr,
+      private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
   GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
-                       ArrayRef<TypeRepr*> GenericArgs,
+                       ArrayRef<TypeRepr *> GenericArgs,
                        SourceRange AngleBrackets)
-    : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-      AngleBrackets(AngleBrackets) {
+      : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
+        AngleBrackets(AngleBrackets) {
     Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
@@ -402,84 +419,61 @@ private:
   friend class TypeRepr;
 };
 
-/// A type with identifier components.
+/// A member type consisting of an arbitrary base component and one or more
+/// identifier type member components.
 /// \code
-///   Foo.Bar<Gen>
+///   Foo.Bar<Gen>.Baz
+///   [Int].Bar
 /// \endcode
-class CompoundIdentTypeRepr final : public IdentTypeRepr,
-    private llvm::TrailingObjects<CompoundIdentTypeRepr,
-                                  ComponentIdentTypeRepr *> {
+class MemberTypeRepr final : public DeclRefTypeRepr,
+      private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
   friend TrailingObjects;
 
-  CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
-      : IdentTypeRepr(TypeReprKind::CompoundIdent) {
-    Bits.CompoundIdentTypeRepr.NumComponents = Components.size();
-    assert(Components.size() > 1 &&
-           "should have just used the single ComponentIdentTypeRepr directly");
-    std::uninitialized_copy(Components.begin(), Components.end(),
-                            getTrailingObjects<ComponentIdentTypeRepr*>());
+  /// The base component, which is not necessarily an identifier type.
+  TypeRepr *Base;
+
+  MemberTypeRepr(TypeRepr *Base, ArrayRef<IdentTypeRepr *> MemberComponents)
+      : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
+    Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
+    assert(MemberComponents.size() > 0 &&
+           "MemberTypeRepr requires at least 1 member component");
+    std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
+                            getTrailingObjects<IdentTypeRepr *>());
   }
 
 public:
-  static CompoundIdentTypeRepr *create(const ASTContext &Ctx,
-                                  ArrayRef<ComponentIdentTypeRepr*> Components);
+  static MemberTypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
+                                ArrayRef<IdentTypeRepr *> MemberComponents);
 
-  ArrayRef<ComponentIdentTypeRepr*> getComponents() const {
-    return {getTrailingObjects<ComponentIdentTypeRepr*>(),
-            Bits.CompoundIdentTypeRepr.NumComponents};
+  static MemberTypeRepr *create(const ASTContext &Ctx,
+                                ArrayRef<IdentTypeRepr *> Components);
+
+  TypeRepr *getBaseComponent() const { return Base; }
+
+  ArrayRef<IdentTypeRepr *> getMemberComponents() const {
+    return {getTrailingObjects<IdentTypeRepr *>(),
+            Bits.MemberTypeRepr.NumMemberComponents};
+  }
+
+  IdentTypeRepr *getLastComponent() const {
+    return getMemberComponents().back();
   }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompoundIdent;
+    return T->getKind() == TypeReprKind::Member;
   }
-  static bool classof(const CompoundIdentTypeRepr *T) { return true; }
+  static bool classof(const MemberTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const {
-    return getComponents().front()->getStartLoc();
+    return getBaseComponent()->getStartLoc();
   }
-  SourceLoc getEndLocImpl() const {
-    return getComponents().back()->getEndLoc();
-  }
-  SourceLoc getLocImpl() const {
-    return getComponents().back()->getLoc();
-  }
+  SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
+  SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
 
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
-
-/// This wraps an IdentTypeRepr and provides an iterator interface for the
-/// components (or the single component) it represents.
-class IdentTypeRepr::ComponentRange {
-  IdentTypeRepr *IdT;
-
-public:
-  explicit ComponentRange(IdentTypeRepr *T) : IdT(T) {}
-
-  typedef ComponentIdentTypeRepr * const* iterator;
-
-  iterator begin() const {
-    if (isa<ComponentIdentTypeRepr>(IdT))
-      return reinterpret_cast<iterator>(&IdT);
-    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().begin();
-  }
-
-  iterator end() const {
-    if (isa<ComponentIdentTypeRepr>(IdT))
-      return reinterpret_cast<iterator>(&IdT) + 1;
-    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().end();
-  }
-
-  bool empty() const { return begin() == end(); }
-
-  ComponentIdentTypeRepr *front() const { return *begin(); }
-  ComponentIdentTypeRepr *back() const { return *(end()-1); }
-};
-
-inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
-  return ComponentRange(this);
-}
 
 /// A function type.
 /// \code
@@ -704,6 +698,32 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
+/// A vararg type 'T...' with element type 'T'.
+class VarargTypeRepr final : public TypeRepr {
+  TypeRepr *Element;
+  SourceLoc EllipsisLoc;
+
+public:
+  VarargTypeRepr(TypeRepr *Element, SourceLoc EllipsisLoc)
+  : TypeRepr(TypeReprKind::Vararg), Element(Element),
+    EllipsisLoc(EllipsisLoc) {}
+
+  TypeRepr *getElementType() const { return Element; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Vararg;
+  }
+  static bool classof(const VarargTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Element->getEndLoc(); }
+  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
+  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A pack expansion 'T...' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
@@ -719,16 +739,16 @@ struct TupleTypeReprElement {
 /// In the third case, tuples cannot contain an old-style variadic element,
 /// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
+  SourceLoc RepeatLoc;
   TypeRepr *Pattern;
-  SourceLoc EllipsisLoc;
 
 public:
-  PackExpansionTypeRepr(TypeRepr *Pattern, SourceLoc EllipsisLoc)
-    : TypeRepr(TypeReprKind::PackExpansion), Pattern(Pattern),
-      EllipsisLoc(EllipsisLoc) {}
+  PackExpansionTypeRepr(SourceLoc RepeatLoc, TypeRepr *Pattern)
+    : TypeRepr(TypeReprKind::PackExpansion), RepeatLoc(RepeatLoc),
+      Pattern(Pattern) {}
 
+  SourceLoc getRepeatLoc() const { return RepeatLoc; }
   TypeRepr *getPatternType() const { return Pattern; }
-  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::PackExpansion;
@@ -736,9 +756,57 @@ public:
   static bool classof(const PackExpansionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
-  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  SourceLoc getStartLocImpl() const { return RepeatLoc; }
+  SourceLoc getEndLocImpl() const { return Pattern->getEndLoc(); }
+  SourceLoc getLocImpl() const { return RepeatLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// An explicit pack grouping, `Pack{...}`.
+///
+/// This allows packs to be explicitly grouped.  It is currently only
+/// allowed in SIL files.
+class PackTypeRepr final
+    : public TypeRepr,
+      private llvm::TrailingObjects<PackTypeRepr, TypeRepr *> {
+  friend TrailingObjects;
+  SourceLoc KeywordLoc;
+  SourceRange BraceLocs;
+
+  size_t numTrailingObjects(OverloadToken<TypeRepr*>) const {
+    return Bits.PackTypeRepr.NumElements;
+  }
+
+  PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
+               ArrayRef<TypeRepr*> elements);
+public:
+  static PackTypeRepr *create(const ASTContext &ctx,
+                              SourceLoc keywordLoc,
+                              SourceRange braceLocs,
+                              ArrayRef<TypeRepr*> elements);
+
+  SourceLoc getKeywordLoc() const { return KeywordLoc; }
+  SourceRange getBracesRange() const { return BraceLocs; }
+
+  MutableArrayRef<TypeRepr*> getMutableElements() {
+    return llvm::makeMutableArrayRef(getTrailingObjects<TypeRepr*>(),
+                                     Bits.PackTypeRepr.NumElements);
+  }
+  ArrayRef<TypeRepr*> getElements() const {
+    return llvm::makeArrayRef(getTrailingObjects<TypeRepr*>(),
+                              Bits.PackTypeRepr.NumElements);
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Pack;
+  }
+  static bool classof(const PackTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return KeywordLoc; }
+  SourceLoc getEndLocImpl() const { return BraceLocs.End; }
+  SourceLoc getLocImpl() const { return KeywordLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1375,13 +1443,15 @@ inline bool TypeRepr::isSimple() const {
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::Member:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::Vararg:
   case TypeReprKind::PackExpansion:
+  case TypeReprKind::Pack:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:

@@ -522,18 +522,24 @@ private:
                   elementDecl->getParentEnum()->getModuleContext());
               outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
-              outOfLineOS << "::returnNewValue([&](char * _Nonnull result) {\n";
-              outOfLineOS << "      swift::"
-                          << cxx_synthesis::getCxxImplNamespaceName();
-              outOfLineOS << "::implClassFor<";
-              outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                  objectTypeDecl->getModuleContext(),
-                  elementDecl->getParentEnum()->getModuleContext());
-              outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-              outOfLineOS << ">::type";
-              outOfLineOS
-                  << "::initializeWithTake(result, payloadFromDestruction);\n";
-              outOfLineOS << "    });\n  ";
+              if (isa<ClassDecl>(objectTypeDecl)) {
+                outOfLineOS << "::makeRetained(*reinterpret_cast<void "
+                               "**>(payloadFromDestruction));\n  ";
+              } else {
+                outOfLineOS
+                    << "::returnNewValue([&](char * _Nonnull result) {\n";
+                outOfLineOS << "      swift::"
+                            << cxx_synthesis::getCxxImplNamespaceName();
+                outOfLineOS << "::implClassFor<";
+                outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
+                    objectTypeDecl->getModuleContext(),
+                    elementDecl->getParentEnum()->getModuleContext());
+                outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                outOfLineOS << ">::type";
+                outOfLineOS << "::initializeWithTake(result, "
+                               "payloadFromDestruction);\n";
+                outOfLineOS << "    });\n  ";
+              }
             }
           },
           ED, ED->getModuleContext(), outOfLineOS);
@@ -666,6 +672,13 @@ private:
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
+                  } else if (isa<ClassDecl>(objectTypeDecl)) {
+                    outOfLineOS
+                        << "    auto op = swift::"
+                        << cxx_synthesis::getCxxImplNamespaceName()
+                        << "::_impl_RefCountedClass::copyOpaquePointer(val);\n";
+                    outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                   "&op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
@@ -731,6 +744,8 @@ private:
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
+      if (elementDecl)
+        syntaxPrinter.printSymbolUSRAttribute(elementDecl);
       os << ";\n";
     };
 
@@ -742,6 +757,7 @@ private:
           [&](const auto &pair) {
             os << "\n    ";
             syntaxPrinter.printIdentifier(pair.first->getNameStr());
+            syntaxPrinter.printSymbolUSRAttribute(pair.first);
           },
           ",");
       // TODO: allow custom name for this special case
@@ -1413,6 +1429,8 @@ private:
         owningPrinter.interopContext, owningPrinter);
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
+    // FIXME: Support throwing exceptions for Swift errors.
+    modifiers.isNoexcept = !funcTy->isThrowing();
     auto result = funcPrinter.printFunctionSignature(
         FD, funcABI.getSignature(), cxx_translation::getNameForCxx(FD),
         resultTy,
@@ -1420,9 +1438,6 @@ private:
         modifiers);
     assert(
         !result.isUnsupported()); // The C signature should be unsupported too.
-    // FIXME: Support throwing exceptions for Swift errors.
-    if (!funcTy->isThrowing())
-      os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";

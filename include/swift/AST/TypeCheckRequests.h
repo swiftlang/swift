@@ -45,6 +45,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
@@ -70,6 +71,8 @@ struct TypeWrapperInfo;
 void simple_display(
     llvm::raw_ostream &out,
     const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
+
+void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
 /// Request the type from the ith entry in the inheritance clause for the
 /// given declaration.
@@ -3374,6 +3377,10 @@ enum class CustomAttrTypeKind {
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
+
+  /// Attributes that are discoverable/constructable at runtime given a name.
+  /// They allow unbound generic types.
+  RuntimeMetadata,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
@@ -3473,9 +3480,11 @@ public:
   bool isCached() const { return true; }
 };
 
-class IsSemanticallyUnavailableRequest
-    : public SimpleRequest<IsSemanticallyUnavailableRequest,
-                           bool(const Decl *),
+using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;
+
+class SemanticAvailableRangeAttrRequest
+    : public SimpleRequest<SemanticAvailableRangeAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3483,7 +3492,25 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SemanticUnavailableAttrRequest
+    : public SimpleRequest<SemanticUnavailableAttrRequest,
+                           Optional<AvailableAttrDeclPair>(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+                                           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3534,23 +3561,6 @@ private:
 
   Optional<TypeWrapperInfo> evaluate(Evaluator &evaluator,
                                      NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Return a type of the type wrapper (if any) associated with the given
-/// declaration.
-class GetTypeWrapperType
-    : public SimpleRequest<GetTypeWrapperType, Type(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Type evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
@@ -3792,10 +3802,121 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Find the definition of a given macro.
+class ExpandMacroExpansionDeclRequest
+    : public SimpleRequest<ExpandMacroExpansionDeclRequest,
+                           ArrayRef<Decl *>(MacroExpansionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
+                            MacroExpansionDecl *med) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand all member attribute macros attached to the given
+/// declaration.
+class ExpandMemberAttributeMacros
+    : public SimpleRequest<ExpandMemberAttributeMacros,
+                           bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Resolve an external macro given its module and type name.
+class ExternalMacroDefinitionRequest
+    : public SimpleRequest<ExternalMacroDefinitionRequest,
+                           ExternalMacroDefinition(
+                               ASTContext *, Identifier, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ExternalMacroDefinition evaluate(
+      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName,
+      Identifier typeName
+  ) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
+
+  bool isCached() const { return true; }
+};
+
+class GetRuntimeDiscoverableAttributes
+    : public SimpleRequest<GetRuntimeDiscoverableAttributes,
+                           ArrayRef<CustomAttr *>(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeRuntimeMetadataAttrGenerator
+    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGenerator,
+                           Expr *(CustomAttr *, ValueDecl *),
+                           RequestFlags::Cached> {
+
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Expr *evaluate(Evaluator &evaluator, CustomAttr *attr,
+                 ValueDecl *attachedTo) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeRuntimeMetadataAttrGeneratorBody
+    : public SimpleRequest<SynthesizeRuntimeMetadataAttrGeneratorBody,
+                           BraceStmt *(CustomAttr *, ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, CustomAttr *attr,
+                      ValueDecl *attachedTo) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Compute the local discriminators for the given declaration context.
 ///
 /// This is a state-changing operation for closures within the context, which
-/// produces the number of assigned discriminators.
+/// produces the discriminator value that any subsequent requests should use.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
                            unsigned(DeclContext *),

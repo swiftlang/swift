@@ -74,24 +74,24 @@
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: class GenericPair;
+// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair;
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: class GenericPair final {
+// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair final {
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
 // CHECK-NEXT: }
 
-// CHECK: inline void inoutConcretePair(uint16_t x, GenericPair<uint16_t, uint16_t>& y) noexcept {
+// CHECK: inline void inoutConcretePair(uint16_t x, GenericPair<uint16_t, uint16_t>& y) noexcept SWIFT_SYMBOL("s:8Generics17inoutConcretePairyys6UInt16V_AA07GenericD0VyA2DGztF") {
 // CHECK-NEXT: return _impl::$s8Generics17inoutConcretePairyys6UInt16V_AA07GenericD0VyA2DGztF(x, _impl::_impl_GenericPair<uint16_t, uint16_t>::getOpaquePointer(y));
 
 
-// CHECK: inline void inoutGenericPair(GenericPair<T_0_0, T_0_1>& x, const T_0_0& y) noexcept {
+// CHECK: inline void inoutGenericPair(GenericPair<T_0_0, T_0_1>& x, const T_0_0& y) noexcept SWIFT_SYMBOL("s:8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -99,11 +99,11 @@
 // CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 
 
-// CHECK: inline GenericPair<uint16_t, uint16_t> makeConcretePair(uint16_t x, uint16_t y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline GenericPair<uint16_t, uint16_t> makeConcretePair(uint16_t x, uint16_t y) noexcept SWIFT_SYMBOL("s:8Generics16makeConcretePairyAA07GenericD0Vys6UInt16VAFGAF_AFtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_GenericPair<uint16_t, uint16_t>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Generics_[[PTRPTRENC]](result, _impl::$s8Generics16makeConcretePairyAA07GenericD0Vys6UInt16VAFGAF_AFtF(x, y));
 
-// CHECK: inline GenericPair<T_0_0, T_0_1> makeGenericPair(const T_0_0& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline GenericPair<T_0_0, T_0_1> makeGenericPair(const T_0_0& x, const T_0_1& y) noexcept SWIFT_SYMBOL("s:8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -111,11 +111,11 @@
 // CHECK-NEXT:  return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Generics_[[PTRPTRENC]](result, _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata()));
 
-// CHECK: inline GenericPair<uint16_t, uint16_t> passThroughConcretePair(const GenericPair<uint16_t, uint16_t>& x, uint16_t y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline GenericPair<uint16_t, uint16_t> passThroughConcretePair(const GenericPair<uint16_t, uint16_t>& x, uint16_t y) noexcept SWIFT_SYMBOL("s:8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt16VAGGAH_AGtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_GenericPair<uint16_t, uint16_t>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Generics_[[PTRPTRENC]](result, _impl::$s8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt16VAGGAH_AGtF(_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_impl::_impl_GenericPair<uint16_t, uint16_t>::getOpaquePointer(x)), y));
 
-// CHECK: inline GenericPair<T_0_0, T_0_1> passThroughGenericPair(const GenericPair<T_0_0, T_0_1>& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline GenericPair<T_0_0, T_0_1> passThroughGenericPair(const GenericPair<T_0_0, T_0_1>& x, const T_0_1& y) noexcept SWIFT_SYMBOL("s:8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -123,11 +123,11 @@
 // CHECK-NEXT:  return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Generics_[[PTRPTRENC]](result, _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x)), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata()));
 
-// CHECK: inline void takeConcretePair(const GenericPair<uint16_t, uint16_t>& x) noexcept {
+// CHECK: inline void takeConcretePair(const GenericPair<uint16_t, uint16_t>& x) noexcept SWIFT_SYMBOL("s:8Generics16takeConcretePairyyAA07GenericD0Vys6UInt16VAFGF") {
 // CHECK-NEXT:  return _impl::$s8Generics16takeConcretePairyyAA07GenericD0Vys6UInt16VAFGF(_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_impl::_impl_GenericPair<uint16_t, uint16_t>::getOpaquePointer(x)));
 
 
-// CHECK:  inline void takeGenericPair(const GenericPair<T_0_0, T_0_1>& x) noexcept {
+// CHECK:  inline void takeGenericPair(const GenericPair<T_0_0, T_0_1>& x) noexcept SWIFT_SYMBOL("s:8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF") {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");

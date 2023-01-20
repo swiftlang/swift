@@ -48,16 +48,16 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   private var insertedInsts: InstructionSet
 
-  init(begin beginInst: Instruction, _ context: PassContext) {
+  init(begin beginInst: Instruction, _ context: some Context) {
     self.begin = beginInst
-    self.blockRange = BasicBlockRange(begin: beginInst.block, context)
+    self.blockRange = BasicBlockRange(begin: beginInst.parentBlock, context)
     self.insertedInsts = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
-    blockRange.insert(inst.block)
+    blockRange.insert(inst.parentBlock)
   }
 
   /// Insert a sequence of potential end instructions.
@@ -69,7 +69,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the exclusive range contains `inst`.
   func contains(_ inst: Instruction) -> Bool {
-    let block = inst.block
+    let block = inst.parentBlock
     if !blockRange.inclusiveRangeContains(block) { return false }
     var inRange = false
     if blockRange.contains(block) {

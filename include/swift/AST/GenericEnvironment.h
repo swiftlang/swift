@@ -67,6 +67,7 @@ struct OpenedExistentialEnvironmentData {
 /// Extra data in a generic environment for an opened pack element.
 struct OpenedElementEnvironmentData {
   UUID uuid;
+  CanType shapeClass;
   SubstitutionMap outerSubstitutions;
 };
 
@@ -140,7 +141,8 @@ private:
       Type existential, GenericSignature parentSig, UUID uuid);
 
   /// Private constructor for opened element environments.
-  explicit GenericEnvironment(GenericSignature signature, UUID uuid,
+  explicit GenericEnvironment(GenericSignature signature,
+                              UUID uuid, CanType shapeClass,
                               SubstitutionMap outerSubs);
 
   friend ArchetypeType;
@@ -187,18 +189,25 @@ public:
   /// opened pack element generic environment.
   SubstitutionMap getPackElementContextSubstitutions() const;
 
+  /// Retrieve the shape equivalence class for an opened element environment.
+  CanType getOpenedElementShapeClass() const;
+
   /// Retrieve the UUID for an opened element environment.
   UUID getOpenedElementUUID() const;
 
-  using PackElementBinding =
-      std::pair<ElementArchetypeType *, PackArchetypeType *>;
+  void forEachPackElementArchetype(
+          llvm::function_ref<void(ElementArchetypeType*)> function) const;
 
-  /// Retrieve the bindings for the opened pack element archetypes in this
-  /// generic environment to the pack archetypes that contain them.
-  ///
-  /// \param bindings The vector to populate with the pack element bindings.
-  void getPackElementBindings(
-      SmallVectorImpl<PackElementBinding> &bindings) const;
+  using PackElementBindingCallback =
+    llvm::function_ref<void(ElementArchetypeType *elementType,
+                            PackType *packSubstitution)>;
+
+  /// Given that this is an opened element environment, iterate the
+  /// opened pack element bindings: the pack archetype that's been opened
+  /// (which may not be meaningful in the surrounding context), the element
+  /// archetype that it has been opened as, and the pack type whose elements
+  /// are opened.
+  void forEachPackElementBinding(PackElementBindingCallback function) const;
 
   /// Create a new, primary generic environment.
   static GenericEnvironment *forPrimary(GenericSignature signature);
@@ -222,10 +231,12 @@ public:
   /// signature of the context whose element type is being opened, but with
   /// the pack parameter bit erased from one or more generic parameters
   /// \param uuid The unique identifier for this opened element
+  /// \param shapeClass The shape equivalence class for the originating packs.
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context.
   static GenericEnvironment *
-  forOpenedElement(GenericSignature signature, UUID uuid,
+  forOpenedElement(GenericSignature signature,
+                   UUID uuid, CanType shapeClass,
                    SubstitutionMap outerSubs);
 
   /// Make vanilla new/delete illegal.

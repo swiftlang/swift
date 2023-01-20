@@ -147,6 +147,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
       return true;
     default:
       return false;
@@ -827,6 +828,7 @@ recur:
     case 'H':
       switch (char c2 = nextChar()) {
       case 'A': return demangleDependentProtocolConformanceAssociated();
+      case 'a': return createNode(Node::Kind::RuntimeDiscoverableAttributeRecord);
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
@@ -1328,6 +1330,39 @@ NodePointer Demangler::demangleExtensionContext() {
   return Ext;
 }
 
+/// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
+/// return type they refer back to.
+static Node *setParentForOpaqueReturnTypeNodes(Demangler &D,
+                                              Node *parent,
+                                              Node *visitedNode) {
+  if (!parent || !visitedNode)
+    return nullptr;
+  if (visitedNode->getKind() == Node::Kind::OpaqueReturnType) {
+    // If this node is not already parented, parent it.
+    if (visitedNode->hasChildren()
+        && visitedNode->getLastChild()->getKind() == Node::Kind::OpaqueReturnTypeParent) {
+      return parent;
+    }
+    visitedNode->addChild(D.createNode(Node::Kind::OpaqueReturnTypeParent,
+                                       (Node::IndexType)parent), D);
+    return parent;
+  }
+  
+  // If this node is one that may in turn define its own opaque return type,
+  // stop recursion, since any opaque return type nodes underneath would refer
+  // to the nested declaration rather than the one we're looking at.
+  if (visitedNode->getKind() == Node::Kind::Function
+      || visitedNode->getKind() == Node::Kind::Variable
+      || visitedNode->getKind() == Node::Kind::Subscript) {
+    return parent;
+  }
+  
+  for (size_t i = 0, e = visitedNode->getNumChildren(); i < e; ++i) {
+    setParentForOpaqueReturnTypeNodes(D, parent, visitedNode->getChild(i));
+  }
+  return parent;
+}
+
 NodePointer Demangler::demanglePlainFunction() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Type = popFunctionType(Node::Kind::FunctionType);
@@ -1341,10 +1376,12 @@ NodePointer Demangler::demanglePlainFunction() {
   auto Name = popNode(isDeclName);
   auto Ctx = popContext();
 
-  if (LabelList)
-    return createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type);
-
-  return createWithChildren(Node::Kind::Function, Ctx, Name, Type);
+  NodePointer result = LabelList
+    ? createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type)
+    : createWithChildren(Node::Kind::Function, Ctx, Name, Type);
+    
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  return result;
 }
 
 NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
@@ -1749,6 +1786,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::RuntimeAttributeGenerator:
       return false;
     default:
       return true;
@@ -2270,7 +2308,8 @@ NodePointer Demangler::demangleArchetype() {
     int ordinal = demangleIndex();
     if (ordinal < 0)
       return NULL;
-    return createType(createNode(Node::Kind::OpaqueReturnTypeIndexed, ordinal));
+    return createType(createWithChild(Node::Kind::OpaqueReturnType,
+                      createNode(Node::Kind::OpaqueReturnTypeIndex, ordinal)));
   }
 
   case 'x': {
@@ -3360,7 +3399,7 @@ NodePointer Demangler::demangleSpecialType() {
         return nullptr;
       // Build layout.
       auto layout = createNode(Node::Kind::SILBoxLayout);
-      for (unsigned i = 0, e = fieldTypes->getNumChildren(); i < e; ++i) {
+      for (size_t i = 0, e = fieldTypes->getNumChildren(); i < e; ++i) {
         auto fieldType = fieldTypes->getChild(i);
         assert(fieldType->getKind() == Node::Kind::Type);
         bool isMutable = false;
@@ -3528,7 +3567,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     None,
     TypeAndMaybePrivateName,
     TypeAndIndex,
-    Index
+    Index,
+    ContextAndName,
   } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
@@ -3545,6 +3585,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
+    case 'a':
+      Args = ContextAndName;
+      Kind = Node::Kind::RuntimeAttributeGenerator;
+      break;
     case 'm': return demangleEntity(Node::Kind::Macro);
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     case 'P':
@@ -3558,7 +3602,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     default: return nullptr;
   }
 
-  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr;
+  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr,
+              Context = nullptr, Id = nullptr;
   switch (Args) {
     case None:
       break;
@@ -3573,6 +3618,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       break;
     case Index:
       NameOrIndex = demangleIndexAsNode();
+      break;
+    case ContextAndName:
+      Context = demangleOperator();
+      Id = demangleOperator();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -3591,6 +3640,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       Entity = addChild(Entity, NameOrIndex);
       Entity = addChild(Entity, ParamType);
       break;
+    case ContextAndName:
+      Entity = addChild(Entity, Context);
+      Entity = addChild(Entity, Id);
+      break;
   }
   return Entity;
 }
@@ -3600,8 +3653,11 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
-  return LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
-                   : createWithChildren(Kind, Context, Name, Type);
+  auto result = LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
+                          : createWithChildren(Kind, Context, Name, Type);
+                          
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  return result;
 }
 
 NodePointer Demangler::demangleVariable() {
@@ -3623,6 +3679,8 @@ NodePointer Demangler::demangleSubscript() {
   addChild(Subscript, LabelList);
   Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
+  
+  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type);
 
   return demangleAccessor(Subscript);
 }

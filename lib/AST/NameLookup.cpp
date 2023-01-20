@@ -31,6 +31,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -2256,12 +2257,15 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
-          if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
-            auto components = compound->getComponents();
-            if (components.size() == 2 &&
-                components[0]->getNameRef().isSimpleName("Builtin") &&
-                components[1]->getNameRef().isSimpleName("AnyObject")) {
-              anyObject = true;
+          if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
+            if (auto identBase =
+                    dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
+              auto memberComps = memberTR->getMemberComponents();
+              if (memberComps.size() == 1 &&
+                  identBase->getNameRef().isSimpleName("Builtin") &&
+                  memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
+                anyObject = true;
+              }
             }
           }
         }
@@ -2420,31 +2424,39 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 
 /// Determine the types directly referenced by the given identifier type.
 static DirectlyReferencedTypeDecls
-directReferencesForIdentTypeRepr(Evaluator &evaluator,
-                                 ASTContext &ctx, IdentTypeRepr *ident,
-                                 DeclContext *dc, bool allowUsableFromInline) {
+directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
+                                   DeclRefTypeRepr *repr, DeclContext *dc,
+                                   bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  for (const auto &component : ident->getComponentRange()) {
+  auto *baseComp = repr->getBaseComponent();
+  if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+    // If we already set a declaration, use it.
+    if (auto *typeDecl = identBase->getBoundDecl()) {
+      current = {1, typeDecl};
+    } else {
+      // For the base component, perform unqualified name lookup.
+      current = directReferencesForUnqualifiedTypeLookup(
+          identBase->getNameRef(), identBase->getLoc(), dc,
+          LookupOuterResults::Excluded, allowUsableFromInline);
+    }
+  } else {
+    current = directReferencesForTypeRepr(evaluator, ctx, baseComp, dc,
+                                          allowUsableFromInline);
+  }
+
+  auto *memberTR = dyn_cast<MemberTypeRepr>(repr);
+  if (!memberTR)
+    return current;
+
+  // If we didn't find anything, fail now.
+  if (current.empty())
+    return current;
+
+  for (const auto &component : memberTR->getMemberComponents()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
       current = {1, typeDecl};
-      continue;
-    }
-
-    // For the first component, perform unqualified name lookup.
-    if (current.empty()) {
-      current =
-        directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
-                                                 component->getLoc(),
-                                                 dc,
-                                                 LookupOuterResults::Excluded,
-                                                 allowUsableFromInline);
-
-      // If we didn't find anything, fail now.
-      if (current.empty())
-        return current;
-
       continue;
     }
 
@@ -2489,12 +2501,12 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return result;
   }
 
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::Member:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
-    return directReferencesForIdentTypeRepr(evaluator, ctx,
-                                            cast<IdentTypeRepr>(typeRepr), dc,
-                                            allowUsableFromInline);
+    return directReferencesForDeclRefTypeRepr(evaluator, ctx,
+                                              cast<DeclRefTypeRepr>(typeRepr),
+                                              dc, allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
@@ -2507,6 +2519,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                          allowUsableFromInline);
     }
     return { };
+  }
+
+  case TypeReprKind::Vararg: {
+    auto packExpansionRepr = cast<VarargTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getElementType(), dc,
+                                       allowUsableFromInline);
   }
 
   case TypeReprKind::PackExpansion: {
@@ -2534,6 +2553,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::Pack:
     return { };
 
   case TypeReprKind::OpaqueReturn:
@@ -2813,7 +2833,7 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
 
       // Don't allow variadic opaque parameter or return types.
-      if (isa<PackExpansionTypeRepr>(repr))
+      if (isa<PackExpansionTypeRepr>(repr) || isa<VarargTypeRepr>(repr))
         return Action::SkipChildren();
 
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
@@ -2840,9 +2860,9 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
           Reprs.clear();
         }
-      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
-        if (identRepr->isProtocol(dc))
-          Reprs.push_back(identRepr);
+      } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
+        if (declRefTR->isProtocol(dc))
+          Reprs.push_back(declRefTR);
       }
       return Action::Continue();
     }
@@ -3020,9 +3040,57 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+/// Perform lookup to determine whether the given custom attribute refers to
+/// a macro declaration, and return that macro declaration.
+static MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
+  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+  if (!identTypeRepr)
+    return nullptr;
+
+  // Look for macros at module scope. They can only occur at module scope, and
+  // we need to be sure not to trigger name lookup into type contexts along
+  // the way.
+  llvm::TinyPtrVector<MacroDecl *> macros;
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+  UnqualifiedLookupDescriptor descriptor(
+      identTypeRepr->getNameRef(), moduleScopeDC
+  );
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &result : lookup.allResults()) {
+    // Only keep attached macros, which can be spelled as custom attributes.
+    if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
+      if (isAttachedMacro(macro->getMacroRoles()))
+        macros.push_back(macro);
+  }
+
+  if (macros.empty())
+    return nullptr;
+
+  if (macros.size() > 1) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::ambiguous_macro_reference,
+                       identTypeRepr->getNameRef().getFullName());
+
+    for (auto macro : macros) {
+      macro->diagnose(
+          diag::kind_declname_declared_here, macro->getDescriptiveKind(),
+          macro->getName());
+    }
+  }
+
+  return macros.front();
+}
+
+MacroOrNominalTypeDecl
+CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
+                                CustomAttr *attr, DeclContext *dc) const {
+  // Look for names at module scope, so we don't trigger name lookup for
+  // nested scopes. At this point, we're looking to see whether there are
+  // any suitable macros.
+  if (auto macro = findMacroForCustomAttr(attr, dc))
+    return macro;
+
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
   DirectlyReferencedTypeDecls decls;
@@ -3070,13 +3138,11 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getDescriptiveKind(),
                                assocType->getName());
 
-            ComponentIdentTypeRepr *components[2] = {
-              new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),
-                                            DeclNameRef(moduleName)),
-              identTypeRepr
-            };
+            auto *baseComp = new (ctx) SimpleIdentTypeRepr(
+                identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
 
-            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(
+                MemberTypeRepr::create(ctx, baseComp, {identTypeRepr}));
             attr->resetTypeInformation(newTE);
             return nominal;
           }

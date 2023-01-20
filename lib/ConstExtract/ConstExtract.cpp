@@ -120,22 +120,72 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
   return true;
 }
 
+static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr);
+
+static std::vector<FunctionParameter>
+extractFunctionArguments(const ArgumentList *args) {
+  std::vector<FunctionParameter> parameters;
+
+  for (auto arg : *args) {
+    auto argExpr = arg.getExpr();
+    const auto label = arg.getLabel().str().str();
+    const auto type = argExpr->getType();
+    if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+      auto *decl = defaultArgument->getParamDecl();
+      if (decl->hasDefaultExpr()) {
+        argExpr = decl->getTypeCheckedDefaultExpr();
+      }
+    }
+    parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
+  }
+
+  return parameters;
+}
+
+static llvm::Optional<std::string> extractRawLiteral(Expr *expr) {
+  if (expr) {
+    switch (expr->getKind()) {
+    case ExprKind::BooleanLiteral:
+    case ExprKind::FloatLiteral:
+    case ExprKind::IntegerLiteral:
+    case ExprKind::NilLiteral: {
+      std::string literalOutput;
+      llvm::raw_string_ostream OutputStream(literalOutput);
+      expr->printConstExprValue(&OutputStream, nullptr);
+      if (!literalOutput.empty()) {
+        return literalOutput;
+      }
+      break;
+    }
+
+    case ExprKind::StringLiteral: {
+      auto stringLiteralExpression = cast<StringLiteralExpr>(expr);
+      std::string literalOutput;
+      llvm::raw_string_ostream OutputStream(literalOutput);
+      OutputStream << stringLiteralExpression->getValue();
+      return literalOutput;
+    }
+
+    default:
+      break;
+    }
+  }
+  return None;
+}
+
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
-    case ExprKind::Dictionary:
-
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
     case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
-      std::string literalOutput;
-      llvm::raw_string_ostream OutputStream(literalOutput);
-      expr->printConstExprValue(&OutputStream, nullptr);
-      if (!literalOutput.empty()) {
-        return std::make_shared<RawLiteralValue>(literalOutput);
+      auto rawLiteral = extractRawLiteral(expr);
+      if (rawLiteral.hasValue()) {
+        return std::make_shared<RawLiteralValue>(rawLiteral.value());
       }
+
       break;
     }
 
@@ -146,6 +196,18 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         elementValues.push_back(extractCompileTimeValue(elementExpr));
       }
       return std::make_shared<ArrayValue>(elementValues);
+    }
+
+    case ExprKind::Dictionary: {
+      auto dictionaryExpr = cast<DictionaryExpr>(expr);
+      std::vector<std::shared_ptr<TupleValue>> tuples;
+      for (auto elementExpr : dictionaryExpr->getElements()) {
+        auto elementValue = extractCompileTimeValue(elementExpr);
+        if (isa<TupleValue>(elementValue.get())) {
+          tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
+        }
+      }
+      return std::make_shared<DictionaryValue>(tuples);
     }
 
     case ExprKind::Tuple: {
@@ -178,23 +240,38 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::Call: {
       auto callExpr = cast<CallExpr>(expr);
       if (callExpr->getFn()->getKind() == ExprKind::ConstructorRefCall) {
-        std::vector<FunctionParameter> parameters;
-        const auto args = callExpr->getArgs();
-        for (auto arg : *args) {
-          auto argExpr = arg.getExpr();
-          const auto label = arg.getLabel().str().str();
-          const auto type = argExpr->getType();
-          if (auto defaultArgument = dyn_cast<DefaultArgumentExpr>(argExpr)) {
-            auto *decl = defaultArgument->getParamDecl();
-            if (decl->hasDefaultExpr()) {
-              argExpr = decl->getTypeCheckedDefaultExpr();
-            }
-          }
-          parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
-        }
-        auto name = toFullyQualifiedTypeNameString(callExpr->getType());
-        return std::make_shared<InitCallValue>(name, parameters);
+        std::vector<FunctionParameter> parameters =
+            extractFunctionArguments(callExpr->getArgs());
+        return std::make_shared<InitCallValue>(callExpr->getType(), parameters);
       }
+
+      if (callExpr->getFn()->getKind() == ExprKind::DotSyntaxCall) {
+        auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(callExpr->getFn());
+        auto fn = dotSyntaxCallExpr->getFn();
+        if (fn->getKind() == ExprKind::DeclRef) {
+          auto declRefExpr = cast<DeclRefExpr>(fn);
+          auto caseName =
+              declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
+
+          std::vector<FunctionParameter> parameters =
+              extractFunctionArguments(callExpr->getArgs());
+          return std::make_shared<EnumValue>(caseName, parameters);
+        }
+      }
+
+      break;
+    }
+
+    case ExprKind::DotSyntaxCall: {
+      auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(expr);
+      auto fn = dotSyntaxCallExpr->getFn();
+      if (fn->getKind() == ExprKind::DeclRef) {
+        auto declRefExpr = cast<DeclRefExpr>(fn);
+        auto caseName =
+            declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
+        return std::make_shared<EnumValue>(caseName, None);
+      }
+
       break;
     }
 
@@ -203,11 +280,23 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(erasureExpr->getSubExpr());
     }
 
+    case ExprKind::Paren: {
+      auto parenExpr = cast<ParenExpr>(expr);
+      return extractCompileTimeValue(parenExpr->getSubExpr());
+    }
+
+    case ExprKind::PropertyWrapperValuePlaceholder: {
+      auto placeholderExpr = cast<PropertyWrapperValuePlaceholderExpr>(expr);
+      return extractCompileTimeValue(
+          placeholderExpr->getOriginalWrappedValue());
+    }
+
     default: {
       break;
     }
     }
   }
+
   return std::make_shared<RuntimeValue>();
 }
 
@@ -242,7 +331,7 @@ extractCustomAttrValues(VarDecl *propertyDecl) {
 static ConstValueTypePropertyInfo
 extractTypePropertyInfo(VarDecl *propertyDecl) {
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
-    if (const auto originalInit = binding->getOriginalInit(0)) {
+    if (const auto originalInit = binding->getInit(0)) {
       if (propertyDecl->hasAttachedPropertyWrapper()) {
         return {propertyDecl, extractCompileTimeValue(originalInit),
                 extractCustomAttrValues(propertyDecl)};
@@ -254,14 +343,51 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
 
   if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
     auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
-    if (node.is<Stmt *>()) {
-      if (auto returnStmt = dyn_cast<ReturnStmt>(node.get<Stmt *>())) {
-        return {propertyDecl, extractCompileTimeValue(returnStmt->getResult())};
+    if (auto *stmt = node.dyn_cast<Stmt *>()) {
+      if (stmt->getKind() == StmtKind::Return) {
+        return {propertyDecl,
+                extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
       }
     }
   }
 
   return {propertyDecl, std::make_shared<RuntimeValue>()};
+}
+
+llvm::Optional<std::vector<EnumElementDeclValue>>
+extractEnumCases(NominalTypeDecl *Decl) {
+  if (Decl->getKind() == DeclKind::Enum) {
+    std::vector<EnumElementDeclValue> Elements;
+    for (EnumCaseDecl *ECD : cast<EnumDecl>(Decl)->getAllCases()) {
+      for (EnumElementDecl *EED : ECD->getElements()) {
+        std::string Name = EED->getNameStr().str();
+        llvm::Optional<std::string> RawValue =
+            extractRawLiteral(EED->getRawValueExpr());
+
+        std::vector<EnumElementParameterValue> Parameters;
+        if (const ParameterList *Params = EED->getParameterList()) {
+          for (const ParamDecl *Parameter : Params->getArray()) {
+            Optional<std::string> Label =
+                Parameter->getParameterName().empty()
+                    ? Optional<std::string>()
+                    : Optional<std::string>(
+                          Parameter->getParameterName().str().str());
+
+            Parameters.push_back({Label, Parameter->getType()});
+          }
+        }
+
+        if (Parameters.empty()) {
+          Elements.push_back({Name, RawValue, None});
+        } else {
+          Elements.push_back({Name, RawValue, Parameters});
+        }
+      }
+    }
+    return Elements;
+  }
+
+  return None;
 }
 
 ConstValueTypeInfo
@@ -294,7 +420,7 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
     }
   }
 
-  return ConstValueTypeInfo{Decl, Properties};
+  return ConstValueTypeInfo{Decl, Properties, extractEnumCases(Decl)};
 }
 
 std::vector<ConstValueTypeInfo>
@@ -329,6 +455,31 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
+void writeFileInformation(llvm::json::OStream &JSON, const VarDecl *VD) {
+  SourceRange sourceRange = VD->getSourceRange();
+  if (sourceRange.isInvalid())
+    return;
+
+  const ASTContext &ctx = VD->getDeclContext()->getASTContext();
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(sourceRange.Start));
+  JSON.attribute(
+      "line",
+      ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceRange.Start).first);
+}
+
+void writeFileInformation(llvm::json::OStream &JSON,
+                          const NominalTypeDecl *NTD) {
+  DeclContext *DC = NTD->getInnermostDeclContext();
+  SourceLoc loc = extractNearestSourceLoc(DC);
+  if (loc.isInvalid())
+    return;
+
+  const ASTContext &ctx = DC->getASTContext();
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(loc));
+  JSON.attribute("line",
+                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first);
+}
+
 void writeValue(llvm::json::OStream &JSON,
                 std::shared_ptr<CompileTimeValue> Value) {
   auto value = Value.get();
@@ -344,7 +495,8 @@ void writeValue(llvm::json::OStream &JSON,
 
     JSON.attribute("valueKind", "InitCall");
     JSON.attributeObject("value", [&]() {
-      JSON.attribute("type", initCallValue->getName());
+      JSON.attribute("type",
+                     toFullyQualifiedTypeNameString(initCallValue->getType()));
       JSON.attributeArray("arguments", [&] {
         for (auto FP : initCallValue->getParameters()) {
           JSON.object([&] {
@@ -383,6 +535,17 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Dictionary: {
     JSON.attribute("valueKind", "Dictionary");
+    JSON.attributeArray("value", [&] {
+      for (auto tupleValue : cast<DictionaryValue>(value)->getElements()) {
+        auto tupleElements = tupleValue.get()->getElements();
+        JSON.object([&] {
+          JSON.attributeObject(
+              "key", [&] { writeValue(JSON, tupleElements[0].Value); });
+          JSON.attributeObject(
+              "value", [&] { writeValue(JSON, tupleElements[1].Value); });
+        });
+      }
+    });
     break;
   }
 
@@ -393,6 +556,27 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attributeArray("value", [&] {
       for (auto CTP : arrayValue->getElements()) {
         JSON.object([&] { writeValue(JSON, CTP); });
+      }
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Enum: {
+    auto enumValue = cast<EnumValue>(value);
+    JSON.attribute("valueKind", "Enum");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("name", enumValue->getIdentifier());
+      if (enumValue->getParameters().hasValue()) {
+        auto params = enumValue->getParameters().value();
+        JSON.attributeArray("arguments", [&] {
+          for (auto FP : params) {
+            JSON.object([&] {
+              JSON.attribute("label", FP.Label);
+              JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+              writeValue(JSON, FP.Value);
+            });
+          }
+        });
       }
     });
     break;
@@ -430,6 +614,38 @@ void writeAttributes(
   });
 }
 
+void writeEnumCases(
+    llvm::json::OStream &JSON,
+    llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
+  if (!EnumElements.hasValue()) {
+    return;
+  }
+
+  JSON.attributeArray("cases", [&] {
+    for (const auto &Case : EnumElements.value()) {
+      JSON.object([&] {
+        JSON.attribute("name", Case.Name);
+        if (Case.RawValue.hasValue()) {
+          JSON.attribute("rawValue", Case.RawValue.value());
+        }
+        if (Case.Parameters.hasValue()) {
+          JSON.attributeArray("parameters", [&] {
+            for (const auto &Parameter : Case.Parameters.value()) {
+              JSON.object([&] {
+                if (auto Label = Parameter.Label) {
+                  JSON.attribute("label", Label);
+                }
+                JSON.attribute("type",
+                               toFullyQualifiedTypeNameString(Parameter.Type));
+              });
+            }
+          });
+        }
+      });
+    }
+  });
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -442,6 +658,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
                 .str());
+        writeFileInformation(JSON, TypeDecl);
         JSON.attributeArray("properties", [&] {
           for (const auto &PropertyInfo : TypeInfo.Properties) {
             JSON.object([&] {
@@ -452,11 +669,13 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
                              !decl->hasStorage() ? "true" : "false");
+              writeFileInformation(JSON, decl);
               writeValue(JSON, PropertyInfo.Value);
               writeAttributes(JSON, PropertyInfo.PropertyWrappers);
             });
           }
         });
+        writeEnumCases(JSON, TypeInfo.EnumElements);
       });
     }
   });

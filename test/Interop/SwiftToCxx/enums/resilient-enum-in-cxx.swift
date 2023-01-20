@@ -42,7 +42,7 @@ public enum Empty {
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT:    class Empty final {
+// CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums5EmptyO") Empty final {
 // CHECK:         enum class cases {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    };
@@ -63,11 +63,11 @@ public enum Empty {
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT:    class Foo final {
+// CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums3FooO") Foo final {
 // CHECK-NEXT:    public:
 // CHECK:         enum class cases {
-// CHECK-NEXT:      a,
-// NEW_CASE-NEXT:   b,
+// CHECK-NEXT:      a SWIFT_SYMBOL("s:5Enums3FooO1ayACSdcACmF"),
+// NEW_CASE-NEXT:   b SWIFT_SYMBOL("s:5Enums3FooO1byACSicACmF"),
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    }
 // CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault

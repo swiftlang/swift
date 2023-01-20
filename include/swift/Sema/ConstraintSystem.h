@@ -680,6 +680,13 @@ template <typename T = Decl> T *getAsDecl(ASTNode node) {
   return nullptr;
 }
 
+template <typename T = TypeRepr>
+T *getAsTypeRepr(ASTNode node) {
+  if (auto *type = node.dyn_cast<TypeRepr *>())
+    return dyn_cast_or_null<T>(type);
+  return nullptr;
+}
+
 template <typename T = Stmt>
 T *getAsStmt(ASTNode node) {
   if (auto *S = node.dyn_cast<Stmt *>())
@@ -1487,6 +1494,10 @@ public:
   llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
+  /// The pack expansion environment that can open pack elements for
+  /// a given locator.
+  llvm::DenseMap<ConstraintLocator *, UUID> PackExpansionEnvironments;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
@@ -1669,7 +1680,11 @@ public:
   Type getContextualType(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
       if (entry.first == anchor) {
-        return simplifyType(entry.second.getType());
+        // The contextual information record could contain the purpose
+        // without a type i.e. when the context is an optional-some or
+        // an invalid pattern binding.
+        if (auto contextualTy = entry.second.getType())
+          return simplifyType(contextualTy);
       }
     }
     return Type();
@@ -1783,6 +1798,9 @@ enum class ConstraintSystemFlags {
 
   /// When set, ignore async/sync mismatches
   IgnoreAsyncSyncMismatch = 0x80,
+
+  /// Disable macro expansions.
+  DisableMacroExpansions = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2739,7 +2757,7 @@ struct GetClosureType {
   Type operator()(const AbstractClosureExpr *expr) const;
 };
 
-/// Retrieve the closure type from the constraint system.
+/// Retrieve the closure's preconcurrency status from the constraint system.
 struct ClosureIsolatedByPreconcurrency {
   ConstraintSystem &cs;
 
@@ -3009,6 +3027,8 @@ private:
   /// used for the 'self' of an existential type.
   llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
       OpenedExistentialTypes;
+
+  llvm::SmallMapVector<ConstraintLocator *, UUID, 4> PackExpansionEnvironments;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
@@ -3484,6 +3504,9 @@ public:
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
+
+    /// The length of \c PackExpansionEnvironments.
+    unsigned numPackExpansionEnvironments;
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
@@ -3962,6 +3985,13 @@ public:
   /// constraint system and returning both it and the root opened archetype.
   std::pair<Type, OpenedArchetypeType *> openExistentialType(
       Type type, ConstraintLocator *locator);
+
+  /// Add the given pack expansion as an opened pack element environment.
+  void addPackElementEnvironment(PackExpansionExpr *expr);
+
+  /// Get the opened element generic environment for the given locator.
+  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
+                                                CanType shapeClass);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
@@ -6108,6 +6138,46 @@ public:
   }
 };
 
+/// A function object that opens a given pack type by generating a
+/// \c PackElementOf constraint.
+class OpenPackElementType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+  PackExpansionExpr *elementEnv;
+
+public:
+  explicit OpenPackElementType(ConstraintSystem &cs,
+                               const ConstraintLocatorBuilder &locator,
+                               PackExpansionExpr *elementEnv)
+      : cs(cs), elementEnv(elementEnv) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(Type packType, PackReferenceTypeRepr *packRepr) const {
+    // Only assert we have an element environment when invoking the function
+    // object. In cases where pack elements are referenced outside of a
+    // pack expansion, type resolution will error before opening the pack
+    // element.
+    assert(elementEnv);
+
+    auto *elementType = cs.createTypeVariable(locator,
+                                              TVO_CanBindToHole |
+                                              TVO_CanBindToNoEscape);
+
+    // If we're opening a pack element from an explicit type repr,
+    // set the type repr types in the constraint system for generating
+    // ShapeOf constraints when visiting the PackExpansionExpr.
+    if (packRepr) {
+      cs.setType(packRepr->getPackType(), packType);
+      cs.setType(packRepr, elementType);
+    }
+
+    cs.addConstraint(ConstraintKind::PackElementOf, elementType,
+                     packType, cs.getConstraintLocator(elementEnv));
+    return elementType;
+  }
+};
+
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
@@ -6459,6 +6529,10 @@ public:
     Out << "conjunction element ";
     Element->print(Out, SM, indent);
   }
+
+  /// Returns \c false if this conjunction element is known not to contain the
+  /// code compleiton token.
+  bool mightContainCodeCompletionToken(const ConstraintSystem &cs) const;
 
 private:
   /// Find type variables referenced by this conjunction element.

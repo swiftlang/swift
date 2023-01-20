@@ -18,16 +18,15 @@ import SILBridging
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
 public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
-  public var definingBlock: BasicBlock { block }
 
-  public var block: BasicBlock {
+  public var parentBlock: BasicBlock {
     return SILArgument_getParent(bridged).block
   }
 
   var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
   
   public var index: Int {
-    return block.arguments.firstIndex(of: self)!
+    return parentBlock.arguments.firstIndex(of: self)!
   }
   
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
@@ -47,7 +46,7 @@ final public class FunctionArgument : Argument {
 
 final public class BlockArgument : Argument {
   public var isPhiArgument: Bool {
-    block.predecessors.allSatisfy {
+    parentBlock.predecessors.allSatisfy {
       let term = $0.terminator
       return term is BranchInst || term is CondBranchInst
     }
@@ -56,16 +55,16 @@ final public class BlockArgument : Argument {
   public var incomingPhiOperands: LazyMapSequence<PredecessorList, Operand> {
     assert(isPhiArgument)
     let idx = index
-    return block.predecessors.lazy.map {
+    return parentBlock.predecessors.lazy.map {
       switch $0.terminator {
         case let br as BranchInst:
           return br.operands[idx]
         case let condBr as CondBranchInst:
-          if condBr.trueBlock == self.block {
-            assert(condBr.falseBlock != self.block)
+          if condBr.trueBlock == self.parentBlock {
+            assert(condBr.falseBlock != self.parentBlock)
             return condBr.trueOperands[idx]
           } else {
-            assert(condBr.falseBlock == self.block)
+            assert(condBr.falseBlock == self.parentBlock)
             return condBr.falseOperands[idx]
           }
         default:

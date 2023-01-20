@@ -370,6 +370,7 @@ done:
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
 ///     '_move' expr-sequence-element(Mode)
+///     'borrow' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -405,17 +406,28 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
    return sub;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::MoveOnly)
-      && Tok.isContextualKeyword("_move")) {
-    Tok.setKind(tok::contextual_keyword);
-    SourceLoc awaitLoc = consumeToken();
-    ParserResult<Expr> sub =
-        parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
-    if (!sub.hasCodeCompletion() && !sub.isNull()) {
-      sub = makeParserResult(new (Context) MoveExpr(awaitLoc, sub.get()));
+  if (Context.LangOpts.hasFeature(Feature::MoveOnly)) {
+    if (Tok.isContextualKeyword("_move")) {
+      Tok.setKind(tok::contextual_keyword);
+      SourceLoc awaitLoc = consumeToken();
+      ParserResult<Expr> sub =
+          parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
+      if (!sub.hasCodeCompletion() && !sub.isNull()) {
+        sub = makeParserResult(new (Context) MoveExpr(awaitLoc, sub.get()));
+      }
+      return sub;
     }
 
-    return sub;
+    if (Tok.isContextualKeyword("_borrow")) {
+      Tok.setKind(tok::contextual_keyword);
+      SourceLoc awaitLoc = consumeToken();
+      ParserResult<Expr> sub = parseExprSequenceElement(
+          diag::expected_expr_after_borrow, isExprBasic);
+      if (!sub.hasCodeCompletion() && !sub.isNull()) {
+        sub = makeParserResult(new (Context) BorrowExpr(awaitLoc, sub.get()));
+      }
+      return sub;
+    }
   }
 
   SourceLoc tryLoc;
@@ -498,6 +510,20 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   // First check to see if we have the start of a regex literal `/.../`.
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
+
+  // 'repeat' as an expression prefix is a pack expansion expression.
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+      Tok.is(tok::kw_repeat)) {
+    SourceLoc repeatLoc = consumeToken();
+    auto patternExpr = parseExpr(Message);
+    if (patternExpr.isNull())
+      return patternExpr;
+
+    auto *expansion =
+        PackExpansionExpr::create(Context, repeatLoc, patternExpr.get(),
+                                  /*genericEnv*/ nullptr);
+    return makeParserResult(expansion);
+  }
 
   switch (Tok.getKind()) {
   default:
@@ -1774,14 +1800,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundCodeCompletion(/*ParentKind*/None);
     }
-    if (Context.LangOpts.hasFeature(Feature::Macros)) {
-      return parseExprMacroExpansion(isExprBasic);
-    }
-    if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
-        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-      return parseExprPoundUnknown(SourceLoc());
-    }
-    goto UnknownCharacter;
+
+    return parseExprMacroExpansion(isExprBasic);
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
@@ -2012,15 +2032,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // whole InterpolatedStringLiteral.
   llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
-  // We're not in a place where an interpolation would be valid.
-  if (!CurLocalContext) {
-    // Return an error, but include an empty InterpolatedStringLiteralExpr
-    // so that parseDeclPoundDiagnostic() can figure out why this string
-    // literal was bad.
-    return makeParserErrorResult(new (Context) InterpolatedStringLiteralExpr(
-        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), 0, 0, nullptr));
-  }
-
   unsigned LiteralCapacity = 0;
   unsigned InterpolationCount = 0;
   TapExpr * AppendingExpr;
@@ -2036,7 +2047,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
 
@@ -2779,16 +2789,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
       throwsLoc, arrowLoc, explicitResultType, inLoc);
 
-  // If the closure was created in the context of an array type signature's
-  // size expression, there will not be a local context. A parse error will
-  // be reported at the signature's declaration site.
-  if (!CurLocalContext) {
-    skipUntil(tok::r_brace);
-    if (Tok.is(tok::r_brace))
-      consumeToken();
-    return makeParserError();
-  }
-  
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
       attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
@@ -2796,9 +2796,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
-  if (params) {
-    setLocalDiscriminatorToParamList(params);
-  } else {
+  if (!params) {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
@@ -2975,7 +2973,8 @@ ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
 
   // A tuple with a single, unlabeled element is just parentheses.
   if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-    if (elts.size() == 1 && elts[0].LabelLoc.isInvalid()) {
+    if (elts.size() == 1 && !isa<PackExpansionExpr>(elts[0].E) &&
+        elts[0].LabelLoc.isInvalid()) {
       return makeParserResult(
           status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
     }
@@ -3267,82 +3266,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                                     /*implicit*/ false));
 }
 
-/// Parse and diagnose unknown pound expression
-///
-/// If it look like a legacy (Swift 2) object literal expression, suggest fix-it
-/// to use new object literal syntax.
-///
-/// expr-unknown-pound:
-///   '#' identifier expr-paren?
-///   '[' '#' identifier expr-paren? '#' ']' ; Legacy object literal
-ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
-  SourceLoc PoundLoc = consumeToken(tok::pound);
-
-  assert(Tok.is(tok::identifier) && !Tok.isEscapedIdentifier() &&
-         PoundLoc.getAdvancedLoc(1) == Tok.getLoc());
-
-  Identifier Name;
-  SourceLoc NameLoc = consumeIdentifier(Name, /*diagnoseDollarPrefix=*/false);
-
-  // Parse arguments if exist.
-  ArgumentList *ArgList = nullptr;
-  if (Tok.isFollowingLParen()) {
-    // Parse arguments.
-    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
-                                    /*isExprBasic*/ true);
-    if (result.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
-    if (result.isParseErrorOrHasCompletion())
-      return makeParserError();
-    ArgList = result.get();
-  }
-
-  std::pair<StringRef, StringRef> NewNameArgPair =
-      llvm::StringSwitch<std::pair<StringRef, StringRef>>(Name.str())
-          .Case("Color", {"colorLiteral", "red"})
-          .Case("Image", {"imageLiteral", "resourceName"})
-          .Case("FileReference", {"fileLiteral", "resourceName"})
-          .Default({});
-
-  // If it's not legacy object literal, we don't know how to handle this.
-  if (NewNameArgPair.first.empty()) {
-    diagnose(PoundLoc, diag::unknown_pound_expr, Name.str());
-    return makeParserError();
-  }
-
-  // Diagnose legacy object literal.
-
-  // Didn't have arguments.
-  if (!ArgList || ArgList->getLParenLoc().isInvalid()) {
-    diagnose(Tok.getLoc(), diag::expected_arg_list_in_object_literal);
-    return makeParserError();
-  }
-
-  // If it's started with '[', try to parse closing '#]'.
-  SourceLoc RPoundLoc, RSquareLoc;
-  if (LSquareLoc.isValid() && consumeIf(tok::pound, RPoundLoc))
-    consumeIf(tok::r_square, RSquareLoc);
-
-  auto diag = diagnose(LSquareLoc.isValid() ? LSquareLoc : PoundLoc,
-                       diag::legacy_object_literal, LSquareLoc.isValid(),
-                       Name.str(), NewNameArgPair.first);
-
-  // Remove '[' if exist.
-  if (LSquareLoc.isValid())
-    diag.fixItRemove(LSquareLoc);
-  // Replace the literal name.
-  diag.fixItReplace(NameLoc, NewNameArgPair.first);
-  // Replace the first argument.
-  if (!ArgList->empty() && ArgList->front().getLabelLoc().isValid())
-    diag.fixItReplace(ArgList->front().getLabelLoc(), NewNameArgPair.second);
-  // Remove '#]' if exist.
-  if (RPoundLoc.isValid())
-    diag.fixItRemove(
-        {RPoundLoc, RSquareLoc.isValid() ? RSquareLoc : RPoundLoc});
-
-  return makeParserError();
-}
-
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
@@ -3480,14 +3403,6 @@ ParserResult<Expr> Parser::parseExprCollection() {
     RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
                DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
-  }
-
-  // [#identifier is likely to be a legacy object literal.
-  if (Tok.is(tok::pound) && peekToken().is(tok::identifier) &&
-      !peekToken().isEscapedIdentifier() &&
-      LSquareLoc.getAdvancedLoc(1) == Tok.getLoc() &&
-      Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-    return parseExprPoundUnknown(LSquareLoc);
   }
 
   ParserStatus Status;

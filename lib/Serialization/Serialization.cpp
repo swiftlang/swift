@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -68,6 +69,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
+
+#define DEBUG_TYPE "Serialization"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -1528,6 +1531,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
 
   case GenericEnvironment::Kind::OpenedElement: {
     auto kind = GenericEnvironmentKind::OpenedElement;
+    auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSig = genericEnv->getGenericSignature();
     auto parentSigID = addGenericSignatureRef(parentSig);
     auto contextSubs = genericEnv->getPackElementContextSubstitutions();
@@ -1535,7 +1539,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
 
     auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
     GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
-                                         unsigned(kind), /*existentialTypeID=*/0,
+                                         unsigned(kind), shapeClassID,
                                          parentSigID, subsID);
     return;
   }
@@ -1821,6 +1825,9 @@ static bool shouldSerializeMember(Decl *D) {
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
+
+  case DeclKind::Missing:
+    llvm_unreachable("attempting to serialize a missing decl");
 
   case DeclKind::MissingMember:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
@@ -2209,6 +2216,36 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
+}
+
+static uint8_t getRawStableMacroRole(swift::MacroRole context) {
+  switch (context) {
+#define CASE(NAME) \
+  case swift::MacroRole::NAME: \
+    return static_cast<uint8_t>(serialization::MacroRole::NAME);
+  CASE(Expression)
+  CASE(FreestandingDeclaration)
+  CASE(Accessor)
+  CASE(MemberAttribute)
+  }
+#undef CASE
+  llvm_unreachable("bad result declaration macro kind");
+  }
+
+static uint8_t getRawStableMacroIntroducedDeclNameKind(
+    swift::MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(NAME) \
+  case swift::MacroIntroducedDeclNameKind::NAME: \
+    return static_cast<uint8_t>(serialization::MacroIntroducedDeclNameKind::NAME);
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+  }
+#undef CASE
+  llvm_unreachable("bad result macro-introduced decl name kind");
 }
 
 #ifndef NDEBUG
@@ -2821,6 +2858,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
+
+      // Macro attributes are not serialized.
+      if (theAttr->isAttachedMacro(D))
+        return;
+
       auto typeID = S.addTypeRef(theAttr->getType());
       if (!typeID && !S.allowCompilerErrors()) {
         llvm::PrettyStackTraceString message("CustomAttr has no type");
@@ -2945,6 +2987,46 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           metadataIDPair.second, hasVisibility, visibility);
       return;
     }
+
+    case DAK_Declaration: {
+      auto *theAttr = cast<DeclarationAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[DeclarationDeclAttrLayout::Code];
+      auto rawMacroRole =
+          getRawStableMacroRole(theAttr->getMacroRole());
+      SmallVector<IdentifierID, 4> introducedDeclNames;
+      for (auto name : theAttr->getPeerAndMemberNames()) {
+        introducedDeclNames.push_back(IdentifierID(
+            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
+        introducedDeclNames.push_back(
+            S.addDeclBaseNameRef(name.getIdentifier()));
+      }
+
+      DeclarationDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          rawMacroRole, theAttr->getPeerNames().size(),
+          theAttr->getMemberNames().size(), introducedDeclNames);
+      return;
+    }
+
+    case DAK_Attached: {
+      auto *theAttr = cast<AttachedAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[AttachedDeclAttrLayout::Code];
+      auto rawMacroRole =
+          getRawStableMacroRole(theAttr->getMacroRole());
+      SmallVector<IdentifierID, 4> introducedDeclNames;
+      for (auto name : theAttr->getNames()) {
+        introducedDeclNames.push_back(IdentifierID(
+            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
+        introducedDeclNames.push_back(
+            S.addDeclBaseNameRef(name.getIdentifier()));
+      }
+
+      AttachedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          rawMacroRole, theAttr->getNames().size(),
+          introducedDeclNames);
+      return;
+    }
     }
   }
 
@@ -3005,12 +3087,177 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       }
     }
 
-    if (value->getDeclContext()->isLocalContext()) {
+    if (value->hasLocalDiscriminator()) {
       auto discriminator = value->getLocalDiscriminator();
+      assert(discriminator != ValueDecl::InvalidDiscriminator);
       auto abbrCode = S.DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                            discriminator);
     }
+  }
+
+  /// Determine if \p decl is safe to deserialize when it's public
+  /// or otherwise needed by the client in normal builds, this should usually
+  /// correspond to logic in type-checking ensuring these safe decls don't
+  /// refer to implementation details. We have to be careful not to mark
+  /// anything needed by a client as unsafe as the client will reject reading
+  /// it, but at the same time keep the safety checks precise to avoid
+  /// XRef errors and such.
+  ///
+  /// \p decl should be either an \c ExtensionDecl or a \c ValueDecl.
+  static bool isDeserializationSafe(const Decl *decl) {
+    if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+      // Consider extensions as safe as their extended type.
+      auto nominalType = ext->getExtendedNominal();
+      if (!nominalType ||
+          !isDeserializationSafe(nominalType))
+        return false;
+
+      // We can mark the extension unsafe only if it has no public members.
+      auto members = ext->getMembers();
+      auto hasSafeMembers = std::any_of(members.begin(), members.end(),
+        [](const Decl *D) -> bool {
+          if (auto VD = dyn_cast<ValueDecl>(D))
+            return isDeserializationSafe(VD);
+          return true;
+        });
+      if (hasSafeMembers)
+        return true;
+
+      // We can mark the extension unsafe only if it has no  public
+      // conformances.
+      auto protocols = ext->getLocalProtocols(
+                                        ConformanceLookupKind::OnlyExplicit);
+      bool hasSafeConformances = std::any_of(protocols.begin(),
+                                             protocols.end(),
+                                             isDeserializationSafe);
+      if (hasSafeConformances)
+        return true;
+
+      // Truly empty extensions are safe, it may happen in swiftinterfaces.
+      if (members.empty() && protocols.size() == 0)
+        return true;
+
+      return false;
+    }
+
+    auto value = cast<ValueDecl>(decl);
+
+    // A decl is safe if formally accessible publicly.
+    auto accessScope = value->getFormalAccessScope(/*useDC=*/nullptr,
+                       /*treatUsableFromInlineAsPublic=*/true);
+    if (accessScope.isPublic())
+      return true;
+
+    // Testable allows access to internal details.
+    if (value->getDeclContext()->getParentModule()->isTestingEnabled() &&
+        accessScope.isInternal())
+      return true;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(value))
+      // Accessors are as safe as their storage.
+      if (isDeserializationSafe(accessor->getStorage()))
+        return true;
+
+    // Frozen fields are always safe.
+    if (auto var = dyn_cast<VarDecl>(value)) {
+      if (var->isLayoutExposedToClients())
+        return true;
+
+      // Consider all lazy var storage as "safe".
+      // FIXME: We should keep track of what lazy var is associated to the
+      //        storage for them to preserve the same safeness.
+      if (var->isLazyStorageProperty())
+        return true;
+
+      // Property wrappers storage is as safe as the wrapped property.
+      if (VarDecl *wrapped = var->getOriginalWrappedProperty())
+        if (isDeserializationSafe(wrapped))
+          return true;
+    }
+
+    return false;
+  }
+
+  /// Write a \c DeserializationSafetyLayout record only when \p decl is unsafe
+  /// to deserialize.
+  ///
+  /// \sa isDeserializationSafe
+  void writeDeserializationSafety(const Decl *decl) {
+    using namespace decls_block;
+
+    auto DC = decl->getDeclContext();
+    if (!DC->getParentModule()->isResilient())
+      return;
+
+    // Everything should be safe in a swiftinterface. So, don't emit any safety
+    // record when building a swiftinterface in release builds. Debug builds
+    // instead print inconsistencies.
+    auto parentSF = DC->getParentSourceFile();
+    bool fromModuleInterface = parentSF &&
+                               parentSF->Kind == SourceFileKind::Interface;
+#if NDEBUG
+    if (fromModuleInterface)
+      return;
+#endif
+
+    // Private imports allow safe access to everything.
+    if (DC->getParentModule()->arePrivateImportsEnabled())
+      return;
+
+    // Ignore things with no access level.
+    // Note: There's likely room to report some of these as unsafe to prevent
+    //       failures.
+    if (isa<GenericTypeParamDecl>(decl) ||
+        isa<OpaqueTypeDecl>(decl) ||
+        isa<ParamDecl>(decl) ||
+        isa<EnumCaseDecl>(decl) ||
+        isa<EnumElementDecl>(decl))
+      return;
+
+    if (!isa<ValueDecl>(decl) && !isa<ExtensionDecl>(decl))
+      return;
+
+    // Don't look at decls inside functions and
+    // check the ValueDecls themselves.
+    auto declIsSafe = DC->isLocalContext() ||
+                      isDeserializationSafe(decl);
+#ifdef NDEBUG
+    // In release builds, bail right away if the decl is safe.
+    // In debug builds, wait to bail after the debug prints and asserts.
+    if (declIsSafe)
+      return;
+#endif
+
+    // Write a human readable name to an identifier.
+    SmallString<64> out;
+    llvm::raw_svector_ostream outStream(out);
+    if (auto val = dyn_cast<ValueDecl>(decl)) {
+      outStream << val->getName();
+    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+      outStream << "extension ";
+      if (auto nominalType = ext->getExtendedNominal())
+        outStream << nominalType->getName();
+    }
+    auto name = S.getASTContext().getIdentifier(out);
+
+    LLVM_DEBUG(
+      llvm::dbgs() << "Serialization safety, "
+                   << (declIsSafe? "safe" : "unsafe")
+                   << ": '" << name << "'\n";
+      assert((declIsSafe || !fromModuleInterface) &&
+             "All swiftinterface decls should be deserialization safe");
+    );
+
+#ifndef NDEBUG
+    // Bail out here in debug builds, release builds would bailed out earlier.
+    if (declIsSafe)
+      return;
+#endif
+
+    auto abbrCode = S.DeclTypeAbbrCodes[DeserializationSafetyLayout::Code];
+    DeserializationSafetyLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            S.addDeclBaseNameRef(name));
   }
 
   void writeForeignErrorConvention(const ForeignErrorConvention &fec) {
@@ -3293,15 +3540,27 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   ///
   /// This should be kept conservative. Compiler crashes are still better than
   /// miscompiles.
-  static bool overriddenDeclAffectsABI(const ValueDecl *overridden) {
+  static bool overriddenDeclAffectsABI(const ValueDecl *override,
+                                       const ValueDecl *overridden) {
     if (!overridden)
       return false;
-    // There's one case where we know a declaration doesn't affect the ABI of
+    // There's a few cases where we know a declaration doesn't affect the ABI of
     // its overrides after they've been compiled: if the declaration is '@objc'
     // and 'dynamic'. In that case, all accesses to the method or property will
     // go through the Objective-C method tables anyway.
     if (overridden->hasClangNode() || overridden->shouldUseObjCDispatch())
       return false;
+
+    // In a public-override-internal case, the override doesn't have ABI
+    // implications.
+    auto isPublic = [](const ValueDecl *VD) {
+      return VD->getFormalAccessScope(VD->getDeclContext(),
+                                      /*treatUsableFromInlineAsPublic*/true)
+               .isPublic();
+    };
+    if (isPublic(override) && !isPublic(overridden))
+      return false;
+
     return true;
   }
 
@@ -3317,6 +3576,8 @@ public:
   void visit(const Decl *D) {
     if (D->isInvalid())
       writeDeclErrorFlag();
+
+    writeDeserializationSafety(D);
 
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
@@ -3992,7 +4253,7 @@ public:
                            fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
-                           overriddenDeclAffectsABI(fn->getOverriddenDecl()),
+                           overriddenDeclAffectsABI(fn, fn->getOverriddenDecl()),
                            fn->getName().getArgumentNames().size() +
                              fn->getName().isCompoundName(),
                            rawAccessLevel,
@@ -4084,7 +4345,7 @@ public:
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
 
     bool overriddenAffectsABI =
-        overriddenDeclAffectsABI(fn->getOverriddenDecl());
+        overriddenDeclAffectsABI(fn, fn->getOverriddenDecl());
 
     Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
@@ -4324,6 +4585,32 @@ public:
 
     Type resultType = macro->getResultInterfaceType();
 
+    uint8_t builtinID = 0;
+    IdentifierID externalModuleNameID = 0;
+    IdentifierID externalMacroTypeNameID = 0;
+    auto def = macro->getDefinition();
+    switch (def.kind) {
+      case MacroDefinition::Kind::Invalid:
+      case MacroDefinition::Kind::Undefined:
+        break;
+
+      case MacroDefinition::Kind::External: {
+        auto external = def.getExternalMacro();
+        externalModuleNameID = S.addDeclBaseNameRef(external.moduleName);
+        externalMacroTypeNameID = S.addDeclBaseNameRef(external.macroTypeName);
+        break;
+      }
+
+      case MacroDefinition::Kind::Builtin: {
+        switch (def.getBuiltinKind()) {
+        case BuiltinMacroKind::ExternalMacro:
+          builtinID = 1;
+          break;
+        }
+        break;
+      }
+    }
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];
     MacroLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                             contextID.getOpaqueValue(),
@@ -4334,8 +4621,9 @@ public:
                             S.addTypeRef(resultType),
                             rawAccessLevel,
                             macro->getName().getArgumentNames().size(),
-                            S.addDeclBaseNameRef(macro->externalModuleName),
-                            S.addDeclBaseNameRef(macro->externalMacroTypeName),
+                            builtinID,
+                            externalModuleNameID,
+                            externalMacroTypeNameID,
                             nameComponentsAndDependencies);
 
     writeGenericParams(macro->getGenericParams());
@@ -4365,6 +4653,10 @@ public:
 
   void visitModuleDecl(const ModuleDecl *) {
     llvm_unreachable("module decls are not serialized");
+  }
+
+  void visitMissingDecl(const MissingDecl *) {
+    llvm_unreachable("missing decls are not serialized");
   }
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
@@ -5308,6 +5600,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
   registerDeclTypeAbbr<FilenameForPrivateLayout>();
+  registerDeclTypeAbbr<DeserializationSafetyLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 

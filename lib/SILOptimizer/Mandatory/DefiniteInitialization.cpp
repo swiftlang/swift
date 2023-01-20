@@ -1315,15 +1315,24 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
         wrapperInitArgs.push_back(storageObj);
         wrapperInitArgs.push_back(typeWrapperType);
 
-        // <wrapper-var> = <TypeWrapper>.init(storage: tmpStorage)
-        auto wrapperInitResult = b.createApply(
-            loc, typeWrapperInitRef,
-            SubstitutionMap::get(typeWrapperInit->getGenericSignature(),
-                                 /*substitutions=*/
-                                 {wrappedType->getMetatypeInstanceType(),
-                                  storageType.getASTType()},
-                                 /*conformances=*/{}),
-            wrapperInitArgs);
+        TypeSubstitutionMap wrapperInitSubs;
+        {
+          auto sig =
+              typeWrapperInit->getGenericSignature().getCanonicalSignature();
+          wrapperInitSubs[sig.getGenericParams()[0]] =
+              wrappedType->getMetatypeInstanceType();
+          wrapperInitSubs[sig.getGenericParams()[1]] = storageType.getASTType();
+        }
+
+        // <wrapper-var> = <TypeWrapper>.init(for: <Type>, storage: tmpStorage)
+        auto wrapperInitResult =
+            b.createApply(loc, typeWrapperInitRef,
+                          SubstitutionMap::get(
+                              typeWrapperInit->getGenericSignature(),
+                              QueryTypeSubstitutionMap{wrapperInitSubs},
+                              LookUpConformanceInModule(
+                                  ctor->getDeclContext()->getParentModule())),
+                          wrapperInitArgs);
 
         // self.$storage is a property access so it has to has to be wrapped
         // in begin/end access instructions.
@@ -3227,14 +3236,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilderWithScope B(TheMemory.getUninitializedValue());
   Identifier ShiftRightFn, TruncateFn, CmpEqFn;
 
-  unsigned NumMemoryElements = TheMemory.getNumElements();
-
   unsigned SelfInitializedElt = TheMemory.getNumElements();
   unsigned SuperInitElt = TheMemory.getNumElements() - 1;
-
-  // We might need an extra bit to check if self was consumed.
-  if (HasConditionalSelfInitialized)
-    ++NumMemoryElements;
 
   // Utilities.
 

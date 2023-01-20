@@ -2118,15 +2118,7 @@ namespace {
           if (friendDecl->getFriendDecl()) {
             m = friendDecl->getFriendDecl();
 
-            // Find the owning module of the class template. Members of class
-            // template specializations don't have an owning module.
-            clang::Module *owningModule = nullptr;
-            if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
-              owningModule = spec->getSpecializedTemplate()->getOwningModule();
-            else
-              owningModule = decl->getOwningModule();
-
-            auto lookupTable = Impl.findLookupTable(owningModule);
+            auto lookupTable = Impl.findLookupTable(decl);
             addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
                                   Impl.getNameImporter());
           }
@@ -2243,6 +2235,9 @@ namespace {
 
               // Make sure the synthesized decl can be found by lookupDirect.
               result->addMemberToLookupTable(opFuncDecl);
+
+              addEntryToLookupTable(*Impl.findLookupTable(decl), cxxMethod,
+                                    Impl.getNameImporter());
             }
           }
           methods.push_back(MD);
@@ -8241,11 +8236,17 @@ ClangImporter::Implementation::importDeclContextOf(
     if (dc->getDeclKind() == clang::Decl::LinkageSpec)
       dc = dc->getParent();
 
-    // Treat friend decls like top-level decls.
     if (auto functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
+      // Treat friend decls like top-level decls.
       if (functionDecl->getFriendObjectKind()) {
         // Find the top-level decl context.
         while (isa<clang::NamedDecl>(dc))
+          dc = dc->getParent();
+      }
+
+      // If this is a non-member operator, import it as a top-level function.
+      if (functionDecl->isOverloadedOperator()) {
+        while (dc->isNamespace())
           dc = dc->getParent();
       }
     }
@@ -8441,6 +8442,9 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
+      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();

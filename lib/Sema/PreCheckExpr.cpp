@@ -399,47 +399,6 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
   return nullptr;
 }
 
-static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
-  struct PackReferenceFinder : public ASTWalker {
-    DeclContext *dc;
-    llvm::SmallVector<PackElementExpr *, 2> packElements;
-    GenericEnvironment *environment;
-
-    PackReferenceFinder(DeclContext *dc)
-      : dc(dc), environment(nullptr) {}
-
-    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto &ctx = dc->getASTContext();
-      auto *packElement = dyn_cast<PackElementExpr>(E);
-      if (!packElement)
-        return Action::Continue(E);
-
-      if (!environment) {
-        auto sig = ctx.getOpenedElementSignature(
-            dc->getGenericSignatureOfContext().getCanonicalSignature());
-        auto *contextEnv = dc->getGenericEnvironmentOfContext();
-        auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-        environment =
-            GenericEnvironment::forOpenedElement(sig, UUID::fromTime(),
-                                                 contextSubs);
-      }
-
-      packElements.push_back(packElement);
-      return Action::Continue(packElement);
-    }
-  } packReferenceFinder(dc);
-
-  auto *pattern = expr->walk(packReferenceFinder);
-
-  if (!packReferenceFinder.packElements.empty()) {
-    return PackExpansionExpr::create(dc->getASTContext(), pattern,
-                                     packReferenceFinder.packElements,
-                                     opLoc, packReferenceFinder.environment);
-  }
-
-  return nullptr;
-}
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -1017,10 +976,6 @@ namespace {
     /// in simple pattern-like expressions, so we reject anything complex here.
     void markAcceptableDiscardExprs(Expr *E);
 
-    /// Check if this is a postfix '...' operator, which might denote a pack
-    /// expansion expression.
-    Expr *isPostfixEllipsisOperator(Expr *E);
-
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
                        bool replaceInvalidRefsWithErrors,
@@ -1188,14 +1143,6 @@ namespace {
           return Action::Stop();
 
         return Action::Continue(result);
-      }
-
-      // Rewrite postfix unary '...' expressions containing pack
-      // references to PackExpansionExpr.
-      if (auto *operand = isPostfixEllipsisOperator(expr)) {
-        if (auto *expansion = getPackExpansion(DC, operand, expr->getLoc())) {
-          return Action::Continue(expansion);
-        }
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
@@ -1439,7 +1386,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   }
 
   // Fold 'T.U' into a nested type.
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
+  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
     const auto BaseTy = TypeResolution::resolveContextualType(
         InnerTypeRepr, DC, TypeResolverContext::InExpression,
@@ -1450,7 +1397,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        PlaceholderType::get);
+        PlaceholderType::get,
+        // TypeExpr pack elements are opened in CSGen.
+        /*packElementOpener*/ nullptr);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -1461,7 +1410,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(ITR, UDE->getNameLoc(),
+        return TypeExpr::createForMemberDecl(DeclRefTR, UDE->getNameLoc(),
                                              Result.front().Member);
       }
     }
@@ -1475,12 +1424,11 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
-    if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(ITR,
-                                                us->getUnresolvedParams(),
-                                                SourceRange(us->getLAngleLoc(),
-                                                            us->getRAngleLoc()),
-                                                getASTContext());
+    if (auto *declRefTR =
+            dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
+      return TypeExpr::createForSpecializedDecl(
+          declRefTR, us->getUnresolvedParams(),
+          SourceRange(us->getLAngleLoc(), us->getRAngleLoc()), getASTContext());
     }
   }
 
@@ -1495,7 +1443,7 @@ bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
       isa<ForceValueExpr>(expr) ||
       isa<ParenExpr>(expr) ||
       isa<ArrowExpr>(expr) ||
-      isPostfixEllipsisOperator(expr) ||
+      isa<PackExpansionExpr>(expr) ||
       isa<TupleExpr>(expr) ||
       (isa<ArrayExpr>(expr) &&
        cast<ArrayExpr>(expr)->getElements().size() == 1) ||
@@ -1694,28 +1642,6 @@ VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   return methodSelf;
 }
 
-/// Check if this is a postfix '...' operator, which might denote a pack
-/// expansion expression.
-Expr *PreCheckExpression::isPostfixEllipsisOperator(Expr *E) {
-  if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics))
-    return nullptr;
-
-  auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(E);
-  if (!postfixExpr)
-    return nullptr;
-
-  if (auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn())) {
-    if (op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
-      return postfixExpr->getOperand();
-    }
-  } else if (auto *op = dyn_cast<UnresolvedDeclRefExpr>(postfixExpr->getFn())) {
-    if (op->getName().getBaseName().getIdentifier().isExpansionOperator())
-      return postfixExpr->getOperand();
-  }
-
-  return nullptr;
-}
-
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -1801,6 +1727,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     SmallVector<TupleTypeReprElement, 4> Elts;
     unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
+      // Try to simplify the element, e.g. to fold PackExpansionExprs
+      // into TypeExprs.
+      if (auto simplified = simplifyTypeExpr(Elt))
+        Elt = simplified;
+
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
       if (!eltTE) return nullptr;
       TupleTypeReprElement elt;
@@ -2001,11 +1932,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(CompRepr);
   }
 
-  // Fold 'T...' into a pack expansion type when 'T' is a TypeExpr.
-  if (auto *operand = isPostfixEllipsisOperator(E)) {
-    if (auto *pattern = dyn_cast<TypeExpr>(operand)) {
-      auto *repr = new (Ctx) PackExpansionTypeRepr(pattern->getTypeRepr(),
-                                                   E->getLoc());
+  // Fold a pack expansion expr into a TypeExpr when the pattern is a TypeExpr.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    if (auto *pattern = dyn_cast<TypeExpr>(expansion->getPatternExpr())) {
+      auto *repr = new (Ctx) PackExpansionTypeRepr(expansion->getStartLoc(),
+                                                   pattern->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
     }
   }
@@ -2203,7 +2134,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        PlaceholderType::get);
+        PlaceholderType::get,
+        // Pack elements for CoerceExprs are opened in CSGen.
+        /*packElementOpener*/ nullptr);
 
     if (result->hasError())
       return new (getASTContext())

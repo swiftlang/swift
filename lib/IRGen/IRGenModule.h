@@ -771,6 +771,8 @@ public:
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
+  llvm::StructType *RuntimeDiscoverableAttributeTy; // { i32, i32*, i32 }
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::GlobalVariable *swiftImmortalRefCount = nullptr;
@@ -1488,6 +1490,11 @@ public:
   void emitProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
+  /// Emit runtime discoverable attribute metadata section for the given set
+  /// of source files.
+  void
+  emitRuntimeDiscoverableAttributes(TinyPtrVector<FileUnit *> &filesToEmit);
+
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
@@ -1724,6 +1731,8 @@ public:
                                      ForDefinition_t forDefinition);
 
   void emitDistributedTargetAccessor(SILFunction *method);
+
+  llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
 
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.

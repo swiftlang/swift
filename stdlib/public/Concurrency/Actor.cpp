@@ -283,6 +283,8 @@ static bool isExecutingOnMainThread() {
 JobPriority swift::swift_task_getCurrentThreadPriority() {
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   return JobPriority::UserInitiated;
+#elif SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  return JobPriority::Unspecified;
 #elif defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
 #else
@@ -853,7 +855,9 @@ public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
     this->isDistributedRemoteActor = isDistributedRemote;
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    new (&this->drainLock) Mutex();
+#else
    _status().store(ActiveActorStatus(), std::memory_order_relaxed);
 #endif
     SWIFT_TASK_DEBUG_LOG("Creating default actor %p", this);

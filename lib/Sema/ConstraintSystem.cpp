@@ -637,6 +637,28 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
   return {result, opened};
 }
 
+void ConstraintSystem::addPackElementEnvironment(PackExpansionExpr *expr) {
+  auto *locator = getConstraintLocator(expr);
+  PackExpansionEnvironments[locator] = UUID::fromTime();
+}
+
+GenericEnvironment *
+ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
+                                            CanType shapeClass) {
+  auto result = PackExpansionEnvironments.find(locator);
+  if (result == PackExpansionEnvironments.end())
+    return nullptr;
+
+  auto uuid = result->second;
+  auto &ctx = getASTContext();
+  auto elementSig = ctx.getOpenedElementSignature(
+      DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeClass);
+  auto *contextEnv = DC->getGenericEnvironmentOfContext();
+  auto contextSubs = contextEnv->getForwardingSubstitutionMap();
+  return GenericEnvironment::forOpenedElement(elementSig, uuid, shapeClass,
+                                              contextSubs);
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -780,7 +802,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
       TypeResolution::forInterface(
           DC, None,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -1281,6 +1304,10 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
+  // Strip pack expansion types off of pack references.
+  if (auto *expansion = requestedType->getAs<PackExpansionType>())
+    requestedType = expansion->getPatternType();
+
   // Adjust the type for concurrency if requested.
   if (adjustForPreconcurrency)
     requestedType = adjustVarTypeForConcurrency(
@@ -1596,7 +1623,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type =
         TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
                                      /*unboundTyOpener*/ nullptr,
-                                     /*placeholderHandler*/ nullptr)
+                                     /*placeholderHandler*/ nullptr,
+                                     /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
     type = useDC->mapTypeIntoContext(type);
@@ -1923,16 +1951,11 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
   if (!typeRepr)
     return false;
 
-  auto identTypeRepr = dyn_cast<IdentTypeRepr>(typeRepr);
-  if (!identTypeRepr)
+  auto declRefTR = dyn_cast<DeclRefTypeRepr>(typeRepr);
+  if (!declRefTR)
     return false;
 
-  auto components = identTypeRepr->getComponentRange();
-  if (components.empty())
-    return false;
-
-  if (components.back()->getNameRef().getBaseName().userFacingName() !=
-        "DispatchQueue")
+  if (declRefTR->getNameRef().getBaseName().userFacingName() != "DispatchQueue")
     return false;
 
   return true;
@@ -2957,7 +2980,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
           castType = TypeResolution::resolveContextualType(
               castTypeRepr, DC, TypeResolverContext::InExpression,
               /*unboundTyOpener*/ nullptr,
-              /*placeholderHandler*/ nullptr);
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr);
         } else {
           castType = isp->getCastType();
         }
@@ -3559,6 +3583,36 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
         // Otherwise both `Self` and arguments are applied,
         // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
+      }
+    }
+
+    // If we have a macro, check for correct usage.
+    if (auto macro = dyn_cast<MacroDecl>(decl)) {
+      // Macro can only be used in an expansion. If we end up here, it's
+      // because we found a macro but are missing the leading '#'.
+      if (!locator->isForMacroExpansion()) {
+        // Record a fix here
+        (void)recordFix(MacroMissingPound::create(*this, macro, locator));
+      }
+
+      // If the macro has parameters but wasn't provided with any arguments,
+      // introduce a fix to add the arguments.
+      bool isCall;
+      switch (choice.getFunctionRefKind()) {
+      case FunctionRefKind::SingleApply:
+      case FunctionRefKind::DoubleApply:
+        isCall = true;
+        break;
+
+      case FunctionRefKind::Unapplied:
+      case FunctionRefKind::Compound:
+        // Note: macros don't have compound name references.
+        isCall = false;
+        break;
+      }
+      if (macro->parameterList && !isCall) {
+        // Record a fix here
+        (void)recordFix(MacroMissingArguments::create(*this, macro, locator));
       }
     }
   }
@@ -4335,7 +4389,15 @@ static bool diagnoseAmbiguityWithContextualType(
   auto name = result->choices.front().getName();
   auto contextualTy = solution.getContextualType(anchor);
 
-  assert(contextualTy);
+  // In some situations `getContextualType` for a contextual type
+  // locator is going to return then empty type. This happens because
+  // e.g. optional-some patterns and patterns with incorrect type don't
+  // have a contextual type for initialization expression but use
+  // a conversion with contextual locator nevertheless to indicate
+  // the purpose. This doesn't affect non-ambiguity diagnostics
+  // because mismatches carry both `from` and `to` types.
+  if (!contextualTy)
+    return false;
 
   DE.diagnose(getLoc(anchor),
               contextualTy->is<ProtocolType>()
@@ -5201,10 +5263,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
       break;
 
-    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::GlobalActorType:
+    case ConstraintLocator::ContextualType: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
+    }
 
     case ConstraintLocator::KeyPathComponent: {
       auto elt = path[0].castTo<LocatorPathElt::KeyPathComponent>();
@@ -5338,7 +5402,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
 
     case ConstraintLocator::PackElement:
-    case ConstraintLocator::OpenedPackElement:
     case ConstraintLocator::PackShape:
       break;
 

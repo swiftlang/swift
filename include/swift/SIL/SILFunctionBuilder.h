@@ -68,7 +68,8 @@ class SILFunctionBuilder {
                                          ProfileCounter entryCount,
                                          IsThunk_t isThunk,
                                          IsDynamicallyReplaceable_t isDynamic,
-                                         IsDistributed_t isDistributed);
+                                         IsDistributed_t isDistributed,
+                                         IsRuntimeAccessible_t isRuntimeAccessible);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
@@ -77,6 +78,7 @@ class SILFunctionBuilder {
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
       IsDynamicallyReplaceable_t isDynamic,
       IsDistributed_t isDistributed,
+      IsRuntimeAccessible_t isRuntimeAccessible,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
@@ -105,6 +107,7 @@ class SILFunctionBuilder {
                  IsTransparent_t isTrans, IsSerialized_t isSerialized,
                  IsDynamicallyReplaceable_t isDynamic,
                  IsDistributed_t isDistributed,
+                 IsRuntimeAccessible_t isRuntimeAccessible,
                  ProfileCounter entryCount = ProfileCounter(),
                  IsThunk_t isThunk = IsNotThunk,
                  SubclassScope subclassScope = SubclassScope::NotApplicable,

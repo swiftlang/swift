@@ -143,13 +143,13 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
-    Result->addModuleDependencies(*sourceFile, alreadyAddedModules);
+    Result->addModuleImport(*sourceFile, alreadyAddedModules);
 
     // Collect implicitly imported modules in case they are not explicitly
     // printed in the interface file, e.g. SwiftOnoneSupport.
     auto &imInfo = mainMod->getImplicitImportInfo();
     for (auto import: imInfo.AdditionalUnloadedImports) {
-      Result->addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
+      Result->addModuleImport(import.module.getModulePath(), &alreadyAddedModules);
     }
     return std::error_code();
   });
@@ -160,25 +160,9 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
   return *Result;
 }
 
-Optional<ModuleDependencyInfo> SerializedModuleLoaderBase::getModuleDependencies(
+Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
-  auto currentSearchPathSet = Ctx.getAllModuleSearchPathsSet();
-
-  // Check whether we've cached this result.
-  if (auto found = cache.findDependencies(
-           moduleName, ModuleDependencyKind::SwiftInterface))
-    return found;
-  if (auto found = cache.findDependencies(
-           moduleName, ModuleDependencyKind::SwiftSource))
-    return found;
-  if (auto found = cache.findDependencies(
-            moduleName, ModuleDependencyKind::SwiftBinary))
-    return found;
-  if (auto found = cache.findDependencies(
-            moduleName, ModuleDependencyKind::SwiftPlaceholder))
-    return found;
-
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
@@ -201,8 +185,8 @@ Optional<ModuleDependencyInfo> SerializedModuleLoaderBase::getModuleDependencies
   for (auto &scanner : scanners) {
     if (scanner->canImportModule(modulePath, nullptr)) {
       // Record the dependencies.
-      cache.recordDependencies(moduleName, *(scanner->dependencies));
-      return std::move(scanner->dependencies);
+      cache.recordDependency(moduleName, *(scanner->dependencies));
+      return cache.findDependency(moduleName, scanner->dependencies->getKind());
     }
   }
 

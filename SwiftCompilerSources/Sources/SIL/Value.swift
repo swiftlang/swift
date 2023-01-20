@@ -26,7 +26,7 @@ public protocol Value : AnyObject, CustomStringConvertible {
   /// The block where the value is defined.
   ///
   /// It's not legal to get the definingBlock of an `Undef` value.
-  var definingBlock: BasicBlock { get }
+  var parentBlock: BasicBlock { get }
 
   /// True if the value has a trivial type.
   var hasTrivialType: Bool { get }
@@ -95,15 +95,15 @@ extension Value {
     UseList(SILValue_firstUse(bridged))
   }
   
-  public var function: Function { definingBlock.function }
+  public var parentFunction: Function { parentBlock.parentFunction }
 
   public var type: Type { SILValue_getType(bridged).type }
 
   /// True if the value has a trivial type.
-  public var hasTrivialType: Bool { type.isTrivial(in: function) }
+  public var hasTrivialType: Bool { type.isTrivial(in: parentFunction) }
 
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
-  public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: function) }
+  public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: parentFunction) }
 
   public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
 
@@ -175,10 +175,10 @@ extension BridgedValue {
   }
 }
 
-final class Undef : Value {
+public final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
 
-  public var definingBlock: BasicBlock {
+  public var parentBlock: BasicBlock {
     fatalError("undef has no defining block")
   }
 
@@ -193,7 +193,7 @@ final class Undef : Value {
 
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
-  public var definingBlock: BasicBlock {
+  public var parentBlock: BasicBlock {
     fatalError("PlaceholderValue has no defining block")
   }
 }

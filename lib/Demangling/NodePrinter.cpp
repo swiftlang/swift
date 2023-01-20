@@ -579,7 +579,8 @@ private:
     case Node::Kind::OpaqueType:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
-    case Node::Kind::OpaqueReturnTypeIndexed:
+    case Node::Kind::OpaqueReturnTypeIndex:
+    case Node::Kind::OpaqueReturnTypeParent:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -609,6 +610,8 @@ private:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
+    case Node::Kind::RuntimeAttributeGenerator:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2076,6 +2079,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "accessible function runtime record for ";
     }
     return nullptr;
+  case Node::Kind::RuntimeDiscoverableAttributeRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "runtime discoverable attribute record for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2915,7 +2923,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
-  case Node::Kind::OpaqueReturnTypeIndexed:
     Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:
@@ -3080,6 +3087,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::HasSymbolQuery:
     Printer << "#_hasSymbol query for ";
     return nullptr;
+  case Node::Kind::RuntimeAttributeGenerator:
+    printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                /*hasName*/ false,
+                "runtime attribute generator");
+    Printer << " for attribute = " << Node->getChild(1)->getText() << "."
+            << Node->getChild(2)->getText();
+    return nullptr;
+  case Node::Kind::OpaqueReturnTypeIndex:
+  case Node::Kind::OpaqueReturnTypeParent:
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");
@@ -3210,7 +3227,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||
         Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer ||
-        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue) {
+        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue ||
+        Entity->getKind() == Node::Kind::RuntimeAttributeGenerator) {
       Printer << " of ";
     } else {
       Printer << " in ";

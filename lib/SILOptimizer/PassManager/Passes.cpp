@@ -278,17 +278,7 @@ void SILPassManager_registerFunctionPass(llvm::StringRef name,
   passesRegistered = true;
 }
 
-#define SWIFT_FUNCTION_PASS_COMMON(ID, TAG) \
-class ID##Pass : public SILFunctionTransform {                             \
-  static BridgedFunctionPassRunFn runFunction;                             \
-  void run() override {                                                    \
-    runBridgedFunctionPass(runFunction, PM, getFunction(), TAG);           \
-  }                                                                        \
-};                                                                         \
-BridgedFunctionPassRunFn ID##Pass::runFunction = nullptr;                  \
-
 #define PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_INSTRUCTION_PASS(INST, TAG)
 
 #define SWIFT_MODULE_PASS(ID, TAG, DESCRIPTION) \
 class ID##Pass : public SILModuleTransform {                               \
@@ -301,7 +291,13 @@ BridgedModulePassRunFn ID##Pass::runFunction = nullptr;                    \
 SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 
 #define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION) \
-SWIFT_FUNCTION_PASS_COMMON(ID, TAG)                                        \
+class ID##Pass : public SILFunctionTransform {                             \
+  static BridgedFunctionPassRunFn runFunction;                             \
+  void run() override {                                                    \
+    runBridgedFunctionPass(runFunction, PM, getFunction(), TAG);           \
+  }                                                                        \
+};                                                                         \
+BridgedFunctionPassRunFn ID##Pass::runFunction = nullptr;                  \
 SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 
 #include "swift/SILOptimizer/PassManager/Passes.def"

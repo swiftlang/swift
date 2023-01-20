@@ -156,9 +156,9 @@ With instruction passes it's possible to implement small peephole optimizations 
 
 To add a new instruction pass:
 
-* add a `SWIFT_INSTRUCTION_PASS` entry in `Passes.def`
+* add a `SWIFT_SILCOMBINE_PASS` entry in `Passes.def`
 * create a new Swift file in `SwiftCompilerSources/Optimizer/InstructionPasses`
-* add an `InstructionPass` global
+* implement the `simplify` function in conformance to `SILCombineSimplifyable`
 * register the pass in `registerSwiftPasses()`
 * if this pass replaces an existing `SILCombiner` visit function, remove the old visit function
 

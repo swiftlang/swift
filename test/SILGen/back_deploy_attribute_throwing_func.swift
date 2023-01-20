@@ -50,12 +50,10 @@
 
 // -- Original definition of throwingFunc()
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error any Error
-@available(macOS 10.51, *)
 @_backDeploy(before: macOS 10.52)
 public func throwingFunc() throws {}
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyKF : $@convention(thin) () -> @error any Error
-@available(macOS 10.51, *)
+// CHECK-LABEL: sil hidden [ossa] @$s11back_deploy6calleryyKF : $@convention(thin) () -> @error any Error
 func caller() throws {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error any Error

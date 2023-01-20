@@ -70,7 +70,6 @@ public:
       return RHS.isPublic();
     if (isPackage())
       return RHS.isPackage();
-
     return getDeclContext() == RHS.getDeclContext();
   }
 

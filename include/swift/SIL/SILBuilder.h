@@ -263,7 +263,10 @@ public:
   bool hasValidInsertionPoint() const { return BB != nullptr; }
   SILBasicBlock *getInsertionBB() const { return BB; }
   SILBasicBlock::iterator getInsertionPoint() const { return InsertPt; }
-  SILLocation getInsertionPointLoc() const { return InsertPt->getLoc(); }
+  SILLocation getInsertionPointLoc() const {
+    assert(!insertingAtEndOfBlock());
+    return InsertPt->getLoc();
+  }
 
   /// insertingAtEndOfBlock - Return true if the insertion point is at the end
   /// of the current basic block.  False if we're inserting before an existing
@@ -745,6 +748,7 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false) {
+    assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
@@ -1930,6 +1934,14 @@ public:
   createDeinitExistentialValue(SILLocation Loc, SILValue Existential) {
     return insert(new (getModule()) DeinitExistentialValueInst(
         getSILDebugLocation(Loc), Existential));
+  }
+
+  OpenPackElementInst *
+  createOpenPackElement(SILLocation loc, SILValue packIndex,
+                        GenericEnvironment *openedElementEnvironment) {
+    return insert(OpenPackElementInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packIndex, openedElementEnvironment));
   }
 
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,

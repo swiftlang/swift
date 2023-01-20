@@ -24,7 +24,7 @@ public struct CalleeAnalysis {
       },
       // getMemBehaviorFn
       { (bridgedCtxt: BridgedPassContext, bridgedApply: BridgedInstruction, observeRetains: Bool) -> BridgedMemoryBehavior in
-        let context = PassContext(_bridged: bridgedCtxt)
+        let context = FunctionPassContext(_bridged: bridgedCtxt)
         let apply = bridgedApply.instruction as! ApplySite
         let e = context.calleeAnalysis.getSideEffects(of: apply)
         return e.getMemBehavior(observeRetains: observeRetains)

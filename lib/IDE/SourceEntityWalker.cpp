@@ -582,12 +582,14 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // The macro itself.
     auto macroRef = ME->getMacroRef();
     auto macroDecl = macroRef.getDecl();
-    auto macroRefType =
-        macroDecl->getInterfaceType().subst(macroRef.getSubstitutions());
-    if (!passReference(
-            macroDecl, macroRefType, ME->getMacroNameLoc(),
-            ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
-      return Action::Stop();
+    if (macroDecl) {
+      auto macroRefType =
+          macroDecl->getInterfaceType().subst(macroRef.getSubstitutions());
+      if (!passReference(
+              macroDecl, macroRefType, ME->getMacroNameLoc(),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+        return Action::Stop();
+    }
 
     // Walk the arguments, since they were written directly by the user.
     if (auto argList = ME->getArgs()) {
@@ -619,7 +621,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (!Continue)
     return Action::Stop();
 
-  if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
+  if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
         auto ident = IdT->getNameRef().getBaseIdentifier();

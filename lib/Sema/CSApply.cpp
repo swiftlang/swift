@@ -2939,7 +2939,7 @@ namespace {
 
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
-        LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
+        LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value, loc);
         cs.setType(expr, ctx.getIntType());
         return handleIntegerLiteralExpr(expr);
       };
@@ -3818,7 +3818,16 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      return simplifyExprType(expr);
+      simplifyExprType(expr);
+
+      // Set the opened pack element environment for this pack expansion.
+      auto expansionTy = cs.getType(expr)->castTo<PackExpansionType>();
+      auto *locator = cs.getConstraintLocator(expr);
+      auto *environment = cs.getPackElementEnvironment(locator,
+          expansionTy->getCountType()->getCanonicalType());
+      expr->setGenericEnvironment(environment);
+
+      return expr;
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
@@ -5387,27 +5396,23 @@ namespace {
     }
 
     Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-#if SWIFT_SWIFT_PARSER
-      auto &ctx = cs.getASTContext();
-      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
-        auto expandedType = solution.simplifyType(solution.getType(E));
-        cs.setType(E, expandedType);
+      auto expandedType = solution.simplifyType(solution.getType(E));
+      cs.setType(E, expandedType);
 
-        auto locator = cs.getConstraintLocator(E);
-        auto overload = solution.getOverloadChoice(locator);
+      auto locator = cs.getConstraintLocator(E);
+      auto overload = solution.getOverloadChoice(locator);
 
-        auto macro = cast<MacroDecl>(overload.choice.getDecl());
-        ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
-        E->setMacroRef(macroRef);
+      auto macro = cast<MacroDecl>(overload.choice.getDecl());
+      ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
+      E->setMacroRef(macroRef);
 
+      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
         if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);
-          cs.cacheExprTypes(E);
-          return E;
         }
-        // Fall through to use old implementation.
       }
-#endif
+
+      cs.cacheExprTypes(E);
       return E;
     }
 
@@ -7121,8 +7126,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
     auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
-    auto patternType = packEnv->mapElementTypeIntoPackContext(
-        toElementType->mapTypeOutOfContext());
+    auto patternType = packEnv->mapElementTypeIntoPackContext(toElementType);
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 

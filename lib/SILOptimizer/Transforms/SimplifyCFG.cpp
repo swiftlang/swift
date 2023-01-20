@@ -245,7 +245,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
           dyn_cast<BranchInst>(ThreadedSuccessorBlock->getTerminator())) {
     simplifyBranchBlock(branchInst);
   }
-  Cloner.updateOSSAAfterCloning();
+  Cloner.updateSSAAfterCloning();
   return true;
 }
 
@@ -924,6 +924,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (destTerminator->isFunctionExiting())
     return false;
 
+  // There is no benefit duplicating such a destination.
+  if (DestBB->getSinglePredecessorBlock() != nullptr) {
+    return false;
+  }
+
   // Jump threading only makes sense if there is an argument on the branch
   // (which is reacted on in the DestBB), or if this goes through a memory
   // location (switch_enum_addr is the only address-instruction which we
@@ -942,6 +947,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
 
+    // TODO: Verify if we need to jump thread to remove releases in OSSA.
     // If the value being substituted on is release there is a chance we could
     // remove the release after jump threading.
     if (!Arg->getType().isTrivial(*SrcBB->getParent()) &&
@@ -1030,7 +1036,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // Duplicate the destination block into this one, rewriting uses of the BBArgs
   // to use the branch arguments as we go.
   Cloner.cloneBranchTarget(BI);
-  Cloner.updateOSSAAfterCloning();
+  Cloner.updateSSAAfterCloning();
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
   // the threaded and edge block to the worklist now that they (likely) can be
@@ -1278,13 +1284,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     //
     SILBasicBlock *remainingBlock = nullptr, *deletedBlock = nullptr;
     if (BB != Fn.getEntryBlock() && hasLessInstructions(BB, DestBB)) {
-      while (!BB->pred_empty()) {
-        SILBasicBlock *pred = *BB->pred_begin();
-        replaceBranchTarget(pred->getTerminator(), BB, DestBB, true);
-      }
       DestBB->spliceAtBegin(BB);
       DestBB->dropAllArguments();
       DestBB->moveArgumentList(BB);
+      while (!BB->pred_empty()) {
+        SILBasicBlock *pred = *BB->pred_begin();
+        pred->getTerminator()->replaceBranchTarget(BB, DestBB);
+      }
       remainingBlock = DestBB;
       deletedBlock = BB;
     } else {
@@ -1715,10 +1721,6 @@ static bool isOnlyUnreachable(SILBasicBlock *BB) {
 /// switch_enum where all but one block consists of just an
 /// "unreachable" with an unchecked_enum_data and branch.
 bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (!SEI->getOperand()->getType().isTrivial(Fn))
-      return false;
-  }
   auto Count = SEI->getNumCases();
 
   SILBasicBlock *Dest = nullptr;
@@ -1851,7 +1853,9 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
 
     // The branch should forward one of the objc_method call.
     if (auto *br = dyn_cast<BranchInst>(inst)) {
-      if (br->getNumArgs() == 0 || br->getNumArgs() > 1)
+      if (br->getNumArgs() == 0)
+        continue;
+      if (br->getNumArgs() > 1)
         return false;
       auto branchArg = br->getArg(0);
       if (std::find(objCApplies.begin(), objCApplies.end(), branchArg) ==
@@ -1899,6 +1903,9 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
       continue;
     }
     if (auto *noneBranch = dyn_cast<BranchInst>(inst)) {
+      if (noneBranch->getNumArgs() == 0) {
+        continue;
+      }
       if (noneBranch->getNumArgs() != 1 ||
           (noneBranch->getArg(0) != SEI->getOperand() &&
            noneBranch->getArg(0) != optionalNone))
@@ -2010,12 +2017,6 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
 ///    %4 = enum #Optional.none
 ///    br mergeBB(%4)
 bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
-  // TODO: OSSA; handle non-trivial enum case cleanup
-  // (simplify_switch_enum_objc.sil).
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    return false;
-  }
-
   auto optional = SEI->getOperand();
   auto optionalPayloadType = optional->getType().getOptionalObjectType();
   if (!optionalPayloadType ||
@@ -2052,10 +2053,20 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
                                                      optionalPayloadType);
   optionalPayload->replaceAllUsesWith(payloadCast);
   auto *switchBB = SEI->getParent();
-  if (someBB->getNumArguments())
-    Builder.createBranch(SEI->getLoc(), someBB, SILValue(payloadCast));
-  else
+
+  if (!someBB->args_empty()) {
+    assert(someBB->getNumArguments() == 1);
+    auto *someBBArg = someBB->getArgument(0);
+    if (!someBBArg->use_empty()) {
+      assert(optionalPayload != someBBArg);
+      someBBArg->replaceAllUsesWith(payloadCast);
+    }
+    someBB->eraseArgument(0);
     Builder.createBranch(SEI->getLoc(), someBB);
+  } else {
+    assert(!Fn.hasOwnership());
+    Builder.createBranch(SEI->getLoc(), someBB);
+  }
 
   SEI->eraseFromParent();
   addToWorklist(switchBB);
@@ -2076,12 +2087,6 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *LiveBlock = SEI->getCaseDestination(EnumCase.get());
   auto *ThisBB = SEI->getParent();
 
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    // TODO: OSSA; cleanup terminator results.
-    if (!SEI->getOperand()->getType().isTrivial(Fn))
-      return false;
-  }
-
   bool DroppedLiveBlock = false;
   // Copy the successors into a vector, dropping one entry for the liveblock.
   SmallVector<SILBasicBlock*, 4> Dests;
@@ -2096,6 +2101,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   LLVM_DEBUG(llvm::dbgs() << "fold switch " << *SEI);
 
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+  auto loc = SEI->getLoc();
   SILBuilderWithScope Builder(SEI);
   if (!LiveBlock->args_empty()) {
     SILValue PayLoad;
@@ -2103,22 +2109,19 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
       assert(Fn.hasOwnership() && "Only OSSA default case has an argument");
       PayLoad = SEI->getOperand();
     } else {
-      if (EI) {
-        PayLoad = EI->getOperand();
-      } else {
-        PayLoad = Builder.createUncheckedEnumData(SEI->getLoc(),
-                                                  SEI->getOperand(),
-                                                  EnumCase.get());
-      }
+      PayLoad = Builder.createUncheckedEnumData(loc, SEI->getOperand(),
+                                                EnumCase.get());
     }
-    Builder.createBranch(SEI->getLoc(), LiveBlock, PayLoad);
+    Builder.createBranch(loc, LiveBlock, PayLoad);
   } else {
-    Builder.createBranch(SEI->getLoc(), LiveBlock);
+    Builder.createBranch(loc, LiveBlock);
   }
+
   SEI->eraseFromParent();
-  // TODO: also remove this EnumInst in OSSA default case when the only
-  // remaining uses are destroys, and incidental uses.
-  if (EI && EI->use_empty()) EI->eraseFromParent();
+  if (EI && isInstructionTriviallyDead(EI)) {
+    EI->replaceAllUsesOfAllResultsWithUndef();
+    EI->eraseFromParent();
+  }
 
   addToWorklist(ThisBB);
 
@@ -2547,15 +2550,6 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
     return false;
   }
   TermInst *Term = BB->getTerminator();
-  // TODO: OSSA; cleanup nontrivial terminator operands (if this ever actually
-  // happens)
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (llvm::any_of(Term->getOperandValues(), [this](SILValue op) {
-          return !op->getType().isTrivial(Fn);
-        })) {
-      return false;
-    }
-  }
   LLVM_DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
   SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest.destBB,
                                          commonDest.newSourceBranchArgs);
@@ -2877,7 +2871,7 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
       continue;
 
     Cloner.cloneBranchTarget(Branch);
-    Cloner.updateOSSAAfterCloning();
+    Cloner.updateSSAAfterCloning();
 
     Changed = true;
     // Simplify the cloned block and continue tail duplicating through its new
@@ -3832,16 +3826,21 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
-  auto *NewArg =
-      BB->replacePhiArgument(i, proj->getType(), OwnershipKind::Owned);
+  auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
+                                        BB->getArgument(i)->getOwnershipKind());
   proj->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.
   for (auto *Pred : BB->getPredecessorBlocks()) {
     if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
+      auto *BranchOpValue = cast<SingleValueInstruction>(Branch->getOperand(i));
       auto V = getInsertedValue(cast<SingleValueInstruction>(Branch->getArg(i)),
                                 proj);
       Branch->setOperand(i, V);
+      if (isInstructionTriviallyDead(BranchOpValue)) {
+        BranchOpValue->replaceAllUsesWithUndef();
+        BranchOpValue->eraseFromParent();
+      }
       addToWorklist(Pred);
     }
   }
@@ -3886,15 +3885,6 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   // Ignore the entry block.
   if (BB->pred_empty())
     return false;
-
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    // TODO: OSSA phi support
-    if (llvm::any_of(BB->getArguments(), [this](SILArgument *arg) {
-          return !arg->getType().isTrivial(Fn);
-        })) {
-      return false;
-    }
-  }
 
   // Ignore blocks that are successors of terminators with mandatory args.
   for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {

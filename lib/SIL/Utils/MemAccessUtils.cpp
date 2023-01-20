@@ -16,6 +16,8 @@
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/NodeDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILInstruction.h"
@@ -860,78 +862,42 @@ SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
   return ref;
 }
 
-void swift::findGuaranteedReferenceRoots(SILValue value,
+void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
                                          bool lookThroughNestedBorrows,
                                          SmallVectorImpl<SILValue> &roots) {
-  GraphNodeWorklist<SILValue, 4> worklist;
-  auto addAllOperandsToWorklist = [&worklist](SILInstruction *inst) -> bool {
-    if (inst->getNumOperands() > 0) {
-      for (auto operand : inst->getOperandValues()) {
-        worklist.insert(operand);
-      }
-      return true;
-    }
-    return false;
-  };
-  worklist.initialize(value);
+  ValueWorklist worklist(referenceValue->getFunction());
+  worklist.pushIfNotVisited(referenceValue);
   while (auto value = worklist.pop()) {
-    if (auto *result = SILArgument::isTerminatorResult(value)) {
-      if (auto *forwardedOper = result->forwardedTerminatorResultOperand()) {
-        worklist.insert(forwardedOper->get());
-        continue;
-      }
-    } else if (auto *inst = value->getDefiningInstruction()) {
-      if (auto *bbi = dyn_cast<BeginBorrowInst>(inst)) {
-        auto borrowee = bbi->getOperand();
-        if (lookThroughNestedBorrows &&
-            borrowee->getOwnershipKind() == OwnershipKind::Guaranteed) {
-          // A nested borrow, the root guaranteed earlier in the use-def chain.
-          worklist.insert(borrowee);
-        }
-        // The borrowee isn't guaranteed or we aren't looking through nested
-        // borrows.  Fall through to add the begin_borrow to roots.
-      } else if (auto *result =
-              dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(inst)) {
-        if (result->getNumOperands() > 0) {
-          worklist.insert(result->getOperand(0));
-          continue;
-        }
-      } else if (auto *result =
-                     dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
-        if (addAllOperandsToWorklist(result)) {
-          continue;
-        }
-      } else if (auto *result = dyn_cast<OwnershipForwardingTermInst>(inst)) {
-        assert(false && "value defined by a terminator?!");
-      } else if (auto *result =
-                     dyn_cast<OwnershipForwardingConversionInst>(inst)) {
-        worklist.insert(result->getConverted());
-        continue;
-      } else if (auto *result =
-                     dyn_cast<OwnershipForwardingSelectEnumInstBase>(inst)) {
-        if (addAllOperandsToWorklist(result)) {
-          continue;
-        }
-      } else if (auto *result =
-                     dyn_cast<OwnershipForwardingMultipleValueInstruction>(
-                         inst)) {
-        if (addAllOperandsToWorklist(result)) {
-          continue;
-        }
-      } else if (auto *mvi =
-                     dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst)) {
-        if (addAllOperandsToWorklist(mvi)) {
-          continue;
-        }
-      } else if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst)) {
-        if (addAllOperandsToWorklist(c)) {
-          continue;
-        }
-      }
+    // Instructions may forwarded None ownership to guaranteed.
+    if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
+      continue;
+
+    if (SILArgument::asPhi(value)) {
+      roots.push_back(value);
+      continue;
     }
 
-    if (value->getOwnershipKind() == OwnershipKind::Guaranteed)
-      roots.push_back(value);
+    if (visitForwardedGuaranteedOperands(value, [&](Operand *operand) {
+        worklist.pushIfNotVisited(operand->get());
+      })) {
+      // This instruction is not a root if any operands were forwarded,
+      // regardless of whether they were already visited.
+      continue;
+    }
+    // Found a potential root.
+    if (lookThroughNestedBorrows) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
+        auto borrowee = bbi->getOperand();
+        if (borrowee->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          // A nested borrow, the root guaranteed earlier in the use-def chain.
+          worklist.pushIfNotVisited(borrowee);
+          continue;
+        }
+        // The borrowee isn't guaranteed or we aren't looking through nested
+        // borrows. Fall through to add the begin_borrow to roots.
+      }
+    }
+    roots.push_back(value);
   }
 }
 
@@ -2539,6 +2505,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::CreateTaskGroupWithFlags:
     case BuiltinValueKind::DestroyTaskGroup:
       return;
 

@@ -196,11 +196,12 @@ ERROR(lex_conflict_marker_in_file,none,
 // MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
+NOTE(note_in_decl_of,none,
+     "in declaration of %0", (DeclNameRef))
+NOTE(note_in_extension_of,none,
+     "in extension of %0", (TypeRepr *))
 ERROR(line_directive_style_deprecated,none,
-        "#line directive was renamed to #sourceLocation",
-        ())
+      "#line directive was renamed to #sourceLocation", ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
@@ -672,6 +673,10 @@ ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
       "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
+ERROR(expected_generic_signature,none,
+      "expected a generic signature", ())
+ERROR(sil_expected_uuid,none,
+      "expected a UUID string literal", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -888,6 +893,10 @@ ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,
       "'protocol<>' syntax has been removed; use 'Any' instead", ())
+
+// Pack Types
+ERROR(expected_rbrace_pack_type_list,none,
+      "expected '}' at end of pack type list", ())
 
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,
@@ -1329,9 +1338,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(legacy_object_literal,none,
-      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
-      (bool, StringRef, StringRef))
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
@@ -1348,6 +1354,10 @@ ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_move, none,
+      "expected expression after '_move'", ())
+ERROR(expected_expr_after_borrow, none,
+      "expected expression after '_borrow'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1999,19 +2009,44 @@ ERROR(expected_lparen_macro,PointsToFirstBadToken,
       "expected '(' for macro parameters or ':' for a value-like macro", ())
 ERROR(expected_type_macro_result,PointsToFirstBadToken,
       "expected macro result type", ())
-ERROR(macro_decl_expected_equal,PointsToFirstBadToken,
-      "expected '=' to introduce external macro name", ())
-ERROR(macro_decl_expected_macro_module,PointsToFirstBadToken,
-      "expected external macro name", ())
-ERROR(macro_decl_expected_period,PointsToFirstBadToken,
-      "expected '.' between external macro module and type name", ())
-ERROR(macro_decl_expected_macro_type,PointsToFirstBadToken,
-      "expected external macro type name", ())
+ERROR(macro_decl_expected_macro_definition,PointsToFirstBadToken,
+      "expected macro definition following '=''", ())
 
-ERROR(macro_expansion_expr_expected_macro_identifier,none,
+ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal expression", ())
-ERROR(macro_expansion_decl_expected_macro_identifier,none,
+ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal declaration", ())
+
+ERROR(declaration_attr_expected_kind,PointsToFirstBadToken,
+      "expected a declaration macro kind ('freestanding' or 'attached')", ())
+
+ERROR(macro_role_attr_expected_kind,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro role such as "
+      "%select{'expression'|'accessor'}0", (bool))
+ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro cannot have "
+      "the %1 role", (bool, Identifier))
+ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 has no argument with label %1",
+      (bool, Identifier))
+ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 already has an argument with "
+      "label %1", (bool, Identifier))
+ERROR(macro_attribute_missing_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 argument is missing label '%1'",
+      (bool, StringRef))
+ERROR(macro_attribute_unknown_name_kind,PointsToFirstBadToken,
+      "unknown introduced name kind %0", (Identifier))
+ERROR(macro_attribute_unknown_argument_form,PointsToFirstBadToken,
+      "introduced name argument should be an identifier", ())
+ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
+      "introduced name kind %0 requires a single argument '(name)'", (Identifier))
+ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
+      "introduced name kind %0 must not have an argument", (Identifier))
+
+ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded attribute list'",
+      (StringRef))
 
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())

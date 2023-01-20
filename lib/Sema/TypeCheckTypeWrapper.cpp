@@ -26,6 +26,17 @@
 
 using namespace swift;
 
+/// Check whether given declaration comes from the .swiftinterface file.
+static bool inSwiftInterfaceContext(NominalTypeDecl *typeDecl) {
+  auto *SF = typeDecl->getDeclContext()->getParentSourceFile();
+  return SF && SF->Kind == SourceFileKind::Interface;
+}
+
+static ValueDecl *findMember(NominalTypeDecl *typeDecl, Identifier memberName) {
+  auto members = typeDecl->lookupDirect(memberName);
+  return members.size() == 1 ? members.front() : nullptr;
+}
+
 static PatternBindingDecl *injectVariable(DeclContext *DC, Identifier name,
                                           Type type,
                                           VarDecl::Introducer introducer,
@@ -112,16 +123,30 @@ static void getTypeWrappers(NominalTypeDecl *decl,
   // Attributes applied directly to the type.
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
-    auto *nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{mutableAttr, decl}, nullptr);
+    auto found = evaluateOrDefault(
+        ctx.evaluator, CustomAttrDeclRequest{mutableAttr, decl}, nullptr);
 
+    if (!found)
+      continue;
+
+    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
       continue;
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
-    if (typeWrapper && typeWrapper->isValid())
+    if (typeWrapper && typeWrapper->isValid()) {
+      auto attrType = evaluateOrDefault(
+          ctx.evaluator,
+          CustomAttrTypeRequest{mutableAttr, decl,
+                                CustomAttrTypeKind::TypeWrapper},
+          Type());
+
+      if (!attrType || attrType->hasError())
+        continue;
+
       typeWrappers.push_back(
-          {mutableAttr, nominal, decl, /*isInferred=*/false});
+          {mutableAttr, attrType, nominal, decl, /*isInferred=*/false});
+    }
   }
 
   // Do not allow transitive protocol inference between protocols.
@@ -182,24 +207,6 @@ GetTypeWrapper::evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const {
   }
 
   return typeWrappers.front();
-}
-
-Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *decl) const {
-  auto typeWrapperInfo = decl->getTypeWrapper();
-  if (!typeWrapperInfo)
-    return Type();
-
-  auto type = evaluateOrDefault(
-      evaluator,
-      CustomAttrTypeRequest{typeWrapperInfo->Attr, decl->getDeclContext(),
-                            CustomAttrTypeKind::TypeWrapper},
-      Type());
-
-  if (!type || type->hasError()) {
-    return ErrorType::get(decl->getASTContext());
-  }
-  return type;
 }
 
 VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
@@ -284,6 +291,15 @@ TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
 
   auto &ctx = parent->getASTContext();
 
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<TypeDecl>(
+            findMember(parent, ctx.Id_TypeWrapperStorage)))
+      return storage;
+  }
+
   TypeDecl *storage = nullptr;
   if (isa<ProtocolDecl>(parent)) {
     // If type wrapper is associated with a protocol, we need to
@@ -320,13 +336,19 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   if (!typeWrapper)
     return nullptr;
 
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<VarDecl>(
+            findMember(parent, ctx.Id_TypeWrapperProperty)))
+      return storage;
+  }
+
   auto *storage = parent->getTypeWrapperStorageDecl();
   assert(storage);
 
-  auto *typeWrapperType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
-          ->castTo<AnyGenericType>();
-  assert(typeWrapperType);
+  auto *typeWrapperType = typeWrapper->AttrType->castTo<AnyGenericType>();
 
   // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(

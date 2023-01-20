@@ -21,6 +21,8 @@
 #include <dlfcn.h>
 #endif
 
+#include "swift/Runtime/Win32.h"
+
 #include "ImageInspection.h"
 
 using namespace swift;

@@ -92,7 +92,7 @@ private:
   }
 
   bool isUserTypeAlias(TypeRepr *T) const {
-    if (auto Ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+    if (auto Ident = dyn_cast<IdentTypeRepr>(T)) {
       if (auto Bound = Ident->getBoundDecl()) {
         return isa<TypeAliasDecl>(Bound) &&
           !Bound->getModuleContext()->isSystemModule();
@@ -205,8 +205,8 @@ public:
     return handleParent(T, T->getGenericArgs());
   }
 
-  FoundResult visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-    return visit(T->getComponents().back());
+  FoundResult visitMemberTypeRepr(MemberTypeRepr *T) {
+    return visit(T->getLastComponent());
   }
 
   FoundResult visitOptionalTypeRepr(OptionalTypeRepr *T) {

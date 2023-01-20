@@ -1142,6 +1142,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
         SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
         llvm::SmallString<128> buffer;
         llvm::SmallString<128> bufferName;
+        const Decl *ppDecl = decl;
         {
           // The access level of the buffer we want to print. Declarations below
           // this access level will be omitted from the buffer; declarations
@@ -1152,7 +1153,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
           // Figure out which declaration to print. It's the top-most
           // declaration (not a module).
-          const Decl *ppDecl = decl;
           auto dc = decl->getDeclContext();
 
           // FIXME: Horrible, horrible hackaround. We're not getting a
@@ -1237,6 +1237,20 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
         auto bufferID = SourceMgr.addMemBufferCopy(buffer, bufferName);
         auto memBufferStartLoc = SourceMgr.getLocForBufferStart(bufferID);
 
+        SourceMgr.setGeneratedSourceInfo(
+            bufferID,
+            GeneratedSourceInfo{
+              GeneratedSourceInfo::PrettyPrinted,
+              SourceRange(),
+              SourceRange(
+                  memBufferStartLoc,
+                  memBufferStartLoc.getAdvancedLoc(buffer.size())
+              ),
+              ASTNode(const_cast<Decl *>(ppDecl)).getOpaqueValue(),
+              nullptr
+            }
+        );
+
         // Go through all of the pretty-printed entries and record their
         // locations.
         for (auto entry : entries) {
@@ -1297,10 +1311,17 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
         ASTNode::getFromOpaqueValue(generatedInfo->astNode);
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::MacroExpansion: {
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::AccessorMacroExpansion:
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName;
-      if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+      if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {
+        // FIXME: How will we handle deserialized custom attributes like this?
+        auto declRefType = dyn_cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
+        macroName = declRefType->getNameRef().getFullName();
+      } else if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
               expansionNode.dyn_cast<Expr *>())) {
         macroName = expansionExpr->getMacroName().getFullName();
       } else {
@@ -1318,12 +1339,18 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
       break;
     }
 
+    case GeneratedSourceInfo::PrettyPrinted:
+      break;
+
     case GeneratedSourceInfo::ReplacedFunctionBody:
       return childNotes;
     }
 
     // Walk up the stack.
     currentLoc = expansionNode.getStartLoc();
+    if (currentLoc.isInvalid())
+      return childNotes;
+
     currentBufferID = SourceMgr.findBufferContainingLoc(currentLoc);
   } while (true);
 }

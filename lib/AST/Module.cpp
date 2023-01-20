@@ -573,7 +573,8 @@ void ModuleDecl::updateSourceFileLocationMap() {
   }
 
   // If we are up-to-date, there's nothing to do.
-  if (sourceFileLocationMap->numFiles == getFiles().size() &&
+  ArrayRef<FileUnit *> files = Files;
+  if (sourceFileLocationMap->numFiles == files.size() &&
       sourceFileLocationMap->numAuxiliaryFiles ==
           AuxiliaryFiles.size())
     return;
@@ -582,7 +583,7 @@ void ModuleDecl::updateSourceFileLocationMap() {
   sourceFileLocationMap->allSourceFiles.clear();
 
   // First, add all of the source files with a backing buffer.
-  for (auto *fileUnit : getFiles()) {
+  for (auto *fileUnit : files) {
     if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
       if (sourceFile->getBufferID())
         sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
@@ -884,6 +885,15 @@ ASTNode SourceFile::getMacroExpansion() const {
   auto genInfo =
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
+}
+
+CustomAttr *SourceFile::getAttachedMacroAttribute() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return genInfo.attachedMacroCustomAttr;
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
@@ -3372,6 +3382,15 @@ ArrayRef<ASTNode> SourceFile::getTopLevelItems() const {
 
 ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
   return Hoisted;
+}
+
+void SourceFile::addDeclWithRuntimeDiscoverableAttrs(ValueDecl *decl) {
+  assert(!decl->getRuntimeDiscoverableAttrs().empty());
+  DeclsWithRuntimeDiscoverableAttrs.insert(decl);
+}
+
+ArrayRef<ValueDecl *> SourceFile::getDeclsWithRuntimeDiscoverableAttrs() const {
+  return DeclsWithRuntimeDiscoverableAttrs.getArrayRef();
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

@@ -37,22 +37,6 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   expectEqual(swift6, "xyz\0abc")
 }
 
-extension std.string.const_iterator: UnsafeCxxInputIterator {
-  // This func should not be required.
-  public static func ==(lhs: std.string.const_iterator,
-                        rhs: std.string.const_iterator) -> Bool {
-#if os(Linux)
-    // In libstdc++, `base()` returns UnsafePointer<Optional<UnsafePointer<CChar>>>.
-    return lhs.__baseUnsafe().pointee == rhs.__baseUnsafe().pointee
-#else
-    // In libc++, `base()` returns UnsafePointer<CChar>.
-    return lhs.__baseUnsafe() == rhs.__baseUnsafe()
-#endif
-  }
-}
-
-extension std.string: CxxSequence {}
-
 StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
   let cxx1 = std.string()
   var iterated = false

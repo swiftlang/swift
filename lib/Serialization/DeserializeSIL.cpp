@@ -537,7 +537,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed;
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
@@ -545,7 +545,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -679,6 +679,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     fn->setIsDistributed(IsDistributed_t(isDistributed));
+    fn->setIsRuntimeAccessible(IsRuntimeAccessible_t(isRuntimeAccessible));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -1362,6 +1363,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
+  case SILInstructionKind::OpenPackElementInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
+    auto index = getLocalValue(ValID,
+        getSILType(MF->getType(TyID), (SILValueCategory) TyCategory, Fn));
+    auto env = MF->getGenericEnvironmentChecked(Attr);
+    if (!env) MF->fatal(env.takeError());
+    ResultInst = Builder.createOpenPackElement(Loc, index, *env);
+    break;
+  }
 
 #define ONEOPERAND_ONETYPE_INST(ID)                                            \
   case SILInstructionKind::ID##Inst:                                           \
@@ -3098,7 +3108,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed;
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
@@ -3106,7 +3116,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

@@ -60,6 +60,11 @@ struct I {
   var value: Builtin.Int64
 }
 
+struct Slice {
+    var _startIndex: I
+    var _guts: AnyObject
+}
+
 typealias TXXI = (X, X, I)
 
 struct SXXI {
@@ -1071,6 +1076,61 @@ entry(%instance : @owned $AnyObject):
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     return %cast : $X
+}
+
+// Don't fold a destroy_addr into a copy_addr of the whole aggregate if there
+// is an access to some trivial subobject afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_into_whole_with_later_trivial_subobject_use'
+sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : $@convention(thin) (@in Slice) -> (@out Slice) {
+bb0(%out : $*Slice, %4 : $*Slice):
+  copy_addr %4 to [init] %out : $*Slice
+  %8 = alloc_stack $I
+  %9 = struct_element_addr %4 : $*Slice, #Slice._startIndex
+  copy_addr %9 to [init] %8 : $*I
+  destroy_addr %4 : $*Slice
+  dealloc_stack %8 : $*I
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// Like fold_struct_enclosing_tuples_leaf_fields_mixed_insts but with an access
+// of a trivial field afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : {{.*}} {
+// CHECK:         load [trivial]
+// CHECK:         destroy_addr {{%[^,]+}} : $*STXXITXXII
+// CHECK-LABEL: } // end sil function 'nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject'
+sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : $@convention(thin) (@owned STXXITXXII) -> @owned (X, X) {
+entry(%instance : @owned $STXXITXXII):
+    %addr = alloc_stack $STXXITXXII
+    %txxi_1_alone = alloc_stack $X
+    %txxi_2_alone = alloc_stack $X
+    store %instance to [init] %addr : $*STXXITXXII
+    %txxi_1_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_1
+    %txxi_2_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_2
+    %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
+    %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
+    %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
+    %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
+    %trivial = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.i
+
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
+    %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
+    %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
+    %i = load [trivial] %trivial : $*I
+    destroy_addr %addr : $*STXXITXXII
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+
+    destroy_addr %txxi_1_alone : $*X
+    destroy_addr %txxi_2_alone : $*X
+    dealloc_stack %txxi_2_alone : $*X
+    dealloc_stack %txxi_1_alone : $*X
+    dealloc_stack %addr : $*STXXITXXII
+    %retval = tuple (%x1x1 : $X, %x2x1 : $X)
+    return %retval : $(X, X)
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {

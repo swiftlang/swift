@@ -4,4 +4,4 @@ add_swift_host_library(swiftStaticMirror STATIC
    LLVM_LINK_COMPONENTS object support)
 
  target_link_libraries(swiftStaticMirror PRIVATE
-     swiftReflection)
+     swiftRemoteInspection)

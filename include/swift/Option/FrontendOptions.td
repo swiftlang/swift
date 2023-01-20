@@ -564,6 +564,13 @@ def disable_deserialization_recovery :
   Flag<["-"], "disable-deserialization-recovery">,
   HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
+def enable_deserialization_safety :
+  Flag<["-"], "enable-deserialization-safety">,
+  HelpText<"Avoid reading potentially unsafe decls in swiftmodules">;
+def disable_deserialization_safety :
+  Flag<["-"], "disable-deserialization-safety">,
+  HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
@@ -1111,6 +1118,13 @@ def enable_collocate_metadata_functions :
 def disable_collocate_metadata_functions :
   Flag<["-"], "disable-collocate-metadata-functions">,
   HelpText<"Disable collocate metadata functions">;
+
+def enable_relative_protocol_witness_tables :
+  Flag<["-"], "enable-relative-protocol-witness-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_relative_protocol_witness_tables :
+  Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

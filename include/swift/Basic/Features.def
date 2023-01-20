@@ -86,6 +86,7 @@ LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
 LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
+LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
@@ -104,7 +105,6 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(MoveOnly, false)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
-EXPERIMENTAL_FEATURE(ResultBuilderASTTransform, true)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
 EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 
@@ -151,7 +151,7 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
 /// Enable the experimental macros feature.
-EXPERIMENTAL_FEATURE(Macros, false)
+EXPERIMENTAL_FEATURE(Macros, true)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.

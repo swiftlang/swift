@@ -18,7 +18,7 @@ import SIL
 ///
 /// This pass is used for testing EscapeInfo.
 let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   print("Escape information for \(function.name):")
   
@@ -70,7 +70,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
 ///
 /// This pass is used for testing EscapeInfo.
 let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   print("Address escape information for \(function.name):")
 
@@ -101,6 +101,9 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
       }
       return .continueWalk
     }
+
+    var followTrivialTypes: Bool { true }
+    var followLoads: Bool { false }
   }
 
   // test `isEscaping(addressesOf:)`
@@ -109,7 +112,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
     for apply in applies {
       let path = AliasAnalysis.getPtrOrAddressPath(for: value)
       
-      if value.at(path).isAddressEscaping(using: Visitor(apply: apply), context) {
+      if value.at(path).isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")

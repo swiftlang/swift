@@ -69,7 +69,7 @@ let releaseDevirtualizerPass = FunctionPass(
 
 /// Tries to de-virtualize the final release of a stack-promoted object.
 private func tryDevirtualizeReleaseOfObject(
-  _ context: PassContext,
+  _ context: FunctionPassContext,
   _ release: RefCountingInst,
   _ deallocStackRef: DeallocStackRefInst
 ) {
@@ -88,7 +88,7 @@ private func tryDevirtualizeReleaseOfObject(
     return
   }
 
-  let builder = Builder(at: release, location: release.location, context)
+  let builder = Builder(before: release, location: release.location, context)
 
   var object: Value = allocRefInstruction
   if object.type != type {

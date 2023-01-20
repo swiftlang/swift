@@ -839,13 +839,10 @@ public:
       return true;
     }
 
-    void verifyCheckedAlways(PackExpansionExpr *E) {
-      // Remove the element generic environment before verifying
-      // the pack expansion type, which contains pack archetypes.
+    void cleanup(PackExpansionExpr *E) {
       assert(Generics.back().get<GenericEnvironment *>() ==
              E->getGenericEnvironment());
       Generics.pop_back();
-      verifyCheckedAlwaysBase(E);
     }
 
     bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {

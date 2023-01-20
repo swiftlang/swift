@@ -401,6 +401,34 @@ NOTE(generic_parameter_inferred_from_result_context,none,
      "generic parameter %0 inferred as %1 from context",
      (Type, Type))
 
+ERROR(cannot_convert_global_actor,none,
+      "cannot convert function actor-isolated to %0 to function actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_coercion,none,
+      "cannot convert value actor-isolated to %0 to function actor-isolated to %1 in coercion",
+      (Type,Type))
+ERROR(cannot_convert_argument_value_global_actor,none,
+      "cannot convert value actor-isolated to %0 to expected argument type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_contextual,none,
+      "cannot convert value actor-isolated to %0 to specified type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_closure_result_global_actor,none,
+      "cannot convert value actor-isolated to %0 to expected closure result type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_element,none,
+      "cannot convert value actor-isolated to %0 to expected element type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_dict_value,none,
+      "cannot convert value actor-isolated to %0 to expected dictionary value type actor-isolated to %1",
+      (Type,Type))
+ERROR(cannot_convert_global_actor_mismatch_tuple_element,none,
+      "cannot convert type actor-isolated to %0 to type actor-isolated to %1 at tuple element '#%2'",
+      (Type,Type, unsigned))
+ERROR(ternary_expr_cases_global_actor_mismatch,none,
+      "result values in '? :' expression are functions isolated to different actors (%0 vs. %1)",
+      (Type, Type))
+
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "
@@ -1271,15 +1299,18 @@ ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
       ())
 ERROR(extra_argument_labels,none,
-      "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
-      (bool, StringRef, bool))
+      "extraneous argument label%select{|s}0 '%1' in "
+      "%select{call|subscript|macro expansion}2",
+      (bool, StringRef, unsigned))
 ERROR(missing_argument_labels,none,
-      "missing argument label%select{|s}0 '%1' in %select{call|subscript}2",
-      (bool, StringRef, bool))
+      "missing argument label%select{|s}0 '%1' in "
+      "%select{call|subscript|macro expansion}2",
+      (bool, StringRef, unsigned))
 ERROR(wrong_argument_labels,none,
-      "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
+      "incorrect argument label%select{|s}0 in "
+      "%select{call|subscript|macro expansion}3 "
       "(have '%1', expected '%2')",
-      (bool, StringRef, StringRef, bool))
+      (bool, StringRef, StringRef, unsigned))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
@@ -1313,22 +1344,29 @@ ERROR(instance_member_in_default_parameter,none,
       "cannot use instance member %0 as a default parameter", (DeclNameRef))
 
 ERROR(missing_argument_named,none,
-      "missing argument for parameter %0 in call", (Identifier))
+      "missing argument for parameter %0 in "
+      "%select{call|subscript|macro expansion}1", (Identifier, unsigned))
 ERROR(missing_argument_positional,none,
-      "missing argument for parameter #%0 in call", (unsigned))
+      "missing argument for parameter #%0 in "
+      "%select{call|subscript|macro expansion}1", (unsigned, unsigned))
 ERROR(missing_arguments_in_call,none,
-      "missing arguments for parameters %0 in call", (StringRef))
+      "missing arguments for parameters %0 in "
+      "%select{call|subscript|macro expansion}1", (StringRef, unsigned))
 ERROR(extra_argument_named,none,
-      "extra argument %0 in call", (Identifier))
+      "extra argument %0 in %select{call|subscript|macro expansion}1",
+       (Identifier, unsigned))
 ERROR(extra_argument_positional,none,
-      "extra argument in call", ())
+      "extra argument in %select{call|subscript|macro expansion}0",
+      (unsigned))
 ERROR(extra_arguments_in_call,none,
       "extra %select{arguments|trailing closures}0 at positions %1 in call",
        (bool, StringRef))
 ERROR(extra_argument_to_nullary_call,none,
-      "argument passed to call that takes no arguments", ())
+      "argument passed to %select{call|subscript|macro expansion}0 "
+      "that takes no arguments", (unsigned))
 ERROR(extra_trailing_closure_in_call,none,
-      "extra trailing closure passed in call", ())
+      "extra trailing closure passed in "
+      "%select{call|subscript|macro expansion}0", (unsigned))
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
@@ -2025,10 +2063,12 @@ NOTE(objc_generic_extension_using_type_parameter_here,none,
      "generic parameter used here", ())
 NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
      "add '@objc' to allow uses of 'self' within the function body", ())
+ERROR(unsupported_existential_extension,none,
+      "extension of existential type %0 is not supported", (Type))
 ERROR(invalid_nominal_extension,none,
       "extension of type %0 must be declared as an extension of %1",
       (Type, Type))
-NOTE(invalid_nominal_extension_rewrite,none,
+NOTE(invalid_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
 ERROR(synthesized_nominal_extension,none,
       "cannot extend synthesized type %0", (Type))
@@ -3278,8 +3318,14 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
       (DeclAttribute, AccessLevel))
 
 ERROR(attr_has_no_effect_decl_not_available_before,none,
-      "'%0' has no effect because %1 is not available before %2 %3",
-      (DeclAttribute, DeclName, StringRef, llvm::VersionTuple))
+      "'%0' has no effect because %select{getter for |setter for |}1%2 is not "
+      "available before %3 %4",
+      (DeclAttribute, unsigned, DeclName, StringRef, llvm::VersionTuple))
+
+ERROR(attr_has_no_effect_on_unavailable_decl,none,
+      "'%0' has no effect because %select{getter for |setter for |}1%2 is "
+      "unavailable on %3",
+      (DeclAttribute, unsigned, DeclName, StringRef))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
@@ -3840,6 +3886,9 @@ ERROR(unresolved_member_no_inference,none,
       (DeclNameRef))
 ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
+ERROR(cannot_infer_concrete_for_opaque_result,none,
+      "cannot infer concrete type for opaque result %0 from return expression",
+      (Type))
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
 ERROR(cannot_force_unwrap_nil_literal,none,
@@ -5145,6 +5194,9 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
+ERROR(vararg_not_allowed,none,
+      "variadic parameter cannot appear outside of a function parameter list",
+      ())
 ERROR(expansion_not_allowed,none,
       "variadic expansion %0 cannot appear outside of a function parameter list, "
       "function result, tuple element or generic argument list", (Type))
@@ -5164,6 +5216,9 @@ ERROR(multiple_ellipsis_in_tuple,none,
 ERROR(expansion_not_same_shape,none,
       "variadic expansion %0 requires that %1 and %2 have the same shape",
       (Type, Type, Type))
+ERROR(expansion_expr_not_same_shape,none,
+      "pack expansion requires that %0 and %1 have the same shape",
+      (Type, Type))
 
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
@@ -5282,6 +5337,12 @@ ERROR(differentiable_function_type_invalid_result,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(_linear)}1'",
       (StringRef, bool))
+ERROR(differentiable_function_type_void_result,
+      none,
+      "'@differentiable' function returning Void must have at least one "
+      "differentiable inout parameter, i.e. a non-'@noDerivative' parameter "
+      "whose type conforms to 'Differentiable'",
+      ())
 ERROR(differentiable_function_type_no_differentiability_parameters, 
       none,
       "'@differentiable' function type requires at least one differentiability "
@@ -6638,6 +6699,8 @@ ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
 ERROR(move_expression_not_passed_lvalue,none,
       "'move' can only be applied to lvalues", ())
+ERROR(borrow_expression_not_passed_lvalue,none,
+      "'borrow' can only be applied to lvalues", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Wrappers
@@ -6727,6 +6790,12 @@ WARNING(has_symbol_decl_must_be_weak,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
       "'#_hasSymbol' condition must refer to a declaration", ())
+ERROR(has_symbol_invalid_decl_use_responds_to_selector,none,
+      "'#_hasSymbol' cannot be used with Objective-C %select{method|property}0 "
+      "'%1'; use respondsToSelector() instead",
+      (unsigned, StringRef))
+ERROR(has_symbol_invalid_decl,none,
+      "'#_hasSymbol' cannot be used with this declaration", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure
@@ -6748,13 +6817,18 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
+ERROR(expected_macro_expansion_decls,PointsToFirstBadToken,
+      "expected macro expansion to produce declarations", ())
 ERROR(macro_undefined,PointsToFirstBadToken,
-      "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
-      "libraries that contain this macro", (Identifier))
+      "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
       "macro %2; the type must be public and provided via "
       "'-load-plugin-library'", (StringRef, StringRef, DeclName))
+ERROR(macro_must_be_defined,none,
+      "macro %0 requires a definition", (DeclName))
+ERROR(external_macro_outside_macro_definition,none,
+      "macro 'externalMacro' can only be used to define another macro", ())
 NOTE(macro_note, none,
      "%1 (in macro %0)", (DeclName, StringRef))
 WARNING(macro_warning, none,
@@ -6778,6 +6852,31 @@ WARNING(macro_type_access_warn,none,
         (bool, AccessLevel, AccessLevel, bool))
 ERROR(macro_in_nested,none,
       "macro %0 can only be declared at file scope", (DeclName))
+ERROR(macro_without_context,none,
+      "macro %0 must declare its applicable contexts (e.g., '@expression')",
+       (DeclName))
+ERROR(macro_expansion_missing_pound,none,
+      "expansion of macro %0 requires leading '#'", (DeclName))
+ERROR(macro_expansion_missing_arguments,none,
+      "expansion of macro %0 requires arguments", (DeclName))
+ERROR(macro_unsupported,none,
+      "macros are not supported in this compiler", ())
+ERROR(macro_recursive,none,
+      "recursive expansion of macro %0", (DeclName))
+WARNING(macro_definition_old_style,none,
+        "external macro definitions are now written using #externalMacro", ())
+WARNING(macro_definition_unknown_builtin,none,
+        "ignoring definition of unknown builtin macro %0", (Identifier))
+ERROR(macro_definition_not_expansion,none,
+      "macro must itself be defined by a macro expansion such as "
+      "'#externalMacro(...)'", ())
+ERROR(macro_definition_unsupported,none,
+      "macro definitions other than '#externalMacro(...)' are unsupported", ())
+ERROR(external_macro_arg_not_type_name,none,
+      "argument to `#externalMacro` must be a string literal naming "
+      "the external macro's %select{module|type}", (unsigned))
+ERROR(attached_declaration_macro_not_supported,none,
+      "attached declaration macros are not yet supported", ())
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
@@ -6802,6 +6901,28 @@ ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
 
 ERROR(runtime_discoverable_attrs_are_experimental,none,
       "runtime discoverable attributes are an experimental feature", ())
+
+ERROR(invalid_decl_for_runtime_discoverable_attr,none,
+      "@%0 can only be applied to non-generic types, methods, "
+      "instance properties, and global functions", (StringRef))
+
+ERROR(duplicate_runtime_discoverable_attr,none,
+      "duplicate runtime discoverable attribute", ())
+
+ERROR(runtime_attribute_requires_init,none,
+      "runtime attribute type %0 does not contain a required initializer"
+      " - init(attachedTo:)",
+      (DeclName))
+
+ERROR(runtime_attribute_type_failable_init,none,
+      "runtime attribute type initializer %0 cannot be failable", (DeclName))
+
+ERROR(runtime_attribute_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing runtime attribute type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

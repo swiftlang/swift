@@ -470,6 +470,17 @@ protected:
   }
 };
 
+class SameShapeExpansionFailure final : public FailureDiagnostic {
+  Type lhs, rhs;
+
+public:
+  SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to superclass generic requirements, e.g.
 /// ```swift
 /// class A {
@@ -2841,6 +2852,67 @@ public:
   }
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that was not indicated as a missing # in the source.:
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   print(a, b, c) // missing # to use the macro
+/// }
+/// \endcode
+class AddMissingMacroPound final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroPound(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that has parameters, but was not provided any arguments.
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   #print
+/// }
+/// \endcode
+class AddMissingMacroArguments final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroArguments(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose function types global actor mismatches
+/// e.g.  `@MainActor () -> Void` vs.`@OtherActor () -> Void`
+class GlobalActorFunctionMismatchFailure final : public ContextualFailure {
+public:
+  GlobalActorFunctionMismatchFailure(const Solution &solution, Type fromType,
+                                     Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Diag<Type, Type> getDiagnosticMessage() const;
+  bool diagnoseTupleElement();
 };
 
 } // end namespace constraints

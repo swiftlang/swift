@@ -2,7 +2,7 @@
 
 // REQUIRES: asserts
 
-func debugPrint<T...>(_ items: T...)
+func debugPrint<T...>(_ items: repeat each T)
   where T: CustomDebugStringConvertible
 {
   /*for (item: T) in items {
@@ -10,32 +10,36 @@ func debugPrint<T...>(_ items: T...)
   }*/
 }
 
-func max<T...>(_ values: T...) -> T?
+func max<T...>(_ values: repeat each T) -> T?
   where T: Comparable
 {
   return nil
 }
 
-func min<T...: Comparable>(_ values: T...) -> T? {
+func min<T...: Comparable>(_ values: repeat each T) -> T? {
   return nil
 }
 
 func invalidPacks() {
-  func monovariadic1() -> (String...) {} // expected-error {{variadic expansion 'String' must contain at least one variadic generic parameter}}
-  func monovariadic2<T>() -> (T...) {} // expected-error {{variadic expansion 'T' must contain at least one variadic generic parameter}}
-  func monovariadic3<T, U>() -> (T, U...) {} // expected-error {{variadic expansion 'U' must contain at least one variadic generic parameter}}
+  func monovariadic1() -> (String...) {} // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
+  func monovariadic2<T>() -> (repeat T) {} // expected-error {{variadic expansion 'T' must contain at least one variadic generic parameter}}
+  func monovariadic3<T, U>() -> (T, repeat U) {} // expected-error {{variadic expansion 'U' must contain at least one variadic generic parameter}}
 }
 
 func call() {
-  func multipleParameters<T...>(xs: T..., ys: T...) -> (T...) { return (_: xs) }
+  func multipleParameters<T...>(xs: repeat each T, ys: repeat each T) -> (repeat each T) {
+    return (repeat each xs)
+  }
   multipleParameters()
 
   let x: (_: String) = multipleParameters(xs: "", ys: "")
   let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 
-  func multipleSequences<T..., U...>(xs: T..., ys: U...) -> (T...) { return (_: ys) }
-  // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
+  func multipleSequences<T..., U...>(xs: repeat each T, ys: repeat each U) -> (repeat each T) {
+    return (repeat each ys)
+    // expected-error@-1 {{cannot convert return expression of type '(repeat each U)' to return type '(repeat each T)'}}
+  }
 
   multipleSequences()
   _ = multipleSequences(xs: "", ys: "")
@@ -43,16 +47,16 @@ func call() {
 }
 
 func contextualTyping() {
-  func firsts<T...>(_ seqs: [T]...) -> (T?...) {
+  func firsts<T...>(_ seqs: repeat [each T]) -> (repeat (each T)?) {
     fatalError()
   }
 
   let (_, _): (Int?, String?) = firsts([42], [""]) // OK
-  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
-  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
-  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'((Int)?, (String)?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
 
-  func dependent<T...>(_ seqs: Array<T>...) -> (Array<T>.Element?...) {
+  func dependent<T...>(_ seqs: repeat Array<each T>) -> (repeat Array<each T>.Element?) {
     fatalError()
   }
 

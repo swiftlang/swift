@@ -908,6 +908,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
+    case SymbolKind::RuntimeDiscoverableAttributeRecord:
+      return appendOperator("Ha");
   }
 }
 
@@ -2371,6 +2373,14 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto attrInit = cast<RuntimeAttributeInitializer>(ctx);
+
+      auto *decl = attrInit->getAttachedToDecl();
+      appendRuntimeAttributeGeneratorEntity(decl, attrInit->getAttr());
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
 
@@ -3237,7 +3247,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl,
   } else {
     appendType(type, sig, decl);
   }
-
+  
   // Mangle the generic signature, if any.
   if (genericSig && appendGenericSignature(genericSig, parentGenericSig)) {
     // The 'F' function mangling doesn't need a 'u' for its generic signature.
@@ -3657,6 +3667,14 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }
 
+std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
+    const ValueDecl *decl, CustomAttr *attr, SymbolKind SKind) {
+  beginMangling();
+  appendRuntimeAttributeGeneratorEntity(decl, attr);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
                                           ParameterizedProtocolType *PPT) {
   auto protoTy = PPT->getBaseType();
@@ -3713,4 +3731,14 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
     }
   }
   return appendOperator("XP");
+}
+
+void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                                       CustomAttr *attr) {
+  auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
+
+  appendEntity(decl, "vp", decl->isStatic());
+  appendOperator("fa");
+  appendContextOf(attrType);
+  appendDeclName(attrType);
 }

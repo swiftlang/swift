@@ -21,16 +21,12 @@
 
 using namespace swift;
 
-/// Mark blocks live during a reverse CFG traversal from one specific block
-/// containing a user.
-void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB,
-                                               unsigned startBitNo,
-                                               unsigned endBitNo) {
+void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
+                                                     unsigned bitNo) {
   // If, we are visiting this block, then it is not already LiveOut. Mark it
   // LiveWithin to indicate a liveness boundary within the block.
-  markBlockLive(userBB, startBitNo, endBitNo, LiveWithin);
+  markBlockLive(userBB, bitNo, LiveWithin);
 
-  SmallVector<IsLive, 8> predLivenessInfo;
   BasicBlockWorklist worklist(userBB->getFunction());
   worklist.push(userBB);
 
@@ -40,19 +36,15 @@ void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB,
     // Traversal terminates at any previously visited block, including the
     // blocks initialized as definition blocks.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      SWIFT_DEFER { predLivenessInfo.clear(); };
-      getBlockLiveness(predBlock, startBitNo, endBitNo, predLivenessInfo);
-      for (unsigned i : indices(predLivenessInfo)) {
-        switch (predLivenessInfo[i]) {
-        case Dead:
-          worklist.pushIfNotVisited(predBlock);
-          LLVM_FALLTHROUGH;
-        case LiveWithin:
-          markBlockLive(predBlock, startBitNo, endBitNo, LiveOut);
-          break;
-        case LiveOut:
-          break;
-        }
+      switch (getBlockLiveness(predBlock, bitNo)) {
+      case Dead:
+        worklist.pushIfNotVisited(predBlock);
+        LLVM_FALLTHROUGH;
+      case LiveWithin:
+        markBlockLive(predBlock, bitNo, LiveOut);
+        break;
+      case LiveOut:
+        break;
       }
     }
   }
@@ -66,22 +58,26 @@ void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB,
 void PrunedLiveBlocks::updateForUse(
     SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
     SmallVectorImpl<IsLive> &resultingLivenessInfo) {
+  resultingLivenessInfo.clear();
+
   SWIFT_ASSERT_ONLY(seenUse = true);
 
   auto *bb = user->getParent();
   getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
 
-  for (auto isLive : resultingLivenessInfo) {
-    switch (isLive) {
+  for (auto pair : llvm::enumerate(resultingLivenessInfo)) {
+    unsigned index = pair.index();
+    unsigned specificBitNo = startBitNo + index;
+    switch (pair.value()) {
     case LiveOut:
     case LiveWithin:
       continue;
     case Dead: {
       // This use block has not yet been marked live. Mark it and its
       // predecessor blocks live.
-      computeUseBlockLiveness(bb, startBitNo, endBitNo);
-      resultingLivenessInfo.clear();
-      return getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
+      computeScalarUseBlockLiveness(bb, specificBitNo);
+      resultingLivenessInfo.push_back(getBlockLiveness(bb, specificBitNo));
+      continue;
     }
     }
     llvm_unreachable("covered switch");
@@ -178,11 +174,15 @@ llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
 void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   if (!discoveredBlocks) {
     OS << "No deterministic live block list\n";
+    return;
   }
+  SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
     block->printAsOperand(OS);
-    OS
-      << ": " << getStringRef(this->getBlockLiveness(block, 0)) << "\n";
+    OS << ": ";
+    for (unsigned i : range(getNumBitsToTrack()))
+      OS << getStringRef(this->getBlockLiveness(block, i)) << ", ";
+    OS << "\n";
   }
 }
 
@@ -277,7 +277,20 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 template <typename LivenessWithDefs>
 SimpleLiveRangeSummary
 PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+  ValueSet visited(def->getFunction());
+  return recursivelyUpdateForDef(def, visited, def);
+}
+
+template <typename LivenessWithDefs>
+SimpleLiveRangeSummary
+PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(SILValue initialDef,
+                                                           ValueSet &visited,
+                                                           SILValue value) {
   SimpleLiveRangeSummary summary;
+
+  if (!visited.insert(value))
+    return summary;
+
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
   // everywhere. Non-uses cannot be treated like normal non-lifetime-ending uses
@@ -285,7 +298,7 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   // the return point, and on forwarding instructions, like
   // init_existential_ref, which need to consume their use even when
   // type-dependent operands exist.
-  for (Operand *use : def->getUses()) {
+  for (Operand *use : value->getUses()) {
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
       break;
@@ -299,10 +312,25 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
     case OperandOwnership::GuaranteedForwarding: {
+      updateForUse(use->getUser(), /*lifetimeEnding*/false);
+      if (auto phiOper = PhiOperand(use)) {
+        SILValue phi = phiOper.getValue();
+        // If 'def' is any of the enclosing defs, then it must dominate the phi
+        // and all phi uses should be handled recursively.
+        if (!visitEnclosingDefs(phi, [initialDef](SILValue enclosingDef) {
+          return enclosingDef != initialDef;
+        })) {
+          // At least one enclosing def was 'def'.
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, phi));
+        }
+        // Otherwise all enclosing defs are protected by separate reborrow
+        // scopes, which are not included in "simple" liveness.
+        break;
+      }
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {
-          updateForDef(result);
+          summary.meet(recursivelyUpdateForDef(initialDef, visited, result));
         }
         return true;
       });
@@ -319,6 +347,7 @@ PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
       break;
     }
     default:
+      // Note: An outer reborrow ends the outer lifetime here.
       updateForUse(use->getUser(), use->isLifetimeEnding());
       break;
     }
@@ -579,8 +608,15 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
         boundary.deadDefs.push_back(deadArg);
       }
     }
+    if (auto *predBB = block->getSinglePredecessorBlock()) {
+      if (getBlockLiveness(predBB) == PrunedLiveBlocks::LiveOut) {
+        boundary.boundaryEdges.push_back(block);
+      }
+    }
   }
-  assert(prevCount < boundary.deadDefs.size() + boundary.lastUsers.size()
+  // All live-within blocks must contain a boundary.
+  assert(isLiveOut
+         || (prevCount < boundary.deadDefs.size() + boundary.lastUsers.size())
          && "findBoundariesInBlock must be called on a live block");
 }
 

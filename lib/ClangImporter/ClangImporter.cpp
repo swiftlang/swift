@@ -2661,7 +2661,17 @@ getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
   if (const clang::Decl *D = Node.getAsDecl()) {
     auto ExtSource = ClangCtx.getExternalSource();
     assert(ExtSource);
-    return ExtSource->getModule(D->getOwningModuleID());
+
+    auto originalDecl = D;
+    if (auto functionDecl = dyn_cast<clang::FunctionDecl>(D)) {
+      if (auto pattern = functionDecl->getTemplateInstantiationPattern()) {
+        // Function template instantiations don't have an owning Clang module.
+        // Let's use the owning module of the template pattern.
+        originalDecl = pattern;
+      }
+    }
+
+    return ExtSource->getModule(originalDecl->getOwningModuleID());
   }
 
   if (const clang::ModuleMacro *M = Node.getAsModuleMacro())
@@ -4021,6 +4031,30 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
   return known->second.get();
 }
 
+SwiftLookupTable *
+ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
+  // Contents of a C++ namespace are added to the __ObjC module.
+  bool isWithinNamespace = false;
+  auto declContext = decl->getDeclContext();
+  while (!declContext->isTranslationUnit()) {
+    if (declContext->isNamespace()) {
+      isWithinNamespace = true;
+      break;
+    }
+    declContext = declContext->getParent();
+  }
+
+  clang::Module *owningModule = nullptr;
+  if (!isWithinNamespace) {
+    // Members of class template specializations don't have an owning module.
+    if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
+      owningModule = spec->getSpecializedTemplate()->getOwningModule();
+    else
+      owningModule = decl->getOwningModule();
+  }
+  return findLookupTable(owningModule);
+}
+
 bool ClangImporter::Implementation::forEachLookupTable(
        llvm::function_ref<bool(SwiftLookupTable &table)> fn) {
   // Visit the bridging header's lookup table.
@@ -4074,9 +4108,11 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
           if (auto func = dyn_cast_or_null<FuncDecl>(
                   importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
             if (auto synthesizedOperator =
-                    importer->getCXXSynthesizedOperatorFunc(func))
+                    importer->getCXXSynthesizedOperatorFunc(func)) {
               consumer.foundDecl(synthesizedOperator,
                                  DeclVisibilityKind::VisibleAtTopLevel);
+              declFound = true;
+            }
           }
         }
       }
@@ -4981,6 +5017,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   if (auto cxxRecord =
           dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
     for (auto base : cxxRecord->bases()) {
+      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
@@ -5621,12 +5660,16 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     std::string failedTypesStr;
     llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
     llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+
+    std::string funcName;
+    llvm::raw_string_ostream funcNameStream(funcName);
+    func->printQualifiedName(funcNameStream);
+
     // TODO: Use the location of the apply here.
     // TODO: This error message should not reference implementation details.
     // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
-    ctx.Diags.diagnose(SourceLoc(),
-                       diag::unable_to_convert_generic_swift_types.ID,
-                       {func->getName(), StringRef(failedTypesStr)});
+    ctx.Diags.diagnose(SourceLoc(), diag::unable_to_convert_generic_swift_types,
+                       funcName, failedTypesStr);
     return nullptr;
   }
 

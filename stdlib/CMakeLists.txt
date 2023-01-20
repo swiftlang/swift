@@ -5,6 +5,15 @@
 # standard library from the Swift compiler build.
 project(swift-stdlib LANGUAGES C CXX)
 
+# CMake passes `-external:I` to clang-cl which results in the search order being
+# altered, and this impacts the definitions of the intrinsics. When building
+# with a MSVC toolset 19.29.30036.3 or newer, this will prevent the runtime from
+# being built on Windows.  Since we know that we only support `clang-cl` as the
+# compiler for the runtime due to the use of the Swift calling convention, we
+# simply override the CMake behaviour unconditionally.
+set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-I")
+set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-I")
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -178,6 +187,19 @@ endfunction()
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
    AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
+endif()
+
+if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    message(SEND_ERROR "Cannot use the single-threaded concurrency with task-to-thread concurrency model")
+  endif()
+  if(NOT "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+    message(SEND_ERROR "Task-to-thread concurrency model requires no global executor")
+  endif()
+else()
+  if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+    message(SEND_ERROR "Only task-to-thread concurrency model is usable with no global executor")
+  endif()
 endif()
 
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)

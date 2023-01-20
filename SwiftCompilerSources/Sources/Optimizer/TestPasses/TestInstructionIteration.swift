@@ -24,7 +24,7 @@ import SIL
 /// is encountered during the iteration, it triggers the deletion of all `string_literal`
 /// instructions of the basic block (including the current one).
 let testInstructionIteration = FunctionPass(name: "test-instruction-iteration") {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   print("Test instruction iteration in \(function.name):")
 
@@ -50,16 +50,16 @@ let testInstructionIteration = FunctionPass(name: "test-instruction-iteration") 
   print("End function \(function.name):")
 }
 
-private func handle(instruction: Instruction, _ context: PassContext) {
+private func handle(instruction: Instruction, _ context: FunctionPassContext) {
   print(instruction)
   if let sl = instruction as? StringLiteralInst {
     switch sl.string {
       case "delete_strings":
-        deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: StringLiteralInst.self, in: instruction.parentBlock, context)
       case "delete_ints":
-        deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: IntegerLiteralInst.self, in: instruction.parentBlock, context)
       case "delete_branches":
-        deleteAllInstructions(ofType: BranchInst.self, in: instruction.block, context)
+        deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
       case "split_block":
         _ = context.splitBlock(at: instruction)
       default:
@@ -68,7 +68,7 @@ private func handle(instruction: Instruction, _ context: PassContext) {
   }
 }
 
-private func deleteAllInstructions<InstType: Instruction>(ofType: InstType.Type, in block: BasicBlock, _ context: PassContext) {
+private func deleteAllInstructions<InstType: Instruction>(ofType: InstType.Type, in block: BasicBlock, _ context: FunctionPassContext) {
   for inst in block.instructions {
     if inst is InstType {
       context.erase(instruction: inst)

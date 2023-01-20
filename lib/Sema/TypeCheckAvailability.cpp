@@ -2550,8 +2550,10 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     if (originalArgs->isUnlabeledTrailingClosureIndex(i))
       continue;
     if (argumentLabelIDs[i] != originalArgs->getLabel(i)) {
+      auto paramContext = parsed.IsSubscript ? ParameterContext::Subscript
+                                             : ParameterContext::Call;
       diagnoseArgumentLabelError(ctx, originalArgs, argumentLabelIDs,
-                                 parsed.IsSubscript, &diag);
+                                 paramContext, &diag);
       return;
     }
   }
@@ -3584,34 +3586,6 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
 static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
-  // FIXME: I don't think this is right, but I don't understand the issue well
-  //        enough to fix it properly. If the decl context is an abstract
-  //        closure, we need it to have a type assigned to it before we can
-  //        determine whether it is an asynchronous context. It will crash
-  //        when we go to check without one. In TypeChecker::typeCheckExpression
-  //        (TypeCheckConstraints.cpp:403), we apply a solution before calling
-  //        `performSyntacticDiagnosticsForTarget`, which eventually calls
-  //        down to this function. Under most circumstances, the context that
-  //        we're in is typechecked at that point and has a type assigned.
-  //        When working with specific result builders, the solution applied
-  //        results in an expression with an unset type. In these cases, the
-  //        application makes its way into `ConstraintSystem::applySolution` for
-  //        closures (CSClosure.cpp:1356). The type is computed, but is
-  //        squirreled away in the constrain system to be applied once the
-  //        checks (including this one) approve of the decls within the decl
-  //        context before applying the type to the expression. It might be
-  //        possible to drive the constraint solver through the availability
-  //        checker and into us so that we can ask for it, but that feels wrong
-  //        too.
-  //        This behavior is demonstrated by the first use of the `tuplify`
-  //        function in `testExistingPatternsInCaseStatements` in
-  //        `test/Constraints/result_builder.swift`.
-  const AbstractClosureExpr *declCtxAsExpr =
-      dyn_cast<AbstractClosureExpr>(Where.getDeclContext());
-  if (declCtxAsExpr && !declCtxAsExpr->getType()) {
-    return false;
-  }
-
   // If we are in a synchronous context, don't check it
   if (!Where.getDeclContext()->isAsyncContext())
     return false;
@@ -3954,7 +3928,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   const ExportContext &where;
   DeclAvailabilityFlags flags;
 
-  bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
+  bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
@@ -3984,31 +3958,36 @@ public:
       : where(where), flags(flags) {}
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
-      if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(ITR)) {
-        for (auto *comp : CTR->getComponents()) {
-          // If a parent type is unavailable, don't go on to diagnose
-          // the member since that will just produce a redundant
-          // diagnostic.
-          if (checkComponentIdentTypeRepr(comp)) {
-            foundAnyIssues = true;
-            break;
-          }
-        }
-      } else if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(T)) {
-        if (checkComponentIdentTypeRepr(GTR))
-          foundAnyIssues = true;
-      } else if (auto *STR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-        if (checkComponentIdentTypeRepr(STR))
-          foundAnyIssues = true;
-      }
+    auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
+    if (!declRefTR)
+      return Action::Continue();
 
-      // We've already visited all the children above, so we don't
-      // need to recurse.
+    auto *baseComp = declRefTR->getBaseComponent();
+    if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+      if (checkIdentTypeRepr(identBase)) {
+        foundAnyIssues = true;
+        return Action::SkipChildren();
+      }
+    } else if (diagnoseTypeReprAvailability(baseComp, where, flags)) {
+      foundAnyIssues = true;
       return Action::SkipChildren();
     }
 
-    return Action::Continue();
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      for (auto *comp : memberTR->getMemberComponents()) {
+        // If a parent type is unavailable, don't go on to diagnose
+        // the member since that will just produce a redundant
+        // diagnostic.
+        if (checkIdentTypeRepr(comp)) {
+          foundAnyIssues = true;
+          break;
+        }
+      }
+    }
+
+    // We've already visited all the children above, so we don't
+    // need to recurse.
+    return Action::SkipChildren();
   }
 };
 

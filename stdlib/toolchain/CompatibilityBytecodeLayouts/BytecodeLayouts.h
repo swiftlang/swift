@@ -159,6 +159,9 @@ struct BitVector {
   /// Append on a 64bit value
   void add(uint64_t values);
 
+  /// Append on a pointer-size value
+  void addPointer(uintptr_t values);
+
   /// Append on a vector of bytes
   void add(std::vector<uint8_t> values);
 

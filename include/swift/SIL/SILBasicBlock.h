@@ -155,6 +155,8 @@ public:
 
   ~SILBasicBlock();
 
+  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+
   /// Gets the ID (= index in the function's block list) of the block.
   ///
   /// Returns -1 if the block is not contained in a function.

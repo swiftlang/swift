@@ -415,6 +415,16 @@ enum class FixKind : uint8_t {
   /// For example `.a(let x), .b(let x)` where `x` gets bound to different
   /// types.
   RenameConflictingPatternVariables,
+
+  /// Macro without leading #.
+  MacroMissingPound,
+
+  /// Macro that has parameters but was not provided with any arguments.
+  MacroMissingArguments,
+
+  /// Allow function type actor mismatch e.g. `@MainActor () -> Void`
+  /// vs.`@OtherActor () -> Void`
+  AllowGlobalActorMismatch,
 };
 
 class ConstraintFix {
@@ -659,8 +669,10 @@ public:
   }
 };
 
-/// Skip same-shape generic requirement constraint,
-/// and assume that types are equal.
+/// Skip a same-shape requirement between two type packs.
+///
+/// A same shape requirement can be inferred from a generic requirement,
+/// or from a pack expansion expression.
 class SkipSameShapeRequirement final : public ConstraintFix {
   Type LHS, RHS;
 
@@ -671,7 +683,7 @@ class SkipSameShapeRequirement final : public ConstraintFix {
 
 public:
   std::string getName() const override {
-    return "skip same-shape generic requirement";
+    return "skip same-shape requirement";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -850,7 +862,7 @@ class MarkGlobalActorFunction final : public ContextualMismatch {
   }
 
 public:
-  std::string getName() const override { return "add @escaping"; }
+  std::string getName() const override { return "add global actor"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -1838,6 +1850,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
@@ -3223,6 +3239,82 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::RenameConflictingPatternVariables;
+  }
+};
+
+class MacroMissingPound final : public ConstraintFix {
+  MacroDecl *macro;
+
+  MacroMissingPound(ConstraintSystem &cs, MacroDecl *macro,
+                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MacroMissingPound, locator),
+        macro(macro) { }
+
+public:
+  std::string getName() const override { return "macro missing pound"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static MacroMissingPound *
+  create(ConstraintSystem &cs, MacroDecl *macro,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MacroMissingPound;
+  }
+};
+
+class MacroMissingArguments final : public ConstraintFix {
+  MacroDecl *macro;
+
+  MacroMissingArguments(ConstraintSystem &cs, MacroDecl *macro,
+                        ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MacroMissingArguments, locator),
+        macro(macro) { }
+
+public:
+  std::string getName() const override { return "macro missing arguments"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static MacroMissingArguments *
+  create(ConstraintSystem &cs, MacroDecl *macro,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MacroMissingArguments;
+  }
+};
+
+/// Allow mismatch between function types global actors.
+/// e.g.  `@MainActor () -> Void` vs.`@OtherActor () -> Void`
+class AllowGlobalActorMismatch final : public ContextualMismatch {
+  AllowGlobalActorMismatch(ConstraintSystem &cs, Type fromType, Type toType,
+                           ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowGlobalActorMismatch, fromType,
+                           toType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow function type actor mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowGlobalActorMismatch *create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowGlobalActorMismatch;
   }
 };
 

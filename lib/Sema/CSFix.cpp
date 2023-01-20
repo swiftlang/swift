@@ -467,6 +467,11 @@ SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
 
 bool SkipSameShapeRequirement::diagnose(const Solution &solution,
                                        bool asNote) const {
+  if (getLocator()->isLastElement<LocatorPathElt::PackShape>()) {
+    SameShapeExpansionFailure failure(solution, LHS, RHS, getLocator());
+    return failure.diagnose(asNote);
+  }
+
   SameShapeRequirementFailure failure(solution, LHS, RHS, getLocator());
   return failure.diagnose(asNote);
 }
@@ -2595,4 +2600,42 @@ RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
       size, alignof(RenameConflictingPatternVariables));
   return new (mem)
       RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
+}
+
+bool MacroMissingPound::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  AddMissingMacroPound failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingPound *
+MacroMissingPound::create(ConstraintSystem &cs, MacroDecl *macro,
+                          ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingPound(cs, macro, locator);
+}
+
+bool MacroMissingArguments::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  AddMissingMacroArguments failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingArguments *
+MacroMissingArguments::create(ConstraintSystem &cs, MacroDecl *macro,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingArguments(cs, macro, locator);
+}
+
+bool AllowGlobalActorMismatch::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  GlobalActorFunctionMismatchFailure failure(solution, getFromType(),
+                                             getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowGlobalActorMismatch *
+AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
+                                 Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowGlobalActorMismatch(cs, fromType, toType, locator);
 }

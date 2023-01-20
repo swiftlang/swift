@@ -125,7 +125,8 @@ public:
   /// Print a C++ namespace declaration with the give name and body.
   void printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
                       llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
-                      NamespaceTrivia trivia = NamespaceTrivia::None) const;
+                      NamespaceTrivia trivia = NamespaceTrivia::None,
+                      const ModuleDecl *moduleContext = nullptr) const;
 
   void printNamespace(StringRef name,
                       llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
@@ -219,6 +220,10 @@ public:
 
   void printIgnoredCxx17ExtensionDiagnosticBlock(
       llvm::function_ref<void()> bodyPrinter);
+
+  /// Print the macro that applies Clang's `external_source_symbol` attribute
+  /// on the generated declaration.
+  void printSymbolUSRAttribute(const ValueDecl *D) const;
 
 protected:
   raw_ostream &os;

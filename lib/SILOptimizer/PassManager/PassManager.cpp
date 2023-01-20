@@ -28,8 +28,10 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -137,6 +139,10 @@ llvm::cl::opt<bool> SILForceVerifyAll(
     "sil-verify-force-analysis", llvm::cl::init(false),
     llvm::cl::desc("For all passes, precompute analyses before the pass and "
                    "verify analyses after the pass"));
+
+llvm::cl::list<std::string>
+    SimplifyInstructionTest("simplify-instruction", llvm::cl::CommaSeparated,
+                     llvm::cl::desc("Simplify instruction of specified kind(s)"));
 
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
@@ -481,6 +487,18 @@ bool SILPassManager::isPassDisabled(StringRef passName) {
   for (const std::string &namePattern : SILDisablePass) {
     if (passName.contains(namePattern))
       return true;
+  }
+  return false;
+}
+
+bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
+  StringRef prefix("simplify-");
+  for (const std::string &namePattern : SILDisablePass) {
+    StringRef pattern(namePattern);
+    if (pattern.startswith(prefix) && pattern.endswith(instName) &&
+        pattern.size() == prefix.size() + instName.size()) {
+      return true;
+    }
   }
   return false;
 }
@@ -1351,6 +1369,7 @@ void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(!needFixStackNesting && "Stack nesting not fixed");
 }
 
 void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
@@ -1461,6 +1480,23 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
+void PassContext_eraseBlock(BridgedPassContext passContext,
+                            BridgedBasicBlock block) {
+  castToBasicBlock(block)->eraseFromParent();
+}
+
+bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
+  return tryDeleteDeadClosure(castToInst<SingleValueInstruction>(closure), InstModCallbacks());
+}
+
+void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context) {
+  castToPassInvocation(context)->setNeedFixStackNesting(true);
+}
+
+bool PassContext_getNeedFixStackNesting(BridgedPassContext context) {
+  return castToPassInvocation(context)->getNeedFixStackNesting();
+}
+
 void PassContext_fixStackNesting(BridgedPassContext passContext,
                                  BridgedFunction function) {
   switch (StackNesting::fixNesting(castToFunction(function))) {
@@ -1473,6 +1509,7 @@ void PassContext_fixStackNesting(BridgedPassContext passContext,
       PassContext_notifyChanges(passContext, branchesChanged);
       break;
   }
+  castToPassInvocation(passContext)->setNeedFixStackNesting(false);
 }
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
@@ -1586,6 +1623,12 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }
 
+void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
+                                  BridgedBasicBlock to) {
+  castToInst<TermInst>(term)->replaceBranchTarget(castToBasicBlock(from),
+                                                  castToBasicBlock(to));
+}
+
 SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType) {
@@ -1677,4 +1720,30 @@ SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   return mod->getOptions().EnableMoveInoutStackProtection;
+}
+
+bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
+  // Fast-path check.
+  if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
+    return true;
+
+  StringRef instName = getSILInstructionName(castToInst(inst)->getKind());
+
+  if (SILPassManager::isInstructionPassDisabled(instName))
+    return false;
+
+  if (SimplifyInstructionTest.empty())
+    return true;
+
+  for (const std::string &testName : SimplifyInstructionTest) {
+    if (testName == instName)
+      return true;
+  }
+  return false;
+}
+
+BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context) {
+  SILUndef *undef = SILUndef::get(castToSILType(type),
+                                  *castToPassInvocation(context)->getFunction());
+  return {undef};
 }

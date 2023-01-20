@@ -1586,6 +1586,14 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   llvm_unreachable("bad instruction kind");
 }
 
+void TermInst::replaceBranchTarget(SILBasicBlock *oldDest, SILBasicBlock *newDest) {
+  for (SILSuccessor &succ : getSuccessors()) {
+    if (succ.getBB() == oldDest) {
+      succ = newDest;
+    }
+  }
+}
+
 bool TermInst::isFunctionExiting() const {
   switch (getTermKind()) {
   case TermKind::AwaitAsyncContinuationInst:
@@ -2242,6 +2250,36 @@ OpenExistentialValueInst::OpenExistentialValueInst(
     SILDebugLocation debugLoc, SILValue operand, SILType selfTy,
     ValueOwnershipKind forwardingOwnershipKind)
     : UnaryInstructionBase(debugLoc, operand, selfTy, forwardingOwnershipKind) {
+}
+
+OpenPackElementInst::OpenPackElementInst(
+    SILDebugLocation debugLoc, ArrayRef<SILValue> allOperands,
+    SILType type, GenericEnvironment *env)
+    : InstructionBaseWithTrailingOperands(allOperands, debugLoc, type),
+      Env(env) {
+}
+
+OpenPackElementInst *OpenPackElementInst::create(
+    SILFunction &F, SILDebugLocation debugLoc, SILValue indexOperand,
+    GenericEnvironment *env) {
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+
+  // open_pack_element references the pack substitutions and
+  // the types used in the shape class.
+  TypeDependentOperandCollector typeDependentOperands;
+  env->forEachPackElementBinding([&](ElementArchetypeType *elementType,
+                                     PackType *packSubstitution) {
+    typeDependentOperands.collect(packSubstitution->getCanonicalType());
+  });
+  typeDependentOperands.collect(env->getOpenedElementShapeClass());
+  typeDependentOperands.addTo(allOperands, F);
+
+  SILType type = SILType::getSILTokenType(F.getASTContext());
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer = F.getModule().allocateInst(size, alignof(OpenPackElementInst));
+  return ::new (buffer) OpenPackElementInst(debugLoc, allOperands, type, env);
 }
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,

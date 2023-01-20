@@ -67,3 +67,14 @@ public func test_return_from_conditional() -> some P {
 
   return Tuple<(String, Int)>(("", 0))
 }
+
+// This used to crash during serialization because
+// @available negates availability condition.
+@available(macOS, unavailable)
+public func testUnusable() -> some P {
+  if #available(iOS 50, *) {
+    return Named()
+  }
+
+  return Tuple<(String, Int)>(("", 0))
+}

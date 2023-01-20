@@ -365,6 +365,13 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     Visitor.addMethodDescriptor(method);
   }
 
+  void addRuntimeDiscoverableAttrGenerators(ValueDecl *D) {
+    for (auto *attr : D->getRuntimeDiscoverableAttrs()) {
+      addFunction(SILDeclRef::getRuntimeAttributeGenerator(attr, D),
+                  /*ignoreLinkage=*/true);
+    }
+  }
+
 public:
   SILSymbolVisitorImpl(SILSymbolVisitor &Visitor,
                        const SILSymbolVisitorContext &Ctx)
@@ -473,6 +480,8 @@ public:
                          IndexSubset::get(AFD->getASTContext(), 1, {0}),
                          AFD->getGenericSignature()));
 
+    addRuntimeDiscoverableAttrGenerators(AFD);
+
     visitDefaultArguments(AFD, AFD->getParameters());
 
     if (AFD->hasAsync()) {
@@ -555,6 +564,8 @@ public:
     }
 
     visitAbstractStorageDecl(VD);
+
+    addRuntimeDiscoverableAttrGenerators(VD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -577,6 +588,8 @@ public:
 
     // There are symbols associated with any protocols this type conforms to.
     addConformances(NTD);
+
+    addRuntimeDiscoverableAttrGenerators(NTD);
 
     if (Ctx.getOpts().VisitMembers)
       for (auto member : NTD->getMembers())
@@ -710,6 +723,8 @@ public:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
       return false;
+    case DeclKind::Missing:
+      llvm_unreachable("missing decl should not show up here");
     case DeclKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleDecl should not show up here");
     }
@@ -801,6 +816,7 @@ public:
   UNINTERESTING_DECL(IfConfig)
   UNINTERESTING_DECL(Import)
   UNINTERESTING_DECL(MacroExpansion)
+  UNINTERESTING_DECL(Missing)
   UNINTERESTING_DECL(MissingMember)
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)

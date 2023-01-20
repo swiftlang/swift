@@ -23,8 +23,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Reflection/MetadataSourceBuilder.h"
-#include "swift/Reflection/Records.h"
+#include "swift/RemoteInspection/MetadataSourceBuilder.h"
+#include "swift/RemoteInspection/Records.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"

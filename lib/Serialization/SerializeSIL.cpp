@@ -518,6 +518,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
+      (unsigned)F.isRuntimeAccessible(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -1757,6 +1758,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                          ? 0 : 1;
     writeOneTypeOneOperandLayout(open.getKind(), attrs, open.getType(),
                                  open.getOperand());
+    break;
+  }
+  case SILInstructionKind::OpenPackElementInst: {
+    auto &opei = cast<OpenPackElementInst>(SI);
+    auto envRef =
+      S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
+    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
     break;
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {

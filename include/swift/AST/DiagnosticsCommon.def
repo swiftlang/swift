@@ -219,6 +219,10 @@ ERROR(unknown_attribute,none,
 //------------------------------------------------------------------------------
 NOTE(in_macro_expansion,none,
      "in expansion of macro %0 here", (DeclName))
+ERROR(macro_experimental,none,
+      "macros are an experimental feature that is not enabled", ())
+ERROR(ambiguous_macro_reference,none,
+      "ambiguous reference to macro %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

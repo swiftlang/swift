@@ -267,6 +267,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     OpenedExistentialTypes.insert(openedExistential);
   }
 
+  // Register the solutions's pack expansion environments.
+  for (const auto &expansion : solution.PackExpansionEnvironments) {
+    PackExpansionEnvironments.insert(expansion);
+  }
+
   // Register the defaulted type variables.
   DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
@@ -585,6 +590,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
+  numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
@@ -661,6 +667,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
+
+  // Remove any pack expansion environments.
+  truncate(cs.PackExpansionEnvironments, numPackExpansionEnvironments);
 
   // Remove any defaulted type variables.
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
@@ -1190,7 +1199,8 @@ void ConstraintSystem::shrink(Expr *expr) {
                 // example:
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
                 // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
-                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr);
+                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
+                /*packElementOpener*/ nullptr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())

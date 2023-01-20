@@ -356,11 +356,17 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
-    /// Whether to attempt to recover from missing cross-references and other
-    /// errors when deserializing from a Swift module.
+    /// Whether to attempt to recover from missing cross-references,
+    /// differences in APIs between language versions, and other
+    /// errors when deserializing from a binary swiftmodule file.
     ///
-    /// This is a staging flag; eventually it will be removed.
+    /// This feature should only be disabled for testing as regular builds
+    /// rely heavily on it.
     bool EnableDeserializationRecovery = true;
+
+    /// Enable early skipping deserialization of decls that are marked as
+    /// unsafe to read.
+    bool EnableDeserializationSafety = false;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.

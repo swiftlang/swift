@@ -500,6 +500,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
+  if (auto A = Args.getLastArg(OPT_enable_deserialization_safety,
+                               OPT_disable_deserialization_safety)) {
+    Opts.EnableDeserializationSafety
+      = A->getOption().matches(OPT_enable_deserialization_safety);
+  }
+
   // Whether '/.../' regex literals are enabled. This implies experimental
   // string processing.
   if (Args.hasArg(OPT_enable_bare_slash_regex)) {
@@ -2476,6 +2482,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_collocate_metadata_functions,
                    OPT_disable_collocate_metadata_functions,
                    Opts.CollocatedMetadataFunctions);
+  Opts.UseRelativeProtocolWitnessTables =
+    Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
+                 OPT_disable_relative_protocol_witness_tables,
+                 Opts.UseRelativeProtocolWitnessTables);
   return false;
 }
 

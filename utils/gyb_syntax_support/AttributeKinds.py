@@ -903,6 +903,20 @@ DECL_MODIFIER_KINDS = [
                                   ABIBreakingToAdd, ABIBreakingToRemove,
                                   APIBreakingToAdd, APIBreakingToRemove,
                                   code=130),
+
+    SimpleDeclAttribute('expression', 'Expression',
+                        OnMacro,
+                        ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
+                        code=140),
+
+    DeclAttribute('declaration', 'Declaration',
+                  OnMacro, AllowMultipleAttributes,
+                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
+                  code=141),
+    DeclAttribute('attached', 'Attached',
+                  OnMacro, AllowMultipleAttributes,
+                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
+                  code=142),
 ]
 
 DEPRECATED_MODIFIER_KINDS = [

@@ -193,7 +193,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       SILLinkage::Private, name, overrideInfo.SILFnType,
       genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      IsNotDistributed, ProfileCounter(), IsThunk);
+      IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -817,8 +817,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
-      IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
-      SubclassScope::NotApplicable, InlineStrategy);
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsThunk, SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -892,8 +892,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto *f = builder.createFunction(
       linkage, name, witnessSILFnType, genericEnv,
       SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
-      IsSerialized, IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
-      SubclassScope::NotApplicable, InlineDefault);
+      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineDefault);
 
   f->setDebugScope(new (SGM.M)
                    SILDebugScope(RegularLocation(requirement.getDecl()), f));
@@ -1115,6 +1115,14 @@ public:
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(normal);
     }
+
+    // Emit `init(for:storage)` initializer as it would be used
+    // by DI and IRGen later on.
+    if (auto typeWrapperInfo = theType->getTypeWrapper()) {
+      auto *ctor = typeWrapperInfo->Wrapper->getTypeWrapperInitializer();
+      assert(ctor);
+      (void)SGM.getFunction(SILDeclRef(ctor), NotForDefinition);
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -1222,14 +1230,17 @@ public:
     });
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in types");
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 
@@ -1397,14 +1408,17 @@ public:
     });
   }
 
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in extensions");
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    auto *rewritten = med->getRewritten();
-    assert(rewritten && "Macro must have been rewritten in SILGen");
-    visit(rewritten);
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 

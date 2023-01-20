@@ -20,6 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -3436,6 +3438,30 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     finishStorageImplInfo(storage, info);
 
     return info;
+  }
+
+  // Check for an accessor macro.
+  for (auto customAttrConst : storage->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto decl = evaluateOrDefault(
+        evaluator,
+        CustomAttrDeclRequest{
+          customAttr,
+          storage->getInnermostDeclContext()
+        },
+        nullptr);
+    if (!decl)
+      continue;
+
+    auto macro = decl.dyn_cast<MacroDecl *>();
+    if (!macro)
+      continue;
+
+    if (!macro->getMacroRoles().contains(MacroRole::Accessor))
+      continue;
+
+    // Expand the accessors.
+    expandAccessors(storage, customAttr, macro);
   }
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);

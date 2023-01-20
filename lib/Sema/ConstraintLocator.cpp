@@ -97,12 +97,12 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
-  case ConstraintLocator::OpenedPackElement:
   case ConstraintLocator::PackShape:
   case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
   case ConstraintLocator::AnyPatternDecl:
+  case ConstraintLocator::GlobalActorType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -449,11 +449,6 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::OpenedPackElement: {
-    out << "opened pack element";
-    break;
-  }
-
   case ConstraintLocator::PackShape: {
     out << "pack shape";
     break;
@@ -479,6 +474,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::AnyPatternDecl: {
     out << "'_' pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::GlobalActorType: {
+    out << "global actor type";
     break;
   }
   }
@@ -595,6 +595,10 @@ bool ConstraintLocator::isForOptionalTry() const {
 
 bool ConstraintLocator::isForResultBuilderBodyResult() const {
   return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
+}
+
+bool ConstraintLocator::isForMacroExpansion() const {
+  return directlyAt<MacroExpansionExpr>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {

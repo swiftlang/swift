@@ -959,8 +959,8 @@ protected:
   VarDecl *captureExpr(Expr *expr, SmallVectorImpl<ASTNode> &container) {
     auto *var = builder.buildVar(expr->getStartLoc());
     Pattern *pattern = NamedPattern::createImplicit(ctx, var);
-    auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                  pattern, expr, dc);
+    auto *PB = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, expr, dc, var->getStartLoc());
     return recordVar(PB, container);
   }
 
@@ -972,7 +972,8 @@ protected:
         ctx, NamedPattern::createImplicit(ctx, var),
         type ? type : PlaceholderType::get(ctx, var));
     auto *PB = PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc);
+        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc,
+        var->getStartLoc());
     return recordVar(PB, container);
   }
 
@@ -1058,11 +1059,20 @@ protected:
                                {Identifier()});
     }
 
-    auto *capture = captureExpr(expr, newBody);
-    // A reference to the synthesized variable is passed as an argument
-    // to buildBlock.
-    buildBlockArguments.push_back(
-        builder.buildVarRef(capture, element.getStartLoc()));
+    if (isa<CodeCompletionExpr>(expr)) {
+      // Insert the CodeCompletionExpr directly into the buildBlock call. That
+      // way, we can extract the contextual type of the code completion token
+      // to rank code completion items that match the type expected by
+      // buildBlock higher.
+      buildBlockArguments.push_back(expr);
+    } else {
+      auto *capture = captureExpr(expr, newBody);
+      // A reference to the synthesized variable is passed as an argument
+      // to buildBlock.
+      buildBlockArguments.push_back(
+          builder.buildVarRef(capture, element.getStartLoc()));
+    }
+
     return None;
   }
 
@@ -1245,27 +1255,10 @@ protected:
         auto *builderCall =
             buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
 
-        auto isTopLevel = [&](Stmt *anchor) {
-          if (ifStmt->getThenStmt() == anchor)
-            return true;
-
-          // The situation is this:
-          //
-          // if <cond> {
-          //   ...
-          // } else if <other-cond> {
-          //   ...
-          // }
-          if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt()))
-            return innerIf->getThenStmt() == anchor;
-
-          return ifStmt->getElseStmt() == anchor;
-        };
-
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
-        if (isOptional && isTopLevel(anchor)) {
-          builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
+        if (isOptional) {
+          builderCall = buildCallIfWanted(ifStmt->getThenStmt()->getStartLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
         }
@@ -1294,7 +1287,7 @@ protected:
             /*argLabels=*/{}));
       }
 
-      auto *ifVarRef = builder.buildVarRef(ifVar.get(), ifStmt->getEndLoc());
+      auto *ifVarRef = builder.buildVarRef(ifVar.get(), ifStmt->getStartLoc());
       doBody.push_back(TypeJoinExpr::create(ctx, ifVarRef, buildEitherCalls));
     }
 
@@ -2459,7 +2452,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return None;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
+  auto disableASTTransform = [&](NominalTypeDecl *builder) { return false; };
+
+  if (!disableASTTransform(builder)) {
     auto transformedBody = getBuilderTransformedBody(fn, builder);
     // If this builder transform has not yet been applied to this function,
     // let's do it and cache the result.
@@ -2517,7 +2512,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->getCurrentIndent() : 0;
       log.indent(indent) << "------- Transfomed Body -------\n";
-      transformedBody->second->dump(log);
+      transformedBody->second->dump(log, &getASTContext(), indent);
       log << '\n';
     }
 

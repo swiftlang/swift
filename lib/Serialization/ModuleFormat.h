@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 735; // add package access modifier
+const uint16_t SWIFTMODULE_VERSION_MINOR = 736; // add package access modifier
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -605,6 +605,28 @@ enum class GenericEnvironmentKind : uint8_t {
   OpenedExistential,
   OpenedElement
 };
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class MacroRole : uint8_t {
+  Expression,
+  FreestandingDeclaration,
+  Accessor,
+  MemberAttribute,
+};
+using MacroRoleField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class MacroIntroducedDeclNameKind : uint8_t {
+  Named = 0,
+  Overloaded,
+  Accessors,
+  Prefixed,
+  Suffixed,
+  Arbitrary,
+};
+using MacroIntroducedDeclNameKindField = BCFixed<4>;
 
 // Encodes a VersionTuple:
 //
@@ -1684,8 +1706,9 @@ namespace decls_block {
     TypeIDField,  // result interface type
     AccessLevelField, // access level
     BCVBR<5>,    // number of parameter name components
-    IdentifierIDField, // external module name
-    IdentifierIDField,  // external type name
+    BCVBR<3>,    // builtin macro definition ID
+    IdentifierIDField, // external module name, for external macros
+    IdentifierIDField,  // external type name, for external macros
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1759,7 +1782,7 @@ namespace decls_block {
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
     BCFixed<1>,                  // GenericEnvironmentKind
-    TypeIDField,                 // existential type
+    TypeIDField,                 // existential type or shape class
     GenericSignatureIDField,     // parent signature
     SubstitutionMapIDField       // substitution map
   >;
@@ -1807,6 +1830,11 @@ namespace decls_block {
   using FilenameForPrivateLayout = BCRecordLayout<
     FILENAME_FOR_PRIVATE,
     IdentifierIDField  // the file name, as an identifier
+  >;
+
+  using DeserializationSafetyLayout = BCRecordLayout<
+    DESERIALIZATION_SAFETY,
+    IdentifierIDField // name to debug access to unsafe decl
   >;
 
   using NormalProtocolConformanceLayout = BCRecordLayout<
@@ -2186,6 +2214,23 @@ namespace decls_block {
     IdentifierIDField,  // metadata text
     BCFixed<1>,         // has visibility
     AccessLevelField    // visibility
+  >;
+
+  using DeclarationDeclAttrLayout = BCRecordLayout<
+    Declaration_DECL_ATTR,
+    BCFixed<1>,                // implicit flag
+    MacroRoleField,         // macro context
+    BCVBR<5>,                  // number of peer names
+    BCVBR<5>,                  // number of member names
+    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
+  >;
+
+  using AttachedDeclAttrLayout = BCRecordLayout<
+    Attached_DECL_ATTR,
+    BCFixed<1>,                // implicit flag
+    MacroRoleField,            // macro roles
+    BCVBR<5>,                  // number of names
+    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

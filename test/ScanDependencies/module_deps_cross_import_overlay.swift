@@ -15,28 +15,13 @@ import EWrapper
 import SubEWrapper
 
 // CHECK:  "directDependencies": [
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "EWrapper"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "F"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "SubEWrapper"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "Swift"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "SwiftOnoneSupport"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_Concurrency"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_StringProcessing"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_cross_import_E"
-// CHECK-NEXT: }
-// CHECK-NEXT: ],
+// CHECK-DAG:   "swift": "EWrapper"
+// CHECK-DAG:   "swift": "F"
+// CHECK-DAG:   "swift": "SubEWrapper"
+// CHECK-DAG:   "swift": "Swift"
+// CHECK-DAG:   "swift": "SwiftOnoneSupport"
+// CHECK-DAG:   "swift": "_Concurrency"
+// CHECK-DAG:   "swift": "_StringProcessing"
+// CHECK-DAG:   "swift": "_cross_import_E"
+// CHECK-DAG:   "clang": "_SwiftConcurrencyShims"
+// CHECK: ],

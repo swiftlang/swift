@@ -74,7 +74,7 @@ var values = getIntFloat()
 func wantFloat(_: Float) {}
 wantFloat(values.float)
 
-var e : (x: Int..., y: Int) // expected-error{{variadic expansion 'Int' must contain at least one variadic generic parameter}}
+var e : (x: Int..., y: Int) // expected-error{{variadic parameter cannot appear outside of a function parameter list}}
 
 typealias Interval = (a:Int, b:Int)
 func takeInterval(_ x: Interval) {}

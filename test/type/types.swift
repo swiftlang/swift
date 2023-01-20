@@ -20,7 +20,7 @@ var d4 : () -> Int = { d2 }  // expected-error{{function 'd2' was used as a prop
 
 if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
   var e0 : [Int]
-  e0[] // expected-error {{missing argument for parameter #1 in call}} {{6-6=<#Int#>}}
+  e0[] // expected-error {{missing argument for parameter #1 in subscript}} {{6-6=<#Int#>}}
 }
 
 var f0 : [Float]

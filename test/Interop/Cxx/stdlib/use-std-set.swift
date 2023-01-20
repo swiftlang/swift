@@ -12,7 +12,6 @@ import Cxx
 
 var StdSetTestSuite = TestSuite("StdSet")
 
-extension SetOfCInt.const_iterator : UnsafeCxxInputIterator { }
 extension SetOfCInt : CxxSequence { }
 
 StdSetTestSuite.test("iterate") {

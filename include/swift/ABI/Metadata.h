@@ -4736,6 +4736,48 @@ public:
 
 using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
 
+/// A single entry in an runtine discoverable attribute record
+/// that relates a type attribute is attached to a generator function.
+template <typename Runtime>
+struct TargetRuntimeDiscoverableAttributeEntry {
+  RelativeDirectPointer<const char, /*nullable*/ false> Type;
+  RelativeDirectPointer<TargetAccessibleFunctionRecord<Runtime>> Generator;
+};
+
+/// A record that relates a runtime discoverable attribute to all of the
+/// types (i.e. a nominal type, method, property etc.) it's attached to.
+template <typename Runtime>
+class RuntimeDiscoverableAttributeRecord
+    : private swift::ABI::TrailingObjects<
+          RuntimeDiscoverableAttributeRecord<Runtime>,
+          TargetRuntimeDiscoverableAttributeEntry<Runtime>> {
+  using TrailingObjects = swift::ABI::TrailingObjects<
+      RuntimeDiscoverableAttributeRecord<Runtime>,
+      ConstTargetMetadataPointer<Runtime, TargetMetadata>>;
+  friend TrailingObjects;
+
+  uint32_t flags;
+
+  /// The nominal type that describes the attribute.
+  TargetRelativeIndirectablePointer<Runtime,
+                                    TargetTypeContextDescriptor<Runtime>,
+                                    /*nullable*/ false>
+      Attribute;
+
+  /// The number of types this attribute is associated with.
+  uint32_t numEntries;
+
+public:
+  uint32_t getFlags() { return flags; }
+
+  llvm::ArrayRef<TargetRuntimeDiscoverableAttributeEntry<Runtime>>
+  getEntries() const {
+    return {this->template getTrailingObjects<
+                TargetRuntimeDiscoverableAttributeEntry<Runtime>>(),
+            numEntries};
+  }
+};
+
 } // end namespace swift
 
 #pragma clang diagnostic pop

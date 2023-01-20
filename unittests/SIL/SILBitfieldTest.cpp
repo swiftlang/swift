@@ -34,6 +34,7 @@ struct SILBasicBlock {
   SILBasicBlock(SILFunction *function): function(function) {}
 
   SILFunction *getFunction() const { return function; }
+  bool isMarkedAsDeleted() const { return false; }
   
   unsigned getCustomBits() const { return customBits; }
   void setCustomBits(unsigned value) { customBits = value; }

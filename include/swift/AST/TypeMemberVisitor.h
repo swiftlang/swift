@@ -78,6 +78,12 @@ public:
         asImpl().visit(dd);
     }
   }
+
+  /// Visit expanded macros.
+  void visitMacroExpansionDecl(MacroExpansionDecl *D) {
+    for (auto *decl : D->getRewritten())
+      asImpl().visit(decl);
+  }
 };
 
 template<typename ImplClass, typename RetTy = void>

@@ -175,7 +175,6 @@ bool SILPhiArgument::getIncomingPhiOperands(
     return false;
 
   const auto *parentBlock = getParent();
-  assert(!parentBlock->pred_empty());
 
   unsigned argIndex = getIndex();
   for (auto *predBlock : getParent()->getPredecessorBlocks()) {
@@ -341,7 +340,7 @@ TermInst *SILPhiArgument::getTerminatorForResult() const {
   return nullptr;
 }
 
-const Operand *SILArgument::forwardedTerminatorResultOperand() const {
+Operand *SILArgument::forwardedTerminatorResultOperand() const {
   assert(isTerminatorResult() && "API is invalid for phis");
   return getSingleTerminator()->forwardedOperand();
 }

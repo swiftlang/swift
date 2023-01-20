@@ -138,6 +138,9 @@ enum class TypeCheckExprFlags {
 
   /// Don't type check expressions for correct availability.
   DisableExprAvailabilityChecking = 0x08,
+
+  /// Don't expansino macros.
+  DisableMacroExpansions = 0x10,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -913,6 +916,10 @@ lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
+
+SmallVector<MacroDecl *, 1>
+lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
+             MacroRoles contexts);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,

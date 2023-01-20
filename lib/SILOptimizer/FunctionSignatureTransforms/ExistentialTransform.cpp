@@ -636,8 +636,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
-      F->getEntryCount(), F->isThunk(), F->getClassSubclassScope(),
-      F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
+      IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
+      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
+      nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

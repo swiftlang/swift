@@ -168,6 +168,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumElement);
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
+  TRIVIAL_KIND(Missing);
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
@@ -352,6 +353,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(ModifyAccessor, "_modify accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
+  ENTRY(Missing, "missing decl");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
@@ -361,6 +363,15 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
+}
+
+DeclAttributes Decl::getSemanticAttrs() const {
+  auto mutableThis = const_cast<Decl *>(this);
+  evaluateOrDefault(getASTContext().evaluator,
+                    ExpandMemberAttributeMacros{mutableThis},
+                    false);
+
+  return getAttrs();
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
@@ -390,19 +401,12 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 
 Optional<llvm::VersionTuple>
 Decl::getBackDeployBeforeOSVersion(ASTContext &Ctx) const {
-  for (auto *attr : getAttrs()) {
-    if (auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr)) {
-      if (backDeployAttr->isActivePlatform(Ctx) && backDeployAttr->Version) {
-        return backDeployAttr->Version;
-      }
-    }
-  }
+  if (auto *attr = getAttrs().getBackDeploy(Ctx))
+    return attr->Version;
 
   // Accessors may inherit `@_backDeploy`.
-  if (getKind() == DeclKind::Accessor) {
-    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(
-        Ctx);
-  }
+  if (auto *AD = dyn_cast<AccessorDecl>(this))
+    return AD->getStorage()->getBackDeployBeforeOSVersion(Ctx);
 
   return None;
 }
@@ -1194,6 +1198,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("not a ValueDecl");
@@ -1529,6 +1534,7 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
                         Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
   Result->setInit(0, E);
+  Result->setOriginalInit(0, E);
   return Result;
 }
 
@@ -2033,11 +2039,11 @@ SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
-  return Body->getStartLoc();
+  return Body ? Body->getStartLoc() : SourceLoc();
 }
 
 SourceRange TopLevelCodeDecl::getSourceRange() const {
-  return Body->getSourceRange();
+  return Body? Body->getSourceRange() : SourceRange();
 }
 
 SourceRange IfConfigDecl::getSourceRange() const {
@@ -2643,6 +2649,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
     llvm_unreachable("Not a ValueDecl");
@@ -2696,13 +2703,55 @@ bool ValueDecl::isInstanceMember() const {
   llvm_unreachable("bad DeclKind");
 }
 
+bool ValueDecl::hasLocalDiscriminator() const {
+  // Generic parameters and unnamed parameters never have local discriminators.
+  if (isa<GenericTypeParamDecl>(this) ||
+      (isa<ParamDecl>(this) && !hasName()))
+    return false;
+
+  // Opaque types never have local discriminators.
+  if (isa<OpaqueTypeDecl>(this))
+    return false;
+
+  // Accessors never have local discriminators.
+  if (isa<AccessorDecl>(this))
+    return false;
+
+  // Implicit and unnamed declarations never have local discriminators.
+  if (getBaseName().isSpecial())
+    return false;
+
+  // If we are not in a local context, there's nothing to do.
+  if (!getDeclContext()->isLocalContext())
+    return false;
+
+  return true;
+}
+
 unsigned ValueDecl::getLocalDiscriminator() const {
+  // If we have already assigned a local discriminator, we're done.
+  if (LocalDiscriminator != InvalidDiscriminator)
+    return LocalDiscriminator;
+
+  // If this declaration does not have a local discriminator, use 0 as a
+  // stand-in.
+  if (!hasLocalDiscriminator())
+    return 0;
+
+  // Assign local discriminators in this context.
+  evaluateOrDefault(
+      getASTContext().evaluator,
+      LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+
+  assert(LocalDiscriminator != InvalidDiscriminator);
+
   return LocalDiscriminator;
 }
 
 void ValueDecl::setLocalDiscriminator(unsigned index) {
-  assert(getDeclContext()->isLocalContext());
-  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  assert(hasLocalDiscriminator());
+  assert(LocalDiscriminator == InvalidDiscriminator &&
+         "LocalDiscriminator is set multiple times");
   LocalDiscriminator = index;
 }
 
@@ -2741,6 +2790,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
 
   // If one is an async function and the other is not, they can't conflict.
   if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
+    return false;
+
+  // If one is a macro and the other is not, they can't conflict.
+  if (sig1.IsMacro != sig2.IsMacro)
     return false;
 
   // If one is a compound name and the other is not, they do not conflict
@@ -2974,6 +3027,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
+  signature.IsMacro = isa<MacroDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -6698,10 +6752,8 @@ llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
 
 /// Whether this property has any attached property wrappers.
 bool VarDecl::hasAttachedPropertyWrapper() const {
-  if (getAttrs().hasAttribute<CustomAttr>()) {
-    if (!getAttachedPropertyWrappers().empty())
-      return true;
-  }
+  if (!getAttachedPropertyWrappers().empty())
+    return true;
 
   if (hasImplicitPropertyWrapper())
     return true;
@@ -6773,8 +6825,11 @@ VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
     auto attr = attrs[i];
     auto dc = getDeclContext();
     ASTContext &ctx = getASTContext();
-    nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+    if (auto found = evaluateOrDefault(
+           ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr))
+      nominal = found.dyn_cast<NominalTypeDecl *>();
+    else
+      nominal = nullptr;
   }
 
   if (!nominal)
@@ -9635,26 +9690,86 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+StringRef swift::getMacroRoleString(MacroRole role) {
+  switch (role) {
+  case MacroRole::Expression:
+    return "expression";
+
+  case MacroRole::FreestandingDeclaration:
+    return "freestanding";
+
+  case MacroRole::Accessor:
+    return "accessor";
+
+  case MacroRole::MemberAttribute:
+    return "memberAttributes";
+  }
+}
+
+bool swift::macroIntroducedNameRequiresArgument(
+  MacroIntroducedDeclNameKind kind
+) {
+  switch (kind) {
+  case MacroIntroducedDeclNameKind::Named:
+  case MacroIntroducedDeclNameKind::Prefixed:
+  case MacroIntroducedDeclNameKind::Suffixed:
+    return true;
+
+  case MacroIntroducedDeclNameKind::Overloaded:
+  case MacroIntroducedDeclNameKind::Arbitrary:
+    return false;
+  }
+}
+
+StringRef swift::getMacroIntroducedDeclNameString(
+    MacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+  case MacroIntroducedDeclNameKind::Named:
+    return "named";
+
+  case MacroIntroducedDeclNameKind::Overloaded:
+    return "overloaded";
+
+  case MacroIntroducedDeclNameKind::Prefixed:
+    return "prefixed";
+
+  case MacroIntroducedDeclNameKind::Suffixed:
+    return "suffixed";
+
+  case MacroIntroducedDeclNameKind::Arbitrary:
+    return "arbitrary";
+  }
+}
+
+static MacroRoles freestandingMacroRoles =
+  (MacroRoles() |
+   MacroRole::Expression |
+   MacroRole::FreestandingDeclaration);
+static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor |
+                                        MacroRole::MemberAttribute);
+
+bool swift::isFreestandingMacro(MacroRoles contexts) {
+  return bool(contexts & freestandingMacroRoles);
+}
+
+bool swift::isAttachedMacro(MacroRoles contexts) {
+  return bool(contexts & attachedMacroRoles);
+}
+
 MacroDecl::MacroDecl(
     SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
     GenericParamList *genericParams,
     ParameterList *parameterList,
     SourceLoc arrowOrColonLoc,
     TypeRepr *resultType,
-    Identifier externalModuleName,
-    SourceLoc externalModuleNameLoc,
-    Identifier externalMacroTypeName,
-    SourceLoc externalMacroTypeNameLoc,
+    Expr *definition,
     DeclContext *parent
 ) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
     ValueDecl(DeclKind::Macro, parent, name, nameLoc),
     macroLoc(macroLoc), parameterList(parameterList),
     arrowOrColonLoc(arrowOrColonLoc),
     resultType(resultType),
-    externalModuleName(externalModuleName),
-    externalModuleNameLoc(externalModuleNameLoc),
-    externalMacroTypeName(externalMacroTypeName),
-    externalMacroTypeNameLoc(externalMacroTypeNameLoc) {
+    definition(definition) {
 
   if (parameterList)
     parameterList->setDeclContextOfParamDecls(this);
@@ -9671,10 +9786,39 @@ Type MacroDecl::getResultInterfaceType() const {
 }
 
 SourceRange MacroDecl::getSourceRange() const {
-  SourceLoc endLoc = externalMacroTypeNameLoc;
+  SourceLoc endLoc = getNameLoc();
+  if (parameterList)
+    endLoc = parameterList->getEndLoc();
+  if (definition)
+    endLoc = definition->getEndLoc();
   if (auto trailing = getTrailingWhereClause())
     endLoc = trailing->getSourceRange().End;
   return SourceRange(macroLoc, endLoc);
+}
+
+MacroRoles MacroDecl::getMacroRoles() const {
+  MacroRoles contexts = None;
+  if (getAttrs().hasAttribute<ExpressionAttr>())
+    contexts |= MacroRole::Expression;
+  for (auto attr : getAttrs().getAttributes<DeclarationAttr>())
+    contexts |= attr->getMacroRole();
+  for (auto attr : getAttrs().getAttributes<AttachedAttr>())
+    contexts |= attr->getMacroRole();
+  return contexts;
+}
+
+MacroDefinition MacroDecl::getDefinition() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      MacroDefinitionRequest{const_cast<MacroDecl *>(this)},
+      MacroDefinition::forUndefined());
+}
+
+Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
+  auto def = getDefinition();
+  if (def.kind != MacroDefinition::Kind::Builtin)
+    return None;
+  return def.getBuiltinKind();
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
@@ -9689,14 +9833,19 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
   return SourceRange(PoundLoc, endLoc);
 }
 
-MacroDefinition MacroDefinition::forMissing(
-    ASTContext &ctx, Identifier externalModuleName,
-    Identifier externalMacroTypeName
-) {
-  auto def = ctx.AllocateObjectCopy(
-    MissingDefinition{externalModuleName, externalMacroTypeName}
-  );
-  return MacroDefinition{
-    Kind::Expression, ImplementationKind::Missing, def
-  };
+NominalTypeDecl *
+ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
+  auto &ctx = getASTContext();
+  auto *nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrDeclRequest{attr, getDeclContext()}, nullptr)
+    .get<NominalTypeDecl *>();
+  assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
+  return nominal;
+}
+
+ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetRuntimeDiscoverableAttributes{mutableSelf},
+                           nullptr);
 }

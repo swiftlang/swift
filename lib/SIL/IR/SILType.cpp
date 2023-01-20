@@ -103,6 +103,10 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }
 
+SILType SILType::getPackIndexType(const ASTContext &C) {
+  return getPrimitiveObjectType(CanType(BuiltinIntegerType::getWordType(C)));
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
@@ -318,6 +322,10 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,
                               TypeExpansionContext context) const {
   return getFieldType(field, M.Types, context);
+}
+
+SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
+  return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,

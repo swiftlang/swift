@@ -448,6 +448,10 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   StringScratchSpace stringStorage;
   ContainerTracker Containers;
 
+  // Contains a mapping for captures of the form [x], from the declared "x"
+  // to the captured "x" in the enclosing scope.
+  llvm::DenseMap<VarDecl *, VarDecl *> sameNamedCaptures;
+
   bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
                      StringRef &name, StringRef &USR) {
     auto &result = nameAndUSRCache[ExtD ? (Decl*)ExtD : D];
@@ -701,6 +705,26 @@ private:
   bool walkToExprPre(Expr *E) override {
     if (Cancelled)
       return false;
+
+    // Record any captures of the form [x], herso we can treat
+    if (auto captureList = dyn_cast<CaptureListExpr>(E)) {
+      for (const auto &capture : captureList->getCaptureList()) {
+        auto declaredVar = capture.getVar();
+        if (capture.PBD->getEqualLoc(0).isValid())
+          continue;
+
+        VarDecl *capturedVar = nullptr;
+        if (auto init = capture.PBD->getInit(0)) {
+          if (auto declRef = dyn_cast<DeclRefExpr>(init))
+            capturedVar = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+        }
+
+        if (capturedVar) {
+          sameNamedCaptures[declaredVar] = capturedVar;
+        }
+      }
+    }
+
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
@@ -1300,13 +1324,11 @@ bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<InheritedEntry> Inher
 }
 
 bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related) {
-
-  if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
-    auto Comps = T->getComponentRange();
-    SourceLoc IdLoc = Comps.back()->getLoc();
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(Ty.getTypeRepr())) {
+    SourceLoc IdLoc = declRefTR->getLoc();
     NominalTypeDecl *NTD = nullptr;
     bool isImplicit = false;
-    if (auto *VD = Comps.back()->getBoundDecl()) {
+    if (auto *VD = declRefTR->getBoundDecl()) {
       if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
         IndexSymbol Info;
         if (!reportRef(TAD, IdLoc, Info, None))
@@ -1401,9 +1423,8 @@ NominalTypeDecl *
 IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
   if (Type T = Ty.getType())
     return T->getAnyNominal();
-  if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
-    auto Comp = T->getComponentRange().back();
-    if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(Comp->getBoundDecl()))
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(Ty.getTypeRepr())) {
+    if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(declRefTR->getBoundDecl()))
       return NTD;
   }
   return nullptr;
@@ -1611,6 +1632,15 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Always base the symbol information on the canonical VarDecl
     D = VD->getCanonicalVarDecl();
+
+    // Dig back to the original captured variable.
+    while (true) {
+      auto captured = sameNamedCaptures.find(cast<VarDecl>(D));
+      if (captured == sameNamedCaptures.end())
+        break;
+
+      D = captured->second;
+    }
   }
 
   Info.decl = D;

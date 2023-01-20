@@ -2089,7 +2089,10 @@ private:
         Node::IndexType ordinal;
         if (!demangleIndex(ordinal, depth))
           return nullptr;
-        return Factory.createNode(Node::Kind::OpaqueReturnTypeIndexed, ordinal);
+        auto result = Factory.createNode(Node::Kind::OpaqueReturnType);
+        result->addChild(
+          Factory.createNode(Node::Kind::OpaqueReturnTypeIndex, ordinal), Factory);
+        return result;
       }
       return demangleArchetypeType(depth + 1);
     }

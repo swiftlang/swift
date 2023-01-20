@@ -55,7 +55,7 @@ public struct AtInliningTarget {
 }
 
 @available(macOS 10.14.5, *)
-public struct BetweenTargets {
+public struct BetweenTargets { // expected-note {{enclosing scope requires availability of macOS 10.14.5 or newer}}
   @usableFromInline internal init() {}
 }
 
@@ -1102,7 +1102,7 @@ extension BetweenTargets {
 }
 
 extension BetweenTargets {
-  @available(macOS 10.10, *)
+  @available(macOS 10.10, *) // expected-warning {{instance method cannot be more available than enclosing scope}}
   func excessivelyAvailableInternalFuncInExtension() {}
 }
 

@@ -268,7 +268,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.8")
+set(SWIFT_VERSION "5.9")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -460,6 +460,7 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST "13.1")
 
 #
 # User-configurable debugging options.
@@ -564,6 +565,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION
+  "Enable build of the Swift reflection module"
+  FALSE)
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -584,6 +589,13 @@ option(SWIFT_THREADING_PACKAGE
    single package name, or a semicolon separated sequence of sdk:package pairs.
    Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
    or the empty string for the SDK default.")
+
+option(SWIFT_ENABLE_MACCATALYST
+  "Build the Standard Library and overlays with MacCatalyst support"
+  FALSE)
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
+  "Minimum deployment target version for macCatalyst")
 
 #
 # End of user-configurable options.
@@ -1102,6 +1114,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
+  message(STATUS "Reflection Support:                 ${SWIFT_ENABLE_EXPERIMENTAL_REFLECTION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1188,8 +1201,8 @@ else()
     add_subdirectory(stdlib/public/BackDeployConcurrency)
   endif()
 
-  # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
-  # ensure we build that when building tools.
+  # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
+  # so ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()

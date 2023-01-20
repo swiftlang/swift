@@ -45,6 +45,7 @@ import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import CharacterProperties
+import CharacterRecognizer
 import Chars
 import ClassArrayGetter
 import CodableTest
@@ -178,6 +179,7 @@ import StrComplexWalk
 import StrToInt
 import StringBuilder
 import StringComparison
+import StringDistance
 import StringEdits
 import StringEnum
 import StringInterpolation
@@ -229,6 +231,7 @@ register(ChainedFilterMap.benchmarks)
 register(CharacterLiteralsLarge.benchmarks)
 register(CharacterLiteralsSmall.benchmarks)
 register(CharacterProperties.benchmarks)
+register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
@@ -362,9 +365,10 @@ register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
 register(StringBuilder.benchmarks)
+register(StringComparison.benchmarks)
+register(StringDistance.benchmarks)
 register(StringEdits.benchmarks)
 register(StringEnum.benchmarks)
-register(StringComparison.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)

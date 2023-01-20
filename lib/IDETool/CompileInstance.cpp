@@ -193,10 +193,10 @@ void retypeCheckFunctionBody(AbstractFunctionDecl *func,
       sliceBufferID,
       GeneratedSourceInfo{
         GeneratedSourceInfo::ReplacedFunctionBody,
-        *func->getParentSourceFile()->getBufferID(),
         func->getOriginalBodySourceRange(),
         newRange,
-        func
+        func,
+        nullptr
       }
   );
   func->setBodyToBeReparsed(newRange);

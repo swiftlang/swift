@@ -34,14 +34,14 @@ public struct S {
     }
 }
 
-// CHECK:      class E final {
+// CHECK:      class SWIFT_SYMBOL("s:5Enums1EO") E final {
 // CHECK:        enum class cases {
-// CHECK-NEXT:     x,
-// CHECK-NEXT:     y,
-// CHECK-NEXT:     z,
-// CHECK-NEXT:     w,
-// CHECK-NEXT:     auto_,
-// CHECK-NEXT:     foobar
+// CHECK-NEXT:     x SWIFT_SYMBOL("s:5Enums1EO1xyACSdcACmF"),
+// CHECK-NEXT:     y SWIFT_SYMBOL("s:5Enums1EO1yyACSVSgcACmF"),
+// CHECK-NEXT:     z SWIFT_SYMBOL("s:5Enums1EO1zyAcA1SVcACmF"),
+// CHECK-NEXT:     w SWIFT_SYMBOL("s:5Enums1EO1wyACSi_tcACmF"),
+// CHECK-NEXT:     auto_ SWIFT_SYMBOL("s:5Enums1EO4autoyACSvcACmF"),
+// CHECK-NEXT:     foobar SWIFT_SYMBOL("s:5Enums1EO6foobaryA2CmF")
 // CHECK-NEXT:   };
 // CHECK-EMPTY:
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -51,7 +51,7 @@ public struct S {
 // CHECK-NEXT:       return cases::x;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()(double val) const;
-// CHECK-NEXT:   } x;
+// CHECK-NEXT:   } x SWIFT_SYMBOL("s:5Enums1EO1xyACSdcACmF");
 // CHECK-NEXT:   inline bool isX() const;
 // CHECK-NEXT:   inline double getX() const;
 // CHECK-EMPTY:
@@ -60,7 +60,7 @@ public struct S {
 // CHECK-NEXT:       return cases::y;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()(void const * _Nullable val) const;
-// CHECK-NEXT:   } y;
+// CHECK-NEXT:   } y SWIFT_SYMBOL("s:5Enums1EO1yyACSVSgcACmF");
 // CHECK-NEXT:   inline bool isY() const;
 // CHECK-NEXT:   inline void const * _Nullable getY() const;
 // CHECK-EMPTY:
@@ -69,7 +69,7 @@ public struct S {
 // CHECK-NEXT:       return cases::z;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()(const S& val) const;
-// CHECK-NEXT:   } z;
+// CHECK-NEXT:   } z SWIFT_SYMBOL("s:5Enums1EO1zyAcA1SVcACmF");
 // CHECK-NEXT:   inline bool isZ() const;
 // CHECK-NEXT:   inline S getZ() const;
 // CHECK-EMPTY:
@@ -78,7 +78,7 @@ public struct S {
 // CHECK-NEXT:       return cases::w;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()(swift::Int val) const;
-// CHECK-NEXT:   } w;
+// CHECK-NEXT:   } w SWIFT_SYMBOL("s:5Enums1EO1wyACSi_tcACmF");
 // CHECK-NEXT:   inline bool isW() const;
 // CHECK-NEXT:   inline swift::Int getW() const;
 // CHECK-EMPTY:
@@ -87,7 +87,7 @@ public struct S {
 // CHECK-NEXT:       return cases::auto_;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()(void * _Nonnull val) const;
-// CHECK-NEXT:   } auto_;
+// CHECK-NEXT:   } auto_ SWIFT_SYMBOL("s:5Enums1EO4autoyACSvcACmF");
 // CHECK-NEXT:   inline bool isAuto_() const;
 // CHECK-NEXT:   inline void * _Nonnull getAuto_() const;
 // CHECK-EMPTY:
@@ -96,7 +96,7 @@ public struct S {
 // CHECK-NEXT:       return cases::foobar;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     inline E operator()() const;
-// CHECK-NEXT:   } foobar;
+// CHECK-NEXT:   } foobar SWIFT_SYMBOL("s:5Enums1EO6foobaryA2CmF");
 // CHECK-NEXT:   inline bool isFoobar() const;
 // CHECK-EMPTY:
 // CHECK-NEXT: #pragma clang diagnostic pop
@@ -112,9 +112,9 @@ public struct S {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-EMPTY:
-// CHECK-NEXT:   static inline E init();
-// CHECK-NEXT:   inline swift::Int getTen() const;
-// CHECK-NEXT:   inline void printSelf() const;
+// CHECK-NEXT:   static inline E init() SWIFT_SYMBOL("s:5Enums1EOACycfc");
+// CHECK-NEXT:   inline swift::Int getTen() const SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
+// CHECK-NEXT:   inline void printSelf() const SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
 // CHECK-NEXT: private:
 // CHECK:        inline char * _Nonnull _destructiveProjectEnumData() {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
@@ -166,7 +166,7 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
-// CHECK:      namespace Enums __attribute__((swift_private)) {
+// CHECK:      namespace Enums __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        inline E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));

@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup %s | %FileCheck %s
+
+sil_stage raw
+
+
+import Builtin
+import Swift
+
+sil @cl : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+sil @f : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+// This test case used to loop infinitely because it processed the dead block as
+// part of a dominance based algorithm.
+
+// CHECK: partial_apply
+
+sil [ossa] @repo : $@convention(thin) (Builtin.Int1, Builtin.Int1, @in_guaranteed Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2: $*Builtin.Int64):
+  cond_br %0, bb2, bb1
+
+bb1:
+  br bb7
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br %1, bb4, bb5
+
+bb4:
+  br bb8
+
+bb5:
+  br bb8
+
+bb6:
+  %41 = alloc_stack $Builtin.Int64
+  copy_addr %2 to [init] %41 : $*Builtin.Int64
+        %40 = function_ref @cl : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %43 = partial_apply [callee_guaranteed] %40(%41) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %44 = convert_escape_to_noescape [not_guaranteed] %43 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %55 = function_ref @f : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %56 = apply %55(%44) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %43 : $@callee_guaranteed () -> ()
+  dealloc_stack %41 : $*Builtin.Int64
+  br bb8
+
+bb7:
+  br bb8
+
+bb8:
+  %r = tuple()
+  return %r : $()
+}

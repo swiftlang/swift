@@ -756,6 +756,12 @@ public:
   /// expression initializer.
   void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
 
+  /// Generate a nullary function that has the given result interface type and
+  /// body.
+  void emitGeneratorFunction(SILDeclRef function, Type resultInterfaceType,
+                             BraceStmt *body,
+                             Optional<AbstractionPattern> pattern = None);
+
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 

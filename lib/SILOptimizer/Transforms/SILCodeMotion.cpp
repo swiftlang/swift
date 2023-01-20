@@ -139,7 +139,7 @@ public:
 
   using iterator = decltype(ValueToCaseMap)::iterator;
   iterator begin() { return ValueToCaseMap.getItems().begin(); }
-  iterator end() { return ValueToCaseMap.getItems().begin(); }
+  iterator end() { return ValueToCaseMap.getItems().end(); }
 
   void clear() { ValueToCaseMap.clear(); }
 

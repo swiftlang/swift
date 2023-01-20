@@ -1302,6 +1302,11 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitMissingDecl(MissingDecl *missing) {
+      printCommon(missing, "missing_decl");
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitMissingMemberDecl(MissingMemberDecl *MMD) {
       printCommon(MMD, "missing_member_decl ");
       PrintWithColorRAII(OS, IdentifierColor)
@@ -1420,6 +1425,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     case InitializerKind::PropertyWrapper:
       os << "property wrapper initializer";
       break;
+    case InitializerKind::RuntimeAttribute:
+      os << "runtime attribute initializer";
     }
     break;
 
@@ -2193,6 +2200,12 @@ public:
   }
   void visitMoveExpr(MoveExpr *E) {
     printCommon(E, "move_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitBorrowExpr(BorrowExpr *E) {
+    printCommon(E, "borrow_expr");
     OS << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3106,26 +3119,33 @@ public:
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
     printCommon("type_ident");
-    Indent += 2;
-    for (auto comp : T->getComponentRange()) {
-      OS << '\n';
-      printCommon("component");
-      PrintWithColorRAII(OS, IdentifierColor)
-        << " id='" << comp->getNameRef() << '\'';
-      OS << " bind=";
-      if (comp->isBound())
-        comp->getBoundDecl()->dumpRef(OS);
-      else OS << "none";
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-      if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        for (auto genArg : GenIdT->getGenericArgs()) {
-          OS << '\n';
-          printRec(genArg);
-        }
+
+    PrintWithColorRAII(OS, IdentifierColor)
+        << " id='" << T->getNameRef() << '\'';
+    OS << " bind=";
+    if (T->isBound())
+      T->getBoundDecl()->dumpRef(OS);
+    else
+      OS << "none";
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
+      for (auto genArg : GenIdT->getGenericArgs()) {
+        OS << '\n';
+        printRec(genArg);
       }
     }
+  }
+
+  void visitMemberTypeRepr(MemberTypeRepr *T) {
+    printCommon("type_member");
+
+    OS << '\n';
+    printRec(T->getBaseComponent());
+    for (auto *comp : T->getMemberComponents()) {
+      OS << '\n';
+      printRec(comp);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    Indent -= 2;
   }
 
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -3150,6 +3170,19 @@ public:
     printRec(T->getKey());
     OS << '\n';
     printRec(T->getValue());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitVarargTypeRepr(VarargTypeRepr *T) {
+    printCommon("vararg") << '\n';
+    printRec(T->getElementType());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPackTypeRepr(PackTypeRepr *T) {
+    printCommon("pack") << '\n';
+    for (auto elt : T->getElements())
+      printRec(elt);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

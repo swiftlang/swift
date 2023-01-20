@@ -135,7 +135,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
-  @inlinable
   @discardableResult
   @_unsafeInheritExecutor
   @available(SwiftStdlib 5.1, *) // back deploy requires we declare the availability explicitly on this method
@@ -146,9 +145,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
     _taskLocalValuePush(key: key, value: valueDuringOperation)
-    defer { _taskLocalValuePop() }
-
-    return try await operation()
+    do {
+      let result = try await operation()
+      _taskLocalValuePop()
+      return result
+    } catch {
+      _taskLocalValuePop()
+      throw error
+    }
   }
 
   /// Binds the task-local to the specific value for the duration of the

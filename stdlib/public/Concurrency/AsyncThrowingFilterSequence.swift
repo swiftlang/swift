@@ -36,7 +36,7 @@ extension AsyncSequence {
   ///     } catch {
   ///         print("Error: \(error)")
   ///     }
-  ///     // Prints "2 4 Error: MyError()"
+  ///     // Prints "2 4 Error: MyError() "
   ///
   /// - Parameter isIncluded: An error-throwing closure that takes an element
   ///   of the asynchronous sequence as its argument and returns a Boolean value

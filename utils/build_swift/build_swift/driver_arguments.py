@@ -126,6 +126,7 @@ def _apply_default_arguments(args):
         # Building with Xcode is deprecated.
         args.skip_build = True
         args.build_early_swift_driver = False
+        args.build_early_swiftsyntax = False
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
@@ -1303,6 +1304,10 @@ def create_argument_parser():
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')
+
+    option('--enable-experimental-reflection', toggle_true,
+           default=True,
+           help='Enable experimental Swift reflection.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

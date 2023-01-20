@@ -692,7 +692,7 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
   Type intType = C.getIntType();
 
-  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
+  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index, SourceLoc());
   literal->setType(intType);
   literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
 
