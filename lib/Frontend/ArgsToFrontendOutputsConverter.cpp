@@ -281,8 +281,8 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
            pathsFromUser->size() == 1);
   else {
     // Multi-threaded WMO is the exception
-    assert(OutputFiles.size() == InputsAndOutputs.inputCount() &&
-                   pathsFromUser->size() == (InputsAndOutputs.hasInputs() ? 1 : 0));
+    assert((OutputFiles.size() == InputsAndOutputs.inputCount() &&
+         pathsFromUser->size() == (InputsAndOutputs.hasInputs() ? 1 : 0)));
   }
 
   std::vector<SupplementaryOutputPaths> outputPaths;
