@@ -104,7 +104,7 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 }
 
 SILType SILType::getPackIndexType(const ASTContext &C) {
-  return getPrimitiveObjectType(CanType(BuiltinIntegerType::getWordType(C)));
+  return getPrimitiveObjectType(C.ThePackIndexType);
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {

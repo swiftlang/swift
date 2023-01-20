@@ -1363,6 +1363,33 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
+  case SILInstructionKind::DynamicPackIndexInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    auto indexOperand =
+      getLocalValue(ValID,
+        getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn));
+    auto packType = cast<PackType>(MF->getType(TyID)->getCanonicalType());
+    ResultInst = Builder.createDynamicPackIndex(Loc, indexOperand, packType);
+    break;
+  }
+  case SILInstructionKind::PackPackIndexInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    auto indexOperand =
+      getLocalValue(ValID,
+        getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn));
+    auto packType = cast<PackType>(MF->getType(TyID)->getCanonicalType());
+    ResultInst =
+      Builder.createPackPackIndex(Loc, Attr, indexOperand, packType);
+    break;
+  }
+  case SILInstructionKind::ScalarPackIndexInst: {
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    auto packType = cast<PackType>(MF->getType(TyID)->getCanonicalType());
+    ResultInst = Builder.createScalarPackIndex(Loc, Attr, packType);
+    break;
+  }
   case SILInstructionKind::OpenPackElementInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
     auto index = getLocalValue(ValID,

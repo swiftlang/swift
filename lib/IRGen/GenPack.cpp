@@ -41,6 +41,34 @@ static void accumulateSum(IRGenFunction &IGF, llvm::Value *&result,
   result = IGF.Builder.CreateAdd(result, value);
 }
 
+llvm::Value *
+irgen::emitIndexOfStructuralPackComponent(IRGenFunction &IGF,
+                                          CanPackType packType,
+                                          unsigned structuralIndex) {
+  assert(structuralIndex < packType->getNumElements());
+  unsigned numFixedComponents = 0;
+  llvm::Value *length = nullptr;
+  for (unsigned i = 0; i < structuralIndex; ++i) {
+    auto componentType = packType.getElementType(i);
+    if (auto expansion = dyn_cast<PackExpansionType>(componentType)) {
+      auto countType = expansion.getCountType();
+      auto expansionLength = IGF.emitPackShapeExpression(countType);
+      accumulateSum(IGF, length, expansionLength);
+    } else {
+      numFixedComponents++;
+    }
+  }
+
+  if (numFixedComponents > 0 || !length) {
+    auto fixedLength =
+      llvm::ConstantInt::get(IGF.IGM.SizeTy, numFixedComponents);
+    accumulateSum(IGF, length, fixedLength);
+  }
+
+  assert(length);
+  return length;
+}
+
 using PackExplosionCallback = void (CanType eltTy,
                                     unsigned scalarIndex,
                                     llvm::Value *dynamicIndex,

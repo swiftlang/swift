@@ -1354,6 +1354,7 @@ private:
 
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))

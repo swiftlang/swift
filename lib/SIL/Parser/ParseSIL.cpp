@@ -313,6 +313,19 @@ namespace swift {
                           forceContextualType);
     }
 
+    bool parseASTPackType(CanPackType &result) {
+      SourceLoc loc;
+      CanType rawType;
+      if (parseASTType(rawType, loc))
+        return true;
+      result = dyn_cast<PackType>(rawType);
+      if (!result) {
+        P.diagnose(loc, diag::expected_sil_type_kind, "match $Pack{...}");
+        return true;
+      }
+      return false;
+    }
+
     Optional<StringRef> parseOptionalAttribute(ArrayRef<StringRef> expected) {
       // We parse here @ <identifier>.
       if (P.Tok.getKind() != tok::at_sign)
@@ -3286,6 +3299,43 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     ResultVal =
         B.createOpenExistentialValue(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+  case SILInstructionKind::DynamicPackIndexInst: {
+    CanPackType packType;
+    if (parseValueRef(Val, SILType::getBuiltinWordType(P.Context), InstLoc, B) ||
+        parseVerbatim("of") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTPackType(packType))
+      return true;
+    ResultVal =
+        B.createDynamicPackIndex(InstLoc, Val, packType);
+    break;
+  }
+  case SILInstructionKind::PackPackIndexInst: {
+    unsigned componentIndex = 0;
+    CanPackType packType;
+    if (parseInteger(componentIndex, diag::expected_sil_constant) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseValueRef(Val, SILType::getPackIndexType(P.Context), InstLoc, B) ||
+        parseVerbatim("of") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTPackType(packType))
+      return true;
+    ResultVal =
+        B.createPackPackIndex(InstLoc, componentIndex, Val, packType);
+    break;
+  }
+  case SILInstructionKind::ScalarPackIndexInst: {
+    unsigned componentIndex = 0;
+    CanPackType packType;
+    if (parseInteger(componentIndex, diag::expected_sil_constant) ||
+        parseVerbatim("of") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTPackType(packType))
+      return true;
+    ResultVal =
+        B.createScalarPackIndex(InstLoc, componentIndex, packType);
     break;
   }
   case SILInstructionKind::OpenPackElementInst: {

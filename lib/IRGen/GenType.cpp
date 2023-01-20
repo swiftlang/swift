@@ -2144,6 +2144,9 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return &getExecutorTypeInfo();
   case TypeKind::BuiltinIntegerLiteral:
     return &getIntegerLiteralTypeInfo();
+  case TypeKind::BuiltinPackIndex:
+    return createPrimitive(IGM.SizeTy, IGM.getPointerSize(),
+                           IGM.getCappedAlignment(IGM.getPointerAlignment()));
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinVector: {
