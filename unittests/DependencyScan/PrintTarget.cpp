@@ -36,7 +36,13 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   for (auto &str : CommandStrArr)
     Compilation.push_back(str.c_str());
 
-  auto targetInfo = swift::dependencies::getTargetInfo(Compilation);
+  SmallString<128> pathRoot(llvm::sys::path::root_directory(SWIFTLIB_DIR));
+  SmallString<128> compilerPath(pathRoot);
+  llvm::sys::path::append(compilerPath, "foo", "bar", "bin", "swift-frontend");
+  SmallString<128> relativeLibPath(pathRoot);
+  llvm::sys::path::append(relativeLibPath, "foo", "bar", "lib", "swift");;
+
+  auto targetInfo = swift::dependencies::getTargetInfo(Compilation, compilerPath.c_str());
   if (targetInfo.getError()) {
     llvm::errs() << "For compilation: ";
     for (auto &str : Compilation)
@@ -45,6 +51,8 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   }
 
   auto targetInfoStr = std::string(swift::c_string_utils::get_C_string(targetInfo.get()));
+  std::string expectedRuntimeResourcePath = "\"runtimeResourcePath\": \"" + relativeLibPath.str().str() + "\"";
   EXPECT_NE(targetInfoStr.find("\"triple\": \"x86_64-apple-macosx12.0\""), std::string::npos);
   EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": false"), std::string::npos);
+  EXPECT_NE(targetInfoStr.find(expectedRuntimeResourcePath.c_str()), std::string::npos);
 }

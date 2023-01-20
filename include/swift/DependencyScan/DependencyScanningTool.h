@@ -48,7 +48,8 @@ private:
 
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
 /// JSON target info.
-llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command);
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command,
+                                                    const char *main_executable_path);
 
 /// The high-level implementation of the dependency scanner that runs on
 /// an individual worker thread.
