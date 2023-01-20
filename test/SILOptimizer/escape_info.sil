@@ -41,7 +41,14 @@ final class F {
   @_hasStorage var y: Y
 }
 
-struct TwoF {
+protocol P {
+}
+
+struct OneF : P {
+  @_hasStorage var a: F
+}
+
+struct TwoF : P {
   @_hasStorage var a: F
   @_hasStorage var b: F
 }
@@ -1341,5 +1348,32 @@ bb0:
   store %11 to %10 : $*X
   %13 = tuple ()
   return %13 : $()
+}
+
+// CHECK-LABEL: Escape information for test_mismatching_existential_types:
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: End function test_mismatching_existential_types
+sil @test_mismatching_existential_types : $@convention(thin) (@guaranteed F) -> () {
+bb0(%0 : $F):
+  %1 = alloc_ref $Y
+
+  %2 = alloc_stack $any P
+
+  %3 = init_existential_addr %2 : $*any P, $OneF
+  %4 = struct $OneF (%0 : $F)
+  store %4 to %3 : $*OneF
+
+  // Strictly speaking it's illegal to re-initialize an existential with a different concrete type.
+  // But for this test this doesn't matter.
+  %6 = init_existential_addr %2 : $*any P, $TwoF
+  %7 = struct_element_addr %6 : $*TwoF, #TwoF.b
+  %8 = load %7 : $*F
+
+  %9 = ref_element_addr %8 : $F, #F.y
+  store %1 to %9 : $*Y
+
+  dealloc_stack %2 : $*any P
+  %r = tuple()
+  return %r : $()
 }
 
