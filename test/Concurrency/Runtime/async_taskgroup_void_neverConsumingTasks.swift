@@ -2,6 +2,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+
+// REQUIRES: rdar104332560
+
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: OS=linux-gnu
 
