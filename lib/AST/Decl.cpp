@@ -9860,6 +9860,18 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
   return SourceRange(PoundLoc, endLoc);
 }
 
+unsigned MacroExpansionDecl::getDiscriminator() const {
+  if (getRawDiscriminator() != InvalidDiscriminator)
+    return getRawDiscriminator();
+
+  auto dc = getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{dc}, 0);
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
+}
+
 NominalTypeDecl *
 ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
   auto &ctx = getASTContext();

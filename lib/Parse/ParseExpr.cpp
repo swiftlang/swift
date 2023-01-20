@@ -3367,7 +3367,7 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   return makeParserResult(
       status,
       new (Context) MacroExpansionExpr(
-          poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+          CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
           Context.AllocateCopy(genericArgs), rightAngleLoc, argList));
 }
 

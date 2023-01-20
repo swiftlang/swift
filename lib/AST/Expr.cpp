@@ -2559,6 +2559,18 @@ SourceRange MacroExpansionExpr::getSourceRange() const {
   return SourceRange(PoundLoc, endLoc);
 }
 
+unsigned MacroExpansionExpr::getDiscriminator() const {
+  if (getRawDiscriminator() != InvalidDiscriminator)
+    return getRawDiscriminator();
+
+  auto dc = getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{dc}, 0);
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
   if (!CE) {
     out << "(null)";

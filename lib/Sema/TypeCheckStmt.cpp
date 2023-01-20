@@ -58,10 +58,10 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
-  class ContextualizeClosures : public ASTWalker {
+  class ContextualizeClosuresAndMacros : public ASTWalker {
     DeclContext *ParentDC;
   public:
-    ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
+    ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
@@ -105,7 +105,7 @@ namespace {
         // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked())
-          CE->getBody()->walk(ContextualizeClosures(CE));
+          CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
         return Action::SkipChildren(E);
@@ -115,6 +115,11 @@ namespace {
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
           DAE->getCallerSideDefaultExpr()->walk(*this);
+
+      // Macro expansion expressions require a DeclContext as well.
+      if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
+        macroExpansion->setDeclContext(ParentDC);
+      }
 
       return Action::Continue(E);
     }
@@ -201,12 +206,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
-  ContextualizeClosures CC(DC);
+  ContextualizeClosuresAndMacros CC(DC);
   E->walk(CC);
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
-  ContextualizeClosures CC(TLCD);
+  ContextualizeClosuresAndMacros CC(TLCD);
   if (auto *body = TLCD->getBody())
     body->walk(CC);
 }
@@ -225,6 +230,10 @@ namespace {
 
     /// Local declaration discriminators.
     llvm::SmallDenseMap<Identifier, unsigned> DeclDiscriminators;
+
+    /// Macro expansion discriminator.
+    unsigned NextMacroExpansionDiscriminator = 0;
+
   public:
     SetLocalDiscriminators(
         unsigned initialDiscriminator = 0
@@ -281,6 +290,28 @@ namespace {
         return Action::SkipChildren(E);
       }
 
+      // Macro expansion expressions get a discriminator.
+      if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
+        if (macroExpansion->getRawDiscriminator() ==
+              MacroExpansionExpr::InvalidDiscriminator) {
+          macroExpansion->setDiscriminator(NextMacroExpansionDiscriminator++);
+        }
+
+        // Walk the arguments.
+        if (auto args = macroExpansion->getArgs())
+          args->walk(*this);
+
+        // If there is a rewritten expression, walk it with a fresh macro
+        // discriminator.
+        if (auto rewritten = macroExpansion->getRewritten()) {
+          llvm::SaveAndRestore<unsigned> savedMacroDiscriminator(
+              NextMacroExpansionDiscriminator, 0u);
+          rewritten->walk(*this);
+        }
+
+        return Action::SkipChildren(E);
+      }
+
       // Caller-side default arguments need their @autoclosures checked.
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
@@ -309,6 +340,14 @@ namespace {
       // If we have a local declaration, assign a local discriminator to it.
       if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
         setLocalDiscriminator(valueDecl);
+      }
+
+      // If we have a macro expansion declaration, assign a discriminator to it.
+      if (auto macroExpansion = dyn_cast<MacroExpansionDecl>(D)) {
+        if (macroExpansion->getRawDiscriminator() ==
+              MacroExpansionDecl::InvalidDiscriminator) {
+          macroExpansion->setDiscriminator(NextMacroExpansionDiscriminator++);
+        }
       }
 
       // But we do want to walk into the initializers of local
@@ -991,7 +1030,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    S->walk(ContextualizeClosures(DC));
+    S->walk(ContextualizeClosuresAndMacros(DC));
     return HadError;
   }
 
@@ -2395,7 +2434,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
         body = *optBody;
         alreadyTypeChecked = true;
 
-        body->walk(ContextualizeClosures(AFD));
+        body->walk(ContextualizeClosuresAndMacros(AFD));
       }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {

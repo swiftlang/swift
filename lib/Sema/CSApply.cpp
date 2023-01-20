@@ -2983,7 +2983,7 @@ namespace {
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
         if (auto newExpr = expandMacroExpr(dc, expr, macroRef, expandedType)) {
           auto expansion = new (ctx) MacroExpansionExpr(
-              expr->getStartLoc(), DeclNameRef(macro->getName()),
+              dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
               DeclNameLoc(expr->getLoc()), SourceLoc(), { }, SourceLoc(),
               nullptr, /*isImplicit=*/true, expandedType);
           expansion->setMacroRef(macroRef);
