@@ -377,16 +377,8 @@ static bool lexicalLifetimeEnsured(AllocStackInst *asi) {
 }
 
 static bool isGuaranteedLexicalValue(SILValue src) {
-  if (src->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  if (isa<SILFunctionArgument>(src)) {
-    return true;
-  }
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(src)) {
-    return bbi->isLexical();
-  }
-  return false;
+  return src->getOwnershipKind() == OwnershipKind::Guaranteed &&
+         src->isLexical();
 }
 
 /// Returns true if we have enough information to end the lifetime.
