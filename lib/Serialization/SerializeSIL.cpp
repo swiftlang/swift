@@ -1760,6 +1760,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                  open.getOperand());
     break;
   }
+  case SILInstructionKind::DynamicPackIndexInst: {
+    auto &dpii = cast<DynamicPackIndexInst>(SI);
+    writeOneTypeOneOperandLayout(dpii.getKind(), 0,
+                                 dpii.getIndexedPackType(),
+                                 dpii.getOperand());
+    break;
+  }
+  case SILInstructionKind::PackPackIndexInst: {
+    auto &ppii = cast<PackPackIndexInst>(SI);
+    writeOneTypeOneOperandLayout(ppii.getKind(),
+                                 ppii.getComponentStartIndex(),
+                                 ppii.getIndexedPackType(),
+                                 ppii.getOperand());
+    break;
+  }
+  case SILInstructionKind::ScalarPackIndexInst: {
+    auto &spii = cast<ScalarPackIndexInst>(SI);
+    writeOneTypeLayout(spii.getKind(),
+                       spii.getComponentIndex(),
+                       spii.getIndexedPackType());
+    break;
+  }
   case SILInstructionKind::OpenPackElementInst: {
     auto &opei = cast<OpenPackElementInst>(SI);
     auto envRef =
