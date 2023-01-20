@@ -186,13 +186,15 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 // On Darwin, we want to use the reserved keys
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 
-#if __has_include(<pthread/tsd_private.h>)
+#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && __ARM_ARCH_7K__) && __has_include(<pthread/tsd_private.h>)
 } // namespace threading_impl
 } // namespace swift
 
 extern "C" {
 #include <pthread/tsd_private.h>
 }
+
+#define SWIFT_THREADING_USE_DIRECT_TSD 1
 
 namespace swift {
 namespace threading_impl {
@@ -208,17 +210,12 @@ namespace threading_impl {
 #define __PTK_FRAMEWORK_SWIFT_KEY8 108
 #define __PTK_FRAMEWORK_SWIFT_KEY9 109
 
+#define SWIFT_THREADING_USE_DIRECT_TSD 0
+
 extern "C" {
 
 extern int pthread_key_init_np(int, void (*)(void *));
 
-inline bool _pthread_has_direct_tsd() { return false; }
-inline void *_pthread_getspecific_direct(pthread_key_t k) {
-  return pthread_getspecific(k);
-}
-inline void _pthread_setspecific_direct(pthread_key_t k, void *v) {
-  pthread_setspecific(k, v);
-}
 }
 #endif
 
@@ -257,18 +254,22 @@ inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
 }
 
 inline void *tls_get(tls_key_t key) {
+#if SWIFT_THREADING_USE_DIRECT_TSD
   if (_pthread_has_direct_tsd())
     return _pthread_getspecific_direct(key);
   else
+#endif
     return pthread_getspecific(key);
 }
 
 inline void *tls_get(tls_key key) { return tls_get(tls_get_key(key)); }
 
 inline void tls_set(tls_key_t key, void *value) {
+#if SWIFT_THREADING_USE_DIRECT_TSD
   if (_pthread_has_direct_tsd())
     _pthread_setspecific_direct(key, value);
   else
+#endif
     pthread_setspecific(key, value);
 }
 
