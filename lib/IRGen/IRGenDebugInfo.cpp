@@ -2950,8 +2950,10 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
 SILLocation::FilenameAndLocation
 IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
   auto &Cached = FilenameAndLocationCache[SL.getOpaquePointerValue()];
-  if (Cached.filename.empty())
-    Cached = sanitizeCodeViewFilenameAndLocation(SILLocation::decode(SL, SM));
+  if (Cached.filename.empty()) {
+    Cached = sanitizeCodeViewFilenameAndLocation(
+        SILLocation::decode(SL, SM, /*ForceGeneratedSourceToDisk=*/true));
+  }
   return Cached;
 }
 
