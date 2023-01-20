@@ -14,3 +14,8 @@ public typealias Alias = ExistingType
 // CHECK-LABEL: existingClient2(arg:)
 // CHECK: Canonical generic signature: <τ_0_0>
 public func existingClient2<T>(arg: T.Type) -> Alias<T>? { nil }
+
+// CHECK-LABEL: preconcurrencyClient(arg:)
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Sendable>
+@preconcurrency
+public func preconcurrencyClient<T>(arg: T.Type) -> ExistingType<T>? { nil }

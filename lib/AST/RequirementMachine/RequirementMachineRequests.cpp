@@ -829,7 +829,7 @@ InferredGenericSignatureRequest::evaluate(
       loc = typeLoc;
 
     inferRequirements(sourcePair.getType(), typeLoc, moduleForInference,
-                      requirements);
+                      lookupDC, requirements);
   }
 
   // Finish by adding any remaining requirements. This is used to introduce
