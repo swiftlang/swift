@@ -251,6 +251,8 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
       maxAccess = AccessLevel::Public;
     } else if (maxScope->isPublic()) {
       maxAccess = AccessLevel::Public;
+    } else if (maxScope->isPackage()) {
+      maxAccess = AccessLevel::Package;
     } else if (isa<ModuleDecl>(maxScope->getDeclContext())) {
       maxAccess = AccessLevel::Internal;
     } else {

@@ -1742,6 +1742,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return true;
+    case AccessLevel::Package:
     case AccessLevel::Public:
     case AccessLevel::Open:
       break;

@@ -941,7 +941,7 @@ public:
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (!D->getASTContext().isAccessControlDisabled() &&
             D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() < AccessLevel::Public) {
+            D->getFormalAccess() <= AccessLevel::Package) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
           abort();

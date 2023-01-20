@@ -40,6 +40,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     return FormalLinkage::PublicNonUnique;
 
   switch (D->getEffectiveAccess()) {
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return FormalLinkage::PublicUnique;

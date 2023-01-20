@@ -6180,6 +6180,7 @@ static void diagnoseUnstableName(ProtocolConformance *conformance,
     case AccessLevel::Internal:
     case AccessLevel::Open:
     case AccessLevel::Public:
+    case AccessLevel::Package:
       break;
     }
   }
