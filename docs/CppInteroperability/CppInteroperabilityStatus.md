@@ -83,7 +83,7 @@ This status table describes which of the following C++ language features can be 
 | Virtual Member Functions                    | No |
 | Operators                                   | Yes, with some known issues    |
 | Subscript Operators                         | Yes |
-| Constructors                                | Yes. That includes implicit constructors    |
+| Constructors                                | Yes. That includes implicit constructors but they have to explicitly called in Swift |
 | Destructor                                  | Yes. C++ destructors are invoked automatically when the value is no longer used in Swift |
 | Copy constructor / copy assignment operator | Yes. Swift invokes the underlying copy constructor when copying a C++ value |
 | Move constructor / move assignment operator | No    |
