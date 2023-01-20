@@ -569,6 +569,11 @@ extension ValueUseDefWalker {
     switch def {
     case let str as StructInst:
       if let (index, path) = path.pop(kind: .structField) {
+        if index >= str.operands.count {
+          // This can happen if there is a type mismatch, e.g. two different concrete types of an existential
+          // are visited for the same path.
+          return unmatchedPath(value: str, path: path)
+        }
         return walkUp(value: str.operands[index].value, path: path)
       } else if path.popIfMatches(.anyValueFields, index: nil) != nil {
         return walkUpAllOperands(of: str, path: path)
@@ -577,6 +582,11 @@ extension ValueUseDefWalker {
       }
     case let t as TupleInst:
       if let (index, path) = path.pop(kind: .tupleField) {
+        if index >= t.operands.count {
+          // This can happen if there is a type mismatch, e.g. two different concrete types of an existential
+          // are visited for the same path.
+          return unmatchedPath(value: t, path: path)
+        }
         return walkUp(value: t.operands[index].value, path: path)
       } else if path.popIfMatches(.anyValueFields, index: nil) != nil {
         return walkUpAllOperands(of: t, path: path)
