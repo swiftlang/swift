@@ -2391,7 +2391,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
   {
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
-    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+    auto options = NL_RemoveNonVisible | NL_OnlyTypes | NL_ProtocolMembers;
 
     if (allowUsableFromInline)
       options |= NL_IncludeUsableFromInline;
