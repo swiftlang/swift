@@ -6040,7 +6040,7 @@ ERROR(frozen_attr_on_internal_type,
 
 ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal "
-      "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
+      "declarations, but %0 is %select{private|fileprivate|%error|package|public|open}1",
       (DeclName, AccessLevel))
 
 WARNING(inlinable_implies_usable_from_inline,none,
@@ -6918,9 +6918,9 @@ ERROR(runtime_attribute_type_failable_init,none,
       "runtime attribute type initializer %0 cannot be failable", (DeclName))
 
 ERROR(runtime_attribute_type_requirement_not_accessible,none,
-      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "%select{private|fileprivate|internal|package|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing runtime attribute type %3 "
-      "(which is %select{private|fileprivate|internal|public|open}4)",
+      "(which is %select{private|fileprivate|internal|package|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
 
