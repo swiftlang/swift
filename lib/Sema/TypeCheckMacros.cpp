@@ -1082,3 +1082,44 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
 
   return addedAttributes;
 }
+
+MacroDecl *
+swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
+  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+  if (!identTypeRepr)
+    return nullptr;
+
+  // Look for macros at module scope. They can only occur at module scope, and
+  // we need to be sure not to trigger name lookup into type contexts along
+  // the way.
+  llvm::TinyPtrVector<MacroDecl *> macros;
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+  UnqualifiedLookupDescriptor descriptor(
+      identTypeRepr->getNameRef(), moduleScopeDC
+  );
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &result : lookup.allResults()) {
+    // Only keep attached macros, which can be spelled as custom attributes.
+    if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
+      if (isAttachedMacro(macro->getMacroRoles()))
+        macros.push_back(macro);
+  }
+
+  if (macros.empty())
+    return nullptr;
+
+  if (macros.size() > 1) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::ambiguous_macro_reference,
+                       identTypeRepr->getNameRef().getFullName());
+
+    for (auto macro : macros) {
+      macro->diagnose(
+          diag::kind_declname_declared_here, macro->getDescriptiveKind(),
+          macro->getName());
+    }
+  }
+
+  return macros.front();
+}

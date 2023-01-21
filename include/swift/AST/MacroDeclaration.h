@@ -66,6 +66,13 @@ bool macroIntroducedNameRequiresArgument(MacroIntroducedDeclNameKind kind);
 StringRef getMacroIntroducedDeclNameString(
     MacroIntroducedDeclNameKind kind);
 
+class MacroDecl;
+class CustomAttr;
+
+/// Perform lookup to determine whether the given custom attribute refers to
+/// a macro declaration, and return that macro declaration.
+MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc);
+
 class MacroIntroducedDeclName {
 public:
   using Kind = MacroIntroducedDeclNameKind;
