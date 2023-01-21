@@ -645,7 +645,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
   Optional<StorageStateTracking<LiveValues>> runningVals;
   // Keep track of the last StoreInst that we found and the BeginBorrowInst and
   // CopyValueInst that we created in response if the alloc_stack was lexical.
-  Optional<SILInstruction *> lastStoreInst;
+  SILInstruction *lastStoreInst = nullptr;
 
   // For all instructions in the block.
   for (auto bbi = blockPromotingWithin->begin(),
@@ -724,14 +724,14 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
 
       // If we met a store before this one, delete it.
       if (lastStoreInst) {
-        assert(cast<StoreInst>(*lastStoreInst)->getOwnershipQualifier() !=
+        assert(cast<StoreInst>(lastStoreInst)->getOwnershipQualifier() !=
                    StoreOwnershipQualifier::Assign &&
                "store [assign] to the stack location should have been "
                "transformed to a store [init]");
         LLVM_DEBUG(llvm::dbgs()
-                   << "*** Removing redundant store: " << *lastStoreInst);
+                   << "*** Removing redundant store: " << lastStoreInst);
         ++NumInstRemoved;
-        prepareForDeletion(*lastStoreInst, instructionsToDelete);
+        prepareForDeletion(lastStoreInst, instructionsToDelete);
       }
 
       auto oldRunningVals = runningVals;
@@ -759,9 +759,9 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       // If we met a store before this one, delete it.
       if (lastStoreInst) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "*** Removing redundant store: " << *lastStoreInst);
+                   << "*** Removing redundant store: " << lastStoreInst);
         ++NumInstRemoved;
-        prepareForDeletion(*lastStoreInst, instructionsToDelete);
+        prepareForDeletion(lastStoreInst, instructionsToDelete);
       }
 
       // The stored value is the new running value.
@@ -844,14 +844,14 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
   }
 
   if (lastStoreInst && runningVals->isStorageValid) {
-    assert((isa<StoreBorrowInst>(*lastStoreInst) ||
-            (cast<StoreInst>(*lastStoreInst)->getOwnershipQualifier() !=
+    assert((isa<StoreBorrowInst>(lastStoreInst) ||
+            (cast<StoreInst>(lastStoreInst)->getOwnershipQualifier() !=
              StoreOwnershipQualifier::Assign)) &&
            "store [assign] to the stack location should have been "
            "transformed to a store [init]");
     LLVM_DEBUG(llvm::dbgs()
-               << "*** Finished promotion. Last store: " << *lastStoreInst);
-    return *lastStoreInst;
+               << "*** Finished promotion. Last store: " << lastStoreInst);
+    return lastStoreInst;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion with no stores.\n");
