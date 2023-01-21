@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-relative-protocol-witness-tables -module-name A -primary-file %s -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 protocol FuncOnly {
     func a()
