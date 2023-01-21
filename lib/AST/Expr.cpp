@@ -2570,7 +2570,8 @@ unsigned MacroExpansionExpr::getDiscriminator() const {
   auto discriminatorContext =
       MacroDiscriminatorContext::getParentOf(mutableThis);
   mutableThis->setDiscriminator(
-      ctx.getNextMacroDiscriminator(discriminatorContext));
+      ctx.getNextMacroDiscriminator(
+          discriminatorContext, getMacroName().getBaseName()));
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();

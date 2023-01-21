@@ -1072,8 +1072,9 @@ public:
       llvm::SetVector<AutoDiffConfig> &results);
 
   /// Retrieve the next macro expansion discriminator within the given
-  /// context.
-  unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context);
+  /// name and context.
+  unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
+                                     DeclBaseName baseName);
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///

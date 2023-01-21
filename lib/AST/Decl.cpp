@@ -9871,7 +9871,8 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
   auto discriminatorContext =
       MacroDiscriminatorContext::getParentOf(mutableThis);
   mutableThis->setDiscriminator(
-      ctx.getNextMacroDiscriminator(discriminatorContext));
+      ctx.getNextMacroDiscriminator(
+          discriminatorContext, getMacro().getBaseName()));
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
@@ -9931,6 +9932,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;

@@ -402,7 +402,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<const void *, unsigned> NextMacroDiscriminator;
+  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+      NextMacroDiscriminator;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -2159,8 +2160,12 @@ void ASTContext::loadDerivativeFunctionConfigurations(
 }
 
 unsigned ASTContext::getNextMacroDiscriminator(
-    MacroDiscriminatorContext context) {
-  return getImpl().NextMacroDiscriminator[context.getOpaqueValue()]++;
+    MacroDiscriminatorContext context,
+    DeclBaseName baseName
+) {
+  std::pair<const void *, Identifier> key(
+      context.getOpaqueValue(), baseName.getIdentifier());
+  return getImpl().NextMacroDiscriminator[key]++;
 }
 
 void ASTContext::verifyAllLoadedModules() const {
