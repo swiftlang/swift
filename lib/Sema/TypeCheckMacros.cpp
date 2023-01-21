@@ -1092,7 +1092,7 @@ swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   // Look for macros at module scope. They can only occur at module scope, and
   // we need to be sure not to trigger name lookup into type contexts along
   // the way.
-  llvm::TinyPtrVector<MacroDecl *> macros;
+  llvm::TinyPtrVector<ValueDecl *> macros;
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
   UnqualifiedLookupDescriptor descriptor(
@@ -1110,16 +1110,28 @@ swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   if (macros.empty())
     return nullptr;
 
-  if (macros.size() > 1) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::ambiguous_macro_reference,
-                       identTypeRepr->getNameRef().getFullName());
-
-    for (auto macro : macros) {
-      macro->diagnose(
-          diag::kind_declname_declared_here, macro->getDescriptiveKind(),
-          macro->getName());
-    }
+  // Extract macro arguments from the attribute, or create an empty list.
+  ArgumentList *attrArgs;
+  if (attr->hasArgs()) {
+    attrArgs = attr->getArgs();
+  } else {
+    attrArgs = ArgumentList::createImplicit(ctx, {});
   }
 
-  return macros.front();
+  // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
+  // to ensure @freestanding macros are not considered in overload resolution.
+  FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+  auto macroRefExpr = new (ctx) OverloadedDeclRefExpr(
+      macros, identTypeRepr->getNameLoc(), functionRefKind,
+      /*implicit*/true);
+  auto *call = CallExpr::createImplicit(ctx, macroRefExpr, attrArgs);
+
+  Expr *result = call;
+  TypeChecker::typeCheckExpression(result, dc);
+
+  if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn()))
+    if (auto *macro = dyn_cast<MacroDecl>(fn->getDecl()))
+      return macro;
+
+  return dyn_cast<MacroDecl>(macros.front());
 }

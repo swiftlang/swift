@@ -3590,7 +3590,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (auto macro = dyn_cast<MacroDecl>(decl)) {
       // Macro can only be used in an expansion. If we end up here, it's
       // because we found a macro but are missing the leading '#'.
-      if (!locator->isForMacroExpansion()) {
+      if (!(locator->isForMacroExpansion() || locator->getAnchor().isImplicit())) {
         // Record a fix here
         (void)recordFix(MacroMissingPound::create(*this, macro, locator));
       }

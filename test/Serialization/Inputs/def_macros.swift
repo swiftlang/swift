@@ -2,7 +2,7 @@
 
 @expression macro internalStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
-@attached(accessor) public macro myWrapper: Void = #externalMacro(module: "MacroDefinition", type: "MyWrapperMacro")
+@attached(accessor) public macro myWrapper() = #externalMacro(module: "MacroDefinition", type: "MyWrapperMacro")
 
 @attached(memberAttributes) public macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
 
