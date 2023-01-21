@@ -231,9 +231,6 @@ namespace {
     /// Local declaration discriminators.
     llvm::SmallDenseMap<Identifier, unsigned> DeclDiscriminators;
 
-    /// Macro expansion discriminator.
-    unsigned NextMacroExpansionDiscriminator = 0;
-
   public:
     SetLocalDiscriminators(
         unsigned initialDiscriminator = 0
@@ -290,28 +287,6 @@ namespace {
         return Action::SkipChildren(E);
       }
 
-      // Macro expansion expressions get a discriminator.
-      if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
-        if (macroExpansion->getRawDiscriminator() ==
-              MacroExpansionExpr::InvalidDiscriminator) {
-          macroExpansion->setDiscriminator(NextMacroExpansionDiscriminator++);
-        }
-
-        // Walk the arguments.
-        if (auto args = macroExpansion->getArgs())
-          args->walk(*this);
-
-        // If there is a rewritten expression, walk it with a fresh macro
-        // discriminator.
-        if (auto rewritten = macroExpansion->getRewritten()) {
-          llvm::SaveAndRestore<unsigned> savedMacroDiscriminator(
-              NextMacroExpansionDiscriminator, 0u);
-          rewritten->walk(*this);
-        }
-
-        return Action::SkipChildren(E);
-      }
-
       // Caller-side default arguments need their @autoclosures checked.
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
@@ -340,14 +315,6 @@ namespace {
       // If we have a local declaration, assign a local discriminator to it.
       if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
         setLocalDiscriminator(valueDecl);
-      }
-
-      // If we have a macro expansion declaration, assign a discriminator to it.
-      if (auto macroExpansion = dyn_cast<MacroExpansionDecl>(D)) {
-        if (macroExpansion->getRawDiscriminator() ==
-              MacroExpansionDecl::InvalidDiscriminator) {
-          macroExpansion->setDiscriminator(NextMacroExpansionDiscriminator++);
-        }
       }
 
       // But we do want to walk into the initializers of local

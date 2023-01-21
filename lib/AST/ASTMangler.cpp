@@ -23,6 +23,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
@@ -3674,6 +3675,53 @@ std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
   beginMangling();
   appendRuntimeAttributeGeneratorEntity(decl, attr);
   appendSymbolKind(SKind);
+  return finalize();
+}
+
+void ASTMangler::appendMacroExpansionContext(
+    SourceLoc loc, DeclContext *origDC
+) {
+  if (loc.isInvalid())
+    return appendContext(origDC, StringRef());
+
+  ASTContext &ctx = origDC->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
+  auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+  if (!generatedSourceInfo)
+    return appendContext(origDC, StringRef());
+
+  auto parent = MacroDiscriminatorContext::getParentOf(loc, origDC);
+  if (auto dc = parent.dyn_cast<DeclContext *>())
+    return appendContext(dc, StringRef());
+
+  SourceLoc outerExpansionLoc;
+  unsigned discriminator;
+
+  if (auto expr = parent.dyn_cast<MacroExpansionExpr *>()) {
+    outerExpansionLoc = expr->getLoc();
+    discriminator = expr->getDiscriminator();
+  } else {
+    auto decl = parent.get<MacroExpansionDecl *>();
+    outerExpansionLoc = decl->getLoc();
+    discriminator = decl->getDiscriminator();
+  }
+
+  // Append our own context and discriminator.
+  appendMacroExpansionContext(outerExpansionLoc, origDC);
+  appendMacroExpansionOperator(discriminator);
+}
+
+void ASTMangler::appendMacroExpansionOperator(unsigned discriminator) {
+  appendOperator("fM", Index(discriminator));
+}
+
+std::string ASTMangler::mangleMacroExpansion(
+    const MacroExpansionExpr *expansion) {
+  beginMangling();
+  appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  appendMacroExpansionOperator(expansion->getDiscriminator());
   return finalize();
 }
 

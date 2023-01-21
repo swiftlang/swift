@@ -35,6 +35,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -399,6 +400,9 @@ struct ASTContext::Implementation {
   /// Mapping from the function decl to its original body's source range. This
   /// is populated if the body is reparsed from other source buffers.
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
+
+  /// Macro discriminators per context.
+  llvm::DenseMap<const void *, unsigned> NextMacroDiscriminator;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -2152,6 +2156,11 @@ void ASTContext::loadDerivativeFunctionConfigurations(
     loader->loadDerivativeFunctionConfigurations(originalAFD,
                                                  previousGeneration, results);
   }
+}
+
+unsigned ASTContext::getNextMacroDiscriminator(
+    MacroDiscriminatorContext context) {
+  return getImpl().NextMacroDiscriminator[context.getOpaqueValue()]++;
 }
 
 void ASTContext::verifyAllLoadedModules() const {

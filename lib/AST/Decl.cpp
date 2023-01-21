@@ -33,6 +33,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -9864,9 +9865,13 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
   if (getRawDiscriminator() != InvalidDiscriminator)
     return getRawDiscriminator();
 
+  auto mutableThis = const_cast<MacroExpansionDecl *>(this);
   auto dc = getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{dc}, 0);
+  auto discriminatorContext =
+      MacroDiscriminatorContext::getParentOf(mutableThis);
+  mutableThis->setDiscriminator(
+      ctx.getNextMacroDiscriminator(discriminatorContext));
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
@@ -9887,4 +9892,59 @@ ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            GetRuntimeDiscoverableAttributes{mutableSelf},
                            nullptr);
+}
+
+/// Retrieve the parent discriminator context for the given macro.
+MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
+    SourceLoc loc, DeclContext *origDC) {
+  if (loc.isInvalid())
+    return origDC;
+
+  ASTContext &ctx = origDC->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
+  auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+  if (!generatedSourceInfo)
+    return origDC;
+
+  switch (generatedSourceInfo->kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion: {
+    auto expansion =
+        cast<MacroExpansionExpr>(
+                             ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
+                             .get<Expr *>());
+    if (!origDC->isChildContextOf(expansion->getDeclContext()))
+      return MacroDiscriminatorContext(expansion);
+    return origDC;
+  }
+
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
+    auto expansion =
+        cast<MacroExpansionDecl>(
+          ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
+            .get<Decl *>());
+    if (!origDC->isChildContextOf(expansion->getDeclContext()))
+      return MacroDiscriminatorContext(expansion);
+    return origDC;
+  }
+
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    return origDC;
+  }
+}
+
+MacroDiscriminatorContext
+MacroDiscriminatorContext::getParentOf(MacroExpansionExpr *expansion) {
+  return getParentOf(
+      expansion->getLoc(), expansion->getDeclContext());
+}
+
+MacroDiscriminatorContext
+MacroDiscriminatorContext::getParentOf(MacroExpansionDecl *expansion) {
+  return getParentOf(
+      expansion->getLoc(), expansion->getDeclContext());
 }

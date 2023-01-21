@@ -3782,6 +3782,9 @@ namespace {
     }
 
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
+      // Assign a discriminator.
+      (void)expr->getDiscriminator();
+
       auto &ctx = CS.getASTContext();
       auto locator = CS.getConstraintLocator(expr);
 

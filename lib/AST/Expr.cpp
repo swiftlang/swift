@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -2563,9 +2564,13 @@ unsigned MacroExpansionExpr::getDiscriminator() const {
   if (getRawDiscriminator() != InvalidDiscriminator)
     return getRawDiscriminator();
 
+  auto mutableThis = const_cast<MacroExpansionExpr *>(this);
   auto dc = getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{dc}, 0);
+  auto discriminatorContext =
+      MacroDiscriminatorContext::getParentOf(mutableThis);
+  mutableThis->setDiscriminator(
+      ctx.getNextMacroDiscriminator(discriminatorContext));
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
