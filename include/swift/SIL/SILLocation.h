@@ -410,7 +410,12 @@ public:
   }
 
   /// Extract the line, column, and filename from \p Loc.
-  static FilenameAndLocation decode(SourceLoc Loc, const SourceManager &SM);
+  ///
+  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
+  /// file on-disk for buffers containing generated source code, returning the
+  /// name of that temporary file.
+  static FilenameAndLocation decode(SourceLoc Loc, const SourceManager &SM,
+                                    bool ForceGeneratedSourceToDisk = false);
 
   /// Return the decoded FilenameAndLocation.
   /// In case the location has a separate AST node for debugging, this node is

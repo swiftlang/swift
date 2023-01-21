@@ -111,7 +111,6 @@ static bool equalWithoutExistentialTypes(Type t1, Type t2) {
 }
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
-  friend class IRGenDebugInfoImpl;
   const IRGenOptions &Opts;
   ClangImporter &CI;
   SourceManager &SM;
@@ -395,6 +394,7 @@ private:
     return false;
   }
 
+public:
   llvm::MDNode *createInlinedAt(const SILDebugScope *DS) {
     auto *CS = DS->InlinedCallSite;
     if (!CS)
@@ -414,6 +414,7 @@ private:
     InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
   }
+private:
 
 #ifndef NDEBUG
   /// Perform a couple of sanity checks on scopes.
@@ -2951,8 +2952,10 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
 SILLocation::FilenameAndLocation
 IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
   auto &Cached = FilenameAndLocationCache[SL.getOpaquePointerValue()];
-  if (Cached.filename.empty())
-    Cached = sanitizeCodeViewFilenameAndLocation(SILLocation::decode(SL, SM));
+  if (Cached.filename.empty()) {
+    Cached = sanitizeCodeViewFilenameAndLocation(
+        SILLocation::decode(SL, SM, /*ForceGeneratedSourceToDisk=*/true));
+  }
   return Cached;
 }
 
@@ -3103,8 +3106,8 @@ ArtificialLocation::ArtificialLocation(const SILDebugScope *DS,
   if (DI) {
     unsigned Line = 0;
     auto *Scope = DI->getOrCreateScope(DS);
-    if (static_cast<IRGenDebugInfoImpl *>(DI)->getDebugInfoFormat() ==
-        IRGenDebugInfoFormat::CodeView) {
+    auto DII = static_cast<IRGenDebugInfoImpl *>(DI);
+    if (DII->getDebugInfoFormat() == IRGenDebugInfoFormat::CodeView) {
       // In CodeView, line zero is not an artificial line location and so we
       // try to use the location of the scope.
       if (auto *LB = dyn_cast<llvm::DILexicalBlock>(Scope))
@@ -3112,7 +3115,8 @@ ArtificialLocation::ArtificialLocation(const SILDebugScope *DS,
       else if (auto *SP = dyn_cast<llvm::DISubprogram>(Scope))
         Line = SP->getLine();
     }
-    auto DL = llvm::DILocation::get(Scope->getContext(), Line, 0, Scope);
+    auto DL = llvm::DILocation::get(Scope->getContext(), Line, 0, Scope,
+                                    DII->createInlinedAt(DS));
     Builder.SetCurrentDebugLocation(DL);
   }
 }
