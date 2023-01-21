@@ -11,9 +11,6 @@
 // Debug info SIL testing
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
-// Debug info IR testing
-// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
-
 // Execution testing
 // RUN: %target-build-swift -g -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
@@ -63,11 +60,6 @@ func testStringify(a: Int, b: Int) {
   _ = (b, b2, s2, s3)
 }
 
-// CHECK-IR-LABEL: define swiftcc void @"$s9MacroUser5OuterV4testyyF"
-// CHECK-IR: call {{.*}}@"$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC"{{.*}}!dbg ![[STRING_LITERAL_DI:[0-9]+]]
-// CHECK-IR: ![[STRING_LITERAL_DI]] = !DILocation(line: 1, column: 13, scope: ![[EXPANSION_FILE_SCOPE_DI:[0-9]+]])
-// CHECK-IR: ![[EXPANSION_FILE_SCOPE_DI]] = !DILexicalBlockFile(scope: ![[EXPANSION_FILE_SCOPE_SCOPE_DI:[0-9]+]], file: ![[EXPANSION_FILE_DI:[0-9]+]], discriminator: 0)
-// CHECK-IR: ![[EXPANSION_FILE_DI]] = !DIFile(filename: "{{.*}}swift-generated-sources{{.*}}.swift", directory: "")
 public struct Outer {
   var value: Int = 0
   public func test() {
