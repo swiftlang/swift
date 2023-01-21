@@ -642,6 +642,12 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
 
   // RunningVal is the current value in the stack location.
   // We don't know the value of the alloca until we find the first store.
+  //
+  // States:
+  // - None: no values have been encountered within this block
+  // - Some + !isStorageValid: a value was encountered but is no longer stored--
+  //                           it has been destroy_addr'd, etc
+  // - Some + isStorageValid: a value was encountered and is currently stored
   Optional<StorageStateTracking<LiveValues>> runningVals;
   // Keep track of the last StoreInst that we found and the BeginBorrowInst and
   // CopyValueInst that we created in response if the alloc_stack was lexical.
