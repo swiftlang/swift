@@ -101,6 +101,16 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:[[@LINE-6]]:7 - {{.*}}macro_expand.swift:[[@LINE-6]]:27
   // CHECK-DIAGS-NEXT: oa - oa
   // CHECK-DIAGS-NEXT: END CONTENTS OF FILE
+
+  _ = #addBlocker({ // expected-note{{in expansion of macro 'addBlocker' here}}
+
+      print("hello")
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+    }())
+
   // Check recursion.
   #recurse(false) // okay
   #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}
