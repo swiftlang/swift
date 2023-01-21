@@ -861,13 +861,14 @@ public:
 
   void render(raw_ostream &Out) {
     // Print the excerpt for each file.
-    unsigned lineNumberIndent =
-        std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
-                         [](auto &a, auto &b) {
-                           return a.second.getPreferredLineNumberIndent() <
-                                  b.second.getPreferredLineNumberIndent();
-                         })
-            ->second.getPreferredLineNumberIndent();
+    unsigned lineNumberIndent = 0;
+    if (!FileExcerpts.empty()) {
+      lineNumberIndent = std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
+          [](auto &a, auto &b) {
+            return a.second.getPreferredLineNumberIndent() <
+              b.second.getPreferredLineNumberIndent();
+          })->second.getPreferredLineNumberIndent();
+    }
     for (auto excerpt : FileExcerpts)
       excerpt.second.render(lineNumberIndent, Out);
 

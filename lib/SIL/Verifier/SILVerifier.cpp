@@ -5889,6 +5889,11 @@ public:
       // map and go on.
       auto *DS = SI.getDebugScope();
       assert(DS && "Each instruction should have a debug scope");
+
+      // We don't support this verification on inlined call sites yet.
+      if (DS->InlinedCallSite)
+        continue;
+
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;
