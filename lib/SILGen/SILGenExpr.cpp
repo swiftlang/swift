@@ -5995,6 +5995,8 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
                                               SGFContext C) {
   auto *rewritten = E->getRewritten();
   assert(rewritten && "Macro should have been rewritten by SILGen");
+  MacroScope scope(SGF, CleanupLocation(rewritten), E, E->getMacroName(),
+                   E->getMacroNameLoc());
   return visit(rewritten, C);
 }
 
