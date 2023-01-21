@@ -315,12 +315,17 @@ StringRef REPLCompletions::getRoot() const {
 
   std::string RootStr = CookedResults[0].InsertableString.str();
   for (auto R : CookedResults) {
+    if (RootStr.empty())
+      break;
+
     if (R.NumBytesToErase != 0) {
       RootStr.resize(0);
       break;
     }
-    auto MismatchPlace = std::mismatch(RootStr.begin(), RootStr.end(),
-                                       R.InsertableString.begin());
+
+    auto MismatchPlace =
+        std::mismatch(RootStr.begin(), RootStr.end(),
+                      R.InsertableString.begin(), R.InsertableString.end());
     RootStr.resize(MismatchPlace.first - RootStr.begin());
   }
   Root = RootStr;
