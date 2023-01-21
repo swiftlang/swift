@@ -204,8 +204,11 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer) {
     return None;
 
   // Dump the contents there.
+  auto contents = buffer->getBuffer();
   llvm::raw_fd_ostream out(tempFD, true);
-  out << buffer->getBuffer();
+  out << contents;
+  if (contents.empty() || contents.back() != '\n')
+    out << "\n";
   out.flush();
 
   llvm::sys::DontRemoveFileOnSignal(tempFileName);
