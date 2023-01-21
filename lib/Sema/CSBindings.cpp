@@ -2147,6 +2147,14 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   }
 
   if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
+    // When a 'nil' has a placeholder as contextual type there is not enough
+    // information to resolve it, so let's record a specify contextual type for
+    // nil fix.
+    if (isExpr<NilLiteralExpr>(srcLocator->getAnchor())) {
+      ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
+      return std::make_pair(fix, /*impact=*/(unsigned)10);
+    }
+
     ConstraintFix *fix = SpecifyTypeForPlaceholder::create(cs, srcLocator);
     return std::make_pair(fix, defaultImpact);
   }
