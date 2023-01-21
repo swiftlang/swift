@@ -1309,6 +1309,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Declaration: {
+    Printer.printAttrName("@declaration");
+    Printer << "(";
+    auto Attr = cast<DeclarationAttr>(this);
+    Printer << getMacroRoleString(Attr->getMacroRole());
+    Printer << ")";
+    break;
+  }
+
   case DAK_Attached: {
     Printer.printAttrName("@attached");
     Printer << "(";
