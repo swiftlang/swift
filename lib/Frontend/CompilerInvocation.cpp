@@ -1466,6 +1466,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
     } else if (contents == "swift") {
       Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+    } else if (contents == "swift-syntax") {
+      Opts.PrintedFormattingStyle =
+          DiagnosticOptions::FormattingStyle::SwiftSyntax;
     } else {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                      arg->getOption().getPrefixedName(), arg->getValue());
