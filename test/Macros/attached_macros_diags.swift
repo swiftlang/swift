@@ -6,16 +6,15 @@
 
 @attached(accessor) macro m2(_: Int) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
-// expected-note@-2 2{{candidate has partially matching parameter list (Int)}}
+// expected-note@-2{{candidate has partially matching parameter list (Int)}}
 
 @attached(accessor) macro m2(_: Double) -> Void = #externalMacro(module: "MyMacros", type: "Macro2")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro2' could not be found for macro 'm2'}}
-// expected-note@-2 2{{candidate has partially matching parameter list (Double)}}
+// expected-note@-2{{candidate has partially matching parameter list (Double)}}
 
 @m1 struct X1 { }
 
-// FIXME: Redundant diagnostic
-@m2 struct X2 { } // expected-error 2{{no exact matches in call to macro 'm2'}}
+@m2 struct X2 { } // expected-error{{no exact matches in call to macro 'm2'}}
 
 // Check for nesting rules.
 struct SkipNestedType {
