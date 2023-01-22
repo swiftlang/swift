@@ -72,6 +72,10 @@ public:
 
   /// The custom attribute for an attached macro.
   CustomAttr *attachedMacroCustomAttr = nullptr;
+
+  /// The name of the source file on disk that was created to hold the
+  /// contents of this file for external clients.
+  StringRef onDiskBufferCopyFileName = StringRef();
 };
 
 /// This class manages and owns source buffers.
@@ -253,11 +257,18 @@ public:
   ///
   /// \p BufferID must be a valid buffer ID.
   ///
+  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
+  /// file on-disk for buffers containing generated source code, returning the
+  /// name of that temporary file.
+  ///
   /// This should not be used for displaying information about the \e contents
   /// of a buffer, since lines within the buffer may be marked as coming from
   /// other files using \c #sourceLocation. Use #getDisplayNameForLoc instead
   /// in that case.
-  StringRef getIdentifierForBuffer(unsigned BufferID) const;
+  StringRef getIdentifierForBuffer(
+      unsigned BufferID,
+      bool ForceGeneratedSourceToDisk = false
+  ) const;
 
   /// Returns a SourceRange covering the entire specified buffer.
   ///
@@ -289,10 +300,15 @@ public:
   /// Returns a buffer identifier suitable for display to the user containing
   /// the given source location.
   ///
+  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
+  /// file on-disk for buffers containing generated source code, returning the
+  /// name of that temporary file.
+  ///
   /// This respects \c #sourceLocation directives and the 'use-external-names'
   /// directive in VFS overlay files. If you need an on-disk file name, use
   /// #getIdentifierForBuffer instead.
-  StringRef getDisplayNameForLoc(SourceLoc Loc) const;
+  StringRef getDisplayNameForLoc(
+      SourceLoc Loc, bool ForceGeneratedSourceToDisk = false) const;
 
   /// Returns the line and column represented by the given source location.
   ///

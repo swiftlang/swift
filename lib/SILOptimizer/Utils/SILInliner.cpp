@@ -810,6 +810,15 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ProjectBlockStorageInst:
     return InlineCost::Free;
 
+  // dynamic_pack_index is free.  The other pack-indexing instructions
+  // are just adds of values that should be trivially dynamically
+  // available; that's cheap enough to still consider free under the
+  // same principle as typed GEPs.
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+    return InlineCost::Free;
+
   // Aggregates are exploded at the IR level; these are effectively no-ops.
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::StructInst:

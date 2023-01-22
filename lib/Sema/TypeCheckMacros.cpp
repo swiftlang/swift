@@ -523,6 +523,7 @@ Expr *swift::expandMacroExpr(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(sourceFile->getImports());
 
   // Retrieve the parsed expression from the list of top-level items.
   auto topLevelItems = macroSourceFile->getTopLevelItems();
@@ -701,6 +702,7 @@ bool swift::expandFreestandingDeclarationMacro(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(sourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
@@ -878,6 +880,7 @@ void swift::expandAccessors(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(declSourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", storage);
@@ -1059,6 +1062,7 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(declSourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);

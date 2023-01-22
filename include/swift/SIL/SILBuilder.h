@@ -1936,6 +1936,32 @@ public:
         getSILDebugLocation(Loc), Existential));
   }
 
+  DynamicPackIndexInst *
+  createDynamicPackIndex(SILLocation loc, SILValue indexValue,
+                         CanPackType indexedPackType) {
+    return insert(DynamicPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              indexValue, indexedPackType));
+  }
+
+  PackPackIndexInst *
+  createPackPackIndex(SILLocation loc, unsigned sliceStartIndex,
+                      SILValue indexWithinSlice,
+                      CanPackType indexedPackType) {
+    return insert(PackPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              sliceStartIndex, indexWithinSlice,
+                              indexedPackType));
+  }
+
+  ScalarPackIndexInst *
+  createScalarPackIndex(SILLocation loc, unsigned componentIndex,
+                        CanPackType indexedPackType) {
+    return insert(ScalarPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              componentIndex, indexedPackType));
+  }
+
   OpenPackElementInst *
   createOpenPackElement(SILLocation loc, SILValue packIndex,
                         GenericEnvironment *openedElementEnvironment) {

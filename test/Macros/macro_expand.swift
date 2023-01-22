@@ -8,8 +8,11 @@
 // RUN: not %target-swift-frontend -typecheck -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 
+// Debug info SIL testing
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+
 // Execution testing
-// RUN: %target-build-swift -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -g -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
@@ -24,7 +27,11 @@
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
   print("Result is \(#customFileID)")
+  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":1:1 parent @customFileID {{.*}} }
+  // CHECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]
+  // CHECK-SIL: sil_scope {{[0-9]+}} { loc "{{.*}}":1:1 parent [[MACRO_SCOPE]] inlined_at [[SRC_SCOPE]] }
 
+  
   // CHECK: Builtin result is MacroUser/macro_expand.swift
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
@@ -53,14 +60,19 @@ func testStringify(a: Int, b: Int) {
   _ = (b, b2, s2, s3)
 }
 
-struct Outer {
+public struct Outer {
   var value: Int = 0
-  func test() {
-    _ = #stringify(1 + value)
+  public func test() {
+    let (a, b) = #stringify(1 + value)
 
-    _ = #stringify({ x in
+    let (c, d) = #stringify({ x in
       x + 1
     })
+
+    _ = a
+    _ = b
+    _ = c
+    _ = d
   }
 }
 
@@ -82,11 +94,21 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
 
-  // CHECK-DIAGS: macro_expand.swift:81:7-81:27:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
+  // CHECK-DIAGS: macro_expand.swift:[[@LINE-4]]:7-[[@LINE-4]]:27:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
   // CHECK-DIAGS: CONTENTS OF FILE{{.*}}addBlocker
-  // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:81:7 - {{.*}}macro_expand.swift:81:27
+  // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:[[@LINE-6]]:7 - {{.*}}macro_expand.swift:[[@LINE-6]]:27
   // CHECK-DIAGS-NEXT: oa - oa
   // CHECK-DIAGS-NEXT: END CONTENTS OF FILE
+
+  _ = #addBlocker({ // expected-note{{in expansion of macro 'addBlocker' here}}
+
+      print("hello")
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+    }())
+
   // Check recursion.
   #recurse(false) // okay
   #recurse(true) // expected-note{{in expansion of macro 'recurse' here}}

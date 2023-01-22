@@ -598,31 +598,13 @@ public:
   /// \param isBindingScope If true, this is a scope for the bindings introduced
   /// by a let expression. This scope ends when the next innermost BraceStmt
   /// ends.
-  void enterDebugScope(SILLocation Loc, bool isBindingScope = false) {
-    auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
-                                          : F.getDebugScope();
-    auto *DS = Parent;
-    // Don't nest a scope for Loc under Parent unless it's actually different.
-    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
-      DS = new (SGM.M) SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
-    DebugScopeStack.emplace_back(DS, isBindingScope);
-    B.setCurrentDebugScope(DS);
-  }
+  void enterDebugScope(SILLocation Loc, bool isBindingScope = false,
+                       Optional<SILLocation> MacroExpansion = {},
+                       DeclNameRef MacroName = {},
+                       DeclNameLoc MacroNameLoc = {});
 
   /// Return to the previous debug scope.
-  void leaveDebugScope() {
-    // Pop any 'guard' scopes first.
-    while (DebugScopeStack.back().getInt())
-      DebugScopeStack.pop_back();
-
-    // Pop the scope we're leaving now.
-    DebugScopeStack.pop_back();
-    if (DebugScopeStack.size())
-      B.setCurrentDebugScope(DebugScopeStack.back().getPointer());
-    // Don't reset the debug scope after leaving the outermost scope,
-    // because the debugger is not expecting the function epilogue to
-    // be in a different scope.
-  }
+  void leaveDebugScope();
 
   std::unique_ptr<Initialization>
   prepareIndirectResultInit(AbstractionPattern origResultType,

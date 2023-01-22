@@ -2105,6 +2105,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   case AccessLevel::Internal:
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     break;

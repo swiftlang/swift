@@ -730,6 +730,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     case AccessLevel::Public:
       Printer << tok::kw_public;
       break;
+    case AccessLevel::Package:
+      Printer.printKeyword("package", Options);
+      break;
     case AccessLevel::Open:
       Printer.printKeyword("open", Options);
       break;
@@ -5694,6 +5697,7 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinJobType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinExecutorType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinDefaultActorStorageType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinPackIndexType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnsafeValueBufferType)

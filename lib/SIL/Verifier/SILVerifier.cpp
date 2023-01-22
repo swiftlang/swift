@@ -932,6 +932,13 @@ public:
     }
   }
 
+  template <class T>
+  T *requireValueKind(SILValue value, const Twine &what) {
+    auto match = dyn_cast<T>(value);
+    _require(match != nullptr, what, [=] { llvm::dbgs() << value; });
+    return match;
+  }
+
   static unsigned numInstsInFunction(const SILFunction &F) {
     unsigned numInsts = 0;
     for (auto &BB : F) {
@@ -5395,6 +5402,64 @@ public:
     }
   }
 
+  void verifySameShape(CanPackType left, CanPackType right) {
+    verifySameShape(left, right, 0, right->getNumElements());
+  }
+  void verifySameShape(CanPackType left, CanPackType right,
+                       unsigned rightBegin, unsigned rightEnd) {
+    assert(rightBegin <= rightEnd && rightEnd <= right->getNumElements());
+    require(left->getNumElements() == rightEnd - rightBegin,
+            "packs must agree in length");
+    for (unsigned i = 0, e = left->getNumElements(); i != e; ++i) {
+      auto leftComponent = left.getElementType(i);
+      auto rightComponent = right.getElementType(rightBegin + i);
+      auto leftExpansion = dyn_cast<PackExpansionType>(leftComponent);
+      auto rightExpansion = dyn_cast<PackExpansionType>(rightComponent);
+      if (leftExpansion && rightExpansion) {
+        require(leftExpansion.getCountType()->getReducedShape() ==
+                rightExpansion.getCountType()->getReducedShape(),
+                "packs must have same shape: corresponding expansion "
+                "components must expand packs of same shape");
+      } else {
+        require(!leftExpansion && !rightExpansion,
+                "packs must have same shape: must agree in whether "
+                "corresponding components are expansions");
+      }
+    }
+  }
+
+  void checkPackPackIndexInst(PackPackIndexInst *i) {
+    auto innerIndex = requireValueKind<AnyPackIndexInst>(i->getOperand(),
+                                          "component pack index operand");
+    if (!innerIndex) return;
+
+    auto packType = i->getIndexedPackType();
+    require(i->getComponentStartIndex() < packType->getNumElements(),
+            "component index must be in bounds for indexed pack type");
+    verifySameShape(innerIndex->getIndexedPackType(), packType,
+                    i->getComponentStartIndex(), i->getComponentEndIndex());
+  }
+
+  void checkScalarPackIndexInst(ScalarPackIndexInst *i) {
+    auto packType = i->getIndexedPackType();
+    require(i->getComponentIndex() < packType->getNumElements(),
+            "component index must be in bounds for indexed pack type");
+    require(!isa<PackExpansionType>(
+               packType.getElementType(i->getComponentIndex())),
+            "component index must correspond to scalar component of "
+            "indexed pack type");
+  }
+
+  void checkOpenPackElementInst(OpenPackElementInst *i) {
+    requireObjectType(BuiltinPackIndexType, i->getOperand()->getType(),
+                      "pack index operand");
+    auto index = requireValueKind<AnyPackIndexInst>(i->getOperand(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    verifySameShape(index->getIndexedPackType(), i->getOpenedShapeClass());
+  }
+
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {
@@ -5824,6 +5889,11 @@ public:
       // map and go on.
       auto *DS = SI.getDebugScope();
       assert(DS && "Each instruction should have a debug scope");
+
+      // We don't support this verification on inlined call sites yet.
+      if (DS->InlinedCallSite)
+        continue;
+
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;

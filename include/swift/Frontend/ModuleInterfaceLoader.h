@@ -182,7 +182,7 @@ struct ExplicitModuleInfo {
   // Path of the .swiftsourceinfo file.
   std::string moduleSourceInfoPath;
   // A flag that indicates whether this module is a framework
-  bool isFramework;
+  bool isFramework = false;
   // A flag that indicates whether this module is a system module
   // Set the default to be false.
   bool isSystem = false;

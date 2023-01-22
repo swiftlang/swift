@@ -643,6 +643,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
+  // Variadic pack indexing
+  ABSTRACT_SINGLE_VALUE_INST(AnyPackIndexInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(DynamicPackIndexInst, dynamic_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(PackPackIndexInst, pack_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ScalarPackIndexInst, scalar_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(AnyPackIndexInst, DynamicPackIndexInst, ScalarPackIndexInst)
+
   // BindMemory and RebindMemory have no physical side effect. Semantically they
   // write to their affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.

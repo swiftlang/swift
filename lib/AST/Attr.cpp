@@ -75,6 +75,7 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   case AccessLevel::Private: return "private";
   case AccessLevel::FilePrivate: return "fileprivate";
   case AccessLevel::Internal: return "internal";
+  case AccessLevel::Package: return "package";
   case AccessLevel::Public: return "public";
   case AccessLevel::Open: return "open";
   }
@@ -1306,6 +1307,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<BackDeployAttr>(this);
     Printer << platformString(Attr->Platform) << " " <<
       Attr->Version.getAsString();
+    Printer << ")";
+    break;
+  }
+
+  case DAK_Declaration: {
+    Printer.printAttrName("@declaration");
+    Printer << "(";
+    auto Attr = cast<DeclarationAttr>(this);
+    Printer << getMacroRoleString(Attr->getMacroRole());
     Printer << ")";
     break;
   }

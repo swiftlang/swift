@@ -1598,6 +1598,21 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType)
 
+/// BuiltinPackIndexType - The type of an (untyped) index into a pack
+/// in SIL.  Essentially a UInt32 with some structural restrictions
+/// about how it can be produced that ensures SIL maintains well-typed
+/// use-def relationships around packs.
+class BuiltinPackIndexType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinPackIndexType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinPackIndex, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinPackIndex;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinPackIndexType, BuiltinType)
+
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.

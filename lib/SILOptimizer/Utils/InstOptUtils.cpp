@@ -1344,6 +1344,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd) {
   case AccessLevel::Open:
     return false;
   case AccessLevel::Public:
+  case AccessLevel::Package:
     if (isa<ConstructorDecl>(vd)) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the

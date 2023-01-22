@@ -1525,6 +1525,7 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
       switch (type->getEffectiveAccess()) {
       case AccessLevel::Open:
       case AccessLevel::Public:
+      case AccessLevel::Package:
         // We can't remove metadata for externally visible types.
         return false;
       case AccessLevel::Internal:
@@ -3816,7 +3817,7 @@ getTypeContextDescriptorEntityReference(IRGenModule &IGM,
 
 static TypeEntityReference
 getProtocolDescriptorEntityReference(IRGenModule &IGM, ProtocolDecl *protocol) {
-  assert(!protocol->isObjC() &&
+  assert(!protocol->hasClangNode() &&
          "objc protocols don't have swift protocol descriptors");
   auto entity = LinkEntity::forProtocolDescriptor(protocol);
   return getContextDescriptorEntityReference(IGM, entity);
@@ -3836,7 +3837,7 @@ getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
 TypeEntityReference
 IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-    assert(!protocol->isObjC() && "imported protocols not handled here");
+    assert(!protocol->hasClangNode() && "imported protocols not handled here");
     return getProtocolDescriptorEntityReference(*this, protocol);
   }
   
