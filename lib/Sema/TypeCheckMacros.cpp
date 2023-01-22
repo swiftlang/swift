@@ -1083,11 +1083,11 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return addedAttributes;
 }
 
-MacroDecl *
+Optional<MacroDecl *>
 swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
   if (!identTypeRepr)
-    return nullptr;
+    return None;
 
   // Look for macros at module scope. They can only occur at module scope, and
   // we need to be sure not to trigger name lookup into type contexts along
@@ -1108,7 +1108,7 @@ swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   }
 
   if (macros.empty())
-    return nullptr;
+    return None;
 
   // Extract macro arguments from the attribute, or create an empty list.
   ArgumentList *attrArgs;
@@ -1133,5 +1133,7 @@ swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
     if (auto *macro = dyn_cast<MacroDecl>(fn->getDecl()))
       return macro;
 
-  return dyn_cast<MacroDecl>(macros.front());
+  // If we couldn't resolve a macro decl, the attribute is invalid.
+  attr->setInvalid();
+  return nullptr;
 }

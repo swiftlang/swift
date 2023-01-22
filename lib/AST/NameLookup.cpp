@@ -3048,7 +3048,7 @@ CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
   if (auto macro = findMacroForCustomAttr(attr, dc))
-    return macro;
+    return macro.getValue();
 
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
