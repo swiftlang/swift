@@ -16,9 +16,12 @@ extension SyntaxProtocol {
     }
 
     // Otherwise, it must be one of our children.
-    return children(viewMode: .sourceAccurate).lazy.compactMap { child in
-      child.token(at: position)
-    }.first
+    for child in children(viewMode: .sourceAccurate) {
+      if let token = child.token(at: position) {
+        return token
+      }
+    }
+    fatalError("Children of syntax node do not cover all positions in it")
   }
 }
 
@@ -61,7 +64,7 @@ public func destroyMacro(
 }
 
 /// Allocate a copy of the given string as a UTF-8 string.
-private func allocateUTF8String(
+func allocateUTF8String(
   _ string: String,
   nullTerminated: Bool = false
 ) -> (UnsafePointer<UInt8>, Int) {
