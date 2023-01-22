@@ -952,6 +952,7 @@ static void annotateSnippetWithInfo(SourceManager &SM,
   }
 }
 
+#if SWIFT_SWIFT_PARSER
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void enqueueDiagnostic(
     void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
@@ -988,6 +989,7 @@ static void enqueueDiagnostic(
 
   // FIXME: Need a way to add highlights, Fix-Its, and so on.
 }
+#endif
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
@@ -1003,27 +1005,8 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     return;
 
   switch (FormattingStyle) {
-  case DiagnosticOptions::FormattingStyle::Swift:
-    if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
-      // If this is a note and we have an in-flight message, add it to that
-      // instead of emitting it separately.
-      annotateSnippetWithInfo(SM, Info, *currentSnippet);
-    } else {
-      // If we encounter a new error/warning/remark, flush any in-flight
-      // snippets.
-      flush(/*includeTrailingBreak*/ true);
-      currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
-      annotateSnippetWithInfo(SM, Info, *currentSnippet);
-    }
-    if (PrintEducationalNotes) {
-      for (auto path : Info.EducationalNotePaths) {
-        if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
-          BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
-      }
-    }
-    break;
-
   case DiagnosticOptions::FormattingStyle::SwiftSyntax: {
+#if SWIFT_SWIFT_PARSER
     if (Info.Loc.isValid()) {
       // Ignore "in macro expansion" diagnostics; we want to put them
       // elsewhere.
@@ -1057,8 +1040,29 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     // Fall through to print using the LLVM style when there is no source
     // location.
     flush(/*includeTrailingBreak*/ false);
+#endif
     LLVM_FALLTHROUGH;
   }
+
+  case DiagnosticOptions::FormattingStyle::Swift:
+    if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
+      // If this is a note and we have an in-flight message, add it to that
+      // instead of emitting it separately.
+      annotateSnippetWithInfo(SM, Info, *currentSnippet);
+    } else {
+      // If we encounter a new error/warning/remark, flush any in-flight
+      // snippets.
+      flush(/*includeTrailingBreak*/ true);
+      currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
+      annotateSnippetWithInfo(SM, Info, *currentSnippet);
+    }
+    if (PrintEducationalNotes) {
+      for (auto path : Info.EducationalNotePaths) {
+        if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+          BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+      }
+    }
+    break;
 
   case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
@@ -1095,6 +1099,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     currentSnippet.reset();
   }
 
+#if SWIFT_SWIFT_PARSER
   if (queuedDiagnostics) {
     Stream << "=== " << queuedBufferName << " ===\n";
 
@@ -1113,6 +1118,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     if (includeTrailingBreak)
       Stream << "\n";
   }
+#endif
 
   for (auto note : BufferedEducationalNotes) {
     printMarkdown(note, Stream, ForceColors);
