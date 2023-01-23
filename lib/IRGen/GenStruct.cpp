@@ -368,6 +368,9 @@ namespace {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
+      if (getFields().empty()) {
+        return IGM.typeLayoutCache.getEmptyEntry();
+      }
 
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {

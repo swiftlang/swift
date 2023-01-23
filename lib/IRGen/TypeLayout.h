@@ -57,6 +57,12 @@ enum class ScalarKind : uint8_t {
 ScalarKind refcountingToScalarKind(ReferenceCounting refCounting);
 
 class TypeLayoutEntry {
+protected:
+  /// Memoize the value of layoutString()
+  /// None -> Not yet computed
+  /// Optional(nullptr) -> No layout string
+  /// Optional(Constant*) -> Layout string
+  mutable llvm::Optional<llvm::Constant*> _layoutString;
 public:
   TypeLayoutEntryKind kind;
   uint8_t hasArchetypeField : 1;
@@ -107,7 +113,7 @@ public:
   virtual llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const;
   virtual llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const;
   virtual llvm::Constant *layoutString(IRGenModule &IGM) const;
-  virtual void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const;
+  virtual bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const;
 
   virtual void destroy(IRGenFunction &IGF, Address addr) const;
 
@@ -199,7 +205,7 @@ public:
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Type *getStorageType(IRGenFunction &IGF) const;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -258,7 +264,7 @@ public:
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -316,7 +322,7 @@ public:
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -378,7 +384,7 @@ public:
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  void refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -487,10 +493,11 @@ public:
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
-  CopyDestroyStrategy copyDestroyKind(IRGenFunction &IGF) const;
+  CopyDestroyStrategy copyDestroyKind(IRGenModule &IGM) const;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -661,6 +668,7 @@ public:
                                  Address enumAddr) const override;
 
   llvm::Constant *layoutString(IRGenModule &IGM) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;

@@ -349,9 +349,10 @@ llvm::Constant *TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   return nullptr;
 }
 
-void TypeLayoutEntry::refCountString(IRGenModule &IGM,
+bool TypeLayoutEntry::refCountString(IRGenModule &IGM,
                                      LayoutStringBuilder &B) const {
-  // assert(isEmpty());
+  assert(isEmpty());
+  return true;
 }
 
 llvm::Value *TypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
@@ -983,9 +984,15 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  if (_layoutString) {
+    return *_layoutString;
+  }
+
   LayoutStringBuilder B{};
 
-  refCountString(IGM, B);
+  if (!refCountString(IGM, B)) {
+    return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+  }
 
   ConstantInitBuilder IB(IGM);
   auto SB = IB.beginStruct();
@@ -993,11 +1000,13 @@ llvm::Constant *ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
   B.result(IGM, SB);
 
-  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-                                  /*constant*/ true);
+  _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
+  return *_layoutString;
 }
 
-void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
+bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                            LayoutStringBuilder &B) const {
   auto size = typeInfo.getFixedSize().getValue();
   switch (scalarKind) {
@@ -1046,6 +1055,8 @@ void ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   default:
     llvm_unreachable("Unsupported ScalarKind");
   }
+
+  return true;
 }
 
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -1431,24 +1442,36 @@ llvm::Value *AlignedGroupEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
+  if (_layoutString) {
+    return *_layoutString;
+  }
+
   LayoutStringBuilder B{};
 
-  refCountString(IGM, B);
+  if (!refCountString(IGM, B)) {
+    return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+  }
 
   ConstantInitBuilder IB(IGM);
   auto SB = IB.beginStruct();
 
   B.result(IGM, SB);
 
-  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-                                  /*constant*/ true);
+  _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
+  return *_layoutString;
 }
 
-void AlignedGroupEntry::refCountString(IRGenModule &IGM,
+bool AlignedGroupEntry::refCountString(IRGenModule &IGM,
                                        LayoutStringBuilder &B) const {
   for (auto *entry : entries) {
-    entry->refCountString(IGM, B);
+    if (!entry->refCountString(IGM, B)) {
+      return false;
+    }
   }
+
+  return true;
 }
 
 static Address alignAddress(IRGenFunction &IGF, Address addr,
@@ -1785,16 +1808,36 @@ ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return nullptr;
+  if (_layoutString) {
+    return *_layoutString;
+  }
+
+  LayoutStringBuilder B{};
+
+  if (!refCountString(IGM, B)) {
+    return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+  }
+
+  ConstantInitBuilder IB(IGM);
+  auto SB = IB.beginStruct();
+
+  B.result(IGM, SB);
+
+  _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
+  return *_layoutString;
 }
 
-void ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
+bool ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
                                           LayoutStringBuilder &B) const {
   auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
   auto params = archetypeType->getGenericEnvironment()->getGenericParams();
   for (auto param : params) {
     B.addGenericRefCount(param->getIndex());
   }
+
+  return true;
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -1907,7 +1950,41 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return nullptr;
+  LayoutStringBuilder B{};
+
+  if (!refCountString(IGM, B)) {
+    return nullptr;
+  }
+
+  ConstantInitBuilder IB(IGM);
+  auto SB = IB.beginStruct();
+
+  B.result(IGM, SB);
+
+  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                  /*constant*/ true);
+}
+
+bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
+                                         LayoutStringBuilder &B) const {
+  if (isMultiPayloadEnum()) {
+    return false;
+  }
+
+  switch (copyDestroyKind(IGM)) {
+  case CopyDestroyStrategy::POD: {
+    auto size = fixedSize(IGM);
+    assert(size && "POD should not have dynamic size");
+    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size->getValue());
+    break;
+  }
+  case CopyDestroyStrategy::NullableRefcounted:
+  case CopyDestroyStrategy::ForwardToPayload:
+    return cases[0]->refCountString(IGM, B);
+    break;
+  case CopyDestroyStrategy::Normal:
+    return false;
+  }
 }
 
 void EnumTypeLayoutEntry::computeProperties() {
@@ -1917,7 +1994,7 @@ void EnumTypeLayoutEntry::computeProperties() {
 }
 
 EnumTypeLayoutEntry::CopyDestroyStrategy
-EnumTypeLayoutEntry::copyDestroyKind(IRGenFunction &IGF) const {
+EnumTypeLayoutEntry::copyDestroyKind(IRGenModule &IGM) const {
   if (isPOD()) {
     return POD;
   } else if (isSingleton()) {
@@ -1927,7 +2004,7 @@ EnumTypeLayoutEntry::copyDestroyKind(IRGenFunction &IGF) const {
     return NullableRefcounted;
   } else {
     unsigned numTags = numEmptyCases;
-    if (cases[0]->canValueWitnessExtraInhabitantsUpTo(IGF.IGM, numTags - 1)) {
+    if (cases[0]->canValueWitnessExtraInhabitantsUpTo(IGM, numTags - 1)) {
       return ForwardToPayload;
     }
     return Normal;
@@ -2243,7 +2320,7 @@ void EnumTypeLayoutEntry::initializeSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  switch (copyDestroyKind(IGF)) {
+  switch (copyDestroyKind(IGM)) {
   case POD: {
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
@@ -2302,7 +2379,7 @@ void EnumTypeLayoutEntry::assignSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  switch (copyDestroyKind(IGF)) {
+  switch (copyDestroyKind(IGM)) {
   case POD: {
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
@@ -2490,7 +2567,7 @@ void EnumTypeLayoutEntry::initializeMultiPayloadEnum(IRGenFunction &IGF,
 
 void EnumTypeLayoutEntry::destroySinglePayloadEnum(IRGenFunction &IGF,
                                                    Address addr) const {
-  switch (copyDestroyKind(IGF)) {
+  switch (copyDestroyKind(IGF.IGM)) {
   case POD: {
     break;
   }
@@ -3053,7 +3130,9 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   LayoutStringBuilder B{};
 
-  refCountString(IGM, B);
+  if (!refCountString(IGM, B)) {
+    return nullptr;
+  }
 
   ConstantInitBuilder IB(IGM);
   auto SB = IB.beginStruct();
@@ -3064,12 +3143,18 @@ llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
                                   /*constant*/ true);
 }
 
-void ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
+bool ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                               LayoutStringBuilder &B) const {
+  // TODO: handle generics properly
+  if (ty.hasArchetype()) {
+    return false;
+  }
   // USE PROPER SymbolReferenceKind
   auto metaTypeRef = IGM.getAddrOfTypeMetadata(
       ty.getASTType(), SymbolReferenceKind::Relative_Indirectable);
   B.addResilientRefCount(metaTypeRef);
+
+  return true;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
@@ -3310,6 +3395,11 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
 llvm::Constant *
 TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   return nullptr;
+}
+
+bool TypeInfoBasedTypeLayoutEntry::refCountString(
+    IRGenModule &IGM, LayoutStringBuilder &B) const {
+  return false;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
