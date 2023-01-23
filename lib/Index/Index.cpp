@@ -22,6 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
@@ -448,6 +449,11 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   StringScratchSpace stringStorage;
   ContainerTracker Containers;
 
+  // Contains a mapping for captures of the form [x], from the declared "x"
+  // to the captured "x" in the enclosing scope. Also includes shorthand if
+  // let bindings.
+  llvm::DenseMap<ValueDecl *, ValueDecl *> sameNamedCaptures;
+
   bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
                      StringRef &name, StringRef &USR) {
     auto &result = nameAndUSRCache[ExtD ? (Decl*)ExtD : D];
@@ -553,6 +559,16 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     Info.Relations.push_back(IndexRelation(RelationRoles, D, SymInfo, Name, USR));
     Info.roles |= RelationRoles;
     return false;
+  }
+
+  ValueDecl *firstDecl(ValueDecl *D) {
+    while (true) {
+      auto captured = sameNamedCaptures.find(D);
+      if (captured == sameNamedCaptures.end())
+        break;
+      D = captured->second;
+    }
+    return D;
   }
 
 public:
@@ -701,6 +717,15 @@ private:
   bool walkToExprPre(Expr *E) override {
     if (Cancelled)
       return false;
+
+    // Record any same named captures/shorthand if let bindings so we can
+    // treat their references as references to the original decl.
+    if (auto *captureList = dyn_cast<CaptureListExpr>(E)) {
+      for (auto shadows : getShorthandShadows(captureList)) {
+        sameNamedCaptures[shadows.first] = shadows.second;
+      }
+    }
+
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
@@ -712,6 +737,20 @@ private:
       return false;
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
+    return true;
+  }
+
+  bool walkToStmtPre(Stmt *stmt) override {
+    if (Cancelled)
+      return false;
+
+    // Record any same named captures/shorthand if let bindings so we can
+    // treat their references as references to the original decl.
+    if (auto *condition = dyn_cast<LabeledConditionalStmt>(stmt)) {
+      for (auto shadows : getShorthandShadows(condition)) {
+        sameNamedCaptures[shadows.first] = shadows.second;
+      }
+    }
     return true;
   }
 
@@ -795,6 +834,11 @@ private:
 
     if (isRepressed(Loc) || Loc.isInvalid())
       return true;
+
+    // Dig back to the original captured variable
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      D = firstDecl(D);
+    }
 
     IndexSymbol Info;
 
@@ -1438,6 +1482,24 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
 }
 
 bool IndexSwiftASTWalker::report(ValueDecl *D) {
+  auto *shadowedDecl = firstDecl(D);
+  if (D != shadowedDecl) {
+    // Report a reference to the shadowed decl
+    SourceLoc loc = D->getNameLoc();
+
+    IndexSymbol info;
+    if (!reportRef(shadowedDecl, loc, info, AccessKind::Read))
+      return false;
+
+    // Suppress the reference if there is any (it is implicit and hence
+    // already skipped in the shorthand if let case, but explicit in the
+    // captured case).
+    repressRefAtLoc(loc);
+
+    // Skip the definition of a shadowed decl
+    return true;
+  }
+
   if (startEntityDecl(D)) {
     // Pass accessors.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
