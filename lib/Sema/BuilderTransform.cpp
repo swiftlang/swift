@@ -2480,8 +2480,10 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         }
 
         // Record the first unhandled construct as a fix.
-        if (recordFix(SkipUnhandledConstructInResultBuilder::create(
-                *this, unsupported, builder, getConstraintLocator(locator)))) {
+        if (recordFix(
+                SkipUnhandledConstructInResultBuilder::create(
+                    *this, unsupported, builder, getConstraintLocator(locator)),
+                /*impact=*/100)) {
           return getTypeMatchFailure(locator);
         }
 
