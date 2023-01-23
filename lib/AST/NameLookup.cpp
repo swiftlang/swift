@@ -26,6 +26,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -3040,17 +3041,15 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-/// Perform lookup to determine whether the given custom attribute refers to
-/// a macro declaration, and return that macro declaration.
-static MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
+void swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
+                                   llvm::TinyPtrVector<ValueDecl *> &macros) {
   auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
   if (!identTypeRepr)
-    return nullptr;
+    return;
 
   // Look for macros at module scope. They can only occur at module scope, and
   // we need to be sure not to trigger name lookup into type contexts along
   // the way.
-  llvm::TinyPtrVector<MacroDecl *> macros;
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
   UnqualifiedLookupDescriptor descriptor(
@@ -3064,22 +3063,6 @@ static MacroDecl *findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
       if (isAttachedMacro(macro->getMacroRoles()))
         macros.push_back(macro);
   }
-
-  if (macros.empty())
-    return nullptr;
-
-  if (macros.size() > 1) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::ambiguous_macro_reference,
-                       identTypeRepr->getNameRef().getFullName());
-
-    for (auto macro : macros) {
-      macro->diagnose(
-          diag::kind_declname_declared_here, macro->getDescriptiveKind(),
-          macro->getName());
-    }
-  }
-
-  return macros.front();
 }
 
 MacroOrNominalTypeDecl
@@ -3088,8 +3071,10 @@ CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
-  if (auto macro = findMacroForCustomAttr(attr, dc))
-    return macro;
+  llvm::TinyPtrVector<ValueDecl *> macros;
+  findMacroForCustomAttr(attr, dc, macros);
+  if (!macros.empty())
+    return nullptr;
 
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();

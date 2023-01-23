@@ -3443,17 +3443,14 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   // Check for an accessor macro.
   for (auto customAttrConst : storage->getSemanticAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto decl = evaluateOrDefault(
+    auto *macro = evaluateOrDefault(
         evaluator,
-        CustomAttrDeclRequest{
+        ResolveAttachedMacroRequest{
           customAttr,
           storage->getInnermostDeclContext()
         },
         nullptr);
-    if (!decl)
-      continue;
 
-    auto macro = decl.dyn_cast<MacroDecl *>();
     if (!macro)
       continue;
 

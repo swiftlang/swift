@@ -3558,19 +3558,20 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto found = evaluateOrDefault(
     Ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr);
 
-  // FIXME: deal with macros.
   NominalTypeDecl *nominal = nullptr;
   if (found) {
-    // FIXME: Do full checking of the macro arguments here by turning it into
-    // a macro expansion expression (?).
-    if (found.is<MacroDecl *>())
-      return;
-
     nominal = found.dyn_cast<NominalTypeDecl *>();
   }
 
-  // Diagnose errors.
   if (!found) {
+    // Try resolving an attached macro attribute.
+    auto *macro = evaluateOrDefault(
+        Ctx.evaluator, ResolveAttachedMacroRequest{attr, dc}, nullptr);
+    if (macro || !attr->isValid())
+      return;
+
+    // Diagnose errors.
+
     auto typeRepr = attr->getTypeRepr();
 
     auto type = TypeResolution::forInterface(dc, TypeResolverContext::CustomAttr,
