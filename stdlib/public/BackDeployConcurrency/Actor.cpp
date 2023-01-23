@@ -1228,7 +1228,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     }
 
 #define LOG_STATE_TRANSITION                                                   \
-  SWIFT_TASK_DEBUG_LOG("actor %p transitioned from %zx to %zx (%s)\n", this,   \
+  SWIFT_TASK_DEBUG_LOG("actor %p transitioned from %zx to %zx (%s)", this,     \
                        oldState.Flags.getOpaqueValue(),                        \
                        newState.Flags.getOpaqueValue(), __FUNCTION__)
     LOG_STATE_TRANSITION;
