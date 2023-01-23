@@ -211,6 +211,7 @@ KNOWN_SETTINGS=(
     swift-threading-package                       ""                "override the threading package for the host build; this is either a single package or a semicolon-separated list of sdk:package pairs.  Valid packages are empty string (no override), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
     swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
+    swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
@@ -2169,6 +2170,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}")
                     )
                 fi
 

@@ -5368,6 +5368,283 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   return uniqueForeignWitnessTableRef(result.second);
 }
 
+namespace {
+
+/// A cache-entry type suitable for use with LockingConcurrentMap.
+class RelativeWitnessTableCacheEntry :
+    public SimpleLockingCacheEntryBase<RelativeWitnessTableCacheEntry,
+                                       RelativeWitnessTable*> {
+  /// The type for which this table was instantiated.
+  const Metadata * const Type;
+
+  /// The protocol conformance descriptor. This is only kept around so that we
+  /// can compute the size of an entry correctly in case of a race to
+  /// allocate the entry.
+  const ProtocolConformanceDescriptor * const Conformance;
+
+public:
+  /// Do the structural initialization necessary for this entry to appear
+  /// in a concurrent map.
+  RelativeWitnessTableCacheEntry(const Metadata *type,
+                         WaitQueue::Worker &worker,
+                         const ProtocolConformanceDescriptor *conformance,
+                         const void * const *instantiationArgs)
+    : SimpleLockingCacheEntryBase(worker),
+      Type(type), Conformance(conformance) {}
+
+  intptr_t getKeyIntValueForDump() const {
+    return reinterpret_cast<intptr_t>(Type);
+  }
+
+  friend llvm::hash_code hash_value(const RelativeWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.Type);
+  }
+
+  /// The key value of the entry is just its type pointer.
+  bool matchesKey(const Metadata *type) {
+    return Type == type;
+  }
+
+  static size_t getExtraAllocationSize(
+                             const Metadata *type,
+                             WaitQueue::Worker &worker,
+                             const ProtocolConformanceDescriptor *conformance,
+                             const void * const *instantiationArgs) {
+    return getWitnessTableSize(conformance);
+  }
+
+  size_t getExtraAllocationSize() const {
+    return getWitnessTableSize(Conformance);
+  }
+
+  static size_t getNumBaseProtocolRequirements(
+    const ProtocolConformanceDescriptor *conformance) {
+
+    size_t result = 0;
+    size_t currIdx = 0;
+    auto protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    for (auto &req : requirements) {
+       ++currIdx;
+       if (req.Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::BaseProtocol) {
+         ++result;
+         // We currently assume that base protocol requirements preceed other
+         // requirements i.e we store the base protocol pointers sequentially in
+         // instantiateRelativeWitnessTable starting at index 1.
+         assert(currIdx == result &&
+                "base protocol requirements come before everything else");
+         (void)currIdx;
+       }
+    }
+    return result;
+  }
+
+  static size_t getWitnessTableSize(
+                            const ProtocolConformanceDescriptor *conformance) {
+    auto genericTable = conformance->getGenericWitnessTable();
+
+    size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
+
+    size_t numRequirementWords =
+      WitnessTableFirstRequirementOffset +
+      getNumBaseProtocolRequirements(conformance);
+
+    return (numPrivateWords + numRequirementWords) * sizeof(void*);
+  }
+
+  RelativeWitnessTable *allocate(const ProtocolConformanceDescriptor *conformance,
+                         const void * const *instantiationArgs);
+};
+
+using RelativeGenericWitnessTableCache =
+  MetadataCache<RelativeWitnessTableCacheEntry, GenericWitnessTableCacheTag>;
+using LazyRelativeGenericWitnessTableCache = Lazy<RelativeGenericWitnessTableCache>;
+
+class GlobalRelativeWitnessTableCacheEntry {
+public:
+  const GenericWitnessTable *Gen;
+  RelativeGenericWitnessTableCache Cache;
+
+  GlobalRelativeWitnessTableCacheEntry(const GenericWitnessTable *gen)
+      : Gen(gen), Cache() {}
+
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Gen);
+  }
+  bool matchesKey(const GenericWitnessTable *gen) const {
+    return gen == Gen;
+  }
+  friend llvm::hash_code hash_value(const GlobalRelativeWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.Gen);
+  }
+  static size_t
+  getExtraAllocationSize(const GenericWitnessTable *gen) {
+    return 0;
+  }
+  size_t getExtraAllocationSize() const { return 0; }
+};
+
+static SimpleGlobalCache<GlobalRelativeWitnessTableCacheEntry,
+                         GlobalWitnessTableCacheTag>
+                         GlobalRelativeWitnessTableCache;
+
+} // end anonymous namespace
+
+using RelativeBaseWitness = RelativeDirectPointer<void, true /*nullable*/>;
+
+// Instantiate a relative witness table into a `buffer`
+// that has already been allocated of the appropriate size and zeroed out.
+//
+// The layout of a dynamically allocated relative witness table is:
+//             [ conditional conformance n] ... private area
+//             [ conditional conformance 0]     (negatively adressed)
+// pointer ->  [ pointer to relative witness table (pattern) ]
+//             [ base protocol witness table pointer 0 ] ... base protocol
+//             [ base protocol witness table pointer n ]     pointers
+static RelativeWitnessTable *
+instantiateRelativeWitnessTable(const Metadata *Type,
+                        const ProtocolConformanceDescriptor *conformance,
+                        const void * const *instantiationArgs,
+                        void **fullTable) {
+  auto genericTable = conformance->getGenericWitnessTable();
+  auto pattern = reinterpret_cast<uint32_t const *>(
+            &*conformance->getWitnessTablePattern());
+  assert(pattern);
+
+  auto numBaseProtocols =
+    RelativeWitnessTableCacheEntry::getNumBaseProtocolRequirements(conformance);
+
+  // The number of witnesses provided by the table pattern.
+  size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
+  assert(numBaseProtocols <= numPatternWitnesses);
+  (void)numPatternWitnesses;
+
+  // Number of bytes for any private storage used by the conformance itself.
+  size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
+
+  // Advance the address point; the private storage area is accessed via
+  // negative offsets.
+  auto table = fullTable + privateSizeInWords;
+
+  table[0] = (void*)pattern;
+  assert(1 == WitnessTableFirstRequirementOffset);
+
+  // Fill in the base protocols of the requirements from the pattern.
+  for (size_t i = 0, e = numBaseProtocols; i < e; ++i) {
+    size_t index = i + WitnessTableFirstRequirementOffset;
+    table[index] = ((RelativeBaseWitness const *)pattern)[index].get();
+  }
+
+  // Copy any instantiation arguments that correspond to conditional
+  // requirements into the private area.
+  {
+    unsigned currentInstantiationArg = 0;
+    auto copyNextInstantiationArg = [&] {
+      assert(currentInstantiationArg < privateSizeInWords);
+      table[-1 - (int)currentInstantiationArg] =
+        const_cast<void *>(instantiationArgs[currentInstantiationArg]);
+      ++currentInstantiationArg;
+    };
+
+    for (const auto &conditionalRequirement
+          : conformance->getConditionalRequirements()) {
+      if (conditionalRequirement.Flags.hasKeyArgument())
+        copyNextInstantiationArg();
+      if (conditionalRequirement.Flags.hasExtraArgument())
+        copyNextInstantiationArg();
+    }
+  }
+
+
+  // Call the instantiation function if present.
+  if (!genericTable->Instantiator.isNull()) {
+    auto castTable = reinterpret_cast<WitnessTable*>(table);
+    genericTable->Instantiator(castTable, Type, instantiationArgs);
+  }
+
+  return reinterpret_cast<RelativeWitnessTable*>(table);
+}
+
+/// Instantiate a brand new relative witness table for a generic protocol conformance.
+RelativeWitnessTable *
+RelativeWitnessTableCacheEntry::allocate(
+                               const ProtocolConformanceDescriptor *conformance,
+                               const void * const *instantiationArgs) {
+  // Find the allocation.
+  void **fullTable = reinterpret_cast<void**>(this + 1);
+
+  // Zero out the witness table.
+  memset(fullTable, 0, getWitnessTableSize(conformance));
+
+  // Instantiate the table.
+  return instantiateRelativeWitnessTable(Type, Conformance, instantiationArgs,
+                                         fullTable);
+}
+
+/// Fetch the cache for a generic witness-table structure.
+static RelativeGenericWitnessTableCache &getCacheForRelativeWitness(
+  const GenericWitnessTable *gen) {
+
+  // Keep this assert even if you change the representation above.
+  static_assert(sizeof(LazyRelativeGenericWitnessTableCache) <=
+                sizeof(GenericWitnessTable::PrivateDataType),
+                "metadata cache is larger than the allowed space");
+
+  if (gen->PrivateData == nullptr) {
+    return GlobalRelativeWitnessTableCache.getOrInsert(gen).first->Cache;
+  }
+
+  auto lazyCache =
+    reinterpret_cast<LazyRelativeGenericWitnessTableCache*>(gen->PrivateData.get());
+  return lazyCache->get();
+}
+
+const RelativeWitnessTable *
+swift::swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
+                             const Metadata *type,
+                             const void * const *instantiationArgs) {
+  /// Local function to unique a foreign witness table, if needed.
+  auto uniqueForeignWitnessTableRef =
+      [conformance](const WitnessTable *candidate) {
+        if (!candidate || !conformance->isSynthesizedNonUnique())
+          return candidate;
+
+        auto conformingType =
+          cast<TypeContextDescriptor>(conformance->getTypeDescriptor());
+
+        return _getForeignWitnessTable(candidate,
+                                       conformingType,
+                                       conformance->getProtocol());
+      };
+
+  auto genericTable = conformance->getGenericWitnessTable();
+
+  // When there is no generic table, or it doesn't require instantiation,
+  // use the pattern directly.
+  if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
+    assert(!conformance->isSynthesizedNonUnique());
+    auto pattern = conformance->getWitnessTablePattern();
+    auto table = uniqueForeignWitnessTableRef(pattern);
+    return reinterpret_cast<const RelativeWitnessTable*>(table);
+  }
+
+  assert(genericTable &&
+         !doesNotRequireInstantiation(conformance, genericTable));
+  assert(!conformance->isSynthesizedNonUnique());
+
+  auto &cache = getCacheForRelativeWitness(genericTable);
+  auto result = cache.getOrInsert(type, conformance, instantiationArgs);
+
+  // Our returned 'status' is the witness table itself.
+  auto table = uniqueForeignWitnessTableRef(
+    (const WitnessTable*)result.second);
+
+  // Mark this as a dynamic (conditional conformance) protocol witness table.
+  return reinterpret_cast<RelativeWitnessTable*>(((uintptr_t)table) |
+                                                 (uintptr_t)0x1);
+}
+
 /// Find the name of the associated type with the given descriptor.
 static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
                                         const ProtocolRequirement *assocType) {
@@ -5570,6 +5847,114 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                             reqBase, assocType);
 }
 
+RelativeWitnessTable *
+lookThroughOptionalConditionalWitnessTable(RelativeWitnessTable *wtable) {
+  uintptr_t conditional_wtable = (uintptr_t)wtable;
+  if (conditional_wtable & 0x1) {
+    conditional_wtable = conditional_wtable & ~(uintptr_t)(0x1);
+    conditional_wtable = (uintptr_t)*(void**)conditional_wtable;
+  }
+  wtable = (RelativeWitnessTable*)conditional_wtable;
+  return wtable;
+}
+
+SWIFT_CC(swift)
+static MetadataResponse
+swift_getAssociatedTypeWitnessRelativeSlowImpl(
+                                      MetadataRequest request,
+                                      RelativeWitnessTable *wtable,
+                                      const Metadata *conformingType,
+                                      const ProtocolRequirement *reqBase,
+                                      const ProtocolRequirement *assocType) {
+
+  wtable = lookThroughOptionalConditionalWitnessTable(wtable);
+
+#ifndef NDEBUG
+  {
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
+    const ProtocolDescriptor *protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    assert(assocType >= requirements.begin() &&
+           assocType < requirements.end());
+    assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
+    assert(assocType->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+  }
+#endif
+
+  // Retrieve the witness.
+  unsigned witnessIndex = assocType - reqBase;
+
+  auto *relativeDistanceAddr = &((int32_t*)wtable)[witnessIndex];
+  auto relativeDistance = *relativeDistanceAddr;
+  auto value = swift::detail::applyRelativeOffset(relativeDistanceAddr,
+                                                  relativeDistance);
+  assert((value & 0x1) && "Expecting the bit to be set");
+  value = value & ~((uintptr_t)0x1);
+  const char *mangledNameBase = (const char*) value;
+
+  // Dig out the protocol.
+  const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
+  const ProtocolDescriptor *protocol = conformance->getProtocol();
+
+  // Extract the mangled name itself.
+  StringRef mangledName =
+    Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
+
+  // The generic parameters in the associated type name are those of the
+  // conforming type.
+
+  // For a class, chase the superclass chain up until we hit the
+  // type that specified the conformance.
+  auto originalConformingType = findConformingSuperclass(conformingType,
+                                                         conformance);
+  SubstGenericParametersFromMetadata substitutions(originalConformingType);
+  auto result = swift_getTypeByMangledName(
+      request, mangledName, substitutions.getGenericArgs(),
+      [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index);
+      },
+      [&substitutions](const Metadata *type, unsigned index) {
+        return substitutions.getWitnessTable(type, index);
+      });
+
+  auto *error = result.getError();
+  MetadataResponse response = result.getType().getResponse();
+  auto assocTypeMetadata = response.Value;
+  if (error || !assocTypeMetadata) {
+    const char *errStr = error ? error->copyErrorString()
+                               : "NULL metadata but no error was provided";
+    auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
+    StringRef conformingTypeName(conformingTypeNameInfo.data,
+                                 conformingTypeNameInfo.length);
+    StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
+    fatalError(0,
+               "failed to demangle witness for associated type '%s' in "
+               "conformance '%s: %s' from mangled name '%s' - %s\n",
+               assocTypeName.str().c_str(), conformingTypeName.str().c_str(),
+               protocol->Name.get(), mangledName.str().c_str(), errStr);
+  }
+
+  assert((uintptr_t(assocTypeMetadata) &
+            ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
+
+  return response;
+}
+
+MetadataResponse
+swift::swift_getAssociatedTypeWitnessRelative(MetadataRequest request,
+                                      RelativeWitnessTable *wtable,
+                                      const Metadata *conformingType,
+                                      const ProtocolRequirement *reqBase,
+                                      const ProtocolRequirement *assocType) {
+  assert(assocType->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+
+  return swift_getAssociatedTypeWitnessRelativeSlowImpl(request, wtable,
+                                                    conformingType, reqBase,
+                                                    assocType);
+}
+
 using AssociatedConformanceWitness = std::atomic<void *>;
 
 SWIFT_CC(swift)
@@ -5709,6 +6094,95 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
   }
 
   return swift_getAssociatedConformanceWitnessSlow(wtable, conformingType,
+                                                   assocType, reqBase,
+                                                   assocConformance);
+}
+
+SWIFT_CC(swift)
+static const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelativeSlowImpl(
+                                  RelativeWitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance) {
+  auto origWTable = wtable;
+  wtable = lookThroughOptionalConditionalWitnessTable(wtable);
+
+#ifndef NDEBUG
+  {
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
+    const ProtocolDescriptor *protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    assert(assocConformance >= requirements.begin() &&
+           assocConformance < requirements.end());
+    assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
+    assert(
+      assocConformance->Flags.getKind() ==
+        ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction ||
+      assocConformance->Flags.getKind() ==
+        ProtocolRequirementFlags::Kind::BaseProtocol);
+  }
+#endif
+
+  // Retrieve the witness.
+  unsigned witnessIndex = assocConformance - reqBase;
+
+  auto *relativeDistanceAddr = &((int32_t*)wtable)[witnessIndex];
+  auto relativeDistance = *relativeDistanceAddr;
+  auto value = swift::detail::applyRelativeOffset(relativeDistanceAddr,
+                                                  relativeDistance);
+  assert((value & 0x1) && "Expecting the bit to be set");
+  value = value & ~((uintptr_t)0x1);
+  const char *mangledNameBase = (const char*) value;
+
+  // Extract the mangled name itself.
+  if (*mangledNameBase == '\xFF')
+    ++mangledNameBase;
+
+  StringRef mangledName =
+    Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
+
+  // Relative reference to an associate conformance witness function.
+  // FIXME: This is intended to be a temporary mangling, to be replaced
+  // by a real "protocol conformance" mangling.
+  if (mangledName.size() == 5 &&
+      (mangledName[0] == '\x07' || mangledName[0] == '\x08')) {
+    // Resolve the relative reference to the witness function.
+    int32_t offset;
+    memcpy(&offset, mangledName.data() + 1, 4);
+    void *ptr = TargetCompactFunctionPointer<InProcess, void>::resolve(mangledName.data() + 1, offset);
+
+    // Call the witness function.
+    AssociatedRelativeWitnessTableAccessFunction *witnessFn;
+#if SWIFT_PTRAUTH
+    witnessFn =
+        (AssociatedRelativeWitnessTableAccessFunction *)ptrauth_sign_unauthenticated(
+            (void *)ptr, ptrauth_key_function_pointer, 0);
+#else
+    witnessFn = (AssociatedRelativeWitnessTableAccessFunction *)ptr;
+#endif
+
+    auto assocWitnessTable = witnessFn(assocType, conformingType, origWTable);
+
+    // The access function returns an unsigned pointer for now.
+    return assocWitnessTable;
+  }
+
+  swift_unreachable("Invalid mangled associate conformance");
+}
+
+const RelativeWitnessTable *swift::swift_getAssociatedConformanceWitnessRelative(
+                                  RelativeWitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance) {
+  // We avoid using this function for initializing base protocol conformances
+  // so that we can have a better fast-path.
+  assert(assocConformance->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
+
+  return swift_getAssociatedConformanceWitnessRelativeSlowImpl(wtable, conformingType,
                                                    assocType, reqBase,
                                                    assocConformance);
 }
