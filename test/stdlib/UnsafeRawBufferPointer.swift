@@ -677,4 +677,42 @@ UnsafeRawBufferPointerTestSuite.test("copy.overlap") {
   expectEqual(1, bytes[3])
 }
 
+UnsafeRawBufferPointerTestSuite.test("_customIndexOfEquatableElement") {
+  let fibonacci = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233] as [UInt8]
+  fibonacci.withUnsafeBytes { bytes in
+    expectEqual(Optional(Optional(0)), bytes._customIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(1)), bytes._customIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(7)), bytes._customIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(13)), bytes._customIndexOfEquatableElement(233))
+    expectEqual(Optional(nil), bytes._customIndexOfEquatableElement(255))
+    let unalignedBy1 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 1, count: bytes.count - 1)
+    expectEqual(Optional(nil), unalignedBy1._customIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(0)), unalignedBy1._customIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(6)), unalignedBy1._customIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(12)), unalignedBy1._customIndexOfEquatableElement(233))
+    let unalignedBy2 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 2, count: bytes.count - 2)
+    expectEqual(Optional(nil), unalignedBy2._customIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(0)), unalignedBy2._customIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(5)), unalignedBy2._customIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(11)), unalignedBy2._customIndexOfEquatableElement(233))
+    let unalignedBy3 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 3, count: bytes.count - 3)
+    expectEqual(Optional(nil), unalignedBy3._customIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), unalignedBy3._customIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(4)), unalignedBy3._customIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(10)), unalignedBy3._customIndexOfEquatableElement(233))
+    let singleValueBufferUnaligned = UnsafeRawBufferPointer(start: bytes.baseAddress! + 7, count: 1)
+    expectEqual(Optional(Optional(0)), singleValueBufferUnaligned._customIndexOfEquatableElement(13))
+    expectEqual(Optional(nil), singleValueBufferUnaligned._customIndexOfEquatableElement(0))
+    let singleValueBufferAligned = UnsafeRawBufferPointer(start: bytes.baseAddress!, count: 1)
+    expectEqual(Optional(Optional(0)), singleValueBufferAligned._customIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), singleValueBufferAligned._customIndexOfEquatableElement(1))
+    let emptyBuffer = UnsafeRawBufferPointer(start: bytes.baseAddress!, count: 0)
+    expectEqual(Optional(nil), emptyBuffer._customIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), emptyBuffer._customIndexOfEquatableElement(1))
+  }
+  let emptyBuffer = UnsafeRawBufferPointer(start: nil, count: 0)
+  expectEqual(Optional(nil), emptyBuffer._customIndexOfEquatableElement(0))
+  expectEqual(Optional(nil), emptyBuffer._customIndexOfEquatableElement(1))
+}
+
 runAllTests()
