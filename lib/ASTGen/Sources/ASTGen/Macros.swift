@@ -176,7 +176,7 @@ func evaluateMacro(
     }
 
     // Emit diagnostics accumulated in the context.
-    let macroName = parentExpansion.macro.withoutTrivia().description
+    let macroName = parentExpansion.macro.trimmedDescription
     for diag in context.diagnostics {
       emitDiagnostic(
         diagEnginePtr: diagEnginePtr,
@@ -186,7 +186,7 @@ func evaluateMacro(
       )
     }
 
-    var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
+    var evaluatedSyntaxStr = evaluatedSyntax.trimmedDescription
     evaluatedSyntaxStr.withUTF8 { utf8 in
       let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
       if let baseAddress = utf8.baseAddress {
