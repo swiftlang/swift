@@ -159,11 +159,15 @@ bool Parser::startsParameterName(bool isClosure) {
 
   // If the next token can be an argument label, we might have a name.
   if (nextTok.canBeArgumentLabel()) {
-    // If the first name wasn't "isolated", we're done.
+    // If the first name wasn't a contextual keyword, we're done.
     if (!Tok.isContextualKeyword("isolated") &&
         !Tok.isContextualKeyword("some") &&
         !Tok.isContextualKeyword("any") &&
         !Tok.isContextualKeyword("each") &&
+        !Tok.isContextualKeyword("__shared") &&
+        !Tok.isContextualKeyword("__owned") &&
+        !Tok.isContextualKeyword("borrowing") &&
+        !Tok.isContextualKeyword("consuming") &&
         !Tok.is(tok::kw_repeat))
       return true;
 
@@ -250,13 +254,14 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     {
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
-      while (Tok.is(tok::kw_inout) ||
-             Tok.isContextualKeyword("__shared") ||
-             Tok.isContextualKeyword("__owned") ||
-             Tok.isContextualKeyword("borrowing") ||
-             Tok.isContextualKeyword("consuming") ||
-             Tok.isContextualKeyword("isolated") ||
-             Tok.isContextualKeyword("_const")) {
+      while (Tok.is(tok::kw_inout)
+             || (canHaveParameterSpecifierContextualKeyword()
+                 && (Tok.isContextualKeyword("__shared")
+                     || Tok.isContextualKeyword("__owned")
+                     || Tok.isContextualKeyword("borrowing")
+                     || Tok.isContextualKeyword("consuming")
+                     || Tok.isContextualKeyword("isolated")
+                     || Tok.isContextualKeyword("_const")))) {
         if (Tok.isContextualKeyword("isolated")) {
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {

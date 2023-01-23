@@ -4492,13 +4492,14 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                       TypeAttributes &Attributes) {
   PatternBindingInitializer *initContext = nullptr;
   Specifier = ParamDecl::Specifier::Default;
-  while (Tok.is(tok::kw_inout) ||
-         Tok.isContextualKeyword("__shared") ||
-         Tok.isContextualKeyword("__owned") ||
-         Tok.isContextualKeyword("isolated") ||
-         Tok.isContextualKeyword("consuming") ||
-         Tok.isContextualKeyword("borrowing") ||
-         Tok.isContextualKeyword("_const")) {
+  while (Tok.is(tok::kw_inout)
+         || (canHaveParameterSpecifierContextualKeyword()
+             && (Tok.isContextualKeyword("__shared")
+                 || Tok.isContextualKeyword("__owned")
+                 || Tok.isContextualKeyword("isolated")
+                 || Tok.isContextualKeyword("consuming")
+                 || Tok.isContextualKeyword("borrowing")
+                 || Tok.isContextualKeyword("_const")))) {
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {

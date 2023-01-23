@@ -172,11 +172,6 @@ public:
   bool canBeArgumentLabel() const {
     // Identifiers, escaped identifiers, and '_' can be argument labels.
     if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__)) {
-      // ... except for '__shared' and '__owned'.
-      if (getRawText().equals("__shared") ||
-          getRawText().equals("__owned"))
-        return false;
-
       return true;
     }
 

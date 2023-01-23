@@ -41,7 +41,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     ty = new (Context) AttributedTypeRepr(attrs, ty);
   }
 
-  // Apply 'inout' or '__shared' or '__owned'
+  // Apply 'inout', 'consuming', or 'borrowing' modifiers.
   if (specifierLoc.isValid() &&
       specifier != ParamDecl::Specifier::Default) {
     ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
@@ -154,9 +154,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (Tok.is(tok::kw_inout) ||
-      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
-                                   Tok.getRawText().equals("__owned")))) {
+  if (Tok.is(tok::kw_inout)
+      || (canHaveParameterSpecifierContextualKeyword()
+          && (Tok.getRawText().equals("__shared")
+              || Tok.getRawText().equals("__owned")
+              || Tok.getRawText().equals("consuming")
+              || Tok.getRawText().equals("borrowing")))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
