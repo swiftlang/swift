@@ -53,8 +53,8 @@ extension RangeReplaceableCollection {
   }
 }
 
-extension Set {
-  /// Creates an set containing the elements of a C++ container.
+extension SetAlgebra {
+  /// Creates a set containing the elements of a C++ container.
   ///
   /// This initializes the set by copying every element of the C++ container.
   ///
