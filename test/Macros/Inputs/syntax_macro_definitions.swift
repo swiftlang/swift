@@ -14,7 +14,7 @@ private func replaceFirstLabel(
   }
 
   return tuple.replacing(
-    childAt: 0, with: firstElement.withLabel(.identifier(newLabel)))
+    childAt: 0, with: firstElement.with(\.label, .identifier(newLabel)))
 }
 
 public struct ColorLiteralMacro: ExpressionMacro {
@@ -26,7 +26,7 @@ public struct ColorLiteralMacro: ExpressionMacro {
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
     if let leadingTrivia = macro.leadingTrivia {
-      return initSyntax.withLeadingTrivia(leadingTrivia)
+      return initSyntax.with(\.leadingTrivia, leadingTrivia)
     }
     return initSyntax
   }
@@ -38,7 +38,7 @@ public struct FileIDMacro: ExpressionMacro {
   ) -> ExprSyntax {
     let fileLiteral: ExprSyntax = #""\#(raw: context.moduleName)/\#(raw: context.fileName)""#
     if let leadingTrivia = macro.leadingTrivia {
-      return fileLiteral.withLeadingTrivia(leadingTrivia)
+      return fileLiteral.with(\.leadingTrivia, leadingTrivia)
     }
     return fileLiteral
   }
@@ -82,7 +82,7 @@ public enum AddBlocker: ExpressionMacro {
     }
 
     // Link the folded argument back into the tree.
-    let node = node.withArgumentList(node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.withExpression(foldedArgument.as(ExprSyntax.self)!)))
+    let node = node.with(\.argumentList, node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.with(\.expression, foldedArgument.as(ExprSyntax.self)!)))
 
     class AddVisitor: SyntaxRewriter {
       var diagnostics: [Diagnostic] = []
@@ -102,8 +102,8 @@ public enum AddBlocker: ExpressionMacro {
                   severity: .error
                 ),
                 highlights: [
-                  Syntax(node.leftOperand.withoutTrivia()),
-                  Syntax(node.rightOperand.withoutTrivia())
+                  Syntax(node.leftOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
+                  Syntax(node.rightOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, []))
                 ],
                 fixIts: [
                   FixIt(
@@ -114,7 +114,7 @@ public enum AddBlocker: ExpressionMacro {
                     ),
                     changes: [
                       FixIt.Change.replace(
-                        oldNode: Syntax(binOp.operatorToken.withoutTrivia()),
+                        oldNode: Syntax(binOp.operatorToken.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
                         newNode: Syntax(
                           TokenSyntax(
                             .binaryOperator("-"),
@@ -129,9 +129,11 @@ public enum AddBlocker: ExpressionMacro {
             )
 
             return ExprSyntax(
-              node.withOperatorOperand(
+              node.with(
+                \.operatorOperand,
                 ExprSyntax(
-                  binOp.withOperatorToken(
+                  binOp.with(
+                    \.operatorToken,
                     binOp.operatorToken.withKind(.binaryOperator("-"))
                   )
                 )

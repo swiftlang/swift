@@ -202,7 +202,7 @@ func evaluateMacro(
         return -1
       }
 
-      macroName = parentExpansion.macro.withoutTrivia().description
+      macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
@@ -212,7 +212,7 @@ func evaluateMacro(
         return -1
       }
       let decls = try declMacro.expansion(of: parentExpansion, in: &context)
-      macroName = parentExpansion.macro.withoutTrivia().description
+      macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
 
@@ -241,7 +241,7 @@ func evaluateMacro(
     )
   }
 
-  var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
+  var evaluatedSyntaxStr = evaluatedSyntax.trimmedDescription
   evaluatedSyntaxStr.withUTF8 { utf8 in
     let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
     if let baseAddress = utf8.baseAddress {
@@ -357,7 +357,7 @@ func expandAttachedMacro(
 
       // Form a buffer of accessor declarations to return to the caller.
       evaluatedSyntaxStr = accessors.map {
-        $0.withoutTrivia().description
+        $0.trimmedDescription
       }.joined(separator: "\n\n")
 
     case (let attachedMacro as MemberAttributeMacro.Type, .MemberAttribute):
@@ -380,7 +380,7 @@ func expandAttachedMacro(
 
       // Form a buffer containing an attribute list to return to the caller.
       evaluatedSyntaxStr = attributes.map {
-        $0.withoutTrivia().description
+        $0.trimmedDescription
       }.joined(separator: " ")
 
     case (let attachedMacro as MemberDeclarationMacro.Type, .SynthesizedMembers):
@@ -392,7 +392,7 @@ func expandAttachedMacro(
 
       // Form a buffer of member declarations to return to the caller.
       evaluatedSyntaxStr = members.map {
-        $0.withoutTrivia().description
+        $0.trimmedDescription
       }.joined(separator: "\n\n")
 
     default:
