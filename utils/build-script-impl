@@ -810,6 +810,9 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
+    lldb_cmake_options+=(
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
+    )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
         llvm_cmake_options+=(
@@ -2907,9 +2910,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
-
-                # Record the times test took and report the slowest.
-                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
