@@ -1164,55 +1164,85 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
   // Immediately decrement the pending count.
   // We can do this, since in this mode there is no ready count to keep track of,
   // and we immediately discard the result.
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "discard result, hadError:%d, was pending:%llu, status = %s",
-                             hadErrorResult, assumed.pendingTasks(this), assumed.to_string(this).c_str());
+  auto afterComplete = statusCompletePendingAssumeRelease();
+  (void) afterComplete;
+  const bool alreadyDecrementedStatus = true;
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, status afterComplete:%s", afterComplete.to_string(this).c_str());
 
-    if (hadErrorResult && readyQueue.isEmpty()) {
-      // a discardResults throwing task group must retain the FIRST error it encounters.
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer error, error:%d, completedTask:%p", hadErrorResult, completedTask);
-      enqueueCompletedTask(completedTask, /*hadErrorResult=*/hadErrorResult);
+  // Errors need special treatment
+  if (hadErrorResult) {
+    // Discarding results mode immediately treats a child failure as group cancellation.
+    // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
+    // such that the discarding group can exit as soon as possible.
+    cancelAll();
+
+    if (afterComplete.hasWaitingTask() && afterComplete.pendingTasks(this) == 0) {
+      // This is the last pending task, and we must resume the waiting task.
+      // - if there already was a previous error stored, we resume using it,
+      // - otherwise, we resume using this current (failed) completedTask
+      ReadyQueueItem readyErrorItem;
+      if (readyQueue.dequeue(readyErrorItem)) {
+        switch (readyErrorItem.getStatus()) {
+          case ReadyStatus::RawError:
+            resumeWaitingTaskWithError(readyErrorItem.getRawError(this), assumed, alreadyDecrementedStatus);
+            break;
+          case ReadyStatus::Error:
+            resumeWaitingTask(readyErrorItem.getTask(), assumed, /*hadErrorResult=*/true, alreadyDecrementedStatus);
+            break;
+          default:
+            swift_Concurrency_fatalError(0,
+                                         "only errors can be stored by a discarding task group, yet it wasn't an error! 1");
+        }
+      } else {
+        // There was no prior failed task stored, so we should resume the waitingTask with this (failed) completedTask
+        resumeWaitingTask(completedTask, assumed, hadErrorResult, alreadyDecrementedStatus);
+      }
+    } else if (readyQueue.isEmpty()) {
+      // There was no waiting task, or other tasks are still pending, so we cannot
+      // it is the first error we encountered, thus we need to store it for future throwing
+      enqueueCompletedTask(completedTask, hadErrorResult);
     } else {
-      // we just are going to discard it.
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer discard the completedTask:%p, status=%s", completedTask, statusString().c_str());
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
     }
 
-    auto afterComplete = statusCompletePendingAssumeRelease();
-    (void) afterComplete;
-    bool alreadyDecrementedStatus = true;
-    SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, status:%s",
-                               afterComplete.to_string(this).c_str());
-
-  // Discarding results mode, immediately treats a child failure as group cancellation.
-  // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
-  // such that the discarding group can exit as soon as possible.
-  if (hadErrorResult) {
-    cancelAll();
+    unlock();
+    return;
   }
 
+  assert(!hadErrorResult);
   if (afterComplete.hasWaitingTask() && afterComplete.pendingTasks(this) == 0) {
-    ReadyQueueItem priorErrorItem;
-    if (readyQueue.dequeue(priorErrorItem)) {
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, last pending task, prior error found, fail waitingTask:%p",
-                                 waitQueue.load(std::memory_order_relaxed));
-      switch (priorErrorItem.getStatus()) {
+    SWIFT_TASK_GROUP_DEBUG_LOG(this,
+                               "offer, last pending task completed successfully, resume waitingTask with completedTask:%p",
+                               completedTask);
+
+    /// If there was an error previously stored, we must resume the waitingTask using that error.
+    ReadyQueueItem readyErrorItem;
+    if (readyQueue.dequeue(readyErrorItem)) {
+      _swift_taskGroup_detachChild(asAbstract(this), completedTask);
+      switch (readyErrorItem.getStatus()) {
         case ReadyStatus::RawError:
-          resumeWaitingTaskWithError(priorErrorItem.getRawError(this), assumed, alreadyDecrementedStatus);
+          resumeWaitingTaskWithError(readyErrorItem.getRawError(this), assumed, alreadyDecrementedStatus);
           break;
         case ReadyStatus::Error:
-          resumeWaitingTask(priorErrorItem.getTask(), assumed, /*hadErrorResult=*/true, alreadyDecrementedStatus);
+          resumeWaitingTask(readyErrorItem.getTask(), assumed, /*hadErrorResult=*/true, alreadyDecrementedStatus);
           break;
         default:
-          swift_Concurrency_fatalError(0, "only errors can be stored by a discarding task group, yet it wasn't an error!");
+          swift_Concurrency_fatalError(0,
+                                       "only errors can be stored by a discarding task group, yet it wasn't an error! 2");
       }
     } else {
-      SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, last pending task, completing with completedTask:%p, completedTask.error:%d, waitingTask:%p",
-                                 completedTask, hadErrorResult, waitQueue.load(std::memory_order_relaxed));
-      resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/hadErrorResult, alreadyDecrementedStatus);
+      // This is the last task, we have a waiting task and there was no error stored previously;
+      // We must resume the waiting task with a success, so let us return here.
+      resumeWaitingTask(completedTask, assumed, hadErrorResult, alreadyDecrementedStatus);
     }
+  } else {
+    // it wasn't the last pending task, and there is no-one to resume;
+    // Since this is a successful result, and we're a discarding task group -- always just ignore this task.
+    _swift_taskGroup_detachChild(asAbstract(this), completedTask);
   }
 
   unlock();
+  return;
 }
 
 /// Must be called while holding the TaskGroup lock.
