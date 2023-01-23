@@ -205,3 +205,19 @@ exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaran
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_arg_parsing_2
+// CHECK:       block:
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         {{%[^,]+}} = tuple ()
+// CHECK:         return {{%[^,]+}}
+// CHECK:       uint: 0
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_parsing_2
+sil @test_arg_parsing_2 : $() -> () {
+entry:
+  test_specification "test-specification-parsing Bu @block[1] 0"
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
