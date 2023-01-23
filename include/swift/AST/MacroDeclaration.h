@@ -66,17 +66,13 @@ bool macroIntroducedNameRequiresArgument(MacroIntroducedDeclNameKind kind);
 StringRef getMacroIntroducedDeclNameString(
     MacroIntroducedDeclNameKind kind);
 
-class MacroDecl;
 class CustomAttr;
 
 /// Perform lookup to determine whether the given custom attribute refers to
-/// a macro declaration, and return that macro declaration.
-///
-/// \Returns \c None if the custom attribute name does not match any macro
-/// declarations, \c nullptr if the macro reference has errors in the argument
-/// list, or a resolved macro declaration for a valid macro attribute.
-Optional<MacroDecl *>
-findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc);
+/// a macro declaration, and populate the \c macros vector with the lookup
+/// results that are attached macros.
+void findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
+                            llvm::TinyPtrVector<ValueDecl *> &macros);
 
 class MacroIntroducedDeclName {
 public:

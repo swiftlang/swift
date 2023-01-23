@@ -2342,15 +2342,12 @@ bool CustomAttr::isAttachedMacro(const Decl *decl) const {
   auto &ctx = decl->getASTContext();
   auto *dc = decl->getInnermostDeclContext();
 
-  auto attrDecl = evaluateOrDefault(
+  auto *macroDecl = evaluateOrDefault(
       ctx.evaluator,
-      CustomAttrDeclRequest{const_cast<CustomAttr *>(this), dc},
+      ResolveAttachedMacroRequest{const_cast<CustomAttr *>(this), dc},
       nullptr);
 
-  if (!attrDecl)
-    return false;
-
-  return attrDecl.dyn_cast<MacroDecl *>();
+  return macroDecl != nullptr;
 }
 
 DeclarationAttr::DeclarationAttr(SourceLoc atLoc, SourceRange range,

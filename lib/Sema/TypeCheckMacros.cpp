@@ -318,18 +318,14 @@ bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   auto parentAttrs = parentDecl->getSemanticAttrs();
   for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto customAttrDecl = evaluateOrDefault(
+    auto *macroDecl = evaluateOrDefault(
         evaluator,
-        CustomAttrDeclRequest{
+          ResolveAttachedMacroRequest{
           customAttr,
           parentDecl->getInnermostDeclContext()
         },
         nullptr);
 
-    if (!customAttrDecl)
-      continue;
-
-    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
     if (!macroDecl)
       continue;
 
@@ -364,10 +360,9 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();
       auto &ctx = decl->getASTContext();
-      auto attrDecl = evaluateOrDefault(ctx.evaluator,
-          CustomAttrDeclRequest{macroAttr, decl->getDeclContext()},
+      auto *macroDecl = evaluateOrDefault(ctx.evaluator,
+          ResolveAttachedMacroRequest{macroAttr, decl->getDeclContext()},
           nullptr);
-      auto *macroDecl = attrDecl.dyn_cast<MacroDecl *>();
       if (!macroDecl)
         return false;
 
@@ -1083,32 +1078,16 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return addedAttributes;
 }
 
-Optional<MacroDecl *>
-swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
-  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
-  if (!identTypeRepr)
-    return None;
-
-  // Look for macros at module scope. They can only occur at module scope, and
-  // we need to be sure not to trigger name lookup into type contexts along
-  // the way.
+MacroDecl *
+ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
+                                      CustomAttr *attr,
+                                      DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
   llvm::TinyPtrVector<ValueDecl *> macros;
-  auto moduleScopeDC = dc->getModuleScopeContext();
-  ASTContext &ctx = moduleScopeDC->getASTContext();
-  UnqualifiedLookupDescriptor descriptor(
-      identTypeRepr->getNameRef(), moduleScopeDC
-  );
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-  for (const auto &result : lookup.allResults()) {
-    // Only keep attached macros, which can be spelled as custom attributes.
-    if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
-      if (isAttachedMacro(macro->getMacroRoles()))
-        macros.push_back(macro);
-  }
+  findMacroForCustomAttr(attr, dc, macros);
 
   if (macros.empty())
-    return None;
+    return nullptr;
 
   // Extract macro arguments from the attribute, or create an empty list.
   ArgumentList *attrArgs;
@@ -1121,6 +1100,7 @@ swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc) {
   // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
   // to ensure @freestanding macros are not considered in overload resolution.
   FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+  auto *identTypeRepr = dyn_cast<IdentTypeRepr>(attr->getTypeRepr());
   auto macroRefExpr = new (ctx) OverloadedDeclRefExpr(
       macros, identTypeRepr->getNameLoc(), functionRefKind,
       /*implicit*/true);
