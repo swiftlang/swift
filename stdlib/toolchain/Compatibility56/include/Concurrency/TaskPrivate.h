@@ -29,7 +29,25 @@
 
 namespace swift {
 
+#if 0
+using ThreadID = decltype(pthread_self());
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
+
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
+  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+          (unsigned long)_swift_get_thread_id(),                               \
+          __FILE__, __LINE__, __FUNCTION__,                                    \
+          __VA_ARGS__)
+#else
 #define SWIFT_TASK_DEBUG_LOG(fmt ...) (void)0
+#endif
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
