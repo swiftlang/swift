@@ -32,3 +32,17 @@ public struct RelativeIndirectablePointer<Pointee>: RelativePointer {
     }
   }
 }
+
+extension UnsafeRawPointer {
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public func relativeIndirectableAddress<T>(
+    as type: T.Type
+  ) -> UnsafeRawPointer {
+    let relativePointer = RelativeIndirectablePointer<T>(
+      offset: loadUnaligned(as: Int32.self)
+    )
+
+    return relativePointer.address(from: self)
+  }
+}

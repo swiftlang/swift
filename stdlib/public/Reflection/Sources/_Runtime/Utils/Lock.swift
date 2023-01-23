@@ -43,6 +43,8 @@ class Lock<T> {
       UnsafeRawPointer.self
     )
 
+    lock.value = initialValue
+
     _lockInit(lock.mutex)
 
     return lock
@@ -56,6 +58,11 @@ class Lock<T> {
     }
 
     return try body(&value)
+  }
+
+  // Only use this when you know you're already inside the lock.
+  func withUnsafeValue<U>(_ body: (inout T) throws -> U) rethrows -> U {
+    try body(&value)
   }
 }
 

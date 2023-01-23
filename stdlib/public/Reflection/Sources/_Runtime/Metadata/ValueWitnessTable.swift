@@ -128,9 +128,9 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-
-    return address.signedVWTInitializeBufferWithCopyOfBuffer(
+    return address(
+      for: \.initializeBufferWithCopyOfBuffer
+    ).signedVWTInitializeBufferWithCopyOfBuffer(
       dest,
       src,
       trailing
@@ -139,17 +139,7 @@ extension ValueWitnessTable {
   
   @inlinable
   public func destroy(_ src: UnsafeMutableRawPointer) {
-    // rdar://103834325
-    // FIXME: There's currently a compiler bug preventing me from doing:
-    // 'address(of: \.destroy)'
-    // or even
-    // 'MemoryLayout<ValueWitnessTable.Layout.Pointee>.offset(of: \.destroy)'
-    //
-    // The same goes for everything else in this file
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-    
-    address.signedVWTDestroy(src, trailing)
+    address(for: \.destroy).signedVWTDestroy(src, trailing)
   }
   
   @inlinable
@@ -158,11 +148,9 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-    
-    return address.signedVWTInitializeWithCopy(dest, src, trailing)
+    return address(
+      for: \.initializeWithCopy
+    ).signedVWTInitializeWithCopy(dest, src, trailing)
   }
   
   @inlinable
@@ -171,12 +159,9 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-    
-    return address.signedVWTAssignWithCopy(dest, src, trailing)
+    return address(
+      for: \.assignWithCopy
+    ).signedVWTAssignWithCopy(dest, src, trailing)
   }
   
   @inlinable
@@ -185,13 +170,9 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeMutableRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-    
-    return address.signedVWTInitializeWithTake(dest, src, trailing)
+    return address(
+      for: \.initializeWithTake
+    ).signedVWTInitializeWithTake(dest, src, trailing)
   }
   
   @inlinable
@@ -200,14 +181,9 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeMutableRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
-    
-    return address.signedVWTAssignWithTake(dest, src, trailing)
+    return address(
+      for: \.assignWithTake
+    ).signedVWTAssignWithTake(dest, src, trailing)
   }
   
   @inlinable
@@ -216,15 +192,9 @@ extension ValueWitnessTable {
     _ src: UnsafeRawPointer,
     _ numberOfEmptyCases: UInt32
   ) -> UInt32 {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
-                  + MemoryLayout<AssignWithTake>.size
-    
-    return address.signedVWTGetEnumTagSinglePayload(
+    return address(
+      for: \.getEnumTagSinglePayload
+    ).signedVWTGetEnumTagSinglePayload(
       src,
       numberOfEmptyCases,
       trailing
@@ -237,16 +207,9 @@ extension ValueWitnessTable {
     _ tag: UInt32,
     _ numberOfEmptyCases: UInt32
   ) -> () {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
-                  + MemoryLayout<AssignWithTake>.size
-                  + MemoryLayout<GetEnumTagSinglePayload>.size
-    
-    return address.signedVWTStoreEnumTagSinglePayload(
+    return address(
+      for: \.storeEnumTagSinglePayload
+    ).signedVWTStoreEnumTagSinglePayload(
       src,
       tag,
       numberOfEmptyCases,

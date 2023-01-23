@@ -168,6 +168,12 @@ void swift::initializeDynamicReplacementLookup() {
 void swift::initializeAccessibleFunctionsLookup() {
 }
 
+SWIFT_RUNTIME_EXPORT
+size_t swift_getMetadataSectionCount() {
+  auto snapshot = swift::registered->snapshot();
+  return snapshot.count();
+}
+
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
@@ -212,12 +218,6 @@ void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
   // swift_getMetadataSection(), presumably on the same thread, so we don't need
   // to call it again here.
   *out_expected = section->baseAddress.load(std::memory_order_relaxed);
-}
-
-SWIFT_RUNTIME_EXPORT
-size_t swift_getMetadataSectionCount() {
-  auto snapshot = swift::registered->snapshot();
-  return snapshot.count();
 }
 
 #endif // NDEBUG

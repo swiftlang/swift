@@ -19,4 +19,22 @@ extern void *swift_projectBox(void *object);
 //                                        ProtocolDescriptor *protocol);
 extern void *swift_conformsToProtocol(const void *type, const void *protocol);
 
+#if !defined(__MACH__)
+
+#include <stddef.h>
+
+// size_t swift_getMetadataSectionCount();
+extern size_t swift_getMetadataSectionCount();
+
+// void swift_enumerateAllMetadataSections(
+//   bool (*body)(const swift::MetadataSections *sections, void *context),
+//   void *context
+// )
+extern void swift_enumerateAllMetadataSections(
+  _Bool (*body)(const void *sections, void *context),
+  void *context
+);
+
+#endif // !defined(__MACH__)
+
 #endif /* SWIFT_REFLECTION_RUNTIME_H */

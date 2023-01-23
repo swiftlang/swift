@@ -68,6 +68,8 @@ add_swift_target_library(swift_Runtime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_ST
   ExistentialContainer.swift
   Functions.swift
   HeapObject.swift
+  ImageInspection.cpp
+  ImageInspection.swift
   WitnessTable.swift
 
   C_COMPILE_FLAGS

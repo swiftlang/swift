@@ -16,6 +16,7 @@ list(APPEND SWIFT_REFLECTION_SWIFT_FLAGS
   "-parse-stdlib")
 
 add_swift_target_library(swiftReflection ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Attribute.swift
   Case.swift
   Field.swift
   GenericArguments.swift
