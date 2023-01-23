@@ -17,7 +17,7 @@
 // REQUIRES: OS=macosx
 
 @attached(accessor)
-macro myPropertyWrapper: Void =
+macro myPropertyWrapper() =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperMacro")
 
 struct Date { }
