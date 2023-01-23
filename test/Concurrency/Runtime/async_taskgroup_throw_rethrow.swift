@@ -68,6 +68,33 @@ func test_taskGroup_noThrow_ifNotAwaitedThrowingTask() async {
   print("Expected no error to be thrown, got: \(got)") // CHECK: Expected no error to be thrown, got: 1
 }
 
+func test_taskGroup_throw_rethrows_waitForAll() async {
+  print("==== \(#function) ------") // CHECK-LABEL: test_taskGroup_throw_rethrows_waitForAll
+  do {
+    _ = try await withThrowingTaskGroup(of: Int.self) { group in
+      group.addTask {
+        throw CancellationError()
+      }
+      group.addTask {
+        1
+      }
+
+      do {
+        try await group.waitForAll()
+      } catch {
+        print("waitAll rethrown: ", error)
+        // CHECK: waitAll rethrown: CancellationError()
+        print("isEmpty: ", group.isEmpty)
+        // CHECK: isEmpty: true
+        throw error
+      }
+    }
+  } catch {
+    print("rethrown: ", error)
+    // CHECK: rethrown: CancellationError()
+  }
+}
+
 func test_discardingTaskGroup_automaticallyRethrows() async {
   print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows
   do {
@@ -182,6 +209,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
   static func main() async {
     await test_taskGroup_throws_rethrows()
     await test_taskGroup_noThrow_ifNotAwaitedThrowingTask()
+    await test_taskGroup_throw_rethrows_waitForAll()
     await test_discardingTaskGroup_automaticallyRethrows()
     await test_discardingTaskGroup_automaticallyRethrowsOnlyFirst()
     await test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst()
