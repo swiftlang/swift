@@ -139,7 +139,14 @@ do {
   precondition(error as? BadError == BadError.bad)
 }
 
+precondition(BadError(fromEmoji: "💥") == nil)
+precondition(BadError(fromEmoji: "❗️") == .bad)
+precondition(BadError(fromEmoji: "‼️") == .reallyBad)
+
 do {
+  let defaulted = IntArray()
+  precondition(defaulted.values == [])
+
   let empty = IntArray.empty
   precondition(empty.values == [])
 
@@ -168,6 +175,9 @@ do {
 }
 
 do {
+  let defaulted = ReferenceIntArray()
+  precondition(defaulted.values == [])
+
   let empty = ReferenceIntArray.empty
   precondition(empty.values == [])
 
