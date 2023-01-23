@@ -26,7 +26,8 @@
 namespace swift {
 namespace dependencies {
 
-llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command) {
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command,
+                                                    const char *main_executable_path) {
   // We must reset option occurrences because we are handling an unrelated
   // command-line to those possibly parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
@@ -45,7 +46,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   SourceManager dummySM;
   DiagnosticEngine DE(dummySM);
   CompilerInvocation Invocation;
-  if (Invocation.parseArgs(Args, DE)) {
+  if (Invocation.parseArgs(Args, DE, nullptr, {}, main_executable_path)) {
     return std::make_error_code(std::errc::invalid_argument);
   }
 
@@ -235,7 +236,8 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();
-  if (Invocation.parseArgs(CommandArgs, Instance->getDiags())) {
+  if (Invocation.parseArgs(CommandArgs, Instance->getDiags(),
+                           nullptr, WorkingDirectory, "/tmp/foo")) {
     return std::make_error_code(std::errc::invalid_argument);
   }
 
