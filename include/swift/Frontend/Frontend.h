@@ -47,6 +47,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 #include <memory>
 
@@ -457,6 +458,9 @@ class CompilerInstance {
   /// instance has completed its setup, this will be null.
   std::unique_ptr<UnifiedStatsReporter> Stats;
 
+  /// Virtual OutputBackend.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> TheOutputBackend = nullptr;
+
   mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoaderBase *DefaultSerializedLoader = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
@@ -505,6 +509,14 @@ public:
   }
   void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
     SourceMgr.setFileSystem(FS);
+  }
+
+  llvm::vfs::OutputBackend &getOutputBackend() const {
+    return *TheOutputBackend;
+  }
+  void
+  setOutputBackend(llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
+    TheOutputBackend = std::move(Backend);
   }
 
   ASTContext &getASTContext() { return *Context; }
@@ -629,6 +641,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
+  void setupOutputBackend();
 
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();

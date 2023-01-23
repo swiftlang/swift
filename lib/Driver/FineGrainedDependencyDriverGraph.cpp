@@ -29,6 +29,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_set>
@@ -529,11 +530,12 @@ void ModuleDepGraph::emitDotFileForJob(DiagnosticEngine &diags,
   emitDotFile(diags, getSwiftDeps(job));
 }
 
-void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
+void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags,
+                                 StringRef baseName) {
   unsigned seqNo = dotFileSequenceNumber[baseName.str()]++;
   std::string fullName =
       baseName.str() + "-post-integration." + std::to_string(seqNo) + ".dot";
-  withOutputFile(diags, fullName, [&](llvm::raw_ostream &out) {
+  withOutputFile(diags, *backend, fullName, [&](llvm::raw_ostream &out) {
     emitDotFile(out);
     return false;
   });

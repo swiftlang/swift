@@ -16,6 +16,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <unordered_map>
 
 using namespace swift;
@@ -1146,11 +1147,11 @@ void swift::dependencies::module_dependency_cache_serialization::
 
 bool swift::dependencies::module_dependency_cache_serialization::
     writeInterModuleDependenciesCache(
-        DiagnosticEngine &diags, StringRef path,
-        const SwiftDependencyScanningService &cache) {
+        DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend,
+        StringRef path, const SwiftDependencyScanningService &cache) {
   PrettyStackTraceStringAction stackTrace(
       "saving inter-module dependency graph", path);
-  return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
+  return withOutputFile(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeInterModuleDependenciesCache(Writer, cache);

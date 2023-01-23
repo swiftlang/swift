@@ -21,6 +21,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 using namespace fine_grained_dependencies;
@@ -498,10 +499,10 @@ void swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
 }
 
 bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
-    DiagnosticEngine &diags, StringRef path,
+    DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend, StringRef path,
     const SourceFileDepGraph &g) {
   PrettyStackTraceStringAction stackTrace("saving fine-grained dependency graph", path);
-  return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
+  return withOutputFile(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeFineGrainedDependencyGraph(Writer, g, Purpose::ForSwiftDeps);

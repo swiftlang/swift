@@ -248,7 +248,8 @@ int swift::RunImmediately(CompilerInstance &CI,
 
   performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr, /*hash*/ nullptr,
               GenModule.getModule(), GenModule.getTargetMachine(),
-              PSPs.OutputFilename, Context.Stats);
+              PSPs.OutputFilename, CI.getOutputBackend(),
+              Context.Stats);
 
   if (Context.hadError())
     return -1;

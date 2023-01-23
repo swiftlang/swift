@@ -38,6 +38,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
@@ -45,6 +46,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <llvm/ADT/StringExtras.h>
 
 using namespace swift;
@@ -245,11 +247,12 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   Invocation.getLangOptions().RecordRequestReferences
     = !isWholeModuleCompilation();
 
+  // Make sure the output backend is initialized.
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      SourceMgr, Diagnostics));
+      SourceMgr, Diagnostics, TheOutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -393,11 +396,19 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
+void CompilerInstance::setupOutputBackend() {
+  // Skip if output backend is not setup, default to OnDiskOutputBackend.
+  if (!TheOutputBackend)
+    TheOutputBackend =
+        llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
   Invocation = Invoke;
 
   setupDependencyTrackerIfNeeded();
+  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.

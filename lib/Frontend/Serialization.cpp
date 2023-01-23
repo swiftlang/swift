@@ -17,6 +17,7 @@
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 
@@ -56,11 +57,12 @@ void swift::serializeToBuffers(
     llvm::raw_svector_ostream stream(buf);
     serialization::writeToStream(stream, DC, M, options,
                                  /*dependency info*/ nullptr);
-    bool hadError = withOutputFile(getContext(DC).Diags, options.OutputPath,
-                                   [&](raw_ostream &out) {
-      out << stream.str();
-      return false;
-    });
+    bool hadError = withOutputFile(
+        getContext(DC).Diags, getContext(DC).getOutputBackend(),
+        options.OutputPath, [&](raw_ostream &out) {
+          out << stream.str();
+          return false;
+        });
     if (hadError)
       return;
 
@@ -77,11 +79,12 @@ void swift::serializeToBuffers(
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     serialization::writeDocToStream(stream, DC, options.GroupInfoPath);
-    (void)withOutputFile(getContext(DC).Diags, options.DocOutputPath,
-                         [&](raw_ostream &out) {
-      out << stream.str();
-      return false;
-    });
+    (void)withOutputFile(getContext(DC).Diags,
+                            getContext(DC).getOutputBackend(),
+                            options.DocOutputPath, [&](raw_ostream &out) {
+                              out << stream.str();
+                              return false;
+                            });
     if (moduleDocBuffer)
       *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
           std::move(buf), options.DocOutputPath,
@@ -94,11 +97,12 @@ void swift::serializeToBuffers(
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     serialization::writeSourceInfoToStream(stream, DC);
-    (void)withOutputFile(getContext(DC).Diags, options.SourceInfoOutputPath,
-                         [&](raw_ostream &out) {
-      out << stream.str();
-      return false;
-    });
+    (void)withOutputFile(
+        getContext(DC).Diags, getContext(DC).getOutputBackend(),
+        options.SourceInfoOutputPath, [&](raw_ostream &out) {
+          out << stream.str();
+          return false;
+        });
     if (moduleSourceInfoBuffer)
       *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
           std::move(buf), options.SourceInfoOutputPath,
@@ -120,37 +124,37 @@ void swift::serialize(
     return;
   }
 
-  bool hadError = withOutputFile(getContext(DC).Diags,
-                                 options.OutputPath,
-                                 [&](raw_ostream &out) {
-    FrontendStatsTracer tracer(getContext(DC).Stats,
-                               "Serialization, swiftmodule");
-    serialization::writeToStream(out, DC, M, options, DG);
-    return false;
-  });
+  bool hadError = withOutputFile(
+      getContext(DC).Diags, getContext(DC).getOutputBackend(),
+      options.OutputPath, [&](raw_ostream &out) {
+        FrontendStatsTracer tracer(getContext(DC).Stats,
+                                   "Serialization, swiftmodule");
+        serialization::writeToStream(out, DC, M, options, DG);
+        return false;
+      });
   if (hadError)
     return;
 
   if (!options.DocOutputPath.empty()) {
-    (void)withOutputFile(getContext(DC).Diags,
-                         options.DocOutputPath,
-                         [&](raw_ostream &out) {
-      FrontendStatsTracer tracer(getContext(DC).Stats,
-                                 "Serialization, swiftdoc");
-      serialization::writeDocToStream(out, DC, options.GroupInfoPath);
-      return false;
-    });
+    (void)withOutputFile(
+        getContext(DC).Diags, getContext(DC).getOutputBackend(),
+        options.DocOutputPath, [&](raw_ostream &out) {
+          FrontendStatsTracer tracer(getContext(DC).Stats,
+                                     "Serialization, swiftdoc");
+          serialization::writeDocToStream(out, DC, options.GroupInfoPath);
+          return false;
+        });
   }
 
   if (!options.SourceInfoOutputPath.empty()) {
-    (void)withOutputFile(getContext(DC).Diags,
-                         options.SourceInfoOutputPath,
-                         [&](raw_ostream &out) {
-      FrontendStatsTracer tracer(getContext(DC).Stats,
-                                 "Serialization, swiftsourceinfo");
-      serialization::writeSourceInfoToStream(out, DC);
-      return false;
-    });
+    (void)withOutputFile(
+        getContext(DC).Diags, getContext(DC).getOutputBackend(),
+        options.SourceInfoOutputPath, [&](raw_ostream &out) {
+          FrontendStatsTracer tracer(getContext(DC).Stats,
+                                     "Serialization, swiftsourceinfo");
+          serialization::writeSourceInfoToStream(out, DC);
+          return false;
+        });
   }
 
   if (!symbolGraphOptions.OutputDir.empty()) {

@@ -81,6 +81,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -123,37 +124,36 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
       });
 }
 
-/// Gets an output stream for the provided output filename, or diagnoses to the
-/// provided AST Context and returns null if there was an error getting the
-/// stream.
-static std::unique_ptr<llvm::raw_fd_ostream>
-getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
-  std::error_code errorCode;
-  auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFilename, errorCode, llvm::sys::fs::OF_None);
-  if (errorCode) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                       OutputFilename, errorCode.message());
-    return nullptr;
-  }
-  return os;
+/// Diagnose output file error to ASTContext.
+void diagnoseOutputError(ASTContext &Ctx, StringRef OutputFilename,
+                         llvm::Error Err) {
+  Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, OutputFilename,
+                     toString(std::move(Err)));
 }
 
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
-                     StringRef OutputFilename) {
-  auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
-  if (!OS) return true;
-  SM.print(*OS, M, Opts);
-
+                     StringRef OutputFilename,
+                     llvm::vfs::OutputBackend &Backend) {
+  auto OutFile = Backend.createFile(OutputFilename);
+  if (!OutFile) {
+    diagnoseOutputError(M->getASTContext(), OutputFilename,
+                        OutFile.takeError());
+    return true;
+  }
+  SM.print(*OutFile, M, Opts);
+  if (auto E = OutFile->keep()) {
+    diagnoseOutputError(M->getASTContext(), OutputFilename, std::move(E));
+    return true;
+  }
   return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
-                     const CompilerInstance &Instance,
+                     CompilerInstance &Instance,
                      const SILOptions &Opts) {
   return writeSIL(SM, Instance.getMainModule(), Opts,
-                  PSPs.OutputFilename);
+                  PSPs.OutputFilename, Instance.getOutputBackend());
 }
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
@@ -166,14 +166,14 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \returns true if there were any errors
 ///
 /// \see swift::printAsClangHeader
-static bool printAsClangHeaderIfNeeded(
+static bool printAsClangHeaderIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     StringRef outputPath, ModuleDecl *M, StringRef bridgingHeader,
     const FrontendOptions &frontendOpts, const IRGenOptions &irGenOpts,
     clang::HeaderSearch &clangHeaderSearchInfo) {
   if (outputPath.empty())
     return false;
   return withOutputFile(
-      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+      M->getDiags(), outputBackend, outputPath, [&](raw_ostream &out) -> bool {
         return printAsClangHeader(out, M, bridgingHeader, frontendOpts,
                                   irGenOpts, clangHeaderSearchInfo);
       });
@@ -187,7 +187,8 @@ static bool printAsClangHeaderIfNeeded(
 ///
 /// \see swift::emitSwiftInterface
 static bool
-printModuleInterfaceIfNeeded(StringRef outputPath,
+printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
+                             StringRef outputPath,
                              ModuleInterfaceOptions const &Opts,
                              LangOptions const &LangOpts,
                              ModuleDecl *M) {
@@ -205,10 +206,10 @@ printModuleInterfaceIfNeeded(StringRef outputPath,
     diags.diagnose(SourceLoc(),
                    diag::warn_unsupported_module_interface_library_evolution);
   }
-  return withOutputFile(diags, outputPath,
+  return withOutputFile(diags, outputBackend, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
-    return swift::emitSwiftInterface(out, Opts, M);
-  });
+                          return swift::emitSwiftInterface(out, Opts, M);
+                        });
 }
 
 namespace {
@@ -517,8 +518,18 @@ static bool dumpAST(CompilerInstance &Instance) {
     for (SourceFile *sourceFile: primaryFiles) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
-      auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-      sourceFile->dump(*OS, /*parseIfNeeded*/ true);
+      auto OutFile = Instance.getOutputBackend().createFile(OutputFilename);
+      if (!OutFile) {
+        diagnoseOutputError(Instance.getASTContext(), OutputFilename,
+                            OutFile.takeError());
+        return true;
+      }
+      sourceFile->dump(*OutFile, /*parseIfNeeded*/ true);
+      if (auto E = OutFile->keep()) {
+        diagnoseOutputError(Instance.getASTContext(), OutputFilename,
+                            std::move(E));
+        return true;
+      }
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
@@ -543,17 +554,19 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
 
   using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
   return fine_grained_dependencies::withReferenceDependencies(
-      SF, *Instance.getDependencyTracker(), outputPath, alsoEmitDotFile,
-      [&](SourceFileDepGraph &&g) -> bool {
+      SF, *Instance.getDependencyTracker(), Instance.getOutputBackend(),
+      outputPath, alsoEmitDotFile, [&](SourceFileDepGraph &&g) -> bool {
         const bool hadError =
             fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
-                Instance.getDiags(), outputPath, g);
+                Instance.getDiags(), Instance.getOutputBackend(), outputPath,
+                g);
 
         // If path is stdout, cannot read it back, so check for "-"
         assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
         if (alsoEmitDotFile)
-          g.emitDotFile(outputPath, Instance.getDiags());
+          g.emitDotFile(Instance.getOutputBackend(), outputPath,
+                        Instance.getDiags());
         return hadError;
       });
 }
@@ -925,6 +938,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
       }
     }
     hadAnyError |= printAsClangHeaderIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
         Invocation.getIRGenOptions(),
@@ -940,6 +954,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
     hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getModuleInterfaceOutputPathForWholeModule(),
         Invocation.getModuleInterfaceOptions(),
         Invocation.getLangOptions(),
@@ -953,6 +968,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
         privOpts,
         Invocation.getLangOptions(),
@@ -1437,11 +1453,11 @@ static bool serializeModuleSummary(SILModule *SM,
                                    const PrimarySpecificPaths &PSPs,
                                    const ASTContext &Context) {
   auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
-  return withOutputFile(Context.Diags, summaryOutputPath,
-                        [&](llvm::raw_ostream &out) {
-                          out << "Some stuff";
-                          return false;
-                        });
+  return withOutputFile(Context.Diags, Context.getOutputBackend(),
+                           summaryOutputPath, [&](llvm::raw_ostream &out) {
+                             out << "Some stuff";
+                             return false;
+                           });
 }
 
 static GeneratedModule
@@ -1618,6 +1634,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
                      TargetMachine.get(), OutputFilename,
+                     Instance.getOutputBackend(),
                      Instance.getStatsReporter());
 }
 
@@ -1696,7 +1713,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
       auto *Mod = MSF.get<ModuleDecl *>();
       fine_grained_dependencies::withReferenceDependencies(
-          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          Mod, *Instance.getDependencyTracker(),
+          Instance.getOutputBackend(), Mod->getModuleFilename(),
           alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
             serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get(), &g);
             return false;
@@ -1780,9 +1798,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
   llvm::GlobalVariable *HashGlobal;
-  auto IRModule = generateIR(
-      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
-      OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
+  auto IRModule =
+      generateIR(IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+                 OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
   // Cancellation check after IRGen.
   if (Instance.isCancellationRequested())

@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -208,6 +209,7 @@ int main(int argc, char *argv[]) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
+  llvm::vfs::OnDiskOutputBackend outputBackend;
 
   switch (options::Action) {
   case ActionType::None: {
@@ -224,7 +226,7 @@ int main(int argc, char *argv[]) {
     }
 
     bool hadError =
-      withOutputFile(diags, options::OutputFilename,
+      withOutputFile(diags, outputBackend, options::OutputFilename,
         [&](llvm::raw_pwrite_stream &out) {
           out << "# Fine-grained v0\n";
           llvm::yaml::Output yamlWriter(out);
@@ -256,7 +258,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (writeFineGrainedDependencyGraphToPath(
-            diags, options::OutputFilename, fg)) {
+            diags, outputBackend, options::OutputFilename, fg)) {
       llvm::errs() << "Failed to write binary swiftdeps\n";
       return 1;
     }

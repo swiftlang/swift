@@ -373,11 +373,13 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
 #endif
 }
 
-void SourceFileDepGraph::emitDotFile(StringRef outputPath,
+void SourceFileDepGraph::emitDotFile(llvm::vfs::OutputBackend &outputBackend,
+                                     StringRef outputPath,
                                      DiagnosticEngine &diags) {
   std::string dotFileName = outputPath.str() + ".dot";
-  withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
-    DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
-    return false;
-  });
+  withOutputFile(
+      diags, outputBackend, dotFileName, [&](llvm::raw_pwrite_stream &out) {
+        DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
+        return false;
+      });
 }

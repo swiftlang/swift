@@ -1369,7 +1369,7 @@ static void serializeDependencyCache(CompilerInstance &instance,
   ASTContext &Context = instance.getASTContext();
   auto savePath = opts.SerializedDependencyScannerCachePath;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Context.Diags, savePath, service);
+      Context.Diags, instance.getOutputBackend(), savePath, service);
   if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
   }

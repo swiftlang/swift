@@ -34,6 +34,7 @@
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
@@ -43,6 +44,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <cstdio>
 using namespace swift;
 
@@ -181,14 +183,19 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::error_code EC;
-  llvm::raw_fd_ostream outStream(OutputFilename, EC, llvm::sys::fs::OF_None);
-  if (outStream.has_error() || EC) {
+  llvm::vfs::OnDiskOutputBackend Backend;
+  auto outFile = Backend.createFile(OutputFilename);
+  if (!outFile) {
     CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
-                           OutputFilename, EC.message());
-    outStream.clear_error();
+                           OutputFilename, toString(outFile.takeError()));
     return 1;
   }
+  auto closeFile = llvm::make_scope_exit([&]() {
+    if (auto E = outFile->keep()) {
+      CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
+                             OutputFilename, toString(std::move(E)));
+    }
+  });
 
   auto *mod = CI.getMainModule();
   assert(mod->getFiles().size() == 1);
@@ -205,20 +212,20 @@ int main(int argc, char **argv) {
           mod, Opts, TBDOpts, SILOpts, SILTypes,
           /*SILMod*/ nullptr, moduleName, PSPs);
     } else {
-      return IRGenDescriptor::forFile(mod->getFiles()[0], Opts, TBDOpts,
-                                      SILOpts, SILTypes, /*SILMod*/ nullptr,
-                                      moduleName, PSPs, /*discriminator*/ "");
+      return IRGenDescriptor::forFile(
+          mod->getFiles()[0], Opts, TBDOpts, SILOpts, SILTypes,
+          /*SILMod*/ nullptr, moduleName, PSPs, /*discriminator*/ "");
     }
   };
 
   auto &eval = CI.getASTContext().evaluator;
   auto desc = getDescriptor();
-  desc.out = &outStream;
+  desc.out = &outFile->getOS();
   auto generatedMod = llvm::cantFail(eval(OptimizedIRRequest{desc}));
   if (!generatedMod)
     return 1;
 
   return compileAndWriteLLVM(generatedMod.getModule(),
                              generatedMod.getTargetMachine(), Opts,
-                             CI.getStatsReporter(), CI.getDiags(), outStream);
+                             CI.getStatsReporter(), CI.getDiags(), *outFile);
 }
