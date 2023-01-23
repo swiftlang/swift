@@ -19,7 +19,7 @@
 // RUN:     -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:     -emit-private-module-interface-path %t/Client.private.swiftinterface \
 // RUN:     %t/Client.swift -I %t -experimental-spi-only-imports \
-// RUN:     -alias-module-names-in-module-interface
+// RUN:     -alias-module-names-in-module-interface -parse-stdlib
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I%t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -module-name Client -I%t
 
@@ -48,3 +48,10 @@ import PublicLib
 // PUBLIC: import Module___PublicLib
 // PRIVATE: import Module___PublicLib
 // PRIVATE: import Module___SPILib
+
+public func builtinUser(_ a: Builtin.Int32) {}
+
+@inlinable
+public func builtinInlinableUser() {
+    var a: Builtin.Int32
+}

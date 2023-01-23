@@ -81,6 +81,12 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
 
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
+      // Skip Swift as it's commonly used in inlinable code,
+      // and Builtin as it's imported implicitly by name.
+      if (importedName == STDLIB_NAME ||
+          importedName == BUILTIN_NAME)
+        continue;
+
       if (AliasModuleNamesTargets.insert(importedName).second) {
         out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
                importedName << "=" << importedName;
