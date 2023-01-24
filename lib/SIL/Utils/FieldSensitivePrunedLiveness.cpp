@@ -88,16 +88,16 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
 //                           MARK: SubElementNumber
 //===----------------------------------------------------------------------===//
 
-Optional<SubElementNumber>
-SubElementNumber::computeForAddress(SILValue projectionDerivedFromRoot,
+Optional<SubElementOffset>
+SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
                                     SILValue rootAddress) {
-  unsigned finalSubElementNumber = 0;
+  unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
   while (1) {
     // If we got to the root, we're done.
     if (rootAddress == projectionDerivedFromRoot)
-      return {SubElementNumber(finalSubElementNumber)};
+      return {SubElementOffset(finalSubElementOffset)};
 
     if (auto *pbi = dyn_cast<ProjectBoxInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = pbi->getOperand();
@@ -115,7 +115,7 @@ SubElementNumber::computeForAddress(SILValue projectionDerivedFromRoot,
 
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
-        finalSubElementNumber += TypeSubElementCount(
+        finalSubElementOffset += TypeSubElementCount(
             tupleType.getTupleElementType(i), mod,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
@@ -133,7 +133,7 @@ SubElementNumber::computeForAddress(SILValue projectionDerivedFromRoot,
         if (fieldDecl == seai->getField())
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
-        finalSubElementNumber += TypeSubElementCount(
+        finalSubElementOffset += TypeSubElementCount(
             type.getFieldType(fieldDecl, mod, context), mod, context);
       }
 
@@ -175,16 +175,16 @@ SubElementNumber::computeForAddress(SILValue projectionDerivedFromRoot,
   }
 }
 
-Optional<SubElementNumber>
-SubElementNumber::computeForValue(SILValue projectionDerivedFromRoot,
+Optional<SubElementOffset>
+SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
                                   SILValue rootAddress) {
-  unsigned finalSubElementNumber = 0;
+  unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
   while (1) {
     // If we got to the root, we're done.
     if (rootAddress == projectionDerivedFromRoot)
-      return {SubElementNumber(finalSubElementNumber)};
+      return {SubElementOffset(finalSubElementOffset)};
 
     // Look through these single operand instructions.
     if (isa<BeginBorrowInst>(projectionDerivedFromRoot) ||
@@ -192,6 +192,7 @@ SubElementNumber::computeForValue(SILValue projectionDerivedFromRoot,
       projectionDerivedFromRoot =
           cast<SingleValueInstruction>(projectionDerivedFromRoot)
               ->getOperand(0);
+      continue;
     }
 
     if (auto *teai = dyn_cast<TupleExtractInst>(projectionDerivedFromRoot)) {
@@ -199,12 +200,48 @@ SubElementNumber::computeForValue(SILValue projectionDerivedFromRoot,
 
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
-        finalSubElementNumber += TypeSubElementCount(
+        finalSubElementOffset += TypeSubElementCount(
             tupleType.getTupleElementType(i), mod,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
       projectionDerivedFromRoot = teai->getOperand();
       continue;
+    }
+
+    if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(
+            projectionDerivedFromRoot)) {
+      if (auto *dsi = dyn_cast<DestructureStructInst>(mvir->getParent())) {
+        SILType type = dsi->getOperand()->getType();
+
+        // Keep track of what subelement is being referenced.
+        unsigned resultIndex = mvir->getIndex();
+        StructDecl *structDecl = dsi->getStructDecl();
+        for (auto pair : llvm::enumerate(structDecl->getStoredProperties())) {
+          if (pair.index() == resultIndex)
+            break;
+          auto context = TypeExpansionContext(*rootAddress->getFunction());
+          finalSubElementOffset += TypeSubElementCount(
+              type.getFieldType(pair.value(), mod, context), mod, context);
+        }
+
+        projectionDerivedFromRoot = dsi->getOperand();
+        continue;
+      }
+
+      if (auto *dti = dyn_cast<DestructureTupleInst>(mvir->getParent())) {
+        SILType type = dti->getOperand()->getType();
+
+        // Keep track of what subelement is being referenced.
+        unsigned resultIndex = mvir->getIndex();
+        for (unsigned i : range(resultIndex)) {
+          auto context = TypeExpansionContext(*rootAddress->getFunction());
+          finalSubElementOffset +=
+              TypeSubElementCount(type.getTupleElementType(i), mod, context);
+        }
+
+        projectionDerivedFromRoot = dti->getOperand();
+        continue;
+      }
     }
 
     if (auto *seai = dyn_cast<StructExtractInst>(projectionDerivedFromRoot)) {
@@ -216,7 +253,7 @@ SubElementNumber::computeForValue(SILValue projectionDerivedFromRoot,
         if (fieldDecl == seai->getField())
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
-        finalSubElementNumber += TypeSubElementCount(
+        finalSubElementOffset += TypeSubElementCount(
             type.getFieldType(fieldDecl, mod, context), mod, context);
       }
 
