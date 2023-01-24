@@ -307,7 +307,9 @@ public:
   ///
   /// Generally this should be done immediately after updating
   /// ActiveTask.
+  __attribute__((visibility("hidden")))
   void flagAsRunning();
+  __attribute__((visibility("hidden")))
   void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.  This can update the
@@ -316,26 +318,33 @@ public:
   /// clearing ActiveTask and immediately before enqueuing the task
   /// somewhere.  TODO: record where the task is enqueued if
   /// possible.
+  __attribute__((visibility("hidden")))
   void flagAsSuspended();
+  __attribute__((visibility("hidden")))
   void flagAsSuspended_slow();
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
+  __attribute__((visibility("hidden")))
   void flagAsCompleted();
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
+  __attribute__((visibility("hidden")))
   bool isCancelled() const;
 
   // ==== Task Local Values ----------------------------------------------------
 
+  __attribute__((visibility("hidden")))
   void localValuePush(const HeapObject *key,
                       /* +1 */ OpaqueValue *value,
                       const Metadata *valueType);
 
+  __attribute__((visibility("hidden")))
   OpaqueValue *localValueGet(const HeapObject *key);
 
   /// Returns true if storage has still more bindings.
+  __attribute__((visibility("hidden")))
   bool localValuePop();
 
   // ==== Child Fragment -------------------------------------------------------
@@ -563,6 +572,7 @@ public:
   /// the future has completed and can be queried.
   /// The waiting task's async context will be intialized with the parameters if
   /// the current's task state is executing.
+  __attribute__((visibility("hidden")))
   FutureFragment::Status waitFuture(AsyncTask *waitingTask,
                                     AsyncContext *waitingTaskContext,
                                     TaskContinuationFunction *resumeFn,
