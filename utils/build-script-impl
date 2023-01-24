@@ -3554,7 +3554,7 @@ function build_and_test_installable_package() {
               TIMEOUT_ARGS=--timeout=600 # 10 minutes
             fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python3 "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
+                call python3 "${LIT_EXECUTABLE_PATH}" . ${LLVM_LIT_ARGS} --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
         fi
     fi
 }
