@@ -6445,7 +6445,7 @@ public:
   }
 
   void visitArraySliceType(ArraySliceType *T) {
-    if (Options.AlwaysDesugarDictionaryTypes) {
+    if (Options.AlwaysDesugarArraySliceTypes) {
       visit(T->getDesugaredType());
     } else {
       Printer << "[";
