@@ -546,6 +546,16 @@ public:
 }// End of anonymous namespace
 
 namespace {
+
+static bool isMissingDeclAcceptable(const SDKNodeDecl *D) {
+  // Don't complain about removing importation of SwiftOnoneSupport.
+  if (D->getKind() == SDKNodeKind::DeclImport &&
+      D->getName() == "SwiftOnoneSupport") {
+    return true;
+  }
+  return false;
+}
+
 static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (D->getSDKContext().checkingABI()) {
     // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
@@ -559,9 +569,7 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
       D->isDeprecated())
     return;
-  // Don't complain about removing importation of SwiftOnoneSupport.
-  if (D->getKind() == SDKNodeKind::DeclImport &&
-      D->getName() == "SwiftOnoneSupport") {
+  if (isMissingDeclAcceptable(D)) {
     return;
   }
   D->emitDiag(SourceLoc(), diag::removed_decl, false);
@@ -1705,6 +1713,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
                                                 .findUpdateCounterpart(Node))) {
       DiagLoc = CD->getLoc();
     }
+    if (isMissingDeclAcceptable(Node))
+      return;
     Node->emitDiag(DiagLoc, diag::renamed_decl,
         Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
           Ctx.getOpts().CompilerStyle)) + " " +
