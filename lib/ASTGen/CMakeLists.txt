@@ -32,6 +32,13 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Types.swift
   )
 
+  # The compat56 library is not available during a stage-0 compiler build.
+  # Once we have proper stage tracking, we should turn this on for stages that
+  # are guaranteed to have the compatibility libraries.
+  target_compile_options(swiftASTGen PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
+    $<$<COMPILE_LANGUAGE:Swift>:none>)
+
   # Set the appropriate target triple.
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
