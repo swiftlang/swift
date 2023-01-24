@@ -2372,9 +2372,9 @@ public protocol UnkeyedEncodingContainer {
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode(
-    contentsOf sequence: some Sequence<some Encodable>
-  ) throws
+  mutating func encode<T: Sequence>(
+    contentsOf sequence: T
+  ) throws where T.Element: Encodable
 
   /// Encodes a nested container keyed by the given type and returns it.
   ///
@@ -6151,9 +6151,9 @@ extension UnkeyedEncodingContainer {
     }
   }
 
-  public mutating func encode(
-    contentsOf sequence: some Sequence<some Encodable>
-  ) throws {
+  public mutating func encode<T: Sequence>(
+    contentsOf sequence: T
+  ) throws where T.Element: Encodable {
     for element in sequence {
       try self.encode(element)
     }
