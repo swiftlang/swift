@@ -677,6 +677,43 @@ void writeResultBuilderInformation(llvm::json::OStream &JSON,
   }
 }
 
+void writeAttrInformation(llvm::json::OStream &JSON,
+                          const DeclAttributes &Attrs) {
+  auto availableAttr = Attrs.getAttributes<AvailableAttr>();
+  if (availableAttr.empty())
+    return;
+
+  JSON.attributeArray("availabilityAttributes", [&] {
+    for (const AvailableAttr *attr : availableAttr) {
+      JSON.object([&] {
+        if (!attr->platformString().empty())
+          JSON.attribute("platform", attr->platformString());
+
+        if (!attr->Message.empty())
+          JSON.attribute("message", attr->Message);
+
+        if (!attr->Rename.empty())
+          JSON.attribute("rename", attr->Rename);
+
+        if (attr->Introduced.hasValue())
+          JSON.attribute("introducedVersion",
+                         attr->Introduced.value().getAsString());
+
+        if (attr->Deprecated.hasValue())
+          JSON.attribute("deprecatedVersion",
+                         attr->Deprecated.value().getAsString());
+
+        if (attr->Obsoleted.hasValue())
+          JSON.attribute("obsoletedVersion",
+                         attr->Obsoleted.value().getAsString());
+
+        JSON.attribute("isUnavailable", attr->isUnconditionallyUnavailable());
+        JSON.attribute("isDeprecated", attr->isUnconditionallyDeprecated());
+      });
+    }
+  });
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -705,10 +742,12 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               writeValue(JSON, PropertyInfo.Value);
               writeAttributes(JSON, PropertyInfo.PropertyWrappers);
               writeResultBuilderInformation(JSON, TypeDecl, decl);
+              writeAttrInformation(JSON, decl->getAttrs());
             });
           }
         });
         writeEnumCases(JSON, TypeInfo.EnumElements);
+        writeAttrInformation(JSON, TypeDecl->getAttrs());
       });
     }
   });
