@@ -2355,16 +2355,22 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   } else if (parsed.BaseName == "init" && isa_and_nonnull<CallExpr>(call)) {
     auto *CE = cast<CallExpr>(call);
 
-    // For initializers, replace with a "call" of the context type...but only
-    // if we know we're doing a call (rather than a first-class reference).
+    // If it is a call to an initializer (rather than a first-class reference):
+
     if (parsed.isMember()) {
+      // replace with a "call" to the type (instead of writing `.init`)
       diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
     } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-      SourceLoc removeLoc = dotCall->getDotLoc();
-      if (removeLoc.isInvalid())
-        return;
+      // if it's a dot call, and the left side is a type (and not `self` or 
+      // `super`, for example), just remove the dot and the right side, again 
+      // in order to make it a "call" to the type
+      if (isa<TypeExpr>(dotCall->getBase())) {
+        SourceLoc removeLoc = dotCall->getDotLoc();
+        if (removeLoc.isInvalid())
+          return;
 
-      diag.fixItRemove(SourceRange(removeLoc, dotCall->getFn()->getEndLoc()));
+        diag.fixItRemove(SourceRange(removeLoc, dotCall->getFn()->getEndLoc()));
+      }
     } else if (!isa<ConstructorRefCallExpr>(CE->getFn())) {
       return;
     }
