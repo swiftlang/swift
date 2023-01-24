@@ -182,7 +182,7 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoisting of value destroys")
-PASS(SSADestroyHoisting, "ssa-destroy-hoisting",
+PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")

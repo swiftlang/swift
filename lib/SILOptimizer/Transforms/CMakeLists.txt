@@ -33,7 +33,7 @@ target_sources(swiftSILOptimizer PRIVATE
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
-  SSADestroyHoisting.cpp
+  DestroyAddrHoisting.cpp
   SimplifyCFG.cpp
   Sink.cpp
   SpeculativeDevirtualizer.cpp
