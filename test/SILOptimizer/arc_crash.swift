@@ -15,6 +15,7 @@ public class Base {
 public class Node : Base {
   var node: Base
 
+  @inline(never)
   init(node: Base) { self.node = node }
 }
 struct Queue {
