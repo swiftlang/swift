@@ -10302,6 +10302,11 @@ public:
   static DestructureStructInst *
   create(const SILFunction &F, SILDebugLocation Loc, SILValue Operand,
          ValueOwnershipKind forwardingOwnershipKind);
+
+  StructDecl *getStructDecl() const {
+    return getOperand()->getType().getStructOrBoundGenericStruct();
+  }
+
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::DestructureStructInst;
   }
