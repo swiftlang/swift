@@ -69,13 +69,16 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
     out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
            moduleName << "=" << moduleName;
 
-    SmallVector<ImportedModule> imports;
-    M->getImportedModules(imports,
-                          {ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilter filter = {ModuleDecl::ImportFilterKind::Default,
                            ModuleDecl::ImportFilterKind::Exported,
-                           ModuleDecl::ImportFilterKind::SPIOnly,
-                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+                           ModuleDecl::ImportFilterKind::SPIAccessControl};
+    if (Opts.PrintPrivateInterfaceContent)
+      filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+
+    SmallVector<ImportedModule> imports;
+    M->getImportedModules(imports, filter);
     M->getMissingImportedModules(imports);
+
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
       if (AliasModuleNamesTargets.insert(importedName).second) {
