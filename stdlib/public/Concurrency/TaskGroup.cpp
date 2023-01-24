@@ -666,6 +666,8 @@ public:
 
   virtual void destroy() override;
 
+  virtual ~AccumulatingTaskGroup() {}
+
   virtual bool isDiscardingResults() const override {
     return false;
   }
@@ -713,6 +715,8 @@ public:
   virtual ~DiscardingTaskGroup() {}
 
   virtual void destroy() override;
+
+  virtual ~DiscardingTaskGroup() {}
 
   virtual bool isDiscardingResults() const override {
     return true;
