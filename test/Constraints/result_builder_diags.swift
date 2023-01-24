@@ -938,3 +938,32 @@ func test_dependent_member_with_unresolved_base_type() {
     }
   }
 }
+
+// rdar://89880662 - incorrect error about unsupported control flow statement
+func test_impact_of_control_flow_fix() {
+  @resultBuilder
+  struct BuilderA {
+    static func buildOptional<T>(_ value: T?) -> T? { return value }
+    static func buildBlock<T>(_ v1: T) -> T { v1 }
+    static func buildBlock<T, U>(_ v1: T, _ v2: U) -> (T, U) { (v1, v2) }
+  }
+
+  @resultBuilder
+  struct BuilderB {
+    static func buildBlock<T>(_ v1: T) -> T { v1 }
+    static func buildBlock<T, U>(_ v1: T, _ v2: U) -> (T, U) { (v1, v2) }
+  }
+
+  func fn<T>(@BuilderA _: () -> T) {}
+  func fn(@BuilderB _: () -> (Int?, Void)) {}
+
+  func test(_: Int) {}
+
+  fn {
+    if true {
+      0
+    }
+
+    test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  }
+}

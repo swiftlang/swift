@@ -2671,7 +2671,7 @@ class issue55246 {
 // @_backDeploy
 
 public class BackDeployClass {
-  @_backDeploy(before: macOS 12.0)
-  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' must not be used on an '@objc' instance method}}
+  @objc
   final public func objcMethod() {}
 }

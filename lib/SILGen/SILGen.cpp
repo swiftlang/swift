@@ -885,12 +885,12 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
         (decl->isDesignatedInit() ||
          decl->isObjC())) {
       preEmitFunction(constant, f, decl);
-      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+      PrettyStackTraceSILFunction X("silgen emitClassConstructorAllocator", f);
       SILGenFunction(*this, *f, decl).emitClassConstructorAllocator(decl);
       postEmitFunction(constant, f);
     } else {
       preEmitFunction(constant, f, decl);
-      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+      PrettyStackTraceSILFunction X("silgen emitValueConstructor", f);
       f->createProfiler(constant);
       SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
       postEmitFunction(constant, f);

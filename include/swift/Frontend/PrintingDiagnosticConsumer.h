@@ -45,6 +45,12 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
 
+  /// swift-syntax rendering
+  void *queuedDiagnostics = nullptr;
+  void *queuedSourceFile = nullptr;
+  unsigned queuedDiagnosticsBufferID;
+  StringRef queuedBufferName;
+
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
   ~PrintingDiagnosticConsumer();

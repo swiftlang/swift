@@ -318,18 +318,14 @@ bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   auto parentAttrs = parentDecl->getSemanticAttrs();
   for (auto customAttrConst: parentAttrs.getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto customAttrDecl = evaluateOrDefault(
+    auto *macroDecl = evaluateOrDefault(
         evaluator,
-        CustomAttrDeclRequest{
+          ResolveAttachedMacroRequest{
           customAttr,
           parentDecl->getInnermostDeclContext()
         },
         nullptr);
 
-    if (!customAttrDecl)
-      continue;
-
-    auto macroDecl = customAttrDecl.dyn_cast<MacroDecl *>();
     if (!macroDecl)
       continue;
 
@@ -364,10 +360,9 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro) {
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();
       auto &ctx = decl->getASTContext();
-      auto attrDecl = evaluateOrDefault(ctx.evaluator,
-          CustomAttrDeclRequest{macroAttr, decl->getDeclContext()},
+      auto *macroDecl = evaluateOrDefault(ctx.evaluator,
+          ResolveAttachedMacroRequest{macroAttr, decl->getDeclContext()},
           nullptr);
-      auto *macroDecl = attrDecl.dyn_cast<MacroDecl *>();
       if (!macroDecl)
         return false;
 
@@ -523,6 +518,7 @@ Expr *swift::expandMacroExpr(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(sourceFile->getImports());
 
   // Retrieve the parsed expression from the list of top-level items.
   auto topLevelItems = macroSourceFile->getTopLevelItems();
@@ -701,6 +697,7 @@ bool swift::expandFreestandingDeclarationMacro(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(sourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
@@ -878,6 +875,7 @@ void swift::expandAccessors(
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(declSourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", storage);
@@ -1059,6 +1057,7 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  macroSourceFile->setImports(declSourceFile->getImports());
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
@@ -1081,4 +1080,44 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   }
 
   return addedAttributes;
+}
+
+MacroDecl *
+ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
+                                      CustomAttr *attr,
+                                      DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+  llvm::TinyPtrVector<ValueDecl *> macros;
+  findMacroForCustomAttr(attr, dc, macros);
+
+  if (macros.empty())
+    return nullptr;
+
+  // Extract macro arguments from the attribute, or create an empty list.
+  ArgumentList *attrArgs;
+  if (attr->hasArgs()) {
+    attrArgs = attr->getArgs();
+  } else {
+    attrArgs = ArgumentList::createImplicit(ctx, {});
+  }
+
+  // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
+  // to ensure @freestanding macros are not considered in overload resolution.
+  FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+  auto *identTypeRepr = dyn_cast<IdentTypeRepr>(attr->getTypeRepr());
+  auto macroRefExpr = new (ctx) OverloadedDeclRefExpr(
+      macros, identTypeRepr->getNameLoc(), functionRefKind,
+      /*implicit*/true);
+  auto *call = CallExpr::createImplicit(ctx, macroRefExpr, attrArgs);
+
+  Expr *result = call;
+  TypeChecker::typeCheckExpression(result, dc);
+
+  if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn()))
+    if (auto *macro = dyn_cast<MacroDecl>(fn->getDecl()))
+      return macro;
+
+  // If we couldn't resolve a macro decl, the attribute is invalid.
+  attr->setInvalid();
+  return nullptr;
 }

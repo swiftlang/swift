@@ -137,10 +137,11 @@ DeclContext *SILLocation::getAsDeclContext() const {
 }
 
 SILLocation::FilenameAndLocation SILLocation::decode(SourceLoc Loc,
-                                              const SourceManager &SM) {
+                                              const SourceManager &SM,
+                                              bool ForceGeneratedSourceToDisk) {
   FilenameAndLocation DL;
   if (Loc.isValid()) {
-    DL.filename = SM.getDisplayNameForLoc(Loc);
+    DL.filename = SM.getDisplayNameForLoc(Loc, ForceGeneratedSourceToDisk);
     std::tie(DL.line, DL.column) = SM.getPresumedLineAndColumnForLoc(Loc);
   }
   return DL;

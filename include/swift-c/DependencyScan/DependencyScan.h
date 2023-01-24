@@ -303,6 +303,9 @@ swiftscan_compiler_supported_features_query();
 //=== Target-Info Functions -----------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation);
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_compiler_target_info_query_v2(swiftscan_scan_invocation_t invocation,
+                                        const char *main_executable_path);
 
 //=== Scanner Functions ---------------------------------------------------===//
 
