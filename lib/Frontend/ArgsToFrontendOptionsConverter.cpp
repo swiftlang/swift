@@ -345,6 +345,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
   Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
+  Opts.DeterministicCheck = Args.hasArg(OPT_enable_swift_deterministic_check);
   return false;
 }
 

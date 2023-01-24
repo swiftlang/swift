@@ -45,6 +45,8 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/BLAKE3.h"
+#include "llvm/Support/HashingOutputBackend.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -461,6 +463,10 @@ class CompilerInstance {
   /// Virtual OutputBackend.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> TheOutputBackend = nullptr;
 
+  /// The verification output backend.
+  using HashBackendTy = llvm::vfs::HashingOutputBackend<llvm::BLAKE3>;
+  llvm::IntrusiveRefCntPtr<HashBackendTy> HashBackend;
+
   mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoaderBase *DefaultSerializedLoader = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
@@ -518,6 +524,8 @@ public:
   setOutputBackend(llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
     TheOutputBackend = std::move(Backend);
   }
+  using HashingBackendPtrTy = llvm::IntrusiveRefCntPtr<HashBackendTy>;
+  HashingBackendPtrTy getHashingBackend() { return HashBackend; }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }

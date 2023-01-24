@@ -1176,6 +1176,10 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
+def enable_swift_deterministic_check :
+  Flag<["-"], "enable-swift-deterministic-check">,
+  HelpText<"Check swift compiler output determinisim by run it twice">;
+
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;

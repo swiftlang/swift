@@ -71,7 +71,10 @@
 
 #include "clang/Lex/Preprocessor.h"
 
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -82,6 +85,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -2342,6 +2346,23 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
+  CompilerInstance::HashingBackendPtrTy HashBackend = nullptr;
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    // Setup a verfication instance to run.
+    std::unique_ptr<CompilerInstance> VerifyInstance =
+        std::make_unique<CompilerInstance>();
+    std::string InstanceSetupError;
+    // This should not fail because it passed already.
+    (void)VerifyInstance->setup(Invocation, InstanceSetupError);
+
+    // Run the first time without observer and discard return value;
+    int ReturnValueTest = 0;
+    (void)performCompile(*VerifyInstance, ReturnValueTest,
+                         /*observer*/ nullptr);
+    // Get the hashing output backend and free the compiler instance.
+    HashBackend = VerifyInstance->getHashingBackend();
+  }
+
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, ReturnValue, observer);
 
@@ -2353,6 +2374,44 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       PDC.setSuppressOutput(false);
       diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
       HadError = true;
+    }
+  }
+
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    // Collect all output files.
+    auto ReHashBackend = Instance->getHashingBackend();
+    std::set<std::string> AllOutputs;
+    llvm::for_each(HashBackend->outputFiles(), [&](StringRef F) {
+      AllOutputs.insert(F.str());
+    });
+    llvm::for_each(ReHashBackend->outputFiles(), [&](StringRef F) {
+      AllOutputs.insert(F.str());
+    });
+
+    DiagnosticEngine &diags = Instance->getDiags();
+    for (auto &Filename : AllOutputs) {
+      auto O1 = HashBackend->getHashValueForFile(Filename);
+      if (!O1) {
+        diags.diagnose(SourceLoc(), diag::error_output_missing, Filename,
+                       /*SecondRun=*/false);
+        HadError = true;
+        continue;
+      }
+      auto O2 = ReHashBackend->getHashValueForFile(Filename);
+      if (!O2) {
+        diags.diagnose(SourceLoc(), diag::error_output_missing, Filename,
+                       /*SecondRun=*/true);
+        HadError = true;
+        continue;
+      }
+      if (*O1 != *O2) {
+        diags.diagnose(SourceLoc(), diag::error_nondeterministic_output,
+                       Filename, *O1, *O2);
+        HadError = true;
+        continue;
+      }
+      diags.diagnose(SourceLoc(), diag::matching_output_produced, Filename,
+                     *O1);
     }
   }
 

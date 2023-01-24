@@ -398,9 +398,21 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 void CompilerInstance::setupOutputBackend() {
   // Skip if output backend is not setup, default to OnDiskOutputBackend.
-  if (!TheOutputBackend)
+  if (TheOutputBackend)
+    return;
+
+  TheOutputBackend =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Setup verification backend.
+  // Create a mirroring outputbackend to produce hash for output files.
+  // We cannot skip disk here since swift compiler is expecting to read back
+  // some output file in later stages.
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    HashBackend = llvm::makeIntrusiveRefCnt<HashBackendTy>();
     TheOutputBackend =
-        llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+        llvm::vfs::makeMirroringOutputBackend(TheOutputBackend, HashBackend);
+  }
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
