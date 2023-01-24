@@ -3114,11 +3114,13 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 }
 
 static bool usesFeatureMoveOnly(Decl *decl) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+    return nominal->isMoveOnly();
   return false;
 }
 
 static bool usesFeatureMoveOnlyClasses(Decl *decl) {
-  return false;
+  return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
 
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
