@@ -79,38 +79,6 @@ public:
   void spliceParent(TaskStatusRecord *newParent) { Parent = newParent; }
 };
 
-/// A deadline for the task.  If this is reached, the task will be
-/// automatically cancelled.  The deadline can also be queried and used
-/// in other ways.
-struct TaskDeadline {
-  // FIXME: I don't really know what this should look like right now.
-  // It's probably target-specific.
-  uint64_t Value;
-
-  bool operator==(const TaskDeadline &other) const {
-    return Value == other.Value;
-  }
-  bool operator<(const TaskDeadline &other) const {
-    return Value < other.Value;
-  }
-};
-
-/// A status record which states that there's an active deadline
-/// within the task.
-class DeadlineStatusRecord : public TaskStatusRecord {
-  TaskDeadline Deadline;
-
-public:
-  DeadlineStatusRecord(TaskDeadline deadline)
-      : TaskStatusRecord(TaskStatusRecordKind::Deadline), Deadline(deadline) {}
-
-  TaskDeadline getDeadline() const { return Deadline; }
-
-  static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::Deadline;
-  }
-};
-
 /// A status record which states that a task has one or
 /// more active child tasks.
 class ChildTaskStatusRecord : public TaskStatusRecord {

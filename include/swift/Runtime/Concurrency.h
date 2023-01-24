@@ -643,31 +643,6 @@ void swift_task_localValuePop();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
 
-/// This should have the same representation as an enum like this:
-///    enum NearestTaskDeadline {
-///      case none
-///      case alreadyCancelled
-///      case active(TaskDeadline)
-///    }
-/// TODO: decide what this interface should really be.
-struct NearestTaskDeadline {
-  enum Kind : uint8_t {
-    None,
-    AlreadyCancelled,
-    Active
-  };
-
-  TaskDeadline Value;
-  Kind ValueKind;
-};
-
-/// Returns the nearest deadline that's been registered with this task.
-///
-/// This must be called synchronously with the task.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-NearestTaskDeadline
-swift_task_getNearestDeadline(AsyncTask *task);
-
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
 ///

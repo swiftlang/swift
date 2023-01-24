@@ -423,10 +423,6 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 /// Perform any cancellation actions required by the given record.
 static void performCancellationAction(TaskStatusRecord *record) {
   switch (record->getKind()) {
-  // Deadlines don't require any special support.
-  case TaskStatusRecordKind::Deadline:
-    return;
-
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
@@ -518,10 +514,6 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 static void performEscalationAction(TaskStatusRecord *record,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
-  // Deadlines don't require any special support.
-  case TaskStatusRecordKind::Deadline:
-    return;
-
   // Child tasks need to be recursively escalated.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
@@ -632,53 +624,6 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   // waiting on)
 
   return newStatus.getStoredPriority();
-}
-
-/**************************************************************************/
-/******************************** DEADLINE ********************************/
-/**************************************************************************/
-SWIFT_CC(swift)
-static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
-  // We don't have to worry about the deadline records being
-  // concurrently modified, so we can just walk the record chain,
-  // ignoring the possibility of a concurrent cancelling task.
-
-  // Load the current state.
-  auto &status = task->_private()._status();
-  auto oldStatus = status.load(std::memory_order_relaxed);
-
-  NearestTaskDeadline result;
-
-  // If it's already cancelled, we're done.
-  if (oldStatus.isCancelled()) {
-    result.ValueKind = NearestTaskDeadline::AlreadyCancelled;
-    return result;
-  }
-
-  // If it's locked, wait for the lock; we can't safely step through
-  // the RecordLockStatusRecord on a different thread.
-  if (oldStatus.isStatusRecordLocked()) {
-    waitForStatusRecordUnlock(task, oldStatus);
-    assert(!oldStatus.isStatusRecordLocked());
-  }
-
-  // Walk all the records looking for deadlines.
-  result.ValueKind = NearestTaskDeadline::None;
-  for (const auto *record: oldStatus.records()) {
-    auto deadlineRecord = dyn_cast<DeadlineStatusRecord>(record);
-    if (!deadlineRecord) continue;
-    auto recordDeadline = deadlineRecord->getDeadline();
-
-    // If we already have a deadline, pick the earlier.
-    if (result.ValueKind == NearestTaskDeadline::Active) {
-      if (recordDeadline < result.Value)
-        result.Value = recordDeadline;
-    } else {
-      result.Value = recordDeadline;
-      result.ValueKind = NearestTaskDeadline::Active;
-    }
-  }
-  return result;
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE

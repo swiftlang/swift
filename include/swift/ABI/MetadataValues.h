@@ -2343,8 +2343,6 @@ public:
 
 /// Kinds of task status record.
 enum class TaskStatusRecordKind : uint8_t {
-  /// A DeadlineStatusRecord, which represents an active deadline.
-  Deadline = 0,
 
   /// A ChildTaskStatusRecord, which represents the potential for
   /// active child tasks.
