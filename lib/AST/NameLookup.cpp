@@ -2847,11 +2847,7 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         return Action::Continue();
       
       if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
-        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
-        if(generic)
-          Reprs.push_back(existential);
-        return Action::VisitChildrenIf(meta || generic);
+        return Action::SkipChildren();
       } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!compositionRepr->isTypeReprAny())
           Reprs.push_back(compositionRepr);
