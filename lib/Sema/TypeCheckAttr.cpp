@@ -2096,7 +2096,7 @@ void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
     return;
   }
 
-  if (isa<NominalTypeDecl>(D))
+  if (isa<StructDecl>(D) || isa<EnumDecl>(D))
     return;
 
   diagnose(attr->getLocation(), diag::moveOnly_not_allowed_here)
