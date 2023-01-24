@@ -77,6 +77,7 @@ public struct SomeType {
     @inlinable
     public func inlinableFunc() {
         var x: AmbiguousClientName
+        var y: Swift.Int
     }
 }
 
