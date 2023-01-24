@@ -6445,34 +6445,45 @@ public:
   }
 
   void visitArraySliceType(ArraySliceType *T) {
-    Printer << "[";
-    visit(T->getBaseType());
-    Printer << "]";
+    if (Options.AlwaysDesugarDictionaryTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getBaseType());
+      Printer << "]";
+    }
   }
 
   void visitDictionaryType(DictionaryType *T) {
-    Printer << "[";
-    visit(T->getKeyType());
-    Printer << " : ";
-    visit(T->getValueType());
-    Printer << "]";
+    if (Options.AlwaysDesugarDictionaryTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getKeyType());
+      Printer << " : ";
+      visit(T->getValueType());
+      Printer << "]";
+    }
   }
 
   void visitOptionalType(OptionalType *T) {
     auto printAsIUO = Options.PrintOptionalAsImplicitlyUnwrapped;
-
-    // Printing optionals with a trailing '!' applies only to
-    // top-level optionals, not to any nested within.
-    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
-        false;
-    printWithParensIfNotSimple(T->getBaseType());
-    const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
-        printAsIUO;
-
-    if (printAsIUO)
-      Printer << "!";
-    else
-      Printer << "?";
+    if (Options.AlwaysDesugarOptionalTypes) {
+      visit(T->getDesugaredType());
+      return;
+    } else {
+      // Printing optionals with a trailing '!' applies only to
+      // top-level optionals, not to any nested within.
+      const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+          false;
+      printWithParensIfNotSimple(T->getBaseType());
+      const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
+          printAsIUO;
+      if (printAsIUO)
+        Printer << "!";
+      else
+        Printer << "?";
+    }
   }
 
   void visitVariadicSequenceType(VariadicSequenceType *T) {
