@@ -542,69 +542,6 @@ extension Optional {
     }
   }
 
-  /// Returns a Boolean value indicating whether the right-hand-side argument is
-  /// `nil`.
-  ///
-  /// You can use this equal-to operator (`==`) to test whether an optional
-  /// instance is `nil` even when the wrapped value's type does not conform to
-  /// the `Equatable` protocol.
-  ///
-  /// The following example declares the `stream` variable as an optional
-  /// instance of a hypothetical `DataStream` type. Although `DataStream` is not
-  /// an `Equatable` type, this operator allows checking whether `stream` is
-  /// `nil`.
-  ///
-  ///     var stream: DataStream? = nil
-  ///     if nil == stream {
-  ///         print("No data stream is configured.")
-  ///     }
-  ///     // Prints "No data stream is configured."
-  ///
-  /// - Parameters:
-  ///   - lhs: A `nil` literal.
-  ///   - rhs: A value to compare to `nil`.
-  @_transparent
-  public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
-    switch rhs {
-    case .some:
-      return false
-    case .none:
-      return true
-    }
-  }
-
-  /// Returns a Boolean value indicating whether the right-hand-side argument is
-  /// not `nil`.
-  ///
-  /// You can use this not-equal-to operator (`!=`) to test whether an optional
-  /// instance is not `nil` even when the wrapped value's type does not conform
-  /// to the `Equatable` protocol.
-  ///
-  /// The following example declares the `stream` variable as an optional
-  /// instance of a hypothetical `DataStream` type. Although `DataStream` is not
-  /// an `Equatable` type, this operator allows checking whether `stream` wraps
-  /// a value and is therefore not `nil`.
-  ///
-  ///     var stream: DataStream? = fetchDataStream()
-  ///     if nil != stream {
-  ///         print("The data stream has been configured.")
-  ///     }
-  ///     // Prints "The data stream has been configured."
-  ///
-  /// - Parameters:
-  ///   - lhs: A `nil` literal.
-  ///   - rhs: A value to compare to `nil`.
-  @_transparent
-  public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
-    switch rhs {
-    case .some:
-      return true
-    case .none:
-      return false
-    }
-  }
-}
-
 /// Performs a nil-coalescing operation, returning the wrapped value of an
 /// `Optional` instance or a default value.
 ///
