@@ -355,12 +355,12 @@ public struct AddMembers: MemberDeclarationMacro {
   ) throws -> [DeclSyntax] {
     let storageStruct: StructDeclSyntax =
       """
-      struct Nested {}
+      struct Storage {}
       """
 
     let storageVariable: VariableDeclSyntax =
       """
-      var value: Int = 0
+      var storage = Storage()
       """
 
     let instanceMethod: FunctionDeclSyntax =

@@ -1251,7 +1251,6 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
       extension->addMember(member);
     }
 
-    TypeChecker::typeCheckDecl(member);
     synthesizedMembers = true;
   }
 

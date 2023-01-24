@@ -14,15 +14,13 @@
 @addMembers
 struct S {
   func useSynthesized() {
-    print(s.value)
-    print(S.Nested())
-    s.method()
+    print(type(of: storage))
+    method()
   }
 }
 
 let s = S()
 
-// CHECK: 0
-// CHECK: Nested
+// CHECK: Storage
 // CHECK: synthesized method
 s.useSynthesized()
