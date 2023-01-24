@@ -350,6 +350,39 @@ extension Unsafe${Mutable}RawBufferPointer {
 
     return Optional(nil)
   }
+
+  public func _customLastIndexOfEquatableElement(_ element: UInt8) -> Index?? {
+    guard let ptr = baseAddress else { return Optional(nil) }
+
+    var i = endIndex - 1
+
+    let stride = MemoryLayout<UInt>.stride
+
+    let aligned = ptr.advanced(by: i).alignedDown(for: UInt.self)
+    while ptr.advanced(by: i) >= aligned && i >= startIndex {
+      guard self[i] != element else { return Optional(i) }
+      i &-= 1
+    }
+
+    var mask = UInt(0)
+    withUnsafeMutableBytes(of: &mask) {
+      _ = $0.initializeMemory(as: UInt8.self, repeating: element)
+    }
+
+    while (i &- stride) >= startIndex {
+      let word = ptr.load(fromByteOffset: i, as: UInt.self)
+      guard word ^ mask == 0 else { break }
+      i &-= stride
+    }
+
+    while i >= startIndex {
+      guard self[i] != element else { return Optional(i) }
+      i &-= 1
+    }
+
+    return Optional(nil)
+  }
+
 }
 
 extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
