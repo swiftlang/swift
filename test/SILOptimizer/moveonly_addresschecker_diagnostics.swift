@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s
+// REQUIRES: asserts
 
 //////////////////
 // Declarations //
