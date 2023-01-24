@@ -17,3 +17,8 @@ public class SPIClass5 {}
 
 @_spi_available(mscos 10.15, *) // expected-warning {{unrecognized platform name 'mscos'; did you mean 'macOS'?}} {{17-22=macOS}}
 public class SPIClass6 {}
+
+public class ClassWithMembers {
+  @_spi_available(macOS 10.15, *)
+  public func spiFunc() {} // Ok, this declaration is not top level
+}
