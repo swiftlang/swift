@@ -715,4 +715,52 @@ UnsafeRawBufferPointerTestSuite.test("_customIndexOfEquatableElement") {
   expectEqual(Optional(nil), emptyBuffer._customIndexOfEquatableElement(1))
 }
 
+UnsafeRawBufferPointerTestSuite.test("_customLastIndexOfEquatableElement") {
+  let fibonacci = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233] as [UInt8]
+  fibonacci.withUnsafeBytes { bytes in
+    expectEqual(Optional(Optional(0)), bytes._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(2)), bytes._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(7)), bytes._customLastIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(13)), bytes._customLastIndexOfEquatableElement(233))
+    expectEqual(Optional(nil), bytes._customLastIndexOfEquatableElement(255))
+    let unalignedBy1 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 1, count: bytes.count - 1)
+    expectEqual(Optional(nil), unalignedBy1._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(1)), unalignedBy1._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(6)), unalignedBy1._customLastIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(12)), unalignedBy1._customLastIndexOfEquatableElement(233))
+    let unalignedBy2 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 2, count: bytes.count - 2)
+    expectEqual(Optional(nil), unalignedBy2._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(0)), unalignedBy2._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(5)), unalignedBy2._customLastIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(11)), unalignedBy2._customLastIndexOfEquatableElement(233))
+    let unalignedBy3 = UnsafeRawBufferPointer(start: bytes.baseAddress! + 3, count: bytes.count - 3)
+    expectEqual(Optional(nil), unalignedBy3._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), unalignedBy3._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(4)), unalignedBy3._customLastIndexOfEquatableElement(13))
+    expectEqual(Optional(Optional(10)), unalignedBy3._customLastIndexOfEquatableElement(233))
+    let singleValueBufferUnaligned = UnsafeRawBufferPointer(start: bytes.baseAddress! + 7, count: 1)
+    expectEqual(Optional(Optional(0)), singleValueBufferUnaligned._customLastIndexOfEquatableElement(13))
+    expectEqual(Optional(nil), singleValueBufferUnaligned._customLastIndexOfEquatableElement(0))
+    let singleValueBufferAligned = UnsafeRawBufferPointer(start: bytes.baseAddress!, count: 1)
+    expectEqual(Optional(Optional(0)), singleValueBufferAligned._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), singleValueBufferAligned._customLastIndexOfEquatableElement(1))
+    let exactWordAligned = UnsafeRawBufferPointer(start: bytes.baseAddress!, count: MemoryLayout<UInt>.size)
+    expectEqual(Optional(Optional(0)), exactWordAligned._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(2)), exactWordAligned._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(MemoryLayout<UInt>.size - 1)),
+      exactWordAligned._customLastIndexOfEquatableElement(fibonacci[MemoryLayout<UInt>.size - 1]))
+    let exactWordUnaligned = UnsafeRawBufferPointer(start: bytes.baseAddress! + 1, count: MemoryLayout<UInt>.size)
+    expectEqual(Optional(nil), exactWordUnaligned._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(Optional(1)), exactWordUnaligned._customLastIndexOfEquatableElement(1))
+    expectEqual(Optional(Optional(MemoryLayout<UInt>.size - 1)),
+      exactWordUnaligned._customLastIndexOfEquatableElement(fibonacci[MemoryLayout<UInt>.size]))
+    let emptyBuffer = UnsafeRawBufferPointer(start: bytes.baseAddress!, count: 0)
+    expectEqual(Optional(nil), emptyBuffer._customLastIndexOfEquatableElement(0))
+    expectEqual(Optional(nil), emptyBuffer._customLastIndexOfEquatableElement(1))
+  }
+  let emptyBuffer = UnsafeRawBufferPointer(start: nil, count: 0)
+  expectEqual(Optional(nil), emptyBuffer._customLastIndexOfEquatableElement(0))
+  expectEqual(Optional(nil), emptyBuffer._customLastIndexOfEquatableElement(1))
+}
+
 runAllTests()
