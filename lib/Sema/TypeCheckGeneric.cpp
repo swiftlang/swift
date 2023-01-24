@@ -469,8 +469,15 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      paramDecl->diagnose(diag::unreferenced_generic_parameter,
-                          paramDecl->getNameStr());
+      if (paramDecl->isImplicit()) {
+        paramDecl->getASTContext().Diags
+          .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
+                    diag::unreferenced_generic_parameter,
+                    paramDecl->getNameStr());
+      } else {
+        paramDecl->diagnose(diag::unreferenced_generic_parameter,
+                            paramDecl->getNameStr());
+      }
     }
   }
 }
