@@ -325,7 +325,8 @@ extractCustomAttrValues(VarDecl *propertyDecl) {
             {label, argExpr->getType(), extractCompileTimeValue(argExpr)});
       }
     }
-    customAttrValues.push_back({propertyWrapper->getType(), parameters});
+
+    customAttrValues.push_back({propertyWrapper, parameters});
   }
 
   return customAttrValues;
@@ -458,29 +459,14 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
-void writeFileInformation(llvm::json::OStream &JSON, const VarDecl *VD) {
-  SourceRange sourceRange = VD->getSourceRange();
-  if (sourceRange.isInvalid())
+void writeLocationInformation(llvm::json::OStream &JSON, SourceLoc Loc,
+                              const ASTContext &ctx) {
+  if (Loc.isInvalid())
     return;
 
-  const ASTContext &ctx = VD->getDeclContext()->getASTContext();
-  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(sourceRange.Start));
-  JSON.attribute(
-      "line",
-      ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceRange.Start).first);
-}
-
-void writeFileInformation(llvm::json::OStream &JSON,
-                          const NominalTypeDecl *NTD) {
-  DeclContext *DC = NTD->getInnermostDeclContext();
-  SourceLoc loc = extractNearestSourceLoc(DC);
-  if (loc.isInvalid())
-    return;
-
-  const ASTContext &ctx = DC->getASTContext();
-  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(loc));
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(Loc));
   JSON.attribute("line",
-                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first);
+                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first);
 }
 
 void writeValue(llvm::json::OStream &JSON,
@@ -592,17 +578,20 @@ void writeValue(llvm::json::OStream &JSON,
   }
 }
 
-void writeAttributes(
+void writePropertyWrapperAttributes(
     llvm::json::OStream &JSON,
-    llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers) {
+    llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers,
+    const ASTContext &ctx) {
   if (!PropertyWrappers.has_value()) {
     return;
   }
 
-  JSON.attributeArray("attributes", [&] {
+  JSON.attributeArray("propertyWrappers", [&] {
     for (auto PW : PropertyWrappers.value()) {
       JSON.object([&] {
-        JSON.attribute("type", toFullyQualifiedTypeNameString(PW.Type));
+        JSON.attribute("type",
+                       toFullyQualifiedTypeNameString(PW.Attr->getType()));
+        writeLocationInformation(JSON, PW.Attr->getLocation(), ctx);
         JSON.attributeArray("arguments", [&] {
           for (auto FP : PW.Parameters) {
             JSON.object([&] {
@@ -730,7 +719,9 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
                 .str());
-        writeFileInformation(JSON, TypeDecl);
+        writeLocationInformation(
+            JSON, extractNearestSourceLoc(TypeDecl->getInnermostDeclContext()),
+            TypeDecl->getInnermostDeclContext()->getASTContext());
         JSON.attributeArray("properties", [&] {
           for (const auto &PropertyInfo : TypeInfo.Properties) {
             JSON.object([&] {
@@ -741,9 +732,11 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
                              !decl->hasStorage() ? "true" : "false");
-              writeFileInformation(JSON, decl);
+              writeLocationInformation(JSON, decl->getLoc(),
+                                       decl->getDeclContext()->getASTContext());
               writeValue(JSON, PropertyInfo.Value);
-              writeAttributes(JSON, PropertyInfo.PropertyWrappers);
+              writePropertyWrapperAttributes(
+                  JSON, PropertyInfo.PropertyWrappers, decl->getASTContext());
               writeResultBuilderInformation(JSON, TypeDecl, decl);
               writeAttrInformation(JSON, decl->getAttrs());
             });
