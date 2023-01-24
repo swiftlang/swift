@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
 //////////////////
 // Declarations //
