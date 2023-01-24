@@ -533,6 +533,16 @@ struct PrintOptions {
   /// parameter.
   bool PrintSpecializeAttributeWithAvailability = true;
 
+  /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
+  bool AlwaysDesugarArraySliceTypes = false;
+
+  /// Whether to always desugar dictionary types
+  /// from `[key_type:value_type]` to `Dictionary<key_type,value_type>`
+  bool AlwaysDesugarDictionaryTypes = false;
+
+  /// Whether to always desugar optional types from `base_type?` to `Optional<base_type>`
+  bool AlwaysDesugarOptionalTypes = false;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,

@@ -55,7 +55,7 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:      "properties": [
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "label": "foos",
-// CHECK-NEXT:          "type": "[ExtractResultBuilders.Foo]",
+// CHECK-NEXT:          "type": "Swift.Array<ExtractResultBuilders.Foo>",
 // CHECK-NEXT:          "isStatic": "true",
 // CHECK-NEXT:          "isComputed": "true",
 // CHECK-NEXT:          "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
@@ -67,7 +67,7 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "label": "fooTwo",
-// CHECK-NEXT:          "type": "[ExtractResultBuilders.Foo]",
+// CHECK-NEXT:          "type": "Swift.Array<ExtractResultBuilders.Foo>",
 // CHECK-NEXT:          "isStatic": "true",
 // CHECK-NEXT:          "isComputed": "true",
 // CHECK-NEXT:          "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
@@ -87,7 +87,7 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:      "properties": [
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "label": "foos",
-// CHECK-NEXT:          "type": "[ExtractResultBuilders.Foo]",
+// CHECK-NEXT:          "type": "Swift.Array<ExtractResultBuilders.Foo>",
 // CHECK-NEXT:          "isStatic": "true",
 // CHECK-NEXT:          "isComputed": "true",
 // CHECK-NEXT:          "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
