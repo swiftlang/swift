@@ -2099,6 +2099,12 @@ void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
   if (isa<StructDecl>(D) || isa<EnumDecl>(D))
     return;
 
+  // for development purposes, allow it if specifically requested for classes.
+  if (D->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
+    if (isa<ClassDecl>(D))
+      return;
+  }
+
   diagnose(attr->getLocation(), diag::moveOnly_not_allowed_here)
     .fixItRemove(attr->getRange());
 }

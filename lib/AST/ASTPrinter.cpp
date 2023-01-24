@@ -3117,6 +3117,10 @@ static bool usesFeatureMoveOnly(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyClasses(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }

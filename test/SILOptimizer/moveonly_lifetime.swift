@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -Onone -verify -enable-experimental-move-only %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
 @_moveOnly
 class C {}

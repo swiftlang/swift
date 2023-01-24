@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses
 
 class CopyableKlass {}
 @_moveOnly
