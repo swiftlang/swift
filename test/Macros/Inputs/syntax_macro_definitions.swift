@@ -346,3 +346,32 @@ public struct AccessViaStorageMacro: AccessorDeclarationMacro {
     ]
   }
 }
+
+public struct AddMembers: MemberDeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let storageStruct: StructDeclSyntax =
+      """
+      struct Nested {}
+      """
+
+    let storageVariable: VariableDeclSyntax =
+      """
+      var value: Int = 0
+      """
+
+    let instanceMethod: FunctionDeclSyntax =
+      """
+      func method() { print("synthesized method") }
+      """
+
+    return [
+      DeclSyntax(storageStruct),
+      DeclSyntax(storageVariable),
+      DeclSyntax(instanceMethod),
+    ]
+  }
+}

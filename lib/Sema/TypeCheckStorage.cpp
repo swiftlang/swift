@@ -114,7 +114,6 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
     (void)decl->getTypeWrapperProperty();
 
   // Expand synthesized member macros.
-  // FIXME: Member macros can add members other than stored properties.
   auto &ctx = decl->getASTContext();
   evaluateOrDefault(ctx.evaluator,
                     ExpandSynthesizedMemberMacroRequest{decl},
