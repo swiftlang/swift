@@ -2970,6 +2970,15 @@ namespace {
       SmallVector<TypeVariableType *, 4> referencedVars{
           collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
 
+      if (auto *captureList =
+              getAsExpr<CaptureListExpr>(CS.getParentExpr(closure))) {
+        for (const auto &capture : captureList->getCaptureList()) {
+          if (auto *typeVar =
+                  CS.getType(capture.getVar())->getAs<TypeVariableType>())
+            referencedVars.push_back(typeVar);
+        }
+      }
+
       CS.addUnsolvedConstraint(Constraint::create(
           CS, ConstraintKind::DefaultClosureType, closureType, inferredType,
           locator, referencedVars));
