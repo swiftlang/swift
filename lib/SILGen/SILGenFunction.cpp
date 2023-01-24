@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
+#include "Cleanup.h"
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
@@ -155,6 +156,57 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope,
+                                     Optional<SILLocation> MacroExpansion,
+                                     DeclNameRef MacroName,
+                                     DeclNameLoc MacroNameLoc) {
+  auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
+                                        : F.getDebugScope();
+  auto *Scope = Parent;
+  // Don't nest a scope for Loc under Parent unless it's actually different.
+  if (RegularLocation(Parent->getLoc()) != RegularLocation(Loc)) {
+    SILDebugScope *InlinedAt = nullptr;
+    // Create an inline scope for a macro expansion.
+    if (MacroExpansion && MacroName && MacroNameLoc.isValid()) {
+      InlinedAt = new (SGM.M) SILDebugScope(RegularLocation(*MacroExpansion),
+                                            &getFunction(), Parent);
+      SILGenFunctionBuilder B(SGM);
+      auto ExtInfo = SILFunctionType::ExtInfo::getThin();
+      auto FunctionType = SILFunctionType::get(
+          nullptr, ExtInfo, SILCoroutineKind::None,
+          ParameterConvention::Direct_Unowned, /*Params*/ {}, /*yields*/ {},
+          /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(),
+          SGM.M.getASTContext());
+      SILFunction *MacroFn = B.getOrCreateFunction(
+          Loc, MacroName.getBaseIdentifier().str(),
+          SILLinkage::DefaultForDeclaration, FunctionType, IsNotBare,
+          IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+          IsNotRuntimeAccessible);
+      auto MacroScope = new (SGM.M) SILDebugScope(Loc, MacroFn);
+      Parent = MacroScope;
+    }
+    Scope = new (SGM.M)
+        SILDebugScope(RegularLocation(Loc), &getFunction(), Parent, InlinedAt);
+  }
+  DebugScopeStack.emplace_back(Scope, isBindingScope);
+  B.setCurrentDebugScope(Scope);
+}
+
+  /// Return to the previous debug scope.
+void SILGenFunction::leaveDebugScope() {
+  // Pop any 'guard' scopes first.
+  while (DebugScopeStack.back().getInt())
+    DebugScopeStack.pop_back();
+
+  // Pop the scope we're leaving now.
+  DebugScopeStack.pop_back();
+  if (DebugScopeStack.size())
+    B.setCurrentDebugScope(DebugScopeStack.back().getPointer());
+  // Don't reset the debug scope after leaving the outermost scope,
+  // because the debugger is not expecting the function epilogue to
+  // be in a different scope.
 }
 
 std::tuple<ManagedValue, SILType>

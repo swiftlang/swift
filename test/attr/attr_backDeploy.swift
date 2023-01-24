@@ -12,8 +12,11 @@ public func backDeployedTopLevelFunc() {}
 @usableFromInline
 internal func backDeployedUsableFromInlineTopLevelFunc() {}
 
-// Ok, function/property/subscript decls in a struct
+// Ok, decls in a struct
 public struct TopLevelStruct {
+  @_backDeploy(before: macOS 12.0)
+  public init<T>(_ t: T) {}
+
   @_backDeploy(before: macOS 12.0)
   public func backDeployedMethod() {}
 
@@ -44,8 +47,46 @@ public struct TopLevelStruct {
   }
 }
 
-// Ok, final function decls in a non-final class
+// Ok, decls in an enum
+public enum TopLevelEnum {
+  case a, b
+
+  @_backDeploy(before: macOS 12.0)
+  public init?(from name: String) {
+    switch name {
+    case "a": self = .a
+    case "b": self = .b
+    default: return nil
+    }
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  public func backDeployedMethod() {}
+
+  @_backDeploy(before: macOS 12.0)
+  public var name: String {
+    switch self {
+    case .a: return "a"
+    case .b: return "b"
+    }
+  }
+}
+
+// Ok, final decls in a non-final class
 public class TopLevelClass {
+  var x: Int
+
+  public init(x: Int) {
+    self.x = x
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  public convenience init() {
+    self.init(x: 1)
+  }
+
+  public func hook() {}
+
   @_backDeploy(before: macOS 12.0)
   final public func backDeployedFinalMethod() {}
 
@@ -59,8 +100,25 @@ public class TopLevelClass {
   public final class func backDeployedClassMethod() {}
 }
 
-// Ok, function decls in a final class
+// Ok, final decls in a non-final, derived class
+public class DerivedTopLevelClass: TopLevelClass {
+  @_backDeploy(before: macOS 12.0)
+  final public func backDeployedFinalMethodOnDerived() {}
+}
+
+// Ok, decls in a final class
 final public class FinalTopLevelClass {
+  var x: Int
+
+  public init(x: Int) {
+    self.x = x
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  public convenience init() {
+    self.init(x: 1)
+  }
+
   @_backDeploy(before: macOS 12.0)
   public func backDeployedMethod() {}
 
@@ -68,18 +126,49 @@ final public class FinalTopLevelClass {
   public var backDeployedComputedProperty: Int { 98 }
 }
 
-// Ok, final function decls on an actor
+// Ok, final decls in a non-final actor
 @available(SwiftStdlib 5.1, *)
 public actor TopLevelActor {
-  @_backDeploy(before: macOS 12.0)
-  final public func finalActorMethod() {}
+  var x: Int
 
-  // Ok, actor methods are effectively final
+  public init(x: Int) {
+    self.x = x
+  }
+
   @_backDeploy(before: macOS 12.0)
-  public func actorMethod() {}
+  public init() {
+    self.init(x: 1)
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  final public func method() {}
+
+  @_backDeploy(before: macOS 12.0)
+  final public var computedProperty: Int { 98 }
 }
 
-// Ok, function decls in extension on public types
+// Ok, decls on a final actor
+@available(SwiftStdlib 5.1, *)
+final public actor FinalTopLevelActor {
+  var x: Int
+
+  public init(x: Int) {
+    self.x = x
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  public init() {
+    self.init(x: 1)
+  }
+
+  @_backDeploy(before: macOS 12.0)
+  public func method() {}
+
+  @_backDeploy(before: macOS 12.0)
+  public var computedProperty: Int { 98 }
+}
+
+// Ok, decls in extensions of public types
 extension TopLevelStruct {
   @_backDeploy(before: macOS 12.0)
   public func backDeployedExtensionMethod() {}
@@ -91,6 +180,18 @@ extension TopLevelClass {
 }
 
 extension FinalTopLevelClass {
+  @_backDeploy(before: macOS 12.0)
+  public func backDeployedExtensionMethod() {}
+}
+
+@available(SwiftStdlib 5.1, *)
+extension TopLevelActor {
+  @_backDeploy(before: macOS 12.0)
+  final public func backDeployedExtensionMethod() {}
+}
+
+@available(SwiftStdlib 5.1, *)
+extension FinalTopLevelActor {
   @_backDeploy(before: macOS 12.0)
   public func backDeployedExtensionMethod() {}
 }
@@ -108,12 +209,26 @@ extension TopLevelProtocol {
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public class CannotBackDeployClass {}
 
-public final class CannotBackDeployClassInitDeinit {
-  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to initializer declarations}}
-  public init() {}
+public class CannotBackDeployClassDesignatedInit {
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final initializer}}
+  public init(x: Int) {}
+}
 
+public final class CannotBackDeployClassDeinit {
   @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to deinitializer declarations}}
   deinit {}
+}
+
+// Ok, final decls in a non-final, derived class
+public class CannotBackDeployOverride: TopLevelClass {
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' cannot be combined with 'override'}}
+  final public override func hook() {}
+}
+
+@available(SwiftStdlib 5.1, *)
+public actor CannotBackDeployActorDesignatedInit {
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final initializer}}
+  public init(x: Int) {}
 }
 
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}

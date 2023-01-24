@@ -584,6 +584,46 @@ SILValue ParseArgumentSpecification::getTraceValue(unsigned index,
 
 } // anonymous namespace
 
+// Member function implementations
+
+void Argument::print(llvm::raw_ostream &os) {
+  switch (kind) {
+  case Kind::Value:
+    llvm::errs() << "value:\n";
+    cast<ValueArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::Operand:
+    os << "operand:\n";
+    cast<OperandArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::Instruction:
+    os << "instruction:\n";
+    cast<InstructionArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::BlockArgument:
+    os << "block argument:\n";
+    cast<BlockArgumentArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::Block:
+    os << "block:\n";
+    cast<BlockArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::Function:
+    os << "function:\n";
+    cast<FunctionArgument>(*this).getValue()->print(os);
+    break;
+  case Kind::Bool:
+    os << "bool: " << cast<BoolArgument>(*this).getValue() << "\n";
+    break;
+  case Kind::UInt:
+    os << "uint: " << cast<UIntArgument>(*this).getValue() << "\n";
+    break;
+  case Kind::String:
+    os << "string: " << cast<StringArgument>(*this).getValue() << "\n";
+    break;
+  }
+}
+
 // API
 
 void swift::test::getTestSpecifications(

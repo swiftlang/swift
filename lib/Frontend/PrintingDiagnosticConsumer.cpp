@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
@@ -30,6 +32,25 @@
 
 using namespace swift;
 using namespace swift::markup;
+
+extern "C" void *swift_ASTGen_createQueuedDiagnostics(void *sourceFile);
+extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
+extern "C" void swift_ASTGen_addQueuedDiagnostic(
+    void *queued,
+    const char* text, ptrdiff_t textLength,
+    BridgedDiagnosticSeverity severity,
+    const void *sourceLoc
+);
+extern "C" void swift_ASTGen_renderQueuedDiagnostics(
+    void *queued, char **outBuffer, ptrdiff_t *outBufferLength);
+
+// FIXME: Hack because we cannot easily get to the already-parsed source
+// file from here. Fix this egregious oversight!
+extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
+                                              size_t bufferLength,
+                                              const char *moduleName,
+                                              const char *filename);
+extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
 
 namespace {
   class ColoredStream : public raw_ostream {
@@ -134,7 +155,7 @@ namespace {
 
       void visitDocument(const Document *D) {
         for (const auto *Child : D->getChildren()) {
-          if (Child->getKind() == ASTNodeKind::Paragraph) {
+          if (Child->getKind() == markup::ASTNodeKind::Paragraph) {
             // Add a newline before top-level paragraphs
             printNewline();
           }
@@ -861,13 +882,14 @@ public:
 
   void render(raw_ostream &Out) {
     // Print the excerpt for each file.
-    unsigned lineNumberIndent =
-        std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
-                         [](auto &a, auto &b) {
-                           return a.second.getPreferredLineNumberIndent() <
-                                  b.second.getPreferredLineNumberIndent();
-                         })
-            ->second.getPreferredLineNumberIndent();
+    unsigned lineNumberIndent = 0;
+    if (!FileExcerpts.empty()) {
+      lineNumberIndent = std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
+          [](auto &a, auto &b) {
+            return a.second.getPreferredLineNumberIndent() <
+              b.second.getPreferredLineNumberIndent();
+          })->second.getPreferredLineNumberIndent();
+    }
     for (auto excerpt : FileExcerpts)
       excerpt.second.render(lineNumberIndent, Out);
 
@@ -930,6 +952,45 @@ static void annotateSnippetWithInfo(SourceManager &SM,
   }
 }
 
+#if SWIFT_SWIFT_PARSER
+/// Enqueue a diagnostic with ASTGen's diagnostic rendering.
+static void enqueueDiagnostic(
+    void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
+) {
+  llvm::SmallString<256> text;
+  {
+    llvm::raw_svector_ostream out(text);
+    DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
+                                           info.FormatArgs);
+  }
+
+  BridgedDiagnosticSeverity severity;
+  switch (info.Kind) {
+  case DiagnosticKind::Error:
+    severity = BridgedDiagnosticSeverity::BridgedError;
+    break;
+
+  case DiagnosticKind::Warning:
+    severity = BridgedDiagnosticSeverity::BridgedWarning;
+    break;
+
+  case DiagnosticKind::Remark:
+    severity = BridgedDiagnosticSeverity::BridgedRemark;
+    break;
+
+  case DiagnosticKind::Note:
+    severity = BridgedDiagnosticSeverity::BridgedNote;
+    break;
+  }
+
+  swift_ASTGen_addQueuedDiagnostic(
+      queuedDiagnostics, text.data(), text.size(), severity,
+      info.Loc.getOpaquePointerValue());
+
+  // FIXME: Need a way to add highlights, Fix-Its, and so on.
+}
+#endif
+
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                                   const DiagnosticInfo &Info) {
@@ -944,6 +1005,45 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     return;
 
   switch (FormattingStyle) {
+  case DiagnosticOptions::FormattingStyle::SwiftSyntax: {
+#if SWIFT_SWIFT_PARSER
+    if (Info.Loc.isValid()) {
+      // Ignore "in macro expansion" diagnostics; we want to put them
+      // elsewhere.
+      // FIXME: We should render the "in macro expansion" information in
+      // some other manner. Not quite sure how at this point, though.
+      if (Info.ID == diag::in_macro_expansion.ID)
+        break;
+
+      // If there are no enqueued diagnostics, they are from a different
+      // buffer, flush any enqueued diagnostics and create a new set.
+      unsigned bufferID = SM.findBufferContainingLoc(Info.Loc);
+      if (!queuedDiagnostics || bufferID != queuedDiagnosticsBufferID) {
+        flush(/*includeTrailingBreak*/ true);
+
+        // FIXME: Go parse the source file again. This is an awful hack.
+        auto bufferContents = SM.getEntireTextForBuffer(bufferID);
+        queuedSourceFile = swift_ASTGen_parseSourceFile(
+            bufferContents.data(), bufferContents.size(),
+            "module", "file.swift");
+
+        queuedBufferName = SM.getDisplayNameForLoc(Info.Loc);
+        queuedDiagnostics =
+            swift_ASTGen_createQueuedDiagnostics(queuedSourceFile);
+        queuedDiagnosticsBufferID = bufferID;
+      }
+
+      enqueueDiagnostic(queuedDiagnostics, Info, SM);
+      break;
+    }
+
+    // Fall through to print using the LLVM style when there is no source
+    // location.
+    flush(/*includeTrailingBreak*/ false);
+#endif
+    LLVM_FALLTHROUGH;
+  }
+
   case DiagnosticOptions::FormattingStyle::Swift:
     if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
       // If this is a note and we have an in-flight message, add it to that
@@ -998,6 +1098,27 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     }
     currentSnippet.reset();
   }
+
+#if SWIFT_SWIFT_PARSER
+  if (queuedDiagnostics) {
+    Stream << "=== " << queuedBufferName << " ===\n";
+
+    char *renderedString = nullptr;
+    ptrdiff_t renderedStringLen = 0;
+    swift_ASTGen_renderQueuedDiagnostics(
+        queuedDiagnostics, &renderedString, &renderedStringLen);
+    if (renderedString) {
+      Stream.write(renderedString, renderedStringLen);
+    }
+    swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
+    swift_ASTGen_destroySourceFile(queuedSourceFile);
+    queuedDiagnostics = nullptr;
+    queuedSourceFile = nullptr;
+
+    if (includeTrailingBreak)
+      Stream << "\n";
+  }
+#endif
 
   for (auto note : BufferedEducationalNotes) {
     printMarkdown(note, Stream, ForceColors);
