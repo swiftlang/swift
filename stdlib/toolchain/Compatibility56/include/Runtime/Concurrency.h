@@ -82,6 +82,7 @@ using FutureAsyncSignature =
 /// This has no effect if the task already has at least the given priority.
 /// Returns the priority of the task.
 SWIFT_CC(swift)
+__attribute__((visibility("hidden")))
 JobPriority swift_task_escalateBackdeploy56(AsyncTask *task,
                                             JobPriority newPriority);
 } // namespace swift

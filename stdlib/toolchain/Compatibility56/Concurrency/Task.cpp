@@ -15,6 +15,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                                              TaskContinuationFunction *resumeFn,
                                              AsyncContext *callerContext,
                                              OpaqueValue *result) {
+  SWIFT_TASK_DEBUG_LOG("compat 56 task task %p", this);
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
