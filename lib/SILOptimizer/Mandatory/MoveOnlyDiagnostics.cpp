@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Debug.h"
 
@@ -85,7 +86,7 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
     diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
              diag::sil_moveonlychecker_not_understand_moveonly);
   }
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 }
 
 //===----------------------------------------------------------------------===//
@@ -104,7 +105,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
              diag::sil_moveonlychecker_guaranteed_value_captured_by_closure,
              varName);
     emitObjectDiagnosticsForPartialApplyUses();
-    valuesWithDiagnostics.insert(markedValue);
+    registerDiagnosticEmitted(markedValue);
   }
 
   // If we do not have any non-partial apply consuming uses... just exit early.
@@ -121,7 +122,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
                diag::sil_moveonlychecker_let_value_consumed_in_closure,
                varName);
       emitObjectDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
-      valuesWithDiagnostics.insert(markedValue);
+      registerDiagnosticEmitted(markedValue);
       return;
     }
   }
@@ -131,7 +132,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
            diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
 
   emitObjectDiagnosticsForFoundUses(true /*ignore partial apply uses*/);
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 }
 
 void DiagnosticEmitter::emitObjectOwnedDiagnostic(
@@ -145,7 +146,7 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
            varName);
 
   emitObjectDiagnosticsForFoundUses();
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 }
 
 void DiagnosticEmitter::emitObjectDiagnosticsForFoundUses(
@@ -245,8 +246,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
     MarkMustCheckInst *markedValue, SILInstruction *consumingUse) {
   if (!useWithDiagnostic.insert(consumingUse).second)
     return;
-
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 
   auto &astContext = markedValue->getFunction()->getASTContext();
   StringRef varName = getVariableNameForValue(markedValue);
@@ -269,8 +269,7 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
                                               bool isInOutEndOfFunction) {
   if (!useWithDiagnostic.insert(violatingUse).second)
     return;
-
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 
   auto &astContext = markedValue->getFunction()->getASTContext();
   StringRef varName = getVariableNameForValue(markedValue);
@@ -360,8 +359,7 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
     MarkMustCheckInst *markedValue, SILInstruction *violatingUse) {
   if (!useWithDiagnostic.insert(violatingUse).second)
     return;
-
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
 
   assert(cast<SILFunctionArgument>(markedValue->getOperand())
              ->getArgumentConvention()
@@ -418,5 +416,39 @@ void DiagnosticEmitter::emitAddressDiagnosticNoCopy(
            diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
   diagnose(astContext, consumingUse->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_consuming_use_here);
-  valuesWithDiagnostics.insert(markedValue);
+  registerDiagnosticEmitted(markedValue);
+}
+
+void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
+    MarkMustCheckInst *markedValue, SILInstruction *destructureNeedingUse,
+    TypeTreeLeafTypeRange destructureSpan,
+    FieldSensitivePrunedLivenessBoundary &boundary) {
+  if (!useWithDiagnostic.insert(destructureNeedingUse).second)
+    return;
+
+  auto &astContext = markedValue->getFunction()->getASTContext();
+  StringRef varName = getVariableNameForValue(markedValue);
+
+  LLVM_DEBUG(llvm::dbgs() << "Emitting destructure can't be created error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    Destructure Needing Use: "
+                          << *destructureNeedingUse);
+
+  diagnose(astContext,
+           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_moveonly_field_consumed, varName);
+  diagnose(astContext, destructureNeedingUse->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_moveonly_field_consumed_here);
+  // Only emit errors for last users that overlap with our needed destructure
+  // bits.
+  for (auto pair : boundary.getLastUsers()) {
+    if (llvm::any_of(destructureSpan.getRange(),
+                     [&](unsigned index) { return pair.second.test(index); })) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Destructure Boundary Use: " << *pair.first);
+      diagnose(astContext, pair.first->getLoc().getSourceLoc(),
+               diag::sil_moveonlychecker_boundary_use);
+    }
+  }
+  registerDiagnosticEmitted(markedValue);
 }

@@ -869,8 +869,7 @@ struct MoveOnlyChecker {
           instToDelete->eraseFromParent();
         })));
     canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
-    diagnosticEmitter.fn = fn;
-    diagnosticEmitter.canonicalizer = &canonicalizer;
+    diagnosticEmitter.init(fn, &canonicalizer);
   }
 
   /// Search through the current function for candidate mark_must_check
