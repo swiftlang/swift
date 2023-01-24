@@ -232,3 +232,35 @@ struct TestSelfUse {
   @Flag(Self.description) var x: Int = 42
   @Flag(Self.description) func test() {}
 }
+
+
+@runtimeMetadata
+enum EnumFlag<B, V> {
+  case type(B.Type)
+  case method((B) -> V)
+  case property(KeyPath<B, V>)
+  case function(() -> V)
+}
+
+extension EnumFlag {
+  init(attachedTo: KeyPath<B, V>) { self = .property(attachedTo) }
+  init(attachedTo: @escaping (B) -> V) { self = .method(attachedTo) }
+}
+
+extension EnumFlag where V == Void {
+  init(attachedTo: B.Type) { self = .type(attachedTo) }
+}
+
+extension EnumFlag where B == Void {
+  init(attachedTo: @escaping () -> V) { self = .function(attachedTo) }
+}
+
+@EnumFlag func globalEnumTest() -> (Int, [String])? {
+  nil
+}
+
+@EnumFlag struct EnumTypeTest {
+  @EnumFlag var x: Int = 42
+  @EnumFlag func testInst() {}
+  @EnumFlag static func testStatic() -> Int { 42 }
+}

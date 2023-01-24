@@ -138,8 +138,8 @@ actor MyGlobalActor {
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 // KEYWORD4-NEXT:             Keyword/None:                       typeWrapper[#Enum Attribute#]; name=typeWrapper
+// KEYWORD4-NEXT:             Keyword/None:                       runtimeMetadata[#Enum Attribute#]; name=runtimeMetadata
 // KEYWORD4-NEXT:             End completions
-
 
 @#^KEYWORD5^# struct S{}
 // KEYWORD5:                  Begin completions

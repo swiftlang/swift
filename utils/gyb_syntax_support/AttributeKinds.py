@@ -718,7 +718,7 @@ DECL_ATTR_KINDS = [
                         code=138),
 
     SimpleDeclAttribute('runtimeMetadata', 'RuntimeMetadata',
-                        OnStruct, OnClass,
+                        OnStruct, OnClass, OnEnum,
                         ABIBreakingToAdd, ABIBreakingToRemove, APIBreakingToAdd, APIBreakingToRemove,  # noqa: E501
                         code=139)
 ]
