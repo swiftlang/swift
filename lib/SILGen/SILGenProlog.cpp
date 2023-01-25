@@ -429,18 +429,20 @@ struct ArgumentInitHelper {
     ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
                                       lifetimeAnnotation, parent, loc);
 
+    SILValue value = argrv.getValue();
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
-    } else {
-    #warning "todo"
-      assert(pd->isImmutableInFunctionBody()
-             && "consuming mutable params not implemented yet");
-      // If the variable is immutable, we can bind the value as is.
-      // Leave the cleanup on the argument, if any, in place to consume the
-      // argument if we're responsible for it.
+    } else if (!pd->isImmutableInFunctionBody()) {
+      // If it's a locally mutable parameter, then we need to move the argument
+      // value into a local box to hold the mutated value.
+      auto mutableBox = SGF.emitLocalVariableWithCleanup(pd,
+                                                    MarkUninitializedInst::Var);
+      argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
+      return;
     }
-    SILValue value = argrv.getValue();
-    #warning "todo"
+    // If the variable is immutable, we can bind the value as is.
+    // Leave the cleanup on the argument, if any, in place to consume the
+    // argument if we're responsible for it.
     SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.

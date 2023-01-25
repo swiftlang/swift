@@ -6387,9 +6387,9 @@ Type VarDecl::getType() const {
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
-  // Only inout parameters are settable.
+  // Parameters are settable or not depending on their ownership convention.
   if (auto *PD = dyn_cast<ParamDecl>(this))
-    return PD->isInOut();
+    return !PD->isImmutableInFunctionBody();
 
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
