@@ -51,6 +51,7 @@ import ClassArrayGetter
 import CodableTest
 import Combos
 import CreateObjects
+import CxxSetToCollection
 import CxxVectorSum
 import DataBenchmarks
 import DeadArray
@@ -237,6 +238,7 @@ register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
+register(CxxSetToCollection.benchmarks)
 register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
