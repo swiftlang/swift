@@ -145,12 +145,12 @@ extension ASTGenVisitor {
       let lParenLoc = self.base.advanced(by: node.leftParen.position.utf8Offset).raw
       let rParenLoc = self.base.advanced(by: node.rightParen.position.utf8Offset).raw
       let args = TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
-      let asyncLoc = node.asyncKeyword.map { self.base.advanced(by: $0.position.utf8Offset).raw }
-      let throwsLoc = node.throwsOrRethrowsKeyword.map {
+      let asyncLoc = node.effectSpecifiers?.asyncSpecifier.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+      let throwsLoc = node.effectSpecifiers?.throwsSpecifier.map {
         self.base.advanced(by: $0.position.utf8Offset).raw
       }
-      let arrowLoc = self.base.advanced(by: node.arrow.position.utf8Offset).raw
-      let retTy = visit(node.returnType).rawValue
+      let arrowLoc = self.base.advanced(by: node.output.arrow.position.utf8Offset).raw
+      let retTy = visit(node.output.returnType).rawValue
       return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
     }
   }
