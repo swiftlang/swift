@@ -4785,6 +4785,8 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
 
     appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::WrappedValue });
+  } else {
+    return getTypeMatchFailure(locator);
   }
 
   return getTypeMatchSuccess();
