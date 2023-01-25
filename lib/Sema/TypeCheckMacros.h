@@ -53,6 +53,13 @@ void expandAccessors(
 /// on the custom attribute that references the given macro.
 bool expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
 
+/// Expand the synthesized members for the given declaration based on
+/// the custom attribute that references the given macro.
+///
+/// Returns \c true if the macro added new synthesized members, \c false
+/// otherwise.
+bool expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

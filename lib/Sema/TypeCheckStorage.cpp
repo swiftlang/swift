@@ -113,6 +113,12 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
   if (decl->hasTypeWrapper())
     (void)decl->getTypeWrapperProperty();
 
+  // Expand synthesized member macros.
+  auto &ctx = decl->getASTContext();
+  evaluateOrDefault(ctx.evaluator,
+                    ExpandSynthesizedMemberMacroRequest{decl},
+                    false);
+
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
   for (auto *member : implDecl->getMembers()) {
@@ -3440,26 +3446,11 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     return info;
   }
 
-  // Check for an accessor macro.
-  for (auto customAttrConst : storage->getSemanticAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macro = evaluateOrDefault(
-        evaluator,
-        ResolveAttachedMacroRequest{
-          customAttr,
-          storage->getInnermostDeclContext()
-        },
-        nullptr);
-
-    if (!macro)
-      continue;
-
-    if (!macro->getMacroRoles().contains(MacroRole::Accessor))
-      continue;
-
-    // Expand the accessors.
-    expandAccessors(storage, customAttr, macro);
-  }
+  // Expand any attached accessor macros.
+  storage->forEachAttachedMacro(MacroRole::Accessor,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        expandAccessors(storage, customAttr, macro);
+      });
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);

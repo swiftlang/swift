@@ -374,6 +374,28 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
+void Decl::forEachAttachedMacro(MacroRole role,
+                                MacroCallback macroCallback) const {
+  auto *dc = getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  for (auto customAttrConst : getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto *macroDecl = evaluateOrDefault(
+        ctx.evaluator,
+        ResolveAttachedMacroRequest{customAttr, dc},
+        nullptr);
+
+    if (!macroDecl)
+      continue;
+
+    if (!macroDecl->getMacroRoles().contains(role))
+      continue;
+
+    macroCallback(customAttr, macroDecl);
+  }
+}
+
 const Decl *Decl::getInnermostDeclWithAvailability() const {
   const Decl *enclosingDecl = this;
   // Find the innermost enclosing declaration with an @available annotation.
@@ -9703,6 +9725,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::MemberAttribute:
     return "memberAttributes";
+
+  case MacroRole::SynthesizedMembers:
+    return "synthesizedMembers";
   }
 }
 
@@ -9745,8 +9770,10 @@ static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
    MacroRole::FreestandingDeclaration);
-static MacroRoles attachedMacroRoles = (MacroRoles() | MacroRole::Accessor |
-                                        MacroRole::MemberAttribute);
+static MacroRoles attachedMacroRoles = (MacroRoles() |
+                                        MacroRole::Accessor |
+                                        MacroRole::MemberAttribute |
+                                        MacroRole::SynthesizedMembers);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
