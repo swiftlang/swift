@@ -274,8 +274,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
     ModuleDependenciesCache &cache) {
   auto &ctx = Impl.SwiftContext;
   auto optionalTargetModule = cache.findDependency(moduleName, moduleKind);
-  assert(optionalTargetModule.hasValue());
-  auto targetModule = *(optionalTargetModule.getValue());
+  assert(optionalTargetModule.has_value());
+  auto targetModule = *(optionalTargetModule.value());
 
   // If we've already recorded bridging header dependencies, we're done.
   if (auto swiftInterfaceDeps = targetModule.getAsSwiftInterfaceModule()) {

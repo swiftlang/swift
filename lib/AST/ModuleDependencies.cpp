@@ -454,9 +454,9 @@ void ModuleDependenciesCache::updateDependency(
 void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID moduleID,
                                                        const std::vector<ModuleDependencyID> &dependencyIDs) {
   auto optionalDependencyInfo = findDependency(moduleID.first, moduleID.second);
-  assert(optionalDependencyInfo.hasValue() && "Resolving unknown dependency");
+  assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");
   // Copy the existing info to a mutable one we can then replace it with, after resolving its dependencies.
-  auto dependencyInfo = *(optionalDependencyInfo.getValue());
+  auto dependencyInfo = *(optionalDependencyInfo.value());
   dependencyInfo.resolveDependencies(dependencyIDs);
   updateDependency(moduleID, dependencyInfo);
 }

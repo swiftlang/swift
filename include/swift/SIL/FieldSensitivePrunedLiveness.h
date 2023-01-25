@@ -693,7 +693,7 @@ public:
 
   bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
     return inst == defInst.first &&
-           defInst.second->setIntersection(span).hasValue();
+           defInst.second->setIntersection(span).has_value();
   }
 
   bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
@@ -764,7 +764,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 
@@ -789,7 +789,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 
@@ -798,7 +798,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 

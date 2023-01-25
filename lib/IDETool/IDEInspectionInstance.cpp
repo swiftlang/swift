@@ -452,7 +452,7 @@ void IDEInspectionInstance::performNewOperation(
   llvm::PrettyStackTraceString trace("While performing new IDE inspection");
 
   // If ArgsHash is None we shouldn't cache the compiler instance.
-  bool ShouldCacheCompilerInstance = ArgsHash.hasValue();
+  bool ShouldCacheCompilerInstance = ArgsHash.has_value();
 
   auto CI = std::make_shared<CompilerInstance>();
 
