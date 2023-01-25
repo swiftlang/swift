@@ -102,8 +102,13 @@ EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(VariadicGenerics, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
-EXPERIMENTAL_FEATURE(MoveOnly, false)
-EXPERIMENTAL_FEATURE(MoveOnlyClasses, false)
+EXPERIMENTAL_FEATURE(MoveOnly, true)
+
+// FIXME: MoveOnlyClasses is not intended to be in production,
+// but our tests currently rely on it, and we want to run those
+// tests in non-asserts builds too.
+EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
+
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
