@@ -301,7 +301,7 @@ struct SSALivenessTest : UnitTest {
     SmallVector<SILBasicBlock *, 8> discoveredBlocks;
     SSAPrunedLiveness liveness(&discoveredBlocks);
     liveness.initializeDef(value);
-    SimpleLiveRangeSummary summary = liveness.computeSimple();
+    LiveRangeSummary summary = liveness.computeSimple();
     if (summary.innerBorrowKind == InnerBorrowKind::Reborrowed)
       llvm::outs() << "Incomplete liveness: Reborrowed inner scope\n";
 

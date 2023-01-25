@@ -1131,7 +1131,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   // Compute the reference value's liveness.
   SSAPrunedLiveness liveness;
   liveness.initializeDef(root);
-  SimpleLiveRangeSummary summary = liveness.computeSimple();
+  LiveRangeSummary summary = liveness.computeSimple();
   // Conservatively ignore InnerBorrowKind::Reborrowed and
   // AddressUseKind::PointerEscape and Reborrowed. The resulting liveness at
   // least covers the known uses.

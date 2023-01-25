@@ -410,13 +410,13 @@ inline InnerBorrowKind meet(InnerBorrowKind lhs, InnerBorrowKind rhs) {
 /// Summarize reborrows and pointer escapes that affect a live range. Reborrows
 /// and pointer escapes that are encapsulated in a nested borrow don't affect
 /// the outer live range.
-struct SimpleLiveRangeSummary {
+struct LiveRangeSummary {
   InnerBorrowKind innerBorrowKind;
   AddressUseKind addressUseKind;
 
-  SimpleLiveRangeSummary(): innerBorrowKind(InnerBorrowKind::Contained),
-                            addressUseKind(AddressUseKind::NonEscaping)
-  {}
+  LiveRangeSummary()
+      : innerBorrowKind(InnerBorrowKind::Contained),
+        addressUseKind(AddressUseKind::NonEscaping) {}
 
   void meet(const InnerBorrowKind lhs) {
     innerBorrowKind = swift::meet(innerBorrowKind, lhs);
@@ -424,7 +424,7 @@ struct SimpleLiveRangeSummary {
   void meet(const AddressUseKind lhs) {
     addressUseKind = swift::meet(addressUseKind, lhs);
   }
-  void meet(const SimpleLiveRangeSummary lhs) {
+  void meet(const LiveRangeSummary lhs) {
     meet(lhs.innerBorrowKind);
     meet(lhs.addressUseKind);
   }
@@ -601,13 +601,15 @@ protected:
   PrunedLiveRange(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : PrunedLiveness(discoveredBlocks) {}
 
-  SimpleLiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
-                                                 ValueSet &visited,
-                                                 SILValue value);
+  LiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
+                                           ValueSet &visited,
+                                           SILValue value);
 
 public:
-  /// Update liveness for all direct uses of \p def.
-  SimpleLiveRangeSummary updateForDef(SILValue def);
+  /// Update liveness for all direct uses of \p def. Transitively follows
+  /// guaranteed forwards up to but not including guaranteed phis. If \p def is
+  /// used by a guaranteed phi return InnerBorrowKind::Reborrowed.
+  LiveRangeSummary updateForDef(SILValue def);
 
   /// Check if \p inst occurs in between the definition this def and the
   /// liveness boundary.
@@ -716,7 +718,7 @@ public:
   /// jointly-post dominate if dead-end blocks are present. Nested scopes may
   /// also lack scope-ending instructions, so the liveness of their nested uses
   /// may be ignored.
-  SimpleLiveRangeSummary computeSimple() {
+  LiveRangeSummary computeSimple() {
     assert(def && "SSA def uninitialized");
     return updateForDef(def);
   }
@@ -730,6 +732,13 @@ class MultiDefPrunedLiveness : public PrunedLiveRange<MultiDefPrunedLiveness> {
   NodeSetVector defs;
   BasicBlockSet defBlocks;
 
+  void initializeDefNode(SILNode *def) {
+    defs.insert(def);
+    auto *block = def->getParentBlock();
+    defBlocks.insert(block);
+    initializeDefBlock(block);
+  }
+
 public:
   MultiDefPrunedLiveness(
       SILFunction *function,
@@ -741,15 +750,24 @@ public:
     llvm_unreachable("multi-def liveness cannot be reused");
   }
 
-  void initializeDef(SILNode *def) {
-    assert(isa<SILInstruction>(def) || isa<SILArgument>(def));
-    defs.insert(def);
-    auto *block = def->getParentBlock();
-    defBlocks.insert(block);
-    initializeDefBlock(block);
+  void initializeDef(SILInstruction *defInst) {
+    initializeDefNode(defInst->asSILNode());
+  }
+
+  void initializeDef(SILArgument *defArg) { initializeDefNode(defArg); }
+
+  void initializeDef(SILValue value) {
+    if (auto arg = dyn_cast<SILArgument>(value)) {
+      initializeDefNode(arg);
+    } else {
+      initializeDef(value->getDefiningInstruction());
+    }
   }
 
   bool isInitialized() const { return !defs.empty(); }
+
+  NodeSetVector::iterator defBegin() const { return defs.begin(); }
+  NodeSetVector::iterator defEnd() const { return defs.end(); }
 
   bool isDef(SILInstruction *inst) const {
     return defs.contains(cast<SILNode>(inst));
@@ -779,7 +797,7 @@ public:
   /// jointly-post dominate if dead-end blocks are present. Nested scopes may
   /// also lack scope-ending instructions, so the liveness of their nested uses
   /// may be ignored.
-  SimpleLiveRangeSummary computeSimple();
+  LiveRangeSummary computeSimple();
 };
 
 //===----------------------------------------------------------------------===//

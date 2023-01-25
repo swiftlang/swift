@@ -275,18 +275,15 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 //===----------------------------------------------------------------------===//
 
 template <typename LivenessWithDefs>
-SimpleLiveRangeSummary
-PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   ValueSet visited(def->getFunction());
   return recursivelyUpdateForDef(def, visited, def);
 }
 
 template <typename LivenessWithDefs>
-SimpleLiveRangeSummary
-PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(SILValue initialDef,
-                                                           ValueSet &visited,
-                                                           SILValue value) {
-  SimpleLiveRangeSummary summary;
+LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
+    SILValue initialDef, ValueSet &visited, SILValue value) {
+  LiveRangeSummary summary;
 
   if (!visited.insert(value))
     return summary;
@@ -620,10 +617,10 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
          && "findBoundariesInBlock must be called on a live block");
 }
 
-SimpleLiveRangeSummary MultiDefPrunedLiveness::computeSimple() {
+LiveRangeSummary MultiDefPrunedLiveness::computeSimple() {
   assert(isInitialized() && "defs uninitialized");
 
-  SimpleLiveRangeSummary summary;
+  LiveRangeSummary summary;
   for (SILNode *defNode : defs) {
     if (auto *arg = dyn_cast<SILArgument>(defNode))
       summary.meet(updateForDef(arg));
