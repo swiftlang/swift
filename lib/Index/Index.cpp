@@ -432,7 +432,6 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     SymbolInfo SymInfo;
     SymbolRoleSet Roles;
     SmallVector<IndexedWitness, 6> ExplicitWitnesses;
-    SmallVector<SourceLoc, 6> RefsToSuppress;
   };
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
@@ -448,6 +447,9 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
   ContainerTracker Containers;
+
+  // Already handled references that should be suppressed if found later.
+  llvm::DenseSet<SourceLoc> RefsToSuppress;
 
   // Contains a mapping for captures of the form [x], from the declared "x"
   // to the captured "x" in the enclosing scope. Also includes shorthand if
@@ -832,7 +834,7 @@ private:
                           ReferenceMetaData Data) override {
     SourceLoc Loc = Range.getStart();
 
-    if (isRepressed(Loc) || Loc.isInvalid())
+    if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
 
     // Dig back to the original captured variable
@@ -912,17 +914,13 @@ private:
     });
   }
 
-  void repressRefAtLoc(SourceLoc Loc) {
+  void suppressRefAtLoc(SourceLoc Loc) {
     if (Loc.isInvalid()) return;
-    assert(!EntitiesStack.empty());
-    EntitiesStack.back().RefsToSuppress.push_back(Loc);
+    RefsToSuppress.insert(Loc);
   }
 
-  bool isRepressed(SourceLoc Loc) const {
-    if (EntitiesStack.empty() || Loc.isInvalid())
-      return false;
-    auto &Suppressed = EntitiesStack.back().RefsToSuppress;
-    return std::find(Suppressed.begin(), Suppressed.end(), Loc) != Suppressed.end();
+  bool isSuppressed(SourceLoc Loc) const {
+    return Loc.isValid() && RefsToSuppress.contains(Loc);
   }
 
   Expr *getContainingExpr(size_t index) const {
@@ -1253,7 +1251,7 @@ bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info, bool IsRef) {
         if (!handleWitnesses(D, explicitWitnesses))
           return false;
       }
-      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitWitnesses), {}});
+      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitWitnesses)});
       return true;
     }
   }
@@ -1325,7 +1323,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
     Info.roles |= (unsigned)SymbolRole::Implicit;
 
   // don't report this ref again when visitDeclReference reports it
-  repressRefAtLoc(Loc);
+  suppressRefAtLoc(Loc);
 
   if (!reportRef(D, Loc, Info, None)) {
     Cancelled = true;
@@ -1491,7 +1489,7 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     // Suppress the reference if there is any (it is implicit and hence
     // already skipped in the shorthand if let case, but explicit in the
     // captured case).
-    repressRefAtLoc(loc);
+    suppressRefAtLoc(loc);
 
     // Skip the definition of a shadowed decl
     return true;
