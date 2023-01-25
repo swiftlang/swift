@@ -1837,7 +1837,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
       // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
       workaround_function_swift_taskGroup_waitAllImpl(
-         resultPointer, callerContext, _group, bodyError, resumeFunction, rawContext);
+         resultPointer, callerContext, asAbstract(this), bodyError, resumeFunction, rawContext);
 #endif /* __ARM_ARCH_7K__ */
 
       _swift_task_clearCurrent();
