@@ -39,6 +39,12 @@
 #include <mutex>
 #endif
 
+#if SWIFT_STDLIB_HAS_ASL
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
@@ -467,6 +473,19 @@ struct TaskGroupStatus {
   static const uint64_t maskDiscardingPending   = 0b0011111111111111111111111111111111111111111111111111111111111111;
   static const uint64_t onePendingTask          = 0b0000000000000000000000000000000000000000000000000000000000000001;
 
+  /// Depending on kind of task group, we can either support 2^31 or 2^62 pending tasks.
+  ///
+  /// While a discarding task group's max pending count is unrealistic to be exceeded, the lower
+  /// maximum number used in an accumulating task group has potential to be exceeded, and thus we must crash
+  /// rather than start overflowing status if this were to happen.
+  static uint64_t maximumPendingTasks(TaskGroupBase* group) {
+    if (group->isAccumulatingResults()) {
+      return maskAccumulatingPending;
+    } else {
+      return maskDiscardingPending;
+    }
+  }
+
   uint64_t status;
 
   bool isCancelled() {
@@ -523,6 +542,39 @@ struct TaskGroupStatus {
 
   TaskGroupStatus asCancelled(bool cancel) {
     return TaskGroupStatus{status | (cancel ? cancelled : 0)};
+  }
+
+  static void reportPendingTaskOverflow(TaskGroupBase* group, TaskGroupStatus status) {
+    char *message;
+    swift_asprintf(
+        &message,
+        "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
+        group->isDiscardingResults() ? "Discarding" : "", group, status.to_string(group).c_str());
+
+    if (_swift_shouldReportFatalErrorsToDebugger()) {
+      RuntimeErrorDetails details = {
+          .version = RuntimeErrorDetails::currentVersion,
+          .errorType = "task-group-violation",
+          .currentStackDescription = "TaskGroup exceeded supported pending task count",
+          .framesToSkip = 1,
+      };
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
+    }
+
+#if defined(_WIN32)
+    #define STDERR_FILENO 2
+   _write(STDERR_FILENO, message, strlen(message));
+#else
+    write(STDERR_FILENO, message, strlen(message));
+#endif
+#if defined(__APPLE__)
+    asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#elif defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
+#endif
+
+    free(message);
+    abort();
   }
 
   /// Pretty prints the status, as follows:
@@ -619,6 +671,10 @@ TaskGroupStatus TaskGroupBase::statusAddPendingTaskAssumeRelaxed(bool unconditio
   auto old = status.fetch_add(TaskGroupStatus::onePendingTask,
                               std::memory_order_relaxed);
   auto s = TaskGroupStatus{old + TaskGroupStatus::onePendingTask};
+
+  if (s.pendingTasks(this) == TaskGroupStatus::maximumPendingTasks(this)) {
+    TaskGroupStatus::reportPendingTaskOverflow(this, s); // this will abort()
+  }
 
   if (!unconditionally && s.isCancelled()) {
     // revert that add, it was meaningless
