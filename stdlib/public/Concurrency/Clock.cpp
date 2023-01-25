@@ -87,18 +87,10 @@ void swift_get_time(
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)
-      LARGE_INTEGER freq;
-      QueryPerformanceFrequency(&freq);
-      LARGE_INTEGER count;
-      QueryPerformanceCounter(&count);
-      *seconds = count.QuadPart / freq.QuadPart;
-      if (freq.QuadPart < 1000000000) {
-        *nanoseconds = 
-            ((count.QuadPart % freq.QuadPart) * 1000000000) / freq.QuadPart;
-      } else {
-        *nanoseconds = 
-            (count.QuadPart % freq.QuadPart) * (1000000000.0 / freq.QuadPart);
-      }
+      ULONGLONG unbiasedTime;
+      QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
+      *seconds = unbiasedTime / 10000000ULL; // unit is 100ns
+      *nanoseconds = unbiasedTime % 10000000ULL;
 #else
 #error Missing platform suspending time definition
 #endif
