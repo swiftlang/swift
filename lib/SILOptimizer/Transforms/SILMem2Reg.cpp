@@ -236,7 +236,7 @@ static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   return true;
 }
 
-/// Collects all load instructions which (transitively) use \p I as address.
+/// Collects all load instructions which (transitively) use \p i as address.
 static void collectLoads(SILInstruction *i,
                          SmallVectorImpl<SILInstruction *> &foundLoads) {
   if (isa<LoadInst>(i) || isa<LoadBorrowInst>(i)) {
