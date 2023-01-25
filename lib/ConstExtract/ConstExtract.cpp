@@ -185,7 +185,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
-      if (rawLiteral.hasValue()) {
+      if (rawLiteral.has_value()) {
         return std::make_shared<RawLiteralValue>(rawLiteral.value());
       }
 
@@ -569,7 +569,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "Enum");
     JSON.attributeObject("value", [&]() {
       JSON.attribute("name", enumValue->getIdentifier());
-      if (enumValue->getParameters().hasValue()) {
+      if (enumValue->getParameters().has_value()) {
         auto params = enumValue->getParameters().value();
         JSON.attributeArray("arguments", [&] {
           for (auto FP : params) {
@@ -595,7 +595,7 @@ void writeValue(llvm::json::OStream &JSON,
 void writeAttributes(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers) {
-  if (!PropertyWrappers.hasValue()) {
+  if (!PropertyWrappers.has_value()) {
     return;
   }
 
@@ -620,7 +620,7 @@ void writeAttributes(
 void writeEnumCases(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
-  if (!EnumElements.hasValue()) {
+  if (!EnumElements.has_value()) {
     return;
   }
 
@@ -628,10 +628,10 @@ void writeEnumCases(
     for (const auto &Case : EnumElements.value()) {
       JSON.object([&] {
         JSON.attribute("name", Case.Name);
-        if (Case.RawValue.hasValue()) {
+        if (Case.RawValue.has_value()) {
           JSON.attribute("rawValue", Case.RawValue.value());
         }
-        if (Case.Parameters.hasValue()) {
+        if (Case.Parameters.has_value()) {
           JSON.attributeArray("parameters", [&] {
             for (const auto &Parameter : Case.Parameters.value()) {
               JSON.object([&] {
@@ -698,15 +698,15 @@ void writeAttrInformation(llvm::json::OStream &JSON,
         if (!attr->Rename.empty())
           JSON.attribute("rename", attr->Rename);
 
-        if (attr->Introduced.hasValue())
+        if (attr->Introduced.has_value())
           JSON.attribute("introducedVersion",
                          attr->Introduced.value().getAsString());
 
-        if (attr->Deprecated.hasValue())
+        if (attr->Deprecated.has_value())
           JSON.attribute("deprecatedVersion",
                          attr->Deprecated.value().getAsString());
 
-        if (attr->Obsoleted.hasValue())
+        if (attr->Obsoleted.has_value())
           JSON.attribute("obsoletedVersion",
                          attr->Obsoleted.value().getAsString());
 

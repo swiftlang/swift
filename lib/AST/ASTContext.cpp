@@ -1897,7 +1897,7 @@ static void findPath_dfs(ModuleDependencyID X,
   }
   visited.insert(X);
   auto optionalNode = cache.findDependency(X.first, X.second);
-  auto node = optionalNode.getValue();
+  auto node = optionalNode.value();
   assert(optionalNode.has_value() && "Expected cache value for dependency.");
   for (const auto &dep : node->getModuleImports()) {
     Optional<ModuleDependencyKind> lookupKind = None;
@@ -1909,7 +1909,7 @@ static void findPath_dfs(ModuleDependencyID X,
     auto optionalDepNode = cache.findDependency(dep, lookupKind);
     if (!optionalDepNode.has_value())
       continue;
-    auto depNode = optionalDepNode.getValue();
+    auto depNode = optionalDepNode.value();
     auto depID = std::make_pair(dep, depNode->getKind());
     if (!visited.count(depID)) {
       findPath_dfs(depID, Y, visited, stack, result, cache);
@@ -1953,7 +1953,7 @@ static void diagnoseScannerFailure(StringRef moduleName,
       const auto &entry = *it;
       auto optionalEntryNode = cache.findDependency(entry.first, entry.second);
       assert(optionalEntryNode.has_value());
-      auto entryNode = optionalEntryNode.getValue();
+      auto entryNode = optionalEntryNode.value();
       std::string moduleFilePath = "";
       bool isClang = false;
       switch (entryNode->getKind()) {
