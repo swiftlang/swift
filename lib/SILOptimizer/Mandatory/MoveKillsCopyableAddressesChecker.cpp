@@ -722,7 +722,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
-      livenessForConsumes.initializeDef(cast<SILNode>(user));
+      livenessForConsumes.initializeDef(user);
       initBlocks.insert(user->getParent());
     }
   }
