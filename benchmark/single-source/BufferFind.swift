@@ -13,20 +13,6 @@
 import TestsUtils
 
 public var benchmarks: [BenchmarkInfo] = [
-  BenchmarkInfo(
-    name: "RawBuffer.100000.findFirst",
-    runFunction: run_BufferFindFirst,
-    tags: [.validation, .api],
-    setUpFunction: buffer100000Setup,
-    tearDownFunction: bufferTeardown
-  ),
-  BenchmarkInfo(
-    name: "RawBuffer.100000.findLast",
-    runFunction: run_BufferFindLast,
-    tags: [.validation, .api],
-    setUpFunction: buffer100000Setup,
-    tearDownFunction: bufferTeardown
-  ),
   // size 1000, alignment 0
   BenchmarkInfo(
     name: "RawBuffer.1000.findFirst",
@@ -42,54 +28,50 @@ public var benchmarks: [BenchmarkInfo] = [
     setUpFunction: buffer1000Setup,
     tearDownFunction: bufferTeardown
   ),
-  // size 100, alignment 0
+  // size 15, alignment 0
   BenchmarkInfo(
-    name: "RawBuffer.100.findFirst",
+    name: "RawBuffer.15.findFirst",
     runFunction: run_BufferFindFirst,
     tags: [.validation, .api],
-    setUpFunction: buffer100Setup,
+    setUpFunction: buffer15Setup,
     tearDownFunction: bufferTeardown
   ),
   BenchmarkInfo(
-    name: "RawBuffer.100.findLast",
+    name: "RawBuffer.15.findLast",
     runFunction: run_BufferFindLast,
     tags: [.validation, .api],
-    setUpFunction: buffer100Setup,
+    setUpFunction: buffer15Setup,
     tearDownFunction: bufferTeardown
   ),
-  // size 10, alignment 0
+  // size 7, alignment 0
   BenchmarkInfo(
-    name: "RawBuffer.10.findFirst",
+    name: "RawBuffer.7.findFirst",
     runFunction: run_BufferFindFirst,
     tags: [.validation, .api],
-    setUpFunction: buffer10Setup,
+    setUpFunction: buffer7Setup,
     tearDownFunction: bufferTeardown
   ),
   BenchmarkInfo(
-    name: "RawBuffer.10.findLast",
+    name: "RawBuffer.7.findLast",
     runFunction: run_BufferFindLast,
     tags: [.validation, .api],
-    setUpFunction: buffer10Setup,
+    setUpFunction: buffer7Setup,
     tearDownFunction: bufferTeardown
   )
 ]
 
 var buffer: UnsafeMutableRawBufferPointer = .init(start: nil, count: 0)
 
-func buffer100000Setup() {
-  bufferSetup(size: 100_000, alignment: 0)
-}
-
 func buffer1000Setup() {
   bufferSetup(size: 1000, alignment: 0)
 }
 
-func buffer100Setup() {
-  bufferSetup(size: 100, alignment: 0)
+func buffer15Setup() {
+  bufferSetup(size: 15, alignment: 0)
 }
 
-func buffer10Setup() {
-  bufferSetup(size: 10, alignment: 0)
+func buffer7Setup() {
+  bufferSetup(size: 7, alignment: 0)
 }
 
 func bufferTeardown() {
@@ -106,7 +88,7 @@ func bufferSetup(size: Int, alignment: Int) {
 @inline(never)
 public func run_BufferFindFirst(n: Int) {
   var offset = 0
-  for _ in 0 ..< n * 10 {
+  for _ in 0 ..< n * 10_000 {
     if let index = buffer.firstIndex(of: UInt8.max) {
       offset += index
     }
@@ -117,7 +99,7 @@ public func run_BufferFindFirst(n: Int) {
 @inline(never)
 public func run_BufferFindLast(n: Int) {
   var offset = 0
-  for _ in 0 ..< n * 10 {
+  for _ in 0 ..< n * 10_000 {
     if let index = buffer.lastIndex(of: UInt8.max) {
       offset += index
     }
