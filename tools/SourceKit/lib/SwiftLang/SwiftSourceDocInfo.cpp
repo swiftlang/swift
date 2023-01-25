@@ -1172,6 +1172,7 @@ static bool passCursorInfoForDecl(
     });
     return false;
   }
+
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
     CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
     if (auto Err =
@@ -1182,16 +1183,21 @@ static bool passCursorInfoForDecl(
       Symbols.pop_back();
     }
   }
-  for (auto D : Info.getShorthandShadowedDecls()) {
-    CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
-    DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
-                   ArrayRef<NominalTypeDecl *>(), Invoc);
-    if (auto Err =
-            fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
-                           Lang, Invoc, PreviousSnaps, Allocator)) {
-      // Ignore but make sure to remove the partially-filled symbol
-      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
-      Symbols.pop_back();
+
+  // Add in shadowed declarations if on a decl. For references just go to the
+  // actual declaration.
+  if (!Info.isRef()) {
+    for (auto D : Info.getShorthandShadowedDecls()) {
+      CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
+      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+                     ArrayRef<NominalTypeDecl *>(), Invoc);
+      if (auto Err =
+          fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
+                         Lang, Invoc, PreviousSnaps, Allocator)) {
+        // Ignore but make sure to remove the partially-filled symbol
+        llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
+        Symbols.pop_back();
+      }
     }
   }
 
