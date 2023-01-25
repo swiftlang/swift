@@ -15,7 +15,7 @@ public struct StringifyMacro: ExpressionMacro {
   }
 }
 
-public struct MyWrapperMacro: AccessorDeclarationMacro {
+public struct MyWrapperMacro: AccessorMacro {
     public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: DeclSyntax,
