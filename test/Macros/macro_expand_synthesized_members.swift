@@ -9,30 +9,18 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(memberAttributes)
-@attached(synthesizedMembers)
-macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
-@attached(accessor) macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
+@attached(synthesizedMembers) macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
-struct _Storage {
-  var x: Int = 0 {
-    willSet { print("setting \(newValue)") }
-  }
-  var y: Int = 0 {
-    willSet { print("setting \(newValue)") }
-  }
-}
-
-@myTypeWrapper
+@addMembers
 struct S {
-  var x: Int
-  var y: Int
+  func useSynthesized() {
+    print(type(of: storage))
+    method()
+  }
 }
 
-var s = S()
+let s = S()
 
-// CHECK: setting 10
-s.x = 10
-
-// CHECK: setting 100
-s.y = 100
+// CHECK: Storage
+// CHECK: synthesized method
+s.useSynthesized()

@@ -2792,6 +2792,13 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
   }
 
+  // Expand synthesized member macros.
+  auto *mutableDecl = const_cast<Decl *>(idc->getDecl());
+  (void)evaluateOrDefault(
+      ctx.evaluator,
+      ExpandSynthesizedMemberMacroRequest{mutableDecl},
+      false);
+
   // If the decl has a @main attribute, we need to force synthesis of the
   // $main function.
   (void) evaluateOrDefault(
