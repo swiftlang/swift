@@ -4270,6 +4270,7 @@ class CaptureListExpr final : public Expr,
                   AbstractClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
       closureBody(closureBody) {
+    assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
                             getTrailingObjects<CaptureListEntry>());
