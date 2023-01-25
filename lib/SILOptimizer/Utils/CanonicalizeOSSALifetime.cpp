@@ -402,7 +402,7 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
           continue;
         }
         // Stop at the latest use. An earlier end_access does not overlap.
-        if (blockHasUse && liveness.isInterestingUser(&inst)) {
+        if (blockHasUse && liveness.isInterestingUser(&inst) != PrunedLiveness::NonUser) {
           break;
         }
         if (endsAccessOverlappingPrunedBoundary(&inst)) {
