@@ -4509,12 +4509,16 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
   if (Attrs.empty())
     return;
-  // If all available are spi available, we should use @_spi instead.
-  if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
-    return AV->IsSPI;
-  })) {
-    diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
-  };
+
+  // Only diagnose top level decls since nested ones may have inherited availability.
+  if (!D->getDeclContext()->getInnermostDeclarationDeclContext()) {
+    // If all available are spi available, we should use @_spi instead.
+    if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
+      return AV->IsSPI;
+    })) {
+      diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
+    }
+  }
 }
 
 void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
