@@ -45,6 +45,10 @@
 #include <android/log.h>
 #endif
 
+#if defined(_WIN32)
+#include <io.h>
+#endif
+
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
