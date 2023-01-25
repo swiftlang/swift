@@ -124,8 +124,10 @@ switch (clock_id) {
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
 #elif defined(_WIN32)
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
       *seconds = 0;
-      *nanoseconds = 1000;
+      *nanoseconds = 1000000000 / freq.QuadPart;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -151,7 +153,7 @@ switch (clock_id) {
       *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)
       *seconds = 0;
-      *nanoseconds = 1000;
+      *nanoseconds = 100;
 #else
 #error Missing platform suspending time definition
 #endif
