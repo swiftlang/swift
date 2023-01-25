@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 #include "swift/Markup/LineList.h"
 #include "swift/Markup/Markup.h"
 #include "cmark-gfm.h"
+#include "node.h" // from swift-cmark, for `cmark_init_standard_node_flags`
 
 using namespace swift;
 using namespace markup;
@@ -319,6 +320,8 @@ ParseResult<MarkupASTNode> parseElement(MarkupContext &MC, ParseState State) {
 }
 
 static Document *parseDocumentImpl(MarkupContext &MC, StringRef String) {
+  cmark_init_standard_node_flags();
+
   auto CMarkDoc =
       cmark_parse_document(String.data(), String.size(), CMARK_OPT_SMART);
 
