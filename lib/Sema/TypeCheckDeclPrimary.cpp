@@ -2012,7 +2012,7 @@ public:
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroRoles())
-      MD->diagnose(diag::macro_without_context, MD->getName());
+      MD->diagnose(diag::macro_without_role, MD->getName());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
