@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-sil -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
-// REQUIRES: asserts
 
 @_moveOnly
 class C {}
