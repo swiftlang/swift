@@ -602,6 +602,8 @@ public:
   Type lhsType() const { return LHS; }
   Type rhsType() const { return RHS; }
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   bool diagnose(const Solution &solution,
                 bool asNote = false) const override = 0;
 };
@@ -624,8 +626,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,

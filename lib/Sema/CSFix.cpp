@@ -410,16 +410,16 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
-bool MissingConformance::diagnoseForAmbiguity(
+bool RequirementFix::diagnoseForAmbiguity(
     CommonFixesArray commonFixes) const {
-  auto *primaryFix = commonFixes.front().second->getAs<MissingConformance>();
+  auto *primaryFix = commonFixes.front().second;
   assert(primaryFix);
 
   if (llvm::all_of(
           commonFixes,
           [&primaryFix](
               const std::pair<const Solution *, const ConstraintFix *> &entry) {
-            return primaryFix->isEqual(entry.second);
+            return primaryFix->getLocator() == entry.second->getLocator();
           }))
     return diagnose(*commonFixes.front().first);
 
