@@ -165,10 +165,8 @@ bool CheckerLivenessInfo::compute() {
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
         ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
-          if (auto *arg = dyn_cast<SILPhiArgument>(result)) {
-            if (arg->isTerminatorResult()) {
-              return true;
-            }
+          if (SILArgument::isTerminatorResult(result)) {
+            return true;
           }
           if (result->getOwnershipKind() == OwnershipKind::Guaranteed)
             defUseWorklist.insert(result);
