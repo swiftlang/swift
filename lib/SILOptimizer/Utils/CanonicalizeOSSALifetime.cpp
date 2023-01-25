@@ -121,17 +121,18 @@ static DestroyValueInst *dynCastToDestroyOf(SILInstruction *instruction,
 
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   defUseWorklist.initialize(getCurrentDef());
+  // Only the first level of reborrows need to be consider. All nested inner
+  // adjacent reborrows and phis are encapsulated within their lifetimes.
+  SILPhiArgument *arg;
+  if ((arg = dyn_cast<SILPhiArgument>(getCurrentDef())) && arg->isPhi()) {
+    visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+      defUseWorklist.insert(reborrow);
+      return true;
+    });
+  }
   while (SILValue value = defUseWorklist.pop()) {
-    SILPhiArgument *arg;
-    if ((arg = dyn_cast<SILPhiArgument>(value)) && arg->isPhi()) {
-      visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
-        defUseWorklist.insert(reborrow);
-        return true;
-      });
-    }
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
-
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
         defUseWorklist.insert(copy);
@@ -187,31 +188,31 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
-        // Guaranteed values are considered uses of the value when the value
-        // owneed. If user is a guaranteed phi, then the owned lifetime either
-        // dominates it or its lifetime ends at an outer adjacent reborrow.
+        // Guaranteed values are exposed by inner adjacent reborrows. If user is
+        // a guaranteed phi (GuaranteedForwarding), then the owned lifetime
+        // either dominates it or its lifetime ends at an outer adjacent
+        // reborrow. Only instructions that end the reborrow lifetime should
+        // actually affect liveness of the outer owned value.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::Reborrow:
-        BranchInst *branch;
-        if (!(branch = dyn_cast<BranchInst>(user))) {
-          // Non-phi reborrows (tuples, etc) never end the lifetime of the owned
-          // value.
-          liveness.updateForUse(user, /*lifetimeEnding*/ false);
-          defUseWorklist.insert(cast<SingleValueInstruction>(user));
-          break;
-        }
-        if (is_contained(user->getOperandValues(), getCurrentDef())) {
-          // An adjacent phi consumes the value being reborrowed.  Although this
-          // use doesn't end the lifetime, this user does.
-          liveness.updateForUse(user, /*lifetimeEnding*/ true);
+        BranchInst *branch = cast<BranchInst>(user);
+        // This is a cheap variation on visitEnclosingDef. We already know that
+        // getCurrentDef() is the enclosing def for this use. If the reborrow's
+        // has a enclosing def is an outer adjacent phi then this branch must
+        // consume getCurrentDef() as the outer phi operand.
+        if (is_contained(branch->getOperandValues(), getCurrentDef())) {
+          // An adjacent phi consumes the value being reborrowed. Although this
+          // use doesn't end the lifetime, this branch does end the lifetime by
+          // consuming the owned value.
+          liveness.updateForUse(branch, /*lifetimeEnding*/ true);
           break;
         }
         // No adjacent phi consumes the value.  This use is not lifetime ending.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        liveness.updateForUse(branch, /*lifetimeEnding*/ false);
         // This branch reborrows a guaranteed phi whose lifetime is dependent on
         // currentDef.  Uses of the reborrowing phi extend liveness.
-        auto *reborrow = branch->getArgForOperand(use);
+        auto *reborrow = PhiOperand(use).getValue();
         defUseWorklist.insert(reborrow);
         break;
       }
