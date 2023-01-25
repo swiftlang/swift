@@ -2887,7 +2887,7 @@ namespace {
     void emitUsingAccessor(AccessorKind accessorKind,
                            bool isDirect) {
       auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
+          SGF.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Set: {
@@ -3318,16 +3318,18 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
 static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
                                                   AccessorDecl *accessor,
                                                   CanType baseFormalType) {
-  if (accessor->isMutating()) {
+  if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
-  } else if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::OwnedAddressRead
-             : SGFAccessKind::OwnedObjectRead;
+
+  auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
+  if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::OwnedAddressRead
+               : SGFAccessKind::OwnedObjectRead;
   } else {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::BorrowedAddressRead
-             : SGFAccessKind::BorrowedObjectRead;
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::BorrowedAddressRead
+               : SGFAccessKind::BorrowedObjectRead;
   }
 }
 
@@ -3435,7 +3437,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       var->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3636,7 +3638,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       decl->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
