@@ -278,18 +278,21 @@ bool swift::siloptimizer::cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(
   bool localChanged = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *cvi = dyn_cast<CopyValueInst>(&*ii);
+      if (auto *cvi = dyn_cast<CopyValueInst>(&*ii)) {
+        ++ii;
+
+        if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
+          continue;
+
+        SILBuilderWithScope b(cvi);
+        auto *expCopy =
+            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+        cvi->replaceAllUsesWith(expCopy);
+        cvi->eraseFromParent();
+        localChanged = true;
+      }
+
       ++ii;
-
-      if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
-        continue;
-
-      SILBuilderWithScope b(cvi);
-      auto *expCopy =
-          b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-      cvi->replaceAllUsesWith(expCopy);
-      cvi->eraseFromParent();
-      localChanged = true;
     }
   }
   return localChanged;
@@ -454,7 +457,7 @@ void MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                     "understand part of the SIL\n");
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
       cleanupAfterEmittingDiagnostic();
-      return;
+      continue;
     }
 
     // If we emitted any non-exceptional diagnostics in

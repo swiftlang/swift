@@ -866,24 +866,26 @@ public func aggStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggStruc
 
 public func aggStructConsumeField(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
-// TODO: We should error here!
 public func aggStructConsumeFieldArg(@_noImplicitCopy _ x2: AggStruct) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggStructConsumeFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -911,24 +913,26 @@ public func aggStructAccessGrandFieldOwnedArg(@_noImplicitCopy _ x2: __owned Agg
 
 public func aggStructConsumeGrandField(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
-// TODO: This needs to error.
 public func aggStructConsumeGrandFieldArg(@_noImplicitCopy _ x2: AggStruct) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggStructConsumeGrandFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -1132,23 +1136,26 @@ public func aggGenericStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned A
 
 public func aggGenericStructConsumeField(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg(@_noImplicitCopy _ x2: AggGenericStruct<Klass>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -1176,23 +1183,26 @@ public func aggGenericStructAccessGrandFieldOwnedArg(@_noImplicitCopy _ x2: __ow
 
 public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldArg(@_noImplicitCopy _ x2: AggGenericStruct<Klass>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -1390,23 +1400,26 @@ public func aggGenericStructAccessFieldOwnedArg<T>(@_noImplicitCopy _ x2: __owne
 
 public func aggGenericStructConsumeField<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeFieldArg<T>(@_noImplicitCopy _ x2: AggGenericStruct<T>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeFieldOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.lhs)
+        classConsume(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -1434,23 +1447,26 @@ public func aggGenericStructAccessGrandFieldOwnedArg<T>(@_noImplicitCopy _ x2: _
 
 public func aggGenericStructConsumeGrandField<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldArg<T>(@_noImplicitCopy _ x2: AggGenericStruct<T>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs)
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 

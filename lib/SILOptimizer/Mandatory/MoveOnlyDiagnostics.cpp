@@ -438,7 +438,8 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
            markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
            diag::sil_moveonlychecker_moveonly_field_consumed, varName);
   diagnose(astContext, destructureNeedingUse->getLoc().getSourceLoc(),
-           diag::sil_moveonlychecker_moveonly_field_consumed_here);
+           diag::sil_moveonlychecker_consuming_use_here);
+
   // Only emit errors for last users that overlap with our needed destructure
   // bits.
   for (auto pair : boundary.getLastUsers()) {

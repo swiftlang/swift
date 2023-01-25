@@ -1007,20 +1007,51 @@ void BorrowToDestructureTransform::rewriteUses() {
                    << " of inst: " << *operand.getUser()
                    << "    Type Span: " << span << '\n'
                    << "    AvailableValue: " << *first);
+
         // Then see if first at a type level is equal to our operand's value
         // type. If so, we can just reuse it.
-        if (first->getType() == operand.get()->getType()) {
+        if (first->getType().removingMoveOnlyWrapper() ==
+            operand.get()->getType().removingMoveOnlyWrapper()) {
           LLVM_DEBUG(llvm::dbgs() << "    Found a value that completely covers "
                                      "the operand!\n    Value: "
                                   << *first);
-          if (operand.isConsuming()) {
+          // If we have:
+          //
+          // 1. A consuming use.
+          // 2. A value that is /not/ move only wrapped and an operand that is
+          // non-consuming but can accept an owned value.
+          //
+          // Just use the owned value. In the case of 2, we need to use a borrow
+          // so we can insert the moveonlywrapper_to_copyable [guaranteed] for
+          // the use.
+          if (operand.isConsuming() ||
+              (operand.canAcceptKind(OwnershipKind::Owned) &&
+               (first->getType().isMoveOnlyWrapped() ==
+                operand.get()->getType().isMoveOnlyWrapped()))) {
+            // If we get to this point and have a move only wrapped type and our
+            // operand is not a move only wrapped type, then we need to insert
+            // an owned moveonlywrapper_to_copyable. We know it must be owned
+            // since we can only reach this point if we are consuming.
+            if (first->getType().isMoveOnlyWrapped() &&
+                !operand.get()->getType().isMoveOnlyWrapped()) {
+              SILBuilderWithScope builder(inst);
+              first = builder.createOwnedMoveOnlyWrapperToCopyableValue(
+                  getSafeLoc(inst), first);
+            }
             operand.set(first);
             continue;
           }
 
+          // Otherwise, we need to insert a borrow.
           SILBuilderWithScope borrowBuilder(inst);
-          auto *borrow =
+          SILValue borrow =
               borrowBuilder.createBeginBorrow(getSafeLoc(inst), first);
+          SILValue innerValue = borrow;
+          if (innerValue->getType().isMoveOnlyWrapped()) {
+            innerValue =
+                borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                    getSafeLoc(inst), innerValue);
+          }
 
           if (auto op = InteriorPointerOperand::get(&operand)) {
             op.visitBaseValueScopeEndingUses([&](Operand *endScope) -> bool {
@@ -1035,7 +1066,10 @@ void BorrowToDestructureTransform::rewriteUses() {
             endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
           }
 
-          operand.set(borrow);
+          // NOTE: This needs to be /after/the interior pointer operand usage
+          // above so that we can use the end scope of our interior pointer base
+          // value.
+          operand.set(innerValue);
           continue;
         }
 
@@ -1075,14 +1109,24 @@ void BorrowToDestructureTransform::rewriteUses() {
           // First walk until we find the same size use as our element and our
           // type that also equals our type. The second part of the check allows
           // us to skip through single level types.
-          while (operand.get()->getType() != value->getType()) {
+          SILType operandUnwrappedType =
+              operand.get()->getType().removingMoveOnlyWrapper();
+          while (operandUnwrappedType !=
+                 value->getType().removingMoveOnlyWrapper()) {
             std::tie(firstValueOffsetSize, value) =
                 *useOffsetSize.walkOneLevelTowardsChild(
                     borrowBuilder, loc, firstValueOffsetSize, value);
           }
 
           // At this point, we know we have a type of the same size and the same
-          // type.
+          // type (modulo moveonlywrapped). If we need to wrap our gepped value,
+          // do so now and then set operand to take this new value.
+          if (!operand.get()->getType().isMoveOnlyWrapped() &&
+              value->getType().isMoveOnlyWrapped()) {
+            value =
+                borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                    loc, value);
+          }
           operand.set(value);
 
           // If we have a terminator that is a trivial use (e.x.: we
@@ -1114,13 +1158,13 @@ void BorrowToDestructureTransform::rewriteUses() {
         SILType iterType = iterValue->getType();
         SWIFT_DEFER { typeSpanToValue.clear(); };
 
-        while (operand.get()->getType() != iterType) {
-          // First erase our input type.
-          auto parentOffsetSize = iterOffsetSize;
-
+        SILType unwrappedOperandType =
+            operand.get()->getType().removingMoveOnlyWrapper();
+        while (unwrappedOperandType != iterType.removingMoveOnlyWrapper()) {
           // NOTE: We purposely do not erase our parent offset from the
           // typeSpanToValue. We never insert any element along our walk path
           // (including the initial value) into the interval map.
+          auto parentOffsetSize = iterOffsetSize;
 
           // Then walk one level towards our target type.
           std::tie(iterOffsetSize, iterType) =
@@ -1145,7 +1189,12 @@ void BorrowToDestructureTransform::rewriteUses() {
         }
 
         // Now that we have finished destructuring, set operand to our iter
-        // value.
+        // value... unwrapping iterValue if we need to do so.
+        if (iterValue->getType().isMoveOnlyWrapped() &&
+            !operand.get()->getType().isMoveOnlyWrapped()) {
+          iterValue = consumeBuilder.createOwnedMoveOnlyWrapperToCopyableValue(
+              loc, iterValue);
+        }
         operand.set(iterValue);
 
         // Then go through our available values and use the interval map to

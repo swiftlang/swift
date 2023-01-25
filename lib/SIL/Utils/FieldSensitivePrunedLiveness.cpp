@@ -188,7 +188,8 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
 
     // Look through these single operand instructions.
     if (isa<BeginBorrowInst>(projectionDerivedFromRoot) ||
-        isa<CopyValueInst>(projectionDerivedFromRoot)) {
+        isa<CopyValueInst>(projectionDerivedFromRoot) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot =
           cast<SingleValueInstruction>(projectionDerivedFromRoot)
               ->getOperand(0);
