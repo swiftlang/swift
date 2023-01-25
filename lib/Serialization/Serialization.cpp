@@ -3009,9 +3009,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Attached: {
-      auto *theAttr = cast<AttachedAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[AttachedDeclAttrLayout::Code];
+    case DAK_MacroRole: {
+      auto *theAttr = cast<MacroRoleAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
       auto rawMacroRole =
           getRawStableMacroRole(theAttr->getMacroRole());
       SmallVector<IdentifierID, 4> introducedDeclNames;
@@ -3022,8 +3022,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
             S.addDeclBaseNameRef(name.getIdentifier()));
       }
 
-      AttachedDeclAttrLayout::emitRecord(
+      MacroRoleDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          static_cast<uint8_t>(theAttr->getMacroSyntax()),
           rawMacroRole, theAttr->getNames().size(),
           introducedDeclNames);
       return;

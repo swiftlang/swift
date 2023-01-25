@@ -1628,7 +1628,7 @@ namespace  {
 
     UNINTERESTING_ATTR(Expression)
     UNINTERESTING_ATTR(Declaration)
-    UNINTERESTING_ATTR(Attached)
+    UNINTERESTING_ATTR(MacroRole)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

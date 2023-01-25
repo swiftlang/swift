@@ -2226,10 +2226,11 @@ namespace decls_block {
     BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;
 
-  using AttachedDeclAttrLayout = BCRecordLayout<
-    Attached_DECL_ATTR,
+  using MacroRoleDeclAttrLayout = BCRecordLayout<
+    MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
-    MacroRoleField,            // macro roles
+    BCFixed<1>,                // macro syntax
+    MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
     BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;

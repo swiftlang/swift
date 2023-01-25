@@ -1320,10 +1320,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_Attached: {
-    Printer.printAttrName("@attached");
+  case DAK_MacroRole: {
+    auto Attr = cast<MacroRoleAttr>(this);
+    switch (Attr->getMacroSyntax()) {
+    case MacroSyntax::Freestanding:
+      Printer.printAttrName("@freestanding");
+      break;
+
+    case MacroSyntax::Attached:
+      Printer.printAttrName("@attached");
+      break;
+    }
     Printer << "(";
-    auto Attr = cast<AttachedAttr>(this);
     Printer << getMacroRoleString(Attr->getMacroRole());
     if (!Attr->getNames().empty()) {
       Printer << ", names: ";
@@ -1520,8 +1528,14 @@ StringRef DeclAttribute::getAttrName() const {
     return "_documentation";
   case DAK_Declaration:
     return "declaration";
-  case DAK_Attached:
-    return "attached";
+  case DAK_MacroRole:
+    switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
+    case MacroSyntax::Freestanding:
+      return "freestanding";
+
+    case MacroSyntax::Attached:
+      return "attached";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2405,27 +2419,27 @@ ArrayRef<MacroIntroducedDeclName> DeclarationAttr::getMemberNames() const {
   };
 }
 
-AttachedAttr::AttachedAttr(SourceLoc atLoc, SourceRange range,
-                           MacroRole role,
-                           ArrayRef<MacroIntroducedDeclName> names,
-                           bool implicit)
-    : DeclAttribute(DAK_Attached, atLoc, range, implicit),
-      role(role), numNames(names.size()) {
+MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
+                             MacroSyntax syntax, MacroRole role,
+                             ArrayRef<MacroIntroducedDeclName> names,
+                             bool implicit)
+    : DeclAttribute(DAK_MacroRole, atLoc, range, implicit),
+      syntax(syntax), role(role), numNames(names.size()) {
   auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
   std::uninitialized_copy(names.begin(), names.end(), trailingNamesBuffer);
 }
 
-AttachedAttr *
-AttachedAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-                     MacroRole role,
-                     ArrayRef<MacroIntroducedDeclName> names,
-                     bool implicit) {
+MacroRoleAttr *
+MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
+                      MacroSyntax syntax, MacroRole role,
+                      ArrayRef<MacroIntroducedDeclName> names,
+                      bool implicit) {
   unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(names.size());
-  auto *mem = ctx.Allocate(size, alignof(AttachedAttr));
-  return new (mem) AttachedAttr(atLoc, range, role, names, implicit);
+  auto *mem = ctx.Allocate(size, alignof(MacroRoleAttr));
+  return new (mem) MacroRoleAttr(atLoc, range, syntax, role, names, implicit);
 }
 
-ArrayRef<MacroIntroducedDeclName> AttachedAttr::getNames() const {
+ArrayRef<MacroIntroducedDeclName> MacroRoleAttr::getNames() const {
   return {
     getTrailingObjects<MacroIntroducedDeclName>(),
     numNames

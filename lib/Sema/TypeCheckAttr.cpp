@@ -162,7 +162,7 @@ public:
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(Expression)
   IGNORED_ATTR(Declaration)
-  IGNORED_ATTR(Attached)
+  IGNORED_ATTR(MacroRole)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

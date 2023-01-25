@@ -9829,7 +9829,7 @@ MacroRoles MacroDecl::getMacroRoles() const {
     contexts |= MacroRole::Expression;
   for (auto attr : getAttrs().getAttributes<DeclarationAttr>())
     contexts |= attr->getMacroRole();
-  for (auto attr : getAttrs().getAttributes<AttachedAttr>())
+  for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
     contexts |= attr->getMacroRole();
   return contexts;
 }

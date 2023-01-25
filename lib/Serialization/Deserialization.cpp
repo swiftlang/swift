@@ -5449,14 +5449,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::Attached_DECL_ATTR: {
+      case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
+        uint8_t rawMacroSyntax;
         uint8_t rawMacroRole;
         uint64_t numNames;
         ArrayRef<uint64_t> introducedDeclNames;
-        serialization::decls_block::AttachedDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroRole, numNames,
-                       introducedDeclNames);
+        serialization::decls_block::MacroRoleDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroSyntax, rawMacroRole,
+                       numNames, introducedDeclNames);
         auto role = *getActualMacroRole(rawMacroRole);
         if (introducedDeclNames.size() != numNames * 2)
           return MF.diagnoseFatal();
@@ -5468,8 +5469,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
               MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
           names.push_back(MacroIntroducedDeclName(*kind, identifier));
         }
-        Attr = AttachedAttr::create(
-            ctx, SourceLoc(), SourceRange(), role, names, isImplicit);
+        Attr = MacroRoleAttr::create(
+            ctx, SourceLoc(), SourceRange(),
+            static_cast<MacroSyntax>(rawMacroSyntax), role, names, isImplicit);
         break;
       }
 

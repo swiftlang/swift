@@ -2377,9 +2377,24 @@ static SmallVector<MacroIntroducedDeclName, 2> getMacroIntroducedNames(
   return names;
 }
 
-ParserResult<AttachedAttr>
-Parser::parseAttachedAttribute(SourceLoc AtLoc, SourceLoc Loc) {
-  StringRef attrName = "attached";
+ParserResult<MacroRoleAttr>
+Parser::parseMacroRoleAttribute(
+    MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
+{
+  StringRef attrName;
+  bool isAttached;
+  switch (syntax) {
+  case MacroSyntax::Freestanding:
+    attrName = "freestanding";
+    isAttached = false;
+    break;
+
+  case MacroSyntax::Attached:
+    attrName = "attached";
+    isAttached = true;
+    break;
+  }
+
   if (!Tok.isFollowingLParen()) {
     diagnose(Tok, diag::attr_expected_lparen, attrName, false);
     return makeParserError();
@@ -2397,15 +2412,15 @@ Parser::parseAttachedAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   ArgumentList *argList = argListResult.get();
 
   // Figure out the role.
-  auto role = getMacroRole(Diags, argList, /*attached=*/true);
+  auto role = getMacroRole(Diags, argList, isAttached);
   if (!role)
     return makeParserError();
 
-  auto names = getMacroIntroducedNames(Diags, argList, /*attached=*/true);
+  auto names = getMacroIntroducedNames(Diags, argList, isAttached);
 
   SourceRange range(Loc, argList->getEndLoc());
-  return makeParserResult(AttachedAttr::create(
-      Context, AtLoc, range, *role, names, /*isImplicit*/ false));
+  return makeParserResult(MacroRoleAttr::create(
+      Context, AtLoc, range, syntax, *role, names, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -3406,8 +3421,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     break;
   }
-  case DAK_Attached: {
-    auto Attr = parseAttachedAttribute(AtLoc, Loc);
+  case DAK_MacroRole: {
+    auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
+                                              : MacroSyntax::Attached);
+    auto Attr = parseMacroRoleAttribute(syntax, AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else

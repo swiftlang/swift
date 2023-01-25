@@ -2341,35 +2341,38 @@ public:
   }
 };
 
-/// The @attached attribute, which declares that a given macro can be
-/// "attached" as an attribute to declarations.
-class AttachedAttr final
+/// A macro role attribute, spelled with either @attached or @freestanding,
+/// which declares one of the roles that a given macro can inhabit.
+class MacroRoleAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<AttachedAttr, MacroIntroducedDeclName> {
+      private llvm::TrailingObjects<MacroRoleAttr, MacroIntroducedDeclName> {
   friend TrailingObjects;
 
+  MacroSyntax syntax;
   MacroRole role;
   unsigned numNames;
 
-  AttachedAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
-               ArrayRef<MacroIntroducedDeclName> names,
-               bool implicit);
+  MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
+                MacroRole role, ArrayRef<MacroIntroducedDeclName> names,
+                bool implicit);
 
 public:
-  static AttachedAttr *create(ASTContext &ctx, SourceLoc atLoc,
-                              SourceRange range, MacroRole role,
-                              ArrayRef<MacroIntroducedDeclName> names,
-                              bool implicit);
+  static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                               SourceRange range, MacroSyntax syntax,
+                               MacroRole role,
+                               ArrayRef<MacroIntroducedDeclName> names,
+                               bool implicit);
 
   size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
     return numNames;
   }
 
+  MacroSyntax getMacroSyntax() const { return syntax; }
   MacroRole getMacroRole() const { return role; }
   ArrayRef<MacroIntroducedDeclName> getNames() const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Attached;
+    return DA->getKind() == DAK_MacroRole;
   }
 };
 
