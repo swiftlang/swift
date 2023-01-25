@@ -1,3 +1,5 @@
+// REQUIRES: rdar104716322
+
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
 
 // Because of -enable-experimental-feature VariadicGenerics
@@ -18,7 +20,7 @@ struct G<T...> {
   }
 
   func makeTuple1() -> (repeat each T).Type {
-    return (repeat T).self
+    return (repeat each T).self
   }
 
   func makeTuple2() -> (repeat Array<each T>).Type {

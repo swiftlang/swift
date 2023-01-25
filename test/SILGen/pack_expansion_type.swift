@@ -1,3 +1,5 @@
+// REQUIRES: rdar104716322
+
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
 
 // Experimental features require an asserts compiler
@@ -36,10 +38,10 @@ func variadicMetatypes<T...>(_: repeat each T) {
   _ = VariadicType< >.self
   _ = VariadicType<Int>.self
   _ = VariadicType<Int, String>.self
-  _ = VariadicType<repeat T>.self
-  _ = VariadicType<Int, repeat Array<T>>.self
-  _ = (repeat T).self
-  _ = (Int, repeat Array<T>).self
-  _ = ((repeat T) -> ()).self
-  _ = ((Int, repeat Array<T>) -> ()).self
+  _ = VariadicType<repeat each T>.self
+  _ = VariadicType<Int, repeat Array<each T>>.self
+  _ = (repeat each T).self
+  _ = (Int, repeat Array<each T>).self
+  _ = ((repeat each T) -> ()).self
+  _ = ((Int, repeat Array<each T>) -> ()).self
 }

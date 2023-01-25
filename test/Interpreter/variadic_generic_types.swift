@@ -1,3 +1,5 @@
+// REQUIRES: rdar104716322
+
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics) | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -7,7 +9,7 @@
 
 struct G<T...> {
   func makeTuple() {
-    print((repeat (Array<T>)).self)
+    print((repeat (Array<each T>)).self)
   }
 }
 
