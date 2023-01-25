@@ -2,6 +2,7 @@
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
+// XFAIL: *
 
 // This test used to crash in IRGen because of mismatching pointer types.
 

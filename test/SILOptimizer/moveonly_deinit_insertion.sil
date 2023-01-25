@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name main -enable-sil-verify-all -sil-move-only-deinit-insertion -enable-experimental-move-only %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name main -enable-sil-verify-all -sil-move-only-deinit-insertion -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
 sil_stage raw
 

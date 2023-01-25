@@ -501,9 +501,11 @@ struct SimplifyCFGSimplifyArgument : UnitTest {
     auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
     passToRun->injectPassManager(getPass()->getPassManager());
     passToRun->injectFunction(getFunction());
+    auto *block = arguments.takeBlock();
+    auto index = arguments.takeUInt();
     SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
                 /*EnableJumpThread=*/false)
-        .simplifyArgument(arguments.takeBlock(), arguments.takeUInt());
+        .simplifyArgument(block, index);
   }
 };
 

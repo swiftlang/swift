@@ -3128,6 +3128,24 @@ public:
                            evaluator::SideEffect) const;
 };
 
+/// Resolve a given custom attribute to an attached macro declaration.
+class ResolveAttachedMacroRequest
+    : public SimpleRequest<ResolveAttachedMacroRequest,
+                           MacroDecl *(CustomAttr *, DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  MacroDecl *
+  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeEraserTypeRequest
     : public SimpleRequest<ResolveTypeEraserTypeRequest,
                            Type (ProtocolDecl *, TypeEraserAttr *),

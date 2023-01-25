@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-move-only -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
 sil_stage raw
 

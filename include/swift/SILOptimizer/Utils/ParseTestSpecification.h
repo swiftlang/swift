@@ -19,9 +19,12 @@
 
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FormattedStream.h"
 
 namespace llvm {
 template <class T>
@@ -68,10 +71,15 @@ protected:
 
 public:
   Kind getKind() const { return kind; }
+  void print(llvm::raw_ostream &os);
+#ifndef NDEBUG
+  void dump() { print(llvm::errs()); }
+#endif
 };
 
-template <typename Stored, Argument::Kind TheKind>
+template <typename _Stored, Argument::Kind TheKind>
 struct ConcreteArgument : Argument {
+  using Stored = _Stored;
   using Super = ConcreteArgument<Stored, TheKind>;
   ConcreteArgument(Stored stored) : Argument(Union{stored}, TheKind) {}
   Stored getValue() { return storage.get<Stored>(); }
@@ -142,13 +150,28 @@ struct Arguments {
   Arguments &operator=(Arguments const &) = delete;
   ~Arguments() { assertUsed(); }
   Argument &takeArgument() { return storage[untakenIndex++]; }
-  StringRef takeString() {
-    return cast<StringArgument>(takeArgument()).getValue();
+
+private:
+  template <typename Subtype>
+  typename Subtype::Stored getInstance(StringRef name, Argument &argument) {
+    if (isa<Subtype>(argument)) {
+      auto string = cast<Subtype>(argument).getValue();
+      return string;
+    }
+    llvm::errs() << "Attempting to take a " << name << " argument but have\n";
+    argument.print(llvm::errs());
+    llvm::report_fatal_error("Bad unit test");
   }
-  bool takeBool() { return cast<BoolArgument>(takeArgument()).getValue(); }
-  unsigned long long takeUInt() {
-    return cast<UIntArgument>(takeArgument()).getValue();
+  template <typename Subtype>
+  typename Subtype::Stored takeInstance(StringRef name) {
+    auto argument = takeArgument();
+    return getInstance<Subtype>(name, argument);
   }
+
+public:
+  StringRef takeString() { return takeInstance<StringArgument>("string"); }
+  bool takeBool() { return takeInstance<BoolArgument>("bool"); }
+  unsigned long long takeUInt() { return takeInstance<UIntArgument>("uint"); }
   SILValue takeValue() {
     auto argument = takeArgument();
     if (isa<InstructionArgument>(argument)) {
@@ -159,22 +182,18 @@ struct Arguments {
       auto *arg = cast<BlockArgumentArgument>(argument).getValue();
       return arg;
     }
-    return cast<ValueArgument>(argument).getValue();
+    return getInstance<ValueArgument>("value", argument);
   }
-  Operand *takeOperand() {
-    return cast<OperandArgument>(takeArgument()).getValue();
-  }
+  Operand *takeOperand() { return takeInstance<OperandArgument>("operand"); }
   SILInstruction *takeInstruction() {
-    return cast<InstructionArgument>(takeArgument()).getValue();
+    return takeInstance<InstructionArgument>("instruction");
   }
   SILArgument *takeBlockArgument() {
-    return cast<BlockArgumentArgument>(takeArgument()).getValue();
+    return takeInstance<BlockArgumentArgument>("block argument");
   }
-  SILBasicBlock *takeBlock() {
-    return cast<BlockArgument>(takeArgument()).getValue();
-  }
+  SILBasicBlock *takeBlock() { return takeInstance<BlockArgument>("block"); }
   SILFunction *takeFunction() {
-    return cast<FunctionArgument>(takeArgument()).getValue();
+    return takeInstance<FunctionArgument>("block");
   }
 };
 

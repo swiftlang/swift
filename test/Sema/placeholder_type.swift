@@ -266,3 +266,7 @@ func deferredInit(_ c: Bool) {
     x = "Goodbye"
   }
 }
+
+// https://github.com/apple/swift/issues/63130
+let _: _  = nil // expected-error{{'nil' requires a contextual type}}
+let _: _? = nil // expected-error{{'nil' requires a contextual type}}

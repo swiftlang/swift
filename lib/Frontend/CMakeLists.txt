@@ -33,3 +33,10 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSymbolGraphGen)
 
 set_swift_llvm_is_available(swiftFrontend)
+
+if (SWIFT_SWIFT_PARSER)
+  target_compile_definitions(swiftFrontend
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+    )
+endif()

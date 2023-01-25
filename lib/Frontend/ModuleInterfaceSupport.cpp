@@ -69,15 +69,24 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
     out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
            moduleName << "=" << moduleName;
 
-    SmallVector<ImportedModule> imports;
-    M->getImportedModules(imports,
-                          {ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilter filter = {ModuleDecl::ImportFilterKind::Default,
                            ModuleDecl::ImportFilterKind::Exported,
-                           ModuleDecl::ImportFilterKind::SPIOnly,
-                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+                           ModuleDecl::ImportFilterKind::SPIAccessControl};
+    if (Opts.PrintPrivateInterfaceContent)
+      filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+
+    SmallVector<ImportedModule> imports;
+    M->getImportedModules(imports, filter);
     M->getMissingImportedModules(imports);
+
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
+      // Skip Swift as it's commonly used in inlinable code,
+      // and Builtin as it's imported implicitly by name.
+      if (importedName == STDLIB_NAME ||
+          importedName == BUILTIN_NAME)
+        continue;
+
       if (AliasModuleNamesTargets.insert(importedName).second) {
         out << " -module-alias " << MODULE_DISAMBIGUATING_PREFIX <<
                importedName << "=" << importedName;
@@ -212,7 +221,9 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
 /// source declarations.
 static void printImports(raw_ostream &out,
                          ModuleInterfaceOptions const &Opts,
-                         ModuleDecl *M) {
+                         ModuleDecl *M,
+                         const llvm::SmallSet<StringRef, 4>
+                           &AliasModuleNamesTargets) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
@@ -322,7 +333,8 @@ static void printImports(raw_ostream &out,
     }
 
     out << "import ";
-    if (Opts.AliasModuleNames)
+    if (Opts.AliasModuleNames &&
+        AliasModuleNamesTargets.contains(importedModule->getName().str()))
       out << MODULE_DISAMBIGUATING_PREFIX;
     importedModule->getReverseFullModuleName().printForward(out);
 
@@ -786,7 +798,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   llvm::SmallSet<StringRef, 4> aliasModuleNamesTargets;
   printToolVersionAndFlagsComment(out, Opts, M, aliasModuleNamesTargets);
 
-  printImports(out, Opts, M);
+  printImports(out, Opts, M, aliasModuleNamesTargets);
 
   static bool forceUseExportedModuleNameInPublicOnly =
     getenv("SWIFT_DEBUG_USE_EXPORTED_MODULE_NAME_IN_PUBLIC_ONLY");

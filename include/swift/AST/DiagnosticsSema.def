@@ -3351,6 +3351,14 @@ ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %1",
       (DeclAttribute, DescriptiveDeclKind))
 
+ERROR(attr_incompatible_with_override,none,
+      "'%0' cannot be combined with 'override'",
+      (DeclAttribute))
+
+ERROR(attr_incompatible_with_objc,none,
+      "'%0' must not be used on an '@objc' %1",
+      (DeclAttribute, DescriptiveDeclKind))
+
 ERROR(final_not_on_accessors,none,
       "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
@@ -6696,7 +6704,7 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
       (TypeRepr*, StringRef))
 
 ERROR(moveOnly_not_allowed_here,none,
-      "'moveOnly' may only be applied to classes, structs, and enums", ())
+      "'moveOnly' only applies to structs or enums", ())
 ERROR(move_expression_not_passed_lvalue,none,
       "'move' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,

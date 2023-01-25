@@ -46,6 +46,9 @@ public protocol Countable {
 public enum BadError: Error, Equatable {
   /// Indicates badness
   case bad
+
+  /// Even worse
+  case reallyBad
 }
 
 
@@ -125,6 +128,10 @@ extension IntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  public init() { self.init([]) }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
   public func print() {
     // Tests recursive @_backDeploy since `Array.print()` is also @_backDeploy
     _values.print()
@@ -161,6 +168,10 @@ extension IntArray {
 }
 
 extension ReferenceIntArray {
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public convenience init() { self.init([]) }
+
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public final var values: [Int] { _values }
@@ -213,6 +224,18 @@ extension Array {
   @_backDeploy(before: BackDeploy 2.0)
   public func print() {
     testPrint(handle: #dsohandle, description)
+  }
+}
+
+extension BadError {
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public init?(fromEmoji emoji: Character) {
+    switch emoji {
+    case "❗️": self = .bad
+    case "‼️": self = .reallyBad
+    default: return nil
+    }
   }
 }
 
