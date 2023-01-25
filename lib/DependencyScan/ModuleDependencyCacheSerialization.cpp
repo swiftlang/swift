@@ -1033,7 +1033,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
       auto optionalDependencyInfo = cache.findDependency(moduleID.first, moduleID.second);
       assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
-      auto dependencyInfo = optionalDependencyInfo.getValue();
+      auto dependencyInfo = optionalDependencyInfo.value();
       // Add the module's name
       addIdentifier(moduleID.first);
       // Add the module's dependencies

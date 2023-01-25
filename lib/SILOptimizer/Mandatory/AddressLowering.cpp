@@ -1386,7 +1386,7 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
   for (auto maybeAlloc : allocs) {
     // An allocation may be erased when coalescing block arguments.
-    if (!maybeAlloc.hasValue())
+    if (!maybeAlloc.has_value())
       continue;
 
     auto *alloc = maybeAlloc.value();

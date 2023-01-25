@@ -839,7 +839,7 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
     LLVM_DEBUG(llvm::dbgs() << "    Not live! Checking for dead args!\n");
     for (SILArgument *deadArg : block->getArguments()) {
       auto iter = defs.find(deadArg);
-      if (iter.hasValue() &&
+      if (iter.has_value() &&
           llvm::any_of(*iter, [&](TypeTreeLeafTypeRange span) {
             return span.contains(bitNo);
           })) {

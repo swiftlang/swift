@@ -742,7 +742,7 @@ SourceFile *getContainingFile(ModuleDecl *M, RangeConfig Range) {
   SmallVector<SourceFile*, 4> Files;
   for (auto File : collectSourceFiles(M, Files)) {
     if (File->getBufferID()) {
-      if (File->getBufferID().getValue() == Range.BufferId) {
+      if (File->getBufferID().value() == Range.BufferId) {
         return File;
       }
     }
@@ -856,15 +856,15 @@ isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
                ValueRefInfo->isKeywordArgument()};
 
   auto RenameOp = getAvailableRenameForDecl(ValueRefInfo->getValueD(), RefInfo);
-  return RenameOp.hasValue() &&
-    RenameOp.getValue() == RefactoringKind::LocalRename;
+  return RenameOp.has_value() &&
+    RenameOp.value() == RefactoringKind::LocalRename;
 }
 
 static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                                DiagnosticEngine &Diags,
                                SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
-  if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
+  if (!getAvailableRenameForDecl(VD, RefInfo).has_value()) {
     Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
     return;
   }
@@ -1217,7 +1217,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   if (Instance->setup(Invocation, InstanceSetupError))
     llvm_unreachable(InstanceSetupError.c_str());
 
-  unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
+  unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().value();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
@@ -2986,7 +2986,7 @@ static void collectAvailableRefactoringsAtCursor(
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
+  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().value(), Line, Column);
   if (Loc.isInvalid())
     return;
 
@@ -4853,7 +4853,7 @@ struct CallbackCondition {
     }
   }
 
-  bool isValid() const { return Type.hasValue(); }
+  bool isValid() const { return Type.has_value(); }
 
 private:
   void initFromEnumPattern(const Decl *D, const EnumElementPattern *EEP) {
@@ -8079,7 +8079,7 @@ private:
     // type. If this is for an Error? parameter, we'll need to add parens around
     // the cast to silence a compiler warning about force casting never
     // producing nil.
-    auto RequiresParens = HandlerDesc.getErrorParam().hasValue();
+    auto RequiresParens = HandlerDesc.getErrorParam().has_value();
     if (RequiresParens)
       OS << tok::l_paren;
 
@@ -8548,7 +8548,7 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
     llvm::raw_string_ostream OS(NewText);
     StringRef Tag = tag(Range.RangeKind);
     OS << "<" << Tag;
-    if (Range.Index.hasValue())
+    if (Range.Index.has_value())
       OS << " index=" << *Range.Index;
     OS << ">" << Range.Range.str() << "</" << Tag << ">";
     pRewriter->accept(SM, {Range.Range, OS.str(), {}});
@@ -8666,9 +8666,9 @@ void swift::ide::collectAvailableRefactorings(
                    ValueRefInfo.isKeywordArgument()};
       auto RenameOp =
           getAvailableRenameForDecl(ValueRefInfo.getValueD(), RefInfo);
-      if (RenameOp.hasValue() &&
-          RenameOp.getValue() == RefactoringKind::GlobalRename)
-        Kinds.push_back(RenameOp.getValue());
+      if (RenameOp.has_value() &&
+          RenameOp.value() == RefactoringKind::GlobalRename)
+        Kinds.push_back(RenameOp.value());
     }
     }
   }
@@ -8748,7 +8748,7 @@ static std::vector<ResolvedLoc>
 resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
                        DiagnosticEngine &Diags) {
   SourceManager &SM = SF.getASTContext().SourceMgr;
-  unsigned BufferID = SF.getBufferID().getValue();
+  unsigned BufferID = SF.getBufferID().value();
 
   std::vector<UnresolvedLoc> UnresolvedLocs;
   for (const RenameLoc &RenameLoc : RenameLocs) {
