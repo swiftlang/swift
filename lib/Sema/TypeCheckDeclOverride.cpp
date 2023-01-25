@@ -1626,7 +1626,6 @@ namespace  {
 
     UNINTERESTING_ATTR(RuntimeMetadata)
 
-    UNINTERESTING_ATTR(Expression)
     UNINTERESTING_ATTR(Declaration)
     UNINTERESTING_ATTR(MacroRole)
 #undef UNINTERESTING_ATTR

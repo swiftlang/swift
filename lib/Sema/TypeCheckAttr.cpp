@@ -160,7 +160,6 @@ public:
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeploy)
   IGNORED_ATTR(Documentation)
-  IGNORED_ATTR(Expression)
   IGNORED_ATTR(Declaration)
   IGNORED_ATTR(MacroRole)
 #undef IGNORED_ATTR

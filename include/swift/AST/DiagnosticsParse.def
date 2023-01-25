@@ -2043,6 +2043,8 @@ ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
       "introduced name kind %0 requires a single argument '(name)'", (Identifier))
 ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
       "introduced name kind %0 must not have an argument", (Identifier))
+WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
+      "@expression has been removed in favor of @freestanding(expression)", ())
 
 ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
       "unexpected token '%0' in expanded attribute list'",

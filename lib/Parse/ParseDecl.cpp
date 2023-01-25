@@ -3779,6 +3779,17 @@ ParserStatus Parser::parseDeclAttribute(
     return makeParserSuccess();
   }
 
+  // Old spelling for @freestanding(expression).
+  if (DK == DAK_Count && Tok.getText() == "expression") {
+    SourceLoc attrLoc = consumeToken();
+    diagnose(attrLoc, diag::macro_expression_attribute_removed)
+      .fixItReplace(SourceRange(AtLoc, attrLoc), "@freestanding(expression)");
+    return makeParserResult(MacroRoleAttr::create(
+        Context, AtLoc, SourceRange(AtLoc, attrLoc),
+        MacroSyntax::Freestanding, MacroRole::Expression, { },
+        /*isImplicit*/ false));
+  }
+
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK)) {
     parseNewDeclAttribute(Attributes, AtLoc, DK, isFromClangAttribute);
     return makeParserSuccess();
