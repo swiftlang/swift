@@ -318,6 +318,9 @@ public:
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
+  /// Always recompile the output even the module hash might match.
+  unsigned AlwaysCompile : 1;
+
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
@@ -481,7 +484,7 @@ public:
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         Playground(false),
         EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
-        FunctionSections(false), PrintInlineTree(false),
+        FunctionSections(false), PrintInlineTree(false), AlwaysCompile(false),
         EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),

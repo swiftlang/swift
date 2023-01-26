@@ -1179,6 +1179,9 @@ def enable_emit_generic_class_ro_t_list :
 def enable_swift_deterministic_check :
   Flag<["-"], "enable-swift-deterministic-check">,
   HelpText<"Check swift compiler output determinisim by run it twice">;
+def always_compile_output_files :
+  Flag<["-"], "always-compile-output-files">,
+  HelpText<"Always compile output files even it might not change the results">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

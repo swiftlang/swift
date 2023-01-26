@@ -556,7 +556,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     ArrayRef<uint8_t> HashData(reinterpret_cast<uint8_t *>(&hash),
                                sizeof(hash));
     if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
-        !Opts.PrintInlineTree &&
+        !Opts.PrintInlineTree && !Opts.AlwaysCompile &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
       // The llvm IR did not change. We don't need to re-create the object file.
       return false;
