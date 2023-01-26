@@ -122,7 +122,7 @@ public:
   enum { NumAssignOwnershipQualifierBits = 2 };
   enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
-  enum { NumSILAccessEnforcementBits = 2 };
+  enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
 
 protected:
