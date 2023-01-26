@@ -484,6 +484,9 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
 def package_name : Separate<["-"], "package-name">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Name of the package the module belongs to">;
+def export_as : Separate<["-"], "export-as">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Module name to use when referenced in clients module interfaces">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
