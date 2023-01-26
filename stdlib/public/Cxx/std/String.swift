@@ -35,6 +35,12 @@ extension std.string: CustomDebugStringConvertible {
   }
 }
 
+extension std.string: CustomStringConvertible {
+  public var description: String {
+    return String(cxxString: self)
+  }
+}
+
 extension String {
   /// Creates a String having the same content as the given C++ string.
   ///
