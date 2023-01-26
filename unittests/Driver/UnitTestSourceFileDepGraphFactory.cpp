@@ -58,7 +58,7 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
   const Optional<Fingerprint> fingerprint =
     swift::mockFingerprintFromString(fingerprintString);
 
-  AbstractSourceFileDepGraphFactory::addADefinedDecl(key.getValue(),
+  AbstractSourceFileDepGraphFactory::addADefinedDecl(key.value(),
                                                      fingerprint);
 }
 
@@ -80,7 +80,7 @@ UnitTestSourceFileDepGraphFactory::computeUseKey(StringRef s,
       isCascadingUse ? DeclAspect::interface : DeclAspect::implementation;
 
   if (!s.empty())
-    return parseADefinedDecl(s, kindOfUse, aspectOfUse).getValue();
+    return parseADefinedDecl(s, kindOfUse, aspectOfUse).value();
   StringRef swiftDepsRef(swiftDeps);
   return DependencyKey::Builder(NodeKind::sourceFileProvide, aspectOfUse)
           .withName(swiftDepsRef)
@@ -155,7 +155,7 @@ UnitTestSourceFileDepGraphFactory::parseContext(const StringRef s,
                                                 const NodeKind kind) {
   return !singleNameIsContext(kind)
              ? s.split(nameContextSeparator).first.str()
-             : singleNameIsContext(kind).getValue() ? s.str() : "";
+             : singleNameIsContext(kind).value() ? s.str() : "";
 }
 
 std::string UnitTestSourceFileDepGraphFactory::parseName(const StringRef s,
@@ -163,7 +163,7 @@ std::string UnitTestSourceFileDepGraphFactory::parseName(const StringRef s,
   const std::string name =
       !singleNameIsContext(kind)
           ? s.split(nameContextSeparator).second.str()
-          : singleNameIsContext(kind).getValue() ? "" : s.str();
+          : singleNameIsContext(kind).value() ? "" : s.str();
   assert(kind != NodeKind::member ||
          !name.empty() && "Should be a potentialMember");
   return name;

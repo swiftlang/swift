@@ -148,7 +148,7 @@ public:
     if (Iter == Map.end())
       return ValueT();
     auto &P = Vector[Iter->second];
-    if (!P.hasValue())
+    if (!P.has_value())
       return ValueT();
     return P->second;
   }
