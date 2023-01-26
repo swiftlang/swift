@@ -7159,3 +7159,21 @@ ASTNode constraints::findAsyncNode(ClosureExpr *closure) {
     return ASTNode();
   return body->findAsyncNode();
 }
+
+void constraints::dumpAnchor(ASTNode anchor, SourceManager *SM,
+                             raw_ostream &out) {
+  if (auto *expr = anchor.dyn_cast<Expr *>()) {
+    out << Expr::getKindName(expr->getKind());
+    if (SM) {
+      out << '@';
+      expr->getLoc().print(out, *SM);
+    }
+  } else if (auto *pattern = anchor.dyn_cast<Pattern *>()) {
+    out << Pattern::getKindName(pattern->getKind()) << "Pattern";
+    if (SM) {
+      out << '@';
+      pattern->getLoc().print(out, *SM);
+    }
+  }
+  // TODO(diagnostics): Implement the rest of the cases.
+}
