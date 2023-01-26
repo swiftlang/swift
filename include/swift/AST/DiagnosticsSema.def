@@ -6860,8 +6860,8 @@ WARNING(macro_type_access_warn,none,
         (bool, AccessLevel, AccessLevel, bool))
 ERROR(macro_in_nested,none,
       "macro %0 can only be declared at file scope", (DeclName))
-ERROR(macro_without_context,none,
-      "macro %0 must declare its applicable contexts (e.g., '@expression')",
+ERROR(macro_without_role,none,
+      "macro %0 must declare its applicable roles via '@freestanding' or @attached'",
        (DeclName))
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))

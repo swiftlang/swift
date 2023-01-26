@@ -117,6 +117,29 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   }
 }
 
+extension MacroExpansionDeclSyntax {
+  func asMacroExpansionExpr() -> MacroExpansionExprSyntax {
+    MacroExpansionExprSyntax(
+      unexpectedBeforePoundToken,
+      poundToken: poundToken,
+      unexpectedBetweenPoundTokenAndMacro,
+      macro: macro,
+      genericArguments: genericArguments,
+      unexpectedBetweenGenericArgumentsAndLeftParen,
+      leftParen: leftParen,
+      unexpectedBetweenLeftParenAndArgumentList,
+      argumentList: argumentList,
+      unexpectedBetweenArgumentListAndRightParen,
+      rightParen: rightParen,
+      unexpectedBetweenRightParenAndTrailingClosure,
+      trailingClosure: trailingClosure,
+      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
+      additionalTrailingClosures: additionalTrailingClosures,
+      unexpectedAfterAdditionalTrailingClosures
+    )
+  }
+}
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
@@ -169,10 +192,16 @@ func evaluateMacro(
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      guard let parentExpansion = parentSyntax.as(MacroExpansionExprSyntax.self) else {
-        print("not on a macro expansion node: \(token.recursiveDescription)")
+      let parentExpansion: MacroExpansionExprSyntax
+      if let expansionExpr = parentSyntax.as(MacroExpansionExprSyntax.self) {
+        parentExpansion = expansionExpr
+      } else if let expansionDecl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
+        parentExpansion = expansionDecl.asMacroExpansionExpr()
+      } else {
+        print("not on a macro expansion node: \(parentSyntax.recursiveDescription)")
         return -1
       }
+
       macroName = parentExpansion.macro.withoutTrivia().description
       evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 

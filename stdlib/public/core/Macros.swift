@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=5.8) && hasAttribute(expression)
+#if compiler(>=5.8) && hasAttribute(freestanding)
 /// Specifies the module and type name for an externally-defined macro, which
 /// must conform to the appropriate set of `Macro` protocols.
 ///
@@ -20,7 +20,7 @@
 ///        #externalMacro(module: "ExampleMacros", type :"StringifyMacro")
 ///
 /// Use of this macro in any other context is an error.
-@expression
+@freestanding(expression)
 public macro externalMacro<T>(module: String, type: String) -> T =
     Builtin.ExternalMacro
 
