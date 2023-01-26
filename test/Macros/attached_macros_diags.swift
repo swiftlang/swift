@@ -17,7 +17,7 @@
 @attached(accessor) macro m3(message: String) -> Void = #externalMacro(module: "MyMacros", type: "Macro3")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro3' could not be found for macro 'm3(message:)'}}
 
-@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MyMacros", type: "StringifyMacro")
+@freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MyMacros", type: "StringifyMacro")
 // expected-warning@-1{{external macro implementation type 'MyMacros.StringifyMacro' could not be found for macro 'stringify'}}
 // expected-note@-2{{'stringify' declared here}}
 

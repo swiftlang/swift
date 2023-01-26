@@ -31,3 +31,7 @@ module SynthesizedProtocol {
   header "synthesized_protocol.h"
   export *
 }
+
+module PointerAuth {
+   header "ptrauth_field_fptr_import.h"
+ }

@@ -138,8 +138,8 @@ actor MyGlobalActor {
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 // KEYWORD4-NEXT:             Keyword/None:                       typeWrapper[#Enum Attribute#]; name=typeWrapper
+// KEYWORD4-NEXT:             Keyword/None:                       runtimeMetadata[#Enum Attribute#]; name=runtimeMetadata
 // KEYWORD4-NEXT:             End completions
-
 
 @#^KEYWORD5^# struct S{}
 // KEYWORD5:                  Begin completions
@@ -315,8 +315,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
 // ON_MEMBER_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
-// ON_MEMBER_LAST-DAG: Keyword/None:                       expression[#Declaration Attribute#]; name=expression
-// ON_MEMBER_LAST-DAG: Keyword/None:                       declaration[#Declaration Attribute#]; name=declaration
 // ON_MEMBER_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -390,8 +388,6 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // KEYWORD_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
 // KEYWORD_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
-// KEYWORD_LAST-DAG: Keyword/None:                       expression[#Declaration Attribute#]; name=expression
-// KEYWORD_LAST-DAG: Keyword/None:                       declaration[#Declaration Attribute#]; name=declaration
 // KEYWORD_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

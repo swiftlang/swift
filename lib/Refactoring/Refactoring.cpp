@@ -912,6 +912,11 @@ bool RefactoringActionLocalRename::performChange() {
   auto ValueRefCursorInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
   if (ValueRefCursorInfo && ValueRefCursorInfo->getValueD()) {
     ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
+    // The index always uses the outermost shadow for references
+    if (!ValueRefCursorInfo->getShorthandShadowedDecls().empty()) {
+      VD = ValueRefCursorInfo->getShorthandShadowedDecls().back();
+    }
+
     SmallVector<DeclContext *, 8> Scopes;
 
     Optional<RenameRefInfo> RefInfo;

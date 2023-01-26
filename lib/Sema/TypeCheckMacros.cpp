@@ -568,11 +568,11 @@ BraceStmt *swift::expandFreestandingCodeItemMacro(MacroExpansionDecl *med) {
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
-  assert(macro->getMacroRoles()
-         .contains(MacroRole::Declaration));
+  assert(macro->getMacroRoles().contains(MacroRole::Declaration));
 
-  if (isFromExpansionOfMacro(sourceFile, macro,
-                             MacroRole::Declaration)) {
+  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::CodeItem)) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return nullptr;
   }

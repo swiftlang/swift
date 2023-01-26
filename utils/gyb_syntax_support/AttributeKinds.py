@@ -718,7 +718,7 @@ DECL_ATTR_KINDS = [
                         code=138),
 
     SimpleDeclAttribute('runtimeMetadata', 'RuntimeMetadata',
-                        OnStruct, OnClass,
+                        OnStruct, OnClass, OnEnum,
                         ABIBreakingToAdd, ABIBreakingToRemove, APIBreakingToAdd, APIBreakingToRemove,  # noqa: E501
                         code=139)
 ]
@@ -903,20 +903,11 @@ DECL_MODIFIER_KINDS = [
                                   ABIBreakingToAdd, ABIBreakingToRemove,
                                   APIBreakingToAdd, APIBreakingToRemove,
                                   code=130),
-
-    SimpleDeclAttribute('expression', 'Expression',
-                        OnMacro,
-                        ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
-                        code=140),
-
-    DeclAttribute('declaration', 'Declaration',
-                  OnMacro, AllowMultipleAttributes,
-                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
-                  code=141),
-    DeclAttribute('attached', 'Attached',
+    DeclAttribute('attached', 'MacroRole',
                   OnMacro, AllowMultipleAttributes,
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
                   code=142),
+    DeclAttributeAlias('freestanding', 'MacroRole'),
 ]
 
 DEPRECATED_MODIFIER_KINDS = [

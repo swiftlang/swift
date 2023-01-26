@@ -2012,7 +2012,7 @@ public:
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroRoles())
-      MD->diagnose(diag::macro_without_context, MD->getName());
+      MD->diagnose(diag::macro_without_role, MD->getName());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
@@ -3702,10 +3702,13 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
   // Non-call declaration macros cannot be overloaded.
   MacroRoles viableRoles(MacroRole::Declaration);
-  // In a code block context, a macro expansion decl can also represent a
-  // macro expansion expression.
-  if (dc->isLocalContext() || dc->getContextKind() == DeclContextKind::FileUnit)
+  // In a code block context, a macro expansion decl can also expand to an
+  // arbitrary code item.
+  if (dc->isLocalContext() ||
+      dc->getContextKind() == DeclContextKind::FileUnit) {
     viableRoles |= MacroRole::Expression;
+    viableRoles |= MacroRole::CodeItem;
+  }
   SmallVector<MacroDecl *, 4> foundMacros;
   auto foundRoles = TypeChecker::lookupMacros(
       MED->getDeclContext(), MED->getMacro(), MED->getLoc(), viableRoles,

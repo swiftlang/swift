@@ -1101,13 +1101,11 @@ public:
   bool parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
                                            Optional<AccessLevel> &Visibility);
 
-  /// Parse the @declaration attribute.
-  ParserResult<DeclarationAttr> parseDeclarationAttribute(SourceLoc AtLoc,
-                                                          SourceLoc Loc);
-
-  /// Parse the @attached attribute.
-  ParserResult<AttachedAttr> parseAttachedAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  /// Parse the @attached or @freestanding attribute that specifies a macro
+  /// role.
+  ParserResult<MacroRoleAttr> parseMacroRoleAttribute(
+      MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
+  );
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,

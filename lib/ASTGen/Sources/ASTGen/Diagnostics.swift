@@ -244,13 +244,17 @@ public func addQueuedDiagnostic(
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
 public func renterQueuedDiagnostics(
   queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>,
+  contextSize: Int,
+  colorize: Int,
   renderedPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
   renderedLength: UnsafeMutablePointer<Int>
 ) {
   queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
     let renderedStr = DiagnosticsFormatter.annotatedSource(
       tree: queuedDiagnostics.pointee.sourceFile,
-      diags: queuedDiagnostics.pointee.diagnostics
+      diags: queuedDiagnostics.pointee.diagnostics,
+      contextSize: contextSize,
+      colorize: colorize != 0
     )
 
     (renderedPointer.pointee, renderedLength.pointee) =

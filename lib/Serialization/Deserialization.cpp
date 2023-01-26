@@ -2654,7 +2654,7 @@ getActualMacroRole(uint8_t context) {
   case (uint8_t)serialization::MacroRole::THE_DK: \
     return swift::MacroRole::THE_DK;
   CASE(Expression)
-  CASE(FreestandingDeclaration)
+  CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
 #undef CASE
@@ -5421,42 +5421,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::Declaration_DECL_ATTR: {
+      case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
-        uint8_t rawMacroRole;
-        uint64_t numPeers, numMembers;
-        ArrayRef<uint64_t> introducedDeclNames;
-        serialization::decls_block::DeclarationDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroRole, numPeers,
-                       numMembers, introducedDeclNames);
-        auto role = *getActualMacroRole(rawMacroRole);
-        if (introducedDeclNames.size() != (numPeers + numMembers) * 2)
-          return MF.diagnoseFatal();
-        SmallVector<MacroIntroducedDeclName, 1> peersAndMembers;
-        ArrayRef<MacroIntroducedDeclName> peersAndMembersRef;
-        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
-          auto kind = getActualMacroIntroducedDeclNameKind(
-              (uint8_t)introducedDeclNames[i]);
-          auto identifier =
-              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
-          peersAndMembers.push_back(MacroIntroducedDeclName(*kind, identifier));
-        }
-        Attr = DeclarationAttr::create(
-            ctx, SourceLoc(), SourceRange(), role,
-            peersAndMembersRef.take_front(numPeers),
-            peersAndMembersRef.take_back(numMembers),
-            isImplicit);
-        break;
-      }
-
-      case decls_block::Attached_DECL_ATTR: {
-        bool isImplicit;
+        uint8_t rawMacroSyntax;
         uint8_t rawMacroRole;
         uint64_t numNames;
         ArrayRef<uint64_t> introducedDeclNames;
-        serialization::decls_block::AttachedDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroRole, numNames,
-                       introducedDeclNames);
+        serialization::decls_block::MacroRoleDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroSyntax, rawMacroRole,
+                       numNames, introducedDeclNames);
         auto role = *getActualMacroRole(rawMacroRole);
         if (introducedDeclNames.size() != numNames * 2)
           return MF.diagnoseFatal();
@@ -5468,8 +5441,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
               MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
           names.push_back(MacroIntroducedDeclName(*kind, identifier));
         }
-        Attr = AttachedAttr::create(
-            ctx, SourceLoc(), SourceRange(), role, names, isImplicit);
+        Attr = MacroRoleAttr::create(
+            ctx, SourceLoc(), SourceRange(),
+            static_cast<MacroSyntax>(rawMacroSyntax), role, names, isImplicit);
         break;
       }
 

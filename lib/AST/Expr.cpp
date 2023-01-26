@@ -1918,19 +1918,7 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
     P->setDeclContextOfParamDecls(this);
 }
 
-bool AbstractClosureExpr::hasBody() const {
-  switch (getKind()) {
-    case ExprKind::Closure:
-    case ExprKind::AutoClosure:
-      return true;
-    default:
-      return false;
-  }
-}
-
 BraceStmt * AbstractClosureExpr::getBody() const {
-  if (!hasBody())
-    return nullptr;
   if (const AutoClosureExpr *autocls = dyn_cast<AutoClosureExpr>(this))
     return autocls->getBody();
   if (const ClosureExpr *cls = dyn_cast<ClosureExpr>(this))

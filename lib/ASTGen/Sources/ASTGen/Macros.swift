@@ -117,6 +117,29 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   }
 }
 
+extension MacroExpansionDeclSyntax {
+  func asMacroExpansionExpr() -> MacroExpansionExprSyntax {
+    MacroExpansionExprSyntax(
+      unexpectedBeforePoundToken,
+      poundToken: poundToken,
+      unexpectedBetweenPoundTokenAndMacro,
+      macro: macro,
+      genericArguments: genericArguments,
+      unexpectedBetweenGenericArgumentsAndLeftParen,
+      leftParen: leftParen,
+      unexpectedBetweenLeftParenAndArgumentList,
+      argumentList: argumentList,
+      unexpectedBetweenArgumentListAndRightParen,
+      rightParen: rightParen,
+      unexpectedBetweenRightParenAndTrailingClosure,
+      trailingClosure: trailingClosure,
+      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
+      additionalTrailingClosures: additionalTrailingClosures,
+      unexpectedAfterAdditionalTrailingClosures
+    )
+  }
+}
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
@@ -169,17 +192,18 @@ func evaluateMacro(
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      if let expr = parentSyntax.as(MacroExpansionExprSyntax.self) {
-        macroName = expr.macro.withoutTrivia().description
-        evaluatedSyntax = Syntax(try exprMacro.expansion(of: expr, in: &context))
-      } else if let decl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
-        macroName = decl.macro.withoutTrivia().description
-        evaluatedSyntax = Syntax(
-            try exprMacro.expansion(of: decl.asMacroExpansionExpr(), in: &context))
+      let parentExpansion: MacroExpansionExprSyntax
+      if let expansionExpr = parentSyntax.as(MacroExpansionExprSyntax.self) {
+        parentExpansion = expansionExpr
+      } else if let expansionDecl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
+        parentExpansion = expansionDecl.asMacroExpansionExpr()
       } else {
-        print("not a macro expansion expr; found \(parentSyntax.kind)")
+        print("not on a macro expansion node: \(parentSyntax.recursiveDescription)")
         return -1
       }
+
+      macroName = parentExpansion.macro.withoutTrivia().description
+      evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:

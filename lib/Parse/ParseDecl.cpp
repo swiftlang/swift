@@ -2145,39 +2145,6 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
 }
 
-ParserResult<DeclarationAttr>
-Parser::parseDeclarationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
-  StringRef attrName = "declaration";
-  bool isDeclModifier = DeclAttribute::isDeclModifier(DAK_Declaration);
-  if (!consumeIf(tok::l_paren)) {
-    diagnose(Tok, diag::attr_expected_lparen, attrName, isDeclModifier);
-    return makeParserError();
-  }
-  if (Tok.isNot(tok::identifier)) {
-    diagnose(Tok, diag::declaration_attr_expected_kind);
-    errorAndSkipUntilConsumeRightParen(*this, attrName);
-    return makeParserError();
-  }
-  auto kind = llvm::StringSwitch<Optional<MacroRole>>(Tok.getText())
-      .Case("freestanding", MacroRole::Declaration)
-      .Default(None);
-  if (!kind) {
-    diagnose(Tok, diag::declaration_attr_expected_kind);
-    errorAndSkipUntilConsumeRightParen(*this, attrName);
-    return makeParserError();
-  }
-  consumeToken(tok::identifier);
-  // TODO: Parse peer and member names.
-  SourceLoc rParenLoc;
-  if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(Tok, diag::attr_expected_rparen, attrName, isDeclModifier);
-    return makeParserError();
-  }
-  SourceRange range(Loc, rParenLoc);
-  return makeParserResult(DeclarationAttr::create(
-      Context, AtLoc, range, *kind, {}, {}, /*isImplicit*/ false));
-}
-
 /// If the given argument is effectively a bare identifier, extract that
 /// identifier.
 static Optional<Identifier> getIdentifierFromArgument(Argument argument) {
@@ -2222,6 +2189,7 @@ static Optional<MacroRole> getMacroRole(
 
   // Match the role string to the known set of roles.
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
+      .Case("declaration", MacroRole::Declaration)
       .Case("expression", MacroRole::Expression)
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttributes", MacroRole::MemberAttribute)
@@ -2377,9 +2345,24 @@ static SmallVector<MacroIntroducedDeclName, 2> getMacroIntroducedNames(
   return names;
 }
 
-ParserResult<AttachedAttr>
-Parser::parseAttachedAttribute(SourceLoc AtLoc, SourceLoc Loc) {
-  StringRef attrName = "attached";
+ParserResult<MacroRoleAttr>
+Parser::parseMacroRoleAttribute(
+    MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
+{
+  StringRef attrName;
+  bool isAttached;
+  switch (syntax) {
+  case MacroSyntax::Freestanding:
+    attrName = "freestanding";
+    isAttached = false;
+    break;
+
+  case MacroSyntax::Attached:
+    attrName = "attached";
+    isAttached = true;
+    break;
+  }
+
   if (!Tok.isFollowingLParen()) {
     diagnose(Tok, diag::attr_expected_lparen, attrName, false);
     return makeParserError();
@@ -2397,15 +2380,15 @@ Parser::parseAttachedAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   ArgumentList *argList = argListResult.get();
 
   // Figure out the role.
-  auto role = getMacroRole(Diags, argList, /*attached=*/true);
+  auto role = getMacroRole(Diags, argList, isAttached);
   if (!role)
     return makeParserError();
 
-  auto names = getMacroIntroducedNames(Diags, argList, /*attached=*/true);
+  auto names = getMacroIntroducedNames(Diags, argList, isAttached);
 
   SourceRange range(Loc, argList->getEndLoc());
-  return makeParserResult(AttachedAttr::create(
-      Context, AtLoc, range, *role, names, /*isImplicit*/ false));
+  return makeParserResult(MacroRoleAttr::create(
+      Context, AtLoc, range, syntax, *role, names, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -3398,16 +3381,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     break;
   }
-  case DAK_Declaration: {
-    auto Attr = parseDeclarationAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
-    else
-      return false;
-    break;
-  }
-  case DAK_Attached: {
-    auto Attr = parseAttachedAttribute(AtLoc, Loc);
+  case DAK_MacroRole: {
+    auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
+                                              : MacroSyntax::Attached);
+    auto Attr = parseMacroRoleAttribute(syntax, AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
@@ -3759,6 +3736,19 @@ ParserStatus Parser::parseDeclAttribute(
     SourceLoc attrLoc = consumeToken();
     diagnose(AtLoc, diag::warn_attr_unsafe_removed, attrName)
       .fixItRemove(SourceRange(AtLoc, attrLoc));
+    return makeParserSuccess();
+  }
+
+  // Old spelling for @freestanding(expression).
+  if (DK == DAK_Count && Tok.getText() == "expression") {
+    SourceLoc attrLoc = consumeToken();
+    diagnose(attrLoc, diag::macro_expression_attribute_removed)
+      .fixItReplace(SourceRange(AtLoc, attrLoc), "@freestanding(expression)");
+    auto attr = MacroRoleAttr::create(
+        Context, AtLoc, SourceRange(AtLoc, attrLoc),
+        MacroSyntax::Freestanding, MacroRole::Expression, { },
+        /*isImplicit*/ false);
+    Attributes.add(attr);
     return makeParserSuccess();
   }
 

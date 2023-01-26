@@ -112,7 +112,7 @@ public:
   std::unique_ptr<NodeFinderResult> takeResult() { return std::move(Result); }
 
   /// Get the declarations that \p ShadowingDecl shadows using shorthand shadow
-  /// syntax.
+  /// syntax. Ordered from innermost to outermost shadows.
   SmallVector<ValueDecl *, 2>
   getShorthandShadowedDecls(ValueDecl *ShadowingDecl) {
     SmallVector<ValueDecl *, 2> Result;
