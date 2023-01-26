@@ -134,6 +134,17 @@
 // CHECK-SAME: @"$s18runtime_attributes9OuterTypeV15outerMutatingFnSiycvpfaAA19FlagForInnerMethodsHF"
 // CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
 
+// CHECK: @"$s3RAD8EnumFlagOHa" = internal constant
+// CHECK-SAME: i32 0
+// CHECK-SAME: %swift.type_descriptor** @"got.$s3RAD8EnumFlagOMn"
+// CHECK-SAME: i32 5
+// CHECK-SAME: @"$s18runtime_attributes14globalEnumTestSi_SaySSGtSgycvpfa3RAD0D4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes12EnumTypeTestV1xSivpfa3RAD0C4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes12EnumTypeTestV8testInstyycvpfa3RAD0C4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes12EnumTypeTestV10testStaticSiycvpZfa3RAD0C4FlagHF"
+// CHECK-SAME: @"$s18runtime_attributes12EnumTypeTestAaBVmvpfa3RAD0C4FlagHF"
+// CHECK-SAME: section "__TEXT, __swift5_rattrs, regular"
+
 import RAD
 
 @runtimeMetadata
@@ -315,3 +326,18 @@ extension OuterType {
   // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes9OuterTypeV15outerMutatingFnSiycvpfaAA19FlagForInnerMethods"(%T18runtime_attributes19FlagForInnerMethodsVySiGSg* noalias nocapture sret(%T18runtime_attributes19FlagForInnerMethodsVySiGSg) %0)
   @FlagForInnerMethods mutating func outerMutatingFn() -> Int { 42 }
 }
+
+// CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes14globalEnumTestSi_SaySSGtSgycvpfa3RAD0D4Flag"(%T3RAD8EnumFlagOyytSi_SaySSGtSgGSg* noalias nocapture sret(%T3RAD8EnumFlagOyytSi_SaySSGtSgGSg) %0)
+@EnumFlag func globalEnumTest() -> (Int, [String])? {
+  nil
+}
+
+@EnumFlag struct EnumTypeTest {
+  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes12EnumTypeTestV1xSivpfa3RAD0C4Flag"(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVSiGSg* noalias nocapture sret(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVSiGSg) %0)
+  @EnumFlag var x: Int = 42
+  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes12EnumTypeTestV8testInstyycvpfa3RAD0C4Flag"(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVytGSg* noalias nocapture sret(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVytGSg) %0)
+  @EnumFlag func testInst() {}
+  // CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes12EnumTypeTestV10testStaticSiycvpZfa3RAD0C4Flag"(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVmSiGSg* noalias nocapture sret(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVmSiGSg) %0)
+  @EnumFlag static func testStatic() -> Int { 42 }
+}
+// CHECK-LABEL: define hidden swiftcc void @"$s18runtime_attributes12EnumTypeTestAaBVmvpfa3RAD0C4Flag"(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVytGSg* noalias nocapture sret(%T3RAD8EnumFlagOy18runtime_attributes0B8TypeTestVytGSg) %0)
