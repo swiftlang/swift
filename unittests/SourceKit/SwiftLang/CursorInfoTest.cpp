@@ -142,8 +142,8 @@ public:
 
   void open(const char *DocName, StringRef Text,
             Optional<ArrayRef<const char *>> CArgs = llvm::None) {
-    auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
-                                 : std::vector<const char *>{};
+    auto Args = CArgs.has_value() ? makeArgs(DocName, *CArgs)
+                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
     getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
   }

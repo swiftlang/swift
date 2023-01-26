@@ -48,7 +48,7 @@ TEST_F(SemaTest, TestPlaceholderInferenceForArrayLiteral) {
   auto &solution = solutions[0];
 
   auto eltTy = ConstraintSystem::isArrayType(solution.simplifyType(solution.getType(arrayExpr)));
-  ASSERT_TRUE(eltTy.hasValue());
+  ASSERT_TRUE(eltTy.has_value());
   ASSERT_TRUE((*eltTy)->is<StructType>());
   ASSERT_EQ((*eltTy)->getAs<StructType>()->getDecl(), intTypeDecl);
 }
@@ -89,7 +89,7 @@ TEST_F(SemaTest, TestPlaceholderInferenceForDictionaryLiteral) {
   auto &solution = solutions[0];
 
   auto keyValTys = ConstraintSystem::isDictionaryType(solution.simplifyType(solution.getType(dictExpr)));
-  ASSERT_TRUE(keyValTys.hasValue());
+  ASSERT_TRUE(keyValTys.has_value());
 
   Type keyTy;
   Type valTy;
