@@ -37,8 +37,10 @@ class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
+class TaskDependencyStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
+class ContinuationAsyncContext;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
@@ -316,9 +318,18 @@ public:
   /// ActiveTask.
   void flagAsRunning();
 
-  /// Flag that this task is now suspended.
-  void flagAsSuspended();
+  /// Flag that this task is now suspended with information about what it is
+  /// waiting on.
+  void flagAsSuspendedOnTask(AsyncTask *task);
+  void flagAsSuspendedOnContinuation(ContinuationAsyncContext *context);
+  void flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup);
 
+private:
+  // Helper function
+  void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
+  void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
+
+public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it
   void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);

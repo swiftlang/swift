@@ -20,7 +20,6 @@
 #include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/TaskStatus.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"

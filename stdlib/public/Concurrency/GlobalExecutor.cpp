@@ -23,7 +23,7 @@
 /// resource or memory.  Concurrent executors are usually used to
 /// manage a pool of threads and prevent the number of allocated
 /// threads from growing without limit.
-/// 
+///
 /// Second, executors may own dedicated threads, or they may schedule
 /// work onto some underlying executor.  Dedicated threads can
 /// improve the responsiveness of a subsystem *locally*, but they impose
@@ -41,7 +41,7 @@
 /// of threads.  Having multiple independent concurrent executors
 /// with their own dedicated threads would undermine that.
 /// Therefore, it is sensible to have a single, global executor
-/// that will ultimately schedule most of the work in the system.  
+/// that will ultimately schedule most of the work in the system.
 /// With that as a baseline, special needs can be recognized and
 /// carved out from the global executor with its cooperation.
 ///

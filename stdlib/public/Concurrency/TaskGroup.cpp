@@ -1592,7 +1592,7 @@ reevaluate_if_taskgroup_has_results:;
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_strong(
@@ -1758,7 +1758,7 @@ PollResult TaskGroupBase::tryEnqueueWaitingTask(AsyncTask *waitingTask) {
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_strong(
