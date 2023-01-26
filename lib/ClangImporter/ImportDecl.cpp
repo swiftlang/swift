@@ -2586,6 +2586,7 @@ namespace {
         auto nominalDecl = cast<NominalTypeDecl>(result);
         conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
       }
 
       addExplicitProtocolConformances(cast<NominalTypeDecl>(result));
