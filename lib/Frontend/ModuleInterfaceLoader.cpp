@@ -1875,6 +1875,27 @@ struct ExplicitSwiftModuleLoader::Implementation {
     else if (result == std::errc::no_such_file_or_directory)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
                          fileName);
+
+    // A single module map can define multiple modules; keep track of the ones
+    // we've seen so that we don't generate duplicate flags.
+    std::set<std::string> moduleMapsSeen;
+    std::vector<std::string> &extraClangArgs = Ctx.ClangImporterOpts.ExtraArgs;
+    for (auto &entry : ExplicitModuleMap) {
+      const auto &moduleMapPath = entry.getValue().clangModuleMapPath;
+      if (!moduleMapPath.empty() &&
+          moduleMapsSeen.find(moduleMapPath) == moduleMapsSeen.end()) {
+        moduleMapsSeen.insert(moduleMapPath);
+        extraClangArgs.push_back(
+            (Twine("-fmodule-map-file=") + moduleMapPath).str());
+      }
+
+      const auto &modulePath = entry.getValue().clangModulePath;
+      if (!modulePath.empty()) {
+        extraClangArgs.push_back(
+            (Twine("-fmodule-file=") + entry.getKey() + "=" + modulePath)
+                .str());
+      }
+    }
   }
 };
 
@@ -1909,6 +1930,16 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
     return false;
   }
   auto &moduleInfo = it->getValue();
+
+  // If this is only a Clang module with no paired Swift module, return false
+  // now so that we don't emit diagnostics about it being missing. This gives
+  // ClangImporter an opportunity to import it.
+  bool hasClangModule = !moduleInfo.clangModuleMapPath.empty() ||
+                        !moduleInfo.clangModulePath.empty();
+  bool hasSwiftModule = !moduleInfo.modulePath.empty();
+  if (hasClangModule && !hasSwiftModule) {
+    return false;
+  }
 
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;

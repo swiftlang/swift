@@ -1465,9 +1465,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     if (!info.getType().isNull()) {
       out << "\n";
       out.indent(indent) << "Contextual Type: " << info.getType().getString(PO);
+      out << " at ";
+
+      auto &SM = getASTContext().SourceMgr;
       if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
-        out << " at ";
-        TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+        TR->getSourceRange().print(out, SM, /*text*/ false);
+      } else {
+        dumpAnchor(contextualTypeEntry.first, &SM, out);
       }
     }
   }
