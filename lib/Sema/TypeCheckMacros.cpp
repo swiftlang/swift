@@ -1242,8 +1242,10 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
   bool synthesizedMembers = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto member : topLevelDecls) {
+    // Note that synthesized members are not considered implicit. They have
+    // proper source ranges that should be validated, and ASTScope does not
+    // expand implicit scopes to the parent scope tree.
     member->setDeclContext(decl->getInnermostDeclContext());
-    member->setImplicit();
 
     if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
       nominal->addMember(member);
