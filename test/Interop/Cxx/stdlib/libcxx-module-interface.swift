@@ -5,8 +5,8 @@
 // This test is specific to libc++ and therefore only runs on Darwin platforms.
 // REQUIRES: OS=macosx || OS=ios
 
-// CHECK-STD: import std.iosfwd
-// CHECK-STD: import std.string
+// CHECK-STD: import CxxStdlib.iosfwd
+// CHECK-STD: import CxxStdlib.string
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
