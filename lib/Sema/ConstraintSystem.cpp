@@ -4427,6 +4427,67 @@ static bool diagnoseAmbiguityWithContextualType(
   return true;
 }
 
+/// Diagnose problems with generic requirement fixes that are anchored on
+/// one callee location. The list could contain different kinds of fixes
+/// i.e. missing protocol conformances at different positions,
+/// same-type requirement mismatches, etc.
+static bool diagnoseAmbiguityWithGenericRequirements(
+    ConstraintSystem &cs,
+    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregate) {
+  // If all of the fixes point to the same overload choice,
+  // we can diagnose this an a single error.
+  bool hasNonDeclOverloads = false;
+
+  llvm::SmallSet<ValueDecl *, 4> overloadChoices;
+  for (const auto &entry : aggregate) {
+    const auto &solution = *entry.first;
+    auto *calleeLocator = solution.getCalleeLocator(entry.second->getLocator());
+
+    if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator)) {
+      if (auto *D = overload->choice.getDeclOrNull()) {
+        overloadChoices.insert(D);
+      } else {
+        hasNonDeclOverloads = true;
+      }
+    }
+  }
+
+  auto &primaryFix = aggregate.front();
+  {
+    if (overloadChoices.size() > 0) {
+      // Some of the choices are non-declaration,
+      // let's delegate that to ambiguity diagnostics.
+      if (hasNonDeclOverloads)
+        return false;
+
+      if (overloadChoices.size() == 1)
+        return primaryFix.second->diagnose(*primaryFix.first);
+
+      // fall through to the tailored ambiguity diagnostic.
+    } else {
+      // If there are no overload choices it means that
+      // the issue is with types, delegate that to the primary fix.
+      return primaryFix.second->diagnoseForAmbiguity(aggregate);
+    }
+  }
+
+  // Produce "no exact matches" diagnostic.
+  auto &ctx = cs.getASTContext();
+  auto *choice = *overloadChoices.begin();
+  auto name = choice->getName();
+
+  ctx.Diags.diagnose(getLoc(primaryFix.second->getLocator()->getAnchor()),
+                     diag::no_overloads_match_exactly_in_call,
+                     /*isApplication=*/false, choice->getDescriptiveKind(),
+                     name.isSpecial(), name.getBaseName());
+
+  for (const auto &entry : aggregate) {
+    entry.second->diagnose(*entry.first, /*asNote=*/true);
+  }
+
+  return true;
+}
+
 static bool diagnoseAmbiguity(
     ConstraintSystem &cs, const SolutionDiff::OverloadDiff &ambiguity,
     ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregateFix,
@@ -4850,14 +4911,78 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // overload choices.
   fixes.set_subtract(consideredFixes);
 
+  // Aggregate all requirement fixes that belong to the same callee
+  // and attempt to diagnose possible ambiguities.
+  {
+    auto isResultBuilderRef = [&](ASTNode node) {
+      auto *UDE = getAsExpr<UnresolvedDotExpr>(node);
+      if (!UDE)
+        return false;
+
+      auto &ctx = getASTContext();
+      return UDE->isImplicit() &&
+        UDE->getName().compare(DeclNameRef(ctx.Id_buildBlock)) == 0;
+    };
+
+    llvm::MapVector<SourceLoc,
+                    SmallVector<FixInContext, 4>>
+        builderFixes;
+
+    llvm::MapVector<ConstraintLocator *, SmallVector<FixInContext, 4>>
+        requirementFixes;
+
+    // TODO(diagnostics): This approach doesn't work for synthesized code
+    // because i.e. result builders would inject a new `buildBlock` or
+    // `buildExpression` for every kind of builder. We need to come up
+    // with the strategy to unify locators in such cases.
+    for (const auto &entry : fixes) {
+      auto *fix = entry.second;
+      if (!fix->getLocator()->isLastElement<LocatorPathElt::AnyRequirement>())
+        continue;
+
+      auto *calleeLoc = entry.first->getCalleeLocator(fix->getLocator());
+
+      if (isResultBuilderRef(calleeLoc->getAnchor())) {
+        auto *anchor = castToExpr<Expr>(calleeLoc->getAnchor());
+        builderFixes[anchor->getLoc()].push_back(entry);
+      } else {
+        requirementFixes[calleeLoc].push_back(entry);
+      }
+    }
+
+    SmallVector<FixInContext, 4> diagnosedFixes;
+
+    for (auto &entry : builderFixes) {
+      auto &aggregate = entry.second;
+
+      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate))
+        diagnosedFixes.append(aggregate.begin(), aggregate.end());
+    }
+
+    for (auto &entry : requirementFixes) {
+      auto &aggregate = entry.second;
+
+      // Ambiguity only if all of the solutions have a requirement
+      // fix at the given location.
+      if (aggregate.size() != solutions.size())
+        continue;
+
+      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate))
+        diagnosedFixes.append(aggregate.begin(), aggregate.end());
+    }
+
+    diagnosed |= !diagnosedFixes.empty();
+    // Remove any diagnosed fixes.
+    fixes.set_subtract(diagnosedFixes);
+  }
+
   llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
                   SmallVector<FixInContext, 4>>
       fixesByKind;
 
   for (const auto &entry : fixes) {
     const auto *fix = entry.second;
-    fixesByKind[{fix->getKind(), fix->getLocator()}].push_back(
-        {entry.first, fix});
+    fixesByKind[{fix->getKind(), fix->getLocator()}].push_back(entry);
   }
 
   // If leftover fix is contained in all of the solutions let's
