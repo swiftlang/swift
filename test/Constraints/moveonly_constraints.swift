@@ -91,6 +91,9 @@ func testBasic(_ mo: MO) {
 
   let singleton : (MO) = (mo)
   takeGeneric(singleton) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  takeAny((mo)) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  takeAny((mo, mo)) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
 }
 
 func checkBasicBoxes() {
