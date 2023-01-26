@@ -1311,15 +1311,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_Declaration: {
-    Printer.printAttrName("@declaration");
-    Printer << "(";
-    auto Attr = cast<DeclarationAttr>(this);
-    Printer << getMacroRoleString(Attr->getMacroRole());
-    Printer << ")";
-    break;
-  }
-
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
     switch (Attr->getMacroSyntax()) {
@@ -1526,8 +1517,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_expose";
   case DAK_Documentation:
     return "_documentation";
-  case DAK_Declaration:
-    return "declaration";
   case DAK_MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
@@ -2371,52 +2360,6 @@ bool CustomAttr::isAttachedMacro(const Decl *decl) const {
       nullptr);
 
   return macroDecl != nullptr;
-}
-
-DeclarationAttr::DeclarationAttr(SourceLoc atLoc, SourceRange range,
-                                 MacroRole role,
-                                 ArrayRef<MacroIntroducedDeclName> peerNames,
-                                 ArrayRef<MacroIntroducedDeclName> memberNames,
-                                 bool implicit)
-    : DeclAttribute(DAK_Declaration, atLoc, range, implicit),
-      role(role), numPeerNames(peerNames.size()),
-      numMemberNames(memberNames.size()) {
-  auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
-  std::uninitialized_copy(peerNames.begin(), peerNames.end(),
-                          trailingNamesBuffer);
-  std::uninitialized_copy(memberNames.begin(), memberNames.end(),
-                          trailingNamesBuffer + peerNames.size());
-}
-
-DeclarationAttr *
-DeclarationAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-                        MacroRole role,
-                        ArrayRef<MacroIntroducedDeclName> peerNames,
-                        ArrayRef<MacroIntroducedDeclName> memberNames,
-                        bool implicit) {
-  unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(
-      peerNames.size() + memberNames.size());
-  auto *mem = ctx.Allocate(size, alignof(DeclarationAttr));
-  return new (mem) DeclarationAttr(atLoc, range, role, peerNames,
-                                   memberNames, implicit);
-}
-
-ArrayRef<MacroIntroducedDeclName> DeclarationAttr::getPeerAndMemberNames() const {
-  return {
-    getTrailingObjects<MacroIntroducedDeclName>(),
-    numPeerNames + numMemberNames
-  };
-}
-
-ArrayRef<MacroIntroducedDeclName> DeclarationAttr::getPeerNames() const {
-  return {getTrailingObjects<MacroIntroducedDeclName>(), numPeerNames};
-}
-
-ArrayRef<MacroIntroducedDeclName> DeclarationAttr::getMemberNames() const {
-  return {
-    getTrailingObjects<MacroIntroducedDeclName>() + numPeerNames,
-    numMemberNames
-  };
 }
 
 MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,

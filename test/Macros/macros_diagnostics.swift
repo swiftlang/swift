@@ -67,9 +67,9 @@ func overloaded1(_ p: Any) { }
 // expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@declaration(freestanding) macro unaryDeclMacro(_ x: String) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String) // expected-note {{found this candidate}}
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
-@declaration(freestanding) macro unaryDeclMacro(_ x: String, blah: Bool) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool) // expected-note {{found this candidate}}
 // expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
 
 func testDiags(a: Int, b: Int) {

@@ -39,7 +39,7 @@ enum class MacroRole: uint32_t {
   /// in the source code.
   Expression = 0x01,
   /// A freestanding declaration macro.
-  FreestandingDeclaration = 0x02,
+  Declaration = 0x02,
   /// An attached macro that declares accessors for a variable or subscript
   /// declaration.
   Accessor = 0x04,

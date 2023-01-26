@@ -18,16 +18,16 @@ protocol Q { associatedtype Assoc }
 
 // expected-error @+2 {{expected '('}}
 // expected-error @+1 {{macro 'm7' must declare its applicable roles}}
-@declaration macro m7(_: String) = #externalMacro(module: "A", type: "M4")
+@freestanding macro m7(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm7'; the type must be public and provided via '-load-plugin-library'}}
-// expected-error @+2 {{expected a declaration macro kind ('freestanding' or 'attached')}}
+// expected-error @+2 {{expected a freestanding macro role such as 'expression'}}
 // expected-error @+1 {{macro 'm8' must declare its applicable roles}}
-@declaration(abc) macro m8(_: String) = #externalMacro(module: "A", type: "M4")
+@freestanding(abc) macro m8(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm8'; the type must be public and provided via '-load-plugin-library'}}
-@declaration(freestanding) macro m9(_: String) = #externalMacro(module: "A", type: "M4")
+@freestanding(declaration) macro m9(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm9'; the type must be public and provided via '-load-plugin-library'}}
 
-@freestanding(expression) @declaration(freestanding) @attached(accessor)
+@freestanding(expression) @freestanding(declaration) @attached(accessor)
 macro m10(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm10'; the type must be public and provided via '-load-plugin-library'}}
 

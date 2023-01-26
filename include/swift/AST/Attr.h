@@ -2307,40 +2307,6 @@ public:
   }
 };
 
-class DeclarationAttr final
-    : public DeclAttribute,
-      private llvm::TrailingObjects<DeclarationAttr, MacroIntroducedDeclName> {
-  friend TrailingObjects;
-
-  MacroRole role;
-  unsigned numPeerNames, numMemberNames;
-
-  DeclarationAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
-                  ArrayRef<MacroIntroducedDeclName> peerNames,
-                  ArrayRef<MacroIntroducedDeclName> memberNames,
-                  bool implicit);
-
-public:
-  static DeclarationAttr *create(ASTContext &ctx, SourceLoc atLoc,
-                                 SourceRange range, MacroRole role,
-                                 ArrayRef<MacroIntroducedDeclName> peerNames,
-                                 ArrayRef<MacroIntroducedDeclName> memberNames,
-                                 bool implicit);
-
-  size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
-    return numPeerNames + numMemberNames;
-  }
-
-  MacroRole getMacroRole() const { return role; }
-  ArrayRef<MacroIntroducedDeclName> getPeerAndMemberNames() const;
-  ArrayRef<MacroIntroducedDeclName> getPeerNames() const;
-  ArrayRef<MacroIntroducedDeclName> getMemberNames() const;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Declaration;
-  }
-};
-
 /// A macro role attribute, spelled with either @attached or @freestanding,
 /// which declares one of the roles that a given macro can inhabit.
 class MacroRoleAttr final

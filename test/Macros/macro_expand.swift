@@ -122,9 +122,9 @@ func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
 }
 
-@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 // Test overload
-@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 
 // FIXME: Declaration macro expansions in BraceStmt don't work yet.
 //#bitwidthNumberedStructs("MyIntGlobal")

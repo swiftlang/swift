@@ -3674,7 +3674,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
   auto foundMacros = TypeChecker::lookupMacros(
       MED->getDeclContext(), MED->getMacro(),
-      MED->getLoc(), MacroRole::FreestandingDeclaration);
+      MED->getLoc(), MacroRole::Declaration);
   if (foundMacros.empty()) {
     MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
         .highlight(MED->getMacroLoc().getSourceRange());

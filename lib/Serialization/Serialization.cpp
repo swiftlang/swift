@@ -2224,7 +2224,7 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   case swift::MacroRole::NAME: \
     return static_cast<uint8_t>(serialization::MacroRole::NAME);
   CASE(Expression)
-  CASE(FreestandingDeclaration)
+  CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
   CASE(SynthesizedMembers)
@@ -2986,26 +2986,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
-      return;
-    }
-
-    case DAK_Declaration: {
-      auto *theAttr = cast<DeclarationAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[DeclarationDeclAttrLayout::Code];
-      auto rawMacroRole =
-          getRawStableMacroRole(theAttr->getMacroRole());
-      SmallVector<IdentifierID, 4> introducedDeclNames;
-      for (auto name : theAttr->getPeerAndMemberNames()) {
-        introducedDeclNames.push_back(IdentifierID(
-            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
-        introducedDeclNames.push_back(
-            S.addDeclBaseNameRef(name.getIdentifier()));
-      }
-
-      DeclarationDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-          rawMacroRole, theAttr->getPeerNames().size(),
-          theAttr->getMemberNames().size(), introducedDeclNames);
       return;
     }
 

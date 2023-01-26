@@ -255,7 +255,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     // Determine the parent source location based on the macro role.
     switch (*macroRole) {
     case MacroRole::Expression:
-    case MacroRole::FreestandingDeclaration:
+    case MacroRole::Declaration:
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
       parentLoc = expansion.getStartLoc();

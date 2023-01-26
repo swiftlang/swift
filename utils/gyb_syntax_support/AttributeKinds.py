@@ -903,10 +903,6 @@ DECL_MODIFIER_KINDS = [
                                   ABIBreakingToAdd, ABIBreakingToRemove,
                                   APIBreakingToAdd, APIBreakingToRemove,
                                   code=130),
-    DeclAttribute('declaration', 'Declaration',
-                  OnMacro, AllowMultipleAttributes,
-                  ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
-                  code=141),
     DeclAttribute('attached', 'MacroRole',
                   OnMacro, AllowMultipleAttributes,
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
