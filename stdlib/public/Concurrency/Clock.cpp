@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Once.h"
 
 #if __has_include(<time.h>)
@@ -21,6 +22,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#include <immintrin.h>
 #include <realtimeapiset.h>
 #endif
 
@@ -58,10 +60,12 @@ void swift_get_time(
       // second) to get the counter in seconds. We also need to multiply the
       // count by 1,000,000,000 to get nanosecond resolution. By multiplying
       // first, we maintain high precision. The resulting value is the tick
-      // count in nanoseconds.
-      long long ns = (count.QuadPart * 1000000000) / freq.QuadPart;
-      *seconds = ns / 1000000000;
-      *nanoseconds = ns % 1000000000;
+      // count in nanoseconds. Use 128-bit math to avoid overflowing.
+      DWORD64 hi = 0;
+      DWORD64 lo = _umul128(count.QuadPart, 1'000'000'000, &hi);
+      DWORD64 ns = _udiv128(hi, lo, freq.QuadPart, nullptr);
+      *seconds = ns / 1'000'000'000;
+      *nanoseconds = ns % 1'000'000'000;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -91,8 +95,9 @@ void swift_get_time(
 #elif defined(_WIN32)
       // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
       // the name suggests, more precise than QueryUnbiasedInterruptTime().
-      // However, despite being declared in Windows' headers, we must look it up
-      // dynamically at runtime.
+      // Unfortunately, the symbol is not listed in any .lib file in the SDK and
+      // must be looked up dynamically at runtime even if our minimum deployment
+      // target is Windows 10.
       typedef decltype(QueryUnbiasedInterruptTimePrecise) *QueryUITP_FP;
       static QueryUITP_FP queryUITP = nullptr;
       static swift::once_t onceToken;
@@ -114,15 +119,15 @@ void swift_get_time(
         // Fall back to the older, less precise API.
         (void)QueryUnbiasedInterruptTime(&unbiasedTime);
       }
-      *seconds = unbiasedTime / 10000000;
-      *nanoseconds = (unbiasedTime % 10000000) * 100;
+      *seconds = unbiasedTime / 10'000'000;
+      *nanoseconds = (unbiasedTime % 10'000'000) * 100;
 #else
 #error Missing platform suspending time definition
 #endif
       return;
     }
   }
-  abort(); // Invalid clock_id
+  swift::fatalError(0, "Fatal error: invalid clock ID %d\n", clock_id);
 }
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -152,7 +157,7 @@ switch (clock_id) {
       LARGE_INTEGER freq;
       QueryPerformanceFrequency(&freq);
       *seconds = 0;
-      *nanoseconds = 1000000000 / freq.QuadPart;
+      *nanoseconds = 1'000'000'000 / freq.QuadPart;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -185,5 +190,5 @@ switch (clock_id) {
       return;
     }
   }
-  abort(); // Invalid clock_id
+  swift::fatalError(0, "Fatal error: invalid clock ID %d\n", clock_id);
 }
