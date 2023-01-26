@@ -627,16 +627,26 @@ class BenchmarkDoctor(object):
     @staticmethod
     def _constant_memory_use(measurements):
         select = BenchmarkDoctor._select
+        name = measurements["name"]
+
+        memory_uses = [
+            [r.mem_pages for r in i_series if r.mem_pages is not None]
+            for i_series in [select(measurements, num_iters=i) for i in [1, 2]]
+        ]
+        memory_uses = [m for m in memory_uses if m]
+        if not memory_uses:
+            BenchmarkDoctor.log_memory.info(
+                "unable to compute memory footprint of '%s'",
+                name,
+            )
+            return
+
         (min_i1, max_i1), (min_i2, max_i2) = [
             (min(memory_use), max(memory_use))
-            for memory_use in [
-                [r.mem_pages for r in i_series]
-                for i_series in [select(measurements, num_iters=i) for i in [1, 2]]
-            ]
+            for memory_use in memory_uses
         ]
         range_i1, range_i2 = max_i1 - min_i1, max_i2 - min_i2
         normal_range = 15  # pages
-        name = measurements["name"]
         more_info = False
 
         if abs(min_i1 - min_i2) > max(range_i1, range_i2, normal_range):

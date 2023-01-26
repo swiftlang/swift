@@ -148,10 +148,10 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   allModules.push_back(moduleName.str());
   auto optionalDependencies =
     cache.findDependency(moduleName, ModuleDependencyKind::Clang);
-  if (!optionalDependencies.hasValue())
+  if (!optionalDependencies.has_value())
     return;
 
-  auto dependencies = optionalDependencies.getValue();
+  auto dependencies = optionalDependencies.value();
   for (const auto &dep : dependencies->getModuleDependencies()) {
     findAllImportedClangModules(ctx, dep.first, cache, allModules, knownModules);
   }
@@ -165,8 +165,8 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
   PrettyStackTraceStringAction trace("Resolving direct dependencies of: ", module.first);
   auto &ctx = instance.getASTContext();
   auto optionalKnownDependencies = cache.findDependency(module.first, module.second);
-  assert(optionalKnownDependencies.hasValue());
-  auto knownDependencies = optionalKnownDependencies.getValue();
+  assert(optionalKnownDependencies.has_value());
+  auto knownDependencies = optionalKnownDependencies.value();
 
   // If this dependency has already been resolved, return the result.
   if (knownDependencies->isResolved() &&
@@ -189,7 +189,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     } else {
       if (auto found =
               ctx.getModuleDependencies(dependsOn, cache, ASTDelegate, module))
-        result.insert({dependsOn, found.getValue()->getKind()});
+        result.insert({dependsOn, found.value()->getKind()});
     }
   }
 
@@ -241,14 +241,14 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
       if (auto found =
               ctx.getSwiftModuleDependencies(clangDep, cache, ASTDelegate)) {
         if (clangDep != module.first)
-          result.insert({clangDep, found.getValue()->getKind()});
+          result.insert({clangDep, found.value()->getKind()});
       }
     }
   }
 
   // Resolve the dependnecy info
   cache.resolveDependencyImports(module, result.takeVector());
-  return cache.findDependency(module.first, module.second).getValue()->getModuleDependencies();
+  return cache.findDependency(module.first, module.second).value()->getModuleDependencies();
 }
 
 static void discoverCrossImportOverlayDependencies(
@@ -260,7 +260,7 @@ static void discoverCrossImportOverlayDependencies(
   llvm::SetVector<Identifier> newOverlays;
   for (auto dep : allDependencies) {
     auto moduleName = dep.first;
-    auto dependencies = cache.findDependency(moduleName, dep.second).getValue();
+    auto dependencies = cache.findDependency(moduleName, dep.second).value();
 
     // Collect a map from secondary module name to cross-import overlay names.
     auto overlayMap = dependencies->collectCrossImportOverlayNames(
@@ -323,7 +323,7 @@ static void discoverCrossImportOverlayDependencies(
 
   // Update main module's dependencies to include these new overlays.
   auto mainDep = *(cache.findDependency(
-                   mainModuleName, ModuleDependencyKind::SwiftSource).getValue());
+                   mainModuleName, ModuleDependencyKind::SwiftSource).value());
   std::for_each(/* +1 to exclude dummy main*/ allModules.begin() + 1,
                 allModules.end(),
                 [&](ModuleDependencyID dependencyID) {
@@ -835,8 +835,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
     }
 
     auto optionalDepInfo = cache.findDependency(module.first, module.second);
-    assert(optionalDepInfo.hasValue() && "Missing dependency info during graph generation diagnosis.");
-    auto depInfo = optionalDepInfo.getValue();
+    assert(optionalDepInfo.has_value() && "Missing dependency info during graph generation diagnosis.");
+    auto depInfo = optionalDepInfo.value();
     auto directDependencies = depInfo->getModuleDependencies();
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
@@ -967,8 +967,8 @@ static bool diagnoseCycle(CompilerInstance &instance,
     auto beforeSize = openSet.size();
 
     auto optionalDepInfo = cache.findDependency(lastOpen.first, lastOpen.second);
-    assert(optionalDepInfo.hasValue() && "Missing dependency info during cycle diagnosis.");
-    auto depInfo = optionalDepInfo.getValue();
+    assert(optionalDepInfo.has_value() && "Missing dependency info during cycle diagnosis.");
+    auto depInfo = optionalDepInfo.value();
 
     for (const auto &dep : depInfo->getModuleDependencies()) {
       if (closeSet.count(dep))
@@ -1459,7 +1459,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   // Verify that all collected dependencies have had their
   // imports resolved to module IDs
   for (const auto &moduleID : allModules) {
-    const auto &moduleInfo = cache.findDependency(moduleID.first, moduleID.second).getValue();
+    const auto &moduleInfo = cache.findDependency(moduleID.first, moduleID.second).value();
     assert(moduleInfo->isResolved());
   }
 #endif
@@ -1474,9 +1474,9 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
       auto optionalDeps = cache.findDependency(module.first, module.second);
-      if (!optionalDeps.hasValue())
+      if (!optionalDeps.has_value())
         continue;
-      auto deps = optionalDeps.getValue();
+      auto deps = optionalDeps.value();
 
       if (auto swiftDeps = deps->getAsSwiftInterfaceModule()) {
         depTracker->addDependency(swiftDeps->swiftInterfaceFile,
@@ -1557,7 +1557,7 @@ swift::dependencies::performBatchModuleScan(
           rootDeps =
               ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
         }
-        if (!rootDeps.hasValue()) {
+        if (!rootDeps.has_value()) {
           // We cannot find the clang module, abort.
           batchScanResult.push_back(
               std::make_error_code(std::errc::invalid_argument));
@@ -1633,7 +1633,7 @@ swift::dependencies::performBatchModulePrescan(
         }
 
         auto *importSet = new swiftscan_import_set_s;
-        importSet->imports = create_set(rootDeps.getValue()->getModuleImports());
+        importSet->imports = create_set(rootDeps.value()->getModuleImports());
         batchPrescanResult.push_back(importSet);
       });
 

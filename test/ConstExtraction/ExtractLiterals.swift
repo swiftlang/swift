@@ -110,7 +110,7 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "bool2",
-// CHECK-NEXT:        "type": "Swift.Bool?",
+// CHECK-NEXT:        "type": "Swift.Optional<Swift.Bool>",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
@@ -361,7 +361,7 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "$propertyWrapper1",
-// CHECK-NEXT:        "type": "(Swift.String, Swift.String?)",
+// CHECK-NEXT:        "type": "(Swift.String, Swift.Optional<Swift.String>)",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
@@ -486,7 +486,7 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "$propertyWrapper3",
-// CHECK-NEXT:        "type": "(ExtractLiterals.Clamping<Swift.Int>, ExtractLiterals.Clamping<Swift.Int>?)",
+// CHECK-NEXT:        "type": "(ExtractLiterals.Clamping<Swift.Int>, Swift.Optional<ExtractLiterals.Clamping<Swift.Int>>)",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",

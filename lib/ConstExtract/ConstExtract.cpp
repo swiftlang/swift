@@ -63,6 +63,9 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   swift::PrintOptions Options;
   Options.FullyQualifiedTypes = true;
   Options.PreferTypeRepr = true;
+  Options.AlwaysDesugarArraySliceTypes = true;
+  Options.AlwaysDesugarDictionaryTypes = true;
+  Options.AlwaysDesugarOptionalTypes = true;
   Type.print(OutputStream, Options);
   OutputStream.flush();
   return TypeNameOutput;
@@ -182,7 +185,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
-      if (rawLiteral.hasValue()) {
+      if (rawLiteral.has_value()) {
         return std::make_shared<RawLiteralValue>(rawLiteral.value());
       }
 
@@ -566,7 +569,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "Enum");
     JSON.attributeObject("value", [&]() {
       JSON.attribute("name", enumValue->getIdentifier());
-      if (enumValue->getParameters().hasValue()) {
+      if (enumValue->getParameters().has_value()) {
         auto params = enumValue->getParameters().value();
         JSON.attributeArray("arguments", [&] {
           for (auto FP : params) {
@@ -592,7 +595,7 @@ void writeValue(llvm::json::OStream &JSON,
 void writeAttributes(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers) {
-  if (!PropertyWrappers.hasValue()) {
+  if (!PropertyWrappers.has_value()) {
     return;
   }
 
@@ -617,7 +620,7 @@ void writeAttributes(
 void writeEnumCases(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
-  if (!EnumElements.hasValue()) {
+  if (!EnumElements.has_value()) {
     return;
   }
 
@@ -625,10 +628,10 @@ void writeEnumCases(
     for (const auto &Case : EnumElements.value()) {
       JSON.object([&] {
         JSON.attribute("name", Case.Name);
-        if (Case.RawValue.hasValue()) {
+        if (Case.RawValue.has_value()) {
           JSON.attribute("rawValue", Case.RawValue.value());
         }
-        if (Case.Parameters.hasValue()) {
+        if (Case.Parameters.has_value()) {
           JSON.attributeArray("parameters", [&] {
             for (const auto &Parameter : Case.Parameters.value()) {
               JSON.object([&] {
@@ -677,6 +680,43 @@ void writeResultBuilderInformation(llvm::json::OStream &JSON,
   }
 }
 
+void writeAttrInformation(llvm::json::OStream &JSON,
+                          const DeclAttributes &Attrs) {
+  auto availableAttr = Attrs.getAttributes<AvailableAttr>();
+  if (availableAttr.empty())
+    return;
+
+  JSON.attributeArray("availabilityAttributes", [&] {
+    for (const AvailableAttr *attr : availableAttr) {
+      JSON.object([&] {
+        if (!attr->platformString().empty())
+          JSON.attribute("platform", attr->platformString());
+
+        if (!attr->Message.empty())
+          JSON.attribute("message", attr->Message);
+
+        if (!attr->Rename.empty())
+          JSON.attribute("rename", attr->Rename);
+
+        if (attr->Introduced.has_value())
+          JSON.attribute("introducedVersion",
+                         attr->Introduced.value().getAsString());
+
+        if (attr->Deprecated.has_value())
+          JSON.attribute("deprecatedVersion",
+                         attr->Deprecated.value().getAsString());
+
+        if (attr->Obsoleted.has_value())
+          JSON.attribute("obsoletedVersion",
+                         attr->Obsoleted.value().getAsString());
+
+        JSON.attribute("isUnavailable", attr->isUnconditionallyUnavailable());
+        JSON.attribute("isDeprecated", attr->isUnconditionallyDeprecated());
+      });
+    }
+  });
+}
+
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
                        llvm::raw_fd_ostream &OS) {
   llvm::json::OStream JSON(OS, 2);
@@ -705,10 +745,12 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               writeValue(JSON, PropertyInfo.Value);
               writeAttributes(JSON, PropertyInfo.PropertyWrappers);
               writeResultBuilderInformation(JSON, TypeDecl, decl);
+              writeAttrInformation(JSON, decl->getAttrs());
             });
           }
         });
         writeEnumCases(JSON, TypeInfo.EnumElements);
+        writeAttrInformation(JSON, TypeDecl->getAttrs());
       });
     }
   });

@@ -613,6 +613,7 @@ enum class MacroRole : uint8_t {
   FreestandingDeclaration,
   Accessor,
   MemberAttribute,
+  SynthesizedMembers,
 };
 using MacroRoleField = BCFixed<3>;
 

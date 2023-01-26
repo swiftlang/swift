@@ -274,7 +274,9 @@ public struct WrapAllProperties: MemberAttributeMacro {
   }
 }
 
-public struct TypeWrapperMacro: MemberAttributeMacro {
+public struct TypeWrapperMacro {}
+
+extension TypeWrapperMacro: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: DeclSyntax,
@@ -303,6 +305,23 @@ public struct TypeWrapperMacro: MemberAttributeMacro {
   }
 }
 
+extension TypeWrapperMacro: MemberDeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let storageVariable: VariableDeclSyntax =
+      """
+      private var _storage = _Storage()
+      """
+
+    return [
+      DeclSyntax(storageVariable),
+    ]
+  }
+}
+
 public struct AccessViaStorageMacro: AccessorDeclarationMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -324,6 +343,35 @@ public struct AccessViaStorageMacro: AccessorDeclarationMacro {
     return [
       "get { _storage.\(identifier) }",
       "set { _storage.\(identifier) = newValue }",
+    ]
+  }
+}
+
+public struct AddMembers: MemberDeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: DeclSyntax,
+    in context: inout MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let storageStruct: StructDeclSyntax =
+      """
+      struct Storage {}
+      """
+
+    let storageVariable: VariableDeclSyntax =
+      """
+      var storage = Storage()
+      """
+
+    let instanceMethod: FunctionDeclSyntax =
+      """
+      func method() { print("synthesized method") }
+      """
+
+    return [
+      DeclSyntax(storageStruct),
+      DeclSyntax(storageVariable),
+      DeclSyntax(instanceMethod),
     ]
   }
 }

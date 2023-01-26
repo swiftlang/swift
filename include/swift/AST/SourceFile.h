@@ -511,6 +511,13 @@ public:
   /// macro.
   CustomAttr *getAttachedMacroAttribute() const;
 
+  /// For source files created to hold the source code created by expanding
+  /// an attached macro, this is the macro role that the expansion fulfills.
+  ///
+  /// \Returns the fulfilled macro role, or \c None if this source file is not
+  /// for a macro expansion.
+  Optional<MacroRole> getFulfilledMacroRole() const;
+
   /// When this source file is enclosed within another source file, for example
   /// because it describes a macro expansion, return the source file it was
   /// enclosed in.

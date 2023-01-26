@@ -3654,12 +3654,13 @@ public:
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
       const auto SR = D->getSourceRange();
+
+      // We don't care about source ranges on implicitly-generated
+      // decls.
+      if (D->isImplicit())
+        return;
+
       if (!SR.isValid()) {
-        // We don't care about source ranges on implicitly-generated
-        // decls.
-        if (D->isImplicit())
-          return;
-        
         Out << "invalid source range for decl: ";
         D->print(Out);
         Out << "\n";

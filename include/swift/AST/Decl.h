@@ -80,6 +80,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class MacroDecl;
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
@@ -855,6 +856,13 @@ public:
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
+
+  using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
+
+  /// Iterate over each attached macro with the given role, invoking the
+  /// given callback with each macro custom attribute and corresponding macro
+  /// declaration.
+  void forEachAttachedMacro(MacroRole role, MacroCallback) const;
 
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;

@@ -494,8 +494,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     // Do not try to link std with itself.
     if ((target.isOSDarwin() || target.isOSLinux()) &&
         !getSwiftModule()->getName().is("Cxx") &&
-        !getSwiftModule()->getName().is("std"))
+        !getSwiftModule()->getName().is("CxxStdlib") &&
+        !getSwiftModule()->getName().is("std")) {
+      // TODO: link with swiftCxxStdlib unconditionally once the overlay module
+      // is renamed in CMake
+      if (target.isOSDarwin())
+        this->addLinkLibrary(
+            LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
       this->addLinkLibrary(LinkLibrary("swiftstd", LibraryKind::Library));
+    }
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
