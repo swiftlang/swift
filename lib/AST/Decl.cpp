@@ -384,7 +384,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto *macroDecl = evaluateOrDefault(
         ctx.evaluator,
-        ResolveAttachedMacroRequest{customAttr, dc},
+        ResolveMacroRequest{customAttr, getAttachedMacroRoles(), dc},
         nullptr);
 
     if (!macroDecl)
@@ -9780,8 +9780,16 @@ bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
 }
 
+MacroRoles swift::getFreestandingMacroRoles() {
+  return freestandingMacroRoles;
+}
+
 bool swift::isAttachedMacro(MacroRoles contexts) {
   return bool(contexts & attachedMacroRoles);
+}
+
+MacroRoles swift::getAttachedMacroRoles() {
+  return attachedMacroRoles;
 }
 
 MacroDecl::MacroDecl(
