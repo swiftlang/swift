@@ -1612,6 +1612,11 @@ bool ForwardingOperand::visitForwardedValues(
         });
   }
 
+  // If our terminator is function exiting, we do not have a value to visit, so
+  // just return.
+  if (ti->isFunctionExiting())
+    return true;
+
   auto *succArg = PhiOperand(use).getValue();
   return visitor(succArg);
 }
