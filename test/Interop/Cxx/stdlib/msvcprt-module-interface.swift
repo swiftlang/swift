@@ -5,8 +5,8 @@
 // This test is specific to msvcprt and therefore only runs on Windows.
 // REQUIRES: OS=windows-msvc
 
-// CHECK-STD: import std.iosfwd
-// CHECK-STD: import std.string
+// CHECK-STD: import CxxStdlib.iosfwd
+// CHECK-STD: import CxxStdlib.string
 
 // CHECK-STRING: enum std {
 // CHECK-STRING:   typealias size_t = size_t

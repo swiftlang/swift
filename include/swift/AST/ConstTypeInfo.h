@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CONST_TYPE_INFO_H
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/Type.h"
 #include <memory>
 #include <string>
@@ -194,7 +195,7 @@ public:
 };
 
 struct CustomAttrValue {
-  swift::Type Type;
+  swift::CustomAttr *Attr;
   std::vector<FunctionParameter> Parameters;
 };
 
