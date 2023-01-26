@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Once.h"
 
 #if __has_include(<time.h>)
 #define HAS_TIME 1
@@ -20,6 +21,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#include <realtimeapiset.h>
 #endif
 
 using namespace swift;
@@ -52,14 +54,14 @@ void swift_get_time(
       QueryPerformanceFrequency(&freq);
       LARGE_INTEGER count;
       QueryPerformanceCounter(&count);
-      *seconds = count.QuadPart / freq.QuadPart;
-      if (freq.QuadPart < 1000000000) {
-        *nanoseconds = 
-            ((count.QuadPart % freq.QuadPart) * 1000000000) / freq.QuadPart;
-      } else {
-        *nanoseconds = 
-            (count.QuadPart % freq.QuadPart) * (1000000000.0 / freq.QuadPart);
-      }
+      // Divide count (number of ticks) by frequency (number of ticks per
+      // second) to get the counter in seconds. We also need to multiply the
+      // count by 1,000,000,000 to get nanosecond resolution. By multiplying
+      // first, we maintain high precision. The resulting value is the tick
+      // count in nanoseconds.
+      long long ns = (count.QuadPart * 1000000000) / freq.QuadPart;
+      *seconds = ns / 1000000000;
+      *nanoseconds = ns % 1000000000;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -87,10 +89,33 @@ void swift_get_time(
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)
+      // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
+      // the name suggests, more precise than QueryUnbiasedInterruptTime().
+      // However, despite being declared in Windows' headers, we must look it up
+      // dynamically at runtime.
+      typedef decltype(QueryUnbiasedInterruptTimePrecise) *QueryUITP_FP;
+      static QueryUITP_FP queryUITP = nullptr;
+      static swift::once_t onceToken;
+      swift::once(onceToken, [] {
+        if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
+          queryUnbiasedInterruptTimePrecise = reinterpret_cast<QueryUITP_FP>(
+            GetProcAddress(hKernelBase, "QueryUnbiasedInterruptTimePrecise")
+          );
+        }
+      });
+
+      // Call whichever API is available. Both output a value measured in 100ns
+      // units. We must divide the output by 10,000,000 to get a value in
+      // seconds and multiply the remainder by 100 to get nanoseconds.
       ULONGLONG unbiasedTime;
-      QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
-      *seconds = unbiasedTime / 10000000ULL; // unit is 100ns
-      *nanoseconds = unbiasedTime % 10000000ULL;
+      if (queryUITP) {
+        (* queryUITP)(&unbiasedTime);
+      } else {
+        // Fall back to the older, less precise API.
+        (void)QueryUnbiasedInterruptTime(&unbiasedTime);
+      }
+      *seconds = unbiasedTime / 10000000;
+      *nanoseconds = (unbiasedTime % 10000000) * 100;
 #else
 #error Missing platform suspending time definition
 #endif
