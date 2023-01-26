@@ -29,6 +29,12 @@ extension std.string: ExpressibleByStringLiteral {
   }
 }
 
+extension std.string: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "std.string(\(String(cxxString: self)))"
+  }
+}
+
 extension String {
   /// Creates a String having the same content as the given C++ string.
   ///
