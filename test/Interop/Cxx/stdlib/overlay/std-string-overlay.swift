@@ -37,6 +37,21 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   expectEqual(swift6, "xyz\0abc")
 }
 
+StdStringOverlayTestSuite.test("std::string as Swift.CustomDebugStringConvertible") {
+  let cxx1 = std.string()
+  expectEqual(cxx1.debugDescription, "std.string()")
+
+  let cxx2 = std.string("something123")
+  expectEqual(cxx2.debugDescription, "std.string(something123)")
+
+  let bytes: [UInt8] = [0xE1, 0xC1, 0xAC]
+  var cxx3 = std.string()
+  for byte in bytes {
+    cxx3.push_back(CChar(bitPattern: byte))
+  }
+  expectEqual(cxx3.debugDescription, "std.string(���)")
+}
+
 StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
   let cxx1 = std.string()
   var iterated = false
