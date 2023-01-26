@@ -14,13 +14,12 @@
 @addMembers
 struct S {
   func useSynthesized() {
-    print(type(of: storage))
-    method()
+    print(type(of: getStorage()))
   }
 }
 
 let s = S()
 
-// CHECK: Storage
 // CHECK: synthesized method
+// CHECK: Storage
 s.useSynthesized()
