@@ -92,7 +92,7 @@ TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
 // Declaration Attributes and Modifers
-// To add a new entry here, update https://github.com/apple/swift-syntax
+// To add a new entry here, update `utils/gyb_syntax_support/AttributeKinds.py`
 % for attr in DECL_ATTR_KINDS + DECL_MODIFIER_KINDS + DEPRECATED_MODIFIER_KINDS:
 %   if type(attr) is ContextualDeclAttributeAlias:
 CONTEXTUAL_DECL_ATTR_ALIAS(${attr.name}, ${attr.class_name})
