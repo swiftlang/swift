@@ -726,6 +726,10 @@ protected:
     NumberOfVTableEntries : 2
   );
 
+  SWIFT_INLINE_BITFIELD(MacroExpansionDecl, Decl, 16,
+    Discriminator : 16
+  );
+
   } Bits;
 
   // Storage for the declaration attributes.
@@ -8456,6 +8460,8 @@ class MacroExpansionDecl : public Decl {
   ConcreteDeclRef macroRef;
 
 public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
                      DeclNameLoc macroLoc,
                      SourceLoc leftAngleLoc,
@@ -8465,7 +8471,9 @@ public:
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
         Macro(macro), MacroLoc(macroLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(args) {}
+        GenericArgs(genericArgs), ArgList(args) {
+    Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
+  }
 
   ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
 
@@ -8485,6 +8493,24 @@ public:
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
   MacroExpansionExpr *createExpr() const;
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current function.
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
+    return Bits.MacroExpansionDecl.Discriminator;
+  }
+
+  void setDiscriminator(unsigned discriminator) {
+    assert(getRawDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    Bits.MacroExpansionDecl.Discriminator = discriminator;
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;

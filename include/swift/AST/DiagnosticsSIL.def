@@ -743,7 +743,13 @@ ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
 ERROR(sil_moveonlychecker_exclusivity_violation, none,
       "'%0' has consuming use that cannot be eliminated due to a tight exclusivity scope", (StringRef))
+ERROR(sil_moveonlychecker_moveonly_field_consumed, none,
+      "'%0' has a move only field that was consumed before later uses", (StringRef))
 
+NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
+     "move only field consumed here", ())
+NOTE(sil_moveonlychecker_boundary_use, none,
+     "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
 NOTE(sil_moveonlychecker_consuming_closure_use_here, none,

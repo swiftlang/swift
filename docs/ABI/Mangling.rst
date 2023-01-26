@@ -365,6 +365,7 @@ Entities
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
   entity-spec ::= decl-name label-list? type generic-signature? 'fm'   // macro
+  entity-spec ::= context macro-discriminator-list  // macro expansion
   entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
@@ -391,6 +392,10 @@ Entities
 
   RELATED-DISCRIMINATOR ::= [a-j]
   RELATED-DISCRIMINATOR ::= [A-J]
+
+  macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
+
+  macro-expansion-operator ::= 'f' // freestanding macro
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 

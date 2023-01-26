@@ -2049,6 +2049,9 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    // Assign a discriminator.
+    (void)MED->getDiscriminator();
+
     (void)evaluateOrDefault(
         Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, nullptr);
   }

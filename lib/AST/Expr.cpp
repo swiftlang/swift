@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -2545,6 +2546,23 @@ SourceRange MacroExpansionExpr::getSourceRange() const {
     endLoc = MacroNameLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
+}
+
+unsigned MacroExpansionExpr::getDiscriminator() const {
+  if (getRawDiscriminator() != InvalidDiscriminator)
+    return getRawDiscriminator();
+
+  auto mutableThis = const_cast<MacroExpansionExpr *>(this);
+  auto dc = getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto discriminatorContext =
+      MacroDiscriminatorContext::getParentOf(mutableThis);
+  mutableThis->setDiscriminator(
+      ctx.getNextMacroDiscriminator(
+          discriminatorContext, getMacroName().getBaseName()));
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

@@ -58,10 +58,10 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
-  class ContextualizeClosures : public ASTWalker {
+  class ContextualizeClosuresAndMacros : public ASTWalker {
     DeclContext *ParentDC;
   public:
-    ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
+    ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
@@ -105,7 +105,7 @@ namespace {
         // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked())
-          CE->getBody()->walk(ContextualizeClosures(CE));
+          CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
         return Action::SkipChildren(E);
@@ -115,6 +115,11 @@ namespace {
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
           DAE->getCallerSideDefaultExpr()->walk(*this);
+
+      // Macro expansion expressions require a DeclContext as well.
+      if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
+        macroExpansion->setDeclContext(ParentDC);
+      }
 
       return Action::Continue(E);
     }
@@ -201,12 +206,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
-  ContextualizeClosures CC(DC);
+  ContextualizeClosuresAndMacros CC(DC);
   E->walk(CC);
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
-  ContextualizeClosures CC(TLCD);
+  ContextualizeClosuresAndMacros CC(TLCD);
   if (auto *body = TLCD->getBody())
     body->walk(CC);
 }
@@ -225,6 +230,7 @@ namespace {
 
     /// Local declaration discriminators.
     llvm::SmallDenseMap<Identifier, unsigned> DeclDiscriminators;
+
   public:
     SetLocalDiscriminators(
         unsigned initialDiscriminator = 0
@@ -1016,7 +1022,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    S->walk(ContextualizeClosures(DC));
+    S->walk(ContextualizeClosuresAndMacros(DC));
     return HadError;
   }
 
@@ -2420,7 +2426,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
         body = *optBody;
         alreadyTypeChecked = true;
 
-        body->walk(ContextualizeClosures(AFD));
+        body->walk(ContextualizeClosuresAndMacros(AFD));
       }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {

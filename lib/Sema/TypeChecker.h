@@ -139,7 +139,7 @@ enum class TypeCheckExprFlags {
   /// Don't type check expressions for correct availability.
   DisableExprAvailabilityChecking = 0x08,
 
-  /// Don't expand macros.
+  /// Don't expand macros.
   DisableMacroExpansions = 0x10,
 };
 

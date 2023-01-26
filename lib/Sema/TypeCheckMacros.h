@@ -20,6 +20,10 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Type.h"
 
+/// Prefix used for the names of macro expansion buffers, to replace the
+/// leading "$s" used for Swift manglings.
+#define MACRO_EXPANSION_BUFFER_MANGLING_PREFIX "@__swiftmacro_"
+
 namespace swift {
 
 class CustomAttr;

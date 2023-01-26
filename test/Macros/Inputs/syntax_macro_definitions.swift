@@ -360,12 +360,15 @@ public struct AddMembers: MemberDeclarationMacro {
 
     let storageVariable: VariableDeclSyntax =
       """
-      var storage = Storage()
+      private var storage = Storage()
       """
 
     let instanceMethod: FunctionDeclSyntax =
       """
-      func method() { print("synthesized method") }
+      func getStorage() -> Storage {
+        print("synthesized method")
+        return storage
+      }
       """
 
     return [
