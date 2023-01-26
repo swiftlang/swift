@@ -222,7 +222,7 @@ func evaluateMacro(
         print("not a macro expansion decl; found \(parentSyntax.kind)")
         return -1
       }
-      evaluatedSyntax = Syntax(try declMacro.expansion(of: parentExpansion, in: &context))
+      evaluatedSyntax = Syntax(try codeItemMacro.expansion(of: parentExpansion, in: &context))
       macroName = parentExpansion.macro.withoutTrivia().description
 
     default:
@@ -359,7 +359,7 @@ func expandAttachedMacro(
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
-    case (let attachedMacro as AccessorDeclarationMacro.Type, .Accessor):
+    case (let attachedMacro as AccessorMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
         of: customAttrNode, attachedTo: declarationNode, in: &context
       )
@@ -392,7 +392,7 @@ func expandAttachedMacro(
         $0.withoutTrivia().description
       }.joined(separator: " ")
 
-    case (let attachedMacro as MemberDeclarationMacro.Type, .SynthesizedMembers):
+    case (let attachedMacro as MemberMacro.Type, .SynthesizedMembers):
       let members = try attachedMacro.expansion(
         of: customAttrNode,
         attachedTo: declarationNode,
