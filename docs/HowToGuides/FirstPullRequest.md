@@ -13,20 +13,24 @@ contribution process.
 
 ## How do I pick something to work on?
 
-In case you don't have something specific you'd like to work on, such as
-implementing something for a Swift Evolution pitch, you could start off by
-working on a bug labeled `StarterBug` on [Swift repository 'Issues' tab][StarterBug]. 
-If the issue hasn't been assigned to someone, check the comments in case someone has
-already started working on it. If not, feel free to assign it to yourself and
-start working on it!
+In case you don't have anything specific to work on, such as implementing a
+[Swift evolution proposal](https://www.swift.org/swift-evolution), you could
+start off by picking a [good first issue][good-first-issues]. Before you start
+working on an issue:
+* Check the comments, assignees, and any references to pull requests — make sure
+  nobody else is actively working on it, or awaiting help or review.
 
-[StarterBug]: https://github.com/apple/swift/issues?q=is%3Aissue+is%3Aopen+label%3AStarterBug
+  If someone is assigned to the issue or volunteered to work on it, and there
+  are no signs of progress or activity over at least the past month, don't
+  hesitate to check in with them — it might be that the person moved on.
+
+* Leave a comment that you have started working on it.
 
 ## Getting Help
 
-Usually, Starter Bugs try to provide some instructions to help you get started.
-In case those are missing, please ask the bug reporter for more detailed steps
-and they will be happy to help.
+Usually, [good first issues][good-first-issues] try to provide some instructions
+to help you get started. In case those are missing, please ask the bug reporter
+for more detailed steps and they will be happy to help.
 
 Once you start working on the bug, you will inevitably end up having a lot of
 questions. Don't be afraid to ask for help! The codebase is large and wrapping
@@ -160,7 +164,7 @@ to merge your changes. :tada:
 That's totally okay! There is no shame in that. You only have limited time and
 energy in a day. If you can, leave a comment on the bug report/pull request
 that you will not be able to continue and unassign yourself from the issue on
-Github. Don't worry about trying to explain _why_ you aren't 
+GitHub. Don't worry about trying to explain _why_ you aren't
 able to contribute further. We understand. Unanticipated things come up all 
 the time and you should do what _works for you_.
 
@@ -169,11 +173,15 @@ something in the near future. Please don't feel sad or apologetic!
 
 ## I submitted and merged my first pull request. What now?
 
-Awesome! You could try fixing a few more Starter Bugs until you feel some
-level of comfort working with the codebase. You could also start looking at
-other bugs which interest you and you think you might be able to tackle.
-Don't forget to ask for help if you need directions or you get stuck!
+Awesome! You are welcome to tackle as many [good first issues][good-first-issues]
+as it takes for you to gain a desired level of confidence in working with the
+codebase. Beyond that, there is an endless supply of [other issues](https://github.com/apple/swift/issues)
+waiting for a hero. Don't hesitate to ask for help if you need directions or
+get stuck!
 
 Once you've made multiple substantial contributions, you can
 [ask for commit access](https://swift.org/contributing/#commit-access),
-which will allow you to pick reviewers, trigger the CI bot and merge changes.
+which will allow you to pick reviewers, trigger the CI bot and merge changes
+upon approval.
+
+[good-first-issues]: https://github.com/apple/swift/contribute
