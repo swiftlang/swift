@@ -59,7 +59,7 @@ TaskProcessInformation::TaskProcessInformation(ProcessId Pid, struct rusage Usag
         Usage.ru_maxrss) {
 #ifndef __APPLE__
             // Apple systems report bytes; everything else appears to report KB.
-            this->ProcessUsage.getValue().Maxrss <<= 10;
+            this->ProcessUsage.value().Maxrss <<= 10;
 #endif // __APPLE__
         }
 #endif // defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
