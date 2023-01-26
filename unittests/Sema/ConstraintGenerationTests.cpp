@@ -115,3 +115,64 @@ TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
   ASSERT_TRUE(getTypeOfCoercedExpr(cast<ConditionalCheckedCastExpr>(resultExpr))
               ->isEqual(getStdlibType("Int")));
 }
+
+TEST_F(SemaTest, TestCaptureListIsConnectedToTheClosure) {
+  ConstraintSystem cs(DC, ConstraintSystemOptions());
+
+  DeclAttributes attrs;
+  auto *closure = new (Context) ClosureExpr(attrs,
+                                            /*bracetRange=*/SourceRange(),
+                                            /*capturedSelfDecl=*/nullptr,
+                                            ParameterList::createEmpty(Context),
+                                            /*asyncLoc=*/SourceLoc(),
+                                            /*throwsLoc=*/SourceLoc(),
+                                            /*arrowLoc=*/SourceLoc(),
+                                            /*inLoc=*/SourceLoc(),
+                                            /*explicitResultType=*/nullptr, DC);
+  closure->setImplicit();
+  closure->setBody(BraceStmt::createImplicit(Context, /*elements=*/{}),
+                   /*isSingleExpression=*/true);
+
+  SmallVector<CaptureListEntry> captures;
+  {
+    // The capture variable.
+    auto *xVar = new (Context)
+        VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+                /*loc=*/SourceLoc(), Context.getIdentifier("x"), DC);
+    xVar->setImplicit();
+
+    auto *PBD = PatternBindingDecl::createImplicit(
+        Context, StaticSpellingKind::None,
+        /*pattern=*/NamedPattern::createImplicit(Context, xVar),
+        IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc()), DC);
+
+    captures.push_back(CaptureListEntry(PBD));
+  }
+
+  auto *captureList = CaptureListExpr::create(Context, captures, closure);
+
+  // _ = { [x = 42] in }
+  Expr *assign = new (Context)
+      AssignExpr(new (Context) DiscardAssignmentExpr(/*loc=*/SourceLoc(),
+                                                     /*Implicit=*/true),
+                 /*EqualLoc=*/SourceLoc(), captureList, /*Implicit=*/true);
+
+  auto *processed = cs.generateConstraints(assign, DC);
+  ASSERT_NE(processed, nullptr);
+
+  auto *closureType = cs.getType(closure)->castTo<TypeVariableType>();
+  auto &CG = cs.getConstraintGraph();
+
+  for (auto *constraint : CG[closureType].getConstraints()) {
+    if (constraint->getKind() != ConstraintKind::DefaultClosureType)
+      continue;
+
+    for (const auto &capture : captureList->getCaptureList()) {
+      auto *capturedVar =
+          cs.getType(capture.getVar())->castTo<TypeVariableType>();
+
+      ASSERT_TRUE(
+          llvm::is_contained(constraint->getTypeVariables(), capturedVar));
+    }
+  }
+}
