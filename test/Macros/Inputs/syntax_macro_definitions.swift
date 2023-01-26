@@ -192,7 +192,7 @@ enum CustomError: Error, CustomStringConvertible {
   }
 }
 
-public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
+public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
     of node: MacroExpansionDeclSyntax,
     in context: inout MacroExpansionContext
@@ -204,7 +204,7 @@ public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
       throw CustomError.message("#bitwidthNumberedStructs macro requires a string literal")
     }
 
-    let decls: [Decl] = [8, 16, 32, 64].map { bitwidth in
+    return [8, 16, 32, 64].map { bitwidth in
       """
 
       struct \(raw: prefix)\(raw: String(bitwidth)) { }
@@ -380,12 +380,12 @@ public struct AddMembers: MemberDeclarationMacro {
   }
 }
 
-public struct DefineStructWithUnqualifiedLookupMacro: FreestandingDeclarationMacro {
+public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
   public static func expansion(
     of node: MacroExpansionDeclSyntax,
     in context: inout MacroExpansionContext
-  ) throws -> CodeBlockItemListSyntax {
-    return CodeBlockItemList([.init(item: .decl("""
+  ) throws -> [DeclSyntax] {
+    return ["""
     struct StructWithUnqualifiedLookup {
       let hello = 1
 
@@ -393,6 +393,6 @@ public struct DefineStructWithUnqualifiedLookupMacro: FreestandingDeclarationMac
         hello + world // looks up "world" in the parent scope
       }
     }
-    """))])
+    """]
   }
 }

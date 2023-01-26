@@ -242,12 +242,11 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       }
     }
 
-    else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(NTD->getMembers(), true);
-    }
 
-    else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       // Avoid populating the cache with the members of invalid extension
       // declarations.  These members can be used to point validation inside of
       // a malformed context.
@@ -257,13 +256,13 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
 
-    else if (auto *OD = dyn_cast<OperatorDecl>(D))
+    if (auto *OD = dyn_cast<OperatorDecl>(D))
       Operators[OD->getName()].push_back(OD);
 
     else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
 
-    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
+    if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
       DelayedMacroExpansions.push_back(MED);
   }
 }

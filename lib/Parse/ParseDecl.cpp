@@ -2191,6 +2191,7 @@ static Optional<MacroRole> getMacroRole(
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
       .Case("declaration", MacroRole::Declaration)
       .Case("expression", MacroRole::Expression)
+      .Case("codeItem", MacroRole::CodeItem)
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttributes", MacroRole::MemberAttribute)
       .Case("synthesizedMembers", MacroRole::SynthesizedMembers)
@@ -4768,7 +4769,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   // Skip a #if that contains only attributes in all branches. These will be
   // parsed as attributes of a declaration, not as separate declarations.
   if (Tok.is(tok::pound_if) && allowPoundIfAttributes) {
-      BacktrackingScope backtrack(*this);
+    BacktrackingScope backtrack(*this);
     bool sawAnyAttributes = false;
     return skipIfConfigOfAttributes(sawAnyAttributes) &&
         (Tok.is(tok::eof) || (sawAnyAttributes && isStartOfSwiftDecl()));

@@ -2001,7 +2001,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   };
 
   // Add all of the nominal types to the stack.
-  for (auto nominal: typeDecls) {
+  for (auto nominal : typeDecls) {
     addNominalType(nominal);
   }
 

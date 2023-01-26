@@ -489,19 +489,8 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   return nextDiscriminator;
 }
 
-// Find nested functions and perform effects checking on them.
-struct SetLocalMacroExpansionAccess : ASTWalker {
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto vd = dyn_cast<ValueDecl>(D))
-      if (vd->getDeclContext()->isLocalContext())
-        vd->setAccess(AccessLevel::Private);
-    return Action::Continue();
-  }
-};
-
 void TypeChecker::postTypeCheckMacroExpansion(Expr *E, DeclContext *DC) {
-  E->walk(ContextualizeClosures(DC));
-  E->walk(SetLocalMacroExpansionAccess());
+  E->walk(ContextualizeClosuresAndMacros(DC));
   if (auto *tlcd = dyn_cast<TopLevelCodeDecl>(DC))
     checkTopLevelEffects(tlcd);
   else
