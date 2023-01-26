@@ -589,6 +589,7 @@ protected:
   NodePointer demangleGenericRequirement();
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
+  NodePointer demangleMacroExpansion();
 
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind);

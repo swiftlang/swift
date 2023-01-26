@@ -87,6 +87,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  struct MacroDiscriminatorContext;
   class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -1069,6 +1070,11 @@ public:
   void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
+
+  /// Retrieve the next macro expansion discriminator within the given
+  /// name and context.
+  unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
+                                     DeclBaseName baseName);
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///
