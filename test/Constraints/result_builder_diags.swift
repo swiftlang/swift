@@ -967,3 +967,36 @@ func test_impact_of_control_flow_fix() {
     test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
   }
 }
+
+protocol Q {}
+
+func test_requirement_failure_in_buildBlock() {
+  struct A : P { typealias T = Int }
+  struct B : Q { typealias T = String }
+
+  struct Result<T> : P { typealias T = Int }
+
+  @resultBuilder
+  struct BuilderA {
+    static func buildBlock<T0: P, T1: P>(_: T0, _: T1) -> Result<(T0, T1)> { fatalError() }
+    // expected-note@-1 {{candidate requires that 'B' conform to 'P' (requirement specified as 'T1' : 'P')}}
+  }
+
+  @resultBuilder
+  struct BuilderB {
+    static func buildBlock<U0: Q, U1: Q>(_ v: U0, _: U1) -> some Q { v }
+    // expected-note@-1 {{candidate requires that 'A' conform to 'Q' (requirement specified as 'U0' : 'Q')}}
+  }
+
+  struct Test {
+    func fn<T: P>(@BuilderA _: () -> T) {}
+    func fn<T: Q>(@BuilderB _: () -> T) {}
+
+    func test() {
+      fn { // expected-error {{no exact matches in reference to static method 'buildBlock'}}
+        A()
+        B()
+      }
+    }
+  }
+}

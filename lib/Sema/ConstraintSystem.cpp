@@ -4860,27 +4860,29 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // Aggregate all requirement fixes that belong to the same callee
   // and attempt to diagnose possible ambiguities.
   {
-    auto isResultBuilderRef = [&](ASTNode node) {
+    auto isResultBuilderMethodRef = [&](ASTNode node) {
       auto *UDE = getAsExpr<UnresolvedDotExpr>(node);
-      if (!UDE)
+      if (!(UDE && UDE->isImplicit()))
         return false;
 
       auto &ctx = getASTContext();
-      return UDE->isImplicit() &&
-        UDE->getName().compare(DeclNameRef(ctx.Id_buildBlock)) == 0;
+      SmallVector<Identifier, 4> builderMethods(
+          {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
+           ctx.Id_buildFinalResult});
+
+      return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
+        return UDE->getName().compare(DeclNameRef(methodId)) == 0;
+      });
     };
 
-    llvm::MapVector<SourceLoc,
-                    SmallVector<FixInContext, 4>>
-        builderFixes;
+    // Aggregates fixes fixes attached to `buildExpression` and `buildBlock`
+    // methods at the particular source location.
+    llvm::MapVector<SourceLoc, SmallVector<FixInContext, 4>>
+        builderMethodRequirementFixes;
 
     llvm::MapVector<ConstraintLocator *, SmallVector<FixInContext, 4>>
-        requirementFixes;
+        perCalleeRequirementFixes;
 
-    // TODO(diagnostics): This approach doesn't work for synthesized code
-    // because i.e. result builders would inject a new `buildBlock` or
-    // `buildExpression` for every kind of builder. We need to come up
-    // with the strategy to unify locators in such cases.
     for (const auto &entry : fixes) {
       auto *fix = entry.second;
       if (!fix->getLocator()->isLastElement<LocatorPathElt::AnyRequirement>())
@@ -4888,38 +4890,38 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
       auto *calleeLoc = entry.first->getCalleeLocator(fix->getLocator());
 
-      if (isResultBuilderRef(calleeLoc->getAnchor())) {
+      if (isResultBuilderMethodRef(calleeLoc->getAnchor())) {
         auto *anchor = castToExpr<Expr>(calleeLoc->getAnchor());
-        builderFixes[anchor->getLoc()].push_back(entry);
+        builderMethodRequirementFixes[anchor->getLoc()].push_back(entry);
       } else {
-        requirementFixes[calleeLoc].push_back(entry);
+        perCalleeRequirementFixes[calleeLoc].push_back(entry);
       }
     }
 
-    SmallVector<FixInContext, 4> diagnosedFixes;
+    SmallVector<SmallVector<FixInContext, 4>, 4> viableGroups;
+    {
+      auto takeAggregateIfViable =
+          [&](SmallVector<FixInContext, 4> &aggregate) {
+            // Ambiguity only if all of the solutions have a requirement
+            // fix at the given location.
+            if (aggregate.size() == solutions.size())
+              viableGroups.push_back(std::move(aggregate));
+          };
 
-    for (auto &entry : builderFixes) {
-      auto &aggregate = entry.second;
+      for (auto &entry : builderMethodRequirementFixes)
+        takeAggregateIfViable(entry.second);
 
-      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate))
-        diagnosedFixes.append(aggregate.begin(), aggregate.end());
+      for (auto &entry : perCalleeRequirementFixes)
+        takeAggregateIfViable(entry.second);
     }
 
-    for (auto &entry : requirementFixes) {
-      auto &aggregate = entry.second;
-
-      // Ambiguity only if all of the solutions have a requirement
-      // fix at the given location.
-      if (aggregate.size() != solutions.size())
-        continue;
-
-      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate))
-        diagnosedFixes.append(aggregate.begin(), aggregate.end());
+    for (auto &aggregate : viableGroups) {
+      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate)) {
+        // Remove diagnosed fixes.
+        fixes.set_subtract(aggregate);
+        diagnosed = true;
+      }
     }
-
-    diagnosed |= !diagnosedFixes.empty();
-    // Remove any diagnosed fixes.
-    fixes.set_subtract(diagnosedFixes);
   }
 
   llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
