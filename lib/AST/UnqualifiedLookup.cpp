@@ -283,7 +283,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
         !options.contains(UnqualifiedLookupFlags::MacroLookup))
       lookInASTScopes();
   } else {
-    assert((DC->isModuleScopeContext() || !DC->getParentSourceFile()) &&
+    assert((DC->isModuleScopeContext() || !sf) &&
            "Unqualified lookup without a source location must start from "
            "a module-scope context");
 

@@ -222,7 +222,8 @@ func evaluateMacro(
         print("not a macro expansion decl; found \(parentSyntax.kind)")
         return -1
       }
-      evaluatedSyntax = Syntax(try codeItemMacro.expansion(of: parentExpansion, in: &context))
+      evaluatedSyntax = try Syntax(CodeBlockItemListSyntax(
+        codeItemMacro.expansion(of: parentExpansion, in: &context)))
       macroName = parentExpansion.macro.withoutTrivia().description
 
     default:
