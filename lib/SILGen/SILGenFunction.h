@@ -2358,6 +2358,11 @@ public:
 
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
+
+  /// Returns the SILDeclRef to use for references to the given accessor.
+  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
+    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+  }
 };
 
 
