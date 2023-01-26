@@ -61,9 +61,15 @@ void swift_get_time(
       // count by 1,000,000,000 to get nanosecond resolution. By multiplying
       // first, we maintain high precision. The resulting value is the tick
       // count in nanoseconds. Use 128-bit math to avoid overflowing.
-      DWORD64 hi = 0;
-      DWORD64 lo = _umul128(count.QuadPart, 1'000'000'000, &hi);
-      DWORD64 ns = _udiv128(hi, lo, freq.QuadPart, nullptr);
+//#if defined(_MSC_VER)
+//      DWORD64 hi = 0;
+//      DWORD64 lo = _umul128(count.QuadPart, 1'000'000'000, &hi);
+//      DWORD64 ns = _udiv128(hi, lo, freq.QuadPart, nullptr);
+//#else
+      auto ns = static_cast<unsigned __int128>(count.QuadPart);
+      ns *= 1'000'000'000;
+      ns /= freq.QuadPart;
+//#endif
       *seconds = ns / 1'000'000'000;
       *nanoseconds = ns % 1'000'000'000;
 #else
@@ -103,7 +109,7 @@ void swift_get_time(
       static swift::once_t onceToken;
       swift::once(onceToken, [] {
         if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
-          queryUnbiasedInterruptTimePrecise = reinterpret_cast<QueryUITP_FP>(
+          queryUITP = reinterpret_cast<QueryUITP_FP>(
             GetProcAddress(hKernelBase, "QueryUnbiasedInterruptTimePrecise")
           );
         }
