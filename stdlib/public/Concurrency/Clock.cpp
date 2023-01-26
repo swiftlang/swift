@@ -62,15 +62,8 @@ void swift_get_time(
       // count by 1,000,000,000 to get nanosecond resolution. By multiplying
       // first, we maintain high precision. The resulting value is the tick
       // count in nanoseconds. Use 128-bit math to avoid overflowing.
-//#if defined(_MSC_VER)
-//      DWORD64 hi = 0;
-//      DWORD64 lo = _umul128(count.QuadPart, 1'000'000'000, &hi);
-//      DWORD64 ns = _udiv128(hi, lo, freq.QuadPart, nullptr);
-//#else
-      auto ns = static_cast<unsigned __int128>(count.QuadPart);
-      ns *= 1'000'000'000;
-      ns /= freq.QuadPart;
-//#endif
+      auto quadPart = static_cast<unsigned __int128>(count.QuadPart);
+      auto ns = (quadPart * 1'000'000'000) / freq.QuadPart;
       *seconds = ns / 1'000'000'000;
       *nanoseconds = ns % 1'000'000'000;
 #else
