@@ -650,24 +650,9 @@ bool swift::expandFreestandingDeclarationMacro(
   // Figure out a reasonable name for the macro expansion buffer.
   std::string bufferName;
   {
-    llvm::raw_string_ostream out(bufferName);
-
-    out << "macro:" << macro->getName().getBaseName();
-    if (auto bufferID = sourceFile->getBufferID()) {
-      unsigned startLine, startColumn;
-      std::tie(startLine, startColumn) =
-          sourceMgr.getLineAndColumnInBuffer(med->getStartLoc(), *bufferID);
-
-      SourceLoc endLoc =
-          Lexer::getLocForEndOfToken(sourceMgr, med->getEndLoc());
-      unsigned endLine, endColumn;
-      std::tie(endLine, endColumn) =
-          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
-
-      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
-          << startLine << ":" << startColumn
-          << "-" << endLine << ":" << endColumn;
-    }
+    Mangle::ASTMangler mangler;
+    bufferName = adjustMacroExpansionBufferName(
+        mangler.mangleMacroExpansion(med));
   }
 
   // Dump macro expansions to standard output, if requested.
