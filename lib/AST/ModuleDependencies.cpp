@@ -422,7 +422,19 @@ ModuleDependenciesCache::ModuleDependenciesCache(
 Optional<const ModuleDependencyInfo*>
 ModuleDependenciesCache::findDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  return globalScanningService.findDependency(moduleName, kind);
+  auto optionalDep = globalScanningService.findDependency(moduleName, kind);
+  // During a scan, only produce the cached source module info for the current module
+  // under scan.
+  if (optionalDep.hasValue()) {
+    auto dep = optionalDep.getValue();
+    if (dep->getAsSwiftSourceModule() &&
+        moduleName != mainScanModuleName &&
+        moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
+      return None;
+    }
+  }
+
+  return optionalDep;
 }
 
 bool ModuleDependenciesCache::hasDependency(

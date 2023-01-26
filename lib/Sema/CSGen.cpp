@@ -2970,6 +2970,15 @@ namespace {
       SmallVector<TypeVariableType *, 4> referencedVars{
           collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
 
+      if (auto *captureList =
+              getAsExpr<CaptureListExpr>(CS.getParentExpr(closure))) {
+        for (const auto &capture : captureList->getCaptureList()) {
+          if (auto *typeVar =
+                  CS.getType(capture.getVar())->getAs<TypeVariableType>())
+            referencedVars.push_back(typeVar);
+        }
+      }
+
       CS.addUnsolvedConstraint(Constraint::create(
           CS, ConstraintKind::DefaultClosureType, closureType, inferredType,
           locator, referencedVars));
@@ -4771,7 +4780,6 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     return getTypeMatchSuccess();
   }
 
-  PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
@@ -4782,15 +4790,17 @@ ConstraintSystem::applyPropertyWrapperToParameter(
       setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
-    initKind = PropertyWrapperInitKind::ProjectedValue;
-  } else {
+    appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::ProjectedValue });
+  } else if (param->hasExternalPropertyWrapper()) {
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, wrappedValueType, locator);
-    initKind = PropertyWrapperInitKind::WrappedValue;
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
+
+    appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::WrappedValue });
+  } else {
+    return getTypeMatchFailure(locator);
   }
 
-  appliedPropertyWrappers[anchor].push_back({ wrapperType, initKind });
   return getTypeMatchSuccess();
 }
 

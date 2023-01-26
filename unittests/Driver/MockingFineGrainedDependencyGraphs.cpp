@@ -43,8 +43,8 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
   auto swiftDeps =
     cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps).str();
   auto swiftDepsFingerprint =
-    swift::mockFingerprintFromString(swiftDeps).getValue();
-  auto interfaceHash = interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint);
+    swift::mockFingerprintFromString(swiftDeps).value();
+  auto interfaceHash = interfaceHashIfNonEmpty.value_or(swiftDepsFingerprint);
 
   SourceManager sm;
   DiagnosticEngine diags(sm);
@@ -70,7 +70,7 @@ mocking_fine_grained_dependency_graphs::simulateReload(
       hadCompilationError);
   if (!changedNodes)
     return g.getAllJobs();
-  return g.findJobsToRecompileWhenNodesChange(changedNodes.getValue());
+  return g.findJobsToRecompileWhenNodesChange(changedNodes.value());
 }
 
 LLVM_ATTRIBUTE_UNUSED

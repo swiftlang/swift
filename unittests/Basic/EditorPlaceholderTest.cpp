@@ -49,17 +49,17 @@ TEST(EditorPlaceholder, EditorPlaceholders) {
 TEST(EditorPlaceholder, InvalidEditorPlaceholders) {
   const char *Text = "<#foo";
   Optional<EditorPlaceholderData> DataOpt = parseEditorPlaceholder(Text);
-  EXPECT_FALSE(DataOpt.hasValue());
+  EXPECT_FALSE(DataOpt.has_value());
 
   Text = "foo#>";
   DataOpt = parseEditorPlaceholder(Text);
-  EXPECT_FALSE(DataOpt.hasValue());
+  EXPECT_FALSE(DataOpt.has_value());
 
   Text = "#foo#>";
   DataOpt = parseEditorPlaceholder(Text);
-  EXPECT_FALSE(DataOpt.hasValue());
+  EXPECT_FALSE(DataOpt.has_value());
 
   Text = " <#foo#>";
   DataOpt = parseEditorPlaceholder(Text);
-  EXPECT_FALSE(DataOpt.hasValue());
+  EXPECT_FALSE(DataOpt.has_value());
 }

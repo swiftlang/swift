@@ -9,8 +9,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_REFLECTION_FUNCTIONS_H
-#define SWIFT_REFLECTION_FUNCTIONS_H
+#ifndef SWIFT_REFLECTION_RUNTIME_H
+#define SWIFT_REFLECTION_RUNTIME_H
 
 // OpaqueValue *swift_projectBox(HeapObject *object);
 extern void *swift_projectBox(void *object);
@@ -19,4 +19,4 @@ extern void *swift_projectBox(void *object);
 //                                        ProtocolDescriptor *protocol);
 extern void *swift_conformsToProtocol(const void *type, const void *protocol);
 
-#endif /* SWIFT_REFLECTION_FUNCTIONS_H */
+#endif /* SWIFT_REFLECTION_RUNTIME_H */

@@ -20,7 +20,7 @@ extension ASTGenVisitor {
       let tupleElement = TupleExprElementSyntax(
         label: nil, colon: nil, expression: ExprSyntax(trailingClosure), trailingComma: nil)
 
-      return visit(node.addArgument(tupleElement).withTrailingClosure(nil))
+      return visit(node.addArgument(tupleElement).with(\.trailingClosure, nil))
     }
 
     let args = visit(node.argumentList).rawValue
