@@ -758,6 +758,8 @@ public struct AggStruct {
 
 public func aggStructUseMoveOnlyWithoutEscaping(_ x: AggStruct) {
 }
+public func useKlassPairWithoutConsuming(_ x: KlassPair) {
+}
 public func aggStructConsume(_ x: __owned AggStruct) {
 }
 
@@ -1019,6 +1021,36 @@ public func aggStructConsumeGrandFieldOwnedArg(_ x2: __owned AggStruct) {
         classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
+
+public func aggStructConsumeFieldNoError(_ x2: __owned AggStruct) {
+    if boolValue {
+        classConsume(x2.pair.lhs)
+    } else {
+        classConsume(x2.pair.rhs)
+    }
+    classConsume(x2.lhs)
+}
+
+public func aggStructConsumeFieldError(_ x2: __owned AggStruct) {
+    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
+    if boolValue {
+        classConsume(x2.lhs)
+    } else {
+        classConsume(x2.pair.rhs) // expected-note {{consuming use}}
+    }
+    useKlassPairWithoutConsuming(x2.pair) // expected-note {{boundary use here}}
+}
+
+public func aggStructConsumeFieldError2(_ x2: __owned AggStruct) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    if boolValue {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    } else {
+        classConsume(x2.pair.rhs) // expected-note {{consuming use}}
+    }
+    aggStructConsume(x2) // expected-note {{consuming use}}
+}
+
 
 //////////////////////////////
 // Aggregate Generic Struct //
