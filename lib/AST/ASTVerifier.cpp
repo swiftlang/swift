@@ -3736,6 +3736,18 @@ public:
         return;
       } else if (Decl *D = Parent.getAsDecl()) {
         Enclosing = D->getSourceRange();
+
+        // If the current source range is in a macro expansion buffer, its enclosing
+        // context can be in the source file where the macro expansion originated. In
+        // this case, grab the source range of the original ASTNode that was expanded.
+        if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
+          auto *expansionBuffer =
+              D->getModuleContext()->getSourceFileContainingLocation(Current.Start);
+          if (auto expansion = expansionBuffer->getMacroExpansion()) {
+            Current = expansion.getSourceRange();
+          }
+        }
+
         if (D->isImplicit())
           return;
         // FIXME: This is not working well for decl parents.

@@ -984,6 +984,11 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
     if (getASTContext().SourceMgr.isBeforeInBuffer(prevEnd, nextStart))
       return;
 
+    // Synthesized member macros can add new members in a macro expansion buffer.
+    auto *memberSourceFile = member->getInnermostDeclContext()->getParentSourceFile();
+    if (memberSourceFile->getFulfilledMacroRole() == MacroRole::SynthesizedMembers)
+      return;
+
     llvm::errs() << "Source ranges out of order in addMember():\n";
     prev->dump(llvm::errs());
     next->dump(llvm::errs());
