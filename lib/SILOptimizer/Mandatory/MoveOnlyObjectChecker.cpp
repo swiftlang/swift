@@ -14,29 +14,46 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FrozenMultiMap.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PostOrder.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "clang/AST/DeclTemplate.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntervalMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/RecyclingAllocator.h"
 
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectChecker.h"
@@ -45,70 +62,14 @@ using namespace swift;
 using namespace swift::siloptimizer;
 
 //===----------------------------------------------------------------------===//
-//                         MARK: Diagnostic Utilities
+//                Mark Must Check Candidate Search for Objects
 //===----------------------------------------------------------------------===//
 
-//===----------------------------------------------------------------------===//
-//                              MARK: Main Pass
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct MoveOnlyChecker {
-  SILFunction *fn;
-
-  /// A set of mark_must_check that we are actually going to process.
-  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-
-  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
-
-  /// Search through the current function for candidate mark_must_check
-  /// [noimplicitcopy]. If we find one that does not fit a pattern that we
-  /// understand, emit an error diagnostic telling the programmer that the move
-  /// checker did not know how to recognize this code pattern.
-  ///
-  /// \returns true if we deleted a mark_must_check inst that we didn't
-  /// recognize after emitting the diagnostic.
-  bool searchForCandidateMarkMustChecks(DiagnosticEmitter &emitter);
-
-  bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-             DominanceInfo *domTree);
-
-  /// After we have emitted a diagnostic, we need to clean up the instruction
-  /// stream by converting /all/ copies of move only typed things to use
-  /// explicit_copy_value so that we maintain the SIL invariant that in
-  /// canonical SIL move only types are not copied by normal copies.
-  ///
-  /// Returns true if we actually changed any instructions.
-  bool cleanupAfterEmittingDiagnostic();
-};
-
-} // namespace
-
-bool MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
-  bool changed = false;
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *cvi = dyn_cast<CopyValueInst>(&*ii);
-      ++ii;
-
-      if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
-        continue;
-
-      SILBuilderWithScope b(cvi);
-      auto *expCopy =
-          b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-      cvi->replaceAllUsesWith(expCopy);
-      cvi->eraseFromParent();
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-bool MoveOnlyChecker::searchForCandidateMarkMustChecks(
+bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
+    SILFunction *fn,
+    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
     DiagnosticEmitter &emitter) {
-  bool changed = false;
+  bool localChanged = false;
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
@@ -302,16 +263,140 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks(
       emitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
-      changed = true;
+      localChanged = true;
     }
   }
-  return changed;
+  return localChanged;
 }
 
-bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                            DominanceInfo *domTree) {
+//===----------------------------------------------------------------------===//
+//                  MARK: Cleanup After Emitting Diagnostic
+//===----------------------------------------------------------------------===//
+
+bool swift::siloptimizer::cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(
+    SILFunction *fn) {
+  bool localChanged = false;
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(&*ii)) {
+        ++ii;
+
+        if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
+          continue;
+
+        SILBuilderWithScope b(cvi);
+        auto *expCopy =
+            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+        cvi->replaceAllUsesWith(expCopy);
+        cvi->eraseFromParent();
+        localChanged = true;
+      }
+
+      ++ii;
+    }
+  }
+  return localChanged;
+}
+
+//===----------------------------------------------------------------------===//
+//                         MARK: Forward Declaration
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct MoveOnlyChecker {
+  SILFunction *fn;
+
   bool changed = false;
 
+  /// A set of mark_must_check that we are actually going to process.
+  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+
+  BorrowToDestructureTransform::IntervalMapAllocator allocator;
+
+  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
+
+  void check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+             DominanceInfo *domTree, PostOrderAnalysis *poa);
+
+  bool convertBorrowExtractsToOwnedDestructures(MarkMustCheckInst *mmci,
+                                                DiagnosticEmitter &emitter,
+                                                DominanceInfo *domTree,
+                                                PostOrderAnalysis *poa);
+
+  /// After we have emitted a diagnostic, we need to clean up the instruction
+  /// stream by converting /all/ copies of move only typed things to use
+  /// explicit_copy_value so that we maintain the SIL invariant that in
+  /// canonical SIL move only types are not copied by normal copies.
+  ///
+  /// Returns true if we actually changed any instructions.
+  bool cleanupAfterEmittingDiagnostic() {
+    bool localChange = cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(fn);
+    changed |= localChange;
+    return localChange;
+  }
+};
+
+} // namespace
+
+bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
+    MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter,
+    DominanceInfo *domTree, PostOrderAnalysis *poa) {
+  StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
+
+  // If we failed to gather borrows due to the transform not understanding part
+  // of the SIL, fail and return false.
+  if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
+    return false;
+
+  // If we do not have any borrows to process, return true early to show we
+  // succeeded in processing.
+  if (borrowWorklist.empty())
+    return true;
+
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+
+  // Now that we have found all of our borrows, we want to find struct_extract
+  // uses of our borrow as well as any operands that cannot use an owned value.
+  SWIFT_DEFER { discoveredBlocks.clear(); };
+  BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
+                                         poa, discoveredBlocks);
+
+  // Attempt to gather uses. Return false if we saw something that we did not
+  // understand.
+  if (!transform.gatherUses(borrowWorklist))
+    return false;
+
+  // Next make sure that any destructure needing instructions are on the
+  // boundary in a per bit field sensitive manner.
+  unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+  transform.checkDestructureUsesOnBoundary();
+
+  // If we emitted any diagnostic, break out. We return true since we actually
+  // succeeded in our processing by finding the error. We only return false if
+  // we want to tell the rest of the checker that there was an internal
+  // compiler error that we need to emit a "compiler doesn't understand
+  // error".
+  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
+  // At this point, we know that all of our destructure requiring uses are on
+  // the boundary of our live range. Now we need to do the rewriting.
+  transform.blockToAvailableValues.emplace(transform.liveness);
+  transform.rewriteUses();
+
+  // Now that we have done our rewritting, we need to do a few cleanups.
+  transform.cleanup(borrowWorklist);
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                             MARK: Main Routine
+//===----------------------------------------------------------------------===//
+
+void MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                            DominanceInfo *domTree, PostOrderAnalysis *poa) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -321,14 +406,17 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   InstructionDeleter deleter(std::move(callbacks));
   OSSACanonicalizer canonicalizer;
   canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
-  DiagnosticEmitter diagnosticEmitter{fn, &canonicalizer, {}, {}};
+  DiagnosticEmitter diagnosticEmitter;
+  diagnosticEmitter.init(fn, &canonicalizer);
 
   // First search for candidates to process and emit diagnostics on any
   // mark_must_check [noimplicitcopy] we didn't recognize.
-  bool emittedDiagnostic = searchForCandidateMarkMustChecks(diagnosticEmitter);
+  bool madeChange = searchForCandidateObjectMarkMustChecks(
+      fn, moveIntroducersToProcess, diagnosticEmitter);
   LLVM_DEBUG(llvm::dbgs()
              << "Emitting diagnostic when checking for mark must check inst: "
-             << (emittedDiagnostic ? "yes" : "no") << '\n');
+             << (diagnosticEmitter.emittedAnyDiagnostics() ? "yes" : "no")
+             << '\n');
 
   // If we didn't find any introducers to check, just return if we emitted an
   // error (which is the only way we emitted a change to the instruction
@@ -338,21 +426,51 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
   // and then deleting.
   if (moveIntroducersToProcess.empty()) {
-    if (emittedDiagnostic) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "No move introducers found?! Returning early?!\n");
+    if (madeChange) {
       cleanupAfterEmittingDiagnostic();
-      return true;
     }
-    return false;
+    return;
   }
 
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
+  for (auto *introducer : moveIntroducers) {
+    LLVM_DEBUG(llvm::dbgs() << "Found move introducer: " << *introducer);
+  }
+
   while (!moveIntroducers.empty()) {
     SWIFT_DEFER { canonicalizer.clear(); };
 
     MarkMustCheckInst *markedValue = moveIntroducers.front();
     moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
+
+    // Before we do anything, we need to look for borrowed extracted values and
+    // convert them to destructure operations.
+    unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+    if (!convertBorrowExtractsToOwnedDestructures(
+            markedValue, diagnosticEmitter, domTree, poa)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Borrow extract to owned destructure transformation didn't "
+                    "understand part of the SIL\n");
+      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
+      cleanupAfterEmittingDiagnostic();
+      continue;
+    }
+
+    // If we emitted any non-exceptional diagnostics in
+    // convertBorrowExtractsToOwnedDestructures, continue and process the next
+    // instruction. The user can fix and re-compile. We want the OSSA
+    // canonicalizer to be able to assume that all such borrow + struct_extract
+    // uses were already handled.
+    if (diagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Emitting diagnostic in BorrowExtractToOwnedDestructure "
+                    "transformation!\n");
+      continue;
+    }
 
     // First canonicalize ownership.
     if (!canonicalizer.canonicalize(markedValue)) {
@@ -387,7 +505,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
   }
 
-  emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
+  bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
   LLVM_DEBUG(llvm::dbgs() << "Emitting checker based diagnostic: "
                           << (emittedDiagnostic ? "yes" : "no") << '\n');
 
@@ -444,12 +562,10 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   if (emittedDiagnostic) {
     changed |= cleanupAfterEmittingDiagnostic();
   }
-
-  return changed;
 }
 
 //===----------------------------------------------------------------------===//
-//                            Top Level Entrypoint
+//                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -476,9 +592,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
+    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis)
-            .check(accessBlockAnalysis, domTree)) {
+    MoveOnlyChecker checker(getFunction(), deAnalysis);
+    checker.check(accessBlockAnalysis, domTree, postOrderAnalysis);
+    if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
 
@@ -486,8 +604,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
       for (auto &block : *getFunction()) {
         for (auto &inst : block) {
           if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
-            assert(!cvi->getOperand()->getType().isMoveOnly() &&
-                   "Shouldn't copy move only types at this point");
+            if (cvi->getOperand()->getType().isMoveOnly()) {
+              llvm::errs() << "Should have eliminated copy at this point: "
+                           << *cvi;
+              llvm::report_fatal_error("standard compiler error");
+            }
           }
         }
       }

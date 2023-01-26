@@ -21,11 +21,16 @@
 
 #include "MoveOnlyObjectChecker.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
+
+class FieldSensitivePrunedLivenessBoundary;
+
 namespace siloptimizer {
 
-struct DiagnosticEmitter {
+class DiagnosticEmitter {
   SILFunction *fn;
 
   /// The canonicalizer that contains the final consuming uses and consuming
@@ -40,6 +45,14 @@ struct DiagnosticEmitter {
   // multiple diagnostics for the same use.
   SmallPtrSet<SILInstruction *, 8> useWithDiagnostic;
 
+  unsigned diagnosticCount = 0;
+
+public:
+  void init(SILFunction *inputFn, OSSACanonicalizer *inputCanonicalizer) {
+    fn = inputFn;
+    canonicalizer = inputCanonicalizer;
+  }
+
   /// Clear our cache of uses that we have diagnosed for a specific
   /// mark_must_check.
   void clearUsesWithDiagnostic() { useWithDiagnostic.clear(); }
@@ -47,6 +60,8 @@ struct DiagnosticEmitter {
   const OSSACanonicalizer &getCanonicalizer() const {
     return *canonicalizer.get();
   }
+
+  unsigned getDiagnosticCount() const { return diagnosticCount; }
 
   void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
@@ -68,6 +83,10 @@ struct DiagnosticEmitter {
                                    SILInstruction *consumingUse);
   void emitAddressExclusivityHazardDiagnostic(MarkMustCheckInst *markedValue,
                                               SILInstruction *consumingUse);
+  void emitObjectDestructureNeededWithinBorrowBoundary(
+      MarkMustCheckInst *markedValue, SILInstruction *destructureNeedingUse,
+      TypeTreeLeafTypeRange destructureNeededBits,
+      FieldSensitivePrunedLivenessBoundary &boundary);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
@@ -76,6 +95,11 @@ private:
   /// the caller processed it correctly. false, then we continue to process it.
   void emitObjectDiagnosticsForFoundUses(bool ignorePartialApply = false) const;
   void emitObjectDiagnosticsForPartialApplyUses() const;
+
+  void registerDiagnosticEmitted(MarkMustCheckInst *value) {
+    ++diagnosticCount;
+    valuesWithDiagnostics.insert(value);
+  }
 };
 
 } // namespace siloptimizer
