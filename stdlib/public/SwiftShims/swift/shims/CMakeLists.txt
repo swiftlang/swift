@@ -23,8 +23,7 @@ set(sources
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
-
-  _SwiftRuntimeShims/Functions.h
+  _SwiftRuntime.h
 
   module.modulemap
   )
