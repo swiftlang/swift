@@ -94,8 +94,8 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
   // expected-note@-1{{in expansion of macro 'addBlocker' here}}
   // expected-note@-2{{use '-'}}{{22-23=-}}
 
-  // CHECK-DIAGS: macro_expand.swift:[[@LINE-4]]:7-[[@LINE-4]]:27:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
-  // CHECK-DIAGS: CONTENTS OF FILE{{.*}}addBlocker
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser14testAddBlocker1a1b1c2oaySi_S2iAA8OnlyAddsVtF03addE0fMf1_.swift:1:4: error: binary operator '-' cannot be applied to two 'OnlyAdds' operands [] []
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser14testAddBlocker1a1b1c2oaySi_S2iAA8OnlyAddsVtF03addE0fMf1_.swift:
   // CHECK-DIAGS-NEXT: Original source range: {{.*}}macro_expand.swift:[[@LINE-6]]:7 - {{.*}}macro_expand.swift:[[@LINE-6]]:27
   // CHECK-DIAGS-NEXT: oa - oa
   // CHECK-DIAGS-NEXT: END CONTENTS OF FILE

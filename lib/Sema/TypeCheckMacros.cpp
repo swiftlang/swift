@@ -29,6 +29,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 
@@ -310,6 +311,20 @@ ExternalMacroDefinitionRequest::evaluate(
   return ExternalMacroDefinition{nullptr};
 }
 
+/// Adjust the given mangled name for a macro expansion to produce a valid
+/// buffer name.
+static std::string adjustMacroExpansionBufferName(StringRef name) {
+  std::string result;
+  if (name.startswith(MANGLING_PREFIX_STR)) {
+    result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
+    name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+  }
+
+  result += name;
+  result += ".swift";
+  return result;
+}
+
 bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                            Decl *decl) const {
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
@@ -468,12 +483,12 @@ Expr *swift::expandMacroExpr(
 
   // Figure out a reasonable name for the macro expansion buffer.
   std::string bufferName;
-  {
+  if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
     Mangle::ASTMangler mangler;
-    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr))
-      bufferName = mangler.mangleMacroExpansion(expansionExpr);
-    else
-      bufferName = "<macro expansion>";
+    bufferName = adjustMacroExpansionBufferName(
+        mangler.mangleMacroExpansion(expansionExpr));
+  } else {
+    bufferName = "macro-expansion";
   }
 
   // Dump macro expansions to standard output, if requested.
