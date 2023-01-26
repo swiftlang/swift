@@ -1,0 +1,3 @@
+module PointerAuth {
+   header "ptrauth_field_fptr_import.h"
+ }

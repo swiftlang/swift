@@ -853,8 +853,17 @@ namespace {
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
-      return ManagedValue::forLValue(Res);
+
+      if (!Field->getPointerAuthQualifier() ||
+          !SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
+        return ManagedValue::forLValue(Res);
+      }
+      auto beginAccess =
+          enterAccessScope(SGF, loc, base, Res, getTypeData(), getAccessKind(),
+                           SILAccessEnforcement::Signed, takeActorIsolation());
+      return ManagedValue::forLValue(beginAccess);
     }
+
     void dump(raw_ostream &OS, unsigned indent) const override {
       OS.indent(indent) << "StructElementComponent("
                         << Field->getName() << ")\n";

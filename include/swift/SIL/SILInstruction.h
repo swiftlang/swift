@@ -4446,8 +4446,13 @@ enum class SILAccessEnforcement : uint8_t {
   /// behavior.
   Unsafe,
 
+  /// Access to pointers that are signed via pointer authentication mechanishm.
+  /// Such pointers should be authenticated before read and signed before a
+  /// write. Optimizer should avoid promoting such accesses to values.
+  Signed,
+
   // This enum is encoded.
-  Last = Unsafe
+  Last = Signed
 };
 StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
@@ -4520,9 +4525,9 @@ class BeginAccessInst
       : BeginAccessBase(loc, accessKind, enforcement, noNestedConflict,
         fromBuiltin, lvalue, lvalue->getType()) {
 
-    static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
+    static_assert(unsigned(SILAccessKind::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
-    static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 2),
+    static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
 
     static_assert(unsigned(SILAccessKind::Last) <
