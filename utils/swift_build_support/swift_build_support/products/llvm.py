@@ -232,6 +232,8 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.skip_build or not self.args.build_llvm:
             build_targets = ['llvm-tblgen', 'clang-resource-headers',
                              'intrinsics_gen', 'clang-tablegen-targets']
+            if self.args.cmake_generator == 'Xcode':
+                build_targets += ['llvm_gtest_main']
             if not self.args.build_toolchain_only:
                 build_targets.extend([
                     'FileCheck',
