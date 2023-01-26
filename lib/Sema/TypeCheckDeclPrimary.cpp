@@ -3667,13 +3667,41 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
+static bool addSpecializationConstraint(
+    constraints::ConstraintLocator *locator, Type boundType,
+    ArrayRef<TypeRepr *> specializationArgs,
+    DeclContext *dc, constraints::ConstraintSystem &cs) {
+  using namespace constraints;
+  // Resolve each type.
+  SmallVector<Type, 2> specializationArgTypes;
+  auto options =
+      TypeResolutionOptions(TypeResolverContext::InExpression);
+  for (auto specializationArg : specializationArgs) {
+    const auto result = TypeResolution::resolveContextualType(
+        specializationArg, dc, options,
+        // Introduce type variables for unbound generics.
+        OpenUnboundGenericType(cs, locator),
+        HandlePlaceholderType(cs, locator),
+        OpenPackElementType(cs, locator, nullptr));
+    if (result->hasError())
+      return true;
+
+    specializationArgTypes.push_back(result);
+  }
+  cs.addConstraint(
+      ConstraintKind::ExplicitGenericArguments, boundType,
+      PackType::get(cs.getASTContext(), specializationArgTypes),
+      locator);
+  return false;
+}
+
 BraceStmt *
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
   // Non-call declaration macros cannot be overloaded.
-  MacroRoles viableRoles(MacroRole::FreestandingDeclaration);
+  MacroRoles viableRoles(MacroRole::Declaration);
   // In a code block context, a macro expansion decl can also represent a
   // macro expansion expression.
   if (dc->isLocalContext() || dc->getContextKind() == DeclContextKind::FileUnit)
@@ -3753,9 +3781,9 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     auto macroRefType = Type(cs.createTypeVariable(locator, 0));
     cs.addOverloadSet(macroRefType, choices, dc, locator);
     if (MED->getGenericArgsRange().isValid()) {
-      // FIXME: Deal with generic args.
-      MED->diagnose(diag::macro_unsupported);
-      return {};
+      addSpecializationConstraint(cs.getConstraintLocator(MED), macroRefType,
+                                  MED->getGenericArgs(), dc, cs);
+      return nullptr;
     }
     auto getMatchingParams = [&](
         ArgumentList *argList,
@@ -3809,8 +3837,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     return expandAsMacroExpansionExpr();
 
   // Otherwise, we treat it as a freestanding declaration macro.
-  assert(roles.contains(MacroRole::FreestandingDeclaration));
-  auto *expansion = expandFreestandingDeclarationMacro(MED);
+  assert(roles.contains(MacroRole::Declaration));
+  auto *expansion = expandFreestandingCodeItemMacro(MED);
   MED->setRewritten(expansion);
   return expansion;
 }

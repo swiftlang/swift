@@ -2159,7 +2159,7 @@ Parser::parseDeclarationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return makeParserError();
   }
   auto kind = llvm::StringSwitch<Optional<MacroRole>>(Tok.getText())
-      .Case("freestanding", MacroRole::FreestandingDeclaration)
+      .Case("freestanding", MacroRole::Declaration)
       .Default(None);
   if (!kind) {
     diagnose(Tok, diag::declaration_attr_expected_kind);

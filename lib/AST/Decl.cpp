@@ -9724,8 +9724,8 @@ StringRef swift::getMacroRoleString(MacroRole role) {
   case MacroRole::Expression:
     return "expression";
 
-  case MacroRole::FreestandingDeclaration:
-    return "freestanding";
+  case MacroRole::Declaration:
+    return "declaration";
 
   case MacroRole::Accessor:
     return "accessor";
@@ -9735,6 +9735,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::SynthesizedMembers:
     return "synthesizedMembers";
+
+  case MacroRole::CodeItem:
+    return "codeItem";
   }
 }
 
@@ -9776,7 +9779,8 @@ StringRef swift::getMacroIntroducedDeclNameString(
 static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
-   MacroRole::FreestandingDeclaration);
+   MacroRole::Declaration |
+   MacroRole::CodeItem);
 static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |

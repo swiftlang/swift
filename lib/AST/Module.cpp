@@ -937,7 +937,7 @@ Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
     return MacroRole::Expression;
 
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    return MacroRole::FreestandingDeclaration;
+    return MacroRole::Declaration;
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
     return MacroRole::Accessor;

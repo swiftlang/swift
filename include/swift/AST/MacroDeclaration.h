@@ -28,7 +28,7 @@ enum class MacroRole: uint32_t {
   /// in the source code.
   Expression = 0x01,
   /// A freestanding declaration macro.
-  FreestandingDeclaration = 0x02,
+  Declaration = 0x02,
   /// An attached macro that declares accessors for a variable or subscript
   /// declaration.
   Accessor = 0x04,
@@ -38,6 +38,8 @@ enum class MacroRole: uint32_t {
   /// An attached macro that generates synthesized members
   /// inside the declaration.
   SynthesizedMembers = 0x10,
+  /// A freestanding code item macro.
+  CodeItem = 0x20,
 };
 
 /// The contexts in which a particular macro declaration can be used.

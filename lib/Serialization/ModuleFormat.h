@@ -614,6 +614,7 @@ enum class MacroRole : uint8_t {
   Accessor,
   MemberAttribute,
   SynthesizedMembers,
+  CodeItem,
 };
 using MacroRoleField = BCFixed<3>;
 

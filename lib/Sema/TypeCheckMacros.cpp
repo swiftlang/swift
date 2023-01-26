@@ -554,7 +554,7 @@ Expr *swift::expandMacroExpr(
 }
 
 /// Expands the given macro expansion declaration and type-check the result.
-BraceStmt *swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
+BraceStmt *swift::expandFreestandingCodeItemMacro(MacroExpansionDecl *med) {
   auto *dc = med->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -569,10 +569,10 @@ BraceStmt *swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
   assert(macro->getMacroRoles()
-         .contains(MacroRole::FreestandingDeclaration));
+         .contains(MacroRole::Declaration));
 
   if (isFromExpansionOfMacro(sourceFile, macro,
-                             MacroRole::FreestandingDeclaration)) {
+                             MacroRole::Declaration)) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return nullptr;
   }

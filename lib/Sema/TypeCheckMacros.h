@@ -38,7 +38,7 @@ Expr *expandMacroExpr(
 
 /// Expands the given macro expansion declaration, and type-checks the
 /// replacement code block items.
-BraceStmt *expandFreestandingDeclarationMacro(MacroExpansionDecl *med);
+BraceStmt *expandFreestandingCodeItemMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.

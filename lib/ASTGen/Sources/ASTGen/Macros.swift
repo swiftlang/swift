@@ -182,7 +182,18 @@ func evaluateMacro(
       }
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
-    case let declMacro as FreestandingDeclarationMacro.Type:
+    case let declMacro as DeclarationMacro.Type:
+      guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
+        print("not a macro expansion decl; found \(parentSyntax.kind)")
+        return -1
+      }
+      let decls = try declMacro.expansion(of: parentExpansion, in: &context)
+      evaluatedSyntax = Syntax(CodeBlockItemListSyntax(decls.map {
+        CodeBlockItemSyntax(item: .decl($0))
+      }))
+      macroName = parentExpansion.macro.withoutTrivia().description
+
+    case let codeItemMacro as CodeItemMacro.Type:
       guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
         print("not a macro expansion decl; found \(parentSyntax.kind)")
         return -1

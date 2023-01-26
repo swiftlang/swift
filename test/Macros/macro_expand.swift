@@ -122,9 +122,9 @@ func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
 }
 
-@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 // Test overload
-@declaration(freestanding) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 
 #bitwidthNumberedStructs("MyIntGlobal")
 
@@ -133,7 +133,7 @@ func testNestedDeclInExpr() {
 let blah = false
 #bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
 
-@declaration(freestanding) macro structWithUnqualifiedLookup: Void = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+@freestanding(declaration) macro structWithUnqualifiedLookup: Void = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
