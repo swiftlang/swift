@@ -374,7 +374,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
       auto *decl = expansion.dyn_cast<Decl *>();
       auto &ctx = decl->getASTContext();
       auto *macroDecl = evaluateOrDefault(ctx.evaluator,
-          ResolveAttachedMacroRequest{macroAttr, decl->getDeclContext()},
+          ResolveMacroRequest{macroAttr, role, decl->getDeclContext()},
           nullptr);
       if (!macroDecl)
         return false;
@@ -1248,33 +1248,119 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
   return synthesizedMembers;
 }
 
-MacroDecl *
-ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
-                                      CustomAttr *attr,
-                                      DeclContext *dc) const {
-  auto &ctx = dc->getASTContext();
-  llvm::TinyPtrVector<ValueDecl *> macros;
-  findMacroForCustomAttr(attr, dc, macros);
+DeclNameRef UnresolvedMacroReference::getMacroName() const {
+  if (auto *med = pointer.get<MacroExpansionDecl *>())
+    return med->getMacro();
+  if (auto *mee = pointer.get<MacroExpansionExpr *>())
+    return mee->getMacroName();
+  if (auto *attr = pointer.get<CustomAttr *>()) {
+    auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+    if (!identTypeRepr)
+      return DeclNameRef();
+    return identTypeRepr->getNameRef();
+  }
+  llvm_unreachable("Unhandled case");
+}
 
-  if (macros.empty())
+DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
+  if (auto *med = pointer.get<MacroExpansionDecl *>())
+    return med->getMacroLoc();
+  if (auto *mee = pointer.get<MacroExpansionExpr *>())
+    return mee->getMacroNameLoc();
+  if (auto *attr = pointer.get<CustomAttr *>()) {
+    auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+    if (!identTypeRepr)
+      return DeclNameLoc();
+    return identTypeRepr->getNameLoc();
+  }
+  llvm_unreachable("Unhandled case");
+}
+
+SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
+  if (auto *med = pointer.get<MacroExpansionDecl *>())
+    return med->getGenericArgsRange();
+  if (auto *mee = pointer.get<MacroExpansionExpr *>())
+    return mee->getGenericArgsRange();
+  if (auto *attr = pointer.get<CustomAttr *>())
+    return SourceRange();
+  llvm_unreachable("Unhandled case");
+}
+
+ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
+  if (auto *med = pointer.get<MacroExpansionDecl *>())
+    return med->getGenericArgs();
+  if (auto *mee = pointer.get<MacroExpansionExpr *>())
+    return mee->getGenericArgs();
+  if (auto *attr = pointer.get<CustomAttr *>())
+    return {};
+  llvm_unreachable("Unhandled case");
+}
+
+ArgumentList *UnresolvedMacroReference::getArgs() const {
+  if (auto *med = pointer.get<MacroExpansionDecl *>())
+    return med->getArgs();
+  if (auto *mee = pointer.get<MacroExpansionExpr *>())
+    return mee->getArgs();
+  if (auto *attr = pointer.get<CustomAttr *>())
+    return attr->getArgs();
+  llvm_unreachable("Unhandled case");
+}
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnresolvedMacroReference &ref) {
+  if (ref.getDecl())
+    out << "macro-expansion-decl";
+  else if (ref.getExpr())
+    out << "macro-expansion-expr";
+  else if (ref.getAttr())
+    out << "custom-attr";
+}
+
+void simple_display(llvm::raw_ostream &out, MacroRoles roles) {
+  out << "macro-roles";
+}
+
+bool operator==(MacroRoles lhs, MacroRoles rhs) {
+  return lhs.containsOnly(rhs);
+}
+
+llvm::hash_code hash_value(MacroRoles roles) {
+  return roles.toRaw();
+}
+
+MacroDecl *
+ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                              UnresolvedMacroReference macroRef,
+                              MacroRoles roles,
+                              DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+  llvm::SmallVector<MacroDecl *, 4> foundMacros;
+  TypeChecker::lookupMacros(dc, macroRef.getMacroName(), SourceLoc(), roles,
+                            foundMacros);
+  if (foundMacros.empty())
     return nullptr;
 
-  // Extract macro arguments from the attribute, or create an empty list.
-  ArgumentList *attrArgs;
-  if (attr->hasArgs()) {
-    attrArgs = attr->getArgs();
-  } else {
-    attrArgs = ArgumentList::createImplicit(ctx, {});
-  }
+  // Extract macro arguments, or create an empty list.
+  auto *args = macroRef.getArgs();
+  if (!args)
+    args = ArgumentList::createImplicit(ctx, {});
 
   // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
   // to ensure @freestanding macros are not considered in overload resolution.
   FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-  auto *identTypeRepr = dyn_cast<IdentTypeRepr>(attr->getTypeRepr());
-  auto macroRefExpr = new (ctx) OverloadedDeclRefExpr(
-      macros, identTypeRepr->getNameLoc(), functionRefKind,
+  SmallVector<ValueDecl *> valueDecls;
+  for (auto *macro : foundMacros)
+    valueDecls.push_back(macro);
+  Expr *callee = new (ctx) OverloadedDeclRefExpr(
+      valueDecls, macroRef.getMacroNameLoc(), functionRefKind,
       /*implicit*/true);
-  auto *call = CallExpr::createImplicit(ctx, macroRefExpr, attrArgs);
+  auto genArgs = macroRef.getGenericArgs();
+  if (!genArgs.empty()) {
+    auto genArgsRange = macroRef.getGenericArgsRange();
+    callee = UnresolvedSpecializeExpr::create(
+        ctx, callee, genArgsRange.Start, genArgs, genArgsRange.End);
+  }
+  auto *call = CallExpr::createImplicit(ctx, callee, args);
 
   Expr *result = call;
   TypeChecker::typeCheckExpression(result, dc);
@@ -1284,6 +1370,7 @@ ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
       return macro;
 
   // If we couldn't resolve a macro decl, the attribute is invalid.
-  attr->setInvalid();
+  if (auto *attr = macroRef.getAttr())
+    attr->setInvalid();
   return nullptr;
 }

@@ -3670,34 +3670,6 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
-static bool addSpecializationConstraint(
-    constraints::ConstraintLocator *locator, Type boundType,
-    ArrayRef<TypeRepr *> specializationArgs,
-    DeclContext *dc, constraints::ConstraintSystem &cs) {
-  using namespace constraints;
-  // Resolve each type.
-  SmallVector<Type, 2> specializationArgTypes;
-  auto options =
-      TypeResolutionOptions(TypeResolverContext::InExpression);
-  for (auto specializationArg : specializationArgs) {
-    const auto result = TypeResolution::resolveContextualType(
-        specializationArg, dc, options,
-        // Introduce type variables for unbound generics.
-        OpenUnboundGenericType(cs, locator),
-        HandlePlaceholderType(cs, locator),
-        OpenPackElementType(cs, locator, nullptr));
-    if (result->hasError())
-      return true;
-
-    specializationArgTypes.push_back(result);
-  }
-  cs.addConstraint(
-      ConstraintKind::ExplicitGenericArguments, boundType,
-      PackType::get(cs.getASTContext(), specializationArgTypes),
-      locator);
-  return false;
-}
-
 BraceStmt *
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
@@ -3749,9 +3721,11 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
 
   // Resolve macro candidates.
   MacroDecl *macro;
-  // Non-call macros cannot be overloaded.
-  auto *args = MED->getArgs();
-  if (!args) {
+  if (auto *args = MED->getArgs()) {
+    macro = evaluateOrDefault(
+      ctx.evaluator, ResolveMacroRequest{MED, viableRoles, dc}, nullptr);
+  }
+  else {
     if (foundMacros.size() > 1) {
       MED->diagnose(diag::ambiguous_decl_ref, MED->getMacro())
           .highlight(MED->getMacroLoc().getSourceRange());
@@ -3761,80 +3735,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     }
     macro = foundMacros.front();
   }
-    // Call-like macros need to be resolved.
-  else {
-    using namespace constraints;
-    ConstraintSystem cs(dc, ConstraintSystemOptions());
-    SmallVector<Argument, 2> newArgs;
-    newArgs.reserve(args->size());
-    for (auto arg : *args) {
-      auto *expr = arg.getExpr();
-      auto type = TypeChecker::typeCheckExpression(expr, dc);
-      arg.setExpr(expr);
-      cs.setType(expr, type);
-      newArgs.push_back(arg);
-    }
-    args = ArgumentList::create(
-        ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
-        args->getFirstTrailingClosureIndex(), args->isImplicit());
-    MED->setArgs(args);
-    auto choices = map<SmallVector<OverloadChoice, 1>>(
-        foundMacros,
-        [](MacroDecl *md) {
-          return OverloadChoice(Type(), md, FunctionRefKind::SingleApply);
-        });
-    auto locator = cs.getConstraintLocator(MED);
-    auto macroRefType = Type(cs.createTypeVariable(locator, 0));
-    cs.addOverloadSet(macroRefType, choices, dc, locator);
-    if (MED->getGenericArgsRange().isValid()) {
-      addSpecializationConstraint(cs.getConstraintLocator(MED), macroRefType,
-                                  MED->getGenericArgs(), dc, cs);
-      return nullptr;
-    }
-    auto getMatchingParams = [&](
-        ArgumentList *argList,
-        SmallVectorImpl<AnyFunctionType::Param> &result) {
-      for (auto arg : *argList) {
-        ParameterTypeFlags flags;
-        auto ty = cs.getType(arg.getExpr()); if (arg.isInOut()) {
-          ty = ty->getInOutObjectType();
-          flags = flags.withInOut(true);
-        }
-        if (arg.isConst()) {
-          flags = flags.withCompileTimeConst(true);
-        }
-        result.emplace_back(ty, arg.getLabel(), flags);
-      }
-    };
-    SmallVector<AnyFunctionType::Param, 8> params;
-    getMatchingParams(args, params);
-    cs.associateArgumentList(locator, args);
-    auto resultType = cs.createTypeVariable(
-        cs.getConstraintLocator(MED, ConstraintLocator::FunctionResult),
-        TVO_CanBindToNoEscape);
-    cs.addConstraint(
-        ConstraintKind::ApplicableFunction,
-        FunctionType::get(params, resultType),
-        macroRefType,
-        cs.getConstraintLocator(MED, ConstraintLocator::ApplyFunction));
-    // Solve.
-    auto solution = cs.solveSingle();
-    if (!solution) {
-      if (viableRoles.contains(MacroRole::Expression))
-        return nullptr;
-      MED->diagnose(diag::no_overloads_match_exactly_in_call,
-                    /*reference|call*/false, DescriptiveDeclKind::Macro,
-                    false, MED->getMacro().getBaseName())
-          .highlight(MED->getMacroLoc().getSourceRange());
-      for (auto *candidate : foundMacros)
-        candidate->diagnose(diag::found_candidate);
-      return nullptr;
-    }
-    auto choice = solution->getOverloadChoice(locator).choice;
-    macro = cast<MacroDecl>(choice.getDecl());
-  }
-  MED->setMacroRef(macro);
 
+  MED->setMacroRef(macro);
   auto roles = macro->getMacroRoles();
 
   // If the resolved macro is an expression-only macro, expand to a macro

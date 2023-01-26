@@ -196,7 +196,7 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
     of node: MacroExpansionDeclSyntax,
     in context: inout MacroExpansionContext
-  ) throws -> CodeBlockItemListSyntax {
+  ) throws -> [DeclSyntax] {
     guard let firstElement = node.argumentList.first,
           let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
           stringLiteral.segments.count == 1,
@@ -376,7 +376,6 @@ public struct AddMembers: MemberDeclarationMacro {
       DeclSyntax(storageVariable),
       DeclSyntax(instanceMethod),
     ]
-    return CodeBlockItemList(decls.map { CodeBlockItemSyntax(item: .init($0)) })
   }
 }
 

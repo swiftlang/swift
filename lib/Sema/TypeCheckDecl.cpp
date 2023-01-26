@@ -1602,18 +1602,22 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
 
 MacroRoles
 TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroRoles contexts,
+                          SourceLoc loc, MacroRoles roles,
                           SmallVectorImpl<MacroDecl *> &results) {
-  auto result = lookupUnqualified(dc, DeclNameRef(macroName), loc,
-                                  (defaultUnqualifiedLookupOptions |
-                                      NameLookupFlags::IncludeOuterResults |
-                                      NameLookupFlags::DisableMacroExpansions |
-                                      NameLookupFlags::MacroLookup));
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+  UnqualifiedLookupDescriptor descriptor(
+    macroName, moduleScopeDC, SourceLoc(),
+    UnqualifiedLookupFlags::DisableMacroExpansions |
+        UnqualifiedLookupFlags::MacroLookup
+  );
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
   MacroRoles foundRoles;
-  for (const auto &found : result.allResults()) {
+  for (const auto &found : lookup.allResults()) {
     if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
       auto candidateRoles = macro->getMacroRoles();
-      if (contexts.contains(candidateRoles)) {
+      if (roles.contains(candidateRoles)) {
         foundRoles |= candidateRoles;
         results.push_back(macro);
       }
