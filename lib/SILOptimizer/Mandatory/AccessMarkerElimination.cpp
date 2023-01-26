@@ -77,6 +77,7 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   switch (enforcement) {
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
+  case SILAccessEnforcement::Signed:
     return false;
   case SILAccessEnforcement::Unknown:
   case SILAccessEnforcement::Dynamic:

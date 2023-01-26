@@ -238,6 +238,15 @@ PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
   return PointerAuthInfo(key, discriminator);
 }
 
+PointerAuthInfo
+PointerAuthInfo::emit(IRGenModule &IGM,
+                      clang::PointerAuthQualifier pointerAuthQual) {
+  return PointerAuthInfo(
+      pointerAuthQual.getKey(),
+      llvm::ConstantInt::get(IGM.Int64Ty,
+                             pointerAuthQual.getExtraDiscriminator()));
+}
+
 llvm::ConstantInt *
 PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
                                        const PointerAuthSchema &schema,
