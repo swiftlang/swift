@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Once.h"
 
 #if __has_include(<time.h>)
@@ -25,6 +24,8 @@
 #include <immintrin.h>
 #include <realtimeapiset.h>
 #endif
+
+#include "Error.h"
 
 using namespace swift;
 
@@ -133,7 +134,8 @@ void swift_get_time(
       return;
     }
   }
-  swift::fatalError(0, "Fatal error: invalid clock ID %d\n", clock_id);
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
 }
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -196,5 +198,6 @@ switch (clock_id) {
       return;
     }
   }
-  swift::fatalError(0, "Fatal error: invalid clock ID %d\n", clock_id);
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
 }
