@@ -122,7 +122,11 @@ public:
 
   bool isFrozen() const { return frozen; }
 
-  /// Set this map into its frozen state when we
+  /// Set this map into its frozen state. This stable sorts our internal array
+  /// to create our map like context.
+  ///
+  /// After this, one can only use map like operations and non-mutable vector
+  /// operations instead of full mutable/non-mutable vector operations.
   void setFrozen() {
     std::stable_sort(storage.begin(), storage.end(),
                      [&](const std::pair<Key, Optional<Value>> &lhs,
@@ -133,6 +137,13 @@ public:
                      });
     frozen = true;
   }
+
+  /// Unfreeze the map, so one can go back to using mutable vector
+  /// operations. After one calls this until one freezes the map again, one
+  /// cannot use map operations.
+  ///
+  /// This allows one to incrementally update the map.
+  void unfreeze() { frozen = false; }
 
   /// Reset the frozen multimap in an unfrozen state with its storage cleared.
   void reset() {

@@ -20,7 +20,10 @@
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKER_H
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKER_H
 
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "llvm/ADT/IntervalMap.h"
+#include "llvm/Support/Compiler.h"
 
 namespace swift {
 namespace siloptimizer {
@@ -102,6 +105,152 @@ struct OSSACanonicalizer {
            });
   }
 };
+
+class DiagnosticEmitter;
+
+struct BorrowToDestructureTransform {
+  class IntervalMapAllocator {
+  public:
+    using Map = llvm::IntervalMap<
+        unsigned, SILValue,
+        llvm::IntervalMapImpl::NodeSizer<unsigned, SILValue>::LeafSize,
+        llvm::IntervalMapHalfOpenInfo<unsigned>>;
+
+    using Allocator = Map::Allocator;
+
+  private:
+    /// Lazily initialized allocator.
+    Optional<Allocator> allocator;
+
+  public:
+    Allocator &get() {
+      if (!allocator)
+        allocator.emplace();
+      return *allocator;
+    }
+  };
+
+  // We reserve more bits that we need at the beginning so that we can avoid
+  // reallocating and potentially breaking our internal mutable array ref
+  // points into the data store.
+  struct AvailableValues {
+    MutableArrayRef<SILValue> values;
+
+    SILValue operator[](unsigned index) const { return values[index]; }
+    SILValue &operator[](unsigned index) { return values[index]; }
+    unsigned size() const { return values.size(); }
+
+    AvailableValues() : values() {}
+    AvailableValues(MutableArrayRef<SILValue> values) : values(values) {}
+
+    void print(llvm::raw_ostream &os, const char *prefix = nullptr) const;
+    SWIFT_DEBUG_DUMP;
+  };
+
+  struct AvailableValueStore {
+    std::vector<SILValue> dataStore;
+    llvm::DenseMap<SILBasicBlock *, AvailableValues> blockToValues;
+    unsigned nextOffset = 0;
+    unsigned numBits;
+
+    AvailableValueStore(const FieldSensitivePrunedLiveness &liveness)
+        : dataStore(liveness.getDiscoveredBlocks().size() *
+                    liveness.getNumSubElements()),
+          numBits(liveness.getNumSubElements()) {}
+
+    std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
+      auto iter = blockToValues.try_emplace(block, AvailableValues());
+
+      if (!iter.second) {
+        return {&iter.first->second, false};
+      }
+
+      iter.first->second.values =
+          MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
+      nextOffset += numBits;
+      return {&iter.first->second, true};
+    }
+  };
+
+  IntervalMapAllocator &allocator;
+  MarkMustCheckInst *mmci;
+  DiagnosticEmitter &diagnosticEmitter;
+  FieldSensitiveSSAPrunedLiveRange liveness;
+  SmallVector<Operand *, 8> destructureNeedingUses;
+  SmallVector<Operand *, 8> livenessNeedingUses;
+  SmallVector<SILInstruction *, 8> endScopeInsts;
+  PostOrderAnalysis *poa;
+  PostOrderFunctionInfo *pofi = nullptr;
+  Optional<AvailableValueStore> blockToAvailableValues;
+  SILValue initialValue;
+  SmallVector<SILInstruction *, 8> createdDestructures;
+
+  using InterestingUser = FieldSensitivePrunedLiveness::InterestingUser;
+  SmallFrozenMultiMap<SILBasicBlock *, std::pair<Operand *, InterestingUser>, 8>
+      blocksToUses;
+
+  BorrowToDestructureTransform(
+      IntervalMapAllocator &allocator, MarkMustCheckInst *mmci,
+      DiagnosticEmitter &diagnosticEmitter, PostOrderAnalysis *poa,
+      SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
+      : allocator(allocator), mmci(mmci), diagnosticEmitter(diagnosticEmitter),
+        liveness(mmci->getFunction(), mmci, &discoveredBlocks), poa(poa) {
+    liveness.initializeDef(mmci, TypeTreeLeafTypeRange(mmci));
+  }
+
+  PostOrderFunctionInfo *getPostOrderFunctionInfo() {
+    if (!pofi)
+      pofi = poa->get(mmci->getFunction());
+    return pofi;
+  }
+
+  /// Visit all of the uses of \p mmci and find all begin_borrows.
+  ///
+  /// Returns false if we found an escape and thus cannot process. It is assumed
+  /// that the caller will fail in such a case.
+  static bool gatherBorrows(MarkMustCheckInst *mmci,
+                            StackList<BeginBorrowInst *> &borrowWorklist);
+
+  /// Walk through our borrow's uses recursively and find uses that require only
+  /// a subset of the bits of our type. These are uses that are consuming uses
+  /// that are destructure uses.
+  bool gatherUses(StackList<BeginBorrowInst *> &borrowWorklist);
+
+  /// Once we have gathered up all of our destructure uses and liveness
+  /// requiring uses, validate that all of our destructure uses are on our
+  /// boundary. Once we have done this, we know that it is safe to perform our
+  /// transform.
+  void checkDestructureUsesOnBoundary() const;
+
+  /// Rewrite all of the uses of our borrow on our borrow operand, performing
+  /// destructures as appropriate.
+  void rewriteUses();
+
+  /// After we have rewritten uses, cleanup the IR by deleting the original
+  /// borrow/struct_extract/copies and inserting compensating destroy_values.
+  void cleanup(StackList<BeginBorrowInst *> &borrowWorklist);
+
+  AvailableValues &computeAvailableValues(SILBasicBlock *block);
+};
+
+/// Search for candidate object mark_must_checks. If we find one that does not
+/// fit a pattern that we understand, emit an error diagnostic telling the
+/// programmer that the move checker did not know how to recognize this code
+/// pattern.
+///
+/// \returns true if we deleted a mark_must_check inst that we didn't recognize
+/// after emitting the diagnostic.
+///
+/// To check if an error was emitted call checker.emittedAnyDiagnostics().
+///
+/// NOTE: This is the routine used by the move only object checker to find mark
+/// must checks to process.
+bool searchForCandidateObjectMarkMustChecks(
+    SILFunction *fn,
+    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    DiagnosticEmitter &emitter);
+
+bool cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(SILFunction *fn);
 
 } // namespace siloptimizer
 } // namespace swift
