@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 737; // allow @runtimeMetadata on enums
+const uint16_t SWIFTMODULE_VERSION_MINOR = 738; // macro role attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -610,7 +610,7 @@ enum class GenericEnvironmentKind : uint8_t {
 // the module version.
 enum class MacroRole : uint8_t {
   Expression,
-  FreestandingDeclaration,
+  Declaration,
   Accessor,
   MemberAttribute,
   SynthesizedMembers,
@@ -2217,19 +2217,11 @@ namespace decls_block {
     AccessLevelField    // visibility
   >;
 
-  using DeclarationDeclAttrLayout = BCRecordLayout<
-    Declaration_DECL_ATTR,
+  using MacroRoleDeclAttrLayout = BCRecordLayout<
+    MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
-    MacroRoleField,         // macro context
-    BCVBR<5>,                  // number of peer names
-    BCVBR<5>,                  // number of member names
-    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
-  >;
-
-  using AttachedDeclAttrLayout = BCRecordLayout<
-    Attached_DECL_ATTR,
-    BCFixed<1>,                // implicit flag
-    MacroRoleField,            // macro roles
+    BCFixed<1>,                // macro syntax
+    MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
     BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;

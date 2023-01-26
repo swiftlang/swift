@@ -9717,7 +9717,7 @@ StringRef swift::getMacroRoleString(MacroRole role) {
   case MacroRole::Expression:
     return "expression";
 
-  case MacroRole::FreestandingDeclaration:
+  case MacroRole::Declaration:
     return "freestanding";
 
   case MacroRole::Accessor:
@@ -9769,7 +9769,7 @@ StringRef swift::getMacroIntroducedDeclNameString(
 static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
-   MacroRole::FreestandingDeclaration);
+   MacroRole::Declaration);
 static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |
@@ -9825,11 +9825,7 @@ SourceRange MacroDecl::getSourceRange() const {
 
 MacroRoles MacroDecl::getMacroRoles() const {
   MacroRoles contexts = None;
-  if (getAttrs().hasAttribute<ExpressionAttr>())
-    contexts |= MacroRole::Expression;
-  for (auto attr : getAttrs().getAttributes<DeclarationAttr>())
-    contexts |= attr->getMacroRole();
-  for (auto attr : getAttrs().getAttributes<AttachedAttr>())
+  for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
     contexts |= attr->getMacroRole();
   return contexts;
 }

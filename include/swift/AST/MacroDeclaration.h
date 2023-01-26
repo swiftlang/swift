@@ -21,6 +21,17 @@
 
 namespace swift {
 
+/// Describes the syntax that is used for a macro, which affects its role.
+enum class MacroSyntax: uint8_t {
+  /// Freestanding macro syntax starting with an explicit '#' followed by the
+  /// macro name and optional arguments.
+  Freestanding,
+
+  /// Attached macro syntax written as an attribute with a leading `@` followed
+  /// by the macro name an optional arguments.
+  Attached,
+};
+
 /// The context in which a macro can be used, which determines the syntax it
 /// uses.
 enum class MacroRole: uint32_t {
@@ -28,7 +39,7 @@ enum class MacroRole: uint32_t {
   /// in the source code.
   Expression = 0x01,
   /// A freestanding declaration macro.
-  FreestandingDeclaration = 0x02,
+  Declaration = 0x02,
   /// An attached macro that declares accessors for a variable or subscript
   /// declaration.
   Accessor = 0x04,
