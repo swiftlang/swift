@@ -117,6 +117,29 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   }
 }
 
+extension MacroExpansionDeclSyntax {
+  func asMacroExpansionExpr() -> MacroExpansionExprSyntax {
+    MacroExpansionExprSyntax(
+      unexpectedBeforePoundToken,
+      poundToken: poundToken,
+      unexpectedBetweenPoundTokenAndMacro,
+      macro: macro,
+      genericArguments: genericArguments,
+      unexpectedBetweenGenericArgumentsAndLeftParen,
+      leftParen: leftParen,
+      unexpectedBetweenLeftParenAndArgumentList,
+      argumentList: argumentList,
+      unexpectedBetweenArgumentListAndRightParen,
+      rightParen: rightParen,
+      unexpectedBetweenRightParenAndTrailingClosure,
+      trailingClosure: trailingClosure,
+      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
+      additionalTrailingClosures: additionalTrailingClosures,
+      unexpectedAfterAdditionalTrailingClosures
+    )
+  }
+}
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
