@@ -363,6 +363,12 @@ protected:
     : NumPadBits,
     NumElements : 32
   );
+
+  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
+    : 16 - NumExprBits, // Align and leave room for subclasses
+    Discriminator : 16
+  );
+
   } Bits;
 
 private:
@@ -6047,6 +6053,7 @@ public:
 
 class MacroExpansionExpr final : public Expr {
 private:
+  DeclContext *DC;
   SourceLoc PoundLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
@@ -6059,19 +6066,26 @@ private:
   ConcreteDeclRef macroRef;
 
 public:
-  explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  explicit MacroExpansionExpr(DeclContext *dc,
+                              SourceLoc poundLoc, DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
                               SourceLoc leftAngleLoc,
                               ArrayRef<TypeRepr *> genericArgs,
                               SourceLoc rightAngleLoc,
-                              ArgumentList *argList, bool isImplicit = false,
+                              ArgumentList *argList,
+                              bool isImplicit = false,
                               Type ty = Type())
-      : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty),
+        DC(dc), PoundLoc(poundLoc),
         MacroName(macroName), MacroNameLoc(macroNameLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
         GenericArgs(genericArgs),
         ArgList(argList),
-        Rewritten(nullptr) { }
+        Rewritten(nullptr) {
+    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+  }
 
   DeclNameRef getMacroName() const { return MacroName; }
   DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
@@ -6092,6 +6106,27 @@ public:
 
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *dc) { DC = dc; }
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current function.
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
+    return Bits.MacroExpansionExpr.Discriminator;
+  }
+
+  void setDiscriminator(unsigned discriminator) {
+    assert(getRawDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    Bits.MacroExpansionExpr.Discriminator = discriminator;
+  }
 
   SourceRange getSourceRange() const;
 

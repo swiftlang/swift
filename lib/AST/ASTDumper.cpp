@@ -3021,6 +3021,8 @@ public:
   void visitMacroExpansionExpr(MacroExpansionExpr *E) {
     printCommon(E, "macro_expansion_expr");
     PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getMacroName();
+    PrintWithColorRAII(OS, DiscriminatorColor)
+      << " discriminator=" << E->getRawDiscriminator();
     if (E->getArgs()) {
       OS << '\n';
       printArgumentList(E->getArgs());
