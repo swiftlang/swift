@@ -161,7 +161,8 @@ protected:
     /// that names both the newly declared variable and the referenced variable
     /// by the same identifier in the source text. This includes shorthand
     /// closure captures (`[foo]`) and shorthand if captures
-    /// (`if let foo {`).
+    /// (`if let foo {`). Ordered from innermost to outermost shadows.
+    ///
     /// Decls that are shadowed using shorthand syntax should be reported as
     /// additional cursor info results.
     SmallVector<ValueDecl *> ShorthandShadowedDecls;
