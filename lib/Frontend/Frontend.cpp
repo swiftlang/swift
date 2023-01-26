@@ -554,6 +554,20 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
 
+  // If using `-explicit-swift-module-map-file`, create the explicit loader
+  // before creating `ClangImporter` because the entries in the map influence
+  // the Clang flags. The loader is added to the context below.
+  std::unique_ptr<ExplicitSwiftModuleLoader> ESML = nullptr;
+  bool ExplicitModuleBuild =
+      Invocation.getFrontendOptions().DisableImplicitModules;
+  if (ExplicitModuleBuild ||
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty()) {
+    ESML = ExplicitSwiftModuleLoader::create(
+        *Context, getDependencyTracker(), MLM,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+        IgnoreSourceInfoFile);
+  }
+
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
@@ -575,15 +589,9 @@ bool CompilerInstance::setUpModuleLoaders() {
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
           FEOpts.BackupModuleInterfaceDir, LoaderOpts,
           RequireOSSAModules_t(Invocation.getSILOptions())));
-  // If implicit modules are disabled, we need to install an explicit module
-  // loader.
-  bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
-  if (ExplicitModuleBuild || !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty()) {
-    auto ESML = ExplicitSwiftModuleLoader::create(
-        *Context,
-        getDependencyTracker(), MLM,
-        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
-        IgnoreSourceInfoFile);
+
+  // Install an explicit module loader if it was created earlier.
+  if (ESML) {
     this->DefaultSerializedLoader = ESML.get();
     Context->addModuleLoader(std::move(ESML));
   }
