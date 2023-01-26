@@ -42,10 +42,13 @@ enum Maybe<T> {
 
 func takeConcrete(_ m: MO) {}
 func takeGeneric<T>(_ t: T) {}
+func takeGenericSendable<T>(_ t: T) where T: Sendable {}
 func takeMaybe<T>(_ m: Maybe<T>) {}
 func takeAnyBoxErased(_ b: any Box) {}
 func takeAnyBox<T>(_ b: any Box<T>) {}
 func takeAny(_ a: Any) {}
+func takeAnyObject(_ a: AnyObject) {}
+func genericVarArg<T>(_ t: T...) {}
 
 var globalMO: MO = MO()
 
@@ -66,12 +69,28 @@ func testAny() {
   takeAny(MO()) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func testFunctionCalls() {
+func testBasic(_ mo: MO) {
   takeConcrete(globalMO)
   takeConcrete(MO())
 
   takeGeneric(globalMO) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   takeGeneric(MO()) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  takeGeneric(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  takeAny(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  print(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  _ = "\(mo)" // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: String = String(describing: mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  takeGeneric { () -> Int? in mo.x }
+  genericVarArg(5)
+  genericVarArg(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  takeGeneric( (mo, 5) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to '_Copyable'}}
+  takeGenericSendable((mo, mo)) // expected-error 2{{global function 'takeGenericSendable' requires that 'MO' conform to '_Copyable'}}
+
+  let singleton : (MO) = (mo)
+  takeGeneric(singleton) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
 
 func checkBasicBoxes() {

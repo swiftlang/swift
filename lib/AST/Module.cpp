@@ -1362,8 +1362,10 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     return ProtocolConformanceRef(specialized);
   }
 
-  // Tuple type are Sendable when all of their element types are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  /// For some known protocols like Sendable and Copyable, a tuple type
+  /// conforms to the protocol KP when all of their element types conform to KP.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
 
     // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
     // generic signature <T1, T2, ..., TN>.
@@ -1389,9 +1391,9 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
                                     BuiltinConformanceKind::Synthesized));
     }
 
-    // Form a generic conformance of (T1, T2, ..., TN): Sendable with signature
-    // <T1, T2, ..., TN> and conditional requirements T1: Sendable,
-    // T2: Sendable, ..., TN: Sendable.
+    // Form a generic conformance of (T1, T2, ..., TN): KP with signature
+    // <T1, T2, ..., TN> and conditional requirements T1: KP,
+    // T2: P, ..., TN: KP.
     auto genericTupleType = TupleType::get(genericElements, ctx);
     auto genericSig = GenericSignature::get(
         genericParams, conditionalRequirements);
@@ -1440,12 +1442,20 @@ static bool isSendableFunctionType(const FunctionType *functionType) {
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
     Type type, const FunctionType *functionType, ProtocolDecl *protocol) {
+  ASTContext &ctx = protocol->getASTContext();
   // @Sendable function types are Sendable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
       isSendableFunctionType(functionType)) {
-    ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
+  // Functions cannot destroy move-only vars/lets that they capture, so it's
+  // safe to copy functions, as if they're classes.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1456,8 +1466,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
-  // All metatypes are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All metatypes are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
@@ -1471,8 +1482,9 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
     Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
-  // All builtin are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All builtin are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
