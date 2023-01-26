@@ -3552,6 +3552,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 static KeyPathPatternComponent::ComputedPropertyId
 getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
                                          AbstractStorageDecl *storage,
+                                         ResilienceExpansion expansion,
                                          AccessStrategy strategy) {
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
@@ -3563,7 +3564,8 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     strategy = strategy.getReadStrategy();
     if (strategy.getKind() != AccessStrategy::Storage ||
         !getRepresentativeAccessorForKeyPath(storage)) {
-      return getIdForKeyPathComponentComputedProperty(SGM, storage, strategy);
+      return getIdForKeyPathComponentComputedProperty(SGM, storage, expansion,
+                                                      strategy);
     }
     LLVM_FALLTHROUGH;
   case AccessStrategy::DirectToAccessor: {
@@ -3583,7 +3585,8 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    return SGM.getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage));
+    return SGM.getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage),
+                                  expansion);
   }
 
   case AccessStrategy::DispatchToDistributedThunk: {
@@ -3706,7 +3709,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // either.
     if (baseDecl->requiresOpaqueAccessors()) {
       auto representative = getAccessorDeclRef(
-                           getRepresentativeAccessorForKeyPath(baseDecl));
+          getRepresentativeAccessorForKeyPath(baseDecl), expansion);
       if (representative.isForeign)
         return false;
       if (representative.getLinkage(ForDefinition) > SILLinkage::PublicNonABI)
@@ -3785,7 +3788,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 
     // We need thunks to bring the getter and setter to the right signature
     // expected by the key path runtime.
-    auto id = getIdForKeyPathComponentComputedProperty(*this, var,
+    auto id = getIdForKeyPathComponentComputedProperty(*this, var, expansion,
                                                        strategy);
     auto getter = getOrCreateKeyPathGetter(*this,
              var, subs,
@@ -3842,8 +3845,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                indexPatterns,
                indexEquals, indexHash);
     }
-    
-    auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
+
+    auto id = getIdForKeyPathComponentComputedProperty(*this, decl, expansion,
+                                                       strategy);
     auto getter = getOrCreateKeyPathGetter(*this,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
