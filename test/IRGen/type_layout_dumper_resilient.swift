@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/type_layout_dumper_other.swiftmodule -module-name=type_layout_dumper_other %S/Inputs/type_layout_dumper_other.swift
 
-// RUN: %target-swift-frontend -dump-type-info -type-info-dump-filter=resilient -I %t %s -disable-deserialization-safety | %FileCheck %s
+// RUN: %target-swift-frontend -dump-type-info -type-info-dump-filter=resilient -I %t %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
