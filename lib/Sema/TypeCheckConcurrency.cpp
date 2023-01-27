@@ -257,15 +257,10 @@ swift::checkGlobalActorAttributes(
   NominalTypeDecl *globalActorNominal = nullptr;
   for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
-    auto found = evaluateOrDefault(ctx.evaluator,
-                                   CustomAttrDeclRequest{attr, dc},
-                                    nullptr);
+    auto *nominal = evaluateOrDefault(ctx.evaluator,
+                                      CustomAttrNominalRequest{attr, dc},
+                                      nullptr);
 
-    // Ignore unresolvable custom attributes.
-    if (!found)
-      continue;
-
-    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
       continue;
 
