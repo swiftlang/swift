@@ -64,7 +64,6 @@ extension Sub {
 
     // First we get the old value.
     // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $Optional<String>, [[SELF:%.*]] : @guaranteed $Sub):
-    // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [lexical] [[NEW_VALUE]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
@@ -78,6 +77,7 @@ extension Sub {
     // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
+    // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
     //
