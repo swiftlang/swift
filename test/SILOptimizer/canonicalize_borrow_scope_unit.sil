@@ -1,0 +1,59 @@
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+struct Unmanaged<Instance> where Instance : AnyObject {
+  unowned(unsafe) var _value: @sil_unmanaged Instance
+}
+
+// CHECK-LABEL: begin {{.*}} on copy_and_move_argument: canonicalize-borrow-scope
+// CHECK-LABEL: sil [ossa] @copy_and_move_argument : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[UNMANAGED:%[^,]+]] = ref_to_unmanaged [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = struct $Unmanaged<Instance> ([[UNMANAGED]] : $@sil_unmanaged Instance) 
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'copy_and_move_argument'
+// CHECK-LABEL: end {{.*}} on copy_and_move_argument: canonicalize-borrow-scope
+sil [ossa] @copy_and_move_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
+bb0(%instance : @guaranteed $Instance):
+  test_specification "canonicalize-borrow-scope @argument"
+  %copy_1 = copy_value %instance : $Instance
+  %copy_2 = copy_value %copy_1 : $Instance
+  %move = move_value %copy_2 : $Instance
+  %copy_3 = copy_value %move : $Instance
+  %copy_4 = copy_value %copy_3 : $Instance
+  %unmanaged = ref_to_unmanaged %copy_4 : $Instance to $@sil_unmanaged Instance
+  destroy_value %copy_4 : $Instance
+  destroy_value %copy_3 : $Instance
+  destroy_value %move : $Instance
+  destroy_value %copy_1 : $Instance
+  %retval = struct $Unmanaged<Instance> (%unmanaged : $@sil_unmanaged Instance)
+  return %retval : $Unmanaged<Instance>
+}
+
+// CHECK-LABEL: begin {{.*}} on copy_and_move_lexical_argument: canonicalize-borrow-scope
+// CHECK-LABEL: sil [ossa] @copy_and_move_lexical_argument : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[UNMANAGED:%[^,]+]] = ref_to_unmanaged [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = struct $Unmanaged<Instance> ([[UNMANAGED]] : $@sil_unmanaged Instance) 
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'copy_and_move_lexical_argument'
+// CHECK-LABEL: end {{.*}} on copy_and_move_lexical_argument: canonicalize-borrow-scope
+sil [ossa] @copy_and_move_lexical_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
+bb0(%instance : @guaranteed $Instance):
+  test_specification "canonicalize-borrow-scope @argument"
+  %copy_1 = copy_value %instance : $Instance
+  %copy_2 = copy_value %copy_1 : $Instance
+  %move = move_value [lexical] %copy_2 : $Instance
+  %copy_3 = copy_value %move : $Instance
+  %copy_4 = copy_value %copy_3 : $Instance
+  %unmanaged = ref_to_unmanaged %copy_4 : $Instance to $@sil_unmanaged Instance
+  destroy_value %copy_4 : $Instance
+  destroy_value %copy_3 : $Instance
+  destroy_value %move : $Instance
+  destroy_value %copy_1 : $Instance
+  %retval = struct $Unmanaged<Instance> (%unmanaged : $@sil_unmanaged Instance)
+  return %retval : $Unmanaged<Instance>
+}

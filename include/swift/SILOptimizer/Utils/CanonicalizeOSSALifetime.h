@@ -109,7 +109,7 @@
 
 namespace swift {
 
-extern llvm::Statistic NumCopiesEliminated;
+extern llvm::Statistic NumCopiesAndMovesEliminated;
 extern llvm::Statistic NumCopiesGenerated;
 
 /// Insert a copy on this operand. Trace and update stats.

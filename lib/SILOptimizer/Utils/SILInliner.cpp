@@ -305,8 +305,8 @@ public:
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
 protected:
-  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI,
-                                  unsigned index);
+  SILValue borrowFunctionArgument(SILValue callArg, unsigned index);
+  SILValue moveFunctionArgument(SILValue callArg, unsigned index);
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
@@ -486,9 +486,13 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       } else {
         // Insert begin/end borrow for guaranteed arguments.
         if (paramInfo.isGuaranteed()) {
-          if (SILValue newValue = borrowFunctionArgument(callArg, Apply, idx)) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, idx)) {
             callArg = newValue;
             borrowedArgs[idx] = true;
+          }
+        } else if (paramInfo.isConsumed()) {
+          if (SILValue newValue = moveFunctionArgument(callArg, idx)) {
+            callArg = newValue;
           }
         }
       }
@@ -631,34 +635,98 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
   deleter.forceDelete(Apply.getInstruction());
 }
 
-SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
-                                                 FullApplySite AI,
-                                                 unsigned index) {
-  auto &mod = Apply.getFunction()->getModule();
-  auto enableLexicalLifetimes =
-      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
-  auto argOwnershipRequiresBorrow = [&]() {
-    auto kind = callArg->getOwnershipKind();
-    if (enableLexicalLifetimes) {
-      // At this point, we know that the function argument is @guaranteed.
-      // If the value passed as that parameter has ownership, always add a
-      // lexical borrow scope to ensure that the value stays alive for the
-      // duration of the inlined callee.
-      return kind != OwnershipKind::None;
-    }
-    return kind == OwnershipKind::Owned;
-  };
-  if (!AI.getFunction()->hasOwnership() || !argOwnershipRequiresBorrow()) {
-    return SILValue();
+namespace {
+
+enum class Scope : uint8_t {
+  None,
+  Bare,
+  Lexical,
+};
+Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
+                       SILFunction *caller, SILFunction *callee) {
+  if (!caller->hasOwnership()) {
+    // The function isn't in OSSA.  Borrows/moves are not meaningful.
+    return Scope::None;
   }
 
-  SILFunctionArgument *argument = cast<SILFunctionArgument>(
-      getCalleeFunction()->getEntryBlock()->getArgument(index));
+  auto &mod = caller->getModule();
+  auto enableLexicalLifetimes =
+      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
+  SILFunctionArgument *argument =
+      cast<SILFunctionArgument>(callee->getEntryBlock()->getArgument(index));
+  if (!enableLexicalLifetimes) {
+    // Lexical lifetimes are disabled.  Use the non-lexical scope:
+    // - for borrows, do an ownership conversion.
+    // - for moves, do nothing.
+    return nonlexicalScope;
+  }
+  if (!argument->getLifetime().isLexical()) {
+    // The same applies if lexical lifetimes are enabled but the function
+    // argument is not lexical.  There is no lexical lifetime to maintain.  Use
+    // the non-lexical scope.
+    return nonlexicalScope;
+  }
+  // Lexical lifetimes are enabled and the function argument is lexical.
+  // During inlining, we need to ensure that the lifetime is maintained.
+  if (callArg->isLexical()) {
+    // The caller's value is already lexical.  It will maintain the lifetime of
+    // the argument.  Just do an ownership conversion if needed.
+    return nonlexicalScope;
+  }
+  // Lexical lifetimes are enabled, the function argument's lifetime is
+  // lexical, but the caller's value is not lexical.  Extra care is required to
+  // maintain the function argument's lifetime.  We need to add a lexical
+  // scope.
+  return Scope::Lexical;
+}
 
-  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  auto isLexical =
-      enableLexicalLifetimes && argument->getLifetime().isLexical();
-  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg, isLexical);
+} // anonymous namespace
+
+SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
+                                                 unsigned index) {
+  // The "minimal" borrow scope:  Guaranteed values are valid operands to some
+  // instructions that owned values are not.  If the caller's value is owned,
+  // it must be converted (via a "bare" begin_borrow) to a guaranteed value so
+  // that it can be used in place of the original guaranteed value in the
+  // instructions that are being inlined.
+  auto scopeForOwnership = callArg->getOwnershipKind() == OwnershipKind::Owned
+                               ? Scope::Bare
+                               : Scope::None;
+  auto scope = scopeForArgument(scopeForOwnership, callArg, index,
+                                Apply.getFunction(), getCalleeFunction());
+  bool isLexical;
+  switch (scope) {
+  case Scope::None:
+    return SILValue();
+  case Scope::Bare:
+    isLexical = false;
+    break;
+  case Scope::Lexical:
+    isLexical = true;
+    break;
+  }
+  SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
+  return beginBuilder.createBeginBorrow(Apply.getLoc(), callArg, isLexical);
+}
+
+SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
+                                               unsigned index) {
+  auto scope = scopeForArgument(Scope::None, callArg, index,
+                                Apply.getFunction(), getCalleeFunction());
+  bool isLexical;
+  switch (scope) {
+  case Scope::None:
+    return SILValue();
+  case Scope::Bare:
+    assert(false && "Non-lexical move produced during inlining!?");
+    isLexical = false;
+    break;
+  case Scope::Lexical:
+    isLexical = true;
+    break;
+  }
+  SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
+  return beginBuilder.createMoveValue(Apply.getLoc(), callArg, isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
