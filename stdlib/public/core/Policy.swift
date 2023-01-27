@@ -18,7 +18,7 @@
 /// A type that has no values and can't be constructed.
 ///
 /// Use `Never` as the return type of a function
-/// that doesn't ever return normally --- for example,
+/// that doesn't return normally --- for example,
 /// because it runs forever or terminates the program.
 ///
 ///     // An infinite loop never returns.
