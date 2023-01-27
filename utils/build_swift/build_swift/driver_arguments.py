@@ -56,9 +56,20 @@ def _apply_default_arguments(args):
        args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
+    # Set the default CMake generator.
+    if args.cmake_generator is None:
+        args.cmake_generator = 'Ninja'
+    elif args.cmake_generator == 'Xcode':
+        # Building with Xcode is deprecated.
+        args.skip_build = True
+        args.build_early_swift_driver = False
+        args.build_early_swiftsyntax = False
+
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = 'Debug'
+        args.build_variant = (
+            'MinSizeRel' if args.cmake_generator == 'Xcode' else 'Debug'
+        )
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -118,15 +129,6 @@ def _apply_default_arguments(args):
 
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
-
-    # Set the default CMake generator.
-    if args.cmake_generator is None:
-        args.cmake_generator = 'Ninja'
-    elif args.cmake_generator == 'Xcode':
-        # Building with Xcode is deprecated.
-        args.skip_build = True
-        args.build_early_swift_driver = False
-        args.build_early_swiftsyntax = False
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
