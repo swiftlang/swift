@@ -415,9 +415,9 @@ namespace {
     }
   };
 
-  class AddressOnlyClangRecordTypeInfo final
-      : public StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                                  ClangFieldInfo> {
+  class AddressOnlyCXXClangRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
@@ -490,10 +490,10 @@ namespace {
     }
 
   public:
-    AddressOnlyClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
-                                   llvm::Type *storageType, Size size,
-                                   Alignment align,
-                                   const clang::RecordDecl *clangDecl)
+    AddressOnlyCXXClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                      llvm::Type *storageType, Size size,
+                                      Alignment align,
+                                      const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, storageType, size,
                              // We can't assume any spare bits in a C++ type
@@ -513,7 +513,7 @@ namespace {
       if (!destructor || destructor->isTrivial()) {
         // If we didn't find a destructor to call, bail out to the parent
         // implementation.
-        StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+        StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                            ClangFieldInfo>::destroy(IGF, address, T,
                                                     isOutlined);
         return;
@@ -595,7 +595,7 @@ namespace {
                                     destAddr.getAddress());
         return;
       }
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                          ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
                                                              srcAddr, T,
                                                              isOutlined);
@@ -609,10 +609,9 @@ namespace {
                                     destAddr.getAddress());
         return;
       }
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::assignWithCopy(IGF, destAddr,
-                                                         srcAddr, T,
-                                                         isOutlined);
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithCopy(IGF, destAddr, srcAddr,
+                                                         T, isOutlined);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
@@ -625,9 +624,8 @@ namespace {
         return;
       }
 
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::initializeWithTake(IGF, dest,
-                                                             src, T,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::initializeWithTake(IGF, dest, src, T,
                                                              isOutlined);
     }
 
@@ -641,9 +639,8 @@ namespace {
         return;
       }
 
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::assignWithTake(IGF, dest,
-                                                         src, T,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithTake(IGF, dest, src, T,
                                                          isOutlined);
     }
 
@@ -1045,9 +1042,11 @@ public:
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
     if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
-      return AddressOnlyClangRecordTypeInfo::create(
+      return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
+    // TODO: New AddressOnlyPtrAuthTypeInfo to handle address diversified field
+    // function ptrs in C structs.
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);
@@ -1265,8 +1264,8 @@ private:
     case StructTypeInfoKind::LoadableClangRecordTypeInfo:                      \
       return structTI.as<LoadableClangRecordTypeInfo>().op(IGF, __VA_ARGS__);  \
     case StructTypeInfoKind::AddressOnlyClangRecordTypeInfo:                   \
-      return structTI.as<AddressOnlyClangRecordTypeInfo>().op(IGF,             \
-                                                              __VA_ARGS__);    \
+      return structTI.as<AddressOnlyCXXClangRecordTypeInfo>().op(IGF,          \
+                                                                 __VA_ARGS__); \
     case StructTypeInfoKind::LoadableStructTypeInfo:                           \
       return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__);       \
     case StructTypeInfoKind::FixedStructTypeInfo:                              \
