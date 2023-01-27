@@ -6945,6 +6945,10 @@ ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
       " explicitly written on the conforming type",
       ())
 
+NOTE(missing_reflection_metadata_attribute_on_type,none,
+     "protocol %0 requires reflection metadata attribute @%1",
+     (DeclName, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 

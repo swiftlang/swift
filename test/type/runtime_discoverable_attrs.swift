@@ -133,6 +133,9 @@ struct TestNoAmbiguity {
 @Flag
 protocol Flagged {}
 
+@Flag
+protocol OtherFlagged {}
+
 @Flag("flag from protocol") // expected-error {{reflection metadata attributes applied to protocols cannot have additional attribute arguments}}
 protocol InvalidFlagged {}
 
@@ -249,6 +252,9 @@ enum EnumFlag<B, V> {
   case function(() -> V)
 }
 
+@EnumFlag
+protocol EnumFlagged {}
+
 extension EnumFlag {
   init(attachedTo: KeyPath<B, V>) { self = .property(attachedTo) }
   init(attachedTo: @escaping (B) -> V) { self = .method(attachedTo) }
@@ -280,9 +286,35 @@ extension EnumFlag where B == Void {
 }
 
 @available(*, unavailable)
-@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{269:1-11=}}
+@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{275:1-11=}}
 }
 
 @available(*, unavailable)
 @Flag extension CrossModuleTest { // expected-error {{@Flag can only be applied to unavailable extensions in the same module as 'CrossModuleTest'}}
 }
+
+struct InvalidConformanceTest1 {}
+struct InvalidConformanceTest2 {}
+
+extension InvalidConformanceTest1 : Flagged {} // expected-error {{type 'InvalidConformanceTest1' does not conform to protocol 'Flagged'}}
+// expected-note@-1 {{protocol 'Flagged' requires reflection metadata attribute @Flag}}
+
+extension InvalidConformanceTest2 : Flagged & EnumFlagged {}
+// expected-error@-1 {{type 'InvalidConformanceTest2' does not conform to protocol 'Flagged'}}
+// expected-error@-2 {{type 'InvalidConformanceTest2' does not conform to protocol 'EnumFlagged'}}
+// expected-note@-3 {{protocol 'Flagged' requires reflection metadata attribute @Flag}}
+// expected-note@-4 {{protocol 'EnumFlagged' requires reflection metadata attribute @EnumFlag}}
+
+@Flag
+struct ValidConformance1 {}
+extension ValidConformance1 : Flagged {} // Ok
+
+struct ValidConformance2 : Flagged {}
+extension ValidConformance2 : OtherFlagged {} // Ok (@Flag is inferred from Flagged protocol conformance)
+
+@EnumFlag @Flag
+class MultiAttrTest {
+  init() {}
+}
+
+extension MultiAttrTest : Flagged & EnumFlagged {} // Ok

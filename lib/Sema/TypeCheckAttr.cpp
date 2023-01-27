@@ -7541,3 +7541,29 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
 
   return copyAttrs(attrs);
 }
+
+void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
+  auto *extendedType = ED->getExtendedNominal();
+
+  for (auto *protocol : ED->getLocalProtocols()) {
+    forEachCustomAttribute<RuntimeMetadataAttr>(
+        protocol, [&](CustomAttr *attr, NominalTypeDecl *attrType) {
+          if (llvm::none_of(
+                  extendedType->getRuntimeDiscoverableAttrs(),
+                  [&](CustomAttr *typeAttr) {
+                    return extendedType->getRuntimeDiscoverableAttrTypeDecl(
+                               typeAttr) == attrType;
+                  })) {
+            auto &ctx = protocol->getASTContext();
+            ctx.Diags.diagnose(ED->getLoc(), diag::type_does_not_conform,
+                               ED->getExtendedType(),
+                               protocol->getDeclaredInterfaceType());
+
+            ctx.Diags.diagnose(
+                ED->getLoc(),
+                diag::missing_reflection_metadata_attribute_on_type,
+                protocol->getName(), attrType->getNameStr());
+          }
+        });
+  }
+}
