@@ -48,7 +48,7 @@ enum class MacroRole: uint32_t {
   MemberAttribute = 0x08,
   /// An attached macro that generates synthesized members
   /// inside the declaration.
-  SynthesizedMembers = 0x10,
+  Member = 0x10,
 };
 
 /// The contexts in which a particular macro declaration can be used.

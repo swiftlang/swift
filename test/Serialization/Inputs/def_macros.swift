@@ -4,7 +4,7 @@
 
 @attached(accessor) public macro myWrapper() = #externalMacro(module: "MacroDefinition", type: "MyWrapperMacro")
 
-@attached(memberAttributes) public macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+@attached(memberAttribute) public macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
 
 // Make sure that macro custom attributes are not serialized.
 @wrapAllProperties
