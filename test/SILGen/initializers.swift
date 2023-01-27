@@ -1296,8 +1296,8 @@ class SubVariadic : SuperVariadic { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11SubVariadicC4intsACSid_tcfc
 // CHECK:       bb0(%0 : @owned $Array<Int>, %1 : @owned $SubVariadic):
-// CHECK:         [[T0:%.*]] = begin_borrow [lexical] %0 : $Array<Int>
 // CHECK:         [[SELF_UPCAST:%.*]] = upcast {{.*}} : $SubVariadic to $SuperVariadic
+// CHECK:         [[T0:%.*]] = begin_borrow %0 : $Array<Int>
 // CHECK:         [[T1:%.*]] = copy_value [[T0]] : $Array<Int>
 // CHECK:         [[SUPER_INIT:%.*]] = function_ref @$s21failable_initializers13SuperVariadicC4intsACSid_tcfc
 // CHECK:         apply [[SUPER_INIT]]([[T1]], [[SELF_UPCAST]])

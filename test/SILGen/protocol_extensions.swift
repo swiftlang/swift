@@ -704,16 +704,16 @@ extension InitRequirement {
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT: [[SELF_BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_BOX_LIFETIME]]
-    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK-NEXT: [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
     // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator : {{.*}} : $@convention(witness_method: InitRequirement) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_BOX_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
@@ -728,15 +728,15 @@ extension InitRequirement {
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_LIFETIME]]
-    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:      [[DELEGATEE:%.*]] = function_ref @$s19protocol_extensions15InitRequirementPAAE1dxAA1DC_tcfC :
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
@@ -751,18 +751,18 @@ extension InitRequirement {
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_LIFETIME]]
-    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
     // CHECK-NEXT: [[SELF_TYPE:%.*]] = metatype $@thick Self.Type
+    // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_BOX_ADDR]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[ACCESS]]
     // CHECK-NEXT: end_access [[ACCESS]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: destroy_value [[ARG]]
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
@@ -778,7 +778,7 @@ protocol ClassInitRequirement: class {
 extension ClassInitRequirement {
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions20ClassInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : @owned $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
-  // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
+  // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator : {{.*}} : $@convention(witness_method: ClassInitRequirement) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
@@ -805,11 +805,12 @@ func foo(_ t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
 extension ObjCInitRequirement {
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions19ObjCInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC : $@convention(method) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : @owned $OD, [[SELF_TYPE:%.*]] : $@thick Self.Type):
-  // CHECK:         [[BORROWED_ARG_1:%.*]] = begin_borrow [lexical] [[ARG]]
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
+  // CHECK:         [[BORROWED_ARG_1:%.*]] = begin_borrow [[ARG]]
   // CHECK:         [[BORROWED_ARG_1_UPCAST:%.*]] = upcast [[BORROWED_ARG_1]]
-  // CHECK:         [[BORROWED_ARG_2_UPCAST:%.*]] = upcast [[BORROWED_ARG_1]]
+  // CHECK:         [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
+  // CHECK:         [[BORROWED_ARG_2_UPCAST:%.*]] = upcast [[BORROWED_ARG_2]]
   // CHECK:         [[WITNESS:%.*]] = objc_method [[SELF]] : $Self, #ObjCInitRequirement.init!initializer.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:         apply [[WITNESS]]<Self>([[BORROWED_ARG_1_UPCAST]], [[BORROWED_ARG_2_UPCAST]], [[SELF]])
   // CHECK:         end_borrow [[BORROWED_ARG_1]]

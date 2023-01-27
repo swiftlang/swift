@@ -303,15 +303,8 @@ struct ArgumentInitHelper {
     // form.
     if (!isNoImplicitCopy) {
       if (!value->getType().isMoveOnly()) {
-        // Follow the "normal path": perform a lexical borrow if the lifetime is
-        // lexical.
-        if (value->getOwnershipKind() == OwnershipKind::Owned) {
-          if (lifetime.isLexical()) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-          }
-        }
+        // Follow the normal path.  The value's lifetime will be enforced based
+        // on its ownership.
         return value;
       }
 

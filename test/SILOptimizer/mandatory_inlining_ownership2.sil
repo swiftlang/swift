@@ -510,8 +510,10 @@ bb0(%0 : @owned $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.N
 // CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG_COPY]])
 // CHECK:   [[ARG_COPY_3:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MOVE_ARG_COPY_3:%[^,]+]] = move_value [lexical] [[ARG_COPY_3]]
+// CHECK:   [[MOVE_ARG_COPY_2:%[^,]+]] = move_value [lexical] [[ARG_COPY_2]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
-// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG_COPY_3]], [[ARG_COPY_2]])
+// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[MOVE_ARG_COPY_3]], [[MOVE_ARG_COPY_2]])
 // CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY]])
@@ -605,14 +607,14 @@ bb0(%0 : @owned ${ var Bool }):
 // CHECK: bb2:
 // Separation marker
 // CHECK:   integer_literal $Builtin.Int32, 3
-// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   [[BOX2_COPY_COPY_MOVE:%[^,]+]] = move_value [lexical] [[BOX2_COPY_COPY]] : ${ var Bool }  
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY_MOVE]]
 // CHECK:   {{%.*}} = tuple ()
 // CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
-// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY_MOVE]]
 // CHECK:   br [[BB3]](
 //
 // CHECK: [[BB3]](
-// CHECK:   destroy_value [[BOX2_COPY]]
 // CHECK:   destroy_value [[BOX2]]
 // CHECK:   destroy_value [[BOX1]]
 // CHECK:   return {{.*}}
@@ -654,10 +656,11 @@ bb0(%0 : $Bool, %1 : $Bool):
 // CHECK:   integer_literal $Builtin.Int32, 2
 // Marker -
 // CHECK:   integer_literal $Builtin.Int32, 3
-// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   [[BOX2_COPY_COPY_MOVE:%[^,]+]] = move_value [lexical] [[BOX2_COPY_COPY]] : ${ var Bool }
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY_MOVE]]
 // CHECK:   {{%.*}} = tuple ()
 // CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
-// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY_MOVE]]
 // CHECK:   br [[BB3]](
 //
 // CHECK: [[BB3]](
@@ -725,11 +728,13 @@ bb0(%0 : @owned $CP):
 // CHECK-LABEL: sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ :
 // CHECK: bb0([[ARG0:%.*]] : @owned $any CP, [[ARG1:%.*]] : @owned $any CP):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
-// CHECK:   [[ARG0_COPY_COPY:%.*]] = copy_value [[ARG0_COPY]]
+// CHECK:   [[ARG0_COPY_MOVE:%[^,]+]] = move_value [lexical] [[ARG0_COPY]]
+// CHECK:   [[ARG0_COPY_COPY:%.*]] = copy_value [[ARG0_COPY_MOVE]]
 // CHECK:   open_existential_ref [[ARG0_COPY_COPY]] : $any CP to $@opened([[N1:".*"]], any CP) Self
 //
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
-// CHECK:   [[ARG1_COPY_COPY:%.*]] = copy_value [[ARG1_COPY]]
+// CHECK:   [[ARG1_COPY_MOVE:%[^,]+]] = move_value [lexical] [[ARG1_COPY]]
+// CHECK:   [[ARG1_COPY_COPY:%.*]] = copy_value [[ARG1_COPY_MOVE]]
 // CHECK:   open_existential_ref [[ARG1_COPY_COPY]] : $any CP to $@opened([[N1:".*"]], any CP) Self
 // CHECK: } // end sil function '_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_'
 sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin) (@owned CP, @owned CP) -> () {
@@ -844,12 +849,13 @@ bb0(%0 : @owned $T):
 // CHECK-LABEL: sil hidden [ossa] @protocolTypedParam :
 // CHECK: bb0([[ARG:%.*]] : @owned $any Foo):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[ARG_COPY_MOVE:%[^,]+]] = move_value [lexical] [[ARG_COPY]] : $any Foo         
+// CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY_MOVE]]
 // CHECK-NOT: apply
-// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $any Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY_MOVE]] : $any Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
 // CHECK:   apply [[METHOD]]<any Foo>([[ARG_COPY_2]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
 // CHECK:   destroy_value [[ARG_COPY_2]]
-// CHECK:   destroy_value [[ARG_COPY]]
+// CHECK:   destroy_value [[ARG_COPY_MOVE]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK: } // end sil function 'protocolTypedParam'
 sil hidden [ossa] @protocolTypedParam : $@convention(thin) (@owned Foo) -> () {
@@ -916,7 +922,8 @@ bb0(%0 : $*U, %1 : $*T, %2 : @owned $@callee_owned (@in T) -> @out U):
 // CHECK-NOT: function_ref @reabstractionThunk
 // CHECK-NOT: partial_apply
 // CHECK-NOT: apply
-// CHECK:   apply [[ARG2_COPY_COPY]](
+// CHECK:   [[ARG2_COPY_COPY_MOVE:%[^,]+]] = move_value [lexical] [[ARG2_COPY_COPY]]
+// CHECK:   apply [[ARG2_COPY_COPY_MOVE]](
 // CHECK: } // end sil function 'applyPartial'
 sil [ossa] @applyPartial : $@convention(thin) <U> (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out U) -> @out U {
 bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> @out U):
@@ -1046,8 +1053,9 @@ bb0(%0 : @owned $Optional<C>):
 // CHECK: bb0([[ARG:%.*]] : @owned $C):
 // CHECK:   [[F1:%.*]] = function_ref @testMandatoryConvertedHelper : $@convention(thin) (@owned C) -> @owned C
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_MOVE:%[^,]+]] = move_value [lexical] [[ARG_COPY]]
 // CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) (@owned C) -> (@owned C, @error any Error)
-// CHECK:   try_apply [[CVT1]]([[ARG_COPY]]) : $@convention(thin) (@owned C) -> (@owned C, @error any Error), normal bb1, error bb2
+// CHECK:   try_apply [[CVT1]]([[ARG_COPY_MOVE]]) : $@convention(thin) (@owned C) -> (@owned C, @error any Error), normal bb1, error bb2
 //
 // CHECK: bb1(%{{.*}} : @owned $C):
 // CHECK:   br bb3(%{{.*}} : $C)

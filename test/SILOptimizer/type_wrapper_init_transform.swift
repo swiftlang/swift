@@ -129,7 +129,7 @@ struct TupleFlatteningTest<K: Collection & Hashable, V> {
   // CHECK: [[STORAGE_VAR:%.*]] = alloc_stack $TupleFlatteningTest<K, V>.$Storage
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test19TupleFlatteningTestV8$StorageV1a1b1c1dAEyxq__GSi_SS_Si_xttSDyxq_Gq_SgtcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>)
-  // CHECK: [[A_REF:%.*]] = tuple_element_addr %73 : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 0
+  // CHECK: [[A_REF:%.*]] = tuple_element_addr {{%[^,]+}} : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 0
   // CHECK: [[A:%.*]] = load [trivial] [[A_REF]] : $*Int
   // CHECK: [[B_TUPLE:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 1
   // CHECK: [[B_ELT_0_REF:%.*]] = tuple_element_addr [[B_TUPLE]] : $*(String, (Int, K)), 0
@@ -354,7 +354,7 @@ struct TypeWithLetProperties<T> {
   public init(a: T, b: Int? = nil, onSet: (() -> Void)? = nil) {
     // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
     // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
-    // CHECK-NEXT: copy_addr [take] %11 to [init] [[A_REF]] : $*T
+    // CHECK-NEXT: copy_addr [take] {{%[^,]+}} to [init] [[A_REF]] : $*T
     // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
     // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]]
     self.a = a
@@ -444,7 +444,7 @@ struct TypeWithDefaultedProperties<T> {
   // --> Assignment to `let a`
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int)
   // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: Array<String>, b: Optional<T>, c: Int), 0
-  // CHECK-NEXT: assign [[A_ARG:%.*]] to [init] %18 : $*Array<String>
+  // CHECK-NEXT: assign [[A_ARG:%.*]] to [init] {{%[^,]+}} : $*Array<String>
   // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]]
   // --> Assignment to `var c`, note that the assignment is done to a wrapped value
   // CHECK: [[C_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int), 2
