@@ -177,13 +177,12 @@ struct BorrowToDestructureTransform {
   DiagnosticEmitter &diagnosticEmitter;
   FieldSensitiveSSAPrunedLiveRange liveness;
   SmallVector<Operand *, 8> destructureNeedingUses;
-  SmallVector<Operand *, 8> livenessNeedingUses;
-  SmallVector<SILInstruction *, 8> endScopeInsts;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
   Optional<AvailableValueStore> blockToAvailableValues;
   SILValue initialValue;
   SmallVector<SILInstruction *, 8> createdDestructures;
+  SmallVector<SILPhiArgument *, 8> createdPhiArguments;
 
   using InterestingUser = FieldSensitivePrunedLiveness::InterestingUser;
   SmallFrozenMultiMap<SILBasicBlock *, std::pair<Operand *, InterestingUser>, 8>

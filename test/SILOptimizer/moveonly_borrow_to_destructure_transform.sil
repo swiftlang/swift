@@ -26,11 +26,28 @@ struct AggStruct {
 }
 
 @_moveOnly
+struct KlassPair2 {
+  var lhs: MoveOnlyKlass
+  var rhs: MoveOnlyKlass
+}
+
+@_moveOnly
+struct AggStruct2 {
+  var lhs: MoveOnlyKlass
+  var pair: KlassPair2
+  var rhs: MoveOnlyKlass
+}
+
+@_moveOnly
 struct SingleIntContainingStruct {
     var value: Builtin.Int32
 }
 
 sil @misc_use : $@convention(thin) () -> ()
+sil @aggstruct_consume : $@convention(thin) (@owned AggStruct) -> ()
+sil @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+sil @moveonlyklass_use : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+sil @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
 
 ///////////
 // Tests //
@@ -135,6 +152,61 @@ bb0(%0 : @guaranteed $SingleIntContainingStruct):
   apply %f() : $@convention(thin) () -> ()
   destroy_value %2 : $SingleIntContainingStruct
   return %5 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @phis_are_cleaned_up : $@convention(thin) (@owned AggStruct2) -> () {
+// CHECK: bb3([[FIRST_PHI:%.*]] : @owned $MoveOnlyKlass, [[SECOND_PHI:%.*]] : @owned $MoveOnlyKlass, [[THIRD_PHI:%.*]] : @owned $MoveOnlyKlass):
+// CHECK:   destroy_value [[SECOND_PHI]]
+// CHECK:   destroy_value [[THIRD_PHI]]
+// CHECK:   apply {{%.*}}([[FIRST_PHI]])
+// CHECK:   destroy_value [[FIRST_PHI]]
+// CHECK: } // end sil function 'phis_are_cleaned_up'
+sil [ossa] @phis_are_cleaned_up : $@convention(thin) (@owned AggStruct2) -> () {
+bb0(%0 : @owned $AggStruct2):
+  %1 = move_value [lexical] %0 : $AggStruct2
+  %2 = mark_must_check [no_implicit_copy] %1 : $AggStruct2
+  debug_value %2 : $AggStruct2, let, name "x2", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = begin_borrow %2 : $AggStruct2
+  %9 = struct_extract %8 : $AggStruct2, #AggStruct2.pair
+  %10 = copy_value %9 : $KlassPair2
+  %11 = begin_borrow %10 : $KlassPair2
+  %12 = struct_extract %11 : $KlassPair2, #KlassPair2.rhs
+  %13 = copy_value %12 : $MoveOnlyKlass
+  end_borrow %11 : $KlassPair2
+  destroy_value %10 : $KlassPair2
+  %16 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %17 = apply %16(%13) : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  end_borrow %8 : $AggStruct2
+  br bb3
+
+bb2:
+  %20 = begin_borrow %2 : $AggStruct2
+  %21 = struct_extract %20 : $AggStruct2, #AggStruct2.pair
+  %22 = copy_value %21 : $KlassPair2
+  %23 = begin_borrow %22 : $KlassPair2
+  %24 = struct_extract %23 : $KlassPair2, #KlassPair2.rhs
+  %25 = copy_value %24 : $MoveOnlyKlass
+  end_borrow %23 : $KlassPair2
+  destroy_value %22 : $KlassPair2
+  %28 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %29 = apply %28(%25) : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  end_borrow %20 : $AggStruct2
+  br bb3
+
+bb3:
+  %32 = begin_borrow %2 : $AggStruct2
+  %33 = struct_extract %32 : $AggStruct2, #AggStruct2.lhs
+  %34 = copy_value %33 : $MoveOnlyKlass
+  %35 = function_ref @moveonlyklass_use : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+  %36 = apply %35(%34) : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+  destroy_value %34 : $MoveOnlyKlass
+  end_borrow %32 : $AggStruct2
+  destroy_value %2 : $AggStruct2
+  %39 = tuple ()
+  return %39 : $()
 }
 
 ///////////////////////////////
