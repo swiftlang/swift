@@ -3065,9 +3065,9 @@ void swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
   }
 }
 
-MacroOrNominalTypeDecl
-CustomAttrDeclRequest::evaluate(Evaluator &evaluator,
-                                CustomAttr *attr, DeclContext *dc) const {
+NominalTypeDecl *
+CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                   CustomAttr *attr, DeclContext *dc) const {
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.

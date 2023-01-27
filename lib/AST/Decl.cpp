@@ -6848,11 +6848,8 @@ VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
     auto attr = attrs[i];
     auto dc = getDeclContext();
     ASTContext &ctx = getASTContext();
-    if (auto found = evaluateOrDefault(
-           ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr))
-      nominal = found.dyn_cast<NominalTypeDecl *>();
-    else
-      nominal = nullptr;
+    nominal = evaluateOrDefault(
+        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
   }
 
   if (!nominal)
@@ -9878,8 +9875,7 @@ NominalTypeDecl *
 ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
   auto &ctx = getASTContext();
   auto *nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrDeclRequest{attr, getDeclContext()}, nullptr)
-    .get<NominalTypeDecl *>();
+      ctx.evaluator, CustomAttrNominalRequest{attr, getDeclContext()}, nullptr);
   assert(nominal->getAttrs().hasAttribute<RuntimeMetadataAttr>());
   return nominal;
 }
