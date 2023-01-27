@@ -9,7 +9,7 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(synthesizedMembers) macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
+@attached(member) macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
 @addMembers
 struct S {

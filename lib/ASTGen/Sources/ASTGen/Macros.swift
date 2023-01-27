@@ -36,7 +36,7 @@ enum MacroRole: UInt8 {
   case FreestandingDeclaration = 0x02
   case Accessor = 0x04
   case MemberAttribute = 0x08
-  case SynthesizedMembers = 0x10
+  case Member = 0x10
 }
 
 /// Resolve a reference to type metadata into a macro, if posible.
@@ -383,7 +383,7 @@ func expandAttachedMacro(
         $0.trimmedDescription
       }.joined(separator: " ")
 
-    case (let attachedMacro as MemberMacro.Type, .SynthesizedMembers):
+    case (let attachedMacro as MemberMacro.Type, .Member):
       let members = try attachedMacro.expansion(
         of: customAttrNode,
         attachedTo: declarationNode,

@@ -3738,7 +3738,7 @@ void ASTMangler::appendMacroExpansionContext(
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return appendContext(origDC, StringRef());
