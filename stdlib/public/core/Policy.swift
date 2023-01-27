@@ -53,7 +53,7 @@
 ///     }
 ///
 /// In the code above,
-/// the result type has a failure type of `Never`,
+/// `favoriteNumber` has a failure type of `Never`,
 /// indicating that it always succeeds.
 /// The switch statement is therefore exhaustive,
 /// even though it doesn't contain a `.failure` case,
