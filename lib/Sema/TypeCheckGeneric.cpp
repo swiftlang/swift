@@ -136,6 +136,11 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
+    
+    if (opaqueReprs.empty()) {
+      return nullptr;
+    }
+
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {

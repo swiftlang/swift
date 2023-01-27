@@ -2852,11 +2852,6 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         if (!compositionRepr->isTypeReprAny())
           Reprs.push_back(compositionRepr);
         return Action::SkipChildren();
-      } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-        // prevent any P<some P>
-        if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
-          Reprs.clear();
-        }
       } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
         if (declRefTR->isProtocol(dc))
           Reprs.push_back(declRefTR);

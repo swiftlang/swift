@@ -1990,8 +1990,9 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    Type diagnoseDisallowedExistential(TypeRepr *repr, Type type);
     bool diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy);
+    
+    bool diagnoseDisallowedExistential(TypeRepr *repr);
 
     NeverNullType resolveOpenedExistentialArchetype(
         TypeAttributes &attrs, TypeRepr *repr,
@@ -2205,7 +2206,7 @@ static Type evaluateTypeResolution(const TypeResolution *resolution,
   return result;
 }
 
-Type TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr, Type type) {
+bool TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr) {
   auto options = resolution.getOptions();
   if (!(options & TypeResolutionFlags::SilenceErrors) &&
       options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
@@ -2217,9 +2218,10 @@ Type TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr, Type type) {
     // FIXME: We shouldn't have to invalid the type repr here, but not
     // doing so causes a double-diagnostic.
     repr->setInvalid();
+    return true;
+  } else {
+    return false;
   }
-
-  return type;
 }
 
 /// Checks the given type, assuming that it appears as an argument for a
@@ -2336,9 +2338,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       auto *DC = getDeclContext();
       if (getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)) {
         if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
-          if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-            return diagnoseDisallowedExistential(repr,
-                getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+          if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr)){
+            diagnoseDisallowedExistential(repr);
+            return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+          }
         }
       }
 
@@ -2358,10 +2361,12 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
     auto *DC = getDeclContext();
+    
+    bool isInExistential = diagnoseDisallowedExistential(opaqueRepr);
+    
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
       if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr))
-        return diagnoseDisallowedExistential(opaqueRepr,
-            getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+        return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
     }
 
     // Check whether any of the generic parameters in the context represents
@@ -2371,17 +2376,18 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         if (auto genericParams = genericContext->getGenericParams()) {
           for (auto genericParam : *genericParams) {
             if (genericParam->getOpaqueTypeRepr() == opaqueRepr)
-              return diagnoseDisallowedExistential(opaqueRepr,
-                  genericParam->getDeclaredInterfaceType());
+              return genericParam->getDeclaredInterfaceType();
           }
         }
       }
     }
-
-    // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
-    if (!(options & TypeResolutionFlags::SilenceErrors)) {
-      diagnose(opaqueRepr->getOpaqueLoc(),
-               diag::unsupported_opaque_type);
+    
+    if (!isInExistential){
+      // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
+      if (!(options & TypeResolutionFlags::SilenceErrors)) {
+        diagnose(opaqueRepr->getOpaqueLoc(),
+                 diag::unsupported_opaque_type);
+      }
     }
     
     // Try to resolve the constraint upper bound type as a placeholder.
@@ -4074,8 +4080,8 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       // Check whether this type is an implicit opaque result type.
       if (auto *opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
         if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr)) {
-          return diagnoseDisallowedExistential(
-              repr, getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+          diagnoseDisallowedExistential(repr);
+          return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
         }
       }
 
