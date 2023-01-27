@@ -15,38 +15,49 @@
 //===----------------------------------------------------------------------===//
 // Standardized uninhabited type
 //===----------------------------------------------------------------------===//
-/// A standard _uninhabited_ type---that is, a type which has no values,
-/// and cannot be constructed.
+/// A type that has no values and can't be constructed.
 ///
-/// Use `Never` as the return type of a _nonreturning_ function (or closure,
-/// method, computed property, or subscript) which unconditionally throws an
-/// error, traps, or otherwise does not terminate.
+/// Use `Never` as the return type of a function
+/// that doesn't ever return normally --- for example,
+/// because it runs forever or terminates the program.
 ///
-///     // An infinite loop will never return.
+///     // An infinite loop never returns.
 ///     func forever() -> Never {
 ///         while true {
 ///             print("I will print forever.")
 ///         }
 ///     }
 ///
-///     // Calling `fatalError` will unconditionally terminate
-///     // the program.
+///     // Calling fatalError(_file:line:) unconditionally stops the program.
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
 ///
-/// As an uninhabited type, `Never` allows you to represent a state in your 
-/// program that is impossible to reach during its execution. Swift's type
-/// system can use this information to simplify control statements in cases
-/// known to be unreachable.
+/// A function that returns `Never` is called a _nonreturning_ function.
+/// Closures, methods, computed properties, and subscripts
+/// can also be nonreturning.
 ///
-///     // The `.failure` case can never be reached.
+/// There's no way to create an instance of `Never`;
+/// this characteristic makes it an _uninhabited_ type.
+/// You can use an uninhabited type like `Never`
+/// to represent states in your program
+/// that are impossible to reach during execution.
+/// Swift's type system uses this information ---
+/// for example, to reason about control statements
+/// in cases that are known to be unreachable.
+///
 ///     let favoriteNumber: Result<Int, Never> = .success(42)
 ///     switch favoriteNumber {
 ///     case .success(let value):
 ///         print("My favorite number is", value)
 ///     }
 ///
+/// In the code above,
+/// the result type has a failure type of `Never`,
+/// indicating that it always succeeds.
+/// The switch statement is therefore exhaustive,
+/// even though it doesn't contain a `.failure` case,
+/// because that case could never be reached.
 @frozen
 public enum Never {}
 
