@@ -135,7 +135,6 @@ bool BorrowToDestructureTransform::gatherUses(
       blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
-      livenessNeedingUses.push_back(nextUse);
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
       continue;
@@ -146,7 +145,6 @@ bool BorrowToDestructureTransform::gatherUses(
       // Ignore destroy_value, we are going to eliminate them.
       if (isa<DestroyValueInst>(nextUse->getUser())) {
         LLVM_DEBUG(llvm::dbgs() << "        Found destroy value!\n");
-        endScopeInsts.push_back(nextUse->getUser());
         continue;
       }
 
@@ -186,7 +184,6 @@ bool BorrowToDestructureTransform::gatherUses(
       continue;
     case OperandOwnership::EndBorrow:
       LLVM_DEBUG(llvm::dbgs() << "        Found end borrow!\n");
-      endScopeInsts.push_back(nextUse->getUser());
       continue;
     case OperandOwnership::Reborrow:
       llvm_unreachable("Unsupported for now?!");
@@ -879,8 +876,12 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
     }
 
     // Ok, we need to actually construct a phi.
-    SILType offsetType = smallestTypeAvailable[i]->second;
-    newValues[i] = block->createPhiArgument(offsetType, OwnershipKind::Owned);
+    {
+      SILType offsetType = smallestTypeAvailable[i]->second;
+      auto *phi = block->createPhiArgument(offsetType, OwnershipKind::Owned);
+      newValues[i] = phi;
+      createdPhiArguments.push_back(phi);
+    }
 
     for (auto *predBlock : predsSkippingBackEdges) {
       auto &predAvailableValues = computeAvailableValues(predBlock);
@@ -1297,6 +1298,23 @@ void BorrowToDestructureTransform::cleanup(
       };
       addCompensatingDestroys(liveness, boundary, result);
     }
+  }
+
+  // Then do this for our inserted phis.
+  while (!createdPhiArguments.empty()) {
+    auto *arg = createdPhiArguments.pop_back_val();
+
+    // If we have a trivial argument, we do not ened to add any compensating
+    // destroys.
+    if (arg->getType().isTrivial(*fn))
+      continue;
+
+    SWIFT_DEFER {
+      liveness.clear();
+      discoveredBlocks.clear();
+      boundary.clear();
+    };
+    addCompensatingDestroys(liveness, boundary, arg);
   }
 
   // And finally do the same thing for our initial copy_value.
