@@ -86,6 +86,7 @@ public func withDiscardingTaskGroup<GroupResult>(
   let result = await body(&group)
 
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
+
   return result
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
