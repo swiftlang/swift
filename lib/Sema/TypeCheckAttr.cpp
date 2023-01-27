@@ -3564,15 +3564,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
-  auto found = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr);
+  auto *nominal = evaluateOrDefault(
+    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
-  NominalTypeDecl *nominal = nullptr;
-  if (found) {
-    nominal = found.dyn_cast<NominalTypeDecl *>();
-  }
-
-  if (!found) {
+  if (!nominal) {
     // Try resolving an attached macro attribute.
     auto *macro = evaluateOrDefault(
         Ctx.evaluator, ResolveAttachedMacroRequest{attr, dc}, nullptr);
@@ -7426,15 +7421,12 @@ static void forEachCustomAttribute(
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
 
-    auto found = evaluateOrDefault(
+    auto *nominal = evaluateOrDefault(
         ctx.evaluator,
-        CustomAttrDeclRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-    if (!found)
-      continue;
+        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
 
-    auto nominal = found.dyn_cast<NominalTypeDecl *>();
     if (!nominal)
-      continue; // FIXME: add another entry point for macros we've found
+      continue;
 
     if (nominal->getAttrs().hasAttribute<ATTR>())
       fn(mutableAttr, nominal);

@@ -1716,7 +1716,7 @@ public:
   }
 
 private:
-  friend class CustomAttrDeclRequest;
+  friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
 
 private:
