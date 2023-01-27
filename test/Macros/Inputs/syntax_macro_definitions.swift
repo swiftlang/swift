@@ -313,13 +313,13 @@ extension TypeWrapperMacro: MemberMacro {
     attachedTo decl: DeclSyntax,
     in context: inout MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let storageVariable: VariableDeclSyntax =
+    let storageVariable: DeclSyntax =
       """
       private var _storage = _Storage()
       """
 
     return [
-      DeclSyntax(storageVariable),
+      storageVariable,
     ]
   }
 }
@@ -355,17 +355,17 @@ public struct AddMembers: MemberMacro {
     attachedTo decl: DeclSyntax,
     in context: inout MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let storageStruct: StructDeclSyntax =
+    let storageStruct: DeclSyntax =
       """
       struct Storage {}
       """
 
-    let storageVariable: VariableDeclSyntax =
+    let storageVariable: DeclSyntax =
       """
       private var storage = Storage()
       """
 
-    let instanceMethod: FunctionDeclSyntax =
+    let instanceMethod: DeclSyntax =
       """
       func getStorage() -> Storage {
         print("synthesized method")
@@ -374,9 +374,9 @@ public struct AddMembers: MemberMacro {
       """
 
     return [
-      DeclSyntax(storageStruct),
-      DeclSyntax(storageVariable),
-      DeclSyntax(instanceMethod),
+      storageStruct,
+      storageVariable,
+      instanceMethod,
     ]
   }
 }
