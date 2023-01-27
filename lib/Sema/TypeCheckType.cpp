@@ -5022,7 +5022,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via
-  // CustomAttrDeclRequest.
+  // CustomAttrNominalRequest.
   auto checkType = [](Type type) -> bool {
     while (auto *genericDecl = type->getAnyGeneric()) {
       if (isa<NominalTypeDecl>(genericDecl))
