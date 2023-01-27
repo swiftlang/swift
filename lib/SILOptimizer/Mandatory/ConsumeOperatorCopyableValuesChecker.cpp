@@ -1,4 +1,4 @@
-//===--- MoveKillsCopyableValuesChecker.cpp -------------------------------===//
+//===--- ConsumeOperatorCopyableValuesChecker.cpp -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-move-kills-copyable-values-checker"
+#define DEBUG_TYPE "sil-consume-operator-copyable-values-checker"
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Defer.h"
@@ -34,8 +34,8 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-    DisableUnhandledMoveDiagnostic("sil-disable-unknown-move-diagnostic");
+static llvm::cl::opt<bool> DisableUnhandledMoveDiagnostic(
+    "sil-consume-operator-disable-unknown-move-diagnostic");
 
 //===----------------------------------------------------------------------===//
 //                            Diagnostic Utilities
@@ -152,8 +152,8 @@ bool CheckerLivenessInfo::compute() {
             // Otherwise, try to update liveness for a borrowing operand
             // use. This will make it so that we add the end_borrows of the
             // liveness use. If we have a reborrow here, we will bail.
-            if (liveness.updateForBorrowingOperand(use)
-                != InnerBorrowKind::Contained) {
+            if (liveness.updateForBorrowingOperand(use) !=
+                InnerBorrowKind::Contained) {
               return false;
             }
           }
@@ -213,13 +213,13 @@ bool CheckerLivenessInfo::compute() {
 
 namespace {
 
-struct MoveKillsCopyableValuesChecker {
+struct ConsumeOperatorCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
   DominanceInfo *dominanceToUpdate;
   SILLoopInfo *loopInfoToUpdate;
 
-  MoveKillsCopyableValuesChecker(SILFunction *fn)
+  ConsumeOperatorCopyableValuesChecker(SILFunction *fn)
       : fn(fn), livenessInfo(), dominanceToUpdate(nullptr),
         loopInfoToUpdate(nullptr) {}
 
@@ -245,7 +245,7 @@ static SourceLoc getSourceLocFromValue(SILValue value) {
   llvm_unreachable("Do not know how to get source loc for value?!");
 }
 
-void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
+void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
     SILValue borrowedValue, StringRef borrowedValueName, MoveValueInst *mvi) {
   auto &astContext = fn->getASTContext();
 
@@ -399,7 +399,7 @@ void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
   }
 }
 
-bool MoveKillsCopyableValuesChecker::check() {
+bool ConsumeOperatorCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
@@ -511,8 +511,7 @@ bool MoveKillsCopyableValuesChecker::check() {
 
 static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
   auto &astContext = mvi->getModule().getASTContext();
-  auto diag = diag::
-    sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+  auto diag = diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
   diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
   mvi->setAllowsDiagnostics(false);
 }
@@ -523,7 +522,7 @@ static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
 
 namespace {
 
-class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
+class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
@@ -541,7 +540,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "
                             << getFunction()->getName() << '\n');
 
-    MoveKillsCopyableValuesChecker checker(getFunction());
+    ConsumeOperatorCopyableValuesChecker checker(getFunction());
 
     // If we already had dominance or loop info generated, update them when
     // splitting blocks.
@@ -590,6 +589,6 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createMoveKillsCopyableValuesChecker() {
-  return new MoveKillsCopyableValuesCheckerPass();
+SILTransform *swift::createConsumeOperatorCopyableValuesChecker() {
+  return new ConsumeOperatorCopyableValuesCheckerPass();
 }
