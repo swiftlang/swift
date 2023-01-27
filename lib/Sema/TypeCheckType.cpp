@@ -3158,20 +3158,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     // Do we have an old-style variadic parameter?
     bool variadic = false;
 
-    if (auto *packExpansionTypeRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
-      auto patternOptions = elementOptions;
-      patternOptions.setContext(TypeResolverContext::VariadicFunctionInput);
-
-      auto pair = maybeResolvePackExpansionType(packExpansionTypeRepr,
-                                                patternOptions);
-      if (pair.first->hasError()) {
-        elements.emplace_back(ErrorType::get(getASTContext()));
-        continue;
-      }
-
-      // We have a pack expansion type.
-      ty = PackExpansionType::get(pair.first, pair.second);
-    } else if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+    if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
       if (ellipsisLoc) {
         diagnose(varargTypeRepr->getLoc(),
                  diag::multiple_ellipsis_in_tuple)
