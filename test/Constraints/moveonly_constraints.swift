@@ -137,7 +137,7 @@ func checkMethodCalls() {
   takeMaybe(true ? .none : .just(MO())) // expected-error 3{{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func checkCasting(_ b: any Box) {
+func checkCasting(_ b: any Box, _ mo: MO) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
   let box = b as! ValBox<MO> // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -145,6 +145,16 @@ func checkCasting(_ b: any Box) {
 
   let _: MO = dup.get()
   let _: MO = dup.val
+
+  let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
+  let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: _Copyable = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  // FIXME: this shouldn't be allowed
+  let _: AnyHashable = MO() as! AnyHashable
+
 }
 
 func checkStdlibTypes(_ mo: MO) {
