@@ -48,6 +48,19 @@
 // RUN: cat %t/ClientLib.swiftinterface | %FileCheck --check-prefixes=CLIENT-PUBLIC %s
 // RUN: cat %t/ClientLib.private.swiftinterface | %FileCheck --check-prefixes=CLIENT-PRIVATE %s
 
+/// Check that we get the same behavior using swiftinterfaces only.
+// RUN: rm -f %t/PrivateLib.swiftmodule %t/PublicLib.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/ClientLib.swift -I %t \
+// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -o %t/ClientLib.swiftmodule \
+// RUN:   -emit-module-interface-path %t/ClientLib.swiftinterface \
+// RUN:   -emit-private-module-interface-path %t/ClientLib.private.swiftinterface \
+// RUN:   -enable-experimental-feature ModuleInterfaceExportAs
+// RUN: %target-swift-typecheck-module-from-interface(%t/ClientLib.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/ClientLib.private.swiftinterface) -I %t
+// RUN: cat %t/ClientLib.swiftinterface | %FileCheck --check-prefixes=CLIENT-PUBLIC %s
+// RUN: cat %t/ClientLib.private.swiftinterface | %FileCheck --check-prefixes=CLIENT-PRIVATE %s
+
 //--- PrivateLib.swift
 
 public struct PrivateNameStruct {}
