@@ -3538,8 +3538,10 @@ function build_and_test_installable_package() {
 
             if [[ "${host}" == "macosx-"* ]] || [[ "${host}" == "merged-hosts" ]]; then
                 PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"
+		PKG_TESTS_PKG_DIR="${PKG_TESTS_SANDBOX}"
             else # Linux
                 PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"
+		PKG_TESTS_PKG_DIR="${PKG_TESTS_SANDBOX}/${host_install_prefix}"
             fi
 
             LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
@@ -3554,7 +3556,7 @@ function build_and_test_installable_package() {
               TIMEOUT_ARGS=--timeout=600 # 10 minutes
             fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python3 "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
+                call python3 "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_PKG_DIR}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
         fi
     fi
 }
