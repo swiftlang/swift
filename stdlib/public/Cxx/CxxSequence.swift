@@ -65,9 +65,10 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 /// This requires the C++ sequence type to define const methods `begin()` and
 /// `end()` which return input iterators into the C++ sequence. The iterator
 /// types must conform to `UnsafeCxxInputIterator`.
-public protocol CxxSequence: Sequence {
+public protocol CxxSequence<Element>: Sequence {
+  override associatedtype Element
   associatedtype RawIterator: UnsafeCxxInputIterator
-  override associatedtype Element = RawIterator.Pointee
+    where RawIterator.Pointee == Element
   override associatedtype Iterator = CxxIterator<Self>
 
   // `begin()` and `end()` have to be mutating, otherwise calling 

@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 /// A C++ type that can be converted to a Swift collection.
-public protocol CxxConvertibleToCollection {
+public protocol CxxConvertibleToCollection<Element> {
+  associatedtype Element
   associatedtype RawIterator: UnsafeCxxInputIterator
+    where RawIterator.Pointee == Element
 
   /// Do not implement this function manually in Swift.
   mutating func __beginUnsafe() -> RawIterator
