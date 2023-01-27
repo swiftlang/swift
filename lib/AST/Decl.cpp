@@ -9722,7 +9722,7 @@ StringRef swift::getMacroRoleString(MacroRole role) {
     return "accessor";
 
   case MacroRole::MemberAttribute:
-    return "memberAttributes";
+    return "memberAttribute";
 
   case MacroRole::Member:
     return "member";
