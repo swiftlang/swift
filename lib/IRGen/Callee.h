@@ -78,8 +78,9 @@ namespace irgen {
                                 llvm::Value *storageAddress,
                                 const PointerAuthEntity &entity);
 
-    static PointerAuthInfo emit(IRGenModule &IGM,
-                                clang::PointerAuthQualifier pointerAuthQual);
+    static PointerAuthInfo emit(IRGenFunction &IGF,
+                                clang::PointerAuthQualifier pointerAuthQual,
+                                llvm::Value *storageAddress);
 
     static PointerAuthInfo forFunctionPointer(IRGenModule &IGM,
                                               CanSILFunctionType fnType);
