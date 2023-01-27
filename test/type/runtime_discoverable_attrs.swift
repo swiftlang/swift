@@ -1,6 +1,10 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature RuntimeDiscoverableAttrs
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module %S/Inputs/RuntimeAttrs.swift -o %t
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature RuntimeDiscoverableAttrs -I %t
 
 // REQUIRES: asserts
+
+import RuntimeAttrs
 
 @runtimeMetadata
 struct Flag<T> {
@@ -263,4 +267,19 @@ extension EnumFlag where B == Void {
   @EnumFlag var x: Int = 42
   @EnumFlag func testInst() {}
   @EnumFlag static func testStatic() -> Int { 42 }
+}
+
+@Flag extension EnumTypeTest { // expected-error {{@Flag can only be applied to unavailable extensions in the same module as 'EnumTypeTest'}}
+}
+
+@available(*, unavailable)
+@Flag extension EnumTypeTest { // Ok
+}
+
+@available(*, unavailable)
+@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{266:1-11=}}
+}
+
+@available(*, unavailable)
+@Flag extension CrossModuleTest { // expected-error {{@Flag can only be applied to unavailable extensions in the same module as 'CrossModuleTest'}}
 }

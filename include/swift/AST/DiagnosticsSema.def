@@ -6914,6 +6914,14 @@ ERROR(invalid_decl_for_runtime_discoverable_attr,none,
       "@%0 can only be applied to non-generic types, methods, "
       "instance properties, and global functions", (StringRef))
 
+ERROR(invalid_decl_for_runtime_discoverable_attr_in_extension,none,
+      "@%0 can only be applied to unavailable extensions in the same module"
+      " as %1", (StringRef, DeclName))
+
+ERROR(invalid_attr_redeclaration_in_extension,none,
+      "@%0 is already applied to type %1; did you want to remove it?",
+      (StringRef, DeclName))
+
 ERROR(duplicate_runtime_discoverable_attr,none,
       "duplicate runtime discoverable attribute", ())
 

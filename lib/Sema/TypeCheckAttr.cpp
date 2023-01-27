@@ -3715,6 +3715,40 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
+    case DeclKind::Extension: {
+      auto *ext = cast<ExtensionDecl>(D);
+
+      // Only allowed on unavailable extensions in the same module as type
+      // as a way to opt-out from use of the attribute.
+      if (AvailableAttr::isUnavailable(ext)) {
+        auto *extendedType = ext->getExtendedNominal();
+
+        // If there is no type, fallback to default diagnostic.
+        if (!extendedType)
+          break;
+
+        if (extendedType->getParentModule() == ext->getParentModule()) {
+          for (auto directAttr : extendedType->getRuntimeDiscoverableAttrs()) {
+            auto directAttrDecl =
+                extendedType->getRuntimeDiscoverableAttrTypeDecl(directAttr);
+            if (directAttrDecl == nominal) {
+              diagnose(attr->getLocation(),
+                       diag::invalid_attr_redeclaration_in_extension,
+                       nominal->getNameStr(), extendedType->getName())
+                  .fixItRemove(directAttr->getRangeWithAt());
+            }
+          }
+
+          return;
+        }
+      }
+
+      diagnoseAndRemoveAttr(
+          attr, diag::invalid_decl_for_runtime_discoverable_attr_in_extension,
+          nominal->getNameStr(), ext->getExtendedNominal()->getName());
+      return;
+    }
+
     default:
       // All other kinds of declarations i.e. subscripts, constructors etc.
       // are unsupported.
