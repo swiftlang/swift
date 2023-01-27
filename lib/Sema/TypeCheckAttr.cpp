@@ -3689,6 +3689,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     case DeclKind::Protocol: {
       // Allow on protocols because they are sources
       // of inference.
+      if (attr->hasArgs()) {
+        diagnoseAndRemoveAttr(
+            attr, diag::cannot_use_attr_with_custom_arguments_on_protocol);
+      }
       return;
     }
 

@@ -6939,6 +6939,11 @@ ERROR(runtime_attribute_type_requirement_not_accessible,none,
       "(which is %select{private|fileprivate|internal|package|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
+ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
+      "reflection metadata attributes applied to protocols cannot have"
+      " additional attribute arguments; attribute arguments must be"
+      " explicitly written on the conforming type",
+      ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

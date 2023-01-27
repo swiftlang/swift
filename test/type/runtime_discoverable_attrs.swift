@@ -130,8 +130,11 @@ struct TestNoAmbiguity {
   @Flag func testInst(_: Int, _: Int) {} // Ok
 }
 
-@Flag("flag from protocol")
+@Flag
 protocol Flagged {}
+
+@Flag("flag from protocol") // expected-error {{reflection metadata attributes applied to protocols cannot have additional attribute arguments}}
+protocol InvalidFlagged {}
 
 struct Inference1 : Flagged {} // Ok
 class Inference2 : Flagged {}  // Ok
@@ -277,7 +280,7 @@ extension EnumFlag where B == Void {
 }
 
 @available(*, unavailable)
-@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{266:1-11=}}
+@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{269:1-11=}}
 }
 
 @available(*, unavailable)
