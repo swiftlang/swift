@@ -29,7 +29,7 @@ struct S {
   func g<T>(_ a: T, _ b: Int) -> Void {}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{cannot infer contextual base in reference to member 'notAThing'}}
+    g(.notAThing, 7) // expected-error {{type '_Copyable' has no member 'notAThing'}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}

@@ -175,14 +175,14 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 
 /* Invalid result types */
 
-extension P { // expected-note 13 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
+extension P { // expected-note 12 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
   static func generic<T>(_: T) -> T { fatalError() }
   static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note {{in call to function 'genericWithReqs'}} expected-note {{required by static method 'genericWithReqs' where 'T' = '()'}}
     fatalError()
   }
 }
 
-extension P { // expected-note 6 {{missing same-type requirement on 'Self'}}
+extension P { // expected-note 4 {{missing same-type requirement on 'Self'}}
   static var invalidProp: Int { 42 }
   static var selfProp: Self { fatalError() }
   static func invalidMethod() -> Int { 42 }
@@ -224,23 +224,20 @@ _ = P[q: ""].other
 // expected-error@-1 {{static member 'subscript' cannot be used on protocol metatype '(any P).Type'}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
 
-test(.doesntExist) // expected-error {{type 'P' has no member 'doesntExist'}}
-test(.doesnt.exist()) // expected-error {{type 'P' has no member 'doesnt'}}
+test(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
+test(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
 test(.invalidProp)
 // expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
 test(.invalidProp.other)
-// expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
-// expected-error@-2 {{value of type 'Int' has no member 'other'}}
+// expected-error@-1 {{type '_Copyable' has no member 'invalidProp'}}
 test(.invalidMethod())
 // expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 test(.invalidMethod().other)
-// expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
-// expected-error@-2 {{value of type 'Int' has no member 'other'}}
+// expected-error@-1 {{type '_Copyable' has no member 'invalidMethod'}}
 test(.generic(42))
 // expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test(.generic(42).other)
-// expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
-// expected-error@-2 {{value of type 'Int' has no member 'other'}}
+// expected-error@-1 {{type '_Copyable' has no member 'generic'}}
 test(.generic(S())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test(.generic(G<Int>())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test(.genericWithReqs([S()])) // expected-error {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}

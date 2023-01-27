@@ -737,7 +737,7 @@ func rdar66891544() {
   func foo<T>(_: T, defaultT: T? = nil) {}
   func foo<U>(_: U, defaultU: U? = nil) {}
 
-  foo(.bar) // expected-error {{cannot infer contextual base in reference to member 'bar'}}
+  foo(.bar) // expected-error {{type '_Copyable' has no member 'bar'}}
 }
 
 // rdar://55369704 - extraneous diagnostics produced in combination with missing/misspelled members

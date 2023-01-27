@@ -1806,7 +1806,8 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
 
   // When move-only types are available, add a constraint to force generic
   // parameters to conform to a "Copyable" protocol.
-  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
+//  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
+  if (true) {
     ProtocolDecl *copyable = TypeChecker::getProtocol(
         getASTContext(), SourceLoc(), KnownProtocolKind::Copyable);
 

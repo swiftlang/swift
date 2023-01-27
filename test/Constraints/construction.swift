@@ -59,7 +59,7 @@ acceptString("\(hello), \(world) #\(i)!")
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
-Optional(.none) // expected-error {{cannot infer contextual base in reference to member 'none'}}
+Optional(.none) // expected-error {{type '_Copyable' has no member 'none'}}
 
 // Interpolation
 _ = "\(hello), \(world) #\(i)!"
