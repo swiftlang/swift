@@ -2030,9 +2030,6 @@ namespace {
     NeverNullType resolveImplicitlyUnwrappedOptionalType(
         ImplicitlyUnwrappedOptionalTypeRepr *repr,
         TypeResolutionOptions options, bool isDirect);
-    std::pair<Type, Type>
-    maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
-                                  TypeResolutionOptions options);
     NeverNullType resolveVarargType(VarargTypeRepr *repr,
                                     TypeResolutionOptions options);
     NeverNullType resolvePackType(PackTypeRepr *repr,
@@ -3158,20 +3155,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     // Do we have an old-style variadic parameter?
     bool variadic = false;
 
-    if (auto *packExpansionTypeRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
-      auto patternOptions = elementOptions;
-      patternOptions.setContext(TypeResolverContext::VariadicFunctionInput);
-
-      auto pair = maybeResolvePackExpansionType(packExpansionTypeRepr,
-                                                patternOptions);
-      if (pair.first->hasError()) {
-        elements.emplace_back(ErrorType::get(getASTContext()));
-        continue;
-      }
-
-      // We have a pack expansion type.
-      ty = PackExpansionType::get(pair.first, pair.second);
-    } else if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+    if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
       if (ellipsisLoc) {
         diagnose(varargTypeRepr->getLoc(),
                  diag::multiple_ellipsis_in_tuple)
@@ -4194,25 +4178,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   return uncheckedOptionalTy;
 }
 
-std::pair<Type, Type>
-TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
-                                            TypeResolutionOptions options) {
-  auto elementOptions = options;
-  elementOptions |= TypeResolutionFlags::AllowPackReferences;
-  auto patternTy = resolveType(repr->getPatternType(), elementOptions);
-  if (patternTy->hasError())
-    return std::make_pair(ErrorType::get(getASTContext()), Type());
-
-  // Find the first type parameter pack and use that as the count type.
-  SmallVector<Type, 1> rootParameterPacks;
-  patternTy->getTypeParameterPacks(rootParameterPacks);
-
-  if (rootParameterPacks.empty())
-    return std::make_pair(patternTy, Type());
-
-  return std::make_pair(patternTy, rootParameterPacks[0]);
-}
-
 NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
                                               TypeResolutionOptions options) {
   auto element = resolveType(repr->getElementType(), options);
@@ -4257,32 +4222,34 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
                                                      TypeResolutionOptions options) {
   auto &ctx = getASTContext();
 
-  auto pair = maybeResolvePackExpansionType(repr, options);
-
-  if (pair.first->hasError())
+  auto elementOptions = options;
+  elementOptions |= TypeResolutionFlags::AllowPackReferences;
+  auto patternType = resolveType(repr->getPatternType(), elementOptions);
+  if (patternType->hasError())
     return ErrorType::get(ctx);
 
-  // We might not allow variadic expansions here at all.
-  if (!options.isPackExpansionSupported(getDeclContext())) {
-    diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
+  // Find the first type parameter pack and use that as the count type.
+  SmallVector<Type, 2> rootParameterPacks;
+  patternType->getTypeParameterPacks(rootParameterPacks);
+
+  if (rootParameterPacks.empty()) {
+    // The pattern type must contain at least one pack reference.
+    diagnose(repr->getLoc(), diag::expansion_not_variadic, patternType)
+      .highlight(repr->getSourceRange());
     return ErrorType::get(ctx);
   }
 
-  if (!pair.second) {
-    // The pattern type must contain at least one pack reference.
-    diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
-      .highlight(repr->getSourceRange());
+  // We might not allow variadic expansions here at all.
+  if (!options.isPackExpansionSupported(getDeclContext())) {
+    diagnose(repr->getLoc(), diag::expansion_not_allowed, patternType);
     return ErrorType::get(ctx);
   }
 
   if (resolution.getStage() == TypeResolutionStage::Interface) {
     auto genericSig = resolution.getGenericSignature();
-    auto shapeType = genericSig->getReducedShape(pair.second);
+    auto shapeType = genericSig->getReducedShape(rootParameterPacks[0]);
+    auto result = PackExpansionType::get(patternType, shapeType);
 
-    auto result = PackExpansionType::get(pair.first, shapeType);
-
-    SmallVector<Type, 2> rootParameterPacks;
-    pair.first->getTypeParameterPacks(rootParameterPacks);
     for (auto type : rootParameterPacks) {
       if (!genericSig->haveSameShape(type, shapeType)) {
         ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
@@ -4292,7 +4259,7 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return result;
   }
 
-  return PackExpansionType::get(pair.first, pair.second);
+  return PackExpansionType::get(patternType, rootParameterPacks[0]);
 }
 
 NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
