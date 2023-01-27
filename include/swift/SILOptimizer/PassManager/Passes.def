@@ -460,9 +460,12 @@ PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
 PASS(MoveOnlyDeinitInsertion, "sil-move-only-deinit-insertion",
      "After running move only checking, convert last destroy_values to deinit calls")
-PASS(MoveOnlyBorrowToDestructureTransform, "sil-move-only-borrow-to-destructure",
-     "Utility pass that is used to test the borrow to destructure transform "
-     "independently of the move only object/address checkers")
+PASS(MoveOnlyBorrowToDestructureTransform,
+     "sil-move-only-borrow-to-destructure",
+     "Pass that is phased ordered before move only object checking that is "
+     "used to convert borrow+projection to destructures. Once this has run, the move "
+     "only object checker runs and ensures that the destructures do not create "
+     "any move only errors with respect to non-borrow+projection uses")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
