@@ -343,9 +343,9 @@ bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
 bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
                                                    Decl *decl) const {
   bool synthesizedMembers = false;
-  decl->forEachAttachedMacro(MacroRole::SynthesizedMembers,
+  decl->forEachAttachedMacro(MacroRole::Member,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        synthesizedMembers |= expandSynthesizedMembers(attr, macro, decl);
+        synthesizedMembers |= expandMembers(attr, macro, decl);
       });
 
   return synthesizedMembers;
@@ -1070,8 +1070,7 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   return addedAttributes;
 }
 
-bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
-                                     Decl *decl) {
+bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   auto *dc = decl->getInnermostDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -1090,8 +1089,8 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
-  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::SynthesizedMembers) ||
-      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::SynthesizedMembers)) {
+  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::Member) ||
+      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::Member)) {
     decl->diagnose(diag::macro_recursive, macro->getName());
     return false;
   }
@@ -1152,7 +1151,7 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
-        static_cast<uint32_t>(MacroRole::SynthesizedMembers),
+        static_cast<uint32_t>(MacroRole::Member),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, decl->getStartLoc().getOpaquePointerValue(),
         /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
@@ -1207,7 +1206,7 @@ bool swift::expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro,
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::SynthesizedMemberMacroExpansion,
+      GeneratedSourceInfo::MemberMacroExpansion,
       decl->getEndLoc(),
       SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
       ASTNode(decl).getOpaqueValue(),

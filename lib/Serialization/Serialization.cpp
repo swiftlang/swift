@@ -2227,7 +2227,7 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
-  CASE(SynthesizedMembers)
+  CASE(Member)
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");

@@ -321,7 +321,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 
