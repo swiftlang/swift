@@ -194,7 +194,7 @@ enum CustomError: Error, CustomStringConvertible {
   }
 }
 
-public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
+public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
     of node: MacroExpansionDeclSyntax,
     in context: inout MacroExpansionContext
@@ -217,7 +217,7 @@ public struct DefineBitwidthNumberedStructsMacro: FreestandingDeclarationMacro {
 
 public struct PropertyWrapperMacro {}
 
-extension PropertyWrapperMacro: AccessorDeclarationMacro, Macro {
+extension PropertyWrapperMacro: AccessorMacro, Macro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: DeclSyntax,
@@ -307,7 +307,7 @@ extension TypeWrapperMacro: MemberAttributeMacro {
   }
 }
 
-extension TypeWrapperMacro: MemberDeclarationMacro {
+extension TypeWrapperMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: DeclSyntax,
@@ -324,7 +324,7 @@ extension TypeWrapperMacro: MemberDeclarationMacro {
   }
 }
 
-public struct AccessViaStorageMacro: AccessorDeclarationMacro {
+public struct AccessViaStorageMacro: AccessorMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: DeclSyntax,
@@ -349,7 +349,7 @@ public struct AccessViaStorageMacro: AccessorDeclarationMacro {
   }
 }
 
-public struct AddMembers: MemberDeclarationMacro {
+public struct AddMembers: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: DeclSyntax,
