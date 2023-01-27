@@ -1206,6 +1206,13 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   if (!protocol->existentialConformsToSelf())
     return ProtocolConformanceRef::forInvalid();
 
+  // All existentials are Copyable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
   auto layout = type->getExistentialLayout();
 
   // Due to an IRGen limitation, witness tables cannot be passed from an
