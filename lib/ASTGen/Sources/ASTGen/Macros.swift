@@ -206,7 +206,7 @@ func evaluateMacro(
       evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
-    case let declMacro as FreestandingDeclarationMacro.Type:
+    case let declMacro as DeclarationMacro.Type:
       guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
         print("not on a macro expansion node: \(token.recursiveDescription)")
         return -1
@@ -350,7 +350,7 @@ func expandAttachedMacro(
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
-    case (let attachedMacro as AccessorDeclarationMacro.Type, .Accessor):
+    case (let attachedMacro as AccessorMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
         of: customAttrNode, attachedTo: declarationNode, in: &context
       )
@@ -383,7 +383,7 @@ func expandAttachedMacro(
         $0.trimmedDescription
       }.joined(separator: " ")
 
-    case (let attachedMacro as MemberDeclarationMacro.Type, .SynthesizedMembers):
+    case (let attachedMacro as MemberMacro.Type, .SynthesizedMembers):
       let members = try attachedMacro.expansion(
         of: customAttrNode,
         attachedTo: declarationNode,
