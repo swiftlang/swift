@@ -616,11 +616,25 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  ///
-  /// - Throws: only during
   @_alwaysEmitIntoClient
   public mutating func waitForAll() async throws {
-    await self.awaitAllRemainingTasks()
+    var firstError: Error? = nil
+
+    // Make sure we loop until all child tasks have completed
+    while !isEmpty {
+      do {
+        while let _ = try await next() {}
+      } catch {
+        // Upon error throws, capture the first one
+        if firstError == nil {
+          firstError = error
+        }
+      }
+    }
+
+    if let firstError {
+      throw firstError
+    }
   }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
