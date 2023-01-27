@@ -915,8 +915,8 @@ Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
     return MacroRole::MemberAttribute;
 
-  case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
-    return MacroRole::SynthesizedMembers;
+  case GeneratedSourceInfo::MemberMacroExpansion:
+    return MacroRole::Member;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:

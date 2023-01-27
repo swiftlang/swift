@@ -260,7 +260,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::MemberAttribute:
       parentLoc = expansion.getStartLoc();
       break;
-    case MacroRole::SynthesizedMembers: {
+    case MacroRole::Member: {
       // For synthesized member macros, take the end loc of the
       // enclosing declaration (before the closing brace), because
       // the macro expansion is inside this scope.

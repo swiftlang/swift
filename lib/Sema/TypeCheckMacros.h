@@ -62,7 +62,7 @@ bool expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
 ///
 /// Returns \c true if the macro added new synthesized members, \c false
 /// otherwise.
-bool expandSynthesizedMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+bool expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 } // end namespace swift
 

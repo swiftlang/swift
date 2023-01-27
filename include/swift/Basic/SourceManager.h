@@ -44,8 +44,8 @@ public:
     /// The expansion of a member attribute attached macro.
     MemberAttributeMacroExpansion,
 
-    /// The expansion of a synthesized member macro.
-    SynthesizedMemberMacroExpansion,
+    /// The expansion of an attached member macro.
+    MemberMacroExpansion,
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,

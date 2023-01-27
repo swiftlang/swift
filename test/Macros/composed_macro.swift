@@ -10,7 +10,7 @@
 // REQUIRES: OS=macosx
 
 @attached(memberAttributes)
-@attached(synthesizedMembers)
+@attached(member)
 macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
 @attached(accessor) macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
 

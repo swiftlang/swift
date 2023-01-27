@@ -1315,7 +1315,7 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
     case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
     case GeneratedSourceInfo::AccessorMacroExpansion:
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::SynthesizedMemberMacroExpansion: {
+    case GeneratedSourceInfo::MemberMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName;
       if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {

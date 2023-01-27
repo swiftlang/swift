@@ -2193,7 +2193,7 @@ static Optional<MacroRole> getMacroRole(
       .Case("expression", MacroRole::Expression)
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttributes", MacroRole::MemberAttribute)
-      .Case("synthesizedMembers", MacroRole::SynthesizedMembers)
+      .Case("member", MacroRole::Member)
       .Default(None);
 
   if (!role) {

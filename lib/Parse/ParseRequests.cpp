@@ -174,7 +174,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     switch (generatedInfo->kind) {
     case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
     case GeneratedSourceInfo::ExpressionMacroExpansion:
-    case GeneratedSourceInfo::SynthesizedMemberMacroExpansion:
+    case GeneratedSourceInfo::MemberMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::PrettyPrinted: {
       parser.parseTopLevelItems(items);
