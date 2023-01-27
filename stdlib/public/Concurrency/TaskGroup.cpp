@@ -39,6 +39,10 @@
 #include <mutex>
 #endif
 
+#if defined(__APPLE__)
+#include <unistd.h>
+#endif
+
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
