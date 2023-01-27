@@ -164,6 +164,13 @@ func checkStdlibTypes(_ mo: MO) {
   let s: String = "hello \(mo)" // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
 
+func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHashable) {
+  takeGeneric(a)
+  takeGeneric(e1)
+  takeGeneric(e2)
+  takeGeneric(ah)
+}
+
 // ensure that associated types can't be witnessed by move-only types
 
 protocol HasType<Ty> {
