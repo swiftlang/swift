@@ -163,3 +163,26 @@ func checkStdlibTypes(_ mo: MO) {
 
   let s: String = "hello \(mo)" // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
+
+// ensure that associated types can't be witnessed by move-only types
+
+protocol HasType<Ty> {
+  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'; do you want to add it?}}
+}
+
+class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+}
+
+struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
+  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to '_Copyable'}}
+}
+
+protocol Gives: HasType {
+  func give() -> Ty
+}
+
+struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+  func give() -> Ty {}
+}
