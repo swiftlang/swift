@@ -13,10 +13,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
-#if __has_include(<time.h>)
-#define HAS_TIME 1
 #include <time.h>
-#endif
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -37,11 +34,11 @@ void swift_get_time(
   switch (clock_id) {
     case swift_clock_id_continuous: {
       struct timespec continuous;
-#if defined(__linux__) && HAS_TIME
+#if defined(__linux__)
       clock_gettime(CLOCK_BOOTTIME, &continuous);
-#elif defined(__APPLE__) && HAS_TIME
+#elif defined(__APPLE__)
       clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_gettime(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
       LARGE_INTEGER freq;
@@ -66,13 +63,13 @@ void swift_get_time(
     }
     case swift_clock_id_suspending: {
       struct timespec suspending;
-#if defined(__linux__) && HAS_TIME
+#if defined(__linux__)
       clock_gettime(CLOCK_MONOTONIC, &suspending);
-#elif defined(__APPLE__) && HAS_TIME
+#elif defined(__APPLE__)
       clock_gettime(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__) && HAS_TIME
+#elif defined(__wasi__)
       clock_gettime(CLOCK_MONOTONIC, &suspending);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_gettime(CLOCK_UPTIME, &suspending);
 #elif defined(_WIN32)
       // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
@@ -124,11 +121,11 @@ void swift_get_clock_res(
 switch (clock_id) {
     case swift_clock_id_continuous: {
       struct timespec continuous;
-#if defined(__linux__) && HAS_TIME
+#if defined(__linux__)
       clock_getres(CLOCK_BOOTTIME, &continuous);
-#elif defined(__APPLE__) && HAS_TIME
+#elif defined(__APPLE__)
       clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_getres(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
       LARGE_INTEGER freq;
@@ -144,13 +141,13 @@ switch (clock_id) {
     }
     case swift_clock_id_suspending: {
       struct timespec suspending;
-#if defined(__linux__) && HAS_TIME
+#if defined(__linux__)
       clock_getres(CLOCK_MONOTONIC_RAW, &suspending);
-#elif defined(__APPLE__) && HAS_TIME
+#elif defined(__APPLE__)
       clock_getres(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__) && HAS_TIME
+#elif defined(__wasi__)
       clock_getres(CLOCK_MONOTONIC, &suspending);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__)) && HAS_TIME
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_getres(CLOCK_UPTIME, &suspending);
 #elif defined(_WIN32)
       suspending.tv_sec = 0;
