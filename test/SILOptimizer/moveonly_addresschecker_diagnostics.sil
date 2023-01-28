@@ -140,7 +140,7 @@ bb3:
 sil hidden [ossa] @copyableKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
 bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
-  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
+  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct
   store %arg to [init] %1 : $*NonTrivialStruct
   %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
   store %arg1 to [assign] %9 : $*NonTrivialStruct
@@ -154,16 +154,49 @@ bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   end_access %12 : $*NonTrivialStruct
   %19 = begin_access [read] [static] %1 : $*NonTrivialStruct
   %20 = struct_element_addr %19 : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-  %21 = load [copy] %20 : $*CopyableKlass // expected-note {{consuming use}}
+  %21 = load [copy] %20 : $*CopyableKlass
   end_access %19 : $*NonTrivialStruct
   %23 = function_ref @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> ()
   %24 = apply %23(%21) : $@convention(thin) (@owned CopyableKlass) -> ()
   %25 = begin_access [read] [static] %1 : $*NonTrivialStruct
   %26 = struct_element_addr %25 : $*NonTrivialStruct, #NonTrivialStruct.copyableK
-  %27 = load [copy] %26 : $*CopyableKlass // expected-note {{consuming use}}
+  %27 = load [copy] %26 : $*CopyableKlass
   end_access %25 : $*NonTrivialStruct
   %29 = function_ref @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> ()
   %30 = apply %29(%27) : $@convention(thin) (@owned CopyableKlass) -> ()
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  %33 = tuple ()
+  return %33 : $()
+}
+
+sil [ossa] @moveOnlyKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
+bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
+  %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
+  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
+  store %arg to [init] %1 : $*NonTrivialStruct
+  %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
+  store %arg1 to [assign] %9 : $*NonTrivialStruct
+  end_access %9 : $*NonTrivialStruct
+  %12 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %13 = struct_element_addr %12 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %14 = load_borrow %13 : $*Klass
+  %15 = function_ref @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %14 : $Klass
+  end_access %12 : $*NonTrivialStruct
+  %19 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %20 = struct_element_addr %19 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %21 = load [copy] %20 : $*Klass // expected-note {{consuming use}}
+  end_access %19 : $*NonTrivialStruct
+  %23 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %24 = apply %23(%21) : $@convention(thin) (@owned Klass) -> ()
+  %25 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %26 = struct_element_addr %25 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %27 = load [copy] %26 : $*Klass // expected-note {{consuming use}}
+  end_access %25 : $*NonTrivialStruct
+  %29 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %30 = apply %29(%27) : $@convention(thin) (@owned Klass) -> ()
   destroy_addr %1 : $*NonTrivialStruct
   dealloc_stack %0 : $*NonTrivialStruct
   %33 = tuple ()
