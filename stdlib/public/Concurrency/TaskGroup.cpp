@@ -40,6 +40,7 @@
 #endif
 
 #if defined(__APPLE__)
+#include <asl.h>
 #include <unistd.h>
 #endif
 
