@@ -373,6 +373,9 @@ struct MultiDefLivenessTest : UnitTest {
 // Arguments:
 // - bool: pruneDebug
 // - bool: maximizeLifetimes
+// - bool: "respectAccessScopes", whether to contract lifetimes to end within
+//         access scopes which they previously enclosed but can't be hoisted
+//         before
 // - SILValue: value to canonicalize
 // Dumps:
 // - function after value canonicalization
@@ -384,9 +387,11 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
     DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
     auto pruneDebug = arguments.takeBool();
     auto maximizeLifetimes = arguments.takeBool();
+    auto respectAccessScopes = arguments.takeBool();
     InstructionDeleter deleter;
-    CanonicalizeOSSALifetime canonicalizer(pruneDebug, maximizeLifetimes, accessBlockAnalysis,
-                                           domTree, deleter);
+    CanonicalizeOSSALifetime canonicalizer(
+        pruneDebug, maximizeLifetimes,
+        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree, deleter);
     auto value = arguments.takeValue();
     canonicalizer.canonicalizeValueLifetime(value);
     getFunction()->dump();

@@ -1028,7 +1028,9 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     clearLiveness();
     return false;
   }
-  extendLivenessThroughOverlappingAccess();
+  if (accessBlockAnalysis) {
+    extendLivenessThroughOverlappingAccess();
+  }
   // Step 2: compute original boundary
   PrunedLivenessBoundary originalBoundary;
   findOriginalBoundary(originalBoundary);
