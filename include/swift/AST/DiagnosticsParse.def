@@ -2049,6 +2049,9 @@ WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
 ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
       "unexpected token '%0' in expanded attribute list'",
       (StringRef))
+ERROR(unexpected_member_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded member list'",
+      (StringRef))
 
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())
