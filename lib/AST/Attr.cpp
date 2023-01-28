@@ -2356,8 +2356,7 @@ bool CustomAttr::isAttachedMacro(const Decl *decl) const {
 
   auto *macroDecl = evaluateOrDefault(
       ctx.evaluator,
-      ResolveMacroRequest{const_cast<CustomAttr *>(this),
-                          getAttachedMacroRoles(), dc},
+      ResolveAttachedMacroRequest{const_cast<CustomAttr *>(this), dc},
       nullptr);
 
   return macroDecl != nullptr;
