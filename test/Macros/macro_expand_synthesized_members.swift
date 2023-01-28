@@ -14,6 +14,7 @@
 @addMembers
 struct S {
   func useSynthesized() {
+    S.method()
     print(type(of: getStorage()))
   }
 }
