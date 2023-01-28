@@ -1085,6 +1085,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPackageName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().PackageName));
     }
+    if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
+      MainModule->setExportAsName(getASTContext().getIdentifier(
+          Invocation.getFrontendOptions().ExportAsName));
+    }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))

@@ -67,6 +67,9 @@ public:
   /// The name of the package this module belongs to.
   std::string PackageName;
 
+  /// Module name to use when referenced in clients module interfaces.
+  std::string ExportAsName;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
