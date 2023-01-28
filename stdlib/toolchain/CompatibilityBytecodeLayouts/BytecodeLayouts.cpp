@@ -458,18 +458,6 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
   }
 
   type->setLayoutString(instancedLayoutStr);
-
-  fprintf(stderr, "==== Instantiated: ");
-  for (size_t i = 0; i < instancedLayoutStrSize; i++) {
-    fprintf(stderr, "\\%02x", instancedLayoutStr[i]);
-  }
-  fprintf(stderr, "\n");
-
-  fprintf(stderr, "==== From: ");
-  for (size_t i = 0; i < refCountSize + layoutStringHeaderSize; i++) {
-    fprintf(stderr, "\\%02x", layoutStr[i]);
-  }
-  fprintf(stderr, "\n");
 }
 
 // Allow this library to get force-loaded by autolinking

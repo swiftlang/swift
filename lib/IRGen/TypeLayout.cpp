@@ -272,7 +272,6 @@ static std::string scalarToString(ScalarKind kind) {
 
 llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty) {
   auto *nominal = ty.getNominalOrBoundGenericNominal();
-  auto *boundGenericTy = ty.getASTType()->getAs<BoundGenericType>();
 
   IRGenMangler mangler;
   std::string symbolName =
@@ -297,33 +296,40 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty) {
       IGF.Builder.CreateBitCast(contextMetatype, IGM.TypeMetadataPtrPtrTy),
       IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
 
-  auto generics = boundGenericTy->getGenericArgs();
-  llvm::SmallVector<llvm::Value *, 4> typeParams;
-  for (auto generic : generics) {
-    generic->dump();
-    if (auto *archetypeType = generic->getAs<ArchetypeType>()) {
-      auto param =
-          archetypeType->getInterfaceType()->getAs<GenericTypeParamType>();
+  MetadataResponse response;
+  if (auto *boundGenericTy = ty.getASTType()->getAs<BoundGenericType>()) {
+    auto generics = boundGenericTy->getGenericArgs();
+    llvm::SmallVector<llvm::Value *, 4> typeParams;
+    for (auto generic : generics) {
+      if (auto *archetypeType = generic->getAs<ArchetypeType>()) {
+        auto param =
+            archetypeType->getInterfaceType()->getAs<GenericTypeParamType>();
 
-      auto typeParamAddr = IGF.Builder.CreateConstArrayGEP(
-          addr, param->getIndex(), IGF.IGM.getPointerSize());
-      auto *typeParam = IGF.Builder.CreateLoad(typeParamAddr);
-      IGF.setInvariantLoad(typeParam);
-      typeParams.push_back(typeParam);
-    } else {
-      typeParams.push_back(
-          IGF.emitTypeMetadataRef(generic->getCanonicalType()));
+        auto typeParamAddr = IGF.Builder.CreateConstArrayGEP(
+            addr, param->getIndex(), IGF.IGM.getPointerSize());
+        auto *typeParam = IGF.Builder.CreateLoad(typeParamAddr);
+        IGF.setInvariantLoad(typeParam);
+        typeParams.push_back(typeParam);
+      } else {
+        typeParams.push_back(
+            IGF.emitTypeMetadataRef(generic->getCanonicalType()));
+      }
     }
+
+    GenericArguments genericArgs;
+    genericArgs.collectTypes(IGM, nominal);
+
+    auto *accessor = IGM.getAddrOfGenericTypeMetadataAccessFunction(
+        nominal, genericArgs.Types, NotForDefinition);
+
+    response = IGF.emitGenericTypeMetadataAccessFunctionCall(
+        accessor, typeParams, MetadataState::Complete);
+  } else {
+    auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(ty.getASTType(),
+                                                             NotForDefinition);
+    response = IGF.emitGenericTypeMetadataAccessFunctionCall(
+        accessor, {}, MetadataState::Complete);
   }
-
-  GenericArguments genericArgs;
-  genericArgs.collectTypes(IGM, nominal);
-
-  auto *accessor = IGM.getAddrOfGenericTypeMetadataAccessFunction(
-      nominal, genericArgs.Types, NotForDefinition);
-
-  auto response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-      accessor, typeParams, MetadataState::Complete);
   Explosion ret;
   ret.add(response.getMetadata());
   IGF.emitScalarReturn(IGM.TypeMetadataPtrTy, ret);
@@ -3222,18 +3228,9 @@ llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
 bool ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                               LayoutStringBuilder &B) const {
-  // TODO: handle generics properly
-  // if (ty.hasTypeParameter()) {
   auto *accessor = createMetatypeAccessorFunction(IGM, ty);
   B.addResilientRefCount(accessor);
   return true;
-  // }
-  // USE PROPER SymbolReferenceKind
-  // auto metaTypeRef = IGM.getAddrOfTypeMetadata(
-  //   ty.getASTType(), SymbolReferenceKind::Relative_Indirectable);
-  // B.addResilientRefCount(metaTypeRef);
-
-  // return false;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
