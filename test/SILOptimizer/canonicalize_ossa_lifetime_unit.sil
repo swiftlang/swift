@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+class C {}
+
+// When access scopes are respected, the lifetime which previously extended
+// beyond the access scope still extends beyond it.
+// CHECK-LABEL: begin running test 1 of 2 on retract_value_lifetime_into_access_scope_when_access_scopes_not_respected: canonicalize-ossa-lifetime with: true, false, true, @trace
+// CHECK-LABEL: sil [ossa] @retract_value_lifetime_into_access_scope_when_access_scopes_not_respected {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [static] [[ADDR]]
+// CHECK:         store [[COPY]] to [init] [[ACCESS]]
+// CHECK:         end_access [[ACCESS]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'retract_value_lifetime_into_access_scope_when_access_scopes_not_respected'
+// CHECK-LABEL: end running test 1 of 2 on retract_value_lifetime_into_access_scope_when_access_scopes_not_respected: canonicalize-ossa-lifetime with: true, false, true, @trace
+
+// When access scopes are not respected, the lifetime which previously extended
+// beyond the access scope is retracted into the scope.
+// CHECK-LABEL: begin running test 2 of 2 on retract_value_lifetime_into_access_scope_when_access_scopes_not_respected: canonicalize-ossa-lifetime with: true, false, false, @trace
+// CHECK-LABEL: sil [ossa] @retract_value_lifetime_into_access_scope_when_access_scopes_not_respected {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [static] [[ADDR]]
+// CHECK:         store [[INSTANCE]] to [init] [[ACCESS]]
+// CHECK:         end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'retract_value_lifetime_into_access_scope_when_access_scopes_not_respected'
+// CHECK-LABEL: end running test 2 of 2 on retract_value_lifetime_into_access_scope_when_access_scopes_not_respected: canonicalize-ossa-lifetime with: true, false, false, @trace
+sil [ossa] @retract_value_lifetime_into_access_scope_when_access_scopes_not_respected : $@convention(thin) () -> @out C {
+bb0(%addr : $*C):
+  %instance = apply undef() : $@convention(thin) () -> @owned C
+  debug_value [trace] %instance : $C
+                                                         // respect access scopes
+                                                         // VVVV
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  test_specification "canonicalize-ossa-lifetime true false false @trace"
+                                                         // ^^^^^
+                                                         // respect access scopes
+  %copy = copy_value %instance : $C
+  %access = begin_access [modify] [static] %addr : $*C
+  store %copy to [init] %access : $*C
+  end_access %access : $*C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}

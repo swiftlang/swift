@@ -222,6 +222,11 @@ private:
   /// lifetime boundary in case we need to emit diagnostics.
   std::function<void(Operand *)> moveOnlyFinalConsumingUse;
 
+  // If present, will be used to ensure that the lifetime is not shortened to
+  // end inside an access scope which it previously enclosed.  (Note that ending
+  // before such an access scope is fine regardless.)
+  //
+  // For details, see extendLivenessThroughOverlappingAccess.
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
   // Lazily initialize accessBlocks only when
   // extendLivenessThroughOverlappingAccess is invoked.
