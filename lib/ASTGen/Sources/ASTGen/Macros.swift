@@ -1,7 +1,7 @@
 import SwiftDiagnostics
 import SwiftParser
 import SwiftSyntax
-import _SwiftSyntaxMacros
+import SwiftSyntaxMacros
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
@@ -117,29 +117,6 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   }
 }
 
-extension MacroExpansionDeclSyntax {
-  func asMacroExpansionExpr() -> MacroExpansionExprSyntax {
-    MacroExpansionExprSyntax(
-      unexpectedBeforePoundToken,
-      poundToken: poundToken,
-      unexpectedBetweenPoundTokenAndMacro,
-      macro: macro,
-      genericArguments: genericArguments,
-      unexpectedBetweenGenericArgumentsAndLeftParen,
-      leftParen: leftParen,
-      unexpectedBetweenLeftParenAndArgumentList,
-      argumentList: argumentList,
-      unexpectedBetweenArgumentListAndRightParen,
-      rightParen: rightParen,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures
-    )
-  }
-}
-
 @_cdecl("swift_ASTGen_evaluateMacro")
 @usableFromInline
 func evaluateMacro(
@@ -174,9 +151,13 @@ func evaluateMacro(
     return -1
   }
 
-  var context = MacroExpansionContext(
-    moduleName: sourceFilePtr.pointee.moduleName,
-    fileName: sourceFilePtr.pointee.fileName.withoutPath()
+  let context = BasicMacroExpansionContext(
+    sourceFiles: [
+      sourceFilePtr.pointee.syntax : .init(
+        moduleName: sourceFilePtr.pointee.moduleName,
+        fullFilePath: sourceFilePtr.pointee.fileName
+      )
+    ]
   )
 
   guard let parentSyntax = token.parent else {
@@ -192,18 +173,20 @@ func evaluateMacro(
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      let parentExpansion: MacroExpansionExprSyntax
-      if let expansionExpr = parentSyntax.as(MacroExpansionExprSyntax.self) {
-        parentExpansion = expansionExpr
-      } else if let expansionDecl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
-        parentExpansion = expansionDecl.asMacroExpansionExpr()
-      } else {
+      guard let parentExpansion = parentSyntax.asProtocol(
+        FreestandingMacroExpansionSyntax.self
+      ) else {
         print("not on a macro expansion node: \(parentSyntax.recursiveDescription)")
         return -1
       }
 
       macroName = parentExpansion.macro.text
-      evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
+      evaluatedSyntax = Syntax(
+        try exprMacro.expansion(
+          of: context.detach(parentExpansion),
+          in: context
+        )
+      )
 
     // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:
@@ -211,7 +194,10 @@ func evaluateMacro(
         print("not on a macro expansion node: \(token.recursiveDescription)")
         return -1
       }
-      let decls = try declMacro.expansion(of: parentExpansion, in: &context)
+      let decls = try declMacro.expansion(
+        of: context.detach(parentExpansion),
+        in: context
+      )
       macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
@@ -337,22 +323,34 @@ func expandAttachedMacro(
   let macro = macroPtr.pointee.macro
   let macroRole = MacroRole(rawValue: rawMacroRole)
 
-  // FIXME: Which source file? I don't know! This should go.
+  let attributeSourceFile = customAttrSourceFilePtr.bindMemory(
+    to: ExportedSourceFile.self, capacity: 1
+  )
   let declarationSourceFilePtr = declarationSourceFilePtr.bindMemory(
     to: ExportedSourceFile.self, capacity: 1
   )
 
-  var context = MacroExpansionContext(
-    moduleName: declarationSourceFilePtr.pointee.moduleName,
-    fileName: declarationSourceFilePtr.pointee.fileName.withoutPath()
+  // Record the source file(s).
+  var sourceFiles: [SourceFileSyntax : BasicMacroExpansionContext.KnownSourceFile] = [:]
+  sourceFiles[attributeSourceFile.pointee.syntax] = .init(
+    moduleName: attributeSourceFile.pointee.moduleName,
+    fullFilePath: attributeSourceFile.pointee.fileName
   )
+  sourceFiles[declarationSourceFilePtr.pointee.syntax] = .init(
+    moduleName: declarationSourceFilePtr.pointee.moduleName,
+    fullFilePath: declarationSourceFilePtr.pointee.fileName
+  )
+
+  let context = BasicMacroExpansionContext(sourceFiles: sourceFiles)
 
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
     case (let attachedMacro as AccessorMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
-        of: customAttrNode, attachedTo: declarationNode, in: &context
+        of: context.detach(customAttrNode),
+        providingAccessorsOf: context.detach(declarationNode),
+        in: context
       )
 
       // Form a buffer of accessor declarations to return to the caller.
@@ -367,15 +365,17 @@ func expandAttachedMacro(
         sourceFilePtr: parentDeclSourceFilePtr,
         sourceLocationPtr: parentDeclSourceLocPointer,
         type: DeclSyntax.self
-      ) else {
+      ),
+            let parentDeclGroup = parentDeclNode.asProtocol(DeclGroupSyntax.self)
+      else {
         return 1
       }
 
       let attributes = try attachedMacro.expansion(
-        of: customAttrNode,
-        attachedTo: parentDeclNode,
-        annotating: declarationNode,
-        in: &context
+        of: context.detach(customAttrNode),
+        attachedTo: context.detach(parentDeclGroup),
+        providingAttributesFor: context.detach(declarationNode),
+        in: context
       )
 
       // Form a buffer containing an attribute list to return to the caller.
@@ -384,10 +384,15 @@ func expandAttachedMacro(
       }.joined(separator: " ")
 
     case (let attachedMacro as MemberMacro.Type, .Member):
+      guard let declGroup = declarationNode.asProtocol(DeclGroupSyntax.self)
+      else {
+        return 1
+      }
+
       let members = try attachedMacro.expansion(
-        of: customAttrNode,
-        attachedTo: declarationNode,
-        in: &context
+        of: context.detach(customAttrNode),
+        providingMembersOf: context.detach(declGroup),
+        in: context
       )
 
       // Form a buffer of member declarations to return to the caller.
