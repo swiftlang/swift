@@ -7098,6 +7098,31 @@ void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
   return;
 }
 
+void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
+  Optional<DiagnosticTransaction> transaction;
+  parseSourceFileViaASTGen(items, transaction, /*suppressDiagnostics*/true);
+
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  auto *decl = CurDeclContext->getAsDecl();
+  auto *idc = dyn_cast<IterableDeclContext>(decl);
+  bool previousHadSemi = true;
+
+  while (!Tok.is(tok::eof)) {
+    parseDeclItem(previousHadSemi,
+                  getMemberParseDeclOptions(idc),
+                  [&](Decl *d) { items.push_back(d); });
+  }
+
+  // Consume remaining tokens.
+  while (!Tok.is(tok::eof)) {
+    diagnose(Tok.getLoc(), diag::unexpected_member_expansion,
+             Tok.getText());
+    consumeToken();
+  }
+}
+
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,

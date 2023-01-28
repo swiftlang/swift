@@ -373,10 +373,22 @@ public struct AddMembers: MemberMacro {
       }
       """
 
+    let staticMethod: DeclSyntax =
+      """
+      static func method() {}
+      """
+
+    let initDecl: DeclSyntax =
+      """
+      init() {}
+      """
+
     return [
       storageStruct,
       storageVariable,
       instanceMethod,
+      staticMethod,
+      initDecl,
     ]
   }
 }

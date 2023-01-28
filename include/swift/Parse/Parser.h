@@ -1235,6 +1235,10 @@ public:
   /// the attribute list attached.
   void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
 
+  /// Parse the result of member macro expansion, which is a floating
+  /// member list.
+  void parseExpandedMemberList(SmallVectorImpl<ASTNode> &items);
+
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
