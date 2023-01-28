@@ -581,12 +581,12 @@ do {
 
 // https://github.com/apple/swift/issues/62787
 func f62787() -> Optional<some Collection<Int>> {
-  return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
+  return nil // expected-error{{cannot infer underlying type for opaque result 'Optional<some Collection<Int>>' from return expression}}
 }
 
 func f62787_1(x: Bool) -> Optional<some Collection<Int>> {
   if x {
-    return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
+    return nil // expected-error{{cannot infer underlying type for opaque result 'Optional<some Collection<Int>>' from return expression}}
   } 
-  return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
+  return nil // expected-error{{cannot infer underlying type for opaque result 'Optional<some Collection<Int>>' from return expression}}
 }
