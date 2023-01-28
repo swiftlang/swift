@@ -1,4 +1,4 @@
-//===--- MoveKillsCopyableAddressesChecker.cpp ----------------------------===//
+//===--- ConsumeOperatorCopyableAddressChecker.cpp ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -133,7 +133,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-move-kills-copyable-addresses-checker"
+#define DEBUG_TYPE "sil-consume-operator-copyable-addresses-checker"
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
@@ -171,8 +171,8 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-    DisableUnhandledMoveDiagnostic("sil-disable-unknown-moveaddr-diagnostic");
+static llvm::cl::opt<bool> DisableUnhandledConsumeOperator(
+    "sil-consume-operator-disable-unknown-moveaddr-diagnostic");
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
@@ -245,9 +245,7 @@ struct ClosureOperandState {
   /// points.
   DebugValueInst *singleDebugValue = nullptr;
 
-  bool isUpwardsUse() const {
-    return result == DownwardScanResult::ClosureUse;
-  }
+  bool isUpwardsUse() const { return result == DownwardScanResult::ClosureUse; }
 
   bool isUpwardsConsume() const {
     return result == DownwardScanResult::ClosureConsume;
@@ -1552,9 +1550,9 @@ bool DataflowState::cleanupAllDestroyAddr(
         // be defined before the value.
         SILBuilderWithScope reinitBuilder((*reinit)->getNextInstruction());
         reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        reinitBuilder.createDebugValue(
-            addressDebugInst.inst->getLoc(), address, *varInfo, false,
-            /*was moved*/ true);
+        reinitBuilder.createDebugValue(addressDebugInst.inst->getLoc(), address,
+                                       *varInfo, false,
+                                       /*was moved*/ true);
       }
     }
     madeChange = true;
@@ -1914,7 +1912,7 @@ void DataflowState::init() {
 
 namespace {
 
-struct MoveKillsCopyableAddressesChecker {
+struct ConsumeOperatorCopyableAddressesChecker {
   SILFunction *fn;
   UseState useState;
   DataflowState dataflowState;
@@ -1924,8 +1922,8 @@ struct MoveKillsCopyableAddressesChecker {
       applySiteToPromotedArgIndices;
   SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
 
-  MoveKillsCopyableAddressesChecker(SILFunction *fn,
-                                    SILOptFunctionBuilder &funcBuilder)
+  ConsumeOperatorCopyableAddressesChecker(SILFunction *fn,
+                                          SILOptFunctionBuilder &funcBuilder)
       : fn(fn), useState(),
         dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
                       closureConsumes),
@@ -1951,7 +1949,7 @@ struct MoveKillsCopyableAddressesChecker {
 
 } // namespace
 
-void MoveKillsCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
+void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
     SmallVectorImpl<SILValue> &newArgs, const SmallBitVector &bitVector,
     FullApplySite oldApplySite,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
@@ -2012,7 +2010,7 @@ void MoveKillsCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
   oldApplySite->eraseFromParent();
 }
 
-bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
+bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
     Operand *callerOperand, ClosureOperandState &calleeOperandState) {
   auto fas = FullApplySite::isa(callerOperand->getUser());
   auto *func = fas.getCalleeFunction();
@@ -2060,7 +2058,7 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
 // Returns true if we emitted a diagnostic and handled the single block
 // case. Returns false if we visited all of the uses and seeded the UseState
 // struct with the information needed to perform our interprocedural dataflow.
-bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
+bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     SILValue address, DebugVarCarryingInst addressDebugInst,
     MarkUnresolvedMoveAddrInst *mvi) {
   // First scan downwards to make sure we are move out of this block.
@@ -2215,8 +2213,8 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           auto *next = interestingUser->getNextInstruction();
           SILBuilderWithScope reinitBuilder(next);
           reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          reinitBuilder.createDebugValue(addressDebugInst->getLoc(),
-                                         address, *varInfo, false,
+          reinitBuilder.createDebugValue(addressDebugInst->getLoc(), address,
+                                         *varInfo, false,
                                          /*was moved*/ true);
         }
       }
@@ -2287,7 +2285,7 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
   return false;
 }
 
-bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
+bool ConsumeOperatorCopyableAddressesChecker::check(SILValue address) {
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
 
@@ -2384,8 +2382,8 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // Ok, we need to perform global dataflow for one of our moves. Initialize our
   // dataflow state engine and then run the dataflow itself.
   dataflowState.init();
-  bool result = dataflowState.process(
-      address, addressDebugInst, closureConsumes);
+  bool result =
+      dataflowState.process(address, addressDebugInst, closureConsumes);
   return result;
 }
 
@@ -2395,7 +2393,8 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
 
 namespace {
 
-class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
+class ConsumeOperatorCopyableAddressesCheckerPass
+    : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
@@ -2442,7 +2441,7 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
 
     SILOptFunctionBuilder funcBuilder(*this);
 
-    MoveKillsCopyableAddressesChecker checker(getFunction(), funcBuilder);
+    ConsumeOperatorCopyableAddressesChecker checker(getFunction(), funcBuilder);
 
     bool madeChange = false;
     while (!addressToProcess.empty()) {
@@ -2481,7 +2480,7 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     // uses have been resolved appropriately.
     //
     // TODO: Emit specific diagnostics here (e.x.: _move of global).
-    if (DisableUnhandledMoveDiagnostic)
+    if (DisableUnhandledConsumeOperator)
       return;
 
     bool lateMadeChange = false;
@@ -2513,6 +2512,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createMoveKillsCopyableAddressesChecker() {
-  return new MoveKillsCopyableAddressesCheckerPass();
+SILTransform *swift::createConsumeOperatorCopyableAddressesChecker() {
+  return new ConsumeOperatorCopyableAddressesCheckerPass();
 }

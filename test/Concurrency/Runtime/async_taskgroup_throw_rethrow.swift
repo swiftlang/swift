@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: reflection
 
-// REQUIRES: rdar://104762037
+// REQUIRES: rdar104762037
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
