@@ -162,10 +162,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveOnlyDeinitInsertion();
   // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
-  // Check no uses after _move of a value in an address.
-  P.addMoveKillsCopyableAddressesChecker();
-  // No uses after _move of copyable value.
-  P.addMoveKillsCopyableValuesChecker();
+  // Check no uses after consume operator of a value in an address.
+  P.addConsumeOperatorCopyableAddressesChecker();
+  // No uses after consume operator of copyable value.
+  P.addConsumeOperatorCopyableValuesChecker();
 
   //
   // End Ownership Optimizations
