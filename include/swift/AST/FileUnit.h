@@ -322,8 +322,11 @@ public:
   /// The 'real name' is the actual binary name of the module, which can be different from the 'name'
   /// if module aliasing was used (via -module-alias flag).
   ///
-  /// Usually this is the module real name itself, but certain Clang features allow
-  /// substituting another name instead.
+  /// This is usually the module real name which can be overriden by an
+  /// `export_as` definition of a clang module, or `-export-as` flag on an
+  /// imported Swift module. Swift modules built from source do not apply
+  /// their own `-export-as` flag, this way the swiftinterface can be
+  /// verified.
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getRealName().str();
   }

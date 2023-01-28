@@ -455,6 +455,8 @@ public:
 
   virtual StringRef getModuleDefiningPath() const override;
 
+  virtual StringRef getExportedModuleName() const override;
+
   ValueDecl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;

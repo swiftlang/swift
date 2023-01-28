@@ -108,6 +108,7 @@ class ExtendedValidationInfo {
   std::string SDKPath;
   StringRef ModuleABIName;
   StringRef ModulePackageName;
+  StringRef ExportAsName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -182,6 +183,9 @@ public:
 
   StringRef getModulePackageName() const { return ModulePackageName; }
   void setModulePackageName(StringRef name) { ModulePackageName = name; }
+
+  StringRef getExportAsName() const { return ExportAsName; }
+  void setExportAsName(StringRef name) { ExportAsName = name; }
 
   bool isConcurrencyChecked() const {
     return Bits.IsConcurrencyChecked;

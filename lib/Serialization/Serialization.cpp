@@ -1073,6 +1073,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         PackageName.emit(ScratchRecord, M->getPackageName().str());
       }
 
+      if (!M->getExportAsName().empty()) {
+        options_block::ModuleExportAsNameLayout ExportAs(Out);
+        ExportAs.emit(ScratchRecord, M->getExportAsName().str());
+      }
+
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);
         IsConcurrencyChecked.emit(ScratchRecord);
