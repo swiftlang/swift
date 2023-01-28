@@ -42,7 +42,12 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   SmallVector<const char *, 4> Args;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver(Alloc);
-  llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+  // Ensure that we use the Windows command line parsing on Windows as we need
+  // to ensure that we properly handle paths.
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSwindows()) 
+    llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
+  else
+    llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
   SourceManager dummySM;
   DiagnosticEngine DE(dummySM);
   CompilerInvocation Invocation;
