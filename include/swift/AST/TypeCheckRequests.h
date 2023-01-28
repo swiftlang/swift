@@ -3128,10 +3128,53 @@ public:
                            evaluator::SideEffect) const;
 };
 
+class UnresolvedMacroReference {
+private:
+  llvm::PointerUnion<MacroExpansionDecl *, MacroExpansionExpr *, CustomAttr *>
+    pointer;
+
+public:
+  UnresolvedMacroReference(MacroExpansionDecl *decl) : pointer(decl) {}
+  UnresolvedMacroReference(MacroExpansionExpr *expr) : pointer(expr) {}
+  UnresolvedMacroReference(CustomAttr *attr) : pointer(attr) {}
+
+  MacroExpansionDecl *getDecl() const {
+    return pointer.dyn_cast<MacroExpansionDecl *>();
+  }
+  MacroExpansionExpr *getExpr() const {
+    return pointer.dyn_cast<MacroExpansionExpr *>();
+  }
+  CustomAttr *getAttr() const {
+    return pointer.dyn_cast<CustomAttr *>();
+  }
+  void *getOpaqueValue() const {
+    return pointer.getOpaqueValue();
+  }
+
+  DeclNameRef getMacroName() const;
+  DeclNameLoc getMacroNameLoc() const;
+  SourceRange getGenericArgsRange() const;
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+  ArgumentList *getArgs() const;
+
+  friend bool operator==(const UnresolvedMacroReference &lhs,
+                         const UnresolvedMacroReference &rhs) {
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+  }
+
+  friend llvm::hash_code hash_value(const UnresolvedMacroReference &ref) {
+    return reinterpret_cast<ptrdiff_t>(ref.pointer.getOpaqueValue());
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnresolvedMacroReference &ref);
+
 /// Resolve a given custom attribute to an attached macro declaration.
-class ResolveAttachedMacroRequest
-    : public SimpleRequest<ResolveAttachedMacroRequest,
-                           MacroDecl *(CustomAttr *, DeclContext *),
+class ResolveMacroRequest
+    : public SimpleRequest<ResolveMacroRequest,
+                           MacroDecl *(UnresolvedMacroReference, MacroRoles,
+                                       DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3140,7 +3183,8 @@ private:
   friend SimpleRequest;
 
   MacroDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
+           MacroRoles roles, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }

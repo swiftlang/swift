@@ -3570,7 +3570,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   if (!nominal) {
     // Try resolving an attached macro attribute.
     auto *macro = evaluateOrDefault(
-        Ctx.evaluator, ResolveAttachedMacroRequest{attr, dc}, nullptr);
+        Ctx.evaluator, ResolveMacroRequest{attr, getAttachedMacroRoles(), dc},
+        nullptr);
     if (macro || !attr->isValid())
       return;
 
