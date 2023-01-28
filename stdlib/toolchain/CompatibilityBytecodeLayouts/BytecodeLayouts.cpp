@@ -47,8 +47,8 @@ static const size_t layoutStringHeaderSize = sizeof(size_t);
 /// safely use Metadata::getGenericArgs. For our purposes right now anyways,
 /// struct and enums always have their generic argument vector at offset + 2 so
 /// we can hard code that.
-const Metadata **getGenericArgs(Metadata *metadata) {
-  return ((const Metadata **)metadata) + 2;
+Metadata **getGenericArgs(Metadata *metadata) {
+  return ((Metadata **)metadata) + 2;
 }
 
 /// Given a pointer and an offset, read the requested data and increment the
@@ -71,13 +71,15 @@ Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
 
-const Metadata *getResilientTypeMetadata(const uint8_t *layoutStr,
-                                         size_t &offset) {
-  auto metadataAddr =
-      reinterpret_cast<const RelativeIndirectablePointer<Metadata> *>(
-          layoutStr + offset);
-  offset += sizeof(uint32_t);
-  return metadataAddr->get();
+typedef Metadata* (*MetadataAccessor)(Metadata**);
+
+const Metadata *getResilientTypeMetadata(Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
+  auto absolute = layoutStr + offset;
+  auto relativeOffset = (uintptr_t)(intptr_t)readBytes<int32_t>(layoutStr, offset);
+  MetadataAccessor fn =
+      (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
+
+  return fn(getGenericArgs(metadata));
 }
 
 typedef void (*DestrFn)(void*);
@@ -147,7 +149,7 @@ swift_generic_destroy(void *address, void *metadata) {
       type->vw_destroy((OpaqueValue *)addr);
       addr += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(typeLayout, offset);
+      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_destroy((OpaqueValue *)addr);
       addr += type->vw_size();
     } else {
@@ -233,7 +235,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
       addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(typeLayout, offset);
+      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
       addrOffset += type->vw_size();
@@ -298,7 +300,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
       break;
     }
     case RefCountingKind::Resilient: {
-      auto *type = getResilientTypeMetadata(typeLayout, offset);
+      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
@@ -346,7 +348,8 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
     } else if (tag == 2) {
       offset += 4;
       const Metadata *genericType = getGenericArgs(type)[index];
-      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
+      if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
+                   // {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 25;
         genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
@@ -376,8 +379,8 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
     if (tag == 0) {
       break;
     } else if (tag == 1) {
-      memcpy((void *)(layoutStr + layoutStrOffset),
-             (void *)(instancedLayoutStr + instancedLayoutStrOffset), index);
+      memcpy((void *)(instancedLayoutStr + instancedLayoutStrOffset),
+             (void *)(layoutStr + layoutStrOffset), index);
       layoutStrOffset += index;
       instancedLayoutStrOffset += index;
       if (skipBytes) {
@@ -390,14 +393,13 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
     } else if (tag == 2) {
       skipBytes += readBytes<size_t>(layoutStr, offset);
       const Metadata *genericType = getGenericArgs(type)[index];
-      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
+      if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
+                   // {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
         auto genericRefCountSize = readBytes<size_t>(genericLayoutStr, countOffset);
         if (genericRefCountSize > 0) {
-          memcpy((void *)(genericLayoutStr + layoutStringHeaderSize),
-                 (void *)(instancedLayoutStr + instancedLayoutStrOffset),
-                 genericRefCountSize);
+          memcpy((void*)(instancedLayoutStr + instancedLayoutStrOffset), (void*)(genericLayoutStr + layoutStringHeaderSize), genericRefCountSize);
           if (skipBytes) {
             size_t firstRCOffset = instancedLayoutStrOffset;
             auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
@@ -441,6 +443,13 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
     }
   };
 
+  // TODO: this should not really happen once we instantiate resilient types
+  if (instancedLayoutStrOffset == layoutStringHeaderSize) {
+    free(instancedLayoutStr);
+    type->setLayoutString(layoutStr);
+    return;
+  }
+
   size_t trailingBytesOffset = layoutStringHeaderSize + refCountSize;
   skipBytes += readBytes<size_t>(layoutStr, trailingBytesOffset);
 
@@ -449,6 +458,18 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
   }
 
   type->setLayoutString(instancedLayoutStr);
+
+  fprintf(stderr, "==== Instantiated: ");
+  for (size_t i = 0; i < instancedLayoutStrSize; i++) {
+    fprintf(stderr, "\\%02x", instancedLayoutStr[i]);
+  }
+  fprintf(stderr, "\n");
+
+  fprintf(stderr, "==== From: ");
+  for (size_t i = 0; i < refCountSize + layoutStringHeaderSize; i++) {
+    fprintf(stderr, "\\%02x", layoutStr[i]);
+  }
+  fprintf(stderr, "\n");
 }
 
 // Allow this library to get force-loaded by autolinking

@@ -1650,6 +1650,11 @@ namespace {
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
 
+      // TODO: Remove once single payload enums are fully supported
+      // if (CopyDestroyKind == Normal)
+      //   return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
+      //                                                            T);
+
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(getPayloadTypeInfo().buildTypeLayoutEntry(

@@ -2970,6 +2970,8 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
+      if (!IGM.getOptions().ForceStructTypeLayouts)
+        return nullptr;
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
       return typeLayoutEntry.layoutString(IGM);
@@ -4820,6 +4822,8 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
+      if (!IGM.getOptions().ForceStructTypeLayouts)
+        return nullptr;
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
       return typeLayoutEntry.layoutString(IGM);

@@ -16,6 +16,7 @@
 #include "GenOpaque.h"
 #include "IRGen.h"
 #include "GenExistential.h"
+#include "GenericArguments.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "SwitchBuilder.h"
@@ -56,6 +57,7 @@ public:
 
     Existential = 0x0e,
     Resilient = 0x0f,
+    SinglePayloadEnum = 0x10,
 
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
@@ -69,7 +71,7 @@ private:
     union {
       size_t size;
       uint32_t genericIdx;
-      ConstantReference metaTypeRef{};
+      llvm::Function* metaTypeRef;
     };
   };
 
@@ -109,7 +111,7 @@ public:
     }
   }
 
-  void addResilientRefCount(ConstantReference metaTypeRef) {
+  void addResilientRefCount(llvm::Function *metaTypeRef) {
     RefCounting op;
     op.kind = RefCountingKind::Resilient;
     op.metaTypeRef = metaTypeRef;
@@ -122,6 +124,10 @@ public:
     op.genericIdx = genericIdx;
     refCountings.push_back(op);
   }
+
+  // void addSinglePayloadEnumRefCount(size_t size, ) {
+
+  // }
 
   void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
     auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
@@ -151,7 +157,7 @@ public:
       } else if (refCounting.kind == RefCountingKind::Resilient) {
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
-        B.addRelativeAddress(refCounting.metaTypeRef);
+        B.addCompactFunctionReference(refCounting.metaTypeRef);
 
         // TODO: adjust for metatypes and proper target size_t
         instCopyBytes += 12;
@@ -262,6 +268,67 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::ThickFunc: return "ThickFunc";
   case ScalarKind::ExistentialReference: return "ExistentialReference";
   }
+}
+
+llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty) {
+  auto *nominal = ty.getNominalOrBoundGenericNominal();
+  auto *boundGenericTy = ty.getASTType()->getAs<BoundGenericType>();
+
+  IRGenMangler mangler;
+  std::string symbolName =
+      mangler.mangleSymbolNameForMangledMetadataAccessorString(
+          "get_type_metadata_for_layout_string",
+          nominal->getGenericSignature().getCanonicalSignature(),
+          ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
+
+  auto *fnTy = llvm::FunctionType::get(
+      IGM.TypeMetadataPtrTy, {IGM.TypeMetadataPtrPtrTy}, false /*vaargs*/);
+
+  llvm::Function *fn = llvm::Function::Create(
+      fnTy, llvm::Function::InternalLinkage, symbolName, &IGM.Module);
+  fn->setDoesNotThrow();
+  IRGenFunction IGF(IGM, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+
+  auto *contextMetatype = IGF.collectParameters().claimNext();
+
+  Address addr(
+      IGF.Builder.CreateBitCast(contextMetatype, IGM.TypeMetadataPtrPtrTy),
+      IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
+
+  auto generics = boundGenericTy->getGenericArgs();
+  llvm::SmallVector<llvm::Value *, 4> typeParams;
+  for (auto generic : generics) {
+    generic->dump();
+    if (auto *archetypeType = generic->getAs<ArchetypeType>()) {
+      auto param =
+          archetypeType->getInterfaceType()->getAs<GenericTypeParamType>();
+
+      auto typeParamAddr = IGF.Builder.CreateConstArrayGEP(
+          addr, param->getIndex(), IGF.IGM.getPointerSize());
+      auto *typeParam = IGF.Builder.CreateLoad(typeParamAddr);
+      IGF.setInvariantLoad(typeParam);
+      typeParams.push_back(typeParam);
+    } else {
+      typeParams.push_back(
+          IGF.emitTypeMetadataRef(generic->getCanonicalType()));
+    }
+  }
+
+  GenericArguments genericArgs;
+  genericArgs.collectTypes(IGM, nominal);
+
+  auto *accessor = IGM.getAddrOfGenericTypeMetadataAccessFunction(
+      nominal, genericArgs.Types, NotForDefinition);
+
+  auto response = IGF.emitGenericTypeMetadataAccessFunctionCall(
+      accessor, typeParams, MetadataState::Complete);
+  Explosion ret;
+  ret.add(response.getMetadata());
+  IGF.emitScalarReturn(IGM.TypeMetadataPtrTy, ret);
+
+  return fn;
 }
 
 TypeLayoutEntry::~TypeLayoutEntry() {}
@@ -1224,7 +1291,7 @@ llvm::Value *ScalarTypeLayoutEntry::getEnumTagSinglePayload(
   auto &Builder = IGF.Builder;
   value = Address(Builder.CreateBitCast(value.getAddress(), addressType),
                   storageTy, alignment);
-  ;
+
   return typeInfo.getEnumTagSinglePayload(IGF, numEmptyCases, value,
                                           representative, true);
 }
@@ -1950,19 +2017,23 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 }
 
 llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  LayoutStringBuilder B{};
+  return nullptr;
+  // LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B)) {
-    return nullptr;
-  }
+  // if (containsArchetypeField() ||
+  //     containsResilientField() ||
+  //     isMultiPayloadEnum() ||
+  //     !refCountString(IGM, B)) {
+  //   return nullptr;
+  // }
 
-  ConstantInitBuilder IB(IGM);
-  auto SB = IB.beginStruct();
+  // ConstantInitBuilder IB(IGM);
+  // auto SB = IB.beginStruct();
 
-  B.result(IGM, SB);
+  // B.result(IGM, SB);
 
-  return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-                                  /*constant*/ true);
+  // return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+  //                                 /*constant*/ true);
 }
 
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1976,6 +2047,7 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
     auto size = fixedSize(IGM);
     assert(size && "POD should not have dynamic size");
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size->getValue());
+    return true;
     break;
   }
   case CopyDestroyStrategy::NullableRefcounted:
@@ -1983,6 +2055,11 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
     return cases[0]->refCountString(IGM, B);
     break;
   case CopyDestroyStrategy::Normal:
+    // if (containsArchetypeField()) {
+    //   createMetatypeAccessorFunction(IRGenModule &IGM, SILType archetype)
+    //   return false;
+    // }
+
     return false;
   }
 }
@@ -3146,15 +3223,17 @@ llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 bool ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                               LayoutStringBuilder &B) const {
   // TODO: handle generics properly
-  if (ty.hasArchetype()) {
-    return false;
-  }
-  // USE PROPER SymbolReferenceKind
-  auto metaTypeRef = IGM.getAddrOfTypeMetadata(
-      ty.getASTType(), SymbolReferenceKind::Relative_Indirectable);
-  B.addResilientRefCount(metaTypeRef);
-
+  // if (ty.hasTypeParameter()) {
+  auto *accessor = createMetatypeAccessorFunction(IGM, ty);
+  B.addResilientRefCount(accessor);
   return true;
+  // }
+  // USE PROPER SymbolReferenceKind
+  // auto metaTypeRef = IGM.getAddrOfTypeMetadata(
+  //   ty.getASTType(), SymbolReferenceKind::Relative_Indirectable);
+  // B.addResilientRefCount(metaTypeRef);
+
+  // return false;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
@@ -3399,6 +3478,8 @@ TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
 bool TypeInfoBasedTypeLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B) const {
+  // auto *accessor = createMetatypeAccessorFunction(IGM, representative);
+  // B.addResilientRefCount(accessor);
   return false;
 }
 
