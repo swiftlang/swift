@@ -53,8 +53,8 @@ struct OSSACanonicalizer {
 
   OSSACanonicalizer() {}
 
-  void init(SILFunction *fn, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-            DominanceInfo *domTree, InstructionDeleter &deleter) {
+  void init(SILFunction *fn, DominanceInfo *domTree,
+            InstructionDeleter &deleter) {
     auto foundConsumingUseNeedingCopy = std::function<void(Operand *)>(
         [&](Operand *use) { consumingUsesNeedingCopy.push_back(use); });
     auto foundConsumingUseNotNeedingCopy = std::function<void(Operand *)>(
@@ -62,8 +62,8 @@ struct OSSACanonicalizer {
 
     canonicalizer.emplace(
         false /*pruneDebugMode*/, !fn->shouldOptimize() /*maximizeLifetime*/,
-        accessBlockAnalysis, domTree, deleter, foundConsumingUseNeedingCopy,
-        foundConsumingUseNotNeedingCopy);
+        nullptr /*accessBlockAnalysis*/, domTree, deleter,
+        foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
   }
 
   void clear() {

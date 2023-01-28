@@ -314,8 +314,7 @@ struct MoveOnlyChecker {
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
 
-  void check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-             DominanceInfo *domTree);
+  void check(DominanceInfo *domTree);
 
   /// After we have emitted a diagnostic, we need to clean up the instruction
   /// stream by converting /all/ copies of move only typed things to use
@@ -336,8 +335,7 @@ struct MoveOnlyChecker {
 //                             MARK: Main Routine
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                            DominanceInfo *domTree) {
+void MoveOnlyChecker::check(DominanceInfo *domTree) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -346,7 +344,7 @@ void MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       });
   InstructionDeleter deleter(std::move(callbacks));
   OSSACanonicalizer canonicalizer;
-  canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
+  canonicalizer.init(fn, domTree, deleter);
   DiagnosticEmitter diagnosticEmitter;
   diagnosticEmitter.init(fn, &canonicalizer);
 
@@ -508,13 +506,12 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
                             << fn->getName() << '\n');
 
-    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
 
     MoveOnlyChecker checker(getFunction(), deAnalysis);
-    checker.check(accessBlockAnalysis, domTree);
+    checker.check(domTree);
     if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

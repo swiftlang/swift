@@ -859,7 +859,6 @@ struct MoveOnlyChecker {
   ConsumeInfo consumes;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
-                  NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                   DominanceInfo *domTree)
       : fn(fn), deleter(), canonicalizer(), diagnosticEmitter() {
     deleter.setCallbacks(std::move(
@@ -868,7 +867,7 @@ struct MoveOnlyChecker {
             moveIntroducersToProcess.remove(mvi);
           instToDelete->eraseFromParent();
         })));
-    canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
+    canonicalizer.init(fn, domTree, deleter);
     diagnosticEmitter.init(fn, &canonicalizer);
   }
 
@@ -1966,13 +1965,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
            "Should only run on Raw SIL");
     LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Addr Checker. Visiting: "
                             << fn->getName() << '\n');
-    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree)
-            .checkFunction()) {
+    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree).checkFunction()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
