@@ -2259,20 +2259,22 @@ func copyableKlassInAMoveOnlyStruct() {
     copyableClassConsume(a.copyableK)
 }
 
+// This shouldn't error since we are consuming a copyable type.
 func copyableKlassInAMoveOnlyStruct2() {
-    var a = NonTrivialStruct() // expected-error {{'a' consumed more than once}}
+    var a = NonTrivialStruct()
     a = NonTrivialStruct()
     copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
-    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
-    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
+    copyableClassConsume(a.copyableK)
+    copyableClassConsume(a.copyableK)
 }
 
+// This shouldn't error since we are working with a copyable type.
 func copyableKlassInAMoveOnlyStruct3() {
-    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    var a = NonTrivialStruct()
     a = NonTrivialStruct()
     copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
-    copyableClassConsume(a.copyableK) // expected-note {{consuming use}}
-    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK) // expected-note {{non-consuming use}}
+    copyableClassConsume(a.copyableK)
+    copyableClassUseMoveOnlyWithoutEscaping(a.copyableK)
 }
 
 // This used to error, but no longer errors since we are using a true field
