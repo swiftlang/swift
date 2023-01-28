@@ -44,7 +44,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   llvm::StringSaver Saver(Alloc);
   // Ensure that we use the Windows command line parsing on Windows as we need
   // to ensure that we properly handle paths.
-  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSwindows()) 
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()) 
     llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
   else
     llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
