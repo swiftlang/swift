@@ -3685,12 +3685,9 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   }
   // Resolve macro candidates.
   MacroDecl *macro;
-  if (auto *args = MED->getArgs()) {
-    macro = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{MED, MacroRole::Declaration, dc},
-        nullptr);
-  }
-  else {
+  // Non-call declaration macros cannot be overloaded.
+  auto *args = MED->getArgs();
+  if (!args) {
     if (foundMacros.size() > 1) {
       MED->diagnose(diag::ambiguous_decl_ref, MED->getMacro())
           .highlight(MED->getMacroLoc().getSourceRange());
@@ -3700,8 +3697,63 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     }
     macro = foundMacros.front();
   }
-  if (!macro)
-    return {};
+    // Call-like macros need to be resolved.
+  else {
+    using namespace constraints;
+    ConstraintSystem cs(dc, ConstraintSystemOptions());
+    // Type-check macro arguments.
+    for (auto *arg : args->getArgExprs())
+      cs.setType(arg, TypeChecker::typeCheckExpression(arg, dc));
+    auto choices = map<SmallVector<OverloadChoice, 1>>(
+        foundMacros,
+        [](MacroDecl *md) {
+          return OverloadChoice(Type(), md, FunctionRefKind::SingleApply);
+        });
+    auto locator = cs.getConstraintLocator(MED);
+    auto macroRefType = Type(cs.createTypeVariable(locator, 0));
+    cs.addOverloadSet(macroRefType, choices, dc, locator);
+    if (MED->getGenericArgsRange().isValid()) {
+      // FIXME: Deal with generic args.
+      MED->diagnose(diag::macro_unsupported);
+      return {};
+    }
+    auto getMatchingParams = [&](
+        ArgumentList *argList,
+        SmallVectorImpl<AnyFunctionType::Param> &result) {
+      for (auto arg : *argList) {
+        ParameterTypeFlags flags;
+        auto ty = cs.getType(arg.getExpr()); if (arg.isInOut()) {
+          ty = ty->getInOutObjectType();
+          flags = flags.withInOut(true);
+        }
+        if (arg.isConst()) {
+          flags = flags.withCompileTimeConst(true);
+        }
+        result.emplace_back(ty, arg.getLabel(), flags);
+      }
+    };
+    SmallVector<AnyFunctionType::Param, 8> params;
+    getMatchingParams(args, params);
+    cs.associateArgumentList(locator, args);
+    cs.addConstraint(
+        ConstraintKind::ApplicableFunction,
+        FunctionType::get(params, ctx.getVoidType()),
+        macroRefType,
+        cs.getConstraintLocator(MED, ConstraintLocator::ApplyFunction));
+    // Solve.
+    auto solution = cs.solveSingle();
+    if (!solution) {
+      MED->diagnose(diag::no_overloads_match_exactly_in_call,
+                    /*reference|call*/false, DescriptiveDeclKind::Macro,
+                    false, MED->getMacro().getBaseName())
+          .highlight(MED->getMacroLoc().getSourceRange());
+      for (auto *candidate : foundMacros)
+        candidate->diagnose(diag::found_candidate);
+      return {};
+    }
+    auto choice = solution->getOverloadChoice(locator).choice;
+    macro = cast<MacroDecl>(choice.getDecl());
+  }
   MED->setMacroRef(macro);
 
   // Expand the macro.
