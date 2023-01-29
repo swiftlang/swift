@@ -54,6 +54,10 @@ enum class MacroRole: uint32_t {
 /// The contexts in which a particular macro declaration can be used.
 using MacroRoles = OptionSet<MacroRole>;
 
+void simple_display(llvm::raw_ostream &out, MacroRoles roles);
+bool operator==(MacroRoles lhs, MacroRoles rhs);
+llvm::hash_code hash_value(MacroRoles roles);
+
 /// Retrieve the string form of the given macro role, as written on the
 /// corresponding attribute.
 StringRef getMacroRoleString(MacroRole role);
@@ -62,9 +66,13 @@ StringRef getMacroRoleString(MacroRole role);
 /// written in the source code with the `#` syntax.
 bool isFreestandingMacro(MacroRoles contexts);
 
+MacroRoles getFreestandingMacroRoles();
+
 /// Whether a macro with the given set of macro contexts is attached, i.e.,
 /// written in the source code as an attribute with the `@` syntax.
 bool isAttachedMacro(MacroRoles contexts);
+
+MacroRoles getAttachedMacroRoles();
 
 enum class MacroIntroducedDeclNameKind {
   Named,

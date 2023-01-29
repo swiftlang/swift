@@ -67,10 +67,13 @@ func overloaded1(_ p: Any) { }
 // expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@freestanding(declaration) macro unaryDeclMacro(_ x: String) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String)
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
-@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool)
 // expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
+@freestanding(declaration) macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
+// expected-error @-1 {{macro 'genericDeclMacro' requires a definition}}
+// expected-note @-2 {{where 'U' = 'String'}}
 
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
@@ -102,7 +105,9 @@ func testDiags(a: Int, b: Int) {
 
   struct Foo {
     #unaryDeclMacro("abc", blah: false) // okay
-    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{no exact matches in reference to macro 'unaryDeclMacro'}}
+    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{extra argument 'oh' in call}}
+    #genericDeclMacro(2, 4.0) // okay
+    #genericDeclMacro(2, "not a number") // expected-error {{macro 'genericDeclMacro' requires that 'String' conform to 'Numeric'}}
   }
 }
 
