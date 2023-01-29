@@ -28,6 +28,10 @@
 // ambiguities with type names, in AliasModuleNames mode.
 #define MODULE_DISAMBIGUATING_PREFIX "Module___"
 
+namespace clang {
+class Decl;
+}
+
 namespace swift {
   class Decl;
   class DeclContext;
@@ -111,6 +115,7 @@ class ASTPrinter {
   unsigned CurrentIndentation = 0;
   unsigned PendingNewlines = 0;
   TypeOrExtensionDecl SynthesizeTarget;
+  llvm::SmallPtrSet<const clang::Decl *, 8> printedClangDecl;
 
   void printTextImpl(StringRef Text);
 
@@ -329,6 +334,12 @@ public:
   void callPrintStructurePre(PrintStructureKind Kind, const Decl *D = nullptr) {
     forceNewlines();
     printStructurePre(Kind, D);
+  }
+
+  /// Return true when the given redeclared clang decl is being printed for the
+  /// first time.
+  bool shouldPrintRedeclaredClangDecl(const clang::Decl *d) {
+    return printedClangDecl.insert(d).second;
   }
 
 private:
