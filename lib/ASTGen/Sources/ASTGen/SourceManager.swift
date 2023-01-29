@@ -60,8 +60,8 @@ extension SourceManager {
 
   /// Find the root source file and offset from within that file for the given
   /// syntax node.
-  func rootSourceFile(
-    of node: some SyntaxProtocol
+  func rootSourceFile<Node: SyntaxProtocol>(
+    of node: Node
   ) -> (SourceFileSyntax, AbsolutePosition)? {
     let root = node.root
 
@@ -87,8 +87,8 @@ extension SourceManager {
 
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
-  func cxxSourceLocation(
-    for node: some SyntaxProtocol,
+  func cxxSourceLocation<Node: SyntaxProtocol>(
+    for node: Node,
     at position: AbsolutePosition? = nil
   ) -> CxxSourceLoc? {
     // Find the source file and this node's position within it.

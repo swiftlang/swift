@@ -3,10 +3,10 @@ import SwiftDiagnostics
 import SwiftSyntax
 
 extension SourceManager {
-  private func diagnoseSingle(
+  private func diagnoseSingle<Node: SyntaxProtocol>(
     message: String,
     severity: DiagnosticSeverity,
-    node: some SyntaxProtocol,
+    node: Node,
     position: AbsolutePosition,
     highlights: [Syntax] = [],
     fixItChanges: [FixIt.Change] = []

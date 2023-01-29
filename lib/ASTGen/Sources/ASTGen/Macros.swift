@@ -167,17 +167,25 @@ func evaluateMacro(
       }
 
       macroName = parentExpansion.macro.text
-      evaluatedSyntax = Syntax(
-        try exprMacro.expansion(
+
+      func expandExpressionMacro<Node: FreestandingMacroExpansionSyntax>(
+        _ node: Node
+      ) throws -> ExprSyntax {
+        return try exprMacro.expansion(
           of: sourceManager.detach(
-            parentExpansion, in: context,
+            node, in: context,
             foldingWith: OperatorTable.standardOperators
           ),
           in: context
         )
+      }
+
+      evaluatedSyntax = Syntax(
+        try _openExistential(parentExpansion, do: expandExpressionMacro)
       )
 
-    // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
+    // Handle declaration macro. The resulting decls are wrapped in a
+    // `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:
       guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
         print("not on a macro expansion node: \(token.recursiveDescription)")
@@ -354,11 +362,23 @@ func expandAttachedMacro(
         return 1
       }
 
-      let attributes = try attachedMacro.expansion(
-        of: context.detach(customAttrNode),
-        attachedTo: context.detach(parentDeclGroup),
-        providingAttributesFor: context.detach(declarationNode),
-        in: context
+      // Local function to expand a member atribute macro once we've opened up
+      // the existential.
+      func expandMemberAttributeMacro<Node: DeclGroupSyntax>(
+        _ node: Node
+      ) throws -> [AttributeSyntax] {
+        return try attachedMacro.expansion(
+          of: context.detach(customAttrNode),
+          attachedTo: sourceManager.detach(node, in: context),
+          providingAttributesFor: sourceManager.detach(
+            declarationNode, in: context
+          ),
+          in: context
+        )
+      }
+
+      let attributes = try _openExistential(
+        parentDeclGroup, do: expandMemberAttributeMacro
       )
 
       // Form a buffer containing an attribute list to return to the caller.
@@ -372,11 +392,19 @@ func expandAttachedMacro(
         return 1
       }
 
-      let members = try attachedMacro.expansion(
-        of: context.detach(customAttrNode),
-        providingMembersOf: context.detach(declGroup),
-        in: context
-      )
+      // Local function to expand a member macro once we've opened up
+      // the existential.
+      func expandMemberMacro<Node: DeclGroupSyntax>(
+        _ node: Node
+      ) throws -> [DeclSyntax] {
+        return try attachedMacro.expansion(
+          of: sourceManager.detach(customAttrNode, in: context),
+          providingMembersOf: sourceManager.detach(node, in: context),
+          in: context
+        )
+      }
+
+      let members = try _openExistential(declGroup, do: expandMemberMacro)
 
       // Form a buffer of member declarations to return to the caller.
       evaluatedSyntaxStr = members.map {
