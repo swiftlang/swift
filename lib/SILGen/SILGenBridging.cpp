@@ -332,6 +332,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     }
 
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
     llvm_unreachable("unexpected convention");
   }
   llvm_unreachable("bad convention");
@@ -434,6 +437,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Inout:
         llvm_unreachable("indirect params to blocks not supported");
       }
       
@@ -2185,6 +2191,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = emitManagedRValueWithCleanup(tmp);
           break;
         }
+        case ParameterConvention::Pack_Guaranteed:
+        case ParameterConvention::Pack_Owned:
+        case ParameterConvention::Pack_Inout:
+          llvm_unreachable("bridging a parameter pack?");
         }
 
         while (maybeAddForeignArg());

@@ -1916,6 +1916,7 @@ private:
   NEVER_VISIT(SILFunctionType)
   NEVER_VISIT(SILBlockStorageType)
   NEVER_VISIT(SILBoxType)
+  NEVER_VISIT(SILPackType)
   NEVER_VISIT(SILTokenType)
   NEVER_VISIT(SILMoveOnlyWrappedType)
 

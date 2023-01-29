@@ -1255,16 +1255,13 @@ namespace {
     }
   };
 
-  /// A TypeInfo implementation for address-only types which can never
-  /// be copied.
-  class ImmovableTypeInfo :
-    public IndirectTypeInfo<ImmovableTypeInfo, FixedTypeInfo> {
+  template <class Impl, class Base>
+  class ImmovableTypeInfoBase : public IndirectTypeInfo<Impl, Base> {
   public:
-    ImmovableTypeInfo(llvm::Type *storage, Size size,
-                      SpareBitVector &&spareBits,
-                      Alignment align)
-      : IndirectTypeInfo(storage, size, std::move(spareBits), align,
-                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
+    template <class... Args>
+    ImmovableTypeInfoBase(Args &&...args)
+      : IndirectTypeInfo<Impl, Base>(std::forward<Args>(args)...) {}
+
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
@@ -1299,6 +1296,94 @@ namespace {
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+  };
+
+  /// A TypeInfo implementation for address-only types which can never
+  /// be copied.
+  class ImmovableTypeInfo :
+    public ImmovableTypeInfoBase<ImmovableTypeInfo, FixedTypeInfo> {
+  public:
+    ImmovableTypeInfo(llvm::Type *storage, Size size,
+                      SpareBitVector &&spareBits,
+                      Alignment align)
+      : ImmovableTypeInfoBase(storage, size, std::move(spareBits), align,
+                              IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
+  };
+
+  /// A TypeInfo implementation for address-only types which can never
+  /// be copied and whose layouts are not even dynamically knowable.
+  class OpaqueImmovableTypeInfo :
+    public ImmovableTypeInfoBase<OpaqueImmovableTypeInfo, TypeInfo> {
+  public:
+    OpaqueImmovableTypeInfo(llvm::Type *storage, Alignment minAlign)
+      : ImmovableTypeInfoBase(storage, minAlign, IsNotPOD,
+                              IsNotBitwiseTakable, IsNotFixedSize,
+                              IsNotABIAccessible,
+                              SpecialTypeInfoKind::None) {}
+
+    llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
+                                          SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Constant *getStaticSize(IRGenModule &IGM) const override {
+      return nullptr;
+    }
+    llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override {
+      return nullptr;
+    }
+    llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
+      return nullptr;
+    }
+    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                               const llvm::Twine &name) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    void deallocateStack(IRGenFunction &IGF, StackAddress addr,
+                         SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                      bool isOutlined) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address src, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr,
+                                         SILType T,
+                                         bool isOutlined) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address enumAddr,
+                                   SILType T,
+                                   bool isOutlined) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
     }
   };
 } // end anonymous namespace
@@ -1336,6 +1421,11 @@ const FixedTypeInfo *
 TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
   auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
   return new ImmovableTypeInfo(type, size, std::move(spareBits), align);
+}
+
+const TypeInfo *
+TypeConverter::createOpaqueImmovable(llvm::Type *type, Alignment align) {
+  return new OpaqueImmovableTypeInfo(type, align);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
@@ -2216,18 +2306,13 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILBox:
     return convertBoxType(cast<SILBoxType>(ty));
   case TypeKind::Pack:
-    return convertPackType(cast<PackType>(ty));
-  case TypeKind::PackArchetype: {
-    auto archetypeTy = cast<PackArchetypeType>(ty);
-    return convertPackType(archetypeTy->getSingletonPackType());
-  }
-  case TypeKind::PackExpansion: {
-    // FIXME: SIL shouldn't emit values with pack expansion type; they
-    // should always be wrapped in a PackType or be a bare PackArchetypeType
-    SmallVector<Type> elts;
-    elts.push_back(ty);
-    return convertPackType(PackType::get(IGM.Context, elts));
-  }
+    llvm_unreachable("AST pack types should be lowered by SILGen");
+  case TypeKind::SILPack:
+    return convertPackType(cast<SILPackType>(ty));
+  case TypeKind::PackArchetype:
+  case TypeKind::PackExpansion:
+    llvm_unreachable("pack archetypes and expansions should not be seen in "
+                     " arbitrary type positions");
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   }
@@ -2245,10 +2330,10 @@ const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
                          IGM.getPointerAlignment());
 }
 
-const TypeInfo *TypeConverter::convertPackType(PackType *pack) {
-  return new RawPointerTypeInfo(IGM.Int8PtrTy,
-                                IGM.getPointerSize(),
-                                IGM.getPointerAlignment());
+const TypeInfo *TypeConverter::convertPackType(SILPackType *pack) {
+  if (pack->isElementAddress())
+    return createOpaqueImmovable(IGM.OpaquePtrTy, IGM.getPointerAlignment());
+  return createOpaqueImmovable(IGM.OpaqueTy, Alignment(1));
 }
 
 /// Convert a reference storage type. The implementation here depends on the

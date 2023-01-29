@@ -1411,6 +1411,10 @@ public:
     // independently.
     Destructured,
   };
+
+  /// Given that this is a pack expansion, do the pack elements need to be
+  /// passed indirectly?
+  bool arePackElementsPassedIndirectly(TypeConverter &TC) const;
   
   /// If this abstraction pattern appears in function return position, how is
   /// the corresponding value returned?

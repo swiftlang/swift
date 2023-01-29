@@ -3835,6 +3835,18 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitSILPackType(SILPackType *T, StringRef label) {
+      printCommon(label, "sil_pack_type");
+      printField("element_is_address", T->isElementAddress());
+      printField("num_elements", T->getNumElements());
+      Indent += 2;
+      for (Type elt : T->getElementTypes()) {
+        printRec(elt);
+      }
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
       printCommon(label, "pack_expansion_type");
       printRec("pattern", T->getPatternType());

@@ -53,6 +53,17 @@
 ///   This is only expanded if SINGLETON_TYPE is defined, and in this
 ///   case no other macros are expanded.
 
+#ifndef ALWAYS_CANONICAL_ARTIFICIAL_TYPE
+#ifdef ALWAYS_CANONICAL_TYPE
+#ifdef ARTIFICIAL_TYPE
+#error must define ALWAYS_CANONICAL_ARTIFICIAL_TYPE if also defining both ALWAYS_CANONICAL_TYPE and ARTIFICIAL_TYPE
+#endif
+#define ALWAYS_CANONICAL_ARTIFICIAL_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
+#else
+#define ALWAYS_CANONICAL_ARTIFICIAL_TYPE(id, parent) ARTIFICIAL_TYPE(id, parent)
+#endif
+#endif
+
 #ifndef ALWAYS_CANONICAL_TYPE
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
 #endif
@@ -165,6 +176,7 @@ ARTIFICIAL_TYPE(SILFunction, Type)
 ARTIFICIAL_TYPE(SILBlockStorage, Type)
 ARTIFICIAL_TYPE(SILBox, Type)
 ARTIFICIAL_TYPE(SILMoveOnlyWrapped, Type)
+ALWAYS_CANONICAL_ARTIFICIAL_TYPE(SILPack, Type)
 ARTIFICIAL_TYPE(SILToken, Type)
 TYPE(ProtocolComposition, Type)
 TYPE(ParameterizedProtocol, Type)
@@ -213,5 +225,6 @@ SINGLETON_TYPE(SILToken, SILToken)
 #undef SUGARED_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
+#undef ALWAYS_CANONICAL_ARTIFICIAL_TYPE
 #undef TYPE
 #undef LAST_TYPE

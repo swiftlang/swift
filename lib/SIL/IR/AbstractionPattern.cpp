@@ -1497,6 +1497,22 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   }
 }
 
+bool AbstractionPattern::arePackElementsPassedIndirectly(TypeConverter &TC) const {
+  assert(getKind() == Kind::Type && isa<PackExpansionType>(getType()));
+  // It makes sense to pass classes, metatypes, and similar sorts of
+  // types using direct packs.  At the other end of the spectrum, we
+  // definitely shouldn't pass types directly in packs if it's
+  // address-only and we'd need to do a non-trivial operation to move
+  // the value in and out of the pack.  There's also a size component
+  // to this analysis --- we shouldn't pass packs of enormous address-only
+  // structs directly --- and unfortunately we don't have that
+  // information at this point.
+  //
+  // The simplest thing to do is to just not use direct packs for now,
+  // but we should revisit that before locking down the ABI.
+  return true;
+}
+
 bool
 AbstractionPattern::operator==(const AbstractionPattern &other) const {
   if (TheKind != other.TheKind)
