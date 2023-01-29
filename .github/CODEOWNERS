@@ -6,14 +6,39 @@
 # Please mirror the repository's file hierarchy in case-sensitive lexicographic
 # order.
 
+# TODO: /.clang-format
+# TODO: /.dir-locals.el
+# TODO: /.flake8
+# TODO: /.gitattributes
+
 # .github
 /.github/                                 @shahmishal
 /.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
 /.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
 /.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
 
+# TODO: /.gitignore
+# TODO: /.mailmap
+# TODO: /Brewfile
+# TODO: /CHANGELOG.md
+# TODO: /CMakeLists.txt
+# TODO: /CODE_OF_CONDUCT.md
+# TODO: /CODE_OWNERS.TXT
+# TODO: /CONTRIBUTING.md
+# TODO: /LICENSE.txt
+# TODO: /README.md
+
 # SwiftCompilerSources
 /SwiftCompilerSources                     @eeckstein
+
+# apinotes
+# TODO: /apinotes
+
+# benchmark
+# TODO: /benchmark
+
+# bindings
+# TODO: /bindings
 
 # cmake
 /cmake/**/*Windows*                       @compnerd
@@ -82,6 +107,9 @@
 /lib/Serialization/SerializedModuleLoader.cpp       @artemcm
 /lib/Threading                                      @al45tair
 
+# localization
+# TODO: /localization
+
 # stdlib
 # TODO: /stdlib/
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
@@ -111,6 +139,9 @@
 /test/stmt/                                         @hborla @xedin
 /test/type/                                         @hborla @slavapestov @xedin
 
+# tools
+# TODO: /tools
+
 # unittests
 /unittests/AST/                           @hborla @slavapestov @xedin
 /unittests/AST/*Evaluator*                @CodaFi @slavapestov
@@ -118,6 +149,9 @@
 # TODO: /unittests/SIL/
 /unittests/Sema/                          @hborla @xedin
 # TODO: /unittests/stdlib/
+
+# userdocs
+# TODO: /userdocs
 
 # utils
 /utils/*windows*                          @compnerd
