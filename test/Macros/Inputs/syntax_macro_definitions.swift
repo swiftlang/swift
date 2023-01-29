@@ -97,8 +97,8 @@ public enum AddBlocker: ExpressionMacro {
                 severity: .error
               ),
               highlights: [
-                Syntax(node.leftOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
-                Syntax(node.rightOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, []))
+                Syntax(node.leftOperand),
+                Syntax(node.rightOperand)
               ],
               fixIts: [
                 FixIt(
@@ -109,10 +109,12 @@ public enum AddBlocker: ExpressionMacro {
                   ),
                   changes: [
                     FixIt.Change.replace(
-                      oldNode: Syntax(binOp.operatorToken.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
+                      oldNode: Syntax(binOp.operatorToken),
                       newNode: Syntax(
                         TokenSyntax(
                           .binaryOperator("-"),
+                          leadingTrivia: binOp.operatorToken.leadingTrivia,
+                          trailingTrivia: binOp.operatorToken.trailingTrivia,
                           presence: .present
                         )
                       )
@@ -145,17 +147,14 @@ public enum AddBlocker: ExpressionMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
+    let opTable = OperatorTable.standardOperators
+    let node = opTable.foldAll(node) { error in
+      context.diagnose(error.asDiagnostic)
+    }.asProtocol(FreestandingMacroExpansionSyntax.self)!
+
     guard let argument = node.argumentList.first?.expression else {
       fatalError("boom")
     }
-
-    let opTable = OperatorTable.standardOperators
-    let foldedArgument = opTable.foldAll(argument) { error in
-      context.diagnose(error.asDiagnostic)
-    }
-
-    // Link the folded argument back into the tree.
-    let node = node.with(\.argumentList, node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.with(\.expression, foldedArgument.as(ExprSyntax.self)!)))
 
     let visitor = AddVisitor()
     let result = visitor.visit(Syntax(node))
@@ -164,7 +163,7 @@ public enum AddBlocker: ExpressionMacro {
       context.diagnose(diag)
     }
 
-    return result.as(MacroExpansionExprSyntax.self)!.argumentList.first!.expression
+    return result.asProtocol(FreestandingMacroExpansionSyntax.self)!.argumentList.first!.expression
   }
 }
 

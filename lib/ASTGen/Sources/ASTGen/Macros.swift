@@ -1,4 +1,5 @@
 import SwiftDiagnostics
+import SwiftOperators
 import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -94,18 +95,6 @@ func allocateUTF8String(
   }
 }
 
-extension String {
-  /// Drop everything up to and including the last '/' from the string.
-  fileprivate func withoutPath() -> String {
-    // Only keep everything after the last slash.
-    if let lastSlash = lastIndex(of: "/") {
-      return String(self[index(after: lastSlash)...])
-    }
-
-    return self
-  }
-}
-
 /// Diagnostic message used for thrown errors.
 fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   let message: String
@@ -151,14 +140,11 @@ func evaluateMacro(
     return -1
   }
 
-  let context = BasicMacroExpansionContext(
-    sourceFiles: [
-      sourceFilePtr.pointee.syntax : .init(
-        moduleName: sourceFilePtr.pointee.moduleName,
-        fullFilePath: sourceFilePtr.pointee.fileName
-      )
-    ]
-  )
+  // Create a source manager. This should probably persist and be given to us.
+  let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+  sourceManager.insert(sourceFilePtr)
+
+  let context = sourceManager.createMacroExpansionContext()
 
   guard let parentSyntax = token.parent else {
     print("not on a macro expansion node: \(token.recursiveDescription)")
@@ -183,7 +169,10 @@ func evaluateMacro(
       macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(
         try exprMacro.expansion(
-          of: context.detach(parentExpansion),
+          of: sourceManager.detach(
+            parentExpansion, in: context,
+            foldingWith: OperatorTable.standardOperators
+          ),
           in: context
         )
       )
@@ -195,7 +184,7 @@ func evaluateMacro(
         return -1
       }
       let decls = try declMacro.expansion(
-        of: context.detach(parentExpansion),
+        of: sourceManager.detach(parentExpansion, in: context),
         in: context
       )
       macroName = parentExpansion.macro.text
@@ -219,9 +208,7 @@ func evaluateMacro(
 
   // Emit diagnostics accumulated in the context.
   for diag in context.diagnostics {
-    emitDiagnostic(
-      diagEnginePtr: diagEnginePtr,
-      sourceFileBuffer: .init(mutating: sourceFilePtr.pointee.buffer),
+    sourceManager.diagnose(
       diagnostic: diag,
       messageSuffix: " (from macro '\(macroName)')"
     )
@@ -330,19 +317,15 @@ func expandAttachedMacro(
     to: ExportedSourceFile.self, capacity: 1
   )
 
-  // Record the source file(s).
-  var sourceFiles: [SourceFileSyntax : BasicMacroExpansionContext.KnownSourceFile] = [:]
-  sourceFiles[attributeSourceFile.pointee.syntax] = .init(
-    moduleName: attributeSourceFile.pointee.moduleName,
-    fullFilePath: attributeSourceFile.pointee.fileName
-  )
-  sourceFiles[declarationSourceFilePtr.pointee.syntax] = .init(
-    moduleName: declarationSourceFilePtr.pointee.moduleName,
-    fullFilePath: declarationSourceFilePtr.pointee.fileName
-  )
+  // Create a source manager covering the files we know about.
+  let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+  sourceManager.insert(attributeSourceFile)
+  sourceManager.insert(declarationSourceFilePtr)
 
-  let context = BasicMacroExpansionContext(sourceFiles: sourceFiles)
+  // Create an expansion context
+  let context = sourceManager.createMacroExpansionContext()
 
+  let macroName = customAttrNode.attributeName.description
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
@@ -417,8 +400,13 @@ func expandAttachedMacro(
     return 1
   }
 
-  // FIXME: Emit diagnostics, but how do we figure out which source file to
-  // use?
+  // Emit diagnostics accumulated in the context.
+  for diag in context.diagnostics {
+    sourceManager.diagnose(
+      diagnostic: diag,
+      messageSuffix: " (from macro '\(macroName)')"
+    )
+  }
 
   // Form the result buffer for our caller.
   evaluatedSyntaxStr.withUTF8 { utf8 in
