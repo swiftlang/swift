@@ -374,7 +374,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
       auto *decl = expansion.dyn_cast<Decl *>();
       auto &ctx = decl->getASTContext();
       auto *macroDecl = evaluateOrDefault(ctx.evaluator,
-          ResolveAttachedMacroRequest{macroAttr, decl->getDeclContext()},
+          ResolveMacroRequest{macroAttr, role, decl->getDeclContext()},
           nullptr);
       if (!macroDecl)
         return false;
@@ -1247,32 +1247,37 @@ bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
 }
 
 MacroDecl *
-ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
-                                      CustomAttr *attr,
-                                      DeclContext *dc) const {
+ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                              UnresolvedMacroReference macroRef,
+                              MacroRoles roles,
+                              DeclContext *dc) const {
   auto &ctx = dc->getASTContext();
-  llvm::TinyPtrVector<ValueDecl *> macros;
-  findMacroForCustomAttr(attr, dc, macros);
-
-  if (macros.empty())
+  auto foundMacros = TypeChecker::lookupMacros(
+      dc, macroRef.getMacroName(), SourceLoc(), roles);
+  if (foundMacros.empty())
     return nullptr;
 
-  // Extract macro arguments from the attribute, or create an empty list.
-  ArgumentList *attrArgs;
-  if (attr->hasArgs()) {
-    attrArgs = attr->getArgs();
-  } else {
-    attrArgs = ArgumentList::createImplicit(ctx, {});
-  }
+  // Extract macro arguments, or create an empty list.
+  auto *args = macroRef.getArgs();
+  if (!args)
+    args = ArgumentList::createImplicit(ctx, {});
 
   // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
   // to ensure @freestanding macros are not considered in overload resolution.
   FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-  auto *identTypeRepr = dyn_cast<IdentTypeRepr>(attr->getTypeRepr());
-  auto macroRefExpr = new (ctx) OverloadedDeclRefExpr(
-      macros, identTypeRepr->getNameLoc(), functionRefKind,
+  SmallVector<ValueDecl *> valueDecls;
+  for (auto *macro : foundMacros)
+    valueDecls.push_back(macro);
+  Expr *callee = new (ctx) OverloadedDeclRefExpr(
+      valueDecls, macroRef.getMacroNameLoc(), functionRefKind,
       /*implicit*/true);
-  auto *call = CallExpr::createImplicit(ctx, macroRefExpr, attrArgs);
+  auto genArgs = macroRef.getGenericArgs();
+  if (!genArgs.empty()) {
+    auto genArgsRange = macroRef.getGenericArgsRange();
+    callee = UnresolvedSpecializeExpr::create(
+        ctx, callee, genArgsRange.Start, genArgs, genArgsRange.End);
+  }
+  auto *call = CallExpr::createImplicit(ctx, callee, args);
 
   Expr *result = call;
   TypeChecker::typeCheckExpression(result, dc);
@@ -1282,6 +1287,7 @@ ResolveAttachedMacroRequest::evaluate(Evaluator &evaluator,
       return macro;
 
   // If we couldn't resolve a macro decl, the attribute is invalid.
-  attr->setInvalid();
+  if (auto *attr = macroRef.getAttr())
+    attr->setInvalid();
   return nullptr;
 }
