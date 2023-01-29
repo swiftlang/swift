@@ -136,7 +136,7 @@ extension SourceManager {
 
     var detached = context.detach(node)
 
-    if let operatorTable = operatorTable {
+    if let operatorTable {
       detached = operatorTable.foldAll(node) { _ in }.as(Node.self)!
     }
 
