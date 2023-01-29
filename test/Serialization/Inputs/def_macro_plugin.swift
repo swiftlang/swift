@@ -1,14 +1,14 @@
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import _SwiftSyntaxMacros
+import SwiftSyntaxMacros
 
 public struct StringifyMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     guard let argument = macro.argumentList.first?.expression else {
-      // FIXME: Create a diagnostic for the missing argument?
-      return ExprSyntax(macro)
+      fatalError("Boom")
     }
 
     return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
@@ -16,10 +16,10 @@ public struct StringifyMacro: ExpressionMacro {
 }
 
 public struct MyWrapperMacro: AccessorMacro {
-    public static func expansion(
+  public static func expansion(
     of node: AttributeSyntax,
-    attachedTo declaration: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
     return []
   }
@@ -28,9 +28,9 @@ public struct MyWrapperMacro: AccessorMacro {
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo parent: DeclSyntax,
-    annotating member: DeclSyntax,
-    in context: inout MacroExpansionContext
+    attachedTo parent: some DeclGroupSyntax,
+    providingAttributesFor member: DeclSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     return []
   }
