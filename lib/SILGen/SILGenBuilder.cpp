@@ -449,6 +449,7 @@ static ManagedValue createInputFunctionArgument(
   switch (arg->getArgumentConvention()) {
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
+  case SILArgumentConvention::Pack_Guaranteed:
     // Guaranteed parameters are passed at +0.
     return ManagedValue::forUnmanaged(arg);
   case SILArgumentConvention::Direct_Unowned:
@@ -460,6 +461,7 @@ static ManagedValue createInputFunctionArgument(
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
+  case SILArgumentConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(arg);
 
   case SILArgumentConvention::Indirect_In:
@@ -469,9 +471,11 @@ static ManagedValue createInputFunctionArgument(
 
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Pack_Inout:
     // An inout parameter is +0 and guaranteed, but represents an lvalue.
     return ManagedValue::forLValue(arg);
   case SILArgumentConvention::Indirect_Out:
+  case SILArgumentConvention::Pack_Out:
     llvm_unreachable("unsupported convention for API");
   }
   llvm_unreachable("bad parameter convention");

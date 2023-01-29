@@ -2033,7 +2033,8 @@ namespace {
     NeverNullType resolveVarargType(VarargTypeRepr *repr,
                                     TypeResolutionOptions options);
     NeverNullType resolvePackType(PackTypeRepr *repr,
-                                  TypeResolutionOptions options);
+                                  TypeResolutionOptions options,
+                                  bool direct = false);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
     NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
@@ -2673,6 +2674,16 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   if (!SF || SF->Kind != SourceFileKind::SIL) {
     for (auto silOnlyAttr : {TAK_thin, TAK_thick}) {
       checkUnsupportedAttr(silOnlyAttr);
+    }
+  }
+
+  // In SIL mode, allow certain attributes to apply to packs.
+  if (options & TypeResolutionFlags::SILType) {
+    if (auto packRepr = dyn_cast<PackTypeRepr>(repr)) {
+      bool direct = attrs.has(TAK_direct);
+      if (direct) attrs.clearAttribute(TAK_direct);
+
+      ty = resolvePackType(packRepr, options, direct);
     }
   }
 
@@ -3635,6 +3646,12 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
+    checkFor(TypeAttrKind::TAK_pack_owned,
+             ParameterConvention::Pack_Owned);
+    checkFor(TypeAttrKind::TAK_pack_guaranteed,
+             ParameterConvention::Pack_Guaranteed);
+    checkFor(TypeAttrKind::TAK_pack_inout,
+             ParameterConvention::Pack_Inout);
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
       differentiability = SILParameterDifferentiability::NotDifferentiable;
@@ -3721,6 +3738,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
     checkFor(TypeAttrKind::TAK_unowned_inner_pointer,
              ResultConvention::UnownedInnerPointer);
     checkFor(TypeAttrKind::TAK_autoreleased, ResultConvention::Autoreleased);
+    checkFor(TypeAttrKind::TAK_pack_out, ResultConvention::Pack);
     if (hadError) return true;
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
@@ -4193,7 +4211,8 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
 }
 
 NeverNullType TypeResolver::resolvePackType(PackTypeRepr *repr,
-                                            TypeResolutionOptions options) {
+                                            TypeResolutionOptions options,
+                                            bool silDirect) {
   // This form is currently only allowed in SIL, so we're lax about
   // where we allow this.  If this is ever made a proper language feature,
   // it should only be allowed in contexts where an expansion would be
@@ -4215,7 +4234,17 @@ NeverNullType TypeResolver::resolvePackType(PackTypeRepr *repr,
     elementTypes.push_back(elementType);
   }
 
-  return PackType::get(getASTContext(), elementTypes);
+  if (options & TypeResolutionFlags::SILType) {
+    SmallVector<CanType, 8> canElementTypes;
+    canElementTypes.reserve(elementTypes.size());
+    for (auto elementType : elementTypes)
+      canElementTypes.push_back(elementType->getCanonicalType());
+
+    SILPackType::ExtInfo extInfo(/*indirect*/ !silDirect);
+    return SILPackType::get(getASTContext(), extInfo, canElementTypes);
+  } else {
+    return PackType::get(getASTContext(), elementTypes);
+  }
 }
 
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,

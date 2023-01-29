@@ -4774,6 +4774,9 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
       // We may need to support this at some point, but currently only imported
       // objc methods are returns_inner_pointer.
       llvm_unreachable("indirect self argument to method that"
@@ -4913,6 +4916,9 @@ RValue SILGenFunction::emitApply(
     case ResultConvention::Indirect:
       assert(!substFnConv.isSILIndirect(resultInfo) &&
              "indirect direct result?");
+      break;
+
+    case ResultConvention::Pack:
       break;
 
     case ResultConvention::Owned:
@@ -5730,6 +5736,11 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return false;
+
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    llvm_unreachable("self parameter was a pack?");
 
   // If the accessor wants the value 'in', we have to copy if the
   // base isn't a temporary.  We aren't allowed to pass aliased

@@ -1957,6 +1957,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@guaranteed", 'g')
                 .Case("@deallocating", 'e')
                 .Case("@unowned", 'y')
+                .Case("@pack_guaranteed", 'p')
+                .Case("@pack_owned", 'v')
+                .Case("@pack_inout", 'm')
                 .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
@@ -1980,6 +1983,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                         .Case("@unowned", 'd')
                         .Case("@unowned_inner_pointer", 'u')
                         .Case("@autoreleased", 'a')
+                        .Case("@pack_out", 'k')
                         .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
