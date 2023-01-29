@@ -2611,7 +2611,8 @@ namespace {
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
       }
 
-      addExplicitProtocolConformances(cast<NominalTypeDecl>(result));
+      if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
+        addExplicitProtocolConformances(ntd);
 
       return result;
     }
