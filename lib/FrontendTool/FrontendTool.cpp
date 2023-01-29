@@ -1130,9 +1130,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action) &&
-      // TODO: indexing often crashes when interop is enabled (rdar://87719859).
-      !Invocation.getLangOptions().EnableCXXInterop) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
     emitIndexData(Instance);
   }
 
