@@ -3,6 +3,7 @@
 // RUN: ls %t/v5/units | %FileCheck %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: cxx-interop-fixed-cf_options
 
 import Foundation
 
