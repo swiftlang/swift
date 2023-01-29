@@ -83,9 +83,6 @@ public func emitParserDiagnostics(
   ) { sourceFile in
     var anyDiags = false
 
-    let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-    sourceManager.insert(sourceFile)
-
     let diags = ParseDiagnosticsGenerator.diagnostics(
       for: sourceFile.pointee.syntax
     )
@@ -97,7 +94,12 @@ public func emitParserDiagnostics(
         continue
       }
 
-      sourceManager.diagnose(diagnostic: diag)
+      emitDiagnostic(
+        diagEnginePtr: diagEnginePtr,
+        sourceFileBuffer: UnsafeMutableBufferPointer(
+          mutating: sourceFile.pointee.buffer),
+        diagnostic: diag
+      )
       anyDiags = true
     }
 
