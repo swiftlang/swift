@@ -1,7 +1,8 @@
 import SwiftDiagnostics
+import SwiftOperators
 import SwiftParser
 import SwiftSyntax
-import _SwiftSyntaxMacros
+import SwiftSyntaxMacros
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
@@ -94,18 +95,6 @@ func allocateUTF8String(
   }
 }
 
-extension String {
-  /// Drop everything up to and including the last '/' from the string.
-  fileprivate func withoutPath() -> String {
-    // Only keep everything after the last slash.
-    if let lastSlash = lastIndex(of: "/") {
-      return String(self[index(after: lastSlash)...])
-    }
-
-    return self
-  }
-}
-
 /// Diagnostic message used for thrown errors.
 fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   let message: String
@@ -114,29 +103,6 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
 
   var diagnosticID: MessageID {
     .init(domain: "SwiftSyntaxMacros", id: "ThrownErrorDiagnostic")
-  }
-}
-
-extension MacroExpansionDeclSyntax {
-  func asMacroExpansionExpr() -> MacroExpansionExprSyntax {
-    MacroExpansionExprSyntax(
-      unexpectedBeforePoundToken,
-      poundToken: poundToken,
-      unexpectedBetweenPoundTokenAndMacro,
-      macro: macro,
-      genericArguments: genericArguments,
-      unexpectedBetweenGenericArgumentsAndLeftParen,
-      leftParen: leftParen,
-      unexpectedBetweenLeftParenAndArgumentList,
-      argumentList: argumentList,
-      unexpectedBetweenArgumentListAndRightParen,
-      rightParen: rightParen,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures
-    )
   }
 }
 
@@ -174,10 +140,11 @@ func evaluateMacro(
     return -1
   }
 
-  var context = MacroExpansionContext(
-    moduleName: sourceFilePtr.pointee.moduleName,
-    fileName: sourceFilePtr.pointee.fileName.withoutPath()
-  )
+  // Create a source manager. This should probably persist and be given to us.
+  let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+  sourceManager.insert(sourceFilePtr)
+
+  let context = sourceManager.createMacroExpansionContext()
 
   guard let parentSyntax = token.parent else {
     print("not on a macro expansion node: \(token.recursiveDescription)")
@@ -192,26 +159,42 @@ func evaluateMacro(
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      let parentExpansion: MacroExpansionExprSyntax
-      if let expansionExpr = parentSyntax.as(MacroExpansionExprSyntax.self) {
-        parentExpansion = expansionExpr
-      } else if let expansionDecl = parentSyntax.as(MacroExpansionDeclSyntax.self) {
-        parentExpansion = expansionDecl.asMacroExpansionExpr()
-      } else {
+      guard let parentExpansion = parentSyntax.asProtocol(
+        FreestandingMacroExpansionSyntax.self
+      ) else {
         print("not on a macro expansion node: \(parentSyntax.recursiveDescription)")
         return -1
       }
 
       macroName = parentExpansion.macro.text
-      evaluatedSyntax = Syntax(try exprMacro.expansion(of: parentExpansion, in: &context))
 
-    // Handle expression macro. The resulting decls are wrapped in a `CodeBlockItemListSyntax`.
+      func expandExpressionMacro<Node: FreestandingMacroExpansionSyntax>(
+        _ node: Node
+      ) throws -> ExprSyntax {
+        return try exprMacro.expansion(
+          of: sourceManager.detach(
+            node, in: context,
+            foldingWith: OperatorTable.standardOperators
+          ),
+          in: context
+        )
+      }
+
+      evaluatedSyntax = Syntax(
+        try _openExistential(parentExpansion, do: expandExpressionMacro)
+      )
+
+    // Handle declaration macro. The resulting decls are wrapped in a
+    // `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:
       guard let parentExpansion = parentSyntax.as(MacroExpansionDeclSyntax.self) else {
         print("not on a macro expansion node: \(token.recursiveDescription)")
         return -1
       }
-      let decls = try declMacro.expansion(of: parentExpansion, in: &context)
+      let decls = try declMacro.expansion(
+        of: sourceManager.detach(parentExpansion, in: context),
+        in: context
+      )
       macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
@@ -233,9 +216,7 @@ func evaluateMacro(
 
   // Emit diagnostics accumulated in the context.
   for diag in context.diagnostics {
-    emitDiagnostic(
-      diagEnginePtr: diagEnginePtr,
-      sourceFileBuffer: .init(mutating: sourceFilePtr.pointee.buffer),
+    sourceManager.diagnose(
       diagnostic: diag,
       messageSuffix: " (from macro '\(macroName)')"
     )
@@ -337,22 +318,30 @@ func expandAttachedMacro(
   let macro = macroPtr.pointee.macro
   let macroRole = MacroRole(rawValue: rawMacroRole)
 
-  // FIXME: Which source file? I don't know! This should go.
+  let attributeSourceFile = customAttrSourceFilePtr.bindMemory(
+    to: ExportedSourceFile.self, capacity: 1
+  )
   let declarationSourceFilePtr = declarationSourceFilePtr.bindMemory(
     to: ExportedSourceFile.self, capacity: 1
   )
 
-  var context = MacroExpansionContext(
-    moduleName: declarationSourceFilePtr.pointee.moduleName,
-    fileName: declarationSourceFilePtr.pointee.fileName.withoutPath()
-  )
+  // Create a source manager covering the files we know about.
+  let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+  sourceManager.insert(attributeSourceFile)
+  sourceManager.insert(declarationSourceFilePtr)
 
+  // Create an expansion context
+  let context = sourceManager.createMacroExpansionContext()
+
+  let macroName = customAttrNode.attributeName.description
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
     case (let attachedMacro as AccessorMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
-        of: customAttrNode, attachedTo: declarationNode, in: &context
+        of: context.detach(customAttrNode),
+        providingAccessorsOf: context.detach(declarationNode),
+        in: context
       )
 
       // Form a buffer of accessor declarations to return to the caller.
@@ -367,15 +356,29 @@ func expandAttachedMacro(
         sourceFilePtr: parentDeclSourceFilePtr,
         sourceLocationPtr: parentDeclSourceLocPointer,
         type: DeclSyntax.self
-      ) else {
+      ),
+            let parentDeclGroup = parentDeclNode.asProtocol(DeclGroupSyntax.self)
+      else {
         return 1
       }
 
-      let attributes = try attachedMacro.expansion(
-        of: customAttrNode,
-        attachedTo: parentDeclNode,
-        annotating: declarationNode,
-        in: &context
+      // Local function to expand a member atribute macro once we've opened up
+      // the existential.
+      func expandMemberAttributeMacro<Node: DeclGroupSyntax>(
+        _ node: Node
+      ) throws -> [AttributeSyntax] {
+        return try attachedMacro.expansion(
+          of: context.detach(customAttrNode),
+          attachedTo: sourceManager.detach(node, in: context),
+          providingAttributesFor: sourceManager.detach(
+            declarationNode, in: context
+          ),
+          in: context
+        )
+      }
+
+      let attributes = try _openExistential(
+        parentDeclGroup, do: expandMemberAttributeMacro
       )
 
       // Form a buffer containing an attribute list to return to the caller.
@@ -384,11 +387,24 @@ func expandAttachedMacro(
       }.joined(separator: " ")
 
     case (let attachedMacro as MemberMacro.Type, .Member):
-      let members = try attachedMacro.expansion(
-        of: customAttrNode,
-        attachedTo: declarationNode,
-        in: &context
-      )
+      guard let declGroup = declarationNode.asProtocol(DeclGroupSyntax.self)
+      else {
+        return 1
+      }
+
+      // Local function to expand a member macro once we've opened up
+      // the existential.
+      func expandMemberMacro<Node: DeclGroupSyntax>(
+        _ node: Node
+      ) throws -> [DeclSyntax] {
+        return try attachedMacro.expansion(
+          of: sourceManager.detach(customAttrNode, in: context),
+          providingMembersOf: sourceManager.detach(node, in: context),
+          in: context
+        )
+      }
+
+      let members = try _openExistential(declGroup, do: expandMemberMacro)
 
       // Form a buffer of member declarations to return to the caller.
       evaluatedSyntaxStr = members.map {
@@ -412,8 +428,13 @@ func expandAttachedMacro(
     return 1
   }
 
-  // FIXME: Emit diagnostics, but how do we figure out which source file to
-  // use?
+  // Emit diagnostics accumulated in the context.
+  for diag in context.diagnostics {
+    sourceManager.diagnose(
+      diagnostic: diag,
+      messageSuffix: " (from macro '\(macroName)')"
+    )
+  }
 
   // Form the result buffer for our caller.
   evaluatedSyntaxStr.withUTF8 { utf8 in

@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import _SwiftSyntaxMacros
+import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -19,7 +19,8 @@ private func replaceFirstLabel(
 
 public struct ColorLiteralMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     let argList = replaceFirstLabel(
       of: macro.argumentList, with: "_colorLiteralRed"
@@ -33,10 +34,20 @@ public struct ColorLiteralMacro: ExpressionMacro {
 }
 
 public struct FileIDMacro: ExpressionMacro {
-  public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
-  ) -> ExprSyntax {
-    let fileLiteral: ExprSyntax = #""\#(raw: context.moduleName)/\#(raw: context.fileName)""#
+  public static func expansion<
+    Node: FreestandingMacroExpansionSyntax,
+    Context: MacroExpansionContext
+  >(
+    of macro: Node,
+    in context: Context
+  ) throws -> ExprSyntax {
+    guard let sourceLoc = context.location(of: macro),
+      let fileID = sourceLoc.file
+    else {
+      throw CustomError.message("can't find location for macro")
+    }
+
+    let fileLiteral: ExprSyntax = "\(literal: fileID)"
     if let leadingTrivia = macro.leadingTrivia {
       return fileLiteral.with(\.leadingTrivia, leadingTrivia)
     }
@@ -46,11 +57,11 @@ public struct FileIDMacro: ExpressionMacro {
 
 public struct StringifyMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     guard let argument = macro.argumentList.first?.expression else {
-      // FIXME: Create a diagnostic for the missing argument?
-      return ExprSyntax(macro)
+      fatalError("boom")
     }
 
     return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
@@ -68,82 +79,81 @@ extension SimpleDiagnosticMessage: FixItMessage {
 }
 
 public enum AddBlocker: ExpressionMacro {
-  public static func expansion(
-    of node: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
-  ) -> ExprSyntax {
-    guard let argument = node.argumentList.first?.expression else {
-      // FIXME: Create a diagnostic for the missing argument?
-      return ExprSyntax(node)
-    }
+  class AddVisitor: SyntaxRewriter {
+    var diagnostics: [Diagnostic] = []
 
-    let opTable = OperatorTable.standardOperators
-    let foldedArgument = opTable.foldAll(argument) { error in
-      context.diagnose(error.asDiagnostic)
-    }
-
-    // Link the folded argument back into the tree.
-    let node = node.with(\.argumentList, node.argumentList.replacing(childAt: 0, with: node.argumentList.first!.with(\.expression, foldedArgument.as(ExprSyntax.self)!)))
-
-    class AddVisitor: SyntaxRewriter {
-      var diagnostics: [Diagnostic] = []
-
-      override func visit(
-        _ node: InfixOperatorExprSyntax
-      ) -> ExprSyntax {
-        if let binOp = node.operatorOperand.as(BinaryOperatorExprSyntax.self) {
-          if binOp.operatorToken.text == "+" {
-            let messageID = MessageID(domain: "silly", id: "addblock")
-            diagnostics.append(
-              Diagnostic(
-                node: Syntax(node.operatorOperand),
-                message: SimpleDiagnosticMessage(
-                  message: "blocked an add; did you mean to subtract?",
-                  diagnosticID: messageID,
-                  severity: .error
-                ),
-                highlights: [
-                  Syntax(node.leftOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
-                  Syntax(node.rightOperand.with(\.leadingTrivia, []).with(\.trailingTrivia, []))
-                ],
-                fixIts: [
-                  FixIt(
-                    message: SimpleDiagnosticMessage(
-                      message: "use '-'",
-                      diagnosticID: messageID,
-                      severity: .error
-                    ),
-                    changes: [
-                      FixIt.Change.replace(
-                        oldNode: Syntax(binOp.operatorToken.with(\.leadingTrivia, []).with(\.trailingTrivia, [])),
-                        newNode: Syntax(
-                          TokenSyntax(
-                            .binaryOperator("-"),
-                            presence: .present
-                          )
+    override func visit(
+      _ node: InfixOperatorExprSyntax
+    ) -> ExprSyntax {
+      if let binOp = node.operatorOperand.as(BinaryOperatorExprSyntax.self) {
+        if binOp.operatorToken.text == "+" {
+          let messageID = MessageID(domain: "silly", id: "addblock")
+          diagnostics.append(
+            Diagnostic(
+              node: Syntax(node.operatorOperand),
+              message: SimpleDiagnosticMessage(
+                message: "blocked an add; did you mean to subtract?",
+                diagnosticID: messageID,
+                severity: .error
+              ),
+              highlights: [
+                Syntax(node.leftOperand),
+                Syntax(node.rightOperand)
+              ],
+              fixIts: [
+                FixIt(
+                  message: SimpleDiagnosticMessage(
+                    message: "use '-'",
+                    diagnosticID: messageID,
+                    severity: .error
+                  ),
+                  changes: [
+                    FixIt.Change.replace(
+                      oldNode: Syntax(binOp.operatorToken),
+                      newNode: Syntax(
+                        TokenSyntax(
+                          .binaryOperator("-"),
+                          leadingTrivia: binOp.operatorToken.leadingTrivia,
+                          trailingTrivia: binOp.operatorToken.trailingTrivia,
+                          presence: .present
                         )
                       )
-                    ]
-                  ),
-                ]
-              )
+                    )
+                  ]
+                ),
+              ]
             )
+          )
 
-            return ExprSyntax(
-              node.with(
-                \.operatorOperand,
-                ExprSyntax(
-                  binOp.with(
-                    \.operatorToken,
-                    binOp.operatorToken.withKind(.binaryOperator("-"))
-                  )
+          return ExprSyntax(
+            node.with(
+              \.operatorOperand,
+              ExprSyntax(
+                binOp.with(
+                  \.operatorToken,
+                  binOp.operatorToken.withKind(.binaryOperator("-"))
                 )
               )
             )
-          }
+          )
         }
-
-        return ExprSyntax(node)
       }
+
+      return ExprSyntax(node)
+    }
+  }
+
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    let opTable = OperatorTable.standardOperators
+    let node = opTable.foldAll(node) { error in
+      context.diagnose(error.asDiagnostic)
+    }.asProtocol(FreestandingMacroExpansionSyntax.self)!
+
+    guard let argument = node.argumentList.first?.expression else {
+      fatalError("boom")
     }
 
     let visitor = AddVisitor()
@@ -153,17 +163,18 @@ public enum AddBlocker: ExpressionMacro {
       context.diagnose(diag)
     }
 
-    return result.as(MacroExpansionExprSyntax.self)!.argumentList.first!.expression
+    return result.asProtocol(FreestandingMacroExpansionSyntax.self)!.argumentList.first!.expression
   }
 }
 
 public class RecursiveMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     guard let argument = macro.argumentList.first?.expression,
           argument.description == "false" else {
-      return ExprSyntax(macro)
+      return "\(macro)"
     }
 
     return "()"
@@ -172,7 +183,8 @@ public class RecursiveMacro: ExpressionMacro {
 
 public class NestedDeclInExprMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     return """
     { () -> Void in
@@ -196,8 +208,8 @@ enum CustomError: Error, CustomStringConvertible {
 
 public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
-    of node: MacroExpansionDeclSyntax,
-    in context: inout MacroExpansionContext
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     guard let firstElement = node.argumentList.first,
           let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
@@ -220,8 +232,8 @@ public struct PropertyWrapperMacro {}
 extension PropertyWrapperMacro: AccessorMacro, Macro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo declaration: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
     guard let varDecl = declaration.as(VariableDeclSyntax.self),
       let binding = varDecl.bindings.first,
@@ -251,9 +263,9 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo parent: DeclSyntax,
-    annotating member: DeclSyntax,
-    in context: inout MacroExpansionContext
+    attachedTo parent: some DeclGroupSyntax,
+    providingAttributesFor member: DeclSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard member.is(VariableDeclSyntax.self) else {
       return []
@@ -281,9 +293,9 @@ public struct TypeWrapperMacro {}
 extension TypeWrapperMacro: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo decl: DeclSyntax,
-    annotating member: DeclSyntax,
-    in context: inout MacroExpansionContext
+    attachedTo decl: some DeclGroupSyntax,
+    providingAttributesFor member: DeclSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard let varDecl = member.as(VariableDeclSyntax.self),
       let binding = varDecl.bindings.first,
@@ -310,8 +322,8 @@ extension TypeWrapperMacro: MemberAttributeMacro {
 extension TypeWrapperMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo decl: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     let storageVariable: DeclSyntax =
       """
@@ -327,8 +339,8 @@ extension TypeWrapperMacro: MemberMacro {
 public struct AccessViaStorageMacro: AccessorMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo declaration: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
     guard let varDecl = declaration.as(VariableDeclSyntax.self),
       let binding = varDecl.bindings.first,
@@ -352,8 +364,8 @@ public struct AccessViaStorageMacro: AccessorMacro {
 public struct AddMembers: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo decl: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     let storageStruct: DeclSyntax =
       """
