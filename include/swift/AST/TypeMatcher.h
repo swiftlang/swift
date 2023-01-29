@@ -143,6 +143,29 @@ class TypeMatcher {
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
 
+    bool visitSILPackType(CanSILPackType firstPack, Type secondType,
+                          Type sugaredFirstType) {
+      if (auto secondPack = secondType->getAs<SILPackType>()) {
+        if (firstPack->getNumElements() != secondPack->getNumElements())
+          return mismatch(firstPack.getPointer(), secondPack,
+                          sugaredFirstType);
+
+        for (unsigned i = 0, n = firstPack->getNumElements(); i != n; ++i) {
+          // Recurse on the pack elements.  There's no need to preserve
+          // sugar for SIL types.
+          if (!this->visit(firstPack->getElementType(i),
+                           secondPack->getElementType(i),
+                           firstPack->getElementType(i)))
+            return false;
+        }
+
+        return true;
+      }
+
+      // Pack/non-pack mismatch.
+      return mismatch(firstPack.getPointer(), secondType, sugaredFirstType);
+    }
+
     bool visitPackType(CanPackType firstTuple, Type secondType,
                        Type sugaredFirstType) {
       if (auto secondTuple = secondType->getAs<PackType>()) {

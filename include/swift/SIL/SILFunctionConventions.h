@@ -518,6 +518,11 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
   case ParameterConvention::Direct_Owned:
     return false;
 
+  case ParameterConvention::Pack_Inout:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Guaranteed:
+    return true;
+
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
     return (loweredAddresses ||
@@ -540,6 +545,8 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Indirect:
     return (loweredAddresses ||
             result.getInterfaceType()->isOpenedExistentialWithError());
+  case ResultConvention::Pack:
+    return true;
   case ResultConvention::Owned:
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:

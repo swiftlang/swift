@@ -1535,6 +1535,7 @@ private:
                                       File, FwdDeclLine, Flags, MangledName);
     }
 
+    case TypeKind::SILPack:
     case TypeKind::Pack:
     case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");

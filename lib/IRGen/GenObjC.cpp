@@ -893,6 +893,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     case ResultConvention::Unowned:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
+    case ResultConvention::Pack:
       lifetimeExtendsSelf = false;
       break;
     }
@@ -914,6 +915,9 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
     llvm_unreachable("self passed indirectly?!");
   }
   

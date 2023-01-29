@@ -113,8 +113,14 @@ static  bool fixupReferenceCounts(
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Guaranteed:
+      // FIXME: can these happen?
+      llvm_unreachable("Missing pack owned<->guaranteed conversions");
+
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Inout:
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed: {

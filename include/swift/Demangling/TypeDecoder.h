@@ -98,6 +98,9 @@ enum class ImplParameterConvention {
   Direct_Owned,
   Direct_Unowned,
   Direct_Guaranteed,
+  Pack_Owned,
+  Pack_Guaranteed,
+  Pack_Inout,
 };
 
 enum class ImplParameterDifferentiability {
@@ -135,6 +138,12 @@ public:
       return ConventionType::Direct_Unowned;
     if (conventionString == "@guaranteed")
       return ConventionType::Direct_Guaranteed;
+    if (conventionString == "@pack_owned")
+      return ConventionType::Pack_Owned;
+    if (conventionString == "@pack_guaranteed")
+      return ConventionType::Pack_Guaranteed;
+    if (conventionString == "@pack_inout")
+      return ConventionType::Pack_Inout;
 
     return None;
   }
@@ -167,6 +176,7 @@ enum class ImplResultConvention {
   Unowned,
   UnownedInnerPointer,
   Autoreleased,
+  Pack,
 };
 
 enum class ImplResultDifferentiability {
@@ -198,6 +208,8 @@ public:
       return ConventionType::UnownedInnerPointer;
     if (conventionString == "@autoreleased")
       return ConventionType::Autoreleased;
+    if (conventionString == "@pack_out")
+      return ConventionType::Pack;
 
     return None;
   }

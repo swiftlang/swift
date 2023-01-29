@@ -399,6 +399,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
       }
       return;
 
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      // Ignore packs as sources of metadata.
+      // In principle, we could recurse into non-expansion components,
+      // but what situation would we be in where we had concrete
+      // components of a pack and weren't ABI-constrained to ignore them?
+      return;
+
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:

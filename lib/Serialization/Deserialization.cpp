@@ -5736,6 +5736,9 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
+  CASE(Pack_Inout)
+  CASE(Pack_Guaranteed)
+  CASE(Pack_Owned)
 #undef CASE
   }
   return None;
@@ -5768,6 +5771,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   CASE(Unowned)
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
+  CASE(Pack)
 #undef CASE
   }
   return None;
@@ -6833,6 +6837,26 @@ Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
   }
 
   return PackType::get(MF.getContext(), elements);
+}
+
+Expected<Type> DESERIALIZE_TYPE(SIL_PACK_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  unsigned elementIsAddress;
+  ArrayRef<uint64_t> elementTypeIDs;
+  decls_block::SILPackTypeLayout::readRecord(scratch, elementIsAddress,
+                                             elementTypeIDs);
+
+  SmallVector<CanType, 8> elementTypes;
+  for (auto elementTypeID : elementTypeIDs) {
+    auto elementType = MF.getTypeChecked(elementTypeID);
+    if (!elementType)
+      return elementType.takeError();
+    elementTypes.push_back(elementType.get()->getCanonicalType());
+  }
+
+  return SILPackType::get(MF.getContext(),
+                          SILPackType::ExtInfo{bool(elementIsAddress)},
+                          elementTypes);
 }
 
 Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,

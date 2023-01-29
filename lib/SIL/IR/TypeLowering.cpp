@@ -307,6 +307,16 @@ namespace {
                                                IsLexical});
     }
 
+    RetTy visitSILPackType(CanSILPackType type,
+                           AbstractionPattern origType,
+                           IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
     RetTy visitPackExpansionType(CanPackExpansionType type,
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
@@ -2174,6 +2184,16 @@ namespace {
       return handleAddressOnly(packType, properties);
     }
 
+    TypeLowering *visitSILPackType(CanSILPackType packType,
+                                   AbstractionPattern origType,
+                                   IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties properties;
+      properties.setAddressOnly();
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      return handleAddressOnly(packType, properties);
+    }
+
     TypeLowering *visitPackExpansionType(CanPackExpansionType packExpansionType,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
@@ -2504,16 +2524,13 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
 
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
-static CanPackType computeLoweredPackType(TypeConverter &tc,
-                                          TypeExpansionContext context,
-                                          AbstractionPattern origType,
-                                          CanPackType substType) {
+static CanSILPackType computeLoweredPackType(TypeConverter &tc,
+                                             TypeExpansionContext context,
+                                             AbstractionPattern origType,
+                                             CanPackType substType) {
   assert(origType.matchesPack(substType));
 
-  // Does the lowered tuple type differ from the substituted type in
-  // any interesting way?
-  bool changed = false;
-  SmallVector<Type, 4> loweredElts;
+  SmallVector<CanType, 4> loweredElts;
   loweredElts.reserve(substType->getNumElements());
 
   for (auto i : indices(substType->getElementTypes())) {
@@ -2522,14 +2539,13 @@ static CanPackType computeLoweredPackType(TypeConverter &tc,
 
     CanType loweredTy =
         tc.getLoweredRValueType(context, origEltType, substEltType);
-    changed = (changed || substEltType != loweredTy);
-
     loweredElts.push_back(loweredTy);
   }
 
-  if (!changed) return substType;
+  bool elementIsAddress = true; // TODO
+  SILPackType::ExtInfo extInfo(elementIsAddress);
 
-  return CanPackType(PackType::get(tc.Context, loweredElts));
+  return SILPackType::get(tc.Context, extInfo, loweredElts);
 }
 
 static CanType computeLoweredOptionalType(TypeConverter &tc,

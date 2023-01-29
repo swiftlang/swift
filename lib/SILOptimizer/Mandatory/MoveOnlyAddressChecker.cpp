@@ -338,9 +338,13 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Out:
       return false;
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Pack_Inout:
       LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
       return true;
     }
@@ -570,6 +574,10 @@ void UseState::initializeLiveness(
     case swift::SILArgumentConvention::Direct_Owned:
     case swift::SILArgumentConvention::Direct_Unowned:
     case swift::SILArgumentConvention::Direct_Guaranteed:
+    case swift::SILArgumentConvention::Pack_Inout:
+    case swift::SILArgumentConvention::Pack_Guaranteed:
+    case swift::SILArgumentConvention::Pack_Owned:
+    case swift::SILArgumentConvention::Pack_Out:
       llvm_unreachable("Working with addresses");
     }
   }
@@ -1224,6 +1232,10 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Out:
       break;
     }
   }

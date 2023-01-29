@@ -795,6 +795,13 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
     return type;
+
+  // Capture pack parameters by value (a pointer).
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    return type;
+
   // Capture indirect parameters if the closure is not [onstack]. [onstack]
   // closures don't take ownership of their arguments so we just capture the
   // address.
@@ -1433,7 +1440,10 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
-    llvm_unreachable("indirect callables not supported");
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    llvm_unreachable("indirect or pack callables not supported");
   }
 
   // Lower the captured arguments in the original function's generic context.
@@ -1562,6 +1572,9 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
       llvm_unreachable("should never happen!");
     }
 
@@ -1673,6 +1686,11 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
           param.add(fieldAddr.getAddress());
           dependsOnContextLifetime = true;
         }
+        break;
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Inout:
+        llvm_unreachable("partial application of pack?");
         break;
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -2203,6 +2221,12 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_InoutAliasable:
         cast<LoadableTypeInfo>(fieldLayout.getType())
             .initialize(IGF, args, fieldAddr, isOutlined);
+        break;
+
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Inout:
+        llvm_unreachable("partial application of pack?");
         break;
       }
     }
