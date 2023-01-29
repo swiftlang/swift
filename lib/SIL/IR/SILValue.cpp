@@ -232,6 +232,10 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
+  case SILArgumentConvention::Pack_Inout:
+  case SILArgumentConvention::Pack_Out:
+  case SILArgumentConvention::Pack_Owned:
+  case SILArgumentConvention::Pack_Guaranteed:
     value = OwnershipKind::None;
     return;
   case SILArgumentConvention::Direct_Owned:

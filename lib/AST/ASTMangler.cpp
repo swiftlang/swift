@@ -1073,6 +1073,24 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 
+static char getParamConvention(ParameterConvention conv) {
+  // @in and @out are mangled the same because they're put in
+  // different places.
+  switch (conv) {
+    case ParameterConvention::Indirect_In: return 'i';
+    case ParameterConvention::Indirect_Inout: return 'l';
+    case ParameterConvention::Indirect_InoutAliasable: return 'b';
+    case ParameterConvention::Indirect_In_Guaranteed: return 'n';
+    case ParameterConvention::Direct_Owned: return 'x';
+    case ParameterConvention::Direct_Unowned: return 'y';
+    case ParameterConvention::Direct_Guaranteed: return 'g';
+    case ParameterConvention::Pack_Owned: return 'x';
+    case ParameterConvention::Pack_Inout: return 'y';
+    case ParameterConvention::Pack_Guaranteed: return 'g';
+  }
+  llvm_unreachable("bad parameter convention");
+}
+
 /// Whether to mangle the given type as generic.
 static bool shouldMangleAsGeneric(Type type) {
   if (!type)
@@ -1265,6 +1283,23 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         }
       }
       appendOperator("QP");
+      return;
+    }
+
+    case TypeKind::SILPack: {
+      auto packTy = cast<SILPackType>(tybase);
+
+      if (packTy->getNumElements() == 0)
+        appendOperator("y");
+      else {
+        bool firstField = true;
+        for (auto element : packTy->getElementTypes()) {
+          appendType(element, sig, forDecl);
+          appendListSeparator(firstField);
+        }
+      }
+      appendOperator("QS");
+      Buffer << (packTy->isElementAddress() ? 'i' : 'd');
       return;
     }
 
@@ -1865,21 +1900,6 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
   appendOperator("Xj");
 }
 
-static char getParamConvention(ParameterConvention conv) {
-  // @in and @out are mangled the same because they're put in
-  // different places.
-  switch (conv) {
-    case ParameterConvention::Indirect_In: return 'i';
-    case ParameterConvention::Indirect_Inout: return 'l';
-    case ParameterConvention::Indirect_InoutAliasable: return 'b';
-    case ParameterConvention::Indirect_In_Guaranteed: return 'n';
-    case ParameterConvention::Direct_Owned: return 'x';
-    case ParameterConvention::Direct_Unowned: return 'y';
-    case ParameterConvention::Direct_Guaranteed: return 'g';
-  }
-  llvm_unreachable("bad parameter convention");
-}
-
 static Optional<char>
 getParamDifferentiability(SILParameterDifferentiability diffKind) {
   switch (diffKind) {
@@ -1898,6 +1918,7 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Unowned: return 'd';
     case ResultConvention::UnownedInnerPointer: return 'u';
     case ResultConvention::Autoreleased: return 'a';
+    case ResultConvention::Pack: return 'k';
   }
   llvm_unreachable("bad result convention");
 }

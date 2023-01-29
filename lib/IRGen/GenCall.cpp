@@ -270,6 +270,22 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
+static void addPackParameterAttributes(IRGenModule &IGM,
+                                       SILType paramSILType,
+                                       llvm::AttributeList &attrs,
+                                       unsigned argIndex) {
+  llvm::AttrBuilder b(IGM.getLLVMContext());
+  // Pack parameter pointers can't alias or be captured.
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  // TODO: we could mark this dereferenceable when the pack has fixed
+  // components.
+  // TODO: add an alignment attribute
+  // TODO: add a nonnull attribute
+
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
+}
+
 static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
                                         llvm::AttributeList &attrs,
                                         const TypeInfo &ti, unsigned argIndex,
@@ -1547,6 +1563,13 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
         conv == ParameterConvention::Indirect_InoutAliasable);
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
+    return ti;
+
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    addPackParameterAttributes(IGM, paramSILType, Attrs, ParamIRTypes.size());
+    addPointerParameter(ti.getStorageType());
     return ti;
 
   case ParameterConvention::Direct_Owned:

@@ -602,6 +602,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       getSILStorageType(M, FTy, TypeExpansionContext::minimal()).isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
+  case ResultConvention::Pack:
     return SILModuleConventions(M).isSILIndirect(*this) ? OwnershipKind::None
                                                         : OwnershipKind::Owned;
   case ResultConvention::Autoreleased:

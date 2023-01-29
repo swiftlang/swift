@@ -895,6 +895,9 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       break;
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Inout:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Guaranteed:
       break;
       
     case ParameterConvention::Direct_Owned:

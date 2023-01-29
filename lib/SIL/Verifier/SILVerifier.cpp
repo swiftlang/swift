@@ -450,6 +450,7 @@ struct ImmutableAddressUseVerifier {
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Pack_Guaranteed:
       return false;
 
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -462,6 +463,9 @@ struct ImmutableAddressUseVerifier {
       // TODO: Remove this in favor of using Inout and In_Guaranteed.
       return false;
 
+    case SILArgumentConvention::Pack_Out:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Inout:
@@ -5533,12 +5537,17 @@ public:
                          if (!bbarg->getType().isAddress())
                            return true;
                          switch (paramInfo.getConvention()) {
-                         default:
+                         case ParameterConvention::Direct_Unowned:
+                         case ParameterConvention::Direct_Guaranteed:
+                         case ParameterConvention::Direct_Owned:
                            return false;
                          case ParameterConvention::Indirect_In:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Pack_Owned:
+                         case ParameterConvention::Pack_Guaranteed:
+                         case ParameterConvention::Pack_Inout:
                            return true;
                          }
                        }),

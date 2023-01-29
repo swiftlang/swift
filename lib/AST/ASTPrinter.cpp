@@ -5754,6 +5754,21 @@ public:
     Printer << "}";
   }
 
+  void visitSILPackType(SILPackType *T) {
+    if (!T->isElementAddress())
+      Printer << "@direct ";
+    Printer << "Pack{";
+
+    auto Fields = T->getElementTypes();
+    for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+      if (i)
+        Printer << ", ";
+      Type EltType = Fields[i];
+      visit(EltType);
+    }
+    Printer << "}";
+  }
+
   void visitPackExpansionType(PackExpansionType *T) {
     PrintOptions innerOptions = Options;
     innerOptions.PrintExplicitEach = true;
@@ -6289,6 +6304,10 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("callee convention cannot be indirect");
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      llvm_unreachable("callee convention cannot be a pack");
     }
     llvm_unreachable("bad convention");
   }
@@ -6933,6 +6952,9 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   case ParameterConvention::Direct_Owned: return "@owned ";
   case ParameterConvention::Direct_Unowned: return "";
   case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";
+  case ParameterConvention::Pack_Guaranteed: return "@pack_guaranteed ";
+  case ParameterConvention::Pack_Owned: return "@pack_owned ";
+  case ParameterConvention::Pack_Inout: return "@pack_inout ";
   }
   llvm_unreachable("bad parameter convention");
 }
@@ -6981,6 +7003,7 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::Unowned: return "";
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
+  case ResultConvention::Pack: return "@pack_out ";
   }
   llvm_unreachable("bad result convention");
 }
