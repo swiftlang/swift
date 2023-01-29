@@ -337,9 +337,16 @@ extension Unsafe${Mutable}RawBufferPointer {
       _ = $0.initializeMemory(as: UInt8.self, repeating: element)
     }
 
+    var word7f = UInt(0)
+    withUnsafeMutableBytes(of: &word7f) {
+      _ = $0.initializeMemory(as: UInt8.self, repeating: 0x7f)
+    }
+
     while (i &+ stride) <= endIndex {
       let word = ptr.load(fromByteOffset: i, as: UInt.self)
-      guard word ^ mask == 0 else { break }
+      let input = word ^ mask
+      let tmp = (input & word7f) + word7f
+      guard ~(tmp | input | word7f) == 0 else { break }
       i &+= stride
     }
 
