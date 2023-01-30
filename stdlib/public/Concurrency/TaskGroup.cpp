@@ -1080,6 +1080,15 @@ static void _enqueueCompletedTask(NaiveTaskGroupQueue<ReadyQueueItem> *readyQueu
   readyQueue->enqueue(readyItem);
 }
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+static void _enqueueRawError(DiscardingTaskGroup *group,
+                             NaiveTaskGroupQueue<ReadyQueueItem> *readyQueue,
+                             SwiftError *error) {
+  auto readyItem = ReadyQueueItem::getRawError(group, error);
+  readyQueue->enqueue(readyItem);
+}
+#endif
+
 // TaskGroup is locked upon entry and exit
 void AccumulatingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
   // Retain the task while it is in the queue; it must remain alive until
