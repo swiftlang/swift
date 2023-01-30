@@ -5968,7 +5968,7 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
   if (auto opaqueElt =
           locator->findLast<LocatorPathElt::OpenedOpaqueArchetype>()) {
     auto *opaqueDecl = opaqueElt->getDecl();
-    emitDiagnostic(diag::cannot_infer_concrete_for_opaque_result,
+    emitDiagnostic(diag::cannot_infer_underlying_for_opaque_result,
                    opaqueDecl->getDeclaredInterfaceType());
     return true;
   }
