@@ -339,19 +339,24 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
   size_t genericRefCountSize = 0;
   while (true) {
-    const auto tagAndIdx = readBytes<uint64_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndIdx >> 56);
-    const auto index = tagAndIdx & ~(0xffULL << 56);
+    const auto tagAndOffset = readBytes<uint64_t>(layoutStr, offset);
+    const auto tag = (uint8_t)(tagAndOffset >> 56);
 
     if (tag == 0) {
       break;
-    } else if (tag == 2) {
-      offset += 4;
-      const Metadata *genericType = getGenericArgs(type)[index];
+    } else {
+      const Metadata *genericType;
+      if (tag == 2) {
+        auto index = readBytes<uint32_t>(layoutStr, offset);
+        genericType = getGenericArgs(type)[index];
+      } else {
+        genericType = getResilientTypeMetadata(type, layoutStr, offset);
+      }
+
       if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
                    // {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
-        size_t countOffset = 25;
+        size_t countOffset = 0;
         genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
       } else if (genericType->isClassObject()) {
         genericRefCountSize += sizeof(uint64_t);
@@ -372,17 +377,16 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
   size_t instancedLayoutStrOffset = layoutStringHeaderSize;
   size_t skipBytes = 0;
   while (true) {
-    const auto tagAndIdx = readBytes<uint64_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndIdx >> 56);
-    const auto index = tagAndIdx & ~(0xffULL << 56);
+    const auto tagAndOffset = readBytes<uint64_t>(layoutStr, offset);
+    const auto tag = (uint8_t)(tagAndOffset >> 56);
+    const auto sizeOrOffset = tagAndOffset & ~(0xffULL << 56);
 
     if (tag == 0) {
       break;
     } else if (tag == 1) {
-      memcpy((void *)(instancedLayoutStr + instancedLayoutStrOffset),
-             (void *)(layoutStr + layoutStrOffset), index);
-      layoutStrOffset += index;
-      instancedLayoutStrOffset += index;
+      memcpy((void*)(instancedLayoutStr + instancedLayoutStrOffset), (void*)(layoutStr + layoutStrOffset), sizeOrOffset);
+      layoutStrOffset += sizeOrOffset;
+      instancedLayoutStrOffset += sizeOrOffset;
       if (skipBytes) {
         size_t firstRCOffset = instancedLayoutStrOffset;
         auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
@@ -390,9 +394,16 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
         writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
         skipBytes = 0;
       }
-    } else if (tag == 2) {
-      skipBytes += readBytes<size_t>(layoutStr, offset);
-      const Metadata *genericType = getGenericArgs(type)[index];
+    } else {
+      skipBytes += sizeOrOffset;
+      const Metadata *genericType;
+      if (tag == 2) {
+        auto index = readBytes<uint32_t>(layoutStr, offset);
+        genericType = getGenericArgs(type)[index];
+      } else {
+        genericType = getResilientTypeMetadata(type, layoutStr, offset);
+      }
+
       if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
                    // {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();

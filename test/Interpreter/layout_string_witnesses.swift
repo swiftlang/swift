@@ -278,7 +278,7 @@ testExistential()
 
 public struct ResilientWrapper {
     let x: SimpleResilient
-    let y: Int = 2
+    let y: Int
 }
 
 func testResilient() {
@@ -286,7 +286,7 @@ func testResilient() {
     
     do {
         let x = TestClass()
-        testInit(ptr, to: ResilientWrapper(x: SimpleResilient(x: 23, y: x)))
+        testInit(ptr, to: ResilientWrapper(x: SimpleResilient(x: 23, y: x), y: 5))
     }
 
     do {
@@ -295,7 +295,7 @@ func testResilient() {
         print("Before deinit")
 
         // CHECK-NEXT: TestClass deinitialized!
-        testAssign(ptr, from: ResilientWrapper(x: SimpleResilient(x: 23, y: y)))
+        testAssign(ptr, from: ResilientWrapper(x: SimpleResilient(x: 23, y: y), y: 7))
     }
 
     // CHECK-NEXT: Before deinit

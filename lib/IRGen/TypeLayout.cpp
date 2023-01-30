@@ -79,6 +79,7 @@ private:
     enum Type : uint8_t {
       Copy = 1,
       Param = 2,
+      Resilient = 3,
     };
 
     Type type;
@@ -88,10 +89,15 @@ private:
         size_t offset;
         uint32_t idx;
       } generic;
+      struct {
+        size_t offset;
+        llvm::Function *metaTypeRef;
+      } resilient;
     };
   };
 
   std::vector<RefCounting> refCountings;
+  bool containsGenerics = false;
 
 public:
   LayoutStringBuilder() = default;
@@ -118,16 +124,21 @@ public:
     refCountings.push_back(op);
   }
 
+  void addGenericResilientRefCount(llvm::Function *metaTypeRef) {
+    RefCounting op;
+    op.kind = RefCountingKind::Resilient;
+    op.metaTypeRef = metaTypeRef;
+    refCountings.push_back(op);
+    containsGenerics = true;
+  }
+
   void addGenericRefCount(uint32_t genericIdx) {
     RefCounting op;
     op.kind = RefCountingKind::Generic;
     op.genericIdx = genericIdx;
     refCountings.push_back(op);
+    containsGenerics = true;
   }
-
-  // void addSinglePayloadEnumRefCount(size_t size, ) {
-
-  // }
 
   void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
     auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
@@ -155,21 +166,25 @@ public:
 
         skip = 0;
       } else if (refCounting.kind == RefCountingKind::Resilient) {
-        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
-        B.addInt64(op);
-        B.addCompactFunctionReference(refCounting.metaTypeRef);
+        if (containsGenerics) {
+          GenericInstOp op;
+          op.type = GenericInstOp::Type::Resilient;
+          op.resilient = {skip, refCounting.metaTypeRef};
 
-        // TODO: adjust for metatypes and proper target size_t
-        instCopyBytes += 12;
-        refCountBytes += 12;
+          genericInstOps.push_back(op);
+        } else {
+          uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+          B.addInt64(op);
+          B.addCompactFunctionReference(refCounting.metaTypeRef);
+          instCopyBytes += sizeof(uint64_t) + sizeof(uint32_t);
+          refCountBytes += sizeof(uint64_t) + sizeof(uint32_t);
+        }
 
         skip = 0;
       } else {
-        // TODO: handle 32 bit platforms
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
 
-        // TODO: adjust for metatypes and proper target size_t
         instCopyBytes += 8;
         refCountBytes += 8;
 
@@ -195,9 +210,15 @@ public:
           break;
         }
         case GenericInstOp::Type::Param: {
-          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.generic.idx;
+          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.generic.offset;
           B.addInt64(op);
-          B.addSize(Size(genOp.generic.offset));
+          B.addInt32(genOp.generic.idx);
+          break;
+        }
+        case GenericInstOp::Type::Resilient: {
+          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.resilient.offset;
+          B.addInt64(op);
+          B.addCompactFunctionReference(genOp.resilient.metaTypeRef);
           break;
         }
         }
@@ -205,7 +226,7 @@ public:
     }
 
     // NUL terminator
-    B.addInt(IGM.Int8Ty, 0);
+    B.addInt64(0);
   }
 };
 }
@@ -270,7 +291,8 @@ static std::string scalarToString(ScalarKind kind) {
   }
 }
 
-llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty) {
+llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
+                                               bool &isGeneric) {
   auto *nominal = ty.getNominalOrBoundGenericNominal();
 
   IRGenMangler mangler;
@@ -298,6 +320,7 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty) {
 
   MetadataResponse response;
   if (auto *boundGenericTy = ty.getASTType()->getAs<BoundGenericType>()) {
+    isGeneric = true;
     auto generics = boundGenericTy->getGenericArgs();
     llvm::SmallVector<llvm::Value *, 4> typeParams;
     for (auto generic : generics) {
@@ -3228,8 +3251,13 @@ llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
 bool ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                               LayoutStringBuilder &B) const {
-  auto *accessor = createMetatypeAccessorFunction(IGM, ty);
-  B.addResilientRefCount(accessor);
+  bool isGeneric = false;
+  auto *accessor = createMetatypeAccessorFunction(IGM, ty, isGeneric);
+  if (isGeneric) {
+    B.addGenericResilientRefCount(accessor);
+  } else {
+    B.addResilientRefCount(accessor);
+  }
   return true;
 }
 
