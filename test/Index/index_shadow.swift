@@ -4,7 +4,6 @@
 // The index will output references to the shadowed-declaration rather than
 // the one defined by the shorthand if-let or capture. It also skips
 // outputting the shadowing-definiiton since it would then have no references.
-
 struct ShadowedTest {
   // CHECK: [[@LINE+1]]:7 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Def
   let shadowedVar: Int?? = 1
@@ -54,6 +53,18 @@ struct ShadowedTest {
       _ = { [shadowedVar] in
         // CHECK: [[@LINE+1]]:13 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
         _ = shadowedVar
+      }
+    }
+  }
+
+  func nestedFuncTest() {
+    // CHECK: [[@LINE+1]]:10 {{.*}} s:14swift_ide_test12ShadowedTestV010nestedFuncE0yyF08shadowedG0L_yyF {{.*}}Def
+    func shadowedFunc() {
+      // CHECK-NOT: [[@LINE+2]]:14 {{.*}} shadowedFunc {{.*}}Def
+      // CHECK: [[@LINE+1]]:14 {{.*}} s:14swift_ide_test12ShadowedTestV010nestedFuncE0yyF08shadowedG0L_yyF {{.*}}Ref
+      _ = { [shadowedFunc] in
+        // CHECK: [[@LINE+1]]:13 {{.*}} s:14swift_ide_test12ShadowedTestV010nestedFuncE0yyF08shadowedG0L_yyF {{.*}}Ref
+        _ = shadowedFunc
       }
     }
   }
