@@ -51,7 +51,7 @@ static float fromEncoding(unsigned int e) {
 
 #if (defined(__i386__) || defined(__x86_64__)) &&                               \
     !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
-static long double fromEncoding(__uint128 hf) {
+static long double fromEncoding(__uint128_t hf) {
   long double ld;
   __builtin_memcpy(&ld, &hf, sizeof ld);
   return ld;
