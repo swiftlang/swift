@@ -942,8 +942,6 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
     if (!ReferencedVar)
       continue;
 
-    assert(DeclaredVar->getName() == ReferencedVar->getName());
-
     Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
   }
   return Result;
@@ -970,7 +968,6 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
     Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
       if (DeclaredVar->getLoc() != Init->getLoc())
         return;
-      assert(DeclaredVar->getName() == ReferencedVar->getName());
       Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
     });
   }
